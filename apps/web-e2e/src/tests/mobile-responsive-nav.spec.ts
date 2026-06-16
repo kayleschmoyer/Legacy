@@ -10,9 +10,12 @@
  *
  * Tests use viewport resizing to simulate mobile/desktop breakpoints.
  * No GraphQL mocking needed — tests run against /about (no async data).
+ *
+ * Header interactions go through the `navHeader` component (ADR-0015) — specs
+ * own navigation and viewport, never header selectors.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 
 const MOBILE_VIEWPORT = { width: 375, height: 812 };
 const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
@@ -20,26 +23,26 @@ const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
 // ── Hamburger button visibility ────────────────────────────────────────────
 
 test.describe('Mobile hamburger button @smoke', () => {
-  test('is visible on narrow mobile viewport @smoke', async ({ page }) => {
+  test('is visible on narrow mobile viewport @smoke', async ({
+    page,
+    navHeader,
+  }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const hamburger = page.getByRole('button', {
-      name: /open menu|close menu/i,
-    });
-    await expect(hamburger).toBeVisible({ timeout: 15000 });
+    await navHeader.expectHamburgerVisible();
   });
 
-  test('is not visible on wide desktop viewport @smoke', async ({ page }) => {
+  test('is not visible on wide desktop viewport @smoke', async ({
+    page,
+    navHeader,
+  }) => {
     await page.setViewportSize(DESKTOP_VIEWPORT);
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    const hamburger = page.getByRole('button', {
-      name: /open menu|close menu/i,
-    });
-    await expect(hamburger).not.toBeVisible({ timeout: 15000 });
+    await navHeader.expectHamburgerHidden();
   });
 });
 
@@ -52,96 +55,77 @@ test.describe('Mobile navigation panel @critical', () => {
     await page.waitForLoadState('load');
   });
 
-  test('opens when hamburger is clicked @critical', async ({ page }) => {
-    const hamburger = page.getByRole('button', { name: /open menu/i });
-    await hamburger.click();
-
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav).toBeVisible({ timeout: 10000 });
+  test('opens when hamburger is clicked @critical', async ({ navHeader }) => {
+    await navHeader.openMobileMenu();
+    await navHeader.expectMobileMenuVisible();
   });
 
   test('hamburger label changes to "Close menu" when open @critical', async ({
-    page,
+    navHeader,
   }) => {
-    const openBtn = page.getByRole('button', { name: /open menu/i });
-    await openBtn.click();
-    await expect(page.getByRole('button', { name: /close menu/i })).toBeVisible(
-      { timeout: 10000 },
-    );
+    await navHeader.openMobileMenu();
+    await navHeader.expectCloseButtonVisible();
   });
 
-  test('closes when hamburger clicked again @critical', async ({ page }) => {
-    const openBtn = page.getByRole('button', { name: /open menu/i });
-    await openBtn.click();
-
-    const closeBtn = page.getByRole('button', { name: /close menu/i });
-    await closeBtn.click();
-
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav).not.toBeVisible({ timeout: 10000 });
+  test('closes when hamburger clicked again @critical', async ({
+    navHeader,
+  }) => {
+    await navHeader.openMobileMenu();
+    await navHeader.closeMobileMenu();
+    await navHeader.expectMobileMenuHidden();
   });
 
-  test('aria-expanded is false initially @regression', async ({ page }) => {
-    const hamburger = page.getByRole('button', { name: /open menu/i });
-    await expect(hamburger).toHaveAttribute('aria-expanded', 'false');
+  test('aria-expanded is false initially @regression', async ({
+    navHeader,
+  }) => {
+    await navHeader.expectCollapsed();
   });
 
   test('aria-expanded is true when menu is open @regression', async ({
-    page,
+    navHeader,
   }) => {
-    const hamburger = page.getByRole('button', { name: /open menu/i });
-    await hamburger.click();
-
-    const closeBtn = page.getByRole('button', { name: /close menu/i });
-    await expect(closeBtn).toHaveAttribute('aria-expanded', 'true');
+    await navHeader.openMobileMenu();
+    await navHeader.expectExpanded();
   });
 });
 
 // ── Mobile panel link content ──────────────────────────────────────────────
 
 test.describe('Mobile panel navigation links @critical', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, navHeader }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto('/about');
     await page.waitForLoadState('load');
 
     // Open the menu
-    await page.getByRole('button', { name: /open menu/i }).click();
-    await expect(page.getByRole('navigation', { name: /mobile/i })).toBeVisible(
-      { timeout: 10000 },
-    );
+    await navHeader.openMobileMenu();
+    await navHeader.expectMobileMenuVisible();
   });
 
-  test('shows Leagues section heading @critical', async ({ page }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/^leagues$/i).first()).toBeVisible();
+  test('shows Leagues section heading @critical', async ({ navHeader }) => {
+    await navHeader.expectMobileMenuItem(/^leagues$/i);
   });
 
-  test('shows Players link @critical', async ({ page }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/^players$/i)).toBeVisible();
+  test('shows Players link @critical', async ({ navHeader }) => {
+    await navHeader.expectMobileMenuItem(/^players$/i);
   });
 
-  test('shows Minigames link @critical', async ({ page }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/minigames/i)).toBeVisible();
+  test('shows Minigames link @critical', async ({ navHeader }) => {
+    await navHeader.expectMobileMenuItem(/minigames/i);
   });
 
-  test('shows Stats link @regression', async ({ page }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/^stats$/i)).toBeVisible();
+  test('shows Stats link @regression', async ({ navHeader }) => {
+    await navHeader.expectMobileMenuItem(/^stats$/i);
   });
 
   test('shows Help & support link in You section @regression', async ({
-    page,
+    navHeader,
   }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/help.*support/i)).toBeVisible();
+    await navHeader.expectMobileMenuItem(/help.*support/i);
   });
 
-  test('shows You section heading @regression', async ({ page }) => {
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav.getByText(/^you$/i)).toBeVisible();
+  test('shows You section heading @regression', async ({ navHeader }) => {
+    await navHeader.expectMobileMenuItem(/^you$/i);
   });
 });
 
@@ -150,21 +134,19 @@ test.describe('Mobile panel navigation links @critical', () => {
 test.describe('Mobile panel interaction: close on link click @regression', () => {
   test('panel closes when Players link is clicked @regression', async ({
     page,
+    navHeader,
   }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto('/about');
     await page.waitForLoadState('load');
 
-    await page.getByRole('button', { name: /open menu/i }).click();
-    const mobileNav = page.getByRole('navigation', { name: /mobile/i });
-    await expect(mobileNav).toBeVisible({ timeout: 10000 });
+    await navHeader.openMobileMenu();
+    await navHeader.expectMobileMenuVisible();
 
-    await mobileNav.getByText(/^players$/i).click();
+    await navHeader.clickMobileMenuItem(/^players$/i);
     await expect(page).toHaveURL('/players');
 
     // Menu should close after clicking a link
-    await expect(
-      page.getByRole('navigation', { name: /mobile/i }),
-    ).not.toBeVisible({ timeout: 10000 });
+    await navHeader.expectMobileMenuHidden();
   });
 });

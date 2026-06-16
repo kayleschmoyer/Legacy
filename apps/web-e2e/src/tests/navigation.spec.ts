@@ -5,9 +5,12 @@
  * asynchronous data loading.  All tests navigate to a stable page
  * (e.g. /about or /baseball/league/create) so the header is always
  * present and the assertions are deterministic.
+ *
+ * Header interactions go through the `navHeader` component (ADR-0015) — specs
+ * own navigation and viewport, never header selectors.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 
 test.describe('Navigation Header @smoke', () => {
   test.beforeEach(async ({ page }) => {
@@ -16,97 +19,61 @@ test.describe('Navigation Header @smoke', () => {
     await page.waitForLoadState('load');
   });
 
-  test('renders the Legacy Sports logo/home link', async ({ page }) => {
-    // The header contains a link back to the homepage
-    const homeLink = page.locator('a[href="/"]').first();
-    await expect(homeLink).toBeVisible();
-
-    // The logo image must be present in the header branding
-    const logoImg = page.getByTestId('header-logo');
-    await expect(logoImg).toBeVisible();
-    await expect(logoImg).toHaveAttribute('src', '/logo.png');
-    await expect(logoImg).toHaveAttribute('alt', 'Legacy Sports');
+  test('renders the Legacy Sports logo/home link', async ({ navHeader }) => {
+    // Home link + logo image visible, pointing at the branded asset.
+    await navHeader.expectLogo();
   });
 
-  test('logo link navigates to the homepage', async ({ page }) => {
-    await page.locator('a[href="/"]').first().click();
-    await page.waitForLoadState('load');
+  test('logo link navigates to the homepage', async ({ page, navHeader }) => {
+    await navHeader.clickLogo();
     await expect(page).toHaveURL('/');
   });
 
-  test('renders primary navigation with expected items', async ({ page }) => {
+  test('renders primary navigation with expected items', async ({
+    navHeader,
+  }) => {
     // Navigation uses role="navigation" aria-label="Primary"
-    const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    await expect(primaryNav).toBeVisible();
+    await navHeader.expectPrimaryNavVisible();
     // Nav contains pill-tab links for Players, Stats, and Minigames
-    await expect(
-      primaryNav.getByRole('link', { name: /^players$/i }),
-    ).toBeVisible();
-    await expect(
-      primaryNav.getByRole('link', { name: /^stats$/i }),
-    ).toBeVisible();
-    await expect(
-      primaryNav.getByRole('link', { name: /^minigames$/i }),
-    ).toBeVisible();
+    await navHeader.expectNavItem(/^players$/i);
+    await navHeader.expectNavItem(/^stats$/i);
+    await navHeader.expectNavItem(/^minigames$/i);
   });
 
-  test('shows user profile area in header', async ({ page }) => {
-    // The header uses 'banner' landmark role
-    const header = page.getByRole('banner');
-    await expect(header).toBeVisible();
+  test('shows user profile area in header', async ({ navHeader }) => {
+    // The header uses the 'banner' landmark role
+    await navHeader.expectVisible();
   });
 
   test('mobile hamburger button is visible on narrow viewport', async ({
-    page,
+    navHeader,
   }) => {
     // Resize to mobile viewport and reload so Tamagui responsive styles apply
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.reload();
-    await page.waitForLoadState('load');
-
-    const hamburger = page.getByRole('button', {
-      name: /open menu|close menu/i,
-    });
-    await expect(hamburger).toBeVisible();
+    await navHeader.goMobile();
+    await navHeader.expectHamburgerVisible();
   });
 
-  test('mobile menu opens and shows navigation links', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.reload();
-    await page.waitForLoadState('load');
-
-    const hamburger = page.getByRole('button', { name: /open menu/i });
-    await hamburger.click();
+  test('mobile menu opens and shows navigation links', async ({
+    navHeader,
+  }) => {
+    await navHeader.goMobile();
+    await navHeader.openMobileMenu();
 
     // Mobile panel should show main navigation links
-    const mobileNav = page.getByRole('navigation', {
-      name: /mobile navigation/i,
-    });
-    await expect(mobileNav.getByText(/players/i).first()).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(mobileNav.getByText(/minigames/i).first()).toBeVisible({
-      timeout: 10000,
-    });
+    await navHeader.expectMobileMenuItem(/players/i);
+    await navHeader.expectMobileMenuItem(/minigames/i);
   });
 
-  test('mobile menu closes after toggle', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.reload();
-    await page.waitForLoadState('load');
+  test('mobile menu closes after toggle', async ({ navHeader }) => {
+    await navHeader.goMobile();
+    await navHeader.openMobileMenu();
 
-    const hamburger = page.getByRole('button', { name: /open menu/i });
-    await hamburger.click();
+    // The drawer exposes a "Close menu" button while open
+    await navHeader.expectCloseButtonVisible();
 
-    // The button label changes to "close menu"
-    const closeButton = page.getByRole('button', { name: /close menu/i });
-    await expect(closeButton).toBeVisible({ timeout: 10000 });
+    await navHeader.closeMobileMenu();
 
-    await closeButton.click();
-
-    // After closing, the button reverts to "open menu"
-    await expect(page.getByRole('button', { name: /open menu/i })).toBeVisible({
-      timeout: 10000,
-    });
+    // After closing, the hamburger (open-menu) button is visible again
+    await navHeader.expectHamburgerVisible();
   });
 });

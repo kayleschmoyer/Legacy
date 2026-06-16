@@ -6,7 +6,8 @@ import {
   unauthTest as authUnauthTest,
   expect,
 } from './auth-enhanced';
-import { DraftPage, LeaguePage, NavigationPage, PlayersPage } from '../pages';
+import { DraftPage, LeaguePage, PlayersPage } from '../pages';
+import { NavHeader } from '../components';
 
 /**
  * Page-object injection layer (ADR-0015 §5).
@@ -26,7 +27,12 @@ export interface PageObjectFixtures {
   draftPage: DraftPage;
   leaguePage: LeaguePage;
   playersPage: PlayersPage;
-  navigationPage: NavigationPage;
+  /**
+   * The persistent header / nav bar. A component (not a page object) composed
+   * here scoped to the `banner` landmark — present on every authenticated
+   * route (ADR-0015 §2).
+   */
+  navHeader: NavHeader;
 }
 
 /**
@@ -53,18 +59,18 @@ const pageObjects = {
   ) => {
     await use(new PlayersPage(page));
   },
-  navigationPage: async (
+  navHeader: async (
     { page }: { page: Page },
-    use: (pageObject: NavigationPage) => Promise<void>,
+    use: (component: NavHeader) => Promise<void>,
   ) => {
-    await use(new NavigationPage(page));
+    await use(new NavHeader(page.getByRole('banner')));
   },
 };
 
 /**
  * Default authenticated test with page objects injected. Drop-in replacement
  * for the `test` exported from `auth-enhanced` — same isolation, now with
- * `{ draftPage, leaguePage, playersPage, navigationPage }`.
+ * `{ draftPage, leaguePage, playersPage, navHeader }`.
  */
 export const test = authTest.extend<PageObjectFixtures>(pageObjects);
 
