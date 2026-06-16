@@ -1,5 +1,8 @@
 import React from 'react';
-import { DraftPlayerBoard } from './DraftPlayerBoard';
+import {
+  depthChartSlotForPosition,
+  DraftPlayerBoard,
+} from './DraftPlayerBoard';
 import type { DraftPlayer } from './types';
 import { render } from '../../test-utils';
 
@@ -89,5 +92,70 @@ describe('DraftPlayerBoard — sport-aware stat headers (LS-4662)', () => {
     expect(getByText('FG')).toBeTruthy();
     expect(queryByText('AVG')).toBeNull();
     expect(queryByText('WAR')).toBeNull();
+  });
+});
+
+describe('depthChartSlotForPosition (LS-8069)', () => {
+  it('collapses granular pitcher positions to the P slot', () => {
+    expect(depthChartSlotForPosition('SP')).toBe('P');
+    expect(depthChartSlotForPosition('RP')).toBe('P');
+    expect(depthChartSlotForPosition('P')).toBe('P');
+  });
+
+  it('collapses granular outfield positions to the OF slot', () => {
+    expect(depthChartSlotForPosition('CF')).toBe('OF');
+    expect(depthChartSlotForPosition('LF')).toBe('OF');
+    expect(depthChartSlotForPosition('RF')).toBe('OF');
+    expect(depthChartSlotForPosition('OF')).toBe('OF');
+  });
+
+  it('passes infield positions through unchanged and handles missing values', () => {
+    expect(depthChartSlotForPosition('SS')).toBe('SS');
+    expect(depthChartSlotForPosition('1B')).toBe('1B');
+    expect(depthChartSlotForPosition('UTIL')).toBe('UTIL');
+    expect(depthChartSlotForPosition(undefined)).toBeUndefined();
+    expect(depthChartSlotForPosition('')).toBeUndefined();
+  });
+});
+
+describe('DraftPlayerBoard — depth chart slot assignment (LS-8069)', () => {
+  const pitcher = (
+    id: number,
+    name: string,
+    position: string,
+  ): DraftPlayer => ({
+    ...basePlayer(),
+    id,
+    name,
+    position,
+  });
+
+  it('shows drafted pitchers in the P slot, not UTIL', () => {
+    // Reproduces the report: 4 pitchers (SP/RP) + 2 OF drafted, but the depth
+    // chart hid pitchers and filled UTIL because of exact position matching.
+    const myTeam: DraftPlayer[] = [
+      pitcher(101, 'Ace Starter', 'SP'),
+      pitcher(102, 'Reliable Reliever', 'RP'),
+      pitcher(103, 'Second Starter', 'SP'),
+      pitcher(104, 'Closer Guy', 'RP'),
+      { ...basePlayer(), id: 201, name: 'Center Fielder', position: 'CF' },
+      { ...basePlayer(), id: 202, name: 'Right Fielder', position: 'OF' },
+    ];
+
+    const { getByText, getAllByText } = render(
+      <DraftPlayerBoard {...makeProps({ viewMode: 'depth', myTeam })} />,
+    );
+
+    // All four pitchers and both outfielders render (no player is dropped).
+    expect(getByText('Ace Starter')).toBeTruthy();
+    expect(getByText('Reliable Reliever')).toBeTruthy();
+    expect(getByText('Second Starter')).toBeTruthy();
+    expect(getByText('Closer Guy')).toBeTruthy();
+    expect(getByText('Center Fielder')).toBeTruthy();
+    expect(getByText('Right Fielder')).toBeTruthy();
+
+    // Both UTIL slots stay empty — pitchers no longer spill into them.
+    // UTIL has 2 slots; with no eligible UTIL-only players both read "Empty".
+    expect(getAllByText('Empty').length).toBeGreaterThanOrEqual(2);
   });
 });

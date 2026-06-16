@@ -33,6 +33,30 @@ const DEPTH_SLOTS: Array<{ pos: string; label: string; slots: number }> = [
   { pos: 'U', label: 'UTIL', slots: 2 },
 ];
 
+// Dedicated (non-UTIL) depth-chart slot keys. A drafted player whose canonical
+// slot is one of these fills that slot; anything else falls through to UTIL.
+const DEDICATED_DEPTH_SLOTS = ['C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
+
+const DEPTH_OUTFIELD_POSITIONS = new Set(['OF', 'CF', 'LF', 'RF']);
+const DEPTH_PITCHER_POSITIONS = new Set(['P', 'SP', 'RP']);
+
+/**
+ * Map a drafted player's granular eligible position (e.g. 'SP', 'RP', 'CF') to
+ * its canonical depth-chart slot key ('P', 'OF', ...). `myTeam` players carry
+ * the first entry of `eligiblePositions`, which can be a specific pitcher or
+ * outfield position that never equals the canonical slot key — so an exact
+ * match dropped pitchers from the 'P' slot and spilled them into UTIL. Mirrors
+ * the normalization used by `positionCounts` in usePlayerData. (LS-8069)
+ */
+export const depthChartSlotForPosition = (
+  position?: string,
+): string | undefined => {
+  if (!position) return undefined;
+  if (DEPTH_OUTFIELD_POSITIONS.has(position)) return 'OF';
+  if (DEPTH_PITCHER_POSITIONS.has(position)) return 'P';
+  return position;
+};
+
 type ViewMode = 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
 type SortKey = string;
 type SortDir = 'asc' | 'desc';
@@ -567,16 +591,12 @@ export function DraftPlayerBoard({
           <div className="d-depth-grid">
             {DEPTH_SLOTS.map(({ pos, label, slots }) => {
               const drafted = myTeam
-                .filter((p) =>
-                  pos === 'U'
-                    ? !(
-                        p.position &&
-                        ['C', '1B', '2B', '3B', 'SS', 'OF', 'P'].includes(
-                          p.position,
-                        )
-                      )
-                    : p.position === pos,
-                )
+                .filter((p) => {
+                  const slotPos = depthChartSlotForPosition(p.position);
+                  return pos === 'U'
+                    ? !(slotPos && DEDICATED_DEPTH_SLOTS.includes(slotPos))
+                    : slotPos === pos;
+                })
                 .slice(0, slots);
               const posColor = getPositionColor('baseball', pos);
               return (
