@@ -13,6 +13,7 @@ import {
   Text,
   TextInput,
   type TextStyle,
+  useWindowDimensions,
   View,
   type ViewProps,
   type ViewStyle,
@@ -1280,6 +1281,99 @@ const SEASON_PITCHING_HEADERS = [
   'WHIP',
 ] as const;
 
+// Below this viewport width the season tables (which need ~580/480px to lay out
+// without truncation) are rendered as a stacked card list instead of a
+// horizontally-scrolling table. Inner horizontal scroll inside the outer-scroll
+// page is a known mobile-touch pain point; on iPhone SE width (~375px) the table
+// is unreadable without scrolling (LS-7035). The 480px threshold matches the
+// ticket's "stack table vertically below ~480px" recommendation.
+export const SEASON_STACK_BREAKPOINT = 480;
+
+/**
+ * Whether the season breakdown should render as a stacked card list rather than
+ * a horizontally-scrolling table. Pure so the layout decision is unit-testable.
+ */
+export function isNarrowSeasonViewport(width: number): boolean {
+  return width < SEASON_STACK_BREAKPOINT;
+}
+
+/**
+ * Card-list rendering of season stats for narrow viewports. Each season is a
+ * card with the year as its heading and the remaining stats as wrapping
+ * label/value pairs, removing the inner horizontal scroll the table requires.
+ */
+function SeasonCardList({
+  rows,
+  headers,
+  accent,
+  label,
+}: {
+  rows: string[][];
+  headers: readonly string[];
+  accent: string;
+  label: string;
+}) {
+  return (
+    <View role="list" aria-label={label} style={{ gap: 10 }}>
+      {rows.map((cells, idx) => (
+        <View
+          key={`${cells[0]}-${idx}`}
+          role="listitem"
+          style={{
+            borderWidth: 1,
+            borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.25),
+            borderRadius: 12,
+            padding: 12,
+            backgroundColor: withAlpha(BG_DARK, 0.35),
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: '800',
+              fontSize: 16,
+              color: accent,
+              marginBottom: 8,
+            }}
+          >
+            {cells[0]}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            {headers.slice(1).map((header, i) => (
+              <View key={header} style={{ minWidth: 56 }}>
+                <Text
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: '700',
+                    fontSize: 10,
+                    letterSpacing: 1.4,
+                    textTransform: 'uppercase',
+                    color: TEXT_MUTED,
+                    marginBottom: 2,
+                  }}
+                >
+                  {header}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: '600',
+                    fontSize: 14,
+                    color: WHITE,
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {cells[i + 1]}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function SeasonCell({
   value,
   isFirst,
@@ -1412,6 +1506,45 @@ function SeasonBattingBlock({
 
   const pitchingRows = useMemo(() => selectSeasonPitchingRows(data), [data]);
 
+  // Pre-format each season into a flat cell array so the table and the
+  // narrow-viewport card list share one source of values (LS-7035).
+  const battingCellRows = useMemo(
+    () =>
+      rows.map((r) => [
+        String(r?.season ?? '—'),
+        fmt(r?.games),
+        fmt(r?.plateAppearances),
+        fmt(r?.atBats),
+        fmt(r?.hits),
+        fmt(r?.homeRuns),
+        fmt(r?.rbi),
+        fmt(r?.stolenBases),
+        fmtAvg(r?.battingAverage),
+        fmtAvg(r?.onBasePercentage),
+        fmtAvg(r?.sluggingPercentage),
+      ]),
+    [rows],
+  );
+
+  const pitchingCellRows = useMemo(
+    () =>
+      pitchingRows.map((r) => [
+        String(r?.season ?? '—'),
+        fmt(r?.games),
+        fmt(r?.wins),
+        fmt(r?.losses),
+        fmtEra(r?.earnedRunAverage),
+        r?.inningsPitched != null ? r.inningsPitched.toFixed(1) : '—',
+        fmt(r?.strikeouts),
+        fmt(r?.baseOnBalls),
+        r?.whip != null ? r.whip.toFixed(2) : '—',
+      ]),
+    [pitchingRows],
+  );
+
+  const { width } = useWindowDimensions();
+  const stack = isNarrowSeasonViewport(width);
+
   return (
     <View
       aria-label={`Seasons for ${player.name}`}
@@ -1463,47 +1596,44 @@ function SeasonBattingBlock({
         </View>
       ) : null}
 
-      {!loading && rows.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <YStack
-            tag="table"
-            role="table"
-            aria-label={`Season batting for ${player.name}`}
-            minWidth={580}
-          >
-            <YStack tag="thead" role="rowgroup">
-              <SeasonRow
-                cells={[...SEASON_BATTING_HEADERS]}
-                accent={accent}
-                isHeader
-              />
-            </YStack>
-            <YStack tag="tbody" role="rowgroup">
-              {rows.map((r, idx) => (
+      {!loading && battingCellRows.length > 0 ? (
+        stack ? (
+          <SeasonCardList
+            label={`Season batting for ${player.name}`}
+            headers={SEASON_BATTING_HEADERS}
+            rows={battingCellRows}
+            accent={accent}
+          />
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <YStack
+              tag="table"
+              role="table"
+              aria-label={`Season batting for ${player.name}`}
+              minWidth={580}
+            >
+              <YStack tag="thead" role="rowgroup">
                 <SeasonRow
-                  key={`${r?.season}-${idx}`}
+                  cells={[...SEASON_BATTING_HEADERS]}
                   accent={accent}
-                  cells={[
-                    String(r?.season ?? '—'),
-                    fmt(r?.games),
-                    fmt(r?.plateAppearances),
-                    fmt(r?.atBats),
-                    fmt(r?.hits),
-                    fmt(r?.homeRuns),
-                    fmt(r?.rbi),
-                    fmt(r?.stolenBases),
-                    fmtAvg(r?.battingAverage),
-                    fmtAvg(r?.onBasePercentage),
-                    fmtAvg(r?.sluggingPercentage),
-                  ]}
+                  isHeader
                 />
-              ))}
+              </YStack>
+              <YStack tag="tbody" role="rowgroup">
+                {battingCellRows.map((cells, idx) => (
+                  <SeasonRow
+                    key={`${cells[0]}-${idx}`}
+                    accent={accent}
+                    cells={cells}
+                  />
+                ))}
+              </YStack>
             </YStack>
-          </YStack>
-        </ScrollView>
+          </ScrollView>
+        )
       ) : null}
 
-      {!loading && pitchingRows.length > 0 ? (
+      {!loading && pitchingCellRows.length > 0 ? (
         <View style={{ marginTop: 16 }}>
           <Text
             style={{
@@ -1518,43 +1648,40 @@ function SeasonBattingBlock({
           >
             Pitching
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <YStack
-              tag="table"
-              role="table"
-              aria-label={`Season pitching for ${player.name}`}
-              minWidth={480}
-            >
-              <YStack tag="thead" role="rowgroup">
-                <SeasonRow
-                  cells={[...SEASON_PITCHING_HEADERS]}
-                  accent={accent}
-                  isHeader
-                />
-              </YStack>
-              <YStack tag="tbody" role="rowgroup">
-                {pitchingRows.map((r, idx) => (
+          {stack ? (
+            <SeasonCardList
+              label={`Season pitching for ${player.name}`}
+              headers={SEASON_PITCHING_HEADERS}
+              rows={pitchingCellRows}
+              accent={accent}
+            />
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <YStack
+                tag="table"
+                role="table"
+                aria-label={`Season pitching for ${player.name}`}
+                minWidth={480}
+              >
+                <YStack tag="thead" role="rowgroup">
                   <SeasonRow
-                    key={`${r?.season}-${idx}`}
+                    cells={[...SEASON_PITCHING_HEADERS]}
                     accent={accent}
-                    cells={[
-                      String(r?.season ?? '—'),
-                      fmt(r?.games),
-                      fmt(r?.wins),
-                      fmt(r?.losses),
-                      fmtEra(r?.earnedRunAverage),
-                      r?.inningsPitched != null
-                        ? r.inningsPitched.toFixed(1)
-                        : '—',
-                      fmt(r?.strikeouts),
-                      fmt(r?.baseOnBalls),
-                      r?.whip != null ? r.whip.toFixed(2) : '—',
-                    ]}
+                    isHeader
                   />
-                ))}
+                </YStack>
+                <YStack tag="tbody" role="rowgroup">
+                  {pitchingCellRows.map((cells, idx) => (
+                    <SeasonRow
+                      key={`${cells[0]}-${idx}`}
+                      accent={accent}
+                      cells={cells}
+                    />
+                  ))}
+                </YStack>
               </YStack>
-            </YStack>
-          </ScrollView>
+            </ScrollView>
+          )}
         </View>
       ) : null}
 

@@ -16,7 +16,9 @@ import {
   fmtCount,
   fmtEra,
   fmtScoreRow,
+  isNarrowSeasonViewport,
   restorePlayerToSlot,
+  SEASON_STACK_BREAKPOINT,
   type SeasonBattingRow,
   type SeasonPitchingRow,
   type SelectedPlayer,
@@ -235,6 +237,7 @@ describe('addPlayerToSlots', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
 // restorePlayerToSlot — LS-7040 (undo a removed chip)
 // ---------------------------------------------------------------------------
 
@@ -527,5 +530,18 @@ describe('PlayerSearchInput debounce', () => {
     });
     // 300ms after the second keystroke — only the final value emitted
     expect(result.current).toBe('Mi');
+  });
+});
+
+describe('isNarrowSeasonViewport', () => {
+  it('stacks the season tables below the breakpoint (e.g. iPhone SE)', () => {
+    expect(isNarrowSeasonViewport(375)).toBe(true);
+    expect(isNarrowSeasonViewport(SEASON_STACK_BREAKPOINT - 1)).toBe(true);
+  });
+
+  it('keeps the table layout at or above the breakpoint', () => {
+    expect(isNarrowSeasonViewport(SEASON_STACK_BREAKPOINT)).toBe(false);
+    expect(isNarrowSeasonViewport(768)).toBe(false);
+    expect(isNarrowSeasonViewport(1280)).toBe(false);
   });
 });
