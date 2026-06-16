@@ -202,6 +202,13 @@ test.describe('PremiumGate — premium user @critical', () => {
     await expect(
       page.getByRole('button', { name: /upgrade/i }),
     ).not.toBeVisible();
+
+    // LS-7032: the redundant inline premium banner (the "Premium · Player
+    // Comparison" note with the "Subscribed" pill) must NOT render for premium
+    // subscribers — it is dismissed entirely, not just disabled.
+    await expect(
+      page.getByText('Premium · Player Comparison'),
+    ).not.toBeVisible();
   });
 });
 

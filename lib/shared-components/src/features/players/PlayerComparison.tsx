@@ -260,16 +260,13 @@ function ScorecardIllus() {
 }
 
 // ---------------------------------------------------------------------------
-// Premium inline banner (for subscribed users per mockup spec)
+// Premium inline banner — free-user upsell only.
+// Premium subscribers do not see this banner; the persistent "Subscribed" pill
+// was redundant chrome above the masthead (LS-7032). The banner is rendered
+// solely as the inline upgrade CTA for free users (LS-7012).
 // ---------------------------------------------------------------------------
 
-function PremiumBanner({
-  isPremium,
-  onUpgrade,
-}: {
-  isPremium: boolean;
-  onUpgrade?: () => void;
-}) {
+function PremiumBanner({ onUpgrade }: { onUpgrade?: () => void }) {
   return (
     <View
       role="note"
@@ -323,16 +320,15 @@ function PremiumBanner({
       </View>
       <Pressable
         role="button"
-        aria-label={isPremium ? 'Subscribed' : 'Upgrade'}
-        disabled={isPremium}
-        onPress={isPremium ? undefined : onUpgrade}
+        aria-label="Upgrade"
+        onPress={onUpgrade}
         style={{
           paddingVertical: 10,
           paddingHorizontal: 14,
           borderRadius: 12,
           borderWidth: 1,
           borderColor: BRAND_GOLD_DARK,
-          backgroundColor: isPremium ? BRAND_GOLD : SURFACE_PANEL,
+          backgroundColor: SURFACE_PANEL,
         }}
       >
         <Text
@@ -342,10 +338,10 @@ function PremiumBanner({
             fontSize: 11,
             letterSpacing: 1.1,
             textTransform: 'uppercase',
-            color: isPremium ? BRAND_NAVY_DARK : WHITE,
+            color: WHITE,
           }}
         >
-          {isPremium ? 'Subscribed' : 'Upgrade'}
+          Upgrade
         </Text>
       </Pressable>
     </View>
@@ -2255,8 +2251,8 @@ export function PlayerComparison({
     <YStack flex={1}>
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         <View style={containerStyle}>
-          {(isPremium || onUpgrade != null) && (
-            <PremiumBanner isPremium={isPremium} onUpgrade={onUpgrade} />
+          {!isPremium && onUpgrade != null && (
+            <PremiumBanner onUpgrade={onUpgrade} />
           )}
           <Masthead />
 
