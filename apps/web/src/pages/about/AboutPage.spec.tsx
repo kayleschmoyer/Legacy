@@ -83,7 +83,7 @@ jest.mock('../../config/environment', () => ({
     graphqlUrl: 'http://localhost:5000/graphql',
     websocketUrl: '',
     isDev: false,
-    environmentName: 'production',
+    mode: 'production',
     baseUrl: '/',
     appVersion: '1.0.0',
     commitSha: 'abc123',
@@ -104,7 +104,15 @@ jest.mock('../../hooks/useIsPremium', () => ({
 }));
 
 function setEnvName(name: string) {
-  (env as { environmentName: string }).environmentName = name;
+  (env as { mode: string }).mode = name;
+}
+
+function setIsDev(value: boolean) {
+  (env as { isDev: boolean }).isDev = value;
+}
+
+function setBaseUrl(value: string) {
+  (env as { baseUrl: string }).baseUrl = value;
 }
 
 function setConfigErrors(errors: string[]) {
@@ -599,6 +607,70 @@ describe('AboutPage — about-github-deeplinks feature story (LS-7741)', () => {
     const commitRow = screen.getByTestId('build-info-commit-sha');
     expect(commitRow.querySelector('[role="link"]')).toBeNull();
     expect(commitRow).toHaveTextContent('abc1234');
+  });
+});
+
+describe('AboutPage — GraphQL URL visibility (LS-5706)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+    setIsDev(false);
+  });
+
+  afterEach(() => {
+    setIsDev(false);
+  });
+
+  it('hides the GraphQL URL and shows "(hidden in production)" when isDev is false', () => {
+    renderAbout();
+    expect(screen.getByTestId('build-info-graphql-value')).toHaveTextContent(
+      '(hidden in production)',
+    );
+  });
+
+  it('shows the actual graphqlUrl when isDev is true', () => {
+    setIsDev(true);
+    renderAbout();
+    expect(screen.getByTestId('build-info-graphql-value')).toHaveTextContent(
+      'http://localhost:5000/graphql',
+    );
+  });
+});
+
+describe('AboutPage — Base URL resolution (LS-5707)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      isLoading: false,
+    });
+    mockUseIsPremium.mockReturnValue(false);
+    setBaseUrl('/');
+  });
+
+  afterEach(() => {
+    setBaseUrl('/');
+  });
+
+  it('shows window.location.origin + "/" when baseUrl is "/"', () => {
+    renderAbout();
+    expect(screen.getByTestId('build-info-base-url-value')).toHaveTextContent(
+      `${window.location.origin}/`,
+    );
+  });
+
+  it('shows the literal baseUrl when it is not "/"', () => {
+    setBaseUrl('https://example.com/');
+    renderAbout();
+    expect(screen.getByTestId('build-info-base-url-value')).toHaveTextContent(
+      'https://example.com/',
+    );
   });
 });
 

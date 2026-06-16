@@ -7,6 +7,33 @@ import { config } from '@legacy-sports/app-config/native';
 
 declare const __DEV__: boolean;
 
+/**
+ * LS-5709 — Resolve the build mode the same way Expo / EAS labels it
+ * (development | production | preview | staging | ...). Prior implementation
+ * hard-coded a binary `Development / Production` label that mislabelled every
+ * non-prod non-dev native build (preview / staging) as Production. We read
+ * the value from expo-constants `extra.mode` / `releaseChannel` when present,
+ * falling back to the binary __DEV__ check.
+ */
+function resolveNativeEnvironmentLabel(): string {
+  // expo-constants types `extra` as `Record<string, any>`. A variable type
+  // annotation (not an assertion) narrows it to `unknown` values so the
+  // downstream runtime check (`typeof explicitMode === 'string'`) is sound.
+  const extra: Record<string, unknown> | undefined =
+    Constants.expoConfig?.extra;
+  const explicitMode = extra?.['mode'];
+  if (typeof explicitMode === 'string' && explicitMode.length > 0) {
+    return explicitMode;
+  }
+  const releaseChannel = (
+    Constants.manifest as { releaseChannel?: string } | undefined
+  )?.releaseChannel;
+  if (typeof releaseChannel === 'string' && releaseChannel.length > 0) {
+    return releaseChannel;
+  }
+  return __DEV__ ? 'development' : 'production';
+}
+
 interface InfoRowProps {
   label: string;
   value: string;
@@ -123,7 +150,7 @@ export default function AboutScreen() {
 
           <InfoRow
             label="Environment"
-            value={__DEV__ ? 'development' : 'production'}
+            value={resolveNativeEnvironmentLabel()}
           />
           <InfoRow
             label="Platform"

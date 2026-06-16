@@ -15,8 +15,16 @@ export interface EnvironmentConfig {
   readonly graphqlUrl: string;
   readonly websocketUrl: string;
   readonly isDev: boolean;
-  /** Resolved environment name: VITE_ENVIRONMENT_NAME if set, else 'development' or 'production'. */
-  readonly environmentName: string;
+  /**
+   * Build mode string as set at build time (e.g. "development", "production",
+   * "staging", "preview", "test"). Sourced from `import.meta.env.MODE`. Use
+   * this in user-facing diagnostic surfaces (e.g. /about) rather than the
+   * binary `isDev` so non-prod deployments are correctly labelled. (LS-5709)
+   *
+   * Replaces the old `environmentName` field removed in LS-5709. No other
+   * consumers reference `environmentName`; TypeScript enforces completeness.
+   */
+  readonly mode: string;
   readonly baseUrl: string;
   readonly appVersion: string;
   readonly commitSha: string;
@@ -80,9 +88,7 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
       ? window.__e2eWsUrl
       : (config.websocketUrl ?? ''),
   isDev: import.meta.env.DEV === true,
-  environmentName:
-    config.environmentName ??
-    (import.meta.env.DEV === true ? 'development' : 'production'),
+  mode: import.meta.env.MODE || 'unknown',
   baseUrl: import.meta.env.BASE_URL || '/',
   appVersion: config.appVersion ?? 'unknown',
   commitSha: config.commitSha ?? 'unknown',

@@ -59,7 +59,18 @@ const Value = styled(Text, {
   color: '$gray11',
   fontSize: '$4',
   fontFamily: '$mono',
+  // LS-5708 — allow long URLs (e.g. GraphQL endpoint, base URL) to wrap inside
+  // the row instead of overflowing horizontally on narrow mobile viewports.
+  // `flex: 1` + `minWidth: 0` lets the text shrink below its content width,
+  // and `wordBreak: 'break-all'` lets URLs wrap at any character.
+  flex: 1,
+  minWidth: 0,
+  textAlign: 'right',
   wordBreak: 'break-all',
+  $sm: {
+    textAlign: 'left',
+    width: '100%',
+  },
 });
 
 const LinkValue = styled(Text, {
@@ -90,6 +101,27 @@ export default function AboutPage() {
   // Maps sentinel values to a friendly display string; raw sentinel kept for link-suppression logic below.
   const display = (v: string) =>
     v && v !== 'unknown' && v !== 'dev' ? v : '—';
+
+  // LS-5709 — Environment label now reflects the actual build mode
+  // (development | production | staging | preview | test | ...). Prior
+  // implementation hard-coded a binary `dev/prod` label that mislabelled
+  // every non-prod non-dev deployment (staging, preview, etc.) as
+  // "production".
+  const environmentLabel =
+    env.mode || (env.isDev ? 'development' : 'production');
+
+  // LS-5707 — Base URL row used to render just "/" in production, which was
+  // uninformative. Show the effective deployment origin instead so users can
+  // see where the app is actually served from.
+  const effectiveBaseUrl =
+    typeof window !== 'undefined' && env.baseUrl === '/'
+      ? window.location.origin + '/'
+      : env.baseUrl;
+
+  // LS-5706 — GraphQL endpoint URL is treated as internal infrastructure
+  // information. Expose it in dev for debugging, but hide it from
+  // unauthenticated production visitors to reduce recon surface.
+  const showGraphqlUrl = env.isDev;
 
   // Hex-format guard: rejects sentinels ('unknown', 'dev') and non-SHA strings.
   // Returns null for invalid SHAs so the link falls through to plain-text rendering.
@@ -166,19 +198,23 @@ export default function AboutPage() {
 
         <InfoRow data-testid="build-info-environment">
           <Label>Environment:</Label>
-          <Value>{env.environmentName}</Value>
+          <Value data-testid="build-info-environment-value">
+            {environmentLabel}
+          </Value>
         </InfoRow>
 
-        {env.isDev && (
-          <InfoRow>
-            <Label>GraphQL API:</Label>
-            <Value>{env.graphqlUrl}</Value>
-          </InfoRow>
-        )}
+        <InfoRow>
+          <Label>GraphQL API:</Label>
+          <Value data-testid="build-info-graphql-value">
+            {showGraphqlUrl ? env.graphqlUrl : '(hidden in production)'}
+          </Value>
+        </InfoRow>
 
         <InfoRow>
-          <Label>Asset Base Path:</Label>
-          <Value>{env.baseUrl}</Value>
+          <Label>Base URL:</Label>
+          <Value data-testid="build-info-base-url-value">
+            {effectiveBaseUrl}
+          </Value>
         </InfoRow>
       </InfoCard>
 
