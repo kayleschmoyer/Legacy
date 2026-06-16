@@ -1,5 +1,5 @@
 /**
- * NFL Player Name Search — hermetic E2E tests (LS-5442)
+ * NFL Player Name Search — hermetic E2E tests (LS-5442, LS-7049)
  *
  * Verifies the search input on /football/players filters the displayed player
  * list by forwarding a `search` variable to the `FootballPlayers` GraphQL query.
@@ -11,6 +11,8 @@
  *  - Non-matching search → empty state ("No players found")
  *  - Multi-token search (first + last name) → correct player shown
  *  - Clearing via the "Clear search" button restores the full list
+ *  - Accent-insensitive search: unaccented input matches accented names (LS-7049)
+ *  - Accent-insensitive search: accented input matches accented stored names
  *
  * All GraphQL responses are mocked with route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -53,29 +55,52 @@ const ALLEN = {
   careerStats: null,
 } as const;
 
+// Player with accented name to verify diacritic-insensitive search (LS-7049).
+const PENA = {
+  __typename: 'FootballPlayer',
+  id: 3,
+  firstName: 'José',
+  lastName: 'Peña',
+  position: 'RB',
+  isDst: false,
+  nflTeam: 'MIA',
+  pfrId: 'PenaJo00',
+  headshotUrl: null,
+  previousTeams: [],
+  careerStats: null,
+} as const;
+
 const ALL_PLAYERS = [MAHOMES, ALLEN] as const;
+const ALL_PLAYERS_WITH_ACCENTED = [MAHOMES, ALLEN, PENA] as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Simulate server-side name search: case-insensitive AND-token substring match. */
-function filterBySearch(
-  players: readonly (typeof MAHOMES | typeof ALLEN)[],
+/** Strip diacritics to simulate Postgres unaccent() — e.g. 'José' → 'jose'. */
+function stripAccents(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/**
+ * Simulate server-side name search: case- and accent-insensitive AND-token
+ * substring match (mirrors the unaccent(col) ILIKE unaccent(term) logic in
+ * the footballPlayers resolver — LS-7049).
+ */
+function filterBySearch<T extends { firstName: string; lastName: string }>(
+  players: readonly T[],
   search: string | undefined,
-): (typeof MAHOMES | typeof ALLEN)[] {
+): T[] {
   if (!search) return [...players];
-  const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const tokens = search.trim().split(/\s+/).filter(Boolean).map(stripAccents);
   return players.filter((p) =>
     tokens.every(
       (t) =>
-        p.firstName.toLowerCase().includes(t) ||
-        p.lastName.toLowerCase().includes(t),
+        stripAccents(p.firstName).includes(t) ||
+        stripAccents(p.lastName).includes(t),
     ),
   );
 }
 
-function playersResponse(
-  nodes: readonly (typeof MAHOMES | typeof ALLEN)[],
-): object {
+function playersResponse<T>(nodes: readonly T[]): object {
   return {
     data: {
       footballPlayers: {
@@ -99,6 +124,24 @@ async function mockSearchableFootballPlayers(
       return fulfillJson(
         route,
         playersResponse(filterBySearch(ALL_PLAYERS, search)),
+      );
+    },
+  });
+}
+
+/**
+ * Same as above but the player pool includes the accented-name fixture (PENA)
+ * so diacritic-insensitive search tests can verify the full round-trip.
+ */
+async function mockSearchableFootballPlayersWithAccents(
+  page: import('@playwright/test').Page,
+): Promise<void> {
+  await createGraphQLRouter(page, {
+    footballplayers: (route, { variables }) => {
+      const search = variables.search as string | undefined;
+      return fulfillJson(
+        route,
+        playersResponse(filterBySearch(ALL_PLAYERS_WITH_ACCENTED, search)),
       );
     },
   });
@@ -206,5 +249,58 @@ test.describe('NFL player name search @regression', () => {
     // All players should be visible again.
     await expect(page.getByText('Patrick Mahomes')).toBeVisible();
     await expect(page.getByText('Josh Allen')).toBeVisible();
+  });
+});
+
+// ── Diacritic / accent-insensitive search (LS-7049 / PLL-013) ────────────────
+
+test.describe('NFL player name search — accent-insensitive (LS-7049) @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSearchableFootballPlayersWithAccents(page);
+    await page.goto(PAGE_URL);
+  });
+
+  test('unaccented input matches a player with an accented last name', async ({
+    page,
+  }) => {
+    // The mock simulates server-side unaccent(): 'Pena' should match 'Peña'.
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await search.fill('Pena');
+
+    await expect(page.getByText('José Peña')).toBeVisible();
+    await expect(page.getByText('Patrick Mahomes')).not.toBeVisible();
+    await expect(page.getByText('Josh Allen')).not.toBeVisible();
+  });
+
+  test('unaccented input matches a player with an accented first name', async ({
+    page,
+  }) => {
+    // 'Jose' should match 'José'.
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await search.fill('Jose');
+
+    await expect(page.getByText('José Peña')).toBeVisible();
+    await expect(page.getByText('Patrick Mahomes')).not.toBeVisible();
+  });
+
+  test('accented input matches a player stored with accented characters', async ({
+    page,
+  }) => {
+    // Typing the exact accented name should also work.
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await search.fill('Peña');
+
+    await expect(page.getByText('José Peña')).toBeVisible();
+  });
+
+  test('accented input does not accidentally match unaccented names', async ({
+    page,
+  }) => {
+    // 'Peña' must not surface Mahomes or Allen — guards the complementary direction.
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await search.fill('Peña');
+
+    await expect(page.getByText('Patrick Mahomes')).not.toBeVisible();
+    await expect(page.getByText('Josh Allen')).not.toBeVisible();
   });
 });
