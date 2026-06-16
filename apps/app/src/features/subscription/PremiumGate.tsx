@@ -10,6 +10,12 @@ import {
 export interface PremiumGateProps {
   /** Whether the current user has premium access. */
   isPremium: boolean;
+  /**
+   * Pass `false` while user identity is still loading to suppress phantom
+   * `trackPremiumFeatureBlocked` events that fire before isPremium resolves.
+   * Defaults to `true` so existing callers are unaffected.
+   */
+  isUserLoaded?: boolean;
   /** Feature name used for analytics and upgrade prompt copy. */
   featureName: string;
   /** Optional description displayed in the upgrade overlay. */
@@ -36,15 +42,16 @@ const BRAND_NAVY = '#1A2A4A';
  */
 export function PremiumGate({
   isPremium,
+  isUserLoaded = true,
   featureName,
   featureDescription,
   children,
 }: PremiumGateProps) {
   useEffect(() => {
-    if (!isPremium) {
+    if (isUserLoaded && !isPremium) {
       trackPremiumFeatureBlocked(featureName);
     }
-  }, [featureName, isPremium]);
+  }, [featureName, isPremium, isUserLoaded]);
 
   if (isPremium) {
     return children as React.JSX.Element;

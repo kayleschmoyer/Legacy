@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react-native';
 
 // ── Component under test ─────────────────────────────────────────────────────
 import { PremiumGate } from './PremiumGate';
+import { trackPremiumFeatureBlocked } from '../../utils/analytics';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -96,5 +97,85 @@ describe('PremiumGate', () => {
     );
 
     expect(screen.queryByText(/\/mo$/)).toBeNull();
+  });
+
+  it('fires trackPremiumFeatureBlocked on mount for non-premium users (default backward compat)', () => {
+    render(
+      <PremiumGate isPremium={false} featureName="Player Comparison">
+        <RNText>content</RNText>
+      </PremiumGate>,
+    );
+
+    expect(trackPremiumFeatureBlocked).toHaveBeenCalledTimes(1);
+    expect(trackPremiumFeatureBlocked).toHaveBeenCalledWith(
+      'Player Comparison',
+    );
+  });
+
+  it('does not fire trackPremiumFeatureBlocked while isUserLoaded is false', () => {
+    render(
+      <PremiumGate
+        isPremium={false}
+        isUserLoaded={false}
+        featureName="Player Comparison"
+      >
+        <RNText>content</RNText>
+      </PremiumGate>,
+    );
+
+    expect(trackPremiumFeatureBlocked).not.toHaveBeenCalled();
+  });
+
+  it('fires trackPremiumFeatureBlocked once identity settles and user is non-premium', () => {
+    const { rerender } = render(
+      <PremiumGate
+        isPremium={false}
+        isUserLoaded={false}
+        featureName="Player Comparison"
+      >
+        <RNText>content</RNText>
+      </PremiumGate>,
+    );
+
+    expect(trackPremiumFeatureBlocked).not.toHaveBeenCalled();
+
+    rerender(
+      <PremiumGate
+        isPremium={false}
+        isUserLoaded={true}
+        featureName="Player Comparison"
+      >
+        <RNText>content</RNText>
+      </PremiumGate>,
+    );
+
+    expect(trackPremiumFeatureBlocked).toHaveBeenCalledTimes(1);
+    expect(trackPremiumFeatureBlocked).toHaveBeenCalledWith(
+      'Player Comparison',
+    );
+  });
+
+  it('does not fire trackPremiumFeatureBlocked when isPremium resolves true after loading', () => {
+    const { rerender } = render(
+      <PremiumGate
+        isPremium={false}
+        isUserLoaded={false}
+        featureName="Player Comparison"
+      >
+        <RNText>content</RNText>
+      </PremiumGate>,
+    );
+
+    rerender(
+      <PremiumGate
+        isPremium={true}
+        isUserLoaded={true}
+        featureName="Player Comparison"
+      >
+        <RNText>content</RNText>
+      </PremiumGate>,
+    );
+
+    expect(trackPremiumFeatureBlocked).not.toHaveBeenCalled();
   });
 });

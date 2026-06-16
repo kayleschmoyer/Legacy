@@ -22,6 +22,12 @@ import { useStripePrices } from '../hooks/useStripePrices';
 export interface PremiumGateProps {
   /** Whether the current user has premium access. */
   isPremium: boolean;
+  /**
+   * Pass `false` while user identity is still loading to suppress phantom
+   * `trackPremiumFeatureBlocked` events that fire before isPremium resolves.
+   * Defaults to `true` so existing callers are unaffected.
+   */
+  isUserLoaded?: boolean;
   /** Feature name used for analytics and upgrade modal copy. */
   featureName: string;
   /** Optional description displayed in the upgrade prompt overlay and modal. */
@@ -51,6 +57,7 @@ export interface PremiumGateProps {
  */
 export function PremiumGate({
   isPremium,
+  isUserLoaded = true,
   featureName,
   featureDescription,
   children,
@@ -61,10 +68,10 @@ export function PremiumGate({
   const { annualMonthlyEquivalent } = useStripePrices();
 
   useEffect(() => {
-    if (!isPremium) {
+    if (isUserLoaded && !isPremium) {
       trackPremiumFeatureBlocked(featureName);
     }
-  }, [featureName, isPremium]);
+  }, [featureName, isPremium, isUserLoaded]);
 
   function handleUpgradeClick() {
     trackPremiumFeatureClick(featureName);
