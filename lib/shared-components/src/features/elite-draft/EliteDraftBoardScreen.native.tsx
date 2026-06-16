@@ -1104,6 +1104,33 @@ export function EliteDraftBoardScreen({
           </Pressable>
         </YStack>
       )}
+
+      {/* Urgent-error overlay (LS-8066).
+          The shared draft-pick handler routes uncategorized pick failures —
+          including "Draft pick failed: …" — to ui.urgentMessage. The web
+          screen renders this channel, but the native screen previously did
+          not, so mobile users got no feedback during the draft. Mirror the
+          web behavior: show it as an error toast when no toast is already
+          visible (the two channels are mutually exclusive). It auto-dismisses
+          after 6s via useDraftUIState (LS-4827). */}
+      {ui.urgentMessage && !ui.toastMessage && (
+        <YStack
+          position="absolute"
+          bottom={20}
+          left={16}
+          right={16}
+          backgroundColor="$red9"
+          borderRadius="$3"
+          padding="$3"
+          zIndex={100}
+        >
+          <Pressable onPress={() => ui.setUrgentMessage('')}>
+            <Text color="$colorInverse" fontWeight="600" textAlign="center">
+              {ui.urgentMessage}
+            </Text>
+          </Pressable>
+        </YStack>
+      )}
     </YStack>
   );
 }

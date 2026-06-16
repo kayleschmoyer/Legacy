@@ -222,6 +222,19 @@ export function useDraftActions({
         } else if (msg.includes('player pool')) {
           showToast('Player is not in the allowed player pool', 'warning');
           void refetchAvailablePlayers();
+        } else if (
+          // LS-8066: league-eligibility rejections (career minimums, HoF-only,
+          // era filter) must surface a visible toast. They previously fell
+          // through to the urgent-banner branch below, which the native mobile
+          // screen does not render — so a mobile user who drafted an ineligible
+          // player got no notification or error at all. The backend messages
+          // are already user-facing, so show them verbatim.
+          msg.includes('minimum career') ||
+          msg.includes('Hall of Fame') ||
+          msg.includes('not eligible for this league')
+        ) {
+          showToast(msg, 'warning');
+          void refetchAvailablePlayers();
         } else {
           setUrgentMessage(
             isAutoPick

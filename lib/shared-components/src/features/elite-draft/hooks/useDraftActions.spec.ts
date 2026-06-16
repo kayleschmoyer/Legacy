@@ -195,6 +195,64 @@ describe('useDraftActions re-entry guards (LS-2681)', () => {
   });
 });
 
+describe('useDraftActions ineligible-player feedback (LS-8066)', () => {
+  beforeEach(() => {
+    mockCallCounter.current = 0;
+    mockMakeDraftPick.mockReset();
+    mockNoop.mockReset();
+  });
+
+  // Each eligibility-rejection message from the backend
+  // (lib/db-client/src/lib/DraftUtils.ts) must surface as a visible warning
+  // toast rather than falling through to setUrgentMessage, which the native
+  // mobile screen does not render.
+  it.each([
+    'Player does not meet the minimum career games requirement (500)',
+    'Player does not meet the minimum career seasons requirement (3)',
+    'This league is restricted to Hall of Fame players. This player is not in the Hall of Fame.',
+    'Player has no recorded seasons in the Modern era and is not eligible for this league.',
+  ])('shows a warning toast for: %s', async (message) => {
+    mockMakeDraftPick.mockRejectedValueOnce(new Error(message));
+    const showToast = jest.fn();
+    const setUrgentMessage = jest.fn();
+    const refetchAvailablePlayers = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(
+        makeParams({ showToast, setUrgentMessage, refetchAvailablePlayers }),
+      ),
+    );
+
+    await act(async () => {
+      await result.current.handleMakePick(101);
+    });
+
+    expect(showToast).toHaveBeenCalledWith(message, 'warning');
+    // The urgent-banner channel (invisible on native) must not be used.
+    expect(setUrgentMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('Draft pick failed'),
+    );
+    expect(refetchAvailablePlayers).toHaveBeenCalled();
+  });
+
+  it('still routes a genuinely unexpected pick failure to the urgent banner', async () => {
+    mockMakeDraftPick.mockRejectedValueOnce(new Error('kaboom'));
+    const showToast = jest.fn();
+    const setUrgentMessage = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ showToast, setUrgentMessage })),
+    );
+
+    await act(async () => {
+      await result.current.handleMakePick(101);
+    });
+
+    expect(setUrgentMessage).toHaveBeenCalledWith('Draft pick failed: kaboom');
+    expect(showToast).not.toHaveBeenCalled();
+  });
+});
+
 describe('useDraftActions auto-pick toggle refetch (LS-7978)', () => {
   beforeEach(() => {
     mockCallCounter.current = 0;
