@@ -9,6 +9,7 @@ import React, {
 import { Button, Input, Spinner, Text, YStack } from 'tamagui';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { FlatList, InteractionManager } from 'react-native';
+import { ColumnCustomizer, type ColumnPreferences } from './ColumnCustomizer';
 import { Platform } from '../../platform-components';
 import { handleError } from '../../utils/ErrorHandler';
 import {
@@ -31,6 +32,11 @@ import {
 //   - LS-7472 reshape deferred via requestIdleCallback / InteractionManager.
 //   - LS-7473 server pagination (limit/offset/total).
 //   - LS-7475 infinite scroll @ 80% with a 1000-row render cap + Load all.
+//
+// LS-5701 layers sortable headers (LS-7457), premium-gated advanced columns
+// (LS-7463), and the column customizer (LS-7464) on top of this architecture.
+// Sort + column customization run against the full fetched dataset before the
+// virtualizer slices it, so the visible window is always a stable projection.
 
 /** Em-dash used to disambiguate "no value" from a real zero stat. (LS-7461) */
 const EM_DASH = '—';
@@ -43,6 +49,114 @@ function renderCell(cell: CellValue): string | number {
   if (cell === null || cell === undefined) return EM_DASH;
   if (typeof cell === 'string' && cell.trim() === '') return EM_DASH;
   return cell;
+}
+
+/**
+ * Advanced FanGraphs / Statcast metrics. Hidden from non-premium users —
+ * stripped entirely from the column list rather than shown with an in-table
+ * upgrade CTA (a separate marketing pattern). (LS-7463)
+ *
+ * Keep in sync with the backend payload from `lambdas/db/src/baseball-game-logs`.
+ */
+export const ADVANCED_STAT_KEYS = [
+  'wOBA',
+  'xBA',
+  'EV',
+  'barrels',
+  'hardHit',
+  'hardHitPct',
+] as const;
+
+const ADVANCED_KEY_SET = new Set<string>(ADVANCED_STAT_KEYS);
+
+/** localStorage key for column customization, namespaced per sport. (LS-7464) */
+const columnPrefsKey = (sport: string) => `gameLogs.${sport}.columns`;
+
+/**
+ * LS-7457 — single-column sort state. `column: null` means insertion order
+ * (the order the API returned games in). Header click cycles
+ * unsorted → asc → desc → unsorted. Multi-column sort is out of MVP scope.
+ */
+type SortDirection = 'asc' | 'desc';
+interface SortState {
+  column: string | null;
+  direction: SortDirection;
+}
+
+/** A column actually rendered, after premium gating + user customization. */
+interface ColumnDescriptor {
+  key: string;
+  pinned: boolean;
+}
+
+/**
+ * "Missing" sentinels (null/undefined/''/em-dash) sort AFTER everything else
+ * regardless of direction so empty cells don't crowd the top of an asc sort or
+ * hide the worst real values at the bottom of a desc sort. (LS-7457)
+ */
+function isMissing(value: CellValue): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '' || trimmed === EM_DASH;
+  }
+  return false;
+}
+
+export function compareCells(
+  a: CellValue,
+  b: CellValue,
+  direction: SortDirection,
+): number {
+  const aMissing = isMissing(a);
+  const bMissing = isMissing(b);
+  if (aMissing && bMissing) return 0;
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+
+  const aNum = typeof a === 'number' ? a : Number(a);
+  const bNum = typeof b === 'number' ? b : Number(b);
+  const bothNumeric = Number.isFinite(aNum) && Number.isFinite(bNum);
+
+  let cmp: number;
+  if (bothNumeric) {
+    cmp = aNum - bNum;
+  } else {
+    cmp = String(a).localeCompare(String(b), undefined, { numeric: true });
+  }
+  return direction === 'asc' ? cmp : -cmp;
+}
+
+function loadColumnPrefs(sport: string): ColumnPreferences | null {
+  if (Platform.OS !== 'web') return null;
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(columnPrefsKey(sport));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ColumnPreferences;
+    if (
+      !parsed ||
+      !Array.isArray(parsed.order) ||
+      !Array.isArray(parsed.hidden) ||
+      !Array.isArray(parsed.pinned)
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveColumnPrefs(sport: string, prefs: ColumnPreferences): void {
+  if (Platform.OS !== 'web') return;
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    window.localStorage.setItem(columnPrefsKey(sport), JSON.stringify(prefs));
+  } catch {
+    // localStorage may be unavailable (private mode, quota exceeded); fail
+    // silent — the user simply loses persistence for this session.
+  }
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -188,14 +302,18 @@ export interface GameLogsTableProps {
    * player being viewed. Defaults to 'mlb' since this is the baseball stats
    * viewer today; NFL is wired so it lights up the moment the football game
    * logs page mounts the component. (LS-7477)
+   *
+   * Also namespaces the localStorage column-preferences key so baseball / NFL
+   * customizations stay independent. (LS-7464)
    */
   sport?: GameLogSport;
   /**
    * When true the opponent filter renders as a multi-select so a premium user
    * can compare against a custom set (e.g. all AL East teams). Free users see
-   * a single-select. The component never reads premium status itself — that
-   * keeps shared-components free of web-only hooks; the app passes it in.
-   * (LS-7480, LS-7469)
+   * a single-select. Also drives visibility of the advanced FanGraphs/Statcast
+   * columns (LS-7463) and access to the column-customize drawer (LS-7464). The
+   * component never reads premium status itself — that keeps shared-components
+   * free of web-only hooks; the app passes it in. (LS-7480, LS-7469)
    */
   isPremium?: boolean;
   /**
@@ -403,16 +521,22 @@ export function reshapeGameLogs(
 }
 
 interface VirtualBodyProps {
-  stats: string[];
+  /** Columns to render, after premium gating + user customization. */
+  columns: ColumnDescriptor[];
+  /** Rows whose `cells` are already projected into `columns` order. */
   rows: Array<{ gameId: string; cells: CellValue[] }>;
+  sort: SortState;
+  onSortChange: (column: string) => void;
   hasMore: boolean;
   loadingMore: boolean;
   onEndReached: () => void;
 }
 
 const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
-  stats,
+  columns,
   rows,
+  sort,
+  onSortChange,
   hasMore,
   loadingMore,
   onEndReached,
@@ -436,7 +560,7 @@ const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
     }
   }, [lastItem, rows.length, hasMore, loadingMore, onEndReached]);
 
-  const colWidth = `${100 / Math.max(stats.length, 1)}%`;
+  const colWidth = `${100 / Math.max(columns.length, 1)}%`;
 
   return (
     <div
@@ -450,6 +574,8 @@ const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
     >
       <div style={{ minWidth: MIN_TABLE_WIDTH_PX }}>
         <div
+          // LS-7458 — sticky header keeps column labels (and the sort control)
+          // in view while scrolling a 162-game MLB season.
           style={{
             position: 'sticky',
             top: 0,
@@ -459,21 +585,60 @@ const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
             borderBottom: '1px solid #ddd',
           }}
         >
-          {stats.map((h) => (
-            <div
-              key={h}
-              style={{
-                flexBasis: colWidth,
-                flexGrow: 1,
-                padding: 8,
-                fontWeight: 600,
-                fontSize: 14,
-                borderRight: '1px solid #ddd',
-              }}
-            >
-              {h}
-            </div>
-          ))}
+          {columns.map((col) => {
+            const isActive = sort.column === col.key;
+            const indicator = isActive
+              ? sort.direction === 'asc'
+                ? ' ▲'
+                : ' ▼'
+              : '';
+            return (
+              <div
+                key={col.key}
+                role="columnheader"
+                aria-sort={
+                  isActive
+                    ? sort.direction === 'asc'
+                      ? 'ascending'
+                      : 'descending'
+                    : 'none'
+                }
+                data-testid={`game-logs-header-cell-${col.key}`}
+                style={{
+                  flexBasis: colWidth,
+                  flexGrow: 1,
+                  borderRight: '1px solid #ddd',
+                  backgroundColor: '#f5f5f5',
+                  // LS-7464 — pinned columns stick to the left edge so the
+                  // identifying columns stay visible scrolling into stats.
+                  position: col.pinned ? 'sticky' : undefined,
+                  left: col.pinned ? 0 : undefined,
+                  zIndex: col.pinned ? 2 : undefined,
+                }}
+              >
+                {/* LS-7457 — header button: unsorted → asc → desc → unsorted */}
+                <button
+                  type="button"
+                  onClick={() => onSortChange(col.key)}
+                  data-testid={`game-logs-header-${col.key}`}
+                  aria-label={`Sort by ${col.key}`}
+                  style={{
+                    width: '100%',
+                    padding: 8,
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    font: 'inherit',
+                    textAlign: 'left',
+                    fontWeight: isActive ? 700 : 600,
+                  }}
+                >
+                  {col.key}
+                  {indicator}
+                </button>
+              </div>
+            );
+          })}
         </div>
         <div
           style={{
@@ -521,23 +686,29 @@ const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
                     Loading more games…
                   </div>
                 ) : (
-                  (row?.cells ?? []).map((cell, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        flexBasis: colWidth,
-                        flexGrow: 1,
-                        padding: '0 8px',
-                        fontSize: 14,
-                        borderRight: '1px solid #eee',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {renderCell(cell)}
-                    </div>
-                  ))
+                  (row?.cells ?? []).map((cell, i) => {
+                    const col = columns[i];
+                    return (
+                      <div
+                        key={col?.key ?? i}
+                        style={{
+                          flexBasis: colWidth,
+                          flexGrow: 1,
+                          padding: '0 8px',
+                          fontSize: 14,
+                          borderRight: '1px solid #eee',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          position: col?.pinned ? 'sticky' : undefined,
+                          left: col?.pinned ? 0 : undefined,
+                          backgroundColor: col?.pinned ? '#fff' : undefined,
+                        }}
+                      >
+                        {renderCell(cell)}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             );
@@ -549,8 +720,10 @@ const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
 };
 
 const VirtualBodyNative: React.FC<VirtualBodyProps> = ({
-  stats,
+  columns,
   rows,
+  sort,
+  onSortChange,
   hasMore,
   loadingMore,
   onEndReached,
@@ -568,11 +741,31 @@ const VirtualBodyNative: React.FC<VirtualBodyProps> = ({
     }}
     ListHeaderComponent={
       <YStack flexDirection="row" backgroundColor="$gray3" paddingVertical="$2">
-        {stats.map((h) => (
-          <Text key={h} flex={1} fontWeight="600" paddingHorizontal="$2">
-            {h}
-          </Text>
-        ))}
+        {columns.map((col) => {
+          const isActive = sort.column === col.key;
+          const indicator = isActive
+            ? sort.direction === 'asc'
+              ? ' ▲'
+              : ' ▼'
+            : '';
+          return (
+            <Button
+              key={col.key}
+              flex={1}
+              chromeless
+              paddingHorizontal="$2"
+              justifyContent="flex-start"
+              onPress={() => onSortChange(col.key)}
+              testID={`game-logs-header-${col.key}`}
+              accessibilityLabel={`Sort by ${col.key}`}
+            >
+              <Text fontWeight={isActive ? '700' : '600'}>
+                {col.key}
+                {indicator}
+              </Text>
+            </Button>
+          );
+        })}
       </YStack>
     }
     stickyHeaderIndices={[0]}
@@ -593,7 +786,7 @@ const VirtualBodyNative: React.FC<VirtualBodyProps> = ({
         borderBottomColor="$gray5"
       >
         {item.cells.map((cell, i) => (
-          <Text key={i} flex={1} paddingHorizontal="$2">
+          <Text key={columns[i]?.key ?? i} flex={1} paddingHorizontal="$2">
             {renderCell(cell)}
           </Text>
         ))}
@@ -635,6 +828,43 @@ function GameLogsTable({
   const [loadingMore, setLoadingMore] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
+
+  // LS-7457 — single-column sort. `column: null` is API insertion order.
+  const [sort, setSort] = useState<SortState>({
+    column: null,
+    direction: 'asc',
+  });
+
+  // LS-7464 — column visibility / order / pin. Loaded from localStorage on
+  // mount (web only) and persisted on every change.
+  const [prefs, setPrefs] = useState<ColumnPreferences>({
+    order: [],
+    hidden: [],
+    pinned: [],
+  });
+  const [customizerOpen, setCustomizerOpen] = useState(false);
+
+  useEffect(() => {
+    const loaded = loadColumnPrefs(sport);
+    if (loaded) setPrefs(loaded);
+  }, [sport]);
+
+  const updatePrefs = useCallback(
+    (next: ColumnPreferences) => {
+      setPrefs(next);
+      saveColumnPrefs(sport, next);
+    },
+    [sport],
+  );
+
+  /** LS-7457 — cycle unsorted → asc → desc → unsorted on header click. */
+  const handleSortChange = useCallback((column: string) => {
+    setSort((prev) => {
+      if (prev.column !== column) return { column, direction: 'asc' };
+      if (prev.direction === 'asc') return { column, direction: 'desc' };
+      return { column: null, direction: 'asc' };
+    });
+  }, []);
 
   const today = useMemo(() => todayIsoEt(), []);
   const validation = useMemo(
@@ -809,6 +1039,64 @@ function GameLogsTable({
   const totalLabel =
     total != null ? `Showing ${showingCount} of ${total}` : null;
 
+  /**
+   * Available columns after premium gating (LS-7463). Free users never see
+   * advanced FanGraphs/Statcast metrics — stripped entirely rather than shown
+   * with an in-table upgrade CTA.
+   */
+  const availableStats = useMemo(
+    () => (isPremium ? stats : stats.filter((s) => !ADVANCED_KEY_SET.has(s))),
+    [stats, isPremium],
+  );
+
+  /**
+   * Apply user customization (visibility, order, pin) to the available column
+   * list. Pinned columns lead; columns not present in prefs.order keep their
+   * API-returned order. (LS-7464)
+   */
+  const columns = useMemo<ColumnDescriptor[]>(() => {
+    const visible = availableStats.filter((s) => !prefs.hidden.includes(s));
+    const orderIndex = (k: string) => {
+      const i = prefs.order.indexOf(k);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    const ordered = [...visible].sort((a, b) => {
+      const pa = prefs.pinned.includes(a) ? 0 : 1;
+      const pb = prefs.pinned.includes(b) ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      const oi = orderIndex(a) - orderIndex(b);
+      if (oi !== 0) return oi;
+      return availableStats.indexOf(a) - availableStats.indexOf(b);
+    });
+    return ordered.map((key) => ({ key, pinned: prefs.pinned.includes(key) }));
+  }, [availableStats, prefs]);
+
+  /**
+   * Project each fetched row's cells (indexed by the full `stats` order) into
+   * the displayed `columns` order, then sort the FULL fetched dataset (not the
+   * visible window) so the virtualizer always slices a stable, sorted source.
+   * (LS-7457)
+   */
+  const displayRows = useMemo(() => {
+    const statIndex = new Map(stats.map((s, i) => [s, i] as const));
+    const mapped = rows.map((r) => ({
+      gameId: r.gameId,
+      cells: columns.map((c) => {
+        const i = statIndex.get(c.key);
+        return i === undefined ? null : r.cells[i];
+      }),
+    }));
+    if (sort.column !== null) {
+      const sortIdx = columns.findIndex((c) => c.key === sort.column);
+      if (sortIdx !== -1) {
+        mapped.sort((a, b) =>
+          compareCells(a.cells[sortIdx], b.cells[sortIdx], sort.direction),
+        );
+      }
+    }
+    return mapped;
+  }, [rows, columns, stats, sort]);
+
   return (
     // LS-7471 — outer ScrollView removed. Form is non-scrolling; the
     // virtualized table body is the only scroll container.
@@ -967,7 +1255,7 @@ function GameLogsTable({
         </Text>
       ) : null}
 
-      {rows.length > 0 && stats.length > 0 ? (
+      {rows.length > 0 && columns.length > 0 ? (
         <YStack flex={1} marginTop="$2">
           {totalLabel ? (
             <Text
@@ -979,13 +1267,35 @@ function GameLogsTable({
               {totalLabel}
             </Text>
           ) : null}
+          {/* LS-7464 — premium-only "Customize columns" control. Hidden for
+              free users; the advanced column list is also already stripped. */}
+          {isPremium ? (
+            <Button
+              alignSelf="flex-end"
+              marginBottom="$2"
+              onPress={() => setCustomizerOpen((o) => !o)}
+              data-testid="game-logs-customize-columns"
+            >
+              <Text>Customize columns</Text>
+            </Button>
+          ) : null}
           <VirtualBody
-            stats={stats}
-            rows={rows}
+            columns={columns}
+            rows={displayRows}
+            sort={sort}
+            onSortChange={handleSortChange}
             hasMore={hasMore}
             loadingMore={loadingMore}
             onEndReached={handleEndReached}
           />
+          {isPremium && customizerOpen ? (
+            <ColumnCustomizer
+              allColumns={availableStats}
+              prefs={prefs}
+              onChange={updatePrefs}
+              onClose={() => setCustomizerOpen(false)}
+            />
+          ) : null}
           {hitCap ? (
             <YStack marginTop="$3" alignItems="center">
               <Text fontSize="$3" color="$gray10" marginBottom="$2">

@@ -2,12 +2,21 @@ import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react';
 import { InteractionManager } from 'react-native';
 import {
+  ADVANCED_STAT_KEYS,
   buildGameLogsRequestBody,
+  compareCells,
   GameLogsTable,
   reshapeGameLogs,
   validateDateRange,
 } from './GameLogsTable';
 import { MLB_TEAMS, NFL_FRANCHISES } from '../../constants/teams';
+import { Platform } from '../../platform-components';
+
+// Sortable headers, premium-column gating, and the localStorage-backed column
+// customizer are web-DOM behaviors (the native path renders a FlatList header
+// and skips localStorage). Mirror the opponent-select tests, which are also
+// effectively web-only, by gating these describes to the web jest config.
+const webDescribe = Platform.OS === 'web' ? describe : describe.skip;
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -455,5 +464,196 @@ describe('GameLogsTable render cap (LS-7475)', () => {
 
     const label = await findByTestId('game-logs-total-label');
     expect(label.textContent).toMatch(/Showing\s+50\s+of\s+162/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-5701 — sortable headers (LS-7457), premium advanced columns (LS-7463),
+// column customizer (LS-7464).
+// ---------------------------------------------------------------------------
+
+/** Paginated payload with arbitrary stat columns. Each cell is a deterministic
+ *  numeric so sort/gating assertions are stable. */
+function makePaginatedWithStats(
+  stats: string[],
+  count: number,
+  total: number,
+): {
+  stats: string[];
+  rows: Array<Record<string, string | number>>;
+  total: number;
+} {
+  const rows: Array<Record<string, string | number>> = [];
+  for (let i = 0; i < count; i++) {
+    const row: Record<string, string | number> = { gameId: `g-${i + 1}` };
+    for (const s of stats) row[s] = i % 5;
+    rows.push(row);
+  }
+  return { stats, rows, total };
+}
+
+function clickSubmit(getByText: (t: string) => HTMLElement): void {
+  const submit =
+    getByText('Get Player Data').closest('button') ??
+    getByText('Get Player Data');
+  act(() => {
+    fireEvent.click(submit);
+  });
+}
+
+describe('compareCells (LS-7457)', () => {
+  it('orders numbers ascending and descending', () => {
+    expect(compareCells(1, 2, 'asc')).toBeLessThan(0);
+    expect(compareCells(1, 2, 'desc')).toBeGreaterThan(0);
+  });
+
+  it('preserves a real 0 as a sortable value (not treated as missing)', () => {
+    // 0 < 1 ascending — a real zero must not be coerced to "missing".
+    expect(compareCells(0, 1, 'asc')).toBeLessThan(0);
+  });
+
+  it('sorts missing values (null/undefined/""/em-dash) last in both directions', () => {
+    for (const missing of [null, undefined, '', '—']) {
+      expect(compareCells(missing, 5, 'asc')).toBeGreaterThan(0);
+      expect(compareCells(missing, 5, 'desc')).toBeGreaterThan(0);
+      expect(compareCells(5, missing, 'asc')).toBeLessThan(0);
+      expect(compareCells(5, missing, 'desc')).toBeLessThan(0);
+    }
+  });
+
+  it('falls back to a numeric-aware locale compare for non-numeric strings', () => {
+    expect(compareCells('2026-04-01', '2026-05-01', 'asc')).toBeLessThan(0);
+    expect(compareCells('2026-04-01', '2026-05-01', 'desc')).toBeGreaterThan(0);
+  });
+});
+
+webDescribe('GameLogsTable sortable headers (LS-7457)', () => {
+  it('cycles a header aria-sort unsorted → ascending → descending → none', async () => {
+    mockFetchOnce(makePaginatedWithStats(['AB', 'H'], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId, getByTestId } =
+      render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    clickSubmit(getByText);
+
+    const header = await findByTestId('game-logs-header-AB');
+    const headerCell = getByTestId('game-logs-header-cell-AB');
+    expect(headerCell.getAttribute('aria-sort')).toBe('none');
+
+    fireEvent.click(header);
+    expect(
+      getByTestId('game-logs-header-cell-AB').getAttribute('aria-sort'),
+    ).toBe('ascending');
+
+    fireEvent.click(getByTestId('game-logs-header-AB'));
+    expect(
+      getByTestId('game-logs-header-cell-AB').getAttribute('aria-sort'),
+    ).toBe('descending');
+
+    fireEvent.click(getByTestId('game-logs-header-AB'));
+    expect(
+      getByTestId('game-logs-header-cell-AB').getAttribute('aria-sort'),
+    ).toBe('none');
+  });
+});
+
+webDescribe('GameLogsTable premium advanced columns (LS-7463)', () => {
+  it('strips advanced columns for free users', async () => {
+    const advanced = ADVANCED_STAT_KEYS[0];
+    mockFetchOnce(makePaginatedWithStats(['AB', 'H', advanced], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId, queryByTestId } =
+      render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    clickSubmit(getByText);
+
+    await findByTestId('game-logs-header-AB');
+    expect(queryByTestId(`game-logs-header-${advanced}`)).toBeNull();
+  });
+
+  it('shows advanced columns for premium users', async () => {
+    const advanced = ADVANCED_STAT_KEYS[0];
+    mockFetchOnce(makePaginatedWithStats(['AB', 'H', advanced], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId } = render(
+      <GameLogsTable isPremium />,
+    );
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    clickSubmit(getByText);
+
+    expect(await findByTestId(`game-logs-header-${advanced}`)).toBeTruthy();
+  });
+});
+
+webDescribe('GameLogsTable column customizer (LS-7464)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('hides the customize entry for free users', async () => {
+    mockFetchOnce(makePaginatedWithStats(['AB', 'H'], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId, queryByTestId } =
+      render(<GameLogsTable />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    clickSubmit(getByText);
+
+    await findByTestId('game-logs-header-AB');
+    expect(queryByTestId('game-logs-customize-columns')).toBeNull();
+  });
+
+  it('hides a column via the customizer and persists it to localStorage', async () => {
+    mockFetchOnce(makePaginatedWithStats(['AB', 'H'], 50, 162));
+
+    const {
+      getByPlaceholderText,
+      getByText,
+      findByTestId,
+      getByTestId,
+      queryByTestId,
+    } = render(<GameLogsTable isPremium />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    clickSubmit(getByText);
+
+    await findByTestId('game-logs-header-AB');
+
+    fireEvent.click(getByTestId('game-logs-customize-columns'));
+    fireEvent.click(getByTestId('column-customizer-visible-AB'));
+
+    expect(queryByTestId('game-logs-header-AB')).toBeNull();
+    expect(getByTestId('game-logs-header-H')).toBeTruthy();
+
+    const raw = window.localStorage.getItem('gameLogs.mlb.columns');
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string) as { hidden: string[] };
+    expect(parsed.hidden).toContain('AB');
+  });
+
+  it('restores persisted column preferences on mount', async () => {
+    window.localStorage.setItem(
+      'gameLogs.mlb.columns',
+      JSON.stringify({ order: [], hidden: ['AB'], pinned: [] }),
+    );
+    mockFetchOnce(makePaginatedWithStats(['AB', 'H'], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId, queryByTestId } =
+      render(<GameLogsTable isPremium />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    clickSubmit(getByText);
+
+    await findByTestId('game-logs-header-H');
+    expect(queryByTestId('game-logs-header-AB')).toBeNull();
   });
 });
