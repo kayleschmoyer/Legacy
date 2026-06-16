@@ -1,4 +1,4 @@
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import {
   getAvailableDraftPlayersResponse,
@@ -12,7 +12,6 @@ import {
   mockDraftPlayer,
   userTeamIdResponse,
 } from '../mocks/graphql';
-import { DraftPage } from '../pages/draft.page';
 
 /**
  * E2E Tests for Draft Selection Workflow
@@ -25,6 +24,9 @@ import { DraftPage } from '../pages/draft.page';
  * 5. UI updates to reflect the pick (history, available players, turn)
  *
  * All tests are hermetic — GraphQL responses are mocked via route.fulfill().
+ * The `draftPage` page object is fixture-injected (ADR-0015 §5); specs call
+ * only its semantic verbs/reads and never touch a selector — mocking stays here
+ * in the spec, never in the page object (ADR-0015 §6).
  */
 
 // ── Mock data ──────────────────────────────────────────────────────
@@ -409,52 +411,51 @@ async function setupDraftRoute(
 test.describe('Draft Selection Workflow @regression', () => {
   test('should display draft board with available players when draft is in-progress', async ({
     page,
+    draftPage,
   }) => {
     await setupDraftRoute(page);
-    const draftPage = new DraftPage(page);
 
-    await draftPage.goto(TEST_LEAGUE_ID);
+    await draftPage.gotoLeague(TEST_LEAGUE_ID);
     await draftPage.expectBoardVisible();
 
     // Player pool should be visible with available players
-    await expect(draftPage.playerPool).toBeVisible({ timeout: 5000 });
+    await draftPage.expectPlayerPoolVisible();
 
     // Current pick indicator should show it's the user's turn
-    await expect(draftPage.currentPick).toBeVisible({ timeout: 5000 });
+    await draftPage.expectCurrentPickVisible();
+
+    // It's the user's turn, so the pool exposes draftable players
+    expect(await draftPage.draftablePlayerCount()).toBeGreaterThan(0);
   });
 
   test('should allow searching for players in the draft pool', async ({
     page,
+    draftPage,
   }) => {
     await setupDraftRoute(page);
-    const draftPage = new DraftPage(page);
 
-    await draftPage.goto(TEST_LEAGUE_ID);
+    await draftPage.gotoLeague(TEST_LEAGUE_ID);
     await draftPage.expectBoardVisible();
 
-    // Search for a specific player
+    // Search for a specific player. `searchPlayer` fills the input and confirms
+    // the value registered (its deterministic signal), so no separate
+    // input-value assertion is needed in the spec.
     await draftPage.searchPlayer('Trout');
-
-    // Verify search input has the value
-    await expect(draftPage.playerSearch).toHaveValue('Trout');
   });
 
   test('should send makeDraftPick mutation when drafting a player', async ({
     page,
+    draftPage,
   }) => {
     const { capturedMutations } = await setupDraftRoute(page, {
       isMyPick: true,
     });
-    const draftPage = new DraftPage(page);
 
-    await draftPage.goto(TEST_LEAGUE_ID);
+    await draftPage.gotoLeague(TEST_LEAGUE_ID);
     await draftPage.expectBoardVisible();
 
-    // Use the DraftPage helper to find the draft button
-    await expect(draftPage.draftPlayerButton.first()).toBeVisible({
-      timeout: 5000,
-    });
-    await draftPage.draftPlayerButton.first().click();
+    // Draft the first available player
+    await draftPage.draftFirstAvailable();
 
     // Verify the makeDraftPick mutation was captured
     await expect
@@ -471,31 +472,26 @@ test.describe('Draft Selection Workflow @regression', () => {
 
   test("should show correct turn indicator when it is not the user's turn", async ({
     page,
+    draftPage,
   }) => {
     await setupDraftRoute(page, { isMyPick: false });
-    const draftPage = new DraftPage(page);
 
-    await draftPage.goto(TEST_LEAGUE_ID);
+    await draftPage.gotoLeague(TEST_LEAGUE_ID);
     await draftPage.expectBoardVisible();
 
     // Current pick should be visible but show another team's turn
-    await expect(draftPage.currentPick).toBeVisible({ timeout: 5000 });
+    await draftPage.expectCurrentPickVisible();
 
     // Draft/pick buttons must NOT be actionable when it is not the user's turn.
     // Acceptable shapes: button hidden OR button visible-but-disabled. Both
-    // behaviors satisfy the same user-facing contract — the user cannot
-    // submit a pick — so we assert the contract rather than picking one
-    // implementation.
-    const draftBtn = draftPage.draftPlayerButton.first();
-    await expect
-      .poll(
-        async () =>
-          (await draftBtn.isVisible()) && !(await draftBtn.isDisabled()),
-      )
-      .toBe(false);
+    // satisfy the same user-facing contract — the user cannot submit a pick.
+    await draftPage.expectCannotDraft();
   });
 
-  test('should display pick history after picks are made', async ({ page }) => {
+  test('should display pick history after picks are made', async ({
+    page,
+    draftPage,
+  }) => {
     // Set up with existing pick history
     await setupDraftRoute(page, {
       pickHistory: [
@@ -511,17 +507,18 @@ test.describe('Draft Selection Workflow @regression', () => {
       ],
       isMyPick: true,
     });
-    const draftPage = new DraftPage(page);
 
-    await draftPage.goto(TEST_LEAGUE_ID);
+    await draftPage.gotoLeague(TEST_LEAGUE_ID);
     await draftPage.expectBoardVisible();
 
     // Assert pick history shows the previous pick
-    const pickHistoryText = page.getByText('Ohtani').first();
-    await expect(pickHistoryText).toBeVisible({ timeout: 5000 });
+    await draftPage.expectPickInHistory('Ohtani');
   });
 
-  test('should handle makeDraftPick error gracefully', async ({ page }) => {
+  test('should handle makeDraftPick error gracefully', async ({
+    page,
+    draftPage,
+  }) => {
     // Set up base mocks first so the fallback route has something to delegate to
     await setupDraftRoute(page, { isMyPick: true });
 
@@ -564,22 +561,15 @@ test.describe('Draft Selection Workflow @regression', () => {
       },
     );
 
-    const draftPage = new DraftPage(page);
-    await draftPage.goto(TEST_LEAGUE_ID);
+    await draftPage.gotoLeague(TEST_LEAGUE_ID);
     await draftPage.expectBoardVisible();
 
-    // Ensure the draft button is visible before clicking
-    await expect(draftPage.draftPlayerButton.first()).toBeVisible({
-      timeout: 5000,
-    });
-    await draftPage.draftPlayerButton.first().click();
+    // Draft the first available player; the mocked MakeDraftPick returns a
+    // GraphQL error.
+    await draftPage.draftFirstAvailable();
 
-    // The mocked MakeDraftPick returns a GraphQL error. The UI must surface
-    // it on an alert with non-empty content; the draft board must remain
-    // functional (no crash / blank page).
-    const errorAlert = page.locator('[role="alert"]').first();
-    await expect(errorAlert).toBeVisible({ timeout: 5_000 });
-    await expect(errorAlert).not.toHaveText('');
-    await expect(draftPage.draftBoard).toBeVisible();
+    // The UI must surface the error on an alert with non-empty content, and the
+    // draft board must remain functional (no crash / blank page).
+    await draftPage.expectDraftError();
   });
 });

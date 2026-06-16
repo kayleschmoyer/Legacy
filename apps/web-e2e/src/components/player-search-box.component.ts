@@ -31,6 +31,21 @@ export class PlayerSearchBox extends BaseComponent {
   // ── Actions ──────────────────────────────────────────────────────
 
   /**
+   * Type `term` into the search input and confirm it registered, WITHOUT
+   * asserting any result rows. The deterministic signal is the input reflecting
+   * the value; the consuming surface owns the "results filtered" assertion.
+   *
+   * Use this when the composing page renders results the component cannot see —
+   * e.g. the draft board, whose filtered players are `PlayerCard`s (`role=group`)
+   * rather than `player-row-*` rows (ADR-0015 §2; mirrors the old
+   * DraftPage.searchPlayer fill-and-confirm behavior).
+   */
+  async fill(term: string): Promise<void> {
+    await this.#input.fill(term);
+    await expect(this.#input).toHaveValue(term);
+  }
+
+  /**
    * Type `term` into the search input and wait for the debounced filter to
    * flush. The search is debounced (~350ms) and filters client-side without a
    * network request, so the deterministic "flushed" signal is the first result
@@ -42,8 +57,7 @@ export class PlayerSearchBox extends BaseComponent {
    * `expectNoResults()` instead — `filterTo` expects at least one match.
    */
   async filterTo(term: string): Promise<void> {
-    await this.#input.fill(term);
-    await expect(this.#input).toHaveValue(term);
+    await this.fill(term);
     await expect(this.#results.first()).toContainText(term, { timeout: 15000 });
   }
 
