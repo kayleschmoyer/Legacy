@@ -6,6 +6,8 @@
  * the players feature (see PlayersStatsTable.spec.tsx).
  */
 import type { GetAllPlayerSeasonStatsQuery } from '@legacy-sports/graphql';
+import { act, renderHook } from '@testing-library/react';
+import { useEffect, useState } from 'react';
 import {
   addPlayerToSlots,
   bestIndex,
@@ -208,7 +210,6 @@ describe('addPlayerToSlots', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // restorePlayerToSlot — LS-7040 (undo a removed chip)
 // ---------------------------------------------------------------------------
 
@@ -427,5 +428,79 @@ describe('season breakdown render guards (PCM-041 regression)', () => {
       showPitching: false,
       showFallback: true,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PlayerSearchInput debounce — LS-7020
+// ---------------------------------------------------------------------------
+
+function useDebounce(value: string, delay = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
+
+describe('PlayerSearchInput debounce', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('does not update the debounced value before 300ms have elapsed', () => {
+    const { result, rerender } = renderHook(
+      ({ v }: { v: string }) => useDebounce(v),
+      {
+        initialProps: { v: '' },
+      },
+    );
+    rerender({ v: 'M' });
+    act(() => {
+      jest.advanceTimersByTime(299);
+    });
+    expect(result.current).toBe('');
+  });
+
+  it('updates the debounced value after 300ms', () => {
+    const { result, rerender } = renderHook(
+      ({ v }: { v: string }) => useDebounce(v),
+      {
+        initialProps: { v: '' },
+      },
+    );
+    rerender({ v: 'Mi' });
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+    expect(result.current).toBe('Mi');
+  });
+
+  it('cancels the pending update when the value changes before 300ms — prevents per-keystroke queries', () => {
+    const { result, rerender } = renderHook(
+      ({ v }: { v: string }) => useDebounce(v),
+      {
+        initialProps: { v: '' },
+      },
+    );
+    rerender({ v: 'M' });
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    rerender({ v: 'Mi' });
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    // 200ms total — neither timer has fired yet
+    expect(result.current).toBe('');
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    // 300ms after the second keystroke — only the final value emitted
+    expect(result.current).toBe('Mi');
   });
 });

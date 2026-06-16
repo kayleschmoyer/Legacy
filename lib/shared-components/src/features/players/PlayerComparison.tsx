@@ -435,9 +435,9 @@ function PlayerSearchInput({
 
   React.useEffect(() => {
     if (error) {
-      LOGGER.error('Failed to fetch players', error, { query });
+      LOGGER.error('Failed to fetch players', error, { query: debouncedQuery });
     }
-  }, [error, query]);
+  }, [error, debouncedQuery]);
 
   const results = useMemo(
     () =>
@@ -453,7 +453,7 @@ function PlayerSearchInput({
       ? 'Add at least 2 players to run the comparison.'
       : `${usedCount} of 4 selected · ${slotsOpen} slot${slotsOpen === 1 ? '' : 's'} open`;
 
-  const showDropdown = open && query.trim().length >= 2;
+  const showDropdown = open && debouncedQuery.trim().length >= 2;
 
   return (
     <View
