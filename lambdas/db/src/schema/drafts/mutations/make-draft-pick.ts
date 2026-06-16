@@ -4,27 +4,21 @@
 
 import {
   createBadgeService,
-  filterPlayerIdsByLeagueEligibility,
   findFailedEligibilityRule,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
 import { DraftPick } from '../types';
-import {
-  ALLOWED_POSITIONS_FOR_AUTO_PICK,
-  commitDraftPick,
-  getCurrentDraftPickInfo,
-  getFirstQueuedPlayerForTeam,
-  getUnfilledPositionTypes,
-} from '../helpers';
+import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { logDraftPickActivity } from '../../../services/activity-log';
 import { checkRosterCapacity } from '../../../services/roster-service';
+import { triggerAutoProcessDraftPicks } from '../trigger-auto-process';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -370,14 +364,6 @@ builder.mutationField('makeDraftPick', (t) =>
           isDraftComplete: result.isDraftComplete,
         });
 
-        // Track effective draft completion across the manual pick + any auto-pick chain.
-        let effectiveDraftComplete = result.isDraftComplete;
-        // For idempotent picks, suppress auto-pick chaining — the pick was
-        // already committed in a prior request, so we must not advance the draft.
-        let chainedNextPickInfo = result.isIdempotentPick
-          ? null
-          : result.nextPickInfo;
-
         // Send WebSocket notification for the pick (outside transaction).
         // Sent for both new and idempotent picks. Idempotent picks now carry
         // the actual nextPickInfo (fetched inside the transaction), so the
@@ -409,504 +395,78 @@ builder.mutationField('makeDraftPick', (t) =>
           );
         }
 
-        // ── LS-440: Chain consecutive auto-picks ───────────────────────────
-        // After a manual pick, if the next team(s) have auto-pick enabled,
-        // process their picks immediately rather than waiting for the
-        // EventBridge timer to expire (which can take up to 60 seconds).
-        // Uses the same smart FPG × positional-scarcity selection algorithm
-        // as autoProcessDraftPicks in scheduled-mutations.ts.
-        //
-        // Chain failures are non-fatal: the user's pick is already committed.
-        // autoProcessDraftPicks (EventBridge + client nudge) handles remaining
-        // AI picks if the chain throws. Wrapping in try-catch prevents a
-        // transient chain error from surfacing a mutation error to the client
-        // (which would leave the Apollo cache stale and the UI stuck in
-        // "YOUR PICK" with no clickable buttons — LS-3704).
-        try {
-          if (!effectiveDraftComplete && chainedNextPickInfo) {
-            // Cap at 10 picks and bail out after 20 s so we respond well within
-            // API Gateway's 29-second integration timeout. Any remaining
-            // consecutive auto-picks are handled by the EventBridge timer
-            // (fires within 60 s). LS-3119
-            const MAX_CHAINED_AUTO_PICKS = 10;
-            const CHAIN_TIME_BUDGET_MS = 20_000;
-            const chainStartTime = Date.now();
-            let chainCount = 0;
-            let stoppedByTimeBudget = false;
-
-            while (
-              chainCount < MAX_CHAINED_AUTO_PICKS &&
-              !effectiveDraftComplete &&
-              chainedNextPickInfo
-            ) {
-              // Guard before every iteration — the while condition doesn't
-              // re-evaluate the budget after the cheap auto-pick check below,
-              // so check again here before starting the expensive transaction.
-              if (Date.now() - chainStartTime >= CHAIN_TIME_BUDGET_MS) {
-                stoppedByTimeBudget = true;
-                break;
-              }
-
-              // Check if the upcoming team has auto-pick enabled
-              const [upcomingTeamEntry] = await context.db
-                .select({ autoPick: PublicSchema.draftTeams.autoPick })
-                .from(PublicSchema.draftTeams)
-                .where(
-                  and(
-                    eq(PublicSchema.draftTeams.draftId, draftId),
-                    eq(
-                      PublicSchema.draftTeams.teamId,
-                      chainedNextPickInfo.teamId,
-                    ),
+        // ── LS-8107: Offload chained auto-picks to a separate request ───────
+        // Previously (LS-440) consecutive auto-picks were chained synchronously
+        // here — up to 10 picks / 20 s — which made the makeDraftPick response
+        // slow whenever the human's pick was followed by several auto-pick
+        // teams. Instead, return the human's pick immediately and let the
+        // existing autoProcessDraftPicks path handle the auto-picks:
+        //   1. Expire the next auto-pick team's deadline so the work is due now.
+        //   2. Fire a set-and-forget HTTP nudge to autoProcessDraftPicks (the
+        //      same system mutation EventBridge invokes every minute) so the
+        //      picks are processed within ~1 s instead of waiting a full
+        //      EventBridge cycle.
+        // The EventBridge schedule (≤60 s) stays as the safety net if the nudge
+        // is dropped. All failures here are non-fatal — the human's pick is
+        // already committed (LS-3704: never surface a chain error to the client).
+        if (
+          !result.isIdempotentPick &&
+          !result.isDraftComplete &&
+          result.nextPickInfo
+        ) {
+          try {
+            const [upcomingTeamEntry] = await context.db
+              .select({ autoPick: PublicSchema.draftTeams.autoPick })
+              .from(PublicSchema.draftTeams)
+              .where(
+                and(
+                  eq(PublicSchema.draftTeams.draftId, draftId),
+                  eq(
+                    PublicSchema.draftTeams.teamId,
+                    result.nextPickInfo.teamId,
                   ),
-                )
-                .limit(1);
+                ),
+              )
+              .limit(1);
 
-              if (!upcomingTeamEntry?.autoPick) break;
+            if (upcomingTeamEntry?.autoPick) {
+              // Expire the next team's deadline so autoProcessDraftPicks treats
+              // it as due immediately (mirrors LS-3643 / LS-427).
+              await context.db
+                .update(PublicSchema.drafts)
+                .set({ currentPickDeadline: new Date(Date.now() - 1) })
+                .where(eq(PublicSchema.drafts.id, draftId));
 
-              // Re-check budget after the cheap DB query above — we're about to
-              // start a multi-query transaction that can take hundreds of ms.
-              if (Date.now() - chainStartTime >= CHAIN_TIME_BUDGET_MS) {
-                stoppedByTimeBudget = true;
-                break;
-              }
+              // Set-and-forget: dispatch the nudge without awaiting it.
+              triggerAutoProcessDraftPicks(result.leagueId);
 
-              // Capture the expected team ID before the async closure to avoid
-              // non-null assertions inside the transaction callback.
-              const expectedAutoPickTeamId = chainedNextPickInfo.teamId;
-
-              // Execute one auto-pick inside a transaction with row-level locking
-              const autoPickResult = await context.db.transaction(
-                async (
-                  apTx,
-                ): Promise<{
-                  draftPick: typeof PublicSchema.draftPicks.$inferSelect;
-                  playerId: number;
-                  autoPickReason: string;
-                  isDraftComplete: boolean;
-                  currentPickInfo: NonNullable<
-                    Awaited<ReturnType<typeof getCurrentDraftPickInfo>>
-                  >;
-                  nextPickInfo: Awaited<
-                    ReturnType<typeof getCurrentDraftPickInfo>
-                  >;
-                  nextDeadline: Date | null;
-                  leagueId: number;
-                  selectionMethod: string;
-                } | null> => {
-                  // Lock draft row to serialize concurrent pick attempts.
-                  // FOR NO KEY UPDATE (LS-4692) lets concurrent FK-referencing
-                  // inserts on draft_picks from unrelated transactions proceed.
-                  const apDraftRows = await apTx.execute(
-                    sql`SELECT * FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
-                  );
-                  const apDraft = apDraftRows.rows[0] as
-                    | {
-                        id: number;
-                        league_id: number;
-                        current_pick: number;
-                        pick_time_limit_seconds: number;
-                        selection_method: string;
-                      }
-                    | undefined;
-                  if (!apDraft) return null;
-
-                  const [apLeague] = await apTx
-                    .select()
-                    .from(PublicSchema.leagues)
-                    .where(eq(PublicSchema.leagues.id, apDraft.league_id))
-                    .limit(1);
-                  if (!apLeague || apLeague.draftStatus !== 'in-progress')
-                    return null;
-
-                  const apPickInfo = await getCurrentDraftPickInfo(
-                    apTx,
-                    draftId,
-                  );
-                  if (!apPickInfo || apPickInfo.isComplete) return null;
-
-                  // Race-condition guard: verify this is still the expected team
-                  if (apPickInfo.teamId !== expectedAutoPickTeamId) return null;
-
-                  // 1. Fetch undrafted player IDs (deterministic id-ascending order)
-                  const undraftedRows = await apTx.execute(
-                    sql`SELECT id FROM players p
-                      WHERE NOT EXISTS (
-                        SELECT 1 FROM draft_picks dp
-                        WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
-                      )
-                      AND p.sport = ${apLeague.sport}
-                      ORDER BY p.id ASC`,
-                  );
-                  const undraftedIds = undraftedRows.rows.map(
-                    (r) => r.id as number,
-                  );
-
-                  // 2. Apply league eligibility filters
-                  const eligibilityResult =
-                    await filterPlayerIdsByLeagueEligibility(
-                      apTx,
-                      undraftedIds,
-                      {
-                        playerPool: apLeague.playerPool,
-                        minCareerGames: apLeague.minCareerGames ?? 0,
-                        minCareerSeasons: apLeague.minCareerSeasons ?? 0,
-                        baseballHofOnly: apLeague.baseballHofOnly ?? false,
-                        baseballEraFilter: apLeague.baseballEraFilter ?? 'all',
-                        customEraStartYear: apLeague.customEraStartYear ?? null,
-                        customEraEndYear: apLeague.customEraEndYear ?? null,
-                        sport: apLeague.sport,
-                      },
-                    );
-                  const eligibleIds = undraftedIds.filter((id) =>
-                    eligibilityResult.eligibleIds.has(id),
-                  );
-                  if (eligibleIds.length === 0)
-                    throw new Error(
-                      `No available players for auto-pick chain in draft ${draftId}`,
-                    );
-
-                  // 3. Unfilled roster position types for this team
-                  const unfilledPositionTypes = await getUnfilledPositionTypes(
-                    apTx,
-                    draftId,
-                    apPickInfo.teamId,
-                    apDraft.league_id,
-                  );
-
-                  // 3a. Draft queue check (LS-473): prefer the user's queue over
-                  //     the FPG algorithm when a queued, eligible player is available.
-                  const eligibleSet = new Set(eligibleIds);
-                  const queuedPlayerId = await getFirstQueuedPlayerForTeam(
-                    apTx,
-                    draftId,
-                    apPickInfo.teamId,
-                  );
-
-                  let autoPlayerId: number | undefined;
-                  let autoPickReason = '';
-
-                  if (
-                    queuedPlayerId !== null &&
-                    eligibleSet.has(queuedPlayerId)
-                  ) {
-                    autoPlayerId = queuedPlayerId;
-                    autoPickReason = `Draft queue pick — player ${queuedPlayerId} (user's next queued selection)`;
-                  }
-
-                  if (autoPlayerId !== undefined) {
-                    // Queue pick: skip the expensive stats query
-                    LOGGER.info(
-                      '[LS-473] Chained auto-pick: using draft queue selection',
-                      {
-                        draftId,
-                        teamId: apPickInfo.teamId,
-                        playerId: autoPlayerId,
-                      },
-                    );
-                  } else {
-                    // 4. Smart player selection: projected FPG × positional scarcity
-                    //    (same algorithm as autoProcessDraftPicks)
-                    const apGamesPerMatchup = apLeague.gamesPerMatchup ?? 5;
-                    const apSpStartsPerMatchup =
-                      apLeague.pitcherStartsPerMatchup ?? 1;
-                    // Use pre-computed per-category PPG from player_scoring_cache (LS-902)
-                    const statsRows = await apTx.execute(sql`
-                  SELECT
-                    p.id AS player_id,
-                    (
-                      COALESCE(cs.batting_ppg, 0)  * ${apGamesPerMatchup} +
-                      COALESCE(cs.pitching_ppg, 0) * ${apSpStartsPerMatchup} +
-                      COALESCE(cs.fielding_ppg, 0) * ${apGamesPerMatchup}
-                    ) AS projected_fpg
-                  FROM players p
-                  LEFT JOIN public.player_scoring_cache cs
-                    ON cs.player_id = p.id AND cs.league_id IS NULL
-                  WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
-                  ORDER BY projected_fpg DESC
-                  LIMIT 1000
-                `);
-
-                    // Fetch position eligibility from the mat view (same source of truth as the UI)
-                    const positionRows = await apTx
-                      .select({
-                        playerId: PublicSchema.playerEligiblePositions.playerId,
-                        position: PublicSchema.playerEligiblePositions.position,
-                      })
-                      .from(PublicSchema.playerEligiblePositions)
-                      .where(
-                        inArray(
-                          PublicSchema.playerEligiblePositions.playerId,
-                          eligibleIds,
-                        ),
-                      );
-
-                    const eligiblePositionsByPlayer = new Map<
-                      number,
-                      string[]
-                    >();
-                    for (const row of positionRows) {
-                      const positions =
-                        eligiblePositionsByPlayer.get(row.playerId) ?? [];
-                      positions.push(row.position);
-                      eligiblePositionsByPlayer.set(row.playerId, positions);
-                    }
-
-                    const playerDraftInfo = new Map<
-                      number,
-                      { fpg: number; positions: string[] }
-                    >();
-                    for (const row of statsRows.rows) {
-                      const pid = row.player_id as number;
-                      playerDraftInfo.set(pid, {
-                        fpg: Number(row.projected_fpg) || 0,
-                        positions: eligiblePositionsByPlayer.get(pid) ?? [],
-                      });
-                    }
-
-                    if (unfilledPositionTypes.length > 0) {
-                      const totalEligible = Math.max(playerDraftInfo.size, 1);
-                      const positionCandidateCounts = new Map<string, number>();
-                      for (const posType of unfilledPositionTypes) {
-                        const allowedStatPositions =
-                          ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [posType];
-                        let posCount = 0;
-                        for (const [, info] of playerDraftInfo) {
-                          if (
-                            allowedStatPositions.some((sp) =>
-                              info.positions.includes(sp),
-                            )
-                          )
-                            posCount++;
-                        }
-                        positionCandidateCounts.set(
-                          posType,
-                          Math.max(posCount, 1),
-                        );
-                      }
-
-                      let bestScore = -Infinity;
-                      for (const [id, info] of playerDraftInfo) {
-                        let scarcityMultiplier = 0.25;
-                        let matchesUnfilled = false;
-                        let bestPosition = '';
-                        for (const posType of unfilledPositionTypes) {
-                          const allowedStatPositions =
-                            ALLOWED_POSITIONS_FOR_AUTO_PICK[posType] ?? [
-                              posType,
-                            ];
-                          if (
-                            allowedStatPositions.some((sp) =>
-                              info.positions.includes(sp),
-                            )
-                          ) {
-                            matchesUnfilled = true;
-                            const posCount =
-                              positionCandidateCounts.get(posType) ??
-                              totalEligible;
-                            const posScarcity = Math.min(
-                              Math.sqrt(totalEligible / posCount),
-                              5.0,
-                            );
-                            if (posScarcity > scarcityMultiplier) {
-                              scarcityMultiplier = posScarcity;
-                              bestPosition = posType;
-                            }
-                          }
-                        }
-                        const draftScore = info.fpg * scarcityMultiplier;
-                        if (draftScore > bestScore) {
-                          bestScore = draftScore;
-                          autoPlayerId = id;
-                          autoPickReason = matchesUnfilled
-                            ? `Best available for ${bestPosition} — ${info.fpg.toFixed(1)} projected FPG (×${scarcityMultiplier.toFixed(1)} positional scarcity)`
-                            : `Best available (bench) — ${info.fpg.toFixed(1)} projected FPG`;
-                        }
-                      }
-                    } else {
-                      // All positions filled — pick the highest-FPG player (bench)
-                      const topPlayer = statsRows.rows[0];
-                      if (topPlayer) {
-                        autoPlayerId = topPlayer.player_id as number;
-                        autoPickReason = `Best available (bench) — ${Number(topPlayer.projected_fpg).toFixed(1)} projected FPG`;
-                      }
-                    }
-
-                    // Final fallback (no career stats)
-                    if (autoPlayerId === undefined) {
-                      autoPlayerId = eligibleIds[0];
-                      autoPickReason =
-                        'Fallback selection (no career stats available)';
-                    }
-                  } // end else (no queue pick)
-
-                  // Roster limit check
-                  const { isFull: apRosterFull } = await checkRosterCapacity(
-                    apTx,
-                    apPickInfo.teamId,
-                    apDraft.league_id,
-                    apLeague.maxRosterSize,
-                  );
-                  if (apRosterFull) {
-                    throw new Error(
-                      `Team ${apPickInfo.teamId} roster is full in draft ${draftId}`,
-                    );
-                  }
-
-                  // Commit the pick: insert pick row, advance draft state, and add player to roster.
-                  const {
-                    draftPick: apDraftPick,
-                    isDraftComplete: apIsDraftComplete,
-                    nextDeadline: apNextDeadline,
-                    nextPickInfo: apNextPickInfo,
-                  } = await commitDraftPick({
-                    tx: apTx,
-                    draftId,
-                    leagueId: apDraft.league_id,
-                    pickInfo: apPickInfo,
-                    playerId: autoPlayerId,
-                    maxRosterSize: apLeague.maxRosterSize,
-                    pickTimeLimitSeconds: apDraft.pick_time_limit_seconds,
-                    isMockDraft: apLeague.isMockDraft,
-                  });
-
-                  return {
-                    draftPick: apDraftPick,
-                    playerId: autoPlayerId,
-                    autoPickReason,
-                    isDraftComplete: apIsDraftComplete,
-                    currentPickInfo: apPickInfo,
-                    nextPickInfo: apNextPickInfo,
-                    nextDeadline: apNextDeadline,
-                    leagueId: apDraft.league_id,
-                    selectionMethod: apDraft.selection_method,
-                  };
+              LOGGER.info(
+                '[LS-8107] Offloaded chained auto-picks to autoProcessDraftPicks',
+                {
+                  draftId,
+                  leagueId: result.leagueId,
+                  nextTeamId: result.nextPickInfo.teamId,
                 },
               );
-
-              if (!autoPickResult) break;
-
-              chainCount++;
-
-              LOGGER.info('[LS-440] Chained auto-pick made after manual pick', {
-                draftId,
-                leagueId: autoPickResult.leagueId,
-                playerId: autoPickResult.playerId,
-                teamId: autoPickResult.currentPickInfo.teamId,
-                overallPick: autoPickResult.currentPickInfo.overallPick,
-                chainCount,
-                reason: autoPickResult.autoPickReason,
-              });
-
-              // Send WS notification for this chained auto-pick
-              if (context.notificationService) {
-                await context.notificationService.notifyDraftPickMade(
-                  autoPickResult.leagueId,
-                  draftId,
-                  autoPickResult.draftPick.id,
-                  autoPickResult.currentPickInfo.teamId,
-                  autoPickResult.playerId,
-                  autoPickResult.currentPickInfo.round,
-                  autoPickResult.currentPickInfo.pickNumber,
-                  autoPickResult.currentPickInfo.overallPick,
-                  autoPickResult.nextPickInfo
-                    ? {
-                        teamId: autoPickResult.nextPickInfo.teamId,
-                        round: autoPickResult.nextPickInfo.round,
-                        pickNumber: autoPickResult.nextPickInfo.pickNumber,
-                        overallPick: autoPickResult.nextPickInfo.overallPick,
-                      }
-                    : undefined,
-                  {
-                    wasAutoPick: true,
-                    autoPickReason: autoPickResult.autoPickReason,
-                    currentPickDeadline:
-                      autoPickResult.nextDeadline?.toISOString() ?? null,
-                  },
-                );
-              }
-
-              // Record chained auto-pick in the activity log (LS-538)
-              await logDraftPickActivity(context, {
-                leagueId: autoPickResult.leagueId,
-                teamId: autoPickResult.currentPickInfo.teamId,
-                actorUserId: null, // system-driven auto-pick
-                playerId: autoPickResult.playerId,
-                round: autoPickResult.currentPickInfo.round,
-                pickNumber: autoPickResult.currentPickInfo.pickNumber,
-                overallPick: autoPickResult.currentPickInfo.overallPick,
-                wasAutoPick: true,
-              });
-
-              effectiveDraftComplete = autoPickResult.isDraftComplete;
-              chainedNextPickInfo = autoPickResult.nextPickInfo;
             }
-
-            // LS-3643: If the chain stopped (budget or cap) and the next team
-            // has auto-pick enabled, expire their deadline immediately so that
-            // autoProcessDraftPicks picks up the next batch without waiting a
-            // full timer cycle. Mirrors the same logic in scheduled-mutations.ts.
-            if (!effectiveDraftComplete && chainedNextPickInfo) {
-              const [nextAutoPickCheck] = await context.db
-                .select({ autoPick: PublicSchema.draftTeams.autoPick })
-                .from(PublicSchema.draftTeams)
-                .where(
-                  and(
-                    eq(PublicSchema.draftTeams.draftId, draftId),
-                    eq(
-                      PublicSchema.draftTeams.teamId,
-                      chainedNextPickInfo.teamId,
-                    ),
-                  ),
-                )
-                .limit(1);
-              if (nextAutoPickCheck?.autoPick) {
-                await context.db
-                  .update(PublicSchema.drafts)
-                  .set({ currentPickDeadline: new Date(Date.now() - 1) })
-                  .where(eq(PublicSchema.drafts.id, draftId));
-                LOGGER.info(
-                  '[LS-3643] Next team has auto-pick — expiring deadline after chain stop',
-                  {
-                    draftId,
-                    nextTeamId: chainedNextPickInfo.teamId,
-                    chainCount,
-                    stoppedByTimeBudget,
-                  },
-                );
-              }
-            }
-
-            if (chainCount > 0 || stoppedByTimeBudget) {
-              const chainElapsedMs = Date.now() - chainStartTime;
-              LOGGER.info('[LS-440] Auto-pick chain complete', {
-                draftId,
-                chainCount,
-                effectiveDraftComplete,
-                chainElapsedMs,
-                stoppedByTimeBudget,
-              });
-            }
+          } catch (offloadError) {
+            LOGGER.warn(
+              '[LS-8107] Failed to offload auto-picks (non-fatal)',
+              offloadError instanceof Error
+                ? offloadError
+                : new Error(String(offloadError)),
+              { draftId, leagueId: result.leagueId },
+            );
           }
-        } catch (chainError) {
-          // Non-fatal: the user's pick is already committed. EventBridge and
-          // the client nudge (autoProcessDraftPicks) will handle any remaining
-          // AI picks. Without this catch, a transient chain error would surface
-          // a mutation error to the Apollo client, leaving its cache stale and
-          // the UI stuck showing "YOUR PICK" with no clickable buttons (LS-3704).
-          LOGGER.warn(
-            '[LS-440] Auto-pick chain failed (non-fatal)',
-            chainError instanceof Error
-              ? chainError
-              : new Error(String(chainError)),
-            { draftId, leagueId: result.leagueId },
-          );
         }
 
-        // Auto-create all matchups when draft completes.
+        // Auto-create all matchups when the manual pick itself completes the
+        // draft (the final pick, with no auto-pick teams after it). When an
+        // auto-pick completes the draft, autoProcessDraftPicks → executePickEffects
+        // handles matchup creation and the completion notification instead.
         // Skipped for mock drafts — the league is ephemeral and rosters are not
         // persisted, so matchups and badge evaluation would be meaningless.
-        if (effectiveDraftComplete && !result.isMockDraft) {
+        if (result.isDraftComplete && !result.isMockDraft) {
           try {
             const matchupResult = await createAllMatchupsForLeague(
               context.db,
@@ -942,7 +502,7 @@ builder.mutationField('makeDraftPick', (t) =>
         // For real drafts, this fires after createAllMatchupsForLeague so
         // positionId values are set before the frontend refetches team members.
         // Notifying before matchup creation caused roster lineup to show 0 (LS-3774).
-        if (effectiveDraftComplete && context.notificationService) {
+        if (result.isDraftComplete && context.notificationService) {
           await context.notificationService.notifyDraftCompleted(
             result.leagueId,
             result.selectionMethod,

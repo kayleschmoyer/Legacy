@@ -85,12 +85,18 @@ function setupResolver(options: {
     overallPick: number;
     isComplete: boolean;
   } | null;
+  /**
+   * Whether the team that picks AFTER the human has auto-pick enabled. Drives
+   * the LS-8107 offload path (deadline expiry + autoProcessDraftPicks nudge).
+   */
+  nextTeamAutoPick?: boolean;
 }) {
   jest.resetModules();
 
   let capturedFn: Resolver | undefined;
 
   const mockNotifyDraftPickMade = jest.fn().mockResolvedValue(undefined);
+  const mockTriggerAutoProcessDraftPicks = jest.fn();
 
   // Phase-1 draft row
   const draftRow = {
@@ -236,6 +242,7 @@ function setupResolver(options: {
         teamId: 'teamId',
         autoPick: 'autoPick',
       },
+      drafts: { id: 'id', currentPickDeadline: 'currentPickDeadline' },
       players: { id: 'id' },
       playerEligiblePositions: { playerId: 'playerId', position: 'position' },
     },
@@ -257,6 +264,10 @@ function setupResolver(options: {
 
   jest.doMock('../../../services/activity-log', () => ({
     logDraftPickActivity: jest.fn().mockResolvedValue(undefined),
+  }));
+
+  jest.doMock('../trigger-auto-process', () => ({
+    triggerAutoProcessDraftPicks: mockTriggerAutoProcessDraftPicks,
   }));
 
   jest.doMock('../../matchups/mutations', () => ({
@@ -348,6 +359,11 @@ function setupResolver(options: {
         if (call === 1) return Promise.resolve([leagueRow]);
         if (call === 2) return Promise.resolve([memberRow]);
         if (call === 3) return Promise.resolve([playerRow]);
+        // Call 4 = LS-8107 offload: look up whether the next team has auto-pick.
+        if (call === 4)
+          return Promise.resolve([
+            { autoPick: options.nextTeamAutoPick ?? false },
+          ]);
         return Promise.resolve([]);
       }),
       orderBy: jest.fn().mockResolvedValue([]),
@@ -372,7 +388,7 @@ function setupResolver(options: {
     },
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- the module under test must be required AFTER jest.doMock() registers the mocks above; a static import would hoist and bypass them
   require('./make-draft-pick');
 
   if (!capturedFn) throw new Error('makeDraftPick resolver was not captured');
@@ -383,6 +399,9 @@ function setupResolver(options: {
     currentPickInfo,
     mockNotifyDraftPickMade,
     mockGetCurrentDraftPickInfo,
+    mockTriggerAutoProcessDraftPicks,
+    mockCommitDraftPick,
+    mockDb,
     idempotentPick,
   };
 }
@@ -443,15 +462,77 @@ describe('makeDraftPick — idempotent pick re-notification (LS-7977)', () => {
     // For an idempotent pick, `chainedNextPickInfo` must be null so the
     // auto-pick loop is skipped. We verify this indirectly: commitDraftPick
     // should not be called (since no new pick is being made).
-    const { resolve, ctx } = setupResolver({});
+    const { resolve, ctx, mockCommitDraftPick } = setupResolver({});
 
-    // commitDraftPick mock is in helpers — access via the mocked module.
-    // We verify it was NOT called (only getCurrentDraftPickInfo is called
-    // for the idempotent path).
+    // We verify commitDraftPick was NOT called (only getCurrentDraftPickInfo
+    // is called for the idempotent path — no new pick is being made).
     await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const helpers = require('../helpers') as { commitDraftPick: jest.Mock };
-    expect(helpers.commitDraftPick).not.toHaveBeenCalled();
+    expect(mockCommitDraftPick).not.toHaveBeenCalled();
+  });
+});
+
+describe('makeDraftPick — asynchronous auto-pick offload (LS-8107)', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns the human pick immediately without synchronously chaining auto-picks', async () => {
+    // BEFORE LS-8107 this resolver ran the auto-pick chain inline, calling
+    // commitDraftPick once per chained auto-pick (up to 10) before returning —
+    // which is what made the response slow. AFTER the fix, only the human's
+    // pick is committed synchronously; the chain is offloaded.
+    const {
+      resolve,
+      ctx,
+      mockTriggerAutoProcessDraftPicks,
+      mockCommitDraftPick,
+    } = setupResolver({
+      existingOwnPick: null, // new (non-idempotent) pick
+      nextTeamAutoPick: true,
+    });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(mockCommitDraftPick).toHaveBeenCalledTimes(1); // human pick only
+    expect(mockTriggerAutoProcessDraftPicks).toHaveBeenCalledTimes(1);
+    expect(mockTriggerAutoProcessDraftPicks).toHaveBeenCalledWith(10); // leagueId
+  });
+
+  it('expires the next team deadline and nudges autoProcessDraftPicks when the next team auto-picks', async () => {
+    const { resolve, ctx, mockTriggerAutoProcessDraftPicks } = setupResolver({
+      existingOwnPick: null,
+      nextTeamAutoPick: true,
+    });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    // Deadline expiry is the only context.db.update on the non-complete path.
+    expect(ctx.db.update).toHaveBeenCalledTimes(1);
+    expect(mockTriggerAutoProcessDraftPicks).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not nudge or expire the deadline when the next team is human-controlled', async () => {
+    const { resolve, ctx, mockTriggerAutoProcessDraftPicks } = setupResolver({
+      existingOwnPick: null,
+      nextTeamAutoPick: false,
+    });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(mockTriggerAutoProcessDraftPicks).not.toHaveBeenCalled();
+    expect(ctx.db.update).not.toHaveBeenCalled();
+  });
+
+  it('does not nudge for idempotent picks', async () => {
+    // Idempotent picks must never advance the draft, so the offload path is
+    // skipped entirely (guarded by !result.isIdempotentPick).
+    const { resolve, ctx, mockTriggerAutoProcessDraftPicks } = setupResolver({
+      nextTeamAutoPick: true,
+    });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(mockTriggerAutoProcessDraftPicks).not.toHaveBeenCalled();
   });
 });

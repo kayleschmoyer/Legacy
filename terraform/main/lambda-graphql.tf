@@ -225,6 +225,15 @@ resource "aws_lambda_function" "graphql" {
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
       WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.id}.amazonaws.com/${var.environment}"
 
+      # Public URL of this service's own GraphQL endpoint. Used to fire a
+      # set-and-forget HTTP nudge to the autoProcessDraftPicks system mutation
+      # after a manual draft pick so chained auto-picks are processed in a
+      # separate Lambda invocation instead of blocking the response (LS-8107).
+      # Constructed from primitives (not aws_api_gateway_stage.invoke_url) to
+      # avoid a stage→deployment→integration→lambda→stage dependency cycle —
+      # mirrors the WEBSOCKET_ENDPOINT pattern above.
+      GRAPHQL_SELF_URL = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${data.aws_region.current.id}.amazonaws.com/${var.environment}/graphql"
+
       # System API key for EventBridge / admin CLI system mutations.
       # Fetched from Secrets Manager at cold-start — we pass only the secret
       # name here so the plaintext is not present in the Lambda environment
