@@ -239,7 +239,7 @@ test.describe
   // -------------------------------------------------------------------------
 
   test('Phase 5: Player search returns live results; comparison is premium-gated', async ({
-    commissionerPage: page,
+    freePage: page,
   }) => {
     await page.goto('/players/compare');
     await page.waitForLoadState('domcontentloaded');
@@ -250,11 +250,12 @@ test.describe
     });
 
     // The /players/compare comparison tool is wrapped in <PremiumGate>
-    // (apps/web/src/pages/players/PlayerComparisonPage.tsx). The live
-    // integration identity is a per-spec, freshly-registered FREE-tier user
-    // (fixtures/ui.ts → getSpecUserJwt('COMMISSIONER', …)) with no Stripe
-    // subscription and accessLevel 'none', so useIsPremium() resolves false
-    // and the gate renders a full-bleed `premium-feature-gate` overlay with
+    // (apps/web/src/pages/players/PlayerComparisonPage.tsx). This phase asserts
+    // the gate, so it runs on the dedicated FREE-tier identity (fixtures/ui.ts
+    // → loginAs('free', 1), LS-8057) rather than the now-premium commissioner
+    // fixture. A free user has no premium subscription, so useIsPremium()
+    // resolves false and the gate renders a full-bleed `premium-feature-gate`
+    // overlay with
     // pointer-events disabled on the comparison children. A free user
     // therefore CANNOT click a search result to add a chip, build a 2-player
     // comparison, or remove a chip — the click is intercepted by the overlay

@@ -1,6 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
 import { gqlFetch } from './gql-fetch';
-import { freeCommissionerLeagueSlots } from './free-league-slots';
 
 /**
  * API-driven provisioning of a single completed matchup with a narrative recap
@@ -111,12 +110,10 @@ export async function provisionCompletedMatchup(
 ): Promise<ProvisionedMatchup> {
   const { commissionerJwt, managerJwt, leagueName } = args;
 
-  // Free leftover leagues for both identities first — joining a league counts
-  // toward the joiner's free-tier limit too (leagueMembers), so a leftover
-  // under the manager would block the join just as one under the commissioner
-  // blocks creation (LS-7704).
-  await freeCommissionerLeagueSlots(commissionerJwt);
-  await freeCommissionerLeagueSlots(managerJwt);
+  // No free-tier slot clearing (LS-8057): both identities are premium now, so
+  // neither league creation nor joining trips the 3-league cap. Clearing slots
+  // against these shared premium identities would be unsafe — the helper has no
+  // age guard and would delete leagues that concurrent shards are mid-test on.
 
   // 1. Create the league + teams.
   const created = await gqlFetch<{

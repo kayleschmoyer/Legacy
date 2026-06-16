@@ -33,7 +33,6 @@
 import { expect } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { freeCommissionerLeagueSlots } from '../helpers/free-league-slots';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { test } from '../fixtures/ui';
@@ -101,14 +100,13 @@ test.describe
   }) => {
     test.setTimeout(60_000);
 
-    // Free any leftover leagues for this spec's per-spec commissioner before
-    // creating. This spec creates two leagues per run (original + renewed), so
-    // a prior run that leaked either one leaves this identity at or near the
-    // free-tier 3-league cap. The global sweep only cleans the base
-    // commissioner, never this per-spec persona, so clear the slots here so
-    // league creation below never fails with the 3-league limit (LS-7704).
-    await freeCommissionerLeagueSlots(commissionerJwt);
-
+    // No free-tier slot clearing needed (LS-8057): the commissioner is now a
+    // premium identity with no 3-league cap, so creating two leagues per run
+    // (original + renewed) never trips the limit. Both leagues are reaped by the
+    // afterAll cleanupLeague (newest-first for the lineage FK) and the
+    // age-guarded global sweep; clearing slots against a shared premium identity
+    // would be unsafe (it has no age guard and would delete concurrent shards'
+    // in-flight leagues).
     state.leagueName = `Season Renewal E2E ${Date.now()}`;
     const result = await createLeagueViaUI(page, {
       leagueName: state.leagueName,

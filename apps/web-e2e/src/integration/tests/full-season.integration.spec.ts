@@ -1,5 +1,4 @@
 import { cleanupLeague } from '../helpers/cleanup-league';
-import { freeCommissionerLeagueSlots } from '../helpers/free-league-slots';
 import { expect, test } from '../fixtures/api';
 import { graphqlOk } from '../helpers/graphql';
 
@@ -101,23 +100,16 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   // PHASE 1 — PRE-SEASON: LEAGUE SETUP
   // -------------------------------------------------------------------------
 
-  test('Phase 1: League setup', async ({
-    api,
-    api2,
-    apiCommissioner,
-    commissionerJwt,
-  }) => {
+  test('Phase 1: League setup', async ({ api, api2, apiCommissioner }) => {
     // Reset teams array so retries (global retries: 1) start fresh
     state.teams = [];
     await test.step('1.1 Commissioner creates league', async () => {
-      // Free any leftover leagues owned by this spec's per-spec commissioner
-      // persona before creating. A prior run that leaked its league — or a
-      // retry of this very phase, which creates a fresh league each attempt —
-      // can otherwise push the identity over the free-tier 3-league cap, so
-      // createLeagueAndTeams fails with "You have reached the 3-league limit
-      // for your current plan." (LS-7879; same root cause and helper as the
-      // LS-7704 fix in season-renewal-migration-ui). Best-effort: never throws.
-      await freeCommissionerLeagueSlots(commissionerJwt);
+      // No free-tier slot clearing needed (LS-8057): the commissioner is now a
+      // premium identity with no 3-league cap. Clearing slots against a shared
+      // premium identity would also be unsafe — it would delete leagues that
+      // concurrent shards are mid-test on (freeCommissionerLeagueSlots has no
+      // age guard). Per-test cleanupLeague + the age-guarded global sweep handle
+      // cleanup.
       const data = await graphqlOk<{
         createLeagueAndTeams: {
           league: { id: number; name: string; inviteCode: string };

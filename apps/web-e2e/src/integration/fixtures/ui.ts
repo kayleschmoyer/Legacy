@@ -14,42 +14,44 @@ import {
   attributePageCoverage,
   snapshotCoverageBaseline,
 } from '../../fixtures/coverage';
-import {
-  getSpecUserJwt,
-  specSlugFromTestInfo,
-} from '../../utils/test-user-auth';
+import { loginAs } from '../../utils/test-user-auth';
 
 /**
  * Fixtures for live-backend UI E2E tests.
  *
- * Authentication:
- *   The commissioner JWT is sourced from (in order):
- *     1. `INTEGRATION_JWT` env var — escape hatch for passing a pre-issued
- *        JWT directly (not used by the standard nightly CI workflow; handy
- *        for local debugging or ad-hoc runs against a specific user)
- *     2. The CLI token store at `~/.legacy-sports/auth.json` (local dev — run
- *        `./ls-cli.ps1 auth login` before running these tests)
- *     3. `getSpecUserJwt('COMMISSIONER', <specSlug>)` — registers/logs in a
- *        **per-spec unique** commissioner derived from the test file name
- *        (e.g. `commissioner-league-activity-feed-ui@test.legacysports.dev`),
- *        using `E2E_COMMISSIONER_PASSWORD` as the shared password. This is
- *        the path used by the nightly CI workflow and avoids the Cognito 429
- *        collision that surfaced when every spec re-used the same email
- *        (LS-4940).
+ * Tiered auth (LS-8057): feature flows default to the **premium** tier so they
+ * exercise the full app without tripping the LS-5030 premium gates. Specs that
+ * assert gating opt into the **free** fixtures (`freePage` / `freeJwt`); admin-
+ * only flows use the **admin** fixtures. Identities come from the LS-8055
+ * `loginAs(tier, seat)` helper, which resolves stable, pre-provisioned live
+ * users and serves their JWTs from the shared disk cache (LS-5149), so the whole
+ * suite mints each identity's token at most once per run.
  *
- *   Manager JWTs are obtained the same way — `getSpecUserJwt('MANAGER_N',
- *   <specSlug>)` — so each spec gets its own manager identities. No admin
- *   impersonation is used. The persona passwords still come from the
- *   `E2E_COMMISSIONER_PASSWORD` / `E2E_MANAGER_*_PASSWORD` env vars; only the
- *   email is derived from the spec file.
+ *   Commissioner (league creator) ← `loginAs('premium', 2)` — the COMMISSIONER
+ *     identity, which is **premium AND access_level=admin**. Admin is required
+ *     because the creator usually has no `league_members` row, and several specs
+ *     (e.g. live-draft-ui) rely on the `isAdmin` bypass in the `league(id)`
+ *     resolver to read league state without membership.
+ *   Managers 1/2/3 ← `loginAs('premium', 1 | 3 | 4)` — distinct premium
+ *     identities so a multi-manager league has a unique user per seat.
+ *
+ *   The commissioner JWT keeps two local-dev escape hatches ahead of the helper:
+ *     1. `INTEGRATION_JWT` env var — pre-issued JWT (not used by nightly CI).
+ *     2. CLI token store at `~/.legacy-sports/auth.json` (`./ls-cli.ps1 auth login`).
+ *
+ *   Admin-only flows are covered by the commissioner fixture (premium AND
+ *   access_level=admin); API-level admin probes use `fixtures/api.ts`'s
+ *   `adminJwt`. A dedicated admin browser context can be added here if a UI spec
+ *   ever needs an admin user that is NOT the league creator.
  *
  *   Tests can swap tokens in cookies/localStorage via `switchUser()` to act
  *   as different users within one browser context.
  *
  * Provides:
- * - `commissionerPage` — browser context authenticated as the commissioner
+ * - `commissionerPage` — browser context authenticated as the premium+admin commissioner
  * - `commissionerJwt`  — raw JWT for the commissioner
- * - `managerJwt1/2/3`  — raw JWTs for managers 1-3 (direct login, not impersonation)
+ * - `managerJwt1/2/3`  — raw JWTs for premium managers 1-3 (distinct seats)
+ * - `freePage` / `freeJwt` — free-tier identity for gate assertions
  */
 
 export interface UIIntegrationFixtures {
@@ -69,6 +71,16 @@ export interface UIIntegrationFixtures {
   managerPage2: Page;
   /** Separate browser context page authenticated as Manager 3. */
   managerPage3: Page;
+  /**
+   * Raw JWT for a free-tier user (LS-8057, free seat 1). Use ONLY for gate
+   * assertions ("free user sees premium-feature-gate / cannot do X").
+   */
+  freeJwt: string;
+  /**
+   * Browser context authenticated as a free-tier user (LS-8057). Use ONLY for
+   * specs/steps whose intent is to assert premium gating in the UI.
+   */
+  freePage: Page;
   /**
    * GraphQL API request context authenticated as the commissioner.
    * Use for backend polling of server-side state from UI specs (e.g. waiting
@@ -167,11 +179,14 @@ interface CliAuthData {
 }
 
 /**
- * Read the admin JWT from the CLI auth store (~/.legacy-sports/auth.json).
- * Falls back to INTEGRATION_JWT env var for CI, or registers a per-spec
- * unique test commissioner (LS-4940).
+ * Resolve the commissioner (league-creator) JWT. Order:
+ *   1. `INTEGRATION_JWT` env var (local/ad-hoc override).
+ *   2. CLI auth store (~/.legacy-sports/auth.json) for local dev.
+ *   3. `loginAs('premium', 2)` — the premium+admin COMMISSIONER identity
+ *      (LS-8057). Premium clears the LS-5030 gates; admin preserves the
+ *      `league(id)` isAdmin bypass the creator relies on (no league_members row).
  */
-async function getAuthJwt(testInfo: TestInfo): Promise<string> {
+async function getAuthJwt(): Promise<string> {
   if (process.env.INTEGRATION_JWT) {
     const jwt = process.env.INTEGRATION_JWT;
     assertJwtNotExpired(jwt, 'INTEGRATION_JWT env var');
@@ -195,12 +210,12 @@ async function getAuthJwt(testInfo: TestInfo): Promise<string> {
       }
     } catch (err) {
       if (err instanceof JwtExpiredError) throw err;
-      // Fall through to per-spec register
+      // Fall through to the tiered helper.
     }
   }
 
-  // No CLI auth or env var — register/login a per-spec unique commissioner.
-  return getSpecUserJwt('COMMISSIONER', specSlugFromTestInfo(testInfo));
+  // CI / no local token — premium+admin commissioner (LS-8057).
+  return loginAs('premium', 2);
 }
 
 /**
@@ -268,7 +283,7 @@ async function withTracedContext(
 
 export const test = base.extend<UIIntegrationFixtures>({
   commissionerPage: async ({ browser }, use, testInfo) => {
-    const jwt = await getAuthJwt(testInfo);
+    const jwt = await getAuthJwt();
     await withTracedContext(
       browser,
       { baseURL: WEB_BASE, storageState: buildIntegrationStorageState(jwt) },
@@ -278,27 +293,23 @@ export const test = base.extend<UIIntegrationFixtures>({
     );
   },
 
-  commissionerJwt: async ({}, use, testInfo) => {
-    await use(await getAuthJwt(testInfo));
+  commissionerJwt: async ({}, use) => {
+    await use(await getAuthJwt());
   },
 
-  managerJwt1: async ({}, use, testInfo) => {
-    // Per-spec unique manager identity (LS-4940).
-    await use(
-      await getSpecUserJwt('MANAGER_1', specSlugFromTestInfo(testInfo)),
-    );
+  // Premium managers (LS-8057): distinct seats so a multi-manager league has a
+  // unique premium identity per seat (seat 2 is the commissioner; managers take
+  // seats 1, 3, 4). The shared disk cache (LS-5149) mints each at most once/run.
+  managerJwt1: async ({}, use) => {
+    await use(await loginAs('premium', 1));
   },
 
-  managerJwt2: async ({}, use, testInfo) => {
-    await use(
-      await getSpecUserJwt('MANAGER_2', specSlugFromTestInfo(testInfo)),
-    );
+  managerJwt2: async ({}, use) => {
+    await use(await loginAs('premium', 3));
   },
 
-  managerJwt3: async ({}, use, testInfo) => {
-    await use(
-      await getSpecUserJwt('MANAGER_3', specSlugFromTestInfo(testInfo)),
-    );
+  managerJwt3: async ({}, use) => {
+    await use(await loginAs('premium', 4));
   },
 
   managerPage1: async ({ browser, managerJwt1 }, use, testInfo) => {
@@ -335,6 +346,24 @@ export const test = base.extend<UIIntegrationFixtures>({
         storageState: buildIntegrationStorageState(managerJwt3),
       },
       'manager-3',
+      testInfo,
+      use,
+    );
+  },
+
+  // Free-tier identity (LS-8057) — use ONLY for gate assertions.
+  freeJwt: async ({}, use) => {
+    await use(await loginAs('free', 1));
+  },
+
+  freePage: async ({ browser, freeJwt }, use, testInfo) => {
+    await withTracedContext(
+      browser,
+      {
+        baseURL: WEB_BASE,
+        storageState: buildIntegrationStorageState(freeJwt),
+      },
+      'free-user',
       testInfo,
       use,
     );

@@ -1,17 +1,9 @@
-import {
-  type APIRequestContext,
-  test as base,
-  type TestInfo,
-} from '@playwright/test';
+import { type APIRequestContext, test as base } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { assertJwtNotExpired, JwtExpiredError } from '../../utils/jwt';
-import {
-  getSpecUserJwt,
-  loginAs,
-  specSlugFromTestInfo,
-} from '../../utils/test-user-auth';
+import { loginAs } from '../../utils/test-user-auth';
 
 export interface IntegrationFixtures {
   api: APIRequestContext;
@@ -20,9 +12,9 @@ export interface IntegrationFixtures {
   /** A third authenticated API context (commissioner/admin). */
   apiCommissioner: APIRequestContext;
   /**
-   * Raw JWT for the commissioner persona — same identity backing
-   * `apiCommissioner`. Exposed so specs can drive backend cleanup helpers that
-   * take a bearer token directly (e.g. `freeCommissionerLeagueSlots`).
+   * Raw JWT for the commissioner — same identity backing `apiCommissioner`
+   * (LS-8057: premium + admin). Exposed so specs can drive backend helpers that
+   * take a bearer token directly.
    */
   commissionerJwt: string;
   /**
@@ -61,7 +53,7 @@ interface CliAuthData {
   defaultUser: string;
 }
 
-async function getAuthJwt(testInfo: TestInfo): Promise<string> {
+async function getAuthJwt(): Promise<string> {
   if (process.env.INTEGRATION_JWT_COMMISSIONER) {
     const jwt = process.env.INTEGRATION_JWT_COMMISSIONER;
     assertJwtNotExpired(jwt, 'INTEGRATION_JWT_COMMISSIONER env var');
@@ -85,21 +77,21 @@ async function getAuthJwt(testInfo: TestInfo): Promise<string> {
       }
     } catch (err) {
       if (err instanceof JwtExpiredError) throw err;
-      // Fall through to per-spec register
+      // Fall through to the tiered helper.
     }
   }
 
-  // Per-spec unique commissioner (LS-4940 — avoids 429 collision across shards).
-  return getSpecUserJwt('COMMISSIONER', specSlugFromTestInfo(testInfo));
+  // CI / no local token — premium+admin commissioner (LS-8057). Premium clears
+  // the LS-5030 gates; admin (seat 2) preserves the league(id) isAdmin bypass.
+  return loginAs('premium', 2);
 }
 
 export const test = base.extend<IntegrationFixtures>({
-  api: async ({ playwright }, use, testInfo) => {
-    // Per-spec unique manager 1 identity (LS-4940).
-    const jwt = await getSpecUserJwt(
-      'MANAGER_1',
-      specSlugFromTestInfo(testInfo),
-    );
+  // Premium manager contexts (LS-8057). `api` and `api2` are distinct premium
+  // identities (seats 1 and 3; the commissioner takes seat 2) so a league has a
+  // unique user per role. Served from the shared disk cache (LS-5149).
+  api: async ({ playwright }, use) => {
+    const jwt = await loginAs('premium', 1);
 
     const api = await playwright.request.newContext({
       baseURL: GQL_BASE,
@@ -112,11 +104,8 @@ export const test = base.extend<IntegrationFixtures>({
     await api.dispose();
   },
 
-  api2: async ({ playwright }, use, testInfo) => {
-    const jwt = await getSpecUserJwt(
-      'MANAGER_2',
-      specSlugFromTestInfo(testInfo),
-    );
+  api2: async ({ playwright }, use) => {
+    const jwt = await loginAs('premium', 3);
 
     const api2 = await playwright.request.newContext({
       baseURL: GQL_BASE,
@@ -129,8 +118,8 @@ export const test = base.extend<IntegrationFixtures>({
     await api2.dispose();
   },
 
-  commissionerJwt: async ({}, use, testInfo) => {
-    await use(await getAuthJwt(testInfo));
+  commissionerJwt: async ({}, use) => {
+    await use(await getAuthJwt());
   },
 
   // Tier-based JWTs (LS-8055). These resolve to stable, pre-provisioned

@@ -56,14 +56,15 @@ test.describe('subscription gating — GraphQL premium middleware @critical', ()
 
   test('free user receives PREMIUM_REQUIRED error on a gated resolver', async ({
     commissionerJwt,
-    managerJwt1,
+    freeJwt,
   }) => {
-    state = { commissionerJwt, managerJwt: managerJwt1 };
+    state = { commissionerJwt, managerJwt: freeJwt };
 
     // The playerComparison resolver (or similar) is gated behind requirePremium.
-    // A free-tier user (manager) calling it should get a PREMIUM_REQUIRED error.
+    // A free-tier user calling it should get a PREMIUM_REQUIRED error (LS-8057:
+    // the manager fixtures are premium now, so gate assertions use freeJwt).
     const result = await gqlFetch<{ comparePlayers: unknown }>(
-      managerJwt1,
+      freeJwt,
       `
         query ComparePlayers($playerIds: [Int!]!) {
           comparePlayers(playerIds: $playerIds) {
@@ -115,12 +116,12 @@ test.describe('subscription gating — league limit enforcement @critical', () =
   test.describe.configure({ mode: 'serial' });
 
   test('setActiveLeagues rejects more than 3 leagues for free tier user', async ({
-    managerJwt1,
+    freeJwt,
   }) => {
     // Try to activate 4 league IDs. For a free-tier user this should fail with
     // an error indicating the limit.
     const result = await gqlFetch<{ setActiveLeagues: boolean }>(
-      managerJwt1,
+      freeJwt,
       `
         mutation SetActiveLeagues($leagueIds: [Int!]!) {
           setActiveLeagues(leagueIds: $leagueIds)
@@ -148,13 +149,13 @@ test.describe('subscription gating — league limit enforcement @critical', () =
   });
 
   test('setActiveLeagues allows exactly 3 leagues for free tier user', async ({
-    managerJwt1,
+    freeJwt,
   }) => {
     // Passing exactly 3 league IDs (even non-existent ones) should pass the
     // tier-limit gate without a PREMIUM_REQUIRED or limit error, though it
     // may still fail if those leagues don't exist or are not owned by the user.
     const result = await gqlFetch<{ setActiveLeagues: boolean }>(
-      managerJwt1,
+      freeJwt,
       `
         mutation SetActiveLeagues($leagueIds: [Int!]!) {
           setActiveLeagues(leagueIds: $leagueIds)
@@ -182,7 +183,7 @@ test.describe('subscription gating — league limit enforcement @critical', () =
 
 test.describe('subscription gating — mock draft limit @critical', () => {
   test('initializeMockDraft mutation returns PREMIUM_REQUIRED after 2 mock drafts/week for free user', async ({
-    managerJwt1,
+    freeJwt,
   }) => {
     // The limit is enforced at the GraphQL layer inside initialize-mock-draft.ts.
     // We verify the error shape when the limit is reached.
@@ -193,7 +194,7 @@ test.describe('subscription gating — mock draft limit @critical', () => {
     // If the user already has ≥ 2 mock drafts this week, the error fires immediately.
     // If not, we document the expected error shape via the unit tests.
     const result = await gqlFetch<{ initializeMockDraft: unknown }>(
-      managerJwt1,
+      freeJwt,
       `
         mutation InitMockDraft {
           initializeMockDraft(
@@ -227,21 +228,20 @@ test.describe('subscription gating — SubscriptionPage UI @smoke', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('SubscriptionPage loads and shows subscription section for free user', async ({
-    managerPage1,
+    freePage,
   }) => {
-    // Use a dedicated manager browser context rather than switchUser on
-    // commissionerPage. switchUser has a race condition: the background JWT
-    // refresh triggered on first navigation can dispatch AUTH_LOGOUT and clear
-    // localStorage after page.evaluate() sets the manager profile, causing the
-    // reload to start with empty localStorage and show the login page instead
-    // of SubscriptionPage (LS-3672).
-    await managerPage1.goto('/profile/subscription');
+    // Dedicated free-tier browser context (LS-8057) — this asserts the free
+    // user's SubscriptionPage, so it must NOT use the now-premium manager
+    // fixtures. A dedicated context (vs switchUser on commissionerPage) also
+    // avoids the AUTH_LOGOUT race where the background JWT refresh clears
+    // localStorage after page.evaluate() sets the profile (LS-3672).
+    await freePage.goto('/profile/subscription');
     // Wait for all resources including the lazy-loaded SubscriptionPage chunk
     // so React has finished mounting before we assert (LS-3616).
-    await managerPage1.waitForLoadState('load');
+    await freePage.waitForLoadState('load');
 
     await expect(
-      managerPage1.getByRole('heading', { name: /subscription|billing/i }),
+      freePage.getByRole('heading', { name: /subscription|billing/i }),
     ).toBeVisible({ timeout: 20_000 });
   });
 });
