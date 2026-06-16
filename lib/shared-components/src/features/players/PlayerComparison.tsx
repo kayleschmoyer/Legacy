@@ -1339,6 +1339,47 @@ function SeasonRow({
   );
 }
 
+export type SeasonBattingRow = NonNullable<
+  NonNullable<GetAllPlayerSeasonStatsQuery['playerSeasonBatting']>[number]
+>;
+
+export type SeasonPitchingRow = NonNullable<
+  NonNullable<GetAllPlayerSeasonStatsQuery['playerSeasonPitching']>[number]
+>;
+
+/**
+ * Batting rows for the season breakdown: keep only seasons with a real plate
+ * presence (`(atBats ?? 0) > 0`), newest first, capped at the 4 most recent.
+ * A pitcher with no batting AB yields an empty list, so the batting table is
+ * suppressed — symmetric with {@link selectSeasonPitchingRows} so the "No
+ * season data" fallback fires only when both tables are empty (LS-7036).
+ */
+export function selectSeasonBattingRows(
+  data: SeasonStatsData,
+): SeasonBattingRow[] {
+  if (!data?.playerSeasonBatting) return [];
+  return [...data.playerSeasonBatting]
+    .filter((r) => r?.season != null && (r.atBats ?? 0) > 0)
+    .sort((a, b) => (b?.season ?? 0) - (a?.season ?? 0))
+    .slice(0, 4);
+}
+
+/**
+ * Pitching rows for the season breakdown: keep only seasons with real innings
+ * (`(inningsPitched ?? 0) > 0`), newest first, capped at the 4 most recent.
+ * Mirrors {@link selectSeasonBattingRows}; a position player with no innings
+ * yields an empty list so the pitching table is suppressed (LS-7036).
+ */
+export function selectSeasonPitchingRows(
+  data: SeasonStatsData,
+): SeasonPitchingRow[] {
+  if (!data?.playerSeasonPitching) return [];
+  return [...data.playerSeasonPitching]
+    .filter((r) => r?.season != null && (r.inningsPitched ?? 0) > 0)
+    .sort((a, b) => (b?.season ?? 0) - (a?.season ?? 0))
+    .slice(0, 4);
+}
+
 function SeasonBattingBlock({
   player,
   accentIndex,
@@ -1352,21 +1393,9 @@ function SeasonBattingBlock({
 }) {
   const accent = PLAYER_ACCENTS[accentIndex] ?? BRAND_GOLD;
 
-  const rows = useMemo(() => {
-    if (!data?.playerSeasonBatting) return [];
-    return [...data.playerSeasonBatting]
-      .filter((r) => r?.season != null && (r.atBats ?? 0) > 0)
-      .sort((a, b) => (b?.season ?? 0) - (a?.season ?? 0))
-      .slice(0, 4);
-  }, [data]);
+  const rows = useMemo(() => selectSeasonBattingRows(data), [data]);
 
-  const pitchingRows = useMemo(() => {
-    if (!data?.playerSeasonPitching) return [];
-    return [...data.playerSeasonPitching]
-      .filter((r) => r?.season != null && (r.inningsPitched ?? 0) > 0)
-      .sort((a, b) => (b?.season ?? 0) - (a?.season ?? 0))
-      .slice(0, 4);
-  }, [data]);
+  const pitchingRows = useMemo(() => selectSeasonPitchingRows(data), [data]);
 
   return (
     <View

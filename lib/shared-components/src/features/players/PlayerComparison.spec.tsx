@@ -5,6 +5,7 @@
  * highlighting and value rendering — the extract-and-test pattern used across
  * the players feature (see PlayersStatsTable.spec.tsx).
  */
+import type { GetAllPlayerSeasonStatsQuery } from '@legacy-sports/graphql';
 import {
   addPlayerToSlots,
   bestIndex,
@@ -13,7 +14,11 @@ import {
   fmtCount,
   fmtScoreRow,
   restorePlayerToSlot,
+  type SeasonBattingRow,
+  type SeasonPitchingRow,
   type SelectedPlayer,
+  selectSeasonBattingRows,
+  selectSeasonPitchingRows,
   tiedIndices,
 } from './PlayerComparison';
 
@@ -239,5 +244,188 @@ describe('restorePlayerToSlot', () => {
     const prev = [null, null, null, null] as (SelectedPlayer | null)[];
     restorePlayerToSlot(prev, 0, makePlayer(7));
     expect(prev[0]).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Season breakdown row selectors — LS-7036
+//
+// The SeasonBattingBlock renders the batting table only when its batting rows
+// are non-empty, the pitching table only when its pitching rows are non-empty,
+// and the "No season data available." fallback only when BOTH are empty. The
+// QA finding (PCM-041) flagged a data-integrity risk: a pitcher with 0 AB and
+// >0 IP must see the pitching table — never the fallback. These tests lock the
+// symmetric filter logic that drives those render guards in place.
+// ---------------------------------------------------------------------------
+
+function battingRow(
+  season: number | null,
+  atBats: number | null,
+): SeasonBattingRow {
+  return { season, atBats } as SeasonBattingRow;
+}
+
+function pitchingRow(
+  season: number | null,
+  inningsPitched: number | null,
+): SeasonPitchingRow {
+  return { season, inningsPitched } as SeasonPitchingRow;
+}
+
+function seasonData(
+  partial: Partial<GetAllPlayerSeasonStatsQuery>,
+): GetAllPlayerSeasonStatsQuery {
+  return partial;
+}
+
+describe('selectSeasonBattingRows', () => {
+  it('returns an empty array when data is undefined', () => {
+    expect(selectSeasonBattingRows(undefined)).toEqual([]);
+  });
+
+  it('returns an empty array when playerSeasonBatting is absent', () => {
+    expect(selectSeasonBattingRows(seasonData({}))).toEqual([]);
+  });
+
+  it('excludes seasons with zero or nullish at-bats (a pitcher who never hit)', () => {
+    const data = seasonData({
+      playerSeasonBatting: [
+        battingRow(2021, 0),
+        battingRow(2022, null),
+        battingRow(2023, 5),
+      ],
+    });
+    const result = selectSeasonBattingRows(data);
+    expect(result.map((r) => r.season)).toEqual([2023]);
+  });
+
+  it('excludes rows with a null season', () => {
+    const data = seasonData({
+      playerSeasonBatting: [battingRow(null, 100), battingRow(2023, 100)],
+    });
+    expect(selectSeasonBattingRows(data).map((r) => r.season)).toEqual([2023]);
+  });
+
+  it('sorts surviving seasons newest-first and caps at the 4 most recent', () => {
+    const data = seasonData({
+      playerSeasonBatting: [
+        battingRow(2019, 400),
+        battingRow(2023, 400),
+        battingRow(2020, 400),
+        battingRow(2022, 400),
+        battingRow(2021, 400),
+      ],
+    });
+    expect(selectSeasonBattingRows(data).map((r) => r.season)).toEqual([
+      2023, 2022, 2021, 2020,
+    ]);
+  });
+
+  it('does not mutate the source array (sorts a copy)', () => {
+    const source = [battingRow(2019, 400), battingRow(2023, 400)];
+    const data = seasonData({ playerSeasonBatting: source });
+    selectSeasonBattingRows(data);
+    expect(source.map((r) => r.season)).toEqual([2019, 2023]);
+  });
+});
+
+describe('selectSeasonPitchingRows', () => {
+  it('returns an empty array when data is undefined', () => {
+    expect(selectSeasonPitchingRows(undefined)).toEqual([]);
+  });
+
+  it('returns an empty array when playerSeasonPitching is absent', () => {
+    expect(selectSeasonPitchingRows(seasonData({}))).toEqual([]);
+  });
+
+  it('excludes seasons with zero or nullish innings pitched (a position player)', () => {
+    const data = seasonData({
+      playerSeasonPitching: [
+        pitchingRow(2021, 0),
+        pitchingRow(2022, null),
+        pitchingRow(2023, 12.1),
+      ],
+    });
+    expect(selectSeasonPitchingRows(data).map((r) => r.season)).toEqual([2023]);
+  });
+
+  it('sorts surviving seasons newest-first and caps at the 4 most recent', () => {
+    const data = seasonData({
+      playerSeasonPitching: [
+        pitchingRow(2019, 180),
+        pitchingRow(2023, 180),
+        pitchingRow(2020, 180),
+        pitchingRow(2022, 180),
+        pitchingRow(2021, 180),
+      ],
+    });
+    expect(selectSeasonPitchingRows(data).map((r) => r.season)).toEqual([
+      2023, 2022, 2021, 2020,
+    ]);
+  });
+});
+
+describe('season breakdown render guards (PCM-041 regression)', () => {
+  // Mirrors the JSX guards in SeasonBattingBlock: batting renders when its rows
+  // are non-empty, pitching when its rows are non-empty, fallback only when both
+  // are empty.
+  function guards(data: GetAllPlayerSeasonStatsQuery | undefined) {
+    const battingRows = selectSeasonBattingRows(data);
+    const pitchingRows = selectSeasonPitchingRows(data);
+    const showBatting = battingRows.length > 0;
+    const showPitching = pitchingRows.length > 0;
+    return {
+      showBatting,
+      showPitching,
+      showFallback: !showBatting && !showPitching,
+    };
+  }
+
+  it('a pitcher with 0 AB and >0 IP shows pitching only — never the fallback', () => {
+    const data = seasonData({
+      playerSeasonBatting: [battingRow(2022, 0), battingRow(2023, 0)],
+      playerSeasonPitching: [pitchingRow(2022, 165), pitchingRow(2023, 178.2)],
+    });
+    expect(guards(data)).toEqual({
+      showBatting: false,
+      showPitching: true,
+      showFallback: false,
+    });
+  });
+
+  it('a position player with AB and no IP shows batting only — never the fallback', () => {
+    const data = seasonData({
+      playerSeasonBatting: [battingRow(2022, 500), battingRow(2023, 480)],
+      playerSeasonPitching: [pitchingRow(2022, 0)],
+    });
+    expect(guards(data)).toEqual({
+      showBatting: true,
+      showPitching: false,
+      showFallback: false,
+    });
+  });
+
+  it('a two-way player shows both tables', () => {
+    const data = seasonData({
+      playerSeasonBatting: [battingRow(2023, 400)],
+      playerSeasonPitching: [pitchingRow(2023, 130)],
+    });
+    expect(guards(data)).toEqual({
+      showBatting: true,
+      showPitching: true,
+      showFallback: false,
+    });
+  });
+
+  it('shows the fallback only when both batting and pitching are empty', () => {
+    const data = seasonData({
+      playerSeasonBatting: [battingRow(2023, 0)],
+      playerSeasonPitching: [pitchingRow(2023, 0)],
+    });
+    expect(guards(data)).toEqual({
+      showBatting: false,
+      showPitching: false,
+      showFallback: true,
+    });
   });
 });
