@@ -5991,9 +5991,6 @@ export type AppLeagueMemberFragment = {
 
 export type CreateLeagueMutationVariables = Exact<{
   input: CreateLeagueAndTeamsInput;
-  withMembers?: InputMaybe<Scalars['Boolean']['input']>;
-  withTeams?: InputMaybe<Scalars['Boolean']['input']>;
-  withMatchup?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type CreateLeagueMutation = {
@@ -7890,9 +7887,6 @@ export type GetUserByEmailQuery = {
 
 export type GetLeaguesForUserQueryVariables = Exact<{
   id: Scalars['Int']['input'];
-  withMembers?: InputMaybe<Scalars['Boolean']['input']>;
-  withMatchup?: InputMaybe<Scalars['Boolean']['input']>;
-  withTeams?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type GetLeaguesForUserQuery = {
@@ -9454,9 +9448,6 @@ export type GetLeagueAnalyticsQuery = {
 
 export type GetLeagueByIdQueryVariables = Exact<{
   id: Scalars['Int']['input'];
-  withMembers?: InputMaybe<Scalars['Boolean']['input']>;
-  withTeams?: InputMaybe<Scalars['Boolean']['input']>;
-  withMatchup?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type GetLeagueByIdQuery = {
@@ -17021,12 +17012,7 @@ export type StartSeasonMutationOptions = BaseMutationOptions<
   StartSeasonMutationVariables
 >;
 export const CreateLeague = gql`
-  mutation CreateLeague(
-    $input: CreateLeagueAndTeamsInput!
-    $withMembers: Boolean = false
-    $withTeams: Boolean = false
-    $withMatchup: Boolean = false
-  ) {
+  mutation CreateLeague($input: CreateLeagueAndTeamsInput!) {
     createLeagueAndTeams(input: $input) {
       league {
         ...AppLeague
@@ -17054,9 +17040,6 @@ export type CreateLeagueMutationFn = MutationFunction<
  * const [createLeagueMutation, { data, loading, error }] = useCreateLeagueMutation({
  *   variables: {
  *      input: // value for 'input'
- *      withMembers: // value for 'withMembers'
- *      withTeams: // value for 'withTeams'
- *      withMatchup: // value for 'withMatchup'
  *   },
  * });
  */
@@ -20585,12 +20568,7 @@ export type GetUserByEmailQueryResult = Apollo.QueryResult<
   GetUserByEmailQueryVariables
 >;
 export const GetLeaguesForUser = gql`
-  query GetLeaguesForUser(
-    $id: Int!
-    $withMembers: Boolean = false
-    $withMatchup: Boolean = false
-    $withTeams: Boolean = false
-  ) {
+  query GetLeaguesForUser($id: Int!) {
     user(id: $id) {
       ...User
     }
@@ -20611,9 +20589,6 @@ export const GetLeaguesForUser = gql`
  * const { data, loading, error } = useGetLeaguesForUserQuery({
  *   variables: {
  *      id: // value for 'id'
- *      withMembers: // value for 'withMembers'
- *      withMatchup: // value for 'withMatchup'
- *      withTeams: // value for 'withTeams'
  *   },
  * });
  */
@@ -23363,12 +23338,7 @@ export type GetLeagueAnalyticsQueryResult = Apollo.QueryResult<
   GetLeagueAnalyticsQueryVariables
 >;
 export const GetLeagueById = gql`
-  query GetLeagueById(
-    $id: Int!
-    $withMembers: Boolean = false
-    $withTeams: Boolean = false
-    $withMatchup: Boolean = false
-  ) {
+  query GetLeagueById($id: Int!) {
     league(id: $id) {
       ...League
       ...AppLeague
@@ -23391,9 +23361,6 @@ export const GetLeagueById = gql`
  * const { data, loading, error } = useGetLeagueByIdQuery({
  *   variables: {
  *      id: // value for 'id'
- *      withMembers: // value for 'withMembers'
- *      withTeams: // value for 'withTeams'
- *      withMatchup: // value for 'withMatchup'
  *   },
  * });
  */

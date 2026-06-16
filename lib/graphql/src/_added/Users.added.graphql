@@ -110,12 +110,7 @@ query GetUserByEmail($email: String!) {
   }
 }
 
-query GetLeaguesForUser(
-  $id: Int!
-  $withMembers: Boolean = false
-  $withMatchup: Boolean = false
-  $withTeams: Boolean = false
-) {
+query GetLeaguesForUser($id: Int!) {
   user(id: $id) {
     # leagueMembers field not available on User
     # leagueMembers {

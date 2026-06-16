@@ -1,9 +1,4 @@
-query GetLeagueById(
-  $id: Int!
-  $withMembers: Boolean = false
-  $withTeams: Boolean = false
-  $withMatchup: Boolean = false
-) {
+query GetLeagueById($id: Int!) {
   league(id: $id) {
     ...League
     ...AppLeague

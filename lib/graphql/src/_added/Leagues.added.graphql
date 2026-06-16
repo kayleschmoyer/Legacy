@@ -161,12 +161,7 @@ fragment AppLeagueMember on LeagueMember {
   # }
 }
 
-mutation CreateLeague(
-  $input: CreateLeagueAndTeamsInput!
-  $withMembers: Boolean = false
-  $withTeams: Boolean = false
-  $withMatchup: Boolean = false
-) {
+mutation CreateLeague($input: CreateLeagueAndTeamsInput!) {
   createLeagueAndTeams(input: $input) {
     league {
       ...AppLeague
