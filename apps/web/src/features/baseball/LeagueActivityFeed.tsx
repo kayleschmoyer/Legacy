@@ -301,6 +301,14 @@ const FILTER_TABS: { type: ActivityType; label: string }[] = [
   { type: 'commissioner', label: 'Commissioner' },
 ];
 
+/**
+ * Number of activity items rendered per page. The feed query returns up to
+ * 200 events, but rendering all of them at once produces an unbounded panel
+ * (LS-8060). We render this many initially and reveal more in PAGE_SIZE
+ * increments via the "Show more" control.
+ */
+const PAGE_SIZE = 8;
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -314,6 +322,7 @@ export function LeagueActivityFeed({
   leagueId,
 }: LeagueActivityFeedProps): React.JSX.Element {
   const [activeFilter, setActiveFilter] = useState<ActivityType>('all');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const { data, loading, error } = useGetLeagueActivityQuery({
     variables: { leagueId, limit: 200 },
@@ -343,6 +352,21 @@ export function LeagueActivityFeed({
         : activities.filter((a) => a.type === activeFilter),
     [activities, activeFilter],
   );
+
+  // Only ever render the first `visibleCount` items so the panel stays bounded
+  // even when the league has a long history (LS-8060).
+  const visible = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+  const hasMore = filtered.length > visible.length;
+
+  // Switching filters starts a fresh page so the new tab opens from the top
+  // instead of inheriting the previously expanded count.
+  const selectFilter = (type: ActivityType): void => {
+    setActiveFilter(type);
+    setVisibleCount(PAGE_SIZE);
+  };
 
   return (
     <Card
@@ -389,7 +413,7 @@ export function LeagueActivityFeed({
                 borderColor={isActive ? BRAND_NAVY_LIGHT : '$outlineSubtle'}
                 borderWidth={1}
                 onPress={() => {
-                  setActiveFilter(type);
+                  selectFilter(type);
                 }}
               >
                 <Text
@@ -449,7 +473,7 @@ export function LeagueActivityFeed({
             </Text>
           </YStack>
         ) : (
-          filtered.map((activity, idx) => (
+          visible.map((activity, idx) => (
             <React.Fragment key={activity.id}>
               <XStack
                 gap="$3"
@@ -519,13 +543,34 @@ export function LeagueActivityFeed({
                 </YStack>
               </XStack>
 
-              {idx < filtered.length - 1 && (
+              {idx < visible.length - 1 && (
                 <Separator borderColor="$outlineSubtle" marginLeft={44} />
               )}
             </React.Fragment>
           ))
         )}
       </YStack>
+
+      {/* Show more control — reveals the next page of activity */}
+      {hasMore && (
+        <XStack justifyContent="center" marginTop="$3">
+          <Button
+            size="$2"
+            borderRadius="$10"
+            paddingHorizontal="$4"
+            backgroundColor="$surfaceSubtle"
+            borderColor="$outlineSubtle"
+            borderWidth={1}
+            onPress={() => {
+              setVisibleCount((c) => c + PAGE_SIZE);
+            }}
+          >
+            <Text fontSize="$2" fontWeight="600" color="$textMuted">
+              Show more
+            </Text>
+          </Button>
+        </XStack>
+      )}
 
       {/* Footer count */}
       {filtered.length > 0 && (
@@ -537,8 +582,8 @@ export function LeagueActivityFeed({
           borderColor="$outlineSubtle"
         >
           <Text fontSize="$2" color="$textMuted">
-            Showing {filtered.length} of {activities.length} event
-            {activities.length !== 1 ? 's' : ''}
+            Showing {visible.length} of {filtered.length} event
+            {filtered.length !== 1 ? 's' : ''}
           </Text>
         </XStack>
       )}
