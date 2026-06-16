@@ -671,6 +671,51 @@ describe('EliteDraftBoardScreen — stale pick announcement dismissal (LS-4449/L
   });
 });
 
+// LS-8067: the draft WebSocket must receive an auth token so it actually
+// connects. Web/native consumers never pass a `token` prop, so the screen
+// sources it from useAuth — without this the socket defers forever and other
+// open clients (e.g. a laptop) never receive live pick pushes until a refresh.
+describe('EliteDraftBoardScreen — draft socket auth token (LS-8067)', () => {
+  it('passes the useAuth token to useDraftWebSocket when no token prop is given', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 1, accessLevel: 'member' },
+      token: 'jwt-from-auth',
+    } as unknown as ReturnType<typeof useAuth>);
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(useDraftWebSocket).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'jwt-from-auth' }),
+    );
+  });
+
+  it('prefers an explicit token prop over the useAuth token', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 1, accessLevel: 'member' },
+      token: 'jwt-from-auth',
+    } as unknown as ReturnType<typeof useAuth>);
+
+    render(<EliteDraftBoardScreen {...defaultProps} token="explicit-token" />);
+
+    expect(useDraftWebSocket).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'explicit-token' }),
+    );
+  });
+
+  it('passes undefined when neither a token prop nor an auth token exists', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 1, accessLevel: 'member' },
+      token: null,
+    } as unknown as ReturnType<typeof useAuth>);
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(useDraftWebSocket).toHaveBeenCalledWith(
+      expect.objectContaining({ token: undefined }),
+    );
+  });
+});
+
 // LS-4986: onActiveDraftChange fires true when draft is running, false otherwise.
 describe('EliteDraftBoardScreen — onActiveDraftChange (LS-4986)', () => {
   it('calls onActiveDraftChange(true) when draft is in-progress', () => {

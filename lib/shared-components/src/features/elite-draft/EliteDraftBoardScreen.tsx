@@ -70,7 +70,7 @@ export function EliteDraftBoardScreen({
   sport = 'baseball',
   onActiveDraftChange,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
-  const { user } = useAuth();
+  const { user, token: authToken } = useAuth();
   const userId = user?.id ?? 0;
   const isAuthenticated = !!user;
 
@@ -200,7 +200,12 @@ export function EliteDraftBoardScreen({
     refetchQueue: queries.refetchQueue,
     refetchAutoPickStatuses: queries.refetchAutoPickStatuses,
     websocketUrl,
-    token,
+    // LS-8067: fall back to the in-memory JWT from useAuth when no explicit
+    // token prop is supplied. Web (and native) consumers never pass `token`,
+    // so without this the draft socket defers forever and other open clients
+    // (e.g. a laptop while you pick on mobile) never receive live pick pushes
+    // until a manual refetch. The prop still wins when provided.
+    token: token ?? authToken ?? undefined,
     onPlayerDrafted,
   });
 
