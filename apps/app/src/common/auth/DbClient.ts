@@ -4,8 +4,10 @@ import {
   from,
   HttpLink,
   InMemoryCache,
+  Observable,
   ServerError,
 } from '@apollo/client';
+import type { ApolloLink } from '@apollo/client/link';
 import { ErrorLink } from '@apollo/client/link/error';
 import { RetryLink } from '@apollo/client/link/retry';
 import { setContext } from '@apollo/client/link/context';
@@ -13,9 +15,7 @@ import { config } from '@legacy-sports/app-config/native';
 import { LOGGER } from '@legacy-sports/logging';
 import { SecureStorageProvider } from '@legacy-sports/shared-components';
 import { GetUserById, UserFragment } from '@legacy-sports/graphql';
-import { emitSessionExpired } from './sessionEvents';
-
-const INTERNAL_JWT_KEY = 'INTERNAL_JWT';
+import { INTERNAL_JWT_KEY, silentlyRefreshJwt } from './jwtRefresh';
 
 export class DbClient {
   public readonly apolloClient: ApolloClient;
@@ -53,7 +53,7 @@ export class DbClient {
       },
     });
 
-    const errorLink = new ErrorLink(({ error }) => {
+    const errorLink = new ErrorLink(({ error, operation, forward }) => {
       const is401 = ServerError.is(error) && error.statusCode === 401;
       const isUnauthenticated =
         CombinedGraphQLErrors.is(error) &&
@@ -64,8 +64,32 @@ export class DbClient {
         );
 
       if (is401 || isUnauthenticated) {
-        emitSessionExpired();
+        // Attempt a silent JWT refresh via /refresh-jwt and replay the
+        // operation with the new token (authLink re-reads it from secure
+        // storage). silentlyRefreshJwt() clears the session itself on a
+        // definitive rejection, so here we just propagate the original error
+        // when no fresh token comes back. This stops the 24h JWT expiry from
+        // force-bouncing the user through a full Google Sign-In (LS-8103).
+        return new Observable<ApolloLink.Result>((observer) => {
+          silentlyRefreshJwt()
+            .then((newToken) => {
+              if (!newToken) {
+                observer.error(error);
+                return;
+              }
+              forward(operation).subscribe({
+                next: (value) => observer.next(value),
+                error: (err: unknown) => observer.error(err),
+                complete: () => observer.complete(),
+              });
+            })
+            .catch((err: unknown) => {
+              observer.error(err);
+            });
+        });
       }
+
+      return;
     });
 
     this.apolloClient = new ApolloClient({
