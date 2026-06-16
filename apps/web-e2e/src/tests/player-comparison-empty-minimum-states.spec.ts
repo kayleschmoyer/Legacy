@@ -11,7 +11,7 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { adminTest, expect, test } from '../fixtures/auth-enhanced';
+import { adminTest, test } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
@@ -151,66 +151,45 @@ async function mockGraphQL(page: import('@playwright/test').Page) {
   );
 }
 
-/** Add a player by searching and clicking the result. Retries until the dropdown appears. */
-async function addPlayer(
-  page: import('@playwright/test').Page,
-  searchTerm: string,
-  fullName: string,
-) {
-  const input = page.getByLabel('Search players to compare');
-  await expect(async () => {
-    await input.clear();
-    await input.focus();
-    await input.fill(searchTerm);
-    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
-    await page.getByText(fullName).click({ timeout: 5000 });
-  }).toPass({ timeout: 15000 });
-}
-
 // ---------------------------------------------------------------------------
 // Tests: 0-player empty state @smoke
 // ---------------------------------------------------------------------------
 
 test.describe('Player Comparison – empty state (0 players) @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
+    await playersPage.gotoCompare();
   });
 
   test('shows the empty-state card when no players are selected', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByRole('status')).toBeVisible();
+    await playersPage.compare.expectStatusVisible();
   });
 
   test('empty-state card contains "Nobody on deck yet" heading', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('Nobody on deck yet')).toBeVisible();
+    await playersPage.compare.expectEmptyStateHeading();
   });
 
   test('empty-state card prompts user to add at least two players', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(
-      page.getByText(/add at least two players to begin comparing/i),
-    ).toBeVisible();
+    await playersPage.compare.expectEmptyStatePrompt();
   });
 
   test('comparison table is not shown when 0 players are selected', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(
-      page.getByRole('table', { name: 'Player comparison' }),
-    ).not.toBeVisible();
+    await playersPage.compare.expectTableHidden();
   });
 
   test('search input is visible and enabled in empty state', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
-    await expect(page.getByLabel('Search players to compare')).toBeEnabled();
+    await playersPage.compare.expectSearchVisible();
+    await playersPage.compare.expectSearchEnabled();
   });
 });
 
@@ -221,62 +200,53 @@ test.describe('Player Comparison – empty state (0 players) @smoke', () => {
 adminTest.describe(
   'Player Comparison – minimum-selection state (1 player) @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
-      await addPlayer(page, 'Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
     });
 
     adminTest(
       'shows "One player on deck." nudge after selecting first player',
-      async ({ page }) => {
-        await expect(page.getByText('One player on deck.')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectOnePlayerNudge();
       },
     );
 
     adminTest(
       'nudge tells user to add at least one more for head-to-head',
-      async ({ page }) => {
-        await expect(
-          page.getByText(/add at least one more to run the head-to-head/i),
-        ).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectAddOneMoreHint();
       },
     );
 
     adminTest(
       'empty-state card is not shown when 1 player is selected',
-      async ({ page }) => {
-        await expect(page.getByText('Nobody on deck yet')).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectEmptyStateHidden();
       },
     );
 
     adminTest(
       'comparison table is not shown when only 1 player is selected',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('table', { name: 'Player comparison' }),
-        ).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectTableHidden();
       },
     );
 
     adminTest(
       '"Head-to-Head" section heading is not shown with 1 player',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('heading', { name: /head-to-head/i }),
-        ).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectHeadToHeadHidden();
       },
     );
 
     adminTest(
       'search input remains enabled with 1 player selected',
-      async ({ page }) => {
-        await expect(
-          page.getByLabel('Search players to compare'),
-        ).toBeEnabled();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSearchEnabled();
       },
     );
   },
@@ -289,45 +259,40 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – comparison unlocks at 2 players @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
     adminTest(
       'empty-state card is not shown when 2 players are selected',
-      async ({ page }) => {
-        await expect(page.getByText('Nobody on deck yet')).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectEmptyStateHidden();
       },
     );
 
     adminTest(
       'one-player nudge is not shown when 2 players are selected',
-      async ({ page }) => {
-        await expect(page.getByText('One player on deck.')).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectOnePlayerNudgeHidden();
       },
     );
 
     adminTest(
       'comparison table appears once 2 players are selected',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('table', { name: 'Player comparison' }),
-        ).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectTableVisible();
       },
     );
 
     adminTest(
       '"Head-to-Head" section heading appears with 2 players',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('heading', { name: 'Head-to-Head' }),
-        ).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectHeadToHeadVisible();
       },
     );
   },
@@ -340,41 +305,36 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – removing a player restores minimum state @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Add two players to reach full comparison, then remove one
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
-      await page.getByRole('button', { name: /remove aaron judge/i }).click();
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+      await playersPage.compare.removePlayer('Aaron Judge');
     });
 
     adminTest(
       'nudge reappears after dropping back to 1 player',
-      async ({ page }) => {
-        await expect(page.getByText('One player on deck.')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectOnePlayerNudge();
       },
     );
 
     adminTest(
       'comparison table is hidden after dropping back to 1 player',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('table', { name: 'Player comparison' }),
-        ).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectTableHidden();
       },
     );
 
     adminTest(
       'removing the final player restores the empty-state card',
-      async ({ page }) => {
-        await page
-          .getByRole('button', { name: /remove shohei ohtani/i })
-          .click();
-        await expect(page.getByText('Nobody on deck yet')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.removePlayer('Shohei Ohtani');
+        await playersPage.compare.expectEmptyStateHeading();
       },
     );
   },

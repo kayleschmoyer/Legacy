@@ -7,11 +7,11 @@
  *  - position eligibility badges
  *  - player nav (open via /players/:id deep link, back button returns to stats)
  *
- * All GraphQL queries are mocked so these tests run without a live backend.
+ * Element access goes through the injected `playersPage` semantic object
+ * (ADR-0015); GraphQL mocks stay inline (ADR-0015 §6).
  */
 
-import { expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth-enhanced';
+import { test } from '../fixtures/pages';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -398,340 +398,293 @@ async function setupPlayerDetailMocks(
 test.describe('Player Detail Modal @regression', () => {
   test('renders when navigating to the /players/:id deep-link route', async ({
     page,
+    playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
     // The modal is always open on the /players/:id route
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
   });
 
-  test('displays career hero stats — AVG, HR, RBI chips', async ({ page }) => {
+  test('displays career hero stats — AVG, HR, RBI chips', async ({
+    page,
+    playersPage,
+  }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
 
     // Wait for stats to load (spinner should disappear)
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectNotLoading();
 
     // Hero stat chips (label text rendered inside HeroStat components)
-    await expect(dialog.getByText('AVG').first()).toBeVisible();
-    await expect(dialog.getByText('HR').first()).toBeVisible();
-    await expect(dialog.getByText('RBI').first()).toBeVisible();
+    await playersPage.detail.expectText('AVG');
+    await playersPage.detail.expectText('HR');
+    await playersPage.detail.expectText('RBI');
 
     // Computed career AVG from 2 seasons: (165+155)/(550+520) = 320/1070 ≈ .299
-    const avgChip = dialog.getByText('.299').first();
-    await expect(avgChip).toBeVisible();
+    await playersPage.detail.expectText('.299');
   });
 
-  test('shows eligible position badges', async ({ page }) => {
+  test('shows eligible position badges', async ({ page, playersPage }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // "Eligible Positions" label
-    await expect(dialog.getByTestId('eligible-positions')).toBeVisible();
+    await playersPage.detail.expectEligiblePositions();
 
     // CF and OF position badges
-    const cfBadge = dialog
-      .getByText('CF', { exact: true })
-      .or(dialog.locator('text=CF'))
-      .first();
-    await expect(cfBadge).toBeVisible();
-
-    const ofBadge = dialog
-      .getByText('OF', { exact: true })
-      .or(dialog.locator('text=OF'))
-      .first();
-    await expect(ofBadge).toBeVisible();
+    await playersPage.detail.expectText('CF', { exact: true });
+    await playersPage.detail.expectText('OF', { exact: true });
   });
 
-  test('shows Career Batting summary card', async ({ page }) => {
+  test('shows Career Batting summary card', async ({ page, playersPage }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // Career Batting stat card title
-    await expect(dialog.getByTestId('career-batting-card')).toBeVisible();
+    await playersPage.detail.expectCareerBattingCard();
 
     // Key row labels in the batting card
-    await expect(dialog.getByText('AVG').first()).toBeVisible();
-    await expect(dialog.getByText('Home Runs').first()).toBeVisible();
-    await expect(dialog.getByText('RBI').first()).toBeVisible();
+    await playersPage.detail.expectText('AVG');
+    await playersPage.detail.expectText('Home Runs');
+    await playersPage.detail.expectText('RBI');
   });
 
   test('shows season-by-season batting table with correct headers', async ({
     page,
+    playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // Switch to the Batting tab (Career Arc is the default when arc data is available)
-    const battingTab = dialog.getByText('Batting', { exact: true }).first();
-    await expect(battingTab).toBeVisible();
-    await battingTab.click({ force: true });
-    await expect(dialog.getByText('YEAR')).toBeVisible();
+    await playersPage.detail.switchTab('Batting');
+    await playersPage.detail.expectText('YEAR');
 
     // Verify column headers in the batting table
-    await expect(dialog.getByText('YEAR')).toBeVisible();
-    await expect(dialog.getByText('G', { exact: true }).first()).toBeVisible();
-    await expect(dialog.getByText('PA')).toBeVisible();
-    await expect(dialog.getByText('AB')).toBeVisible();
-    await expect(dialog.getByText('H', { exact: true }).first()).toBeVisible();
-    await expect(dialog.getByText('HR', { exact: true }).first()).toBeVisible();
-    await expect(
-      dialog.getByText('RBI', { exact: true }).first(),
-    ).toBeVisible();
-    await expect(dialog.getByText('SB')).toBeVisible();
-    await expect(
-      dialog.getByText('AVG', { exact: true }).first(),
-    ).toBeVisible();
+    await playersPage.detail.expectText('YEAR');
+    await playersPage.detail.expectText('G', { exact: true });
+    await playersPage.detail.expectText('PA');
+    await playersPage.detail.expectText('AB');
+    await playersPage.detail.expectText('H', { exact: true });
+    await playersPage.detail.expectText('HR', { exact: true });
+    await playersPage.detail.expectText('RBI', { exact: true });
+    await playersPage.detail.expectText('SB');
+    await playersPage.detail.expectText('AVG', { exact: true });
 
     // Both season rows should appear
-    await expect(dialog.getByText('2024', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('2023', { exact: true })).toBeVisible();
+    await playersPage.detail.expectText('2024', { exact: true });
+    await playersPage.detail.expectText('2023', { exact: true });
   });
 
-  test('switching to Fielding tab shows fielding table', async ({ page }) => {
+  test('switching to Fielding tab shows fielding table', async ({
+    page,
+    playersPage,
+  }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // Click the Fielding tab
-    const fieldingTab = dialog.getByText('Fielding', { exact: true }).first();
-    await expect(fieldingTab).toBeVisible();
-    await fieldingTab.click({ force: true });
-    await expect(dialog.getByText('POS').first()).toBeVisible();
+    await playersPage.detail.switchTab('Fielding');
+    await playersPage.detail.expectText('POS');
 
     // Fielding table headers
-    await expect(dialog.getByText('POS').first()).toBeVisible();
-    await expect(dialog.getByText('INN').first()).toBeVisible();
-    await expect(dialog.getByText('PO').first()).toBeVisible();
-    await expect(dialog.getByText('A', { exact: true }).first()).toBeVisible();
-    await expect(dialog.getByText('E', { exact: true }).first()).toBeVisible();
+    await playersPage.detail.expectText('POS');
+    await playersPage.detail.expectText('INN');
+    await playersPage.detail.expectText('PO');
+    await playersPage.detail.expectText('A', { exact: true });
+    await playersPage.detail.expectText('E', { exact: true });
   });
 
-  test('shows loading spinner while stats are fetching', async ({ page }) => {
+  test('shows loading spinner while stats are fetching', async ({
+    page,
+    playersPage,
+  }) => {
     // Set a delay so we can catch the loading state
     await setupPlayerDetailMocks(page, { seasonStatsDelay: 1500 });
-    await page.goto('/players/1');
-    await page.waitForLoadState('domcontentloaded');
+    await playersPage.gotoDetail(1, 'domcontentloaded');
 
     // The spinner / loading text should be visible before data arrives
-    await expect(page.getByTestId('player-detail-loading')).toBeVisible();
+    await playersPage.detail.expectLoading();
 
     // Eventually data loads and spinner disappears
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectNotLoading();
   });
 
-  test('closes when the Close button is clicked', async ({ page }) => {
+  test('closes when the Close button is clicked', async ({
+    page,
+    playersPage,
+  }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
 
     // The X / Close button in BaseModal has aria-label="Close"
-    const closeButton = dialog.getByRole('button', { name: 'Close' });
-    await closeButton.click({ force: true });
+    await playersPage.detail.close();
 
     // After close, the page-level PlayerDetailPage navigates to /players/stats
-    await page.waitForURL('**/players/stats');
+    await playersPage.detail.waitForStatsList();
   });
 });
 
 test.describe('Player Detail Modal – Pitcher @regression', () => {
   test('shows Career Pitching card and pitching tab for a pitcher', async ({
     page,
+    playersPage,
   }) => {
     await setupPlayerDetailMocks(page, {
       seasonStatsBody: PITCHER_SEASON_STATS_RESPONSE,
     });
-    await page.goto('/players/2');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(2, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // Eligible positions for a pitcher
-    await expect(dialog.getByText('SP').first()).toBeVisible();
+    await playersPage.detail.expectText('SP');
 
     // Career Pitching card
-    await expect(dialog.getByTestId('career-pitching-card')).toBeVisible();
+    await playersPage.detail.expectCareerPitchingCard();
 
     // Pitching hero chips
-    await expect(dialog.getByText('W-L').first()).toBeVisible();
-    await expect(dialog.getByText('SO').first()).toBeVisible();
+    await playersPage.detail.expectText('W-L');
+    await playersPage.detail.expectText('SO');
 
     // Click the Pitching tab to show season-by-season table
-    const pitchingTab = dialog.getByText('Pitching', { exact: true }).first();
-    await expect(pitchingTab).toBeVisible();
-    await pitchingTab.click({ force: true });
-    await expect(dialog.getByText('ERA').first()).toBeVisible();
+    await playersPage.detail.switchTab('Pitching');
+    await playersPage.detail.expectText('ERA');
 
     // Season-by-season pitching table headers
-    await expect(dialog.getByText('ERA').first()).toBeVisible();
-    await expect(dialog.getByText('IP').first()).toBeVisible();
-    await expect(dialog.getByText('BB').first()).toBeVisible();
+    await playersPage.detail.expectText('ERA');
+    await playersPage.detail.expectText('IP');
+    await playersPage.detail.expectText('BB');
   });
 });
 
 test.describe('Player Detail Modal — Edge Cases @regression', () => {
   test('shows empty state when no season stats are available', async ({
     page,
+    playersPage,
   }) => {
     await setupPlayerDetailMocks(page, {
       seasonStatsBody: EMPTY_STATS_RESPONSE,
     });
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
-
-    await expect(dialog.getByTestId('player-detail-empty')).toBeVisible();
+    await playersPage.detail.expectEmptyState();
   });
 
-  test('shows error state when the stats query fails', async ({ page }) => {
+  test('shows error state when the stats query fails', async ({
+    page,
+    playersPage,
+  }) => {
     await setupPlayerDetailMocks(page, {
       seasonStatsBody: {
         errors: [{ message: 'Internal server error' }],
       },
     });
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
-
-    await expect(dialog.getByTestId('player-detail-error')).toBeVisible();
+    await playersPage.detail.expectErrorState();
   });
 
   test('pressing Escape closes the modal and navigates back', async ({
     page,
+    playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
 
-    await page.keyboard.press('Escape');
+    await playersPage.detail.pressEscape();
 
     // Navigate back to player stats list
-    await page.waitForURL('**/players/stats');
+    await playersPage.detail.waitForStatsList();
   });
 
   test('player nav: back button returns to /players/stats', async ({
     page,
+    playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
 
     // The PlayerDetailPage renders a "← Back" button
-    const backButton = page.getByRole('button', {
-      name: /← back/i,
-    });
-    await expect(backButton).toBeVisible();
+    await playersPage.detail.expectBackButton();
     // dispatchEvent bypasses overlay interception from the open dialog
-    await backButton.dispatchEvent('click');
+    await playersPage.detail.back();
 
-    await page.waitForURL('**/players/stats');
+    await playersPage.detail.waitForStatsList();
     // The stats page heading is a styled div, not a semantic heading element
-    await expect(
-      page.getByText(/MLB Player Statistics/i).first(),
-    ).toBeVisible();
+    await playersPage.stats.expectText(/MLB Player Statistics/i);
   });
 
-  test('batting tab switches back from fielding tab', async ({ page }) => {
+  test('batting tab switches back from fielding tab', async ({
+    page,
+    playersPage,
+  }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // Switch to Fielding
-    await dialog
-      .getByText('Fielding', { exact: true })
-      .first()
-      .click({ force: true });
-    await expect(dialog.getByText('POS').first()).toBeVisible();
+    await playersPage.detail.switchTab('Fielding');
+    await playersPage.detail.expectText('POS');
 
     // Switch back to Batting
-    await dialog
-      .getByText('Batting', { exact: true })
-      .first()
-      .click({ force: true });
+    await playersPage.detail.switchTab('Batting');
 
     // Batting table headers should reappear
-    await expect(dialog.getByText('YEAR')).toBeVisible();
-    await expect(
-      dialog.getByText('AVG', { exact: true }).first(),
-    ).toBeVisible();
+    await playersPage.detail.expectText('YEAR');
+    await playersPage.detail.expectText('AVG', { exact: true });
   });
 
-  test('season data rows contain expected year values', async ({ page }) => {
+  test('season data rows contain expected year values', async ({
+    page,
+    playersPage,
+  }) => {
     await setupPlayerDetailMocks(page);
-    await page.goto('/players/1');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoDetail(1, 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // Season subtitle says "2 seasons"
-    await expect(dialog.getByText(/2 season/i).first()).toBeVisible();
+    await playersPage.detail.expectText(/2 season/i);
 
     // Switch to Batting tab to verify season rows
-    const battingTab = dialog.getByText('Batting', { exact: true }).first();
-    await expect(battingTab).toBeVisible();
-    await battingTab.click({ force: true });
-    await expect(dialog.getByText('2024', { exact: true })).toBeVisible();
+    await playersPage.detail.switchTab('Batting');
+    await playersPage.detail.expectText('2024', { exact: true });
 
     // Both season years are in the batting table
-    await expect(dialog.getByText('2024', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('2023', { exact: true })).toBeVisible();
+    await playersPage.detail.expectText('2024', { exact: true });
+    await playersPage.detail.expectText('2023', { exact: true });
   });
 });

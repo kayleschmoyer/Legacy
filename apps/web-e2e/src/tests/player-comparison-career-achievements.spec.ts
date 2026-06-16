@@ -10,7 +10,7 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { adminTest, expect } from '../fixtures/auth-enhanced';
+import { adminTest } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
@@ -272,22 +272,6 @@ async function mockGraphQL(page: import('@playwright/test').Page) {
   );
 }
 
-/** Helper to add a player by searching and clicking their name. */
-async function addPlayer(
-  page: import('@playwright/test').Page,
-  searchTerm: string,
-  fullName: string,
-) {
-  const input = page.getByLabel('Search players to compare');
-  await expect(async () => {
-    await input.clear();
-    await input.focus();
-    await input.fill(searchTerm);
-    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
-    await page.getByText(fullName).click({ timeout: 5000 });
-  }).toPass({ timeout: 15000 });
-}
-
 // ---------------------------------------------------------------------------
 // Tests: Achievement stat row labels @regression
 // ---------------------------------------------------------------------------
@@ -295,38 +279,37 @@ async function addPlayer(
 adminTest.describe(
   'Player Comparison – career achievements row labels @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
-    adminTest('shows All-Star Selections row', async ({ page }) => {
-      await expect(page.getByText('All-Star Selections')).toBeVisible();
+    adminTest('shows All-Star Selections row', async ({ playersPage }) => {
+      await playersPage.compare.expectText('All-Star Selections');
     });
 
-    adminTest('shows MVP Awards row', async ({ page }) => {
-      await expect(page.getByText('MVP Awards')).toBeVisible();
+    adminTest('shows MVP Awards row', async ({ playersPage }) => {
+      await playersPage.compare.expectText('MVP Awards');
     });
 
-    adminTest('shows Cy Young Awards row', async ({ page }) => {
-      await expect(page.getByText('Cy Young Awards')).toBeVisible();
+    adminTest('shows Cy Young Awards row', async ({ playersPage }) => {
+      await playersPage.compare.expectText('Cy Young Awards');
     });
 
-    adminTest('shows Gold Gloves row', async ({ page }) => {
-      await expect(page.getByText('Gold Gloves')).toBeVisible();
+    adminTest('shows Gold Gloves row', async ({ playersPage }) => {
+      await playersPage.compare.expectText('Gold Gloves');
     });
 
-    adminTest('shows Silver Sluggers row', async ({ page }) => {
-      await expect(page.getByText('Silver Sluggers')).toBeVisible();
+    adminTest('shows Silver Sluggers row', async ({ playersPage }) => {
+      await playersPage.compare.expectText('Silver Sluggers');
     });
 
-    adminTest('shows World Series Rings row', async ({ page }) => {
-      await expect(page.getByText('World Series Rings')).toBeVisible();
+    adminTest('shows World Series Rings row', async ({ playersPage }) => {
+      await playersPage.compare.expectText('World Series Rings');
     });
   },
 );
@@ -341,72 +324,61 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – career achievements stat values @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
     adminTest(
       'All-Star Selections row shows correct values (5 and 4)',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'All-Star Selections' });
-        await expect(row.getByText('5')).toBeVisible();
-        await expect(row.getByText('4')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueInRow('All-Star Selections', '5');
+        await playersPage.compare.expectValueInRow('All-Star Selections', '4');
       },
     );
 
     adminTest(
       'MVP Awards row shows correct values (2 and 2)',
-      async ({ page }) => {
-        const row = page.getByRole('row').filter({ hasText: 'MVP Awards' });
-        await expect(row.getByText('2')).toHaveCount(2);
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueCountInRow('MVP Awards', '2', 2);
       },
     );
 
     adminTest(
       'Silver Sluggers row shows correct values (3 and 2)',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'Silver Sluggers' });
-        await expect(row.getByText('3')).toBeVisible();
-        await expect(row.getByText('2')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueInRow('Silver Sluggers', '3');
+        await playersPage.compare.expectValueInRow('Silver Sluggers', '2');
       },
     );
 
     adminTest(
       'World Series Rings row shows correct values (1 and 0)',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'World Series Rings' });
-        await expect(row.getByText('1')).toBeVisible();
-        await expect(row.getByText('0')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueInRow('World Series Rings', '1');
+        await playersPage.compare.expectValueInRow('World Series Rings', '0');
       },
     );
 
     adminTest(
       'Cy Young Awards row shows correct values (0 and 0)',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'Cy Young Awards' });
-        await expect(row.getByText('0')).toHaveCount(2);
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueCountInRow(
+          'Cy Young Awards',
+          '0',
+          2,
+        );
       },
     );
 
     adminTest(
       'Gold Gloves row shows correct values (0 and 0)',
-      async ({ page }) => {
-        const row = page.getByRole('row').filter({ hasText: 'Gold Gloves' });
-        await expect(row.getByText('0')).toHaveCount(2);
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueCountInRow('Gold Gloves', '0', 2);
       },
     );
   },
@@ -427,69 +399,54 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – career achievements BEST indicator @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
     adminTest(
       'All-Star Selections: BEST indicator shown for the leader',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'All-Star Selections' });
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectBestInRow('All-Star Selections');
       },
     );
 
     adminTest(
       'Silver Sluggers: BEST indicator shown for the leader',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'Silver Sluggers' });
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectBestInRow('Silver Sluggers');
       },
     );
 
     adminTest(
       'World Series Rings: BEST indicator shown for the leader',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'World Series Rings' });
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectBestInRow('World Series Rings');
       },
     );
 
     adminTest(
       'MVP Awards: no BEST indicator when tied (2 vs 2)',
-      async ({ page }) => {
-        const row = page.getByRole('row').filter({ hasText: 'MVP Awards' });
-        await expect(row.getByText('BEST', { exact: true })).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectNoBestInRow('MVP Awards');
       },
     );
 
     adminTest(
       'Cy Young Awards: no BEST indicator when tied (0 vs 0)',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'Cy Young Awards' });
-        await expect(row.getByText('BEST', { exact: true })).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectNoBestInRow('Cy Young Awards');
       },
     );
 
     adminTest(
       'Gold Gloves: no BEST indicator when tied (0 vs 0)',
-      async ({ page }) => {
-        const row = page.getByRole('row').filter({ hasText: 'Gold Gloves' });
-        await expect(row.getByText('BEST', { exact: true })).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectNoBestInRow('Gold Gloves');
       },
     );
   },
@@ -520,31 +477,30 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – Cy Young row hidden for hitter vs hitter (LS-7003) @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Mo', 'Mookie Betts');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
     });
 
     adminTest(
       'Cy Young Awards row is not rendered when neither player has pitched',
-      async ({ page }) => {
-        await expect(page.getByText('Cy Young Awards')).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectTextHidden('Cy Young Awards');
       },
     );
 
     adminTest(
       'other achievement rows are still visible when neither player has pitched',
-      async ({ page }) => {
-        await expect(page.getByText('All-Star Selections')).toBeVisible();
-        await expect(page.getByText('MVP Awards')).toBeVisible();
-        await expect(page.getByText('Gold Gloves')).toBeVisible();
-        await expect(page.getByText('Silver Sluggers')).toBeVisible();
-        await expect(page.getByText('World Series Rings')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectText('All-Star Selections');
+        await playersPage.compare.expectText('MVP Awards');
+        await playersPage.compare.expectText('Gold Gloves');
+        await playersPage.compare.expectText('Silver Sluggers');
+        await playersPage.compare.expectText('World Series Rings');
       },
     );
   },
@@ -553,64 +509,52 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – career achievements three-player comparison @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
-      await addPlayer(page, 'Mo', 'Mookie Betts');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
     });
 
     adminTest(
       'All-Star Selections: BEST shown for Betts (6 > 5, 4)',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'All-Star Selections' });
-        await expect(row.getByText('6')).toBeVisible();
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueInRow('All-Star Selections', '6');
+        await playersPage.compare.expectBestInRow('All-Star Selections');
       },
     );
 
     adminTest(
       'Gold Gloves: BEST shown for Betts (5 > 0, 0)',
-      async ({ page }) => {
-        const row = page.getByRole('row').filter({ hasText: 'Gold Gloves' });
-        await expect(row.getByText('5')).toBeVisible();
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueInRow('Gold Gloves', '5');
+        await playersPage.compare.expectBestInRow('Gold Gloves');
       },
     );
 
     adminTest(
       'Silver Sluggers: BEST shown for Betts (4 > 3, 2)',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'Silver Sluggers' });
-        await expect(row.getByText('4')).toBeVisible();
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueInRow('Silver Sluggers', '4');
+        await playersPage.compare.expectBestInRow('Silver Sluggers');
       },
     );
 
     adminTest(
       'World Series Rings: BEST shown for Betts (2 > 1, 0)',
-      async ({ page }) => {
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'World Series Rings' });
-        await expect(row.getByText('2')).toBeVisible();
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectValueInRow('World Series Rings', '2');
+        await playersPage.compare.expectBestInRow('World Series Rings');
       },
     );
 
     adminTest(
       'MVP Awards: no BEST when top two are tied (Judge=2, Ohtani=2)',
-      async ({ page }) => {
-        const row = page.getByRole('row').filter({ hasText: 'MVP Awards' });
-        await expect(row.getByText('BEST', { exact: true })).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectNoBestInRow('MVP Awards');
       },
     );
   },

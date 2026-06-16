@@ -4,9 +4,12 @@
  * Covers the Player Stats page at /players/stats with all GraphQL
  * queries mocked so tests run without a live backend.
  * Complements the existing player-stats.spec.ts (live-backend tests).
+ *
+ * Element access goes through the injected `playersPage` semantic object
+ * (ADR-0015); GraphQL mocks stay inline (ADR-0015 §6).
  */
 
-import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -237,141 +240,146 @@ async function mockPlayerStatsGraphQL(
 }
 
 test.describe('Player Stats Page (mocked) — navigation @smoke', () => {
-  test('navigates to /players/stats without errors', async ({ page }) => {
+  test('navigates to /players/stats without errors', async ({
+    page,
+    playersPage,
+  }) => {
     await mockPlayerStatsGraphQL(page);
-    await page.goto('/players/stats');
-    await page.waitForLoadState('load');
+    await playersPage.gotoStats();
 
     await expect(page).toHaveURL('/players/stats');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await playersPage.expectNoApplicationError();
   });
 });
 
 test.describe('Player Stats Page (mocked) – page structure @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerStatsGraphQL(page);
-    await page.goto('/players/stats');
-    await page.waitForLoadState('load');
+    await playersPage.gotoStats();
   });
 
-  test('shows "MLB Player Statistics" heading', async ({ page }) => {
-    await expect(page.getByText('MLB Player Statistics')).toBeVisible();
+  test('shows "MLB Player Statistics" heading', async ({ playersPage }) => {
+    await playersPage.stats.expectLoaded();
   });
 
-  test('shows Hitters tab', async ({ page }) => {
-    await expect(page.getByRole('tab', { name: 'Hitters' })).toBeVisible();
+  test('shows Hitters tab', async ({ playersPage }) => {
+    await playersPage.stats.expectTabVisible('Hitters');
   });
 
-  test('shows Pitchers tab', async ({ page }) => {
-    await expect(page.getByRole('tab', { name: 'Pitchers' })).toBeVisible();
+  test('shows Pitchers tab', async ({ playersPage }) => {
+    await playersPage.stats.expectTabVisible('Pitchers');
   });
 
-  test('shows batting stats heading in batting tab', async ({ page }) => {
-    await expect(page.getByText('MLB Career Batting Leaders')).toBeVisible();
+  test('shows batting stats heading in batting tab', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.expectBattingLeaders();
   });
 
-  test('shows player name from mocked batting data', async ({ page }) => {
-    await expect(page.getByText('Barry Bonds')).toBeVisible();
+  test('shows player name from mocked batting data', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.expectPlayerVisible('Barry Bonds');
   });
 
-  test('shows multiple players from mocked batting data', async ({ page }) => {
-    await expect(page.getByText('Barry Bonds')).toBeVisible();
-    await expect(page.getByText('Pete Rose')).toBeVisible();
+  test('shows multiple players from mocked batting data', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.expectPlayerVisible('Barry Bonds');
+    await playersPage.stats.expectPlayerVisible('Pete Rose');
   });
 
-  test('shows HR value from mocked batting data', async ({ page }) => {
+  test('shows HR value from mocked batting data', async ({ playersPage }) => {
     // Barry Bonds row (playerId=101) renders his 762 HR total.
-    await expect(
-      page.getByTestId('player-row-101').getByText('762'),
-    ).toBeVisible();
+    await playersPage.stats.expectRowValue(101, '762');
   });
 
-  test('shows search input for batting stats', async ({ page }) => {
-    await expect(
-      page.getByPlaceholder('Search player name · min 2 chars'),
-    ).toBeVisible();
+  test('shows search input for batting stats', async ({ playersPage }) => {
+    await playersPage.stats.expectSearchVisible();
   });
 });
 
 test.describe('Player Stats Page (mocked) – pitching tab @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerStatsGraphQL(page);
-    await page.goto('/players/stats');
-    await page.waitForLoadState('load');
-    await page.getByRole('tab', { name: 'Pitchers' }).click();
+    await playersPage.gotoStats();
+    await playersPage.stats.switchView('Pitchers');
   });
 
   test('shows pitching stats heading after switching tabs', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('MLB Career Pitching Leaders')).toBeVisible();
+    await playersPage.stats.expectPitchingLeaders();
   });
 
-  test('shows pitcher name from mocked pitching data', async ({ page }) => {
-    await expect(page.getByText('Roger Clemens')).toBeVisible();
+  test('shows pitcher name from mocked pitching data', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.expectPlayerVisible('Roger Clemens');
   });
 
-  test('shows ERA value for pitcher', async ({ page }) => {
-    await expect(page.getByText('3.19')).toBeVisible();
+  test('shows ERA value for pitcher', async ({ playersPage }) => {
+    await playersPage.stats.expectText('3.19');
   });
 
-  test('shows search input for pitching stats', async ({ page }) => {
-    await expect(
-      page.getByPlaceholder('Search player name · min 2 chars'),
-    ).toBeVisible();
+  test('shows search input for pitching stats', async ({ playersPage }) => {
+    await playersPage.stats.expectSearchVisible();
   });
 });
 
 test.describe('Player Stats Page (mocked) — empty states @regression', () => {
-  test('shows empty state when no batting players', async ({ page }) => {
+  test('shows empty state when no batting players', async ({
+    page,
+    playersPage,
+  }) => {
     await mockPlayerStatsGraphQL(page, { battingEmpty: true });
-    await page.goto('/players/stats');
-    await page.waitForLoadState('load');
+    await playersPage.gotoStats();
 
-    await expect(page.getByText('No players found')).toBeVisible();
+    await playersPage.stats.expectMessage('No players found');
   });
 
-  test('shows empty state when no pitchers', async ({ page }) => {
+  test('shows empty state when no pitchers', async ({ page, playersPage }) => {
     await mockPlayerStatsGraphQL(page, { pitchingEmpty: true });
-    await page.goto('/players/stats');
-    await page.waitForLoadState('load');
+    await playersPage.gotoStats();
 
-    await page.getByRole('tab', { name: 'Pitchers' }).click();
-    await expect(page.getByText('No pitchers found')).toBeVisible();
+    await playersPage.stats.switchView('Pitchers');
+    await playersPage.stats.expectMessage('No pitchers found');
   });
 });
 
 test.describe('Player Stats Page (mocked) — error states @regression', () => {
-  test('shows error state when batting query fails', async ({ page }) => {
+  test('shows error state when batting query fails', async ({
+    page,
+    playersPage,
+  }) => {
     await mockPlayerStatsGraphQL(page, { battingError: true });
-    await page.goto('/players/stats');
-    await page.waitForLoadState('load');
+    await playersPage.gotoStats();
 
-    await expect(page.getByText('Error Loading Statistics')).toBeVisible();
+    await playersPage.stats.expectMessage('Error Loading Statistics');
   });
 
-  test('shows error state when pitching query fails', async ({ page }) => {
+  test('shows error state when pitching query fails', async ({
+    page,
+    playersPage,
+  }) => {
     await mockPlayerStatsGraphQL(page, { pitchingError: true });
-    await page.goto('/players/stats');
-    await page.waitForLoadState('load');
+    await playersPage.gotoStats();
 
-    await page.getByRole('tab', { name: 'Pitchers' }).click();
-    await expect(page.getByText('Error Loading Statistics')).toBeVisible();
+    await playersPage.stats.switchView('Pitchers');
+    await playersPage.stats.expectMessage('Error Loading Statistics');
   });
 
-  test('page does not crash on stats query failures', async ({ page }) => {
+  test('page does not crash on stats query failures', async ({
+    page,
+    playersPage,
+  }) => {
     await mockPlayerStatsGraphQL(page, {
       battingError: true,
       pitchingError: true,
     });
-    await page.goto('/players/stats');
-    await page.waitForLoadState('load');
+    await playersPage.gotoStats();
 
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await playersPage.expectNoApplicationError();
   });
 });
 
@@ -386,49 +394,42 @@ test.describe('Player Stats Page (mocked) — error states @regression', () => {
 unauthTest.describe(
   'Player Stats page — unauthenticated visitor (LS-3501) @regression',
   () => {
-    unauthTest.beforeEach(async ({ page }) => {
+    unauthTest.beforeEach(async ({ page, playersPage }) => {
       await mockPlayerStatsGraphQL(page);
-      await page.goto('/players/stats');
-      await page.waitForLoadState('load');
+      await playersPage.gotoStats();
     });
 
     unauthTest(
       'shows "MLB Player Statistics" heading on /players/stats when not authenticated',
-      async ({ page }) => {
-        await expect(page.getByText('MLB Player Statistics')).toBeVisible({
-          timeout: 15_000,
-        });
+      async ({ playersPage }) => {
+        await playersPage.stats.expectLoaded(15_000);
       },
     );
 
     unauthTest(
       'does not show the marketing landing page on /players/stats when not authenticated',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // LS-3785's editorial subtitle on the stats page now contains the
         // phrase "build your dynasty on the numbers that actually happened",
         // so a /build your dynasty/i regex matches the stats page itself.
         // "Dominate Your League" appears only on the marketing landing page,
         // making it a reliable marketing-only signal.
-        await expect(page.getByText(/dominate your league/i)).not.toBeVisible();
+        await playersPage.stats.expectMarketingLandingHidden();
       },
     );
 
     unauthTest(
       'shows player stats data on /players/stats when not authenticated',
-      async ({ page }) => {
-        await expect(page.getByText('Barry Bonds')).toBeVisible({
-          timeout: 15_000,
-        });
+      async ({ playersPage }) => {
+        await playersPage.stats.expectPlayerVisible('Barry Bonds', 15_000);
       },
     );
 
     unauthTest(
       'shows Hitters and Pitchers tabs on /players/stats when not authenticated',
-      async ({ page }) => {
-        await expect(page.getByRole('tab', { name: 'Hitters' })).toBeVisible({
-          timeout: 15_000,
-        });
-        await expect(page.getByRole('tab', { name: 'Pitchers' })).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.stats.expectTabVisible('Hitters', 15_000);
+        await playersPage.stats.expectTabVisible('Pitchers');
       },
     );
   },
@@ -449,10 +450,9 @@ unauthTest.describe(
 unauthTest.describe(
   'Player Stats page — functional 404 regression (LS-3498) @regression',
   () => {
-    unauthTest.beforeEach(async ({ page }) => {
+    unauthTest.beforeEach(async ({ page, playersPage }) => {
       await mockPlayerStatsGraphQL(page);
-      await page.goto('/players/stats');
-      await page.waitForLoadState('load');
+      await playersPage.gotoStats();
     });
 
     unauthTest(
@@ -464,20 +464,21 @@ unauthTest.describe(
 
     unauthTest(
       'does not show marketing landing page for unauthenticated users on /players/stats',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // "Dominate Your League" appears only on the marketing landing page.
         // The /build your dynasty/i regex would false-match LS-3785's
         // editorial subtitle on the stats page itself.
-        await expect(page.getByText(/dominate your league/i)).not.toBeVisible();
+        await playersPage.stats.expectMarketingLandingHidden();
       },
     );
 
     unauthTest(
       'shows player statistics content — not a 404 page — for unauthenticated users',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('heading', { name: /mlb player statistics/i }),
-        ).toBeVisible({ timeout: 15_000 });
+      async ({ playersPage }) => {
+        // The stats title renders as a styled div (not a semantic heading), so
+        // assert the content by text; a 404 / marketing page would not render
+        // the "MLB Player Statistics" title at all.
+        await playersPage.stats.expectLoaded(15_000);
       },
     );
   },

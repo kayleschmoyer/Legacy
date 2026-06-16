@@ -13,7 +13,7 @@
  * All GraphQL responses are mocked; no live backend required.
  */
 
-import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
+import { customAuthTest, test } from '../fixtures/pages';
 import { extractOperationName, useTier } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -175,63 +175,44 @@ async function mockPlayerComparisonGraphQL(
   await useTier(page, 'premium');
 }
 
-/** Add a player by searching and clicking their name in the dropdown. */
-async function addPlayer(
-  page: import('@playwright/test').Page,
-  searchTerm: string,
-  fullName: string,
-) {
-  const input = page.getByLabel('Search players to compare');
-  await expect(async () => {
-    await input.clear();
-    await input.focus();
-    await input.fill(searchTerm);
-    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
-    await page.getByText(fullName).click({ timeout: 5000 });
-  }).toPass({ timeout: 15000 });
-}
-
 // ---------------------------------------------------------------------------
 // Tests: Section visibility @smoke
 // ---------------------------------------------------------------------------
 
 test.describe('Fantasy Scoring – section visibility @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
 
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await addPlayer(page, 'Sh', 'Shohei Ohtani');
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
   });
 
-  test('shows Fantasy Scoring section heading', async ({ page }) => {
-    await expect(
-      page.getByText('Fantasy Scoring', { exact: true }),
-    ).toBeVisible();
+  test('shows Fantasy Scoring section heading', async ({ playersPage }) => {
+    await playersPage.compare.expectSectionVisible('Fantasy Scoring', {
+      exact: true,
+    });
   });
 
-  test('shows Fantasy Score row label', async ({ page }) => {
-    await expect(
-      page.getByText('Fantasy Score', { exact: true }),
-    ).toBeVisible();
+  test('shows Fantasy Score row label', async ({ playersPage }) => {
+    await playersPage.compare.expectText('Fantasy Score', { exact: true });
   });
 
-  test('shows Avg Pts / Game row label', async ({ page }) => {
-    await expect(page.getByText('Avg Pts / Game')).toBeVisible();
+  test('shows Avg Pts / Game row label', async ({ playersPage }) => {
+    await playersPage.compare.expectText('Avg Pts / Game');
   });
 
-  test('shows Hitter Score row label', async ({ page }) => {
-    await expect(page.getByText('Hitter Score')).toBeVisible();
+  test('shows Hitter Score row label', async ({ playersPage }) => {
+    await playersPage.compare.expectText('Hitter Score');
   });
 
-  test('shows Pitcher Score row label', async ({ page }) => {
-    await expect(page.getByText('Pitcher Score')).toBeVisible();
+  test('shows Pitcher Score row label', async ({ playersPage }) => {
+    await playersPage.compare.expectText('Pitcher Score');
   });
 
-  test('shows Field Score row label', async ({ page }) => {
-    await expect(page.getByText('Field Score')).toBeVisible();
+  test('shows Field Score row label', async ({ playersPage }) => {
+    await playersPage.compare.expectText('Field Score');
   });
 });
 
@@ -240,26 +221,25 @@ test.describe('Fantasy Scoring – section visibility @smoke', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Fantasy Scoring – row descriptions @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
 
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await addPlayer(page, 'Sh', 'Shohei Ohtani');
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
   });
 
   test('shows "Projected season total" description under Fantasy Score', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('Projected season total')).toBeVisible();
+    await playersPage.compare.expectText('Projected season total');
   });
 
   test('shows "Across all seasons" description under Avg Pts / Game', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('Across all seasons')).toBeVisible();
+    await playersPage.compare.expectText('Across all seasons');
   });
 });
 
@@ -268,49 +248,48 @@ test.describe('Fantasy Scoring – row descriptions @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Fantasy Scoring – stat values @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
 
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await addPlayer(page, 'Sh', 'Shohei Ohtani');
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
   });
 
   test('shows Fantasy Score values for both players (850.0 and 960.0)', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('850.0')).toBeVisible();
-    await expect(page.getByText('960.0')).toBeVisible();
+    await playersPage.compare.expectText('850.0');
+    await playersPage.compare.expectText('960.0');
   });
 
   test('shows Avg Pts / Game values for both players (2.1 and 2.6)', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('2.1').first()).toBeVisible();
-    await expect(page.getByText('2.6').first()).toBeVisible();
+    await playersPage.compare.expectText('2.1');
+    await playersPage.compare.expectText('2.6');
   });
 
   test('shows Hitter Score values for both players (80.0 and 75.0)', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('80.0')).toBeVisible();
-    await expect(page.getByText('75.0')).toBeVisible();
+    await playersPage.compare.expectText('80.0');
+    await playersPage.compare.expectText('75.0');
   });
 
   test('shows Pitcher Score: non-zero for Ohtani (60.0) and zero for Judge (0.0)', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('60.0').first()).toBeVisible();
-    await expect(page.getByText('0.0').first()).toBeVisible();
+    await playersPage.compare.expectText('60.0');
+    await playersPage.compare.expectText('0.0');
   });
 
   test('shows Field Score values for both players (5.0 and 3.0)', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('5.0').first()).toBeVisible();
-    await expect(page.getByText('3.0').first()).toBeVisible();
+    await playersPage.compare.expectText('5.0');
+    await playersPage.compare.expectText('3.0');
   });
 });
 
@@ -319,66 +298,41 @@ test.describe('Fantasy Scoring – stat values @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Fantasy Scoring – BEST indicator @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
 
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await addPlayer(page, 'Sh', 'Shohei Ohtani');
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
   });
 
   test('at least one BEST badge is visible in the scoring section', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('BEST', { exact: true }).first()).toBeVisible();
+    await playersPage.compare.expectAnyBest();
   });
 
   test('Ohtani has higher Fantasy Score (960 > 850) — BEST appears in his column', async ({
-    page,
+    playersPage,
   }) => {
-    // The comparison table has Ohtani in the second column.
-    // Verify his Fantasy Score cell contains both the value and BEST badge.
-    const table = page.getByRole('table', {
-      name: 'Player comparison',
-    });
-    await expect(table).toBeVisible();
-
-    // Ohtani column should contain 960.0 and a BEST badge in close proximity
-    const ohtaniCol = table
-      .getByRole('row')
-      .filter({ hasText: '960.0' })
-      .getByText('BEST', { exact: true });
-    await expect(ohtaniCol).toBeVisible();
+    // The comparison table has Ohtani in the second column. Verify his Fantasy
+    // Score cell (row containing 960.0) carries the BEST badge.
+    await playersPage.compare.expectBestInTableRowWithValue('960.0');
   });
 
   test('Judge has higher Hitter Score (80 > 75) — BEST appears in his column', async ({
-    page,
+    playersPage,
   }) => {
-    const table = page.getByRole('table', { name: 'Player comparison' });
-    await expect(table).toBeVisible();
-
     // Hitter Score row: Judge has 80.0 and should have the BEST badge
-    const judgeHitterBest = table
-      .getByRole('row')
-      .filter({ hasText: '80.0' })
-      .getByText('BEST', { exact: true });
-    await expect(judgeHitterBest).toBeVisible();
+    await playersPage.compare.expectBestInTableRowWithValue('80.0');
   });
 
   test('Ohtani has higher Pitcher Score (60 > 0) — BEST appears in his column', async ({
-    page,
+    playersPage,
   }) => {
-    const table = page.getByRole('table', { name: 'Player comparison' });
-    await expect(table).toBeVisible();
-
     // Pitcher Score row: find the row by its label, then check for BEST badge
-    const ohtaniPitcherBest = table
-      .getByRole('row')
-      .filter({ hasText: 'Pitcher Score' })
-      .getByText('BEST', { exact: true });
-    await expect(ohtaniPitcherBest).toBeVisible();
+    await playersPage.compare.expectBestInTableRow('Pitcher Score');
   });
 });
 
@@ -387,34 +341,35 @@ test.describe('Fantasy Scoring – BEST indicator @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Fantasy Scoring – requires 2+ players @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
   });
 
-  test('section is not visible with 0 players selected', async ({ page }) => {
-    await expect(
-      page.getByText('Fantasy Scoring', { exact: true }),
-    ).not.toBeVisible();
+  test('section is not visible with 0 players selected', async ({
+    playersPage,
+  }) => {
+    await playersPage.compare.expectSectionHidden('Fantasy Scoring', {
+      exact: true,
+    });
   });
 
   test('section is not visible with only 1 player selected', async ({
-    page,
+    playersPage,
   }) => {
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await expect(
-      page.getByText('Fantasy Scoring', { exact: true }),
-    ).not.toBeVisible();
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.expectSectionHidden('Fantasy Scoring', {
+      exact: true,
+    });
   });
 
-  test('section appears once 2nd player is added', async ({ page }) => {
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await addPlayer(page, 'Sh', 'Shohei Ohtani');
-    await expect(
-      page.getByText('Fantasy Scoring', { exact: true }),
-    ).toBeVisible();
+  test('section appears once 2nd player is added', async ({ playersPage }) => {
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+    await playersPage.compare.expectSectionVisible('Fantasy Scoring', {
+      exact: true,
+    });
   });
 });
 
@@ -422,12 +377,12 @@ test.describe('Fantasy Scoring – requires 2+ players @regression', () => {
 // Tests: Premium gate blocks section @regression
 // ---------------------------------------------------------------------------
 
-const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
+const freeUserTest = customAuthTest('freeuser@test.com', 'none');
 
 freeUserTest.describe(
   'Fantasy Scoring Projections – premium gate @regression',
   () => {
-    freeUserTest.beforeEach(async ({ page }) => {
+    freeUserTest.beforeEach(async ({ page, playersPage }) => {
       await page.route(
         (url) => isGraphQLEndpoint(url),
         async (route) => {
@@ -452,18 +407,15 @@ freeUserTest.describe(
       // (LS-8058) so the inline premium upgrade CTA renders. Registered after
       // the route above so its GetUserById handler runs first (Playwright LIFO).
       await useTier(page, 'free');
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
+      await playersPage.gotoCompare();
     });
 
     freeUserTest(
       'non-premium users see the inline premium upgrade CTA (LS-7012)',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // PremiumGate overlay removed (LS-7012): free users now see the full
         // page. The inline PremiumBanner's Upgrade button is the premium signal.
-        await expect(
-          page.getByRole('button', { name: /upgrade/i }),
-        ).toBeVisible();
+        await playersPage.compare.expectPremiumUpgradeCta();
       },
     );
   },

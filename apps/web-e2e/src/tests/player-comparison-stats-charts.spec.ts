@@ -12,7 +12,7 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { adminTest, expect, test } from '../fixtures/auth-enhanced';
+import { adminTest, test } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
@@ -569,47 +569,31 @@ async function mockGraphQL(
   );
 }
 
-/** Helper to add players by searching and clicking. */
-async function addPlayer(
-  page: import('@playwright/test').Page,
-  searchTerm: string,
-  fullName: string,
-) {
-  const input = page.getByLabel('Search players to compare');
-  await expect(async () => {
-    // Clear, focus, and fill — keeps the dropdown open after typing
-    await input.clear();
-    await input.focus();
-    await input.fill(searchTerm);
-    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
-    await page.getByText(fullName).click({ timeout: 5000 });
-  }).toPass({ timeout: 15000 });
-}
-
 // ---------------------------------------------------------------------------
 // Tests: Empty state card @smoke
 // ---------------------------------------------------------------------------
 
 test.describe('Player Comparison – empty state @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
+    await playersPage.gotoCompare();
   });
 
-  test('shows "Nobody on deck yet" empty state card', async ({ page }) => {
-    await expect(page.getByText('Nobody on deck yet')).toBeVisible();
+  test('shows "Nobody on deck yet" empty state card', async ({
+    playersPage,
+  }) => {
+    await playersPage.compare.expectEmptyStateHeading();
   });
 
-  test('shows comparison hint in empty state', async ({ page }) => {
-    await expect(
-      page.getByText(/add at least two players to begin comparing/i),
-    ).toBeVisible();
+  test('shows comparison hint in empty state', async ({ playersPage }) => {
+    await playersPage.compare.expectEmptyStatePrompt();
   });
 
-  test('empty state disappears after adding first player', async ({ page }) => {
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await expect(page.getByText('Nobody on deck yet')).not.toBeVisible();
+  test('empty state disappears after adding first player', async ({
+    playersPage,
+  }) => {
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.expectEmptyStateHidden();
   });
 });
 
@@ -620,60 +604,68 @@ test.describe('Player Comparison – empty state @smoke', () => {
 adminTest.describe(
   'Player Comparison – career pitching section @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Add Judge (no pitching) and Ohtani (has pitching)
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
     adminTest(
       'shows Career Pitching section when pitcher is selected',
-      async ({ page }) => {
-        await expect(page.getByText(/career pitching/i)).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSectionVisible(/career pitching/i);
       },
     );
 
-    adminTest('shows pitching stat rows (Wins, ERA)', async ({ page }) => {
-      // exact: true avoids matching "Offensive Wins Above Replacement" tooltip
-      await expect(page.getByText('Wins', { exact: true })).toBeVisible();
-      await expect(page.getByText('ERA').first()).toBeVisible();
-    });
+    adminTest(
+      'shows pitching stat rows (Wins, ERA)',
+      async ({ playersPage }) => {
+        // exact: true avoids matching "Offensive Wins Above Replacement" tooltip
+        await playersPage.compare.expectText('Wins', { exact: true });
+        await playersPage.compare.expectText('ERA');
+      },
+    );
 
     adminTest(
       'shows Strikeouts and Win % in pitching section',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // 'Strikeouts' now appears in both Career Batting and Career Pitching;
-        // .first() avoids the strict-mode violation from matching 2 elements.
-        await expect(page.getByText('Strikeouts').first()).toBeVisible();
-        await expect(page.getByText('Win %')).toBeVisible();
+        // expectText resolves to the first match.
+        await playersPage.compare.expectText('Strikeouts');
+        await playersPage.compare.expectText('Win %');
       },
     );
 
     adminTest(
       'shows Games and Losses in pitching section',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // "Games" also appears in the Career Batting section; asserting visibility
         // confirms it renders in the comparison table (both rows are correct).
-        await expect(page.getByText('Games').first()).toBeVisible();
-        await expect(page.getByText('Losses', { exact: true })).toBeVisible();
+        await playersPage.compare.expectText('Games');
+        await playersPage.compare.expectText('Losses', { exact: true });
       },
     );
 
-    adminTest('shows Saves and Walks in pitching section', async ({ page }) => {
-      await expect(page.getByText('Saves', { exact: true })).toBeVisible();
-      // "Walks" also appears in Career Batting; asserting visibility covers both.
-      await expect(page.getByText('Walks').first()).toBeVisible();
-    });
+    adminTest(
+      'shows Saves and Walks in pitching section',
+      async ({ playersPage }) => {
+        await playersPage.compare.expectText('Saves', { exact: true });
+        // "Walks" also appears in Career Batting; asserting visibility covers both.
+        await playersPage.compare.expectText('Walks');
+      },
+    );
 
-    adminTest('shows correct ERA stat value for pitcher', async ({ page }) => {
-      // Ohtani mock era = '2.94' → rendered as '2.94'
-      await expect(page.getByText('2.94')).toBeVisible();
-    });
+    adminTest(
+      'shows correct ERA stat value for pitcher',
+      async ({ playersPage }) => {
+        // Ohtani mock era = '2.94' → rendered as '2.94'
+        await playersPage.compare.expectText('2.94');
+      },
+    );
   },
 );
 
@@ -684,29 +676,28 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – career pitching absent (hitters only) @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Add two pure hitters — neither has careerPitching data
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Mo', 'Mookie Betts');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
     });
 
     adminTest(
       'does not show Career Pitching section when no pitchers selected',
-      async ({ page }) => {
-        await expect(page.getByText(/career pitching/i)).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSectionHidden(/career pitching/i);
       },
     );
 
     adminTest(
       'still shows Career Batting and Career Achievements when no pitchers',
-      async ({ page }) => {
-        await expect(page.getByText(/career batting/i)).toBeVisible();
-        await expect(page.getByText(/career achievements/i)).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSectionVisible(/career batting/i);
+        await playersPage.compare.expectSectionVisible(/career achievements/i);
       },
     );
   },
@@ -719,73 +710,66 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – stat values & best highlighting @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Add Judge and Ohtani
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
     adminTest(
       'displays "BEST" indicator for the leading stat',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // At least one "BEST" badge should be visible in the comparison table
-        await expect(
-          page.getByText('BEST', { exact: true }).first(),
-        ).toBeVisible();
+        await playersPage.compare.expectAnyBest();
       },
     );
 
     adminTest(
       'shows correct Fantasy Score values for each player',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Judge has totalScore 850.0, Ohtani has 960.0
-        await expect(page.getByText('850.0')).toBeVisible();
-        await expect(page.getByText('960.0')).toBeVisible();
+        await playersPage.compare.expectText('850.0');
+        await playersPage.compare.expectText('960.0');
       },
     );
 
     adminTest(
       'shows correct Avg Pts / Game values for each player',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Judge: 2.1, Ohtani: 2.6
-        await expect(page.getByText('2.1').first()).toBeVisible();
-        await expect(page.getByText('2.6').first()).toBeVisible();
+        await playersPage.compare.expectText('2.1');
+        await playersPage.compare.expectText('2.6');
       },
     );
 
     adminTest(
       'Ohtani shows non-zero Pitcher Score; Judge shows 0',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Pitcher Score row: Judge 0.0, Ohtani 60.0
-        await expect(page.getByText('0.0').first()).toBeVisible();
-        await expect(page.getByText('60.0').first()).toBeVisible();
+        await playersPage.compare.expectText('0.0');
+        await playersPage.compare.expectText('60.0');
       },
     );
 
-    adminTest('shows Home Runs career stat values', async ({ page }) => {
+    adminTest('shows Home Runs career stat values', async ({ playersPage }) => {
       // Judge: 220, Ohtani: 175
-      await expect(page.getByText('220').first()).toBeVisible();
-      await expect(page.getByText('175').first()).toBeVisible();
+      await playersPage.compare.expectText('220');
+      await playersPage.compare.expectText('175');
     });
 
     adminTest(
       'shows batting Strikeouts row with lowerIsBetter BEST indicator',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Ohtani (950 K) has fewer batting strikeouts than Judge (1200 K),
         // so Ohtani should receive the BEST indicator (lowerIsBetter: true).
-        // Career Batting renders before Career Pitching, so .first() targets
-        // the batting Strikeouts row specifically.
-        const row = page
-          .getByRole('row')
-          .filter({ hasText: 'Strikeouts' })
-          .first();
-        await expect(row).toBeVisible();
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+        // Career Batting renders before Career Pitching, so the first matching
+        // row is the batting Strikeouts row.
+        await playersPage.compare.expectRowVisible('Strikeouts');
+        await playersPage.compare.expectBestInFirstRow('Strikeouts');
       },
     );
   },
@@ -798,83 +782,101 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – season-by-season breakdown @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Add Judge and Ohtani (Ohtani has season batting + pitching data)
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
-    adminTest('shows Season by Season heading', async ({ page }) => {
-      await expect(page.getByText('Season by Season')).toBeVisible();
-    });
-
-    adminTest('shows Batting by Season table for Judge', async ({ page }) => {
-      await expect(
-        page.getByRole('table', { name: 'Season batting for Aaron Judge' }),
-      ).toBeVisible();
-    });
-
-    adminTest('shows Batting by Season table for Ohtani', async ({ page }) => {
-      await expect(
-        page.getByRole('table', { name: 'Season batting for Shohei Ohtani' }),
-      ).toBeVisible();
-    });
-
-    adminTest('shows Pitching by Season table for Ohtani', async ({ page }) => {
-      await expect(
-        page.getByRole('table', { name: 'Season pitching for Shohei Ohtani' }),
-      ).toBeVisible();
+    adminTest('shows Season by Season heading', async ({ playersPage }) => {
+      await playersPage.compare.expectSeasonBySeasonHeading();
     });
 
     adminTest(
+      'shows Batting by Season table for Judge',
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSeasonTableVisible(
+          'batting',
+          'Aaron Judge',
+        );
+      },
+    );
+
+    adminTest(
+      'shows Batting by Season table for Ohtani',
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSeasonTableVisible(
+          'batting',
+          'Shohei Ohtani',
+        );
+      },
+    );
+
+    adminTest(
+      'shows Pitching by Season table for Ohtani',
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSeasonTableVisible(
+          'pitching',
+          'Shohei Ohtani',
+        );
+      },
+    );
+
+    adminTest(
       'does NOT show Pitching by Season table for Judge (non-pitcher)',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('table', { name: 'Season pitching for Aaron Judge' }),
-        ).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSeasonTableHidden(
+          'pitching',
+          'Aaron Judge',
+        );
       },
     );
 
     adminTest(
       'season batting table shows column headers (Year, G, AB, H, HR, etc.)',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Locate within the season breakdown section
-        const seasonSection = page.getByText('Season by Season');
-        await expect(seasonSection).toBeVisible();
+        await playersPage.compare.expectSeasonBySeasonHeading();
 
         // Column headers for batting table
-        await expect(page.getByText('Year').first()).toBeVisible();
+        await playersPage.compare.expectText('Year');
         // AB and HR appear in the batting table headers
-        await expect(page.getByText('AB').first()).toBeVisible();
-        await expect(page.getByText('AVG').first()).toBeVisible();
+        await playersPage.compare.expectText('AB');
+        await playersPage.compare.expectText('AVG');
       },
     );
 
     adminTest(
       'Ohtani season batting table contains 2021 season row data',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // 2021 season: 155 games, 46 HR, .257 AVG
-        await expect(page.getByText('2021').first()).toBeVisible();
+        await playersPage.compare.expectText('2021');
       },
     );
 
     adminTest(
       'Ohtani season pitching table shows pitching headers',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Scope to the pitching table to avoid matching career pitching comparison
-        const pitchingSection = page.getByRole('table', {
-          name: 'Season pitching for Shohei Ohtani',
-        });
-
-        await expect(pitchingSection).toBeVisible();
-        await expect(pitchingSection.getByText('ERA').first()).toBeVisible();
-        await expect(pitchingSection.getByText('SO').first()).toBeVisible();
-        await expect(pitchingSection.getByText('WHIP').first()).toBeVisible();
+        await playersPage.compare.expectSeasonTableHeader(
+          'pitching',
+          'Shohei Ohtani',
+          'ERA',
+        );
+        await playersPage.compare.expectSeasonTableHeader(
+          'pitching',
+          'Shohei Ohtani',
+          'SO',
+        );
+        await playersPage.compare.expectSeasonTableHeader(
+          'pitching',
+          'Shohei Ohtani',
+          'WHIP',
+        );
       },
     );
   },
@@ -889,58 +891,66 @@ adminTest.describe(
   () => {
     adminTest(
       'no expand toggle when a player has 4 or fewer seasons',
-      async ({ page }) => {
+      async ({ page, playersPage }) => {
         // Default mock gives Ohtani 2 seasons — below the truncation threshold.
         await mockGraphQL(page);
-        await page.goto('/players/compare');
-        await page.waitForLoadState('load');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
+        await playersPage.gotoCompare();
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
 
-        await expect(
-          page.getByRole('table', { name: 'Season batting for Shohei Ohtani' }),
-        ).toBeVisible();
-        await expect(page.getByTestId('season-expand-2')).toHaveCount(0);
+        await playersPage.compare.expectSeasonTableVisible(
+          'batting',
+          'Shohei Ohtani',
+        );
+        await playersPage.compare.expectSeasonExpandAbsent(2);
       },
     );
 
     adminTest(
       'expand toggle reveals seasons beyond the four most recent',
-      async ({ page }) => {
+      async ({ page, playersPage }) => {
         // Give Ohtani six batting seasons so the toggle appears.
         await mockGraphQL(page, { 2: { batting: MOCK_OHTANI_MANY_BATTING } });
-        await page.goto('/players/compare');
-        await page.waitForLoadState('load');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
+        await playersPage.gotoCompare();
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
 
-        const battingTable = page.getByRole('table', {
-          name: 'Season batting for Shohei Ohtani',
-        });
-        await expect(battingTable).toBeVisible();
+        await playersPage.compare.expectSeasonTableVisible(
+          'batting',
+          'Shohei Ohtani',
+        );
 
         // Collapsed: four most recent shown (2025–2022); 2020 is truncated.
-        await expect(
-          battingTable.getByText('2025', { exact: true }),
-        ).toBeVisible();
-        await expect(
-          battingTable.getByText('2020', { exact: true }),
-        ).toHaveCount(0);
+        await playersPage.compare.expectSeasonRowVisible(
+          'batting',
+          'Shohei Ohtani',
+          '2025',
+        );
+        await playersPage.compare.expectSeasonRowAbsent(
+          'batting',
+          'Shohei Ohtani',
+          '2020',
+        );
 
-        const toggle = page.getByTestId('season-expand-2');
-        await expect(toggle).toBeVisible();
-        await expect(toggle).toHaveText(/Expand all 6 seasons/);
+        await playersPage.compare.expectSeasonExpandText(
+          2,
+          /Expand all 6 seasons/,
+        );
 
         // Expand: the older seasons become visible.
-        await toggle.click();
-        await expect(
-          battingTable.getByText('2020', { exact: true }),
-        ).toBeVisible();
-        await expect(toggle).toHaveText(/Show fewer/);
+        await playersPage.compare.clickSeasonExpand(2);
+        await playersPage.compare.expectSeasonRowVisible(
+          'batting',
+          'Shohei Ohtani',
+          '2020',
+        );
+        await playersPage.compare.expectSeasonExpandText(2, /Show fewer/);
 
         // Collapse again: 2020 is hidden once more.
-        await toggle.click();
-        await expect(
-          battingTable.getByText('2020', { exact: true }),
-        ).toHaveCount(0);
+        await playersPage.compare.clickSeasonExpand(2);
+        await playersPage.compare.expectSeasonRowAbsent(
+          'batting',
+          'Shohei Ohtani',
+          '2020',
+        );
       },
     );
   },
@@ -954,59 +964,56 @@ adminTest.describe('Player Comparison – max players (4/4) @regression', () => 
   // Adding 4 players sequentially requires more time than the default 20s
   adminTest.setTimeout(60000);
 
-  adminTest.beforeEach(async ({ page }) => {
+  adminTest.beforeEach(async ({ page, playersPage }) => {
     await mockGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
 
     // Add all 4 players
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await addPlayer(page, 'Sh', 'Shohei Ohtani');
-    await addPlayer(page, 'Mo', 'Mookie Betts');
-    await addPlayer(page, 'Mi', 'Mike Trout');
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+    await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
+    await playersPage.compare.addPlayer('Mi', 'Mike Trout');
   });
 
-  adminTest('shows 4/4 player count hint', async ({ page }) => {
-    await expect(
-      page.getByText('4 of 4 selected · 0 slots open'),
-    ).toBeVisible();
+  adminTest('shows 4/4 player count hint', async ({ playersPage }) => {
+    await playersPage.compare.expectCountHint('4 of 4 selected · 0 slots open');
   });
 
   adminTest(
     'search input shows capacity-reached placeholder when at max',
-    async ({ page }) => {
-      await expect(
-        page.getByPlaceholder('4 players selected — remove one to add more'),
-      ).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectSearchAtCapacity();
     },
   );
 
   adminTest(
     'search input is disabled when at max capacity',
-    async ({ page }) => {
-      const input = page.getByPlaceholder(
-        '4 players selected — remove one to add more',
-      );
-      await expect(input).toBeDisabled();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectSearchAtCapacity();
     },
   );
 
   adminTest(
     'all four player names appear in comparison header',
-    async ({ page }) => {
-      await expect(page.getByText('Aaron Judge').first()).toBeVisible();
-      await expect(page.getByText('Shohei Ohtani').first()).toBeVisible();
-      await expect(page.getByText('Mookie Betts').first()).toBeVisible();
-      await expect(page.getByText('Mike Trout').first()).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectText('Aaron Judge');
+      await playersPage.compare.expectText('Shohei Ohtani');
+      await playersPage.compare.expectText('Mookie Betts');
+      await playersPage.compare.expectText('Mike Trout');
     },
   );
 
-  adminTest('removing a player re-enables search (3/4)', async ({ page }) => {
-    await page.getByRole('button', { name: /remove mookie betts/i }).click();
-    await expect(page.getByText('3 of 4 selected · 1 slot open')).toBeVisible();
-    await expect(page.getByPlaceholder('Search player name…')).toBeVisible();
-  });
+  adminTest(
+    'removing a player re-enables search (3/4)',
+    async ({ playersPage }) => {
+      await playersPage.compare.removePlayer('Mookie Betts');
+      await playersPage.compare.expectCountHint(
+        '3 of 4 selected · 1 slot open',
+      );
+      await playersPage.compare.expectSearchPlaceholderDefault();
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1016,36 +1023,33 @@ adminTest.describe('Player Comparison – max players (4/4) @regression', () => 
 adminTest.describe(
   'Player Comparison – three players comparison @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Add Judge, Ohtani, and Betts
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
-      await addPlayer(page, 'Mo', 'Mookie Betts');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
     });
 
     adminTest(
       'shows comparison table with 3 player columns',
-      async ({ page }) => {
-        await expect(page.getByText('Aaron Judge').first()).toBeVisible();
-        await expect(page.getByText('Shohei Ohtani').first()).toBeVisible();
-        await expect(page.getByText('Mookie Betts').first()).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectText('Aaron Judge');
+        await playersPage.compare.expectText('Shohei Ohtani');
+        await playersPage.compare.expectText('Mookie Betts');
       },
     );
 
     adminTest(
       'shows 3/4 count and search remains enabled',
-      async ({ page }) => {
-        await expect(
-          page.getByText('3 of 4 selected · 1 slot open'),
-        ).toBeVisible();
-        await expect(
-          page.getByPlaceholder('Search player name…'),
-        ).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectCountHint(
+          '3 of 4 selected · 1 slot open',
+        );
+        await playersPage.compare.expectSearchPlaceholderDefault();
       },
     );
   },
@@ -1058,135 +1062,117 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – career batting comparison rows (LS-5570) @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Add Judge (hitter) and Ohtani (two-way — also has batting stats)
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
     adminTest(
       'shows "Career Batting" section header in comparison table',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('rowgroup').filter({ hasText: 'Career Batting' }),
-        ).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectRowGroupVisible('Career Batting');
       },
     );
 
-    adminTest('shows all career batting stat row labels', async ({ page }) => {
-      // Scope to the Career Batting rowgroup — "Walks" appears in both career
-      // batting and career pitching sections, so page-level lookups are ambiguous.
-      const section = page
-        .getByRole('rowgroup')
-        .filter({ hasText: 'Career Batting' });
-      for (const label of [
-        'Games',
-        'Hits',
-        'Home Runs',
-        'RBI',
-        'Runs',
-        'Stolen Bases',
-        'Walks',
-        'Total Bases',
-        'oWAR',
-        'Avg Season AVG',
-        'Avg Season OBP',
-        'Avg Season SLG',
-      ]) {
-        await expect(
-          section.getByRole('row').filter({ hasText: label }).first(),
-        ).toBeVisible();
-      }
-    });
+    adminTest(
+      'shows all career batting stat row labels',
+      async ({ playersPage }) => {
+        // Scope to the Career Batting rowgroup — "Walks" appears in both career
+        // batting and career pitching sections, so page-level lookups are ambiguous.
+        await playersPage.compare.expectRowLabelsInGroup('Career Batting', [
+          'Games',
+          'Hits',
+          'Home Runs',
+          'RBI',
+          'Runs',
+          'Stolen Bases',
+          'Walks',
+          'Total Bases',
+          'oWAR',
+          'Avg Season AVG',
+          'Avg Season OBP',
+          'Avg Season SLG',
+        ]);
+      },
+    );
 
     adminTest(
       'shows career batting values for each player column',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Judge: 900 games, Ohtani: 760 games
-        await expect(page.getByText('900').first()).toBeVisible();
-        await expect(page.getByText('760').first()).toBeVisible();
+        await playersPage.compare.expectText('900');
+        await playersPage.compare.expectText('760');
         // Home Runs: Judge 220, Ohtani 175
-        await expect(page.getByText('220').first()).toBeVisible();
-        await expect(page.getByText('175').first()).toBeVisible();
+        await playersPage.compare.expectText('220');
+        await playersPage.compare.expectText('175');
         // RBI: Judge 600, Ohtani 480
-        await expect(page.getByText('600').first()).toBeVisible();
-        await expect(page.getByText('480').first()).toBeVisible();
+        await playersPage.compare.expectText('600');
+        await playersPage.compare.expectText('480');
       },
     );
 
     adminTest(
       'formats rate stats (Avg Season AVG/OBP/SLG) without leading zero',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Judge: .282 AVG, .387 OBP, .579 SLG
-        await expect(page.getByText('.282')).toBeVisible();
-        await expect(page.getByText('.387')).toBeVisible();
-        await expect(page.getByText('.579')).toBeVisible();
+        await playersPage.compare.expectText('.282');
+        await playersPage.compare.expectText('.387');
+        await playersPage.compare.expectText('.579');
         // Ohtani: .274 AVG, .377 OBP, .564 SLG
-        await expect(page.getByText('.274')).toBeVisible();
-        await expect(page.getByText('.377')).toBeVisible();
-        await expect(page.getByText('.564')).toBeVisible();
+        await playersPage.compare.expectText('.274');
+        await playersPage.compare.expectText('.377');
+        await playersPage.compare.expectText('.564');
       },
     );
 
-    adminTest('formats oWAR with one decimal place', async ({ page }) => {
-      // Judge: 42.0 oWAR, Ohtani: 38.5 oWAR
-      await expect(page.getByText('42.0').first()).toBeVisible();
-      await expect(page.getByText('38.5')).toBeVisible();
-    });
+    adminTest(
+      'formats oWAR with one decimal place',
+      async ({ playersPage }) => {
+        // Judge: 42.0 oWAR, Ohtani: 38.5 oWAR
+        await playersPage.compare.expectText('42.0');
+        await playersPage.compare.expectText('38.5');
+      },
+    );
 
     adminTest(
       'BEST indicator appears on the higher career batting value',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Judge has more Home Runs (220 vs 175) — his HR cell should be marked BEST.
         // Locate the Home Runs row and assert the BEST badge is near the 220 value.
-        const table = page.getByRole('table', { name: 'Player comparison' });
-        const hrRow = table.getByRole('row').filter({ hasText: 'Home Runs' });
-        await expect(hrRow.getByText('BEST', { exact: true })).toBeVisible();
+        await playersPage.compare.expectBestInTableRow('Home Runs');
         // The BEST badge should be in the same cell as the higher value (220)
-        const bestCell = hrRow.getByRole('cell').filter({ hasText: 'BEST' });
-        await expect(bestCell).toContainText('220');
+        await playersPage.compare.expectBestCellContains('Home Runs', '220');
       },
     );
 
     adminTest(
       'BEST indicator is absent from the lower value in a career batting row',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // In the Home Runs row, Ohtani (175) should NOT have the BEST badge
-        const table = page.getByRole('table', { name: 'Player comparison' });
-        const hrRow = table.getByRole('row').filter({ hasText: 'Home Runs' });
-        const cells = hrRow.getByRole('cell');
-        // The cell containing 175 must not contain BEST
-        const ohtaniCell = cells.filter({ hasText: '175' });
-        await expect(ohtaniCell).not.toContainText('BEST');
+        await playersPage.compare.expectCellWithoutBest('Home Runs', '175');
       },
     );
 
     adminTest(
       'Walks stat row displays career base-on-balls totals',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Judge: 400 walks, Ohtani: 310 walks
-        const table = page.getByRole('table', { name: 'Player comparison' });
-        const walksRow = table
-          .getByRole('row')
-          .filter({ hasText: 'Walks' })
-          .first();
-        await expect(walksRow).toBeVisible();
-        await expect(walksRow).toContainText('400');
-        await expect(walksRow).toContainText('310');
+        await playersPage.compare.expectRowContains('Walks', '400');
+        await playersPage.compare.expectRowContains('Walks', '310');
       },
     );
 
     adminTest(
       'Total Bases row shows correct career totals',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Judge: 1,800 total bases, Ohtani: 1,400 total bases
-        await expect(page.getByText('1,800')).toBeVisible();
-        await expect(page.getByText('1,400')).toBeVisible();
+        await playersPage.compare.expectText('1,800');
+        await playersPage.compare.expectText('1,400');
       },
     );
   },

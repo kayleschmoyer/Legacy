@@ -5,10 +5,11 @@
  *  - /players/:brefId resolves via GetPlayerIdByBrefId and opens the modal
  *  - unknown brefId shows the inline "No player found" alert (no modal)
  *
- * All GraphQL queries are mocked so these tests run without a live backend.
+ * Element access goes through the injected `playersPage` semantic object
+ * (ADR-0015); GraphQL mocks stay inline (ADR-0015 §6).
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { test } from '../fixtures/pages';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -154,49 +155,49 @@ async function setupBrefIdMocks(
 test.describe('Player Detail Page — brefId route @regression', () => {
   test('resolves brefId and opens the player detail modal', async ({
     page,
+    playersPage,
   }) => {
     await setupBrefIdMocks(page);
-    await page.goto('/players/troutmi01');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoBrefId('troutmi01', 'networkidle');
 
     // Modal must be visible once brefId resolves to a numeric id
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
 
     // Header should show the resolved player name
-    await expect(dialog.getByText('Mike Trout').first()).toBeVisible();
+    await playersPage.detail.expectText('Mike Trout');
   });
 
-  test('shows player stats after brefId resolves', async ({ page }) => {
+  test('shows player stats after brefId resolves', async ({
+    page,
+    playersPage,
+  }) => {
     await setupBrefIdMocks(page);
-    await page.goto('/players/troutmi01');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoBrefId('troutmi01', 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-    await expect(page.getByTestId('player-detail-loading')).not.toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // Hero stat chips loaded from the season stats response
-    await expect(dialog.getByText('AVG').first()).toBeVisible();
-    await expect(dialog.getByText('HR').first()).toBeVisible();
-    await expect(dialog.getByText('RBI').first()).toBeVisible();
+    await playersPage.detail.expectText('AVG');
+    await playersPage.detail.expectText('HR');
+    await playersPage.detail.expectText('RBI');
   });
 
   test('normalises mixed-case brefId — /players/TroutMi01 resolves the same player', async ({
     page,
+    playersPage,
   }) => {
     await setupBrefIdMocks(page);
     // The page lowercases the param before querying; same mock applies
-    await page.goto('/players/TroutMi01');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoBrefId('TroutMi01', 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText('Mike Trout').first()).toBeVisible();
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectText('Mike Trout');
   });
 
   test('shows loading indicator while brefId lookup is in flight', async ({
     page,
+    playersPage,
   }) => {
     // Delay the brefId response so we can catch the loading state
     await page.route(isGraphQLEndpoint, async (route) => {
@@ -213,45 +214,40 @@ test.describe('Player Detail Page — brefId route @regression', () => {
       }
     });
 
-    await page.goto('/players/troutmi01');
-    await page.waitForLoadState('domcontentloaded');
+    await playersPage.gotoBrefId('troutmi01', 'domcontentloaded');
 
     // Loading indicator must be visible before brefId resolves
-    await expect(page.getByRole('status')).toBeVisible();
+    await playersPage.detail.expectLoadingStatus();
   });
 
   test('shows inline alert and no modal when brefId is not found', async ({
     page,
+    playersPage,
   }) => {
     await setupBrefIdMocks(page, {
       brefIdResponse: BREF_ID_NOT_FOUND_RESPONSE,
     });
-    await page.goto('/players/unknownxx99');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoBrefId('unknownxx99', 'networkidle');
 
     // The "No player found" alert must be visible
-    const alert = page.getByRole('alert');
-    await expect(alert).toBeVisible();
-    await expect(alert).toContainText('No player found');
+    await playersPage.detail.expectNotFoundAlert();
 
     // Modal must NOT be mounted
-    await expect(page.locator('div[role="dialog"]')).not.toBeVisible();
+    await playersPage.detail.expectClosed();
   });
 
   test('back button on brefId route navigates to /players/stats', async ({
     page,
+    playersPage,
   }) => {
     await setupBrefIdMocks(page);
-    await page.goto('/players/troutmi01');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoBrefId('troutmi01', 'networkidle');
 
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible();
+    await playersPage.detail.expectOpen();
 
-    const backButton = page.getByRole('button', { name: /← back/i });
-    await expect(backButton).toBeVisible();
-    await backButton.dispatchEvent('click');
+    await playersPage.detail.expectBackButton();
+    await playersPage.detail.back();
 
-    await page.waitForURL('**/players/stats');
+    await playersPage.detail.waitForStatsList();
   });
 });

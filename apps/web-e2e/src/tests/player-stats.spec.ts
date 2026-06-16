@@ -1,4 +1,4 @@
-﻿import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -121,7 +121,7 @@ const MOCK_CAREER_BATTING_RESPONSE = {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 test.describe('Player Statistics Page @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     // Mock GraphQL endpoints with player data so the stats page has data to render
     await page.route(isGraphQLEndpoint, async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
@@ -142,152 +142,124 @@ test.describe('Player Statistics Page @regression', () => {
     });
 
     // Navigate to the player stats page (BrowserRouter — no hash)
-    await page.goto('/players/stats');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoStats();
   });
 
-  test('should load the player statistics page', async ({ page }) => {
+  test('should load the player statistics page', async ({
+    page,
+    playersPage,
+  }) => {
     // Check that the page has loaded
     await expect(page).toHaveTitle(/.*Web.*|.*Legacy Sports.*/);
 
     // Check for main page elements — rendered as styled div, not heading
-    await expect(
-      page.getByText(/MLB Player Statistics/i).first(),
-    ).toBeVisible();
+    await playersPage.stats.expectText(/MLB Player Statistics/i);
 
     // Check that the stats interface components are present
-    await expect(
-      page.getByPlaceholder('Search player name · min 2 chars'),
-    ).toBeVisible();
+    await playersPage.stats.expectSearchVisible();
     // Batting grid title confirms the stats interface rendered
-    await expect(
-      page.getByText('MLB Career Batting Leaders').first(),
-    ).toBeVisible();
+    await playersPage.stats.expectBattingLeaders();
   });
 
-  test('should display player statistics data grid', async ({ page }) => {
+  test('should display player statistics data grid', async ({
+    playersPage,
+  }) => {
     // Column headers are always visible even without data rows
     const columnHeaders = ['Player', 'H', 'HR', 'RBI'];
     for (const header of columnHeaders) {
-      await expect(
-        page.getByText(header, { exact: true }).first(),
-      ).toBeVisible();
+      await playersPage.stats.expectColumnHeader(header);
     }
   });
 
-  test('should allow searching for players', async ({ page }) => {
-    // Find the search input
-    const searchInput = page.getByPlaceholder(
-      'Search player name · min 2 chars',
-    );
-    await expect(searchInput).toBeVisible();
-
-    // Type in a search query
-    await searchInput.fill('Trout');
-
-    // Verify the page is still functional after search
-    await expect(searchInput).toHaveValue('Trout');
+  test('should allow searching for players', async ({ playersPage }) => {
+    // Type in a search query (search() asserts the input reflects the value)
+    await playersPage.stats.search('Trout');
 
     // Verify search results contain a player with "Trout"
     // The data grid uses XStack (div), not <tr>, so use text locator
-    await expect(page.getByText(/Trout/i).first()).toBeVisible();
+    await playersPage.stats.expectText(/Trout/i);
 
     // Clear search
-    await searchInput.clear();
-    await expect(searchInput).toHaveValue('');
+    await playersPage.stats.clearSearch();
   });
 
-  test('should support view mode switching', async ({ page }) => {
-    const combinedTab = page.getByRole('tab', { name: 'Combined' });
-    const hittersTab = page.getByRole('tab', { name: 'Hitters' });
-    const pitchersTab = page.getByRole('tab', { name: 'Pitchers' });
+  test('should support view mode switching', async ({ playersPage }) => {
+    await playersPage.stats.expectTabVisible('Combined');
+    await playersPage.stats.expectTabVisible('Hitters');
+    await playersPage.stats.expectTabVisible('Pitchers');
+    await playersPage.stats.expectTabSelected('Combined');
 
-    await expect(combinedTab).toBeVisible();
-    await expect(hittersTab).toBeVisible();
-    await expect(pitchersTab).toBeVisible();
-    await expect(combinedTab).toHaveAttribute('aria-selected', 'true');
+    await playersPage.stats.switchView('Hitters');
+    await playersPage.stats.expectTabSelected('Hitters');
 
-    await hittersTab.click();
-    await expect(hittersTab).toHaveAttribute('aria-selected', 'true');
-
-    await pitchersTab.click();
-    await expect(pitchersTab).toHaveAttribute('aria-selected', 'true');
+    await playersPage.stats.switchView('Pitchers');
+    await playersPage.stats.expectTabSelected('Pitchers');
   });
 
   test('should support sorting by clicking column headers', async ({
-    page,
+    playersPage,
   }) => {
-    // Find a sortable column header — e.g. "HR" (Home Runs)
-    const hrHeader = page.getByText('HR', { exact: true }).first();
-    await expect(hrHeader).toBeVisible();
-
-    // Click to sort — verify no crash
-    await hrHeader.click();
-    await expect(hrHeader).toBeVisible();
+    // Click a sortable column header — e.g. "HR" (Home Runs) — and verify no crash
+    await playersPage.stats.clickColumnHeader('HR');
+    await playersPage.stats.expectColumnHeader('HR');
 
     // Click again to reverse sort
-    await hrHeader.click();
-    await expect(hrHeader).toBeVisible();
+    await playersPage.stats.clickColumnHeader('HR');
+    await playersPage.stats.expectColumnHeader('HR');
   });
 
-  test('should show filter controls', async ({ page }) => {
+  test('should show filter controls', async ({ playersPage }) => {
     // LS-3785 redesign moved filters into a toolbar (Search · Position · Team ·
     // Rows · Advanced toggle → Stat Ranges panel). Assert against the toolbar
     // container testid so the test isn't coupled to specific control labels.
-    await expect(page.getByTestId('filter-controls')).toBeVisible();
+    await playersPage.stats.expectFilterControls();
   });
 
-  test('should support pagination', async ({ page }) => {
+  test('should support pagination', async ({ playersPage }) => {
     // LS-3785's Combined view renders batting + pitching grids with
     // independent pagination, so scope the locator to the batting grid to
     // avoid the strict-mode collision on duplicate "Next" buttons. The
     // fixture has fewer rows than one page, so Next/Previous render but stay
     // disabled — verifying the controls exist is the meaningful regression
     // assertion. A separate spec with a multi-page mock can exercise paging.
-    const battingGrid = page.getByTestId('player-stats-data-grid');
-    await expect(
-      battingGrid.getByRole('button', { name: /next/i }),
-    ).toBeVisible();
-    await expect(
-      battingGrid.getByRole('button', { name: /previous|prev/i }),
-    ).toBeVisible();
+    await playersPage.stats.expectPaginationControls();
   });
 
-  test('should handle player selection and navigation', async ({ page }) => {
+  test('should handle player selection and navigation', async ({
+    playersPage,
+  }) => {
     // Verify the stats page loaded with player data
-    await expect(
-      page.getByText(/MLB Player Statistics/i).first(),
-    ).toBeVisible();
+    await playersPage.stats.expectText(/MLB Player Statistics/i);
 
     // Verify the page renders without errors
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await playersPage.expectNoApplicationError();
   });
 
-  test('should be responsive on mobile viewports', async ({ page }) => {
+  test('should be responsive on mobile viewports', async ({
+    page,
+    playersPage,
+  }) => {
     // Test mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Check that the page is still functional
-    await expect(
-      page.getByText(/MLB Player Statistics/i).first(),
-    ).toBeVisible();
+    await playersPage.stats.expectText(/MLB Player Statistics/i);
 
     // Test tablet viewport
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Verify still renders at tablet width
-    await expect(
-      page.getByText(/MLB Player Statistics/i).first(),
-    ).toBeVisible();
+    await playersPage.stats.expectText(/MLB Player Statistics/i);
   });
 
-  test('should handle loading states gracefully', async ({ page }) => {
+  test('should handle loading states gracefully', async ({
+    page,
+    playersPage,
+  }) => {
     // Navigate to page and intercept network requests to simulate slow loading
     await page.route(
       (url) => {
@@ -310,28 +282,25 @@ test.describe('Player Statistics Page @regression', () => {
       },
     );
 
-    await page.goto('/players/stats');
+    await playersPage.gotoStats();
 
     // The 2 s delay above guarantees the loading indicator appears before
     // GraphQL responds. LS-3785's Combined view renders batting + pitching
     // grids, each with its own loading-indicator testid — scope to the
     // batting grid to avoid a strict-mode collision.
-    await expect(
-      page
-        .getByTestId('player-stats-data-grid')
-        .getByTestId('loading-indicator'),
-    ).toBeVisible({ timeout: 5_000 });
+    await playersPage.stats.expectLoadingIndicator();
 
     // Wait for content to load
     await page.waitForLoadState('networkidle');
 
     // Verify page content is loaded
-    await expect(
-      page.getByText(/MLB Player Statistics/i).first(),
-    ).toBeVisible();
+    await playersPage.stats.expectText(/MLB Player Statistics/i);
   });
 
-  test('should handle error states gracefully', async ({ page }) => {
+  test('should handle error states gracefully', async ({
+    page,
+    playersPage,
+  }) => {
     // Intercept GraphQL requests and return an error. Use the
     // isGraphQLEndpoint predicate (same as beforeEach) so the actual API
     // path is matched — a `**/graphql` glob misses the configured endpoint.
@@ -345,15 +314,12 @@ test.describe('Player Statistics Page @regression', () => {
       });
     });
 
-    await page.goto('/players/stats');
-    await page.waitForLoadState('networkidle');
+    await playersPage.gotoStats();
 
     // The mocked 500 response with `errors` must surface a user-visible error.
     // LS-3785's Combined view renders batting + pitching grids, each with its
     // own error-message testid — scope to the batting grid to avoid a
     // strict-mode collision.
-    await expect(
-      page.getByTestId('player-stats-data-grid').getByTestId('error-message'),
-    ).toBeVisible({ timeout: 5_000 });
+    await playersPage.stats.expectGridError();
   });
 });

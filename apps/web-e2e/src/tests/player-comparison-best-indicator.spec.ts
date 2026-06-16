@@ -8,7 +8,7 @@
  * Premium feature; all GraphQL responses are mocked — no live backend required.
  */
 
-import { adminTest, expect } from '../fixtures/auth-enhanced';
+import { adminTest } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
@@ -456,64 +456,31 @@ async function mockGraphQL(
   );
 }
 
-async function addPlayer(
-  page: import('@playwright/test').Page,
-  searchTerm: string,
-  fullName: string,
-) {
-  const input = page.getByLabel('Search players to compare');
-  await expect(async () => {
-    await input.clear();
-    await input.focus();
-    await input.fill(searchTerm);
-    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
-    await page.getByText(fullName).click({ timeout: 5000 });
-  }).toPass({ timeout: 15000 });
-}
-
-async function addPlayerForce(
-  page: import('@playwright/test').Page,
-  searchTerm: string,
-  fullName: string,
-) {
-  const input = page.getByLabel('Search players to compare');
-  await expect(async () => {
-    await input.clear({ force: true });
-    await input.focus({ force: true });
-    await input.fill(searchTerm, { force: true });
-    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
-    await page.getByText(fullName).click({ force: true, timeout: 5000 });
-  }).toPass({ timeout: 15000 });
-}
-
 // ---------------------------------------------------------------------------
 // Tests: BEST indicator basic visibility @regression
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Player Comparison – BEST indicator @regression', () => {
-  adminTest.beforeEach(async ({ page }) => {
+  adminTest.beforeEach(async ({ page, playersPage }) => {
     await mockGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
 
-    await addPlayer(page, 'Aa', 'Aaron Judge');
-    await addPlayer(page, 'Sh', 'Shohei Ohtani');
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
   });
 
   adminTest(
     '"BEST" badge is visible in the comparison table',
-    async ({ page }) => {
-      await expect(
-        page.getByText('BEST', { exact: true }).first(),
-      ).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectAnyBest();
     },
   );
 
   adminTest(
     'upward triangle ▲ is visible alongside the "BEST" badge',
-    async ({ page }) => {
-      await expect(page.getByText('▲').first()).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectTriangle();
     },
   );
 
@@ -522,21 +489,15 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 
   adminTest(
     'All-Star Selections row shows BEST for the player with more selections',
-    async ({ page }) => {
-      const row = page
-        .getByRole('row')
-        .filter({ hasText: /all-star selections/i });
-      await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectBestInRow(/all-star selections/i);
     },
   );
 
   adminTest(
     'All-Star Selections row shows exactly one BEST badge',
-    async ({ page }) => {
-      const row = page
-        .getByRole('row')
-        .filter({ hasText: /all-star selections/i });
-      await expect(row.getByText('BEST', { exact: true })).toHaveCount(1);
+    async ({ playersPage }) => {
+      await playersPage.compare.expectBestCountInRow(/all-star selections/i, 1);
     },
   );
 
@@ -544,9 +505,8 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 
   adminTest(
     'MVP Awards row shows no BEST when both players are tied',
-    async ({ page }) => {
-      const row = page.getByRole('row').filter({ hasText: /mvp awards/i });
-      await expect(row.getByText('BEST', { exact: true })).toHaveCount(0);
+    async ({ playersPage }) => {
+      await playersPage.compare.expectBestCountInRow(/mvp awards/i, 0);
     },
   );
 
@@ -554,9 +514,8 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 
   adminTest(
     'Cy Young Awards row shows no BEST when both players have 0',
-    async ({ page }) => {
-      const row = page.getByRole('row').filter({ hasText: /cy young/i });
-      await expect(row.getByText('BEST', { exact: true })).toHaveCount(0);
+    async ({ playersPage }) => {
+      await playersPage.compare.expectBestCountInRow(/cy young/i, 0);
     },
   );
 
@@ -564,9 +523,8 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 
   adminTest(
     'Silver Sluggers row shows BEST for the player with more awards',
-    async ({ page }) => {
-      const row = page.getByRole('row').filter({ hasText: /silver sluggers/i });
-      await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectBestInRow(/silver sluggers/i);
     },
   );
 
@@ -574,11 +532,8 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 
   adminTest(
     'World Series Rings row shows BEST for the player with more rings',
-    async ({ page }) => {
-      const row = page
-        .getByRole('row')
-        .filter({ hasText: /world series rings/i });
-      await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectBestInRow(/world series rings/i);
     },
   );
 
@@ -586,9 +541,8 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 
   adminTest(
     'Fantasy Score row shows BEST for the player with the higher score',
-    async ({ page }) => {
-      const row = page.getByRole('row').filter({ hasText: /fantasy score/i });
-      await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectBestInRow(/fantasy score/i);
     },
   );
 
@@ -596,9 +550,8 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 
   adminTest(
     'Stolen Bases row shows BEST for the player with more stolen bases',
-    async ({ page }) => {
-      const row = page.getByRole('row').filter({ hasText: /stolen bases/i });
-      await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectBestInRow(/stolen bases/i);
     },
   );
 
@@ -606,12 +559,10 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 
   adminTest(
     'multiple rows show BEST across different stat groups',
-    async ({ page }) => {
+    async ({ playersPage }) => {
       // At least 3 BEST badges should be visible (Fantasy Score, Career Batting,
       // Career Achievements each contribute at least one clear winner)
-      const bestBadges = page.getByText('BEST', { exact: true });
-      const count = await bestBadges.count();
-      expect(count).toBeGreaterThanOrEqual(3);
+      await playersPage.compare.expectBestCountAtLeast(3);
     },
   );
 });
@@ -623,37 +574,37 @@ adminTest.describe('Player Comparison – BEST indicator @regression', () => {
 adminTest.describe(
   'Player Comparison – BEST indicator lowerIsBetter @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page, MOCK_TWO_PITCHER_PLAYERS);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Ohtani (ERA 2.94) and Sandy Koufax (ERA 3.85) — both have pitching data
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
-      await addPlayer(page, 'Sa', 'Sandy Koufax');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Sa', 'Sandy Koufax');
     });
 
     adminTest(
       'Career Pitching section is visible when two pitchers are compared',
-      async ({ page }) => {
-        await expect(page.getByText(/career pitching/i)).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSectionVisible(/career pitching/i);
       },
     );
 
     adminTest(
       'ERA row shows BEST for the pitcher with the lower ERA (lowerIsBetter)',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Ohtani ERA 2.94 < Koufax ERA 3.85, so Ohtani should get BEST
-        const row = page.getByRole('row').filter({ hasText: 'ERA' });
-        await expect(row.getByText('BEST', { exact: true })).toBeVisible();
+        await playersPage.compare.expectBestInRow('ERA');
       },
     );
 
-    adminTest('ERA row shows exactly one BEST badge', async ({ page }) => {
-      const row = page.getByRole('row').filter({ hasText: 'ERA' });
-      await expect(row.getByText('BEST', { exact: true })).toHaveCount(1);
-    });
+    adminTest(
+      'ERA row shows exactly one BEST badge',
+      async ({ playersPage }) => {
+        await playersPage.compare.expectBestCountInRow('ERA', 1);
+      },
+    );
   },
 );
 
@@ -664,51 +615,46 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – ERA suppression below 50 IP threshold @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page, MOCK_UNQUALIFIED_PITCHER_PLAYERS);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Koufax (qualified, 2880 IP) and Short Sample (unqualified, 30 IP)
-      await addPlayer(page, 'Sa', 'Sandy Koufax');
-      await addPlayer(page, 'Sh', 'Short Sample');
+      await playersPage.compare.addPlayer('Sa', 'Sandy Koufax');
+      await playersPage.compare.addPlayer('Sh', 'Short Sample');
     });
 
     adminTest(
       'ERA row is visible in the Career Pitching section',
-      async ({ page }) => {
-        await expect(page.getByText(/career pitching/i)).toBeVisible();
-        const row = page.getByRole('row').filter({ hasText: 'ERA' });
-        await expect(row).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSectionVisible(/career pitching/i);
+        await playersPage.compare.expectRowVisible('ERA');
       },
     );
 
     adminTest(
       'ERA shows — for a pitcher below the 50 IP threshold',
-      async ({ page }) => {
-        const row = page.getByRole('row').filter({ hasText: 'ERA' });
+      async ({ playersPage }) => {
         // The unqualified pitcher's ERA is suppressed — row must contain a dash
-        await expect(row.getByText('—').first()).toBeVisible();
+        await playersPage.compare.expectDashInRow('ERA');
       },
     );
 
     adminTest(
       'ERA row awards BEST to the sole qualifying pitcher (LS-7000)',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // LS-7000 changed bestIndex so the sole valid value wins the BEST badge
         // (valid.length===0 guard). When one pitcher is suppressed (<50 IP) the
         // qualifying pitcher's ERA is the only valid value and correctly gets BEST.
-        const row = page.getByRole('row').filter({ hasText: 'ERA' });
-        await expect(row.getByText('BEST', { exact: true })).toHaveCount(1);
+        await playersPage.compare.expectBestCountInRow('ERA', 1);
       },
     );
 
     adminTest(
       'ERA row shows the Min. 50 IP required qualifier note',
-      async ({ page }) => {
-        const row = page.getByRole('row').filter({ hasText: 'ERA' });
-        await expect(row.getByText(/min\. 50 ip required/i)).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectQualifierNoteInRow('ERA');
       },
     );
   },
@@ -721,34 +667,33 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – BEST indicator absent for non-premium @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       // Pin the current user to free via the shared entitlement fixture
       // (LS-8058) so isPremium resolves to false. All other mocks (players,
       // season stats) remain the premium-baseline defaults. useTier is
       // registered after mockGraphQL so its GetUserById handler runs first.
       await mockGraphQL(page, MOCK_PLAYERS);
       await useTier(page, 'free');
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
 
       // Force-interact to simulate a user who has bypassed the pointer-events
       // gate (e.g. via browser DevTools) and added players to the comparison.
-      await addPlayerForce(page, 'Aa', 'Aaron Judge');
-      await addPlayerForce(page, 'Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayerForce('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayerForce('Sh', 'Shohei Ohtani');
     });
 
     adminTest(
       'BEST badge is absent from DOM for non-premium users (PCM-006)',
-      async ({ page }) => {
-        await expect(page.getByText('BEST', { exact: true })).toHaveCount(0);
+      async ({ playersPage }) => {
+        await playersPage.compare.expectNoBest();
       },
     );
 
     adminTest(
       'upward triangle ▲ is absent from DOM for non-premium users (PCM-006)',
-      async ({ page }) => {
-        await expect(page.getByText('▲')).toHaveCount(0);
+      async ({ playersPage }) => {
+        await playersPage.compare.expectNoTriangle();
       },
     );
   },

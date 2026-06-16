@@ -16,7 +16,7 @@
  * Premium feature; all GraphQL responses are mocked — no live backend required.
  */
 
-import { adminTest, expect } from '../fixtures/auth-enhanced';
+import { adminTest } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
@@ -341,21 +341,6 @@ async function mockGraphQL(page: import('@playwright/test').Page) {
   );
 }
 
-async function addPlayer(
-  page: import('@playwright/test').Page,
-  searchTerm: string,
-  fullName: string,
-) {
-  const input = page.getByLabel('Search players to compare');
-  await expect(async () => {
-    await input.clear();
-    await input.focus();
-    await input.fill(searchTerm);
-    await expect(page.getByText(fullName)).toBeVisible({ timeout: 5000 });
-    await page.getByText(fullName).click({ timeout: 5000 });
-  }).toPass({ timeout: 15000 });
-}
-
 // ---------------------------------------------------------------------------
 // Tests: chip container and basic chip rendering @regression
 // ---------------------------------------------------------------------------
@@ -363,51 +348,52 @@ async function addPlayer(
 adminTest.describe(
   'Player Comparison – color-coded chip container @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
-      await addPlayer(page, 'Aa', 'Aaron Judge');
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
     });
 
     adminTest(
       'selected players container has accessible label',
-      async ({ page }) => {
-        await expect(page.getByLabel('Selected players')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectSelectedPlayersContainer();
       },
     );
 
     adminTest(
       'chip for the added player renders with correct data-testid',
-      async ({ page }) => {
-        await expect(page.getByTestId('selected-chip-1')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectChipVisible(1);
       },
     );
 
-    adminTest('chip shows the selected player name', async ({ page }) => {
-      const chip = page.getByTestId('selected-chip-1');
-      await expect(chip).toContainText('Aaron Judge');
-    });
+    adminTest(
+      'chip shows the selected player name',
+      async ({ playersPage }) => {
+        await playersPage.compare.expectChipContains(1, 'Aaron Judge');
+      },
+    );
 
-    adminTest('chip shows the selected player position', async ({ page }) => {
-      const chip = page.getByTestId('selected-chip-1');
-      await expect(chip).toContainText('OF');
-    });
+    adminTest(
+      'chip shows the selected player position',
+      async ({ playersPage }) => {
+        await playersPage.compare.expectChipContains(1, 'OF');
+      },
+    );
 
     adminTest(
       'chip has a remove button with correct aria-label',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('button', { name: /remove aaron judge/i }),
-        ).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectRemoveButton('Aaron Judge');
       },
     );
 
     adminTest(
       'remove button data-testid matches the player id',
-      async ({ page }) => {
-        await expect(page.getByTestId('remove-player-1')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectRemoveTestId(1);
       },
     );
   },
@@ -420,66 +406,61 @@ adminTest.describe(
 adminTest.describe(
   'Player Comparison – empty slot placeholders @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
     });
 
     adminTest(
       'adding one player shows three empty slot placeholders',
-      async ({ page }) => {
-        await addPlayer(page, 'Aa', 'Aaron Judge');
-        const container = page.getByLabel('Selected players');
-        await expect(container.getByText(/slot.*empty/i)).toHaveCount(3);
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.expectEmptySlotCount(3);
       },
     );
 
     adminTest(
       'adding two players shows two empty slot placeholders',
-      async ({ page }) => {
-        await addPlayer(page, 'Aa', 'Aaron Judge');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
-        const container = page.getByLabel('Selected players');
-        await expect(container.getByText(/slot.*empty/i)).toHaveCount(2);
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+        await playersPage.compare.expectEmptySlotCount(2);
       },
     );
 
     adminTest(
       'adding three players shows one empty slot placeholder',
-      async ({ page }) => {
-        await addPlayer(page, 'Aa', 'Aaron Judge');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
-        await addPlayer(page, 'Mo', 'Mookie Betts');
-        const container = page.getByLabel('Selected players');
-        await expect(container.getByText(/slot.*empty/i)).toHaveCount(1);
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+        await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
+        await playersPage.compare.expectEmptySlotCount(1);
       },
     );
 
     adminTest(
       'adding four players shows no empty slot placeholders',
-      async ({ page }) => {
-        await addPlayer(page, 'Aa', 'Aaron Judge');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
-        await addPlayer(page, 'Mo', 'Mookie Betts');
-        await addPlayer(page, 'Mi', 'Miguel Cabrera');
-        const container = page.getByLabel('Selected players');
-        await expect(container.getByText(/slot.*empty/i)).toHaveCount(0);
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+        await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
+        await playersPage.compare.addPlayer('Mi', 'Miguel Cabrera');
+        await playersPage.compare.expectEmptySlotCount(0);
       },
     );
 
     adminTest(
       'all four player chips appear when four players are added',
-      async ({ page }) => {
-        await addPlayer(page, 'Aa', 'Aaron Judge');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
-        await addPlayer(page, 'Mo', 'Mookie Betts');
-        await addPlayer(page, 'Mi', 'Miguel Cabrera');
-        await expect(page.getByTestId('selected-chip-1')).toBeVisible();
-        await expect(page.getByTestId('selected-chip-2')).toBeVisible();
-        await expect(page.getByTestId('selected-chip-3')).toBeVisible();
-        await expect(page.getByTestId('selected-chip-4')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+        await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
+        await playersPage.compare.addPlayer('Mi', 'Miguel Cabrera');
+        await playersPage.compare.expectChipVisible(1);
+        await playersPage.compare.expectChipVisible(2);
+        await playersPage.compare.expectChipVisible(3);
+        await playersPage.compare.expectChipVisible(4);
       },
     );
   },
@@ -490,20 +471,18 @@ adminTest.describe(
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Player Comparison – slot accent colors @regression', () => {
-  adminTest.beforeEach(async ({ page }) => {
+  adminTest.beforeEach(async ({ page, playersPage }) => {
     await mockGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
   });
 
   adminTest(
     'slot 0 chip (gold) has gold accent border color',
-    async ({ page }) => {
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      const chip = page.getByTestId('selected-chip-1');
-      await expect(chip).toHaveCSS(
-        'border-top-color',
+    async ({ playersPage }) => {
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.expectChipBorderTopColor(
+        1,
         'rgba(197, 165, 90, 0.5)',
       );
     },
@@ -511,12 +490,11 @@ adminTest.describe('Player Comparison – slot accent colors @regression', () =>
 
   adminTest(
     'slot 1 chip (blue) has blue accent border color',
-    async ({ page }) => {
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
-      const chip = page.getByTestId('selected-chip-2');
-      await expect(chip).toHaveCSS(
-        'border-top-color',
+    async ({ playersPage }) => {
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+      await playersPage.compare.expectChipBorderTopColor(
+        2,
         'rgba(96, 165, 250, 0.5)',
       );
     },
@@ -524,13 +502,12 @@ adminTest.describe('Player Comparison – slot accent colors @regression', () =>
 
   adminTest(
     'slot 2 chip (green) has green accent border color',
-    async ({ page }) => {
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
-      await addPlayer(page, 'Mo', 'Mookie Betts');
-      const chip = page.getByTestId('selected-chip-3');
-      await expect(chip).toHaveCSS(
-        'border-top-color',
+    async ({ playersPage }) => {
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
+      await playersPage.compare.expectChipBorderTopColor(
+        3,
         'rgba(52, 211, 153, 0.5)',
       );
     },
@@ -538,14 +515,13 @@ adminTest.describe('Player Comparison – slot accent colors @regression', () =>
 
   adminTest(
     'slot 3 chip (red) has red accent border color',
-    async ({ page }) => {
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
-      await addPlayer(page, 'Mo', 'Mookie Betts');
-      await addPlayer(page, 'Mi', 'Miguel Cabrera');
-      const chip = page.getByTestId('selected-chip-4');
-      await expect(chip).toHaveCSS(
-        'border-top-color',
+    async ({ playersPage }) => {
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+      await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
+      await playersPage.compare.addPlayer('Mi', 'Miguel Cabrera');
+      await playersPage.compare.expectChipBorderTopColor(
+        4,
         'rgba(248, 113, 113, 0.5)',
       );
     },
@@ -553,23 +529,25 @@ adminTest.describe('Player Comparison – slot accent colors @regression', () =>
 
   adminTest(
     'slot 0 chip has gold accent dot background color',
-    async ({ page }) => {
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      const chip = page.getByTestId('selected-chip-1');
+    async ({ playersPage }) => {
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
       // The accent dot is the first child div inside the chip
-      const dot = chip.locator('div').first();
-      await expect(dot).toHaveCSS('background-color', 'rgb(197, 165, 90)');
+      await playersPage.compare.expectChipAccentDotColor(
+        1,
+        'rgb(197, 165, 90)',
+      );
     },
   );
 
   adminTest(
     'slot 1 chip has blue accent dot background color',
-    async ({ page }) => {
-      await addPlayer(page, 'Aa', 'Aaron Judge');
-      await addPlayer(page, 'Sh', 'Shohei Ohtani');
-      const chip = page.getByTestId('selected-chip-2');
-      const dot = chip.locator('div').first();
-      await expect(dot).toHaveCSS('background-color', 'rgb(96, 165, 250)');
+    async ({ playersPage }) => {
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+      await playersPage.compare.expectChipAccentDotColor(
+        2,
+        'rgb(96, 165, 250)',
+      );
     },
   );
 });
@@ -581,34 +559,32 @@ adminTest.describe('Player Comparison – slot accent colors @regression', () =>
 adminTest.describe(
   'Player Comparison – slot color stability after removal @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
     });
 
     adminTest(
       'second slot player retains blue accent after first slot player is removed',
-      async ({ page }) => {
+      async ({ playersPage }) => {
         // Add two players: Judge to slot 0 (gold), Ohtani to slot 1 (blue)
-        await addPlayer(page, 'Aa', 'Aaron Judge');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
 
         // Verify Ohtani's chip is initially blue (slot 1)
-        const ohtaniChip = page.getByTestId('selected-chip-2');
-        await expect(ohtaniChip).toHaveCSS(
-          'border-top-color',
+        await playersPage.compare.expectChipBorderTopColor(
+          2,
           'rgba(96, 165, 250, 0.5)',
         );
 
         // Remove Judge (slot 0 — the gold chip)
-        await page.getByRole('button', { name: /remove aaron judge/i }).click();
-        await expect(page.getByTestId('selected-chip-1')).not.toBeVisible();
+        await playersPage.compare.removePlayer('Aaron Judge');
+        await playersPage.compare.expectChipHidden(1);
 
         // Ohtani's chip must still be blue (slot 1) — not promoted to gold
-        await expect(ohtaniChip).toHaveCSS(
-          'border-top-color',
+        await playersPage.compare.expectChipBorderTopColor(
+          2,
           'rgba(96, 165, 250, 0.5)',
         );
       },
@@ -616,27 +592,24 @@ adminTest.describe(
 
     adminTest(
       'third slot player retains green accent after second slot player is removed',
-      async ({ page }) => {
-        await addPlayer(page, 'Aa', 'Aaron Judge');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
-        await addPlayer(page, 'Mo', 'Mookie Betts');
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
+        await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
 
         // Betts is in slot 2 (green)
-        const bettsChip = page.getByTestId('selected-chip-3');
-        await expect(bettsChip).toHaveCSS(
-          'border-top-color',
+        await playersPage.compare.expectChipBorderTopColor(
+          3,
           'rgba(52, 211, 153, 0.5)',
         );
 
         // Remove Ohtani (slot 1)
-        await page
-          .getByRole('button', { name: /remove shohei ohtani/i })
-          .click();
-        await expect(page.getByTestId('selected-chip-2')).not.toBeVisible();
+        await playersPage.compare.removePlayer('Shohei Ohtani');
+        await playersPage.compare.expectChipHidden(2);
 
         // Betts must still be green (slot 2 unchanged)
-        await expect(bettsChip).toHaveCSS(
-          'border-top-color',
+        await playersPage.compare.expectChipBorderTopColor(
+          3,
           'rgba(52, 211, 153, 0.5)',
         );
       },
@@ -644,17 +617,16 @@ adminTest.describe(
 
     adminTest(
       'removing a player restores the correct number of empty slot placeholders',
-      async ({ page }) => {
-        await addPlayer(page, 'Aa', 'Aaron Judge');
-        await addPlayer(page, 'Sh', 'Shohei Ohtani');
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
 
         // 2 players → 2 empty placeholders
-        const container = page.getByLabel('Selected players');
-        await expect(container.getByText(/slot.*empty/i)).toHaveCount(2);
+        await playersPage.compare.expectEmptySlotCount(2);
 
         // Remove one player → 3 empty placeholders
-        await page.getByRole('button', { name: /remove aaron judge/i }).click();
-        await expect(container.getByText(/slot.*empty/i)).toHaveCount(3);
+        await playersPage.compare.removePlayer('Aaron Judge');
+        await playersPage.compare.expectEmptySlotCount(3);
       },
     );
   },

@@ -13,11 +13,11 @@
 
 import {
   adminTest,
-  createCustomAuthTest,
+  customAuthTest,
   expect,
   test,
   unauthTest,
-} from '../fixtures/auth-enhanced';
+} from '../fixtures/pages';
 import { useTier } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -241,52 +241,47 @@ async function mockPlayerComparisonGraphQL(
 // ---------------------------------------------------------------------------
 
 test.describe('Player Comparison – page structure @smoke', () => {
-  test.beforeEach(async ({ page }) => {
-    // Mock GetUserById so useIsPremium doesn't hit a real backend
+  test.beforeEach(async ({ page, playersPage }) => {
+    // Mock GraphQL so useIsPremium doesn't hit a real backend
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
+    await playersPage.gotoCompare();
   });
 
-  test('loads the player comparison page without errors', async ({ page }) => {
+  test('loads the player comparison page without errors', async ({
+    page,
+    playersPage,
+  }) => {
     await expect(page).toHaveURL('/players/compare');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await playersPage.expectNoApplicationError();
   });
 });
 
 test.describe('Player Comparison – page structure (premium) @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
+    await playersPage.gotoCompare();
   });
 
-  test('shows Player Comparison heading', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /compare up to four/i }).first(),
-    ).toBeVisible();
+  test('shows Player Comparison heading', async ({ playersPage }) => {
+    await playersPage.compare.expectHeadlineVisible();
   });
 
-  test('shows search input for adding players', async ({ page }) => {
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+  test('shows search input for adding players', async ({ playersPage }) => {
+    await playersPage.compare.expectSearchVisible();
   });
 
-  test('shows placeholder text in search input', async ({ page }) => {
-    await expect(page.getByPlaceholder('Search player name…')).toBeVisible();
+  test('shows placeholder text in search input', async ({ playersPage }) => {
+    await playersPage.compare.expectSearchPlaceholderDefault();
   });
 
-  test('shows player slot label', async ({ page }) => {
-    await expect(page.getByText('Add player · up to 4')).toBeVisible();
+  test('shows player slot label', async ({ playersPage }) => {
+    await playersPage.compare.expectSlotLabel();
   });
 
   test('shows minimum player hint when fewer than 2 selected', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(
-      page.getByText(/add at least 2 players to run the comparison/i),
-    ).toBeVisible();
+    await playersPage.compare.expectMinimumPlayersHint();
   });
 });
 
@@ -295,70 +290,55 @@ test.describe('Player Comparison – page structure (premium) @smoke', () => {
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Player Comparison – player search @regression', () => {
-  adminTest.beforeEach(async ({ page }) => {
+  adminTest.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
   });
 
-  adminTest('search input accepts text input', async ({ page }) => {
-    const input = page.getByLabel('Search players to compare');
-    await input.fill('Aa');
-    await expect(input).toHaveValue('Aa');
+  adminTest('search input accepts text input', async ({ playersPage }) => {
+    await playersPage.compare.typeSearch('Aa');
   });
 
   adminTest(
     'search results appear when query is 2+ characters',
-    async ({ page }) => {
-      const input = page.getByLabel('Search players to compare');
-      await input.fill('Aa');
+    async ({ playersPage }) => {
+      await playersPage.compare.typeSearch('Aa');
       // Wait for the dropdown results from the mock
-      await expect(page.getByText('Aaron Judge')).toBeVisible();
+      await playersPage.compare.expectSuggestionVisible('Aaron Judge');
     },
   );
 
   adminTest(
     'search result shows player name and position',
-    async ({ page }) => {
-      const input = page.getByLabel('Search players to compare');
-      await input.fill('Aa');
-      await expect(page.getByText('Aaron Judge')).toBeVisible();
-      await expect(page.getByText('OF').first()).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.typeSearch('Aa');
+      await playersPage.compare.expectSuggestionVisible('Aaron Judge');
+      await playersPage.compare.expectText('OF');
     },
   );
 
   adminTest(
     'selecting a player from results adds them as a chip',
-    async ({ page }) => {
-      const input = page.getByLabel('Search players to compare');
-      await input.fill('Aa');
-      await page.getByText('Aaron Judge').click();
+    async ({ playersPage }) => {
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
 
       // Player chip appears — verified by its Remove button
-      await expect(
-        page.getByRole('button', { name: /remove aaron judge/i }),
-      ).toBeVisible();
+      await playersPage.compare.expectRemoveButton('Aaron Judge');
     },
   );
 
-  adminTest('adding a second player updates count to 2/4', async ({ page }) => {
-    const input = page.getByLabel('Search players to compare');
+  adminTest(
+    'adding a second player updates count to 2/4',
+    async ({ playersPage }) => {
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
 
-    // Add first player
-    await input.fill('Aa');
-    await page.getByText('Aaron Judge').click();
-
-    // Add second player (retry fill+click — dropdown can close from stale blur)
-    await expect(async () => {
-      await input.fill('Sh');
-      await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
-    }).toPass({ timeout: 15000 });
-
-    await expect(
-      page.getByText('2 of 4 selected · 2 slots open'),
-    ).toBeVisible();
-  });
+      await playersPage.compare.expectCountHint(
+        '2 of 4 selected · 2 slots open',
+      );
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -366,56 +346,46 @@ adminTest.describe('Player Comparison – player search @regression', () => {
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Player Comparison – comparison table @regression', () => {
-  adminTest.beforeEach(async ({ page }) => {
+  adminTest.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
 
-    const input = page.getByLabel('Search players to compare');
-
-    // Add first player
-    await input.fill('Aa');
-    await expect(page.getByText('Aaron Judge')).toBeVisible();
-    await page.getByText('Aaron Judge').click();
-
-    // Add second player (retry fill+click — dropdown can close from stale blur)
-    await expect(async () => {
-      await input.fill('Sh');
-      await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
-    }).toPass({ timeout: 15000 });
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+    await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
   });
 
   adminTest(
     'minimum player hint disappears once 2 players are selected',
-    async ({ page }) => {
-      await expect(
-        page.getByText(/add at least 2 players to run the comparison/i),
-      ).not.toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectMinimumPlayersHintHidden();
     },
   );
 
-  adminTest('shows Fantasy Scoring section', async ({ page }) => {
-    await expect(
-      page.getByText('Fantasy Scoring', { exact: true }),
-    ).toBeVisible();
+  adminTest('shows Fantasy Scoring section', async ({ playersPage }) => {
+    await playersPage.compare.expectSectionVisible('Fantasy Scoring', {
+      exact: true,
+    });
   });
 
-  adminTest('shows Career Batting section', async ({ page }) => {
-    await expect(page.getByText(/career batting/i)).toBeVisible();
+  adminTest('shows Career Batting section', async ({ playersPage }) => {
+    await playersPage.compare.expectSectionVisible(/career batting/i);
   });
 
-  adminTest('shows Career Achievements section', async ({ page }) => {
-    await expect(page.getByText(/career achievements/i)).toBeVisible();
+  adminTest('shows Career Achievements section', async ({ playersPage }) => {
+    await playersPage.compare.expectSectionVisible(/career achievements/i);
   });
 
-  adminTest('shows player names in comparison header', async ({ page }) => {
-    await expect(page.getByText('Aaron Judge').first()).toBeVisible();
-    await expect(page.getByText('Shohei Ohtani').first()).toBeVisible();
-  });
+  adminTest(
+    'shows player names in comparison header',
+    async ({ playersPage }) => {
+      await playersPage.compare.expectText('Aaron Judge');
+      await playersPage.compare.expectText('Shohei Ohtani');
+    },
+  );
 
-  adminTest('shows Avg Pts / Game stat row', async ({ page }) => {
-    await expect(page.getByText('Avg Pts / Game')).toBeVisible();
+  adminTest('shows Avg Pts / Game stat row', async ({ playersPage }) => {
+    await playersPage.compare.expectText('Avg Pts / Game');
   });
 });
 
@@ -424,77 +394,59 @@ adminTest.describe('Player Comparison – comparison table @regression', () => {
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Player Comparison – remove player @regression', () => {
-  adminTest.beforeEach(async ({ page }) => {
+  adminTest.beforeEach(async ({ page, playersPage }) => {
     await mockPlayerComparisonGraphQL(page);
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
-    await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    await playersPage.gotoCompare();
+    await playersPage.compare.expectSearchVisible();
 
     // Add one player
-    const input = page.getByLabel('Search players to compare');
-    await input.fill('Aa');
-    await expect(page.getByText('Aaron Judge')).toBeVisible();
-    await page.getByText('Aaron Judge').click();
+    await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
   });
 
-  adminTest('Remove button has correct aria-label', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: /remove aaron judge/i }),
-    ).toBeVisible();
+  adminTest('Remove button has correct aria-label', async ({ playersPage }) => {
+    await playersPage.compare.expectRemoveButton('Aaron Judge');
   });
 
   adminTest(
     'clicking Remove button removes the player chip',
-    async ({ page }) => {
-      await page.getByRole('button', { name: /remove aaron judge/i }).click();
+    async ({ playersPage }) => {
+      await playersPage.compare.removePlayer('Aaron Judge');
 
       // Hint returns to the minimum-player prompt after chip removed
-      await expect(
-        page.getByText(/add at least 2 players to run the comparison/i),
-      ).toBeVisible();
+      await playersPage.compare.expectMinimumPlayersHint();
     },
   );
 
   adminTest(
     'removing a player shows an undo toast that restores the chip',
-    async ({ page }) => {
+    async ({ playersPage }) => {
       // Sanity: chip present before removal.
-      await expect(page.getByTestId('selected-chip-1')).toBeVisible();
+      await playersPage.compare.expectChipVisible(1);
 
-      await page.getByRole('button', { name: /remove aaron judge/i }).click();
+      await playersPage.compare.removePlayer('Aaron Judge');
 
       // Chip is gone, but a non-destructive undo toast appears (LS-7040).
-      await expect(page.getByTestId('selected-chip-1')).toHaveCount(0);
-      const toast = page.getByTestId('undo-remove-toast');
-      await expect(toast).toBeVisible();
-      await expect(toast).toContainText('Removed Aaron Judge');
+      await playersPage.compare.expectChipCount(1, 0);
+      await playersPage.compare.expectUndoToast('Aaron Judge');
 
       // Clicking Undo restores the removed player to its slot.
-      await page
-        .getByRole('button', { name: /undo removing aaron judge/i })
-        .click();
+      await playersPage.compare.clickUndoRemove('Aaron Judge');
 
-      await expect(page.getByTestId('selected-chip-1')).toBeVisible();
-      await expect(page.getByTestId('undo-remove-toast')).toHaveCount(0);
+      await playersPage.compare.expectChipVisible(1);
+      await playersPage.compare.expectUndoToastGone();
     },
   );
 
   adminTest(
     'minimum player hint reappears after removing second player',
-    async ({ page }) => {
+    async ({ playersPage }) => {
       // Add a second player (retry fill+click — dropdown can detach during re-render)
-      const input = page.getByLabel('Search players to compare');
-      await expect(async () => {
-        await input.fill('Sh');
-        await page.getByText('Shohei Ohtani').click({ timeout: 2000 });
-      }).toPass({ timeout: 15000 });
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
 
       // Now remove one
-      await page.getByRole('button', { name: /remove aaron judge/i }).click();
+      await playersPage.compare.removePlayer('Aaron Judge');
 
-      await expect(
-        page.getByText(/add at least 2 players to run the comparison/i),
-      ).toBeVisible();
+      await playersPage.compare.expectMinimumPlayersHint();
     },
   );
 });
@@ -505,10 +457,10 @@ adminTest.describe('Player Comparison – remove player @regression', () => {
 
 // Use a custom auth fixture with accessLevel 'none' so useIsPremium doesn't
 // short-circuit to true (the global-setup user may be an admin).
-const freeUserTest = createCustomAuthTest('freeuser@test.com', 'none');
+const freeUserTest = customAuthTest('freeuser@test.com', 'none');
 
 freeUserTest.describe('Player Comparison – premium gate @regression', () => {
-  freeUserTest.beforeEach(async ({ page }) => {
+  freeUserTest.beforeEach(async ({ page, playersPage }) => {
     await page.route(
       (url) => isGraphQLEndpoint(url),
       async (route) => {
@@ -535,40 +487,33 @@ freeUserTest.describe('Player Comparison – premium gate @regression', () => {
     // so the inline premium upgrade CTA renders. Registered after the route
     // above so its GetUserById handler runs first (Playwright LIFO).
     await useTier(page, 'free');
-    await page.goto('/players/compare');
-    await page.waitForLoadState('load');
+    await playersPage.gotoCompare();
   });
 
   freeUserTest(
     'shows inline premium upgrade CTA for non-premium users (LS-7012)',
-    async ({ page }) => {
+    async ({ playersPage }) => {
       // PremiumGate overlay removed (LS-7012): free users now see the full page
       // with the inline PremiumBanner instead of a blur overlay. The banner
       // renders an "Upgrade" pill button that is always visible on the page.
-      await expect(
-        page.getByRole('button', { name: /upgrade/i }),
-      ).toBeVisible();
+      await playersPage.compare.expectPremiumUpgradeCta();
     },
   );
 
   freeUserTest(
     'shows Upgrade button in the inline premium banner (LS-7012)',
-    async ({ page }) => {
+    async ({ playersPage }) => {
       // The page-level PremiumGate overlay is removed (LS-7012); the shared-
       // components PremiumBanner is the single "Upgrade" CTA, so no scoping
       // to a gate testid is needed — the button is unambiguous.
-      await expect(
-        page.getByRole('button', { name: /upgrade/i }),
-      ).toBeVisible();
+      await playersPage.compare.expectPremiumUpgradeCta();
     },
   );
 
   freeUserTest(
     'shows player comparison feature description',
-    async ({ page }) => {
-      await expect(
-        page.getByText(/compare up to 4 players/i).first(),
-      ).toBeVisible();
+    async ({ playersPage }) => {
+      await playersPage.compare.expectText(/compare up to 4 players/i);
     },
   );
 });
@@ -580,138 +525,100 @@ freeUserTest.describe('Player Comparison – premium gate @regression', () => {
 adminTest.describe(
   'Player Comparison – search threshold & slot selection @regression',
   () => {
-    adminTest.beforeEach(async ({ page }) => {
+    adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockPlayerComparisonGraphQL(page);
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
-      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+      await playersPage.gotoCompare();
+      await playersPage.compare.expectSearchVisible();
     });
 
     adminTest(
       'dropdown does not appear when query has fewer than 2 characters',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('A');
+      async ({ playersPage }) => {
+        await playersPage.compare.typeSearch('A');
         // With only 1 character, showDropdown is false (query.trim().length < 2)
         // — no results should be visible
-        await expect(page.getByLabel('Player suggestions')).not.toBeVisible({
-          timeout: 2000,
-        });
+        await playersPage.compare.expectSuggestionsHidden();
       },
     );
 
     adminTest(
       'search input is cleared after selecting a player from dropdown',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('Aa');
-        await expect(page.getByText('Aaron Judge')).toBeVisible();
-        await page.getByText('Aaron Judge').click();
-        await expect(input).toHaveValue('');
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+        await playersPage.compare.expectSearchValue('');
       },
     );
 
     adminTest(
       'empty slot indicators appear for unfilled slots when a player is added',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('Aa');
-        await page.getByText('Aaron Judge').click();
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
         // After adding 1 player, 3 empty slot chips should appear for slots 2–4
-        await expect(page.getByText('Slot 2 · empty')).toBeVisible();
-        await expect(page.getByText('Slot 3 · empty')).toBeVisible();
-        await expect(page.getByText('Slot 4 · empty')).toBeVisible();
+        await playersPage.compare.expectEmptySlotText(2);
+        await playersPage.compare.expectEmptySlotText(3);
+        await playersPage.compare.expectEmptySlotText(4);
       },
     );
 
     adminTest(
       'empty slot chip is an actionable button that focuses the search input (PCM-046)',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('Aa');
-        await page.getByText('Aaron Judge').click();
+      async ({ playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
 
         // The empty slot chips are announced as actionable buttons rather than
         // static text — the dashed pill now matches its (real) clickability.
-        const emptySlot = page.getByRole('button', {
-          name: 'Slot 2 empty — add a player',
-        });
-        await expect(emptySlot).toBeVisible();
+        await playersPage.compare.expectEmptySlotButton(2);
 
         // Activating it focuses the search input so the user can fill the slot.
-        await emptySlot.click();
-        await expect(input).toBeFocused();
+        await playersPage.compare.clickEmptySlot(2);
+        await playersPage.compare.expectSearchFocused();
       },
     );
 
     adminTest(
       'empty slot chip focuses the search input via the keyboard (PCM-046)',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('Aa');
-        await page.getByText('Aaron Judge').click();
+      async ({ page, playersPage }) => {
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
 
-        const emptySlot = page.getByRole('button', {
-          name: 'Slot 2 empty — add a player',
-        });
-        await emptySlot.focus();
+        await playersPage.compare.focusEmptySlot(2);
         await page.keyboard.press('Enter');
-        await expect(input).toBeFocused();
+        await playersPage.compare.expectSearchFocused();
       },
     );
 
     adminTest(
       'selection succeeds when blur fires before click fires on the suggestion (PCM-030 regression)',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('Aa');
-        const suggestion = page
-          .getByLabel('Player suggestions')
-          .getByText('Aaron Judge')
-          .first();
-        await expect(suggestion).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.typeSearch('Aa');
+        await playersPage.compare.expectSuggestionVisible('Aaron Judge');
 
         // Simulate the blur-before-click race that PCM-030 describes: blur the
         // input (as mousedown on the suggestion would) BEFORE clicking it.
         // Prior to the fix, onBlur called setOpen(false) and destroyed the
         // dropdown before the click could land. Now onBlur only calls
         // setFocused(false), so the dropdown must survive the blur.
-        await input.blur();
-        await expect(suggestion).toBeVisible({ timeout: 500 });
+        await playersPage.compare.blurSearch();
+        await playersPage.compare.expectSuggestionVisible('Aaron Judge', 500);
 
         // Click the suggestion — must succeed even though input is already blurred.
-        await suggestion.click();
-        await expect(
-          page.getByRole('button', { name: /remove aaron judge/i }),
-        ).toBeVisible();
+        await playersPage.compare.clickSuggestion('Aaron Judge');
+        await playersPage.compare.expectRemoveButton('Aaron Judge');
       },
     );
 
     adminTest(
       'already-selected player does not appear in dropdown on subsequent search',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
+      async ({ playersPage }) => {
         // Add Aaron Judge first
-        await input.fill('Aa');
-        await expect(page.getByText('Aaron Judge')).toBeVisible();
-        await page.getByText('Aaron Judge').click();
+        await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
 
         // Search again — mock returns all players but component filters out selected ones
-        await expect(async () => {
-          await input.fill('Aa');
-          await expect(page.getByLabel('Player suggestions')).toBeVisible({
-            timeout: 3000,
-          });
-        }).toPass({ timeout: 10000 });
+        await playersPage.compare.expectSuggestionsVisibleAfterTyping('Aa');
 
         // Aaron Judge should not appear in the dropdown (he's already selected)
-        await expect(
-          page.getByLabel('Player suggestions').getByText('Aaron Judge'),
-        ).not.toBeVisible();
+        await playersPage.compare.expectSuggestionHidden('Aaron Judge');
         // Other players (not selected) still appear
-        await expect(
-          page.getByLabel('Player suggestions').getByText('Shohei Ohtani'),
-        ).toBeVisible();
+        await playersPage.compare.expectSuggestionVisible('Shohei Ohtani');
       },
     );
   },
@@ -724,29 +631,22 @@ adminTest.describe(
 unauthTest.describe(
   'Player Comparison – unauthenticated visitor @regression',
   () => {
-    unauthTest.beforeEach(async ({ page }) => {
-      await page.goto('/players/compare');
-      await page.waitForLoadState('load');
+    unauthTest.beforeEach(async ({ playersPage }) => {
+      await playersPage.gotoCompare();
     });
 
     unauthTest(
       'does not show the player comparison tool when not authenticated',
-      async ({ page }) => {
-        await expect(
-          page.getByRole('heading', { name: /compare up to four/i }),
-        ).not.toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.expectHeadlineHidden();
       },
     );
 
     unauthTest(
       '"Get Started Free" CTA is visible and navigates to / on /players/compare for unauthenticated users',
-      async ({ page }) => {
-        const getStartedBtn = page.getByRole('button', {
-          name: /get started free/i,
-        });
-        await expect(getStartedBtn).toBeVisible({ timeout: 15_000 });
-        await expect(getStartedBtn).toBeEnabled();
-        await getStartedBtn.click();
+      async ({ page, playersPage }) => {
+        await playersPage.compare.expectGetStartedFree();
+        await playersPage.compare.clickGetStartedFree();
         await expect(page).toHaveURL('/');
       },
     );
