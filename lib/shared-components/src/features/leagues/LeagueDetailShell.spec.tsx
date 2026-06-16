@@ -134,6 +134,32 @@ describe('LeagueDetailShell', () => {
     expect(onInvite).toHaveBeenCalledTimes(1);
   });
 
+  it('copies the invite code to the clipboard when the code is pressed', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    const { getByRole, findByText } = renderShell();
+    fireEvent.click(
+      getByRole('button', { name: 'Copy league invite code ABC123' }),
+    );
+
+    expect(writeText).toHaveBeenCalledWith('ABC123');
+    // Confirmation feedback appears after the async clipboard write resolves.
+    expect(await findByText('Copied')).toBeTruthy();
+  });
+
+  it('does not throw when the clipboard API is unavailable', () => {
+    Object.assign(navigator, { clipboard: undefined });
+
+    const { getByRole, queryByText } = renderShell();
+    expect(() =>
+      fireEvent.click(
+        getByRole('button', { name: 'Copy league invite code ABC123' }),
+      ),
+    ).not.toThrow();
+    expect(queryByText('Copied')).toBeNull();
+  });
+
   it('renders the pending-trade badge on the trades tab', () => {
     const { getByText } = renderShell({ pendingTradeCount: 3 });
     expect(getByText('3')).toBeTruthy();

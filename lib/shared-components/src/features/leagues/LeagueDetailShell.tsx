@@ -345,9 +345,7 @@ export function LeagueDetailHero({
             ) : null}
             <HeroMetaItem label="Scoring">{league.scoringLabel}</HeroMetaItem>
             {league.inviteCode ? (
-              <HeroMetaItem label="Invite" valueColor={BRAND_GOLD_LIGHT}>
-                {league.inviteCode}
-              </HeroMetaItem>
+              <InviteCodeMetaItem inviteCode={league.inviteCode} />
             ) : null}
           </XStack>
         </YStack>
@@ -424,6 +422,103 @@ function HeroMetaItem({
       >
         {children}
       </Text>
+    </YStack>
+  );
+}
+
+/**
+ * Hero meta item for the league invite code. The code value is click-to-copy:
+ * pressing it writes the code to the clipboard and briefly swaps the trailing
+ * copy icon for a checkmark + "Copied" confirmation (LS-8062).
+ */
+function InviteCodeMetaItem({
+  inviteCode,
+}: {
+  inviteCode: string;
+}): React.JSX.Element {
+  const [copied, setCopied] = React.useState(false);
+  const resetTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(
+    () => () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+    },
+    [],
+  );
+
+  const handleCopy = React.useCallback(() => {
+    // `navigator.clipboard` is undefined in non-secure contexts (HTTP, some
+    // sandboxed iframes) and on React Native — bail safely so we don't throw.
+    const writeText =
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard?.writeText.bind(navigator.clipboard);
+    if (!writeText) return;
+    void writeText(inviteCode).then(
+      () => {
+        setCopied(true);
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => setCopied(false), 1500);
+      },
+      () => undefined,
+    );
+  }, [inviteCode]);
+
+  return (
+    <YStack gap={2}>
+      <Text
+        fontFamily="$heading"
+        fontWeight="700"
+        fontSize={10}
+        letterSpacing={1.4}
+        textTransform="uppercase"
+        color={FG4}
+      >
+        Invite
+      </Text>
+      <XStack
+        tag="button"
+        role="button"
+        tabIndex={0}
+        alignItems="center"
+        gap={6}
+        cursor="pointer"
+        hoverStyle={{ opacity: 0.85 }}
+        pressStyle={{ opacity: 0.7 }}
+        onPress={handleCopy}
+        aria-label={
+          copied
+            ? 'League invite code copied'
+            : `Copy league invite code ${inviteCode}`
+        }
+      >
+        <Text
+          fontFamily="$heading"
+          fontWeight="700"
+          fontSize={16}
+          letterSpacing={0.32}
+          color={BRAND_GOLD_LIGHT}
+        >
+          {inviteCode}
+        </Text>
+        <BrandIcon
+          name={copied ? 'check' : 'copy'}
+          size={13}
+          color={copied ? BRAND_GOLD : BRAND_GOLD_LIGHT}
+          accentColor={copied ? BRAND_GOLD : BRAND_GOLD_LIGHT}
+        />
+        {copied ? (
+          <Text
+            fontFamily="$heading"
+            fontWeight="700"
+            fontSize={10}
+            letterSpacing={1.4}
+            textTransform="uppercase"
+            color={BRAND_GOLD}
+          >
+            Copied
+          </Text>
+        ) : null}
+      </XStack>
     </YStack>
   );
 }
