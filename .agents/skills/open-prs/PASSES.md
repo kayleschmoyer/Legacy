@@ -238,7 +238,7 @@ After validation:
 8. **Verify mergeability after push** — do not assume CONFLICTING status clears automatically:
    - GitHub's mergeability check typically updates within 2–3 minutes after a force-push
    - If a PR still shows CONFLICTING more than **5 minutes** after the push, treat it as a **real conflict** — do not dismiss as cache lag
-   - Verify with: `worktree_run(worktree: "LS-####", command: "git fetch origin && git merge-base --is-ancestor origin/main HEAD")` — command must exit successfully (status 0)
+   - Verify with: `worktree_fetch(worktree: "LS-####")` then `worktree_run(worktree: "LS-####", command: "git merge-base --is-ancestor origin/main HEAD")` — command must exit successfully (status 0)
    - If the `merge-base --is-ancestor` check fails (non-zero exit status): new commits merged to main after the rebase — rebase again
    - Only mark a PR as "resolved" after it shows MERGEABLE, or the `git merge-base --is-ancestor` check confirms the branch tip is based on current main
 
@@ -566,7 +566,8 @@ For each PR marked as settled in this sweep, verify:
 1. **If rebased this sweep**: confirm the branch is still based on the current base branch
 
    ```
-   worktree_run(command: "git fetch origin && git merge-base origin/<baseRefName> origin/<branch>")
+   worktree_fetch()
+   worktree_run(command: "git merge-base origin/<baseRefName> origin/<branch>")
    ```
 
    Output must equal `git rev-parse origin/<baseRefName>`. If not → rebase again; update settled state.

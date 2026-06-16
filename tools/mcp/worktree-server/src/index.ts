@@ -31,6 +31,7 @@ import {
   sep,
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
+import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
 
 // ---------------------------------------------------------------------------
 // Constants & state
@@ -1304,7 +1305,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_run',
       description:
-        'Run a command in the active worktree. Refuses main repo unless overridden.',
+        'Run a command in the active worktree. Refuses main repo unless overridden. ' +
+        'Use this only for git operations that have no dedicated worktree_* tool: ' +
+        'git merge-base, git cherry-pick, git tag, git add <file> after manual conflict resolution. ' +
+        'For all other operations prefer the purpose-built tools: ' +
+        'worktree_fetch (git fetch), worktree_stash/worktree_stash_pop (git stash), ' +
+        'worktree_unstage (git reset HEAD --), worktree_rm (git rm / file deletion), ' +
+        'worktree_is_tracked (git ls-files), worktree_check_ignore (git check-ignore), ' +
+        'worktree_commit (git add + commit), worktree_push (git push), ' +
+        'worktree_status (git status), worktree_diff (git diff), ' +
+        'worktree_reset (git reset), worktree_reflog (git reflog).',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -2159,6 +2169,37 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'string',
             description:
               "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+        required: [],
+      },
+    },
+    {
+      name: 'worktree_fetch',
+      description:
+        'Fetch from a remote (git fetch [remote] [branch]). ' +
+        'Returns the list of updated refs and whether the remote was already up to date. ' +
+        'Use this instead of worktree_run(command: "git fetch origin") when you need up-to-date ' +
+        'remote refs before a merge-base check, ancestor comparison, or any operation that reads ' +
+        'origin/* refs. Typical use: fetch before worktree_status() to get accurate ahead/behind counts, ' +
+        'or before worktree_run(command: "git merge-base --is-ancestor origin/main HEAD").',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          remote: {
+            type: 'string',
+            description: 'Remote name (default: "origin").',
+          },
+          branch: {
+            type: 'string',
+            description:
+              'Specific branch or refspec to fetch (e.g. "main" or "refs/heads/main"). ' +
+              'Omit to fetch all branches from the remote.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree.',
           },
         },
         required: [],
@@ -10614,6 +10655,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_fetch
+    // -----------------------------------------------------------------------
+    case 'worktree_fetch': {
+      return executeWorktreeFetch(args as FetchArgs, {
+        resolveTargetDir,
+        runGit,
+      });
     }
 
     case 'auth_check_all': {

@@ -414,7 +414,7 @@ When a subagent fails to push or create a PR, the parent agent should **prefer M
 # 1. Push the subagent's commits (include worktree path and setUpstream for new branches)
 worktree_push(worktree: "<absolute path to subagent worktree>", setUpstream: true)
 # OR if worktree_set is active for the subagent's worktree:
-worktree_run(command: "git push --set-upstream origin <branch>")
+worktree_push(worktree: "<absolute path to subagent worktree>", setUpstream: true)
 
 # 2. Create the PR as a draft, using the subagent's branch name (from worktree_status().headRefName)
 github_create_pr(

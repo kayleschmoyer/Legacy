@@ -74,11 +74,17 @@ Agent(subagent_type: "Explore", prompt: """
 For subagents that perform git operations in worktrees, also include:
 
 ```
-  - Use worktree_run for git commands (preferred over git -C via Bash; git -C is the shell fallback when MCP tools are unavailable)
+  - Use dedicated worktree_* tools for git operations (preferred over git -C via Bash or worktree_run); git -C is the shell fallback when MCP tools are unavailable
   - Use worktree_commit/worktree_push for commits and pushes
+  - Use worktree_fetch() instead of git fetch origin (or worktree_run for fetch)
+  - Use worktree_stash()/worktree_stash_pop() instead of git stash/git stash pop
+  - Use worktree_unstage({ files }) instead of git reset HEAD -- <files>
+  - Use worktree_rm({ path }) instead of git rm or file deletion
+  - Use worktree_is_tracked({ paths }) instead of git ls-files
   - Use worktree_diff({ base: "HEAD" }) to inspect uncommitted changes (replaces git -C <wt> diff HEAD)
   - Use worktree_status() to get current branch and working-tree status (replaces git -C <wt> branch --show-current / git status)
   - Use worktree_reset({ ref: "<ref>" }) for mixed reset (replaces git reset <ref> / git reset origin/main); use worktree_reset({ ref: "<ref>", hard: true }) for hard reset (replaces git reset --hard <ref>)
+  - Use worktree_run only as a last resort for git operations without a dedicated tool (e.g. git merge-base, git cherry-pick, git tag, git add after manual conflict resolution)
 ```
 
 ## PR Sweep Subagents
