@@ -8,7 +8,11 @@ import { and, desc, eq } from 'drizzle-orm';
 
 import { Draft } from '../types';
 import { builder } from '../../builder';
-import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
 
 // ── Pause / Resume Draft ────────────────────────────────────────────────────
 
@@ -59,7 +63,7 @@ builder.mutationField('pauseDraft', (t) =>
       }
 
       if (league.draftStatus !== 'in-progress') {
-        throw new Error(
+        throw UserInputError(
           `Cannot pause draft: current status is '${league.draftStatus}'`,
         );
       }
@@ -142,7 +146,7 @@ builder.mutationField('resumeDraft', (t) =>
       }
 
       if (league.draftStatus !== 'paused') {
-        throw new Error(
+        throw UserInputError(
           `Cannot resume draft: current status is '${league.draftStatus}'`,
         );
       }
