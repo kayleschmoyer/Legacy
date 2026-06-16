@@ -203,6 +203,13 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
 
   const logout = useCallback(async () => {
     try {
+      // The native Google client must be configured before signOut() can run.
+      // configure() only happens in googleLogin, so on a session restored from
+      // the stored JWT (the normal launch path — mobile auth is secure-store
+      // based) it was never called this session and GoogleSignin.signOut()
+      // throws "apiClient is null - call configure() first", leaving the Google
+      // session uncleared. Configure first so sign-out actually takes effect.
+      await OAuthProvider.configure(getMobileOAuthConfig());
       // Use platform-specific OAuth provider to sign out
       await OAuthProvider.signOut();
     } catch (error) {

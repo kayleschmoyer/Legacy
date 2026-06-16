@@ -754,6 +754,25 @@ describe('AuthHooks', () => {
       expect(mockReplace).toHaveBeenCalledWith('/');
     });
 
+    it('configures the OAuth provider before signing out', async () => {
+      // On a session restored from the stored JWT, googleLogin's configure()
+      // never ran, so signOut() would throw "apiClient is null - call
+      // configure() first". logout() must configure first (LS-bug).
+      mockSignOut.mockResolvedValue(undefined);
+      mockConfigure.mockClear();
+      mockSignOut.mockClear();
+
+      const { result } = renderHook(() => useAuthHandlers());
+
+      await act(() => result.current.logout());
+
+      expect(mockConfigure).toHaveBeenCalled();
+      expect(mockSignOut).toHaveBeenCalled();
+      expect(mockConfigure.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSignOut.mock.invocationCallOrder[0],
+      );
+    });
+
     it('continues logout even if OAuthProvider.signOut fails', async () => {
       mockSignOut.mockRejectedValue(new Error('Sign-out error'));
 
