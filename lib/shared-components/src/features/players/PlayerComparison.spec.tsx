@@ -14,6 +14,7 @@ import {
   fmt,
   fmtAvg,
   fmtCount,
+  fmtEra,
   fmtScoreRow,
   restorePlayerToSlot,
   type SeasonBattingRow,
@@ -98,6 +99,30 @@ describe('fmtScoreRow', () => {
 
   it('uses 1 decimal when values span both sides of 1 (mixed precision not needed)', () => {
     expect(fmtScoreRow([0.04, 1.5])).toEqual(['0.0', '1.5']);
+  });
+});
+
+describe('fmtEra', () => {
+  it('renders an em dash for nullish values', () => {
+    expect(fmtEra(null)).toBe('—');
+    expect(fmtEra(undefined)).toBe('—');
+  });
+
+  it('treats a literal "0.00" ERA as zero, not absent data (LS-7037)', () => {
+    expect(fmtEra('0.00')).toBe('0.00');
+    expect(fmtEra('0')).toBe('0.00');
+  });
+
+  it('renders an em dash for empty / non-numeric strings (parseFloat → NaN)', () => {
+    expect(fmtEra('')).toBe('—');
+    expect(fmtEra('   ')).toBe('—');
+    expect(fmtEra('N/A')).toBe('—');
+  });
+
+  it('formats numeric ERA strings to two decimal places', () => {
+    expect(fmtEra('3.21')).toBe('3.21');
+    expect(fmtEra('2.5')).toBe('2.50');
+    expect(fmtEra('12.345')).toBe('12.35');
   });
 });
 

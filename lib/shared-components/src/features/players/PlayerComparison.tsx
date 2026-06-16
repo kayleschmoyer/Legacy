@@ -188,6 +188,16 @@ export function fmtScoreRow(nums: (number | null | undefined)[]): string[] {
   return nums.map((n) => (n == null ? '—' : n.toFixed(decimals)));
 }
 
+// ERA arrives from the API as an optional decimal string. Parse it behind an
+// explicit `!= null` check (not a truthy test) so a legitimate '0.00' is kept
+// as 0 rather than dropped (LS-7037); absent values and non-finite parses
+// (e.g. an empty string → NaN) still render the em dash.
+export function fmtEra(value: string | null | undefined): string {
+  if (value == null) return '—';
+  const era = parseFloat(value);
+  return Number.isFinite(era) ? era.toFixed(2) : '—';
+}
+
 export function bestIndex(
   values: (number | null | undefined)[],
   lowerIsBetter = false,
@@ -1523,32 +1533,25 @@ function SeasonBattingBlock({
                 />
               </YStack>
               <YStack tag="tbody" role="rowgroup">
-                {pitchingRows.map((r, idx) => {
-                  const era = r?.earnedRunAverage
-                    ? parseFloat(r.earnedRunAverage)
-                    : null;
-                  return (
-                    <SeasonRow
-                      key={`${r?.season}-${idx}`}
-                      accent={accent}
-                      cells={[
-                        String(r?.season ?? '—'),
-                        fmt(r?.games),
-                        fmt(r?.wins),
-                        fmt(r?.losses),
-                        era != null && Number.isFinite(era)
-                          ? era.toFixed(2)
-                          : '—',
-                        r?.inningsPitched != null
-                          ? r.inningsPitched.toFixed(1)
-                          : '—',
-                        fmt(r?.strikeouts),
-                        fmt(r?.baseOnBalls),
-                        r?.whip != null ? r.whip.toFixed(2) : '—',
-                      ]}
-                    />
-                  );
-                })}
+                {pitchingRows.map((r, idx) => (
+                  <SeasonRow
+                    key={`${r?.season}-${idx}`}
+                    accent={accent}
+                    cells={[
+                      String(r?.season ?? '—'),
+                      fmt(r?.games),
+                      fmt(r?.wins),
+                      fmt(r?.losses),
+                      fmtEra(r?.earnedRunAverage),
+                      r?.inningsPitched != null
+                        ? r.inningsPitched.toFixed(1)
+                        : '—',
+                      fmt(r?.strikeouts),
+                      fmt(r?.baseOnBalls),
+                      r?.whip != null ? r.whip.toFixed(2) : '—',
+                    ]}
+                  />
+                ))}
               </YStack>
             </YStack>
           </ScrollView>
