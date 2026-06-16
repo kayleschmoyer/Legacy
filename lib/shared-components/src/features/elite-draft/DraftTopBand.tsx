@@ -267,7 +267,7 @@ export function DraftTopBand({
                 : undefined
             }
           >
-            Commish…
+            Commish
           </button>
           <button
             className={`d-tb-btn${userApExpanded ? ' active' : ''}`}
@@ -276,7 +276,7 @@ export function DraftTopBand({
             aria-label="Toggle per-team auto-pick controls"
             title="Enable or disable auto-pick for individual teams"
           >
-            AP…
+            AP
           </button>
           {userApExpanded && leagueTeams.length > 0 && (
             <div

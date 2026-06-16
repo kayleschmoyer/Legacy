@@ -112,3 +112,25 @@ describe('DraftTopBand autopick visibility (LS-7980)', () => {
     expect(queryByRole('button', { name: /pause/i })).toBeNull();
   });
 });
+
+describe('DraftTopBand commissioner button labels (LS-8063)', () => {
+  it('renders the Commish and per-team auto-pick buttons without a trailing ellipsis', () => {
+    const { getByRole } = render(
+      <DraftTopBand {...baseProps} isCommissioner={true} isOwner={true} />,
+    );
+
+    // The commissioner-pick-mode toggle and the per-team auto-pick toggle
+    // previously shipped a hardcoded "…" suffix ("Commish…" / "AP…") that
+    // looked like a truncation ellipsis even though the labels fit. The
+    // labels must render in full with no ellipsis character.
+    const commishBtn = getByRole('button', { name: /commish/i });
+    const apBtn = getByRole('button', {
+      name: /toggle per-team auto-pick controls/i,
+    });
+
+    expect(commishBtn.textContent).toBe('Commish');
+    expect(apBtn.textContent).toBe('AP');
+    expect(commishBtn.textContent).not.toContain('…');
+    expect(apBtn.textContent).not.toContain('…');
+  });
+});
