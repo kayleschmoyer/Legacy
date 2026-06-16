@@ -189,6 +189,10 @@ PlayerRef.implement({
       type: CareerBattingRef,
       nullable: true,
       resolve: async (parent, _args, context) => {
+        if (!context.user) return null;
+        if (!(await hasEntitlement(context, ENTITLEMENTS.player_comparison))) {
+          return null;
+        }
         return context.loaders.careerBatting.load(parent.id);
       },
     }),
