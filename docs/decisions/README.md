@@ -25,3 +25,4 @@ for authoring guidance and the immutability rule.
 | [0012](0012-pr-ci-e2e-coverage.md)                       | Affected-selection e2e coverage on PR CI                    | Proposed |
 | [0013](0013-runner-job-heartbeat.md)                     | Runner survival via a runner-level job heartbeat            | Accepted |
 | [0014](0014-integration-nightly-bisect.md)               | Integration regression detection via nightly + bisection    | Accepted |
+| [0015](0015-semantic-page-objects.md)                    | Semantic Page Object Model for Playwright e2e tests         | Proposed |
