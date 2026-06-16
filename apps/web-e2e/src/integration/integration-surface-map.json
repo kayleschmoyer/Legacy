@@ -14,6 +14,12 @@
     "apps/web/src/context/**"
   ],
   "specs": {
+    "apps/web-e2e/src/integration/tests/tiered-auth.integration.spec.ts": [
+      "apps/web-e2e/src/utils/test-user-auth.ts",
+      "lib/utils/src/lib/entitlements.ts",
+      "lambdas/db/src/schema/authorization.ts",
+      "lambdas/db/src/schema/authorization.helpers.ts"
+    ],
     "apps/web-e2e/src/integration/tests/commissioner-announcements-ui.integration.spec.ts": [
       "apps/web/src/pages/management/**",
       "apps/web/src/features/commissioner/**",

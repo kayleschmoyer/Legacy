@@ -491,6 +491,13 @@ jobs:
           E2E_MANAGER_2_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_2_PASSWORD || '' }}
           E2E_MANAGER_3_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_3_EMAIL || '' }}
           E2E_MANAGER_3_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_3_PASSWORD || '' }}
+          # Shared password for the 10 new tiered pool identities — premium
+          # seats 3-6, free seats 3-6, admin-1/2 (LS-8055). Their @test.legacysports.dev
+          # emails are deterministic (hardcoded in test-user-auth.ts); only the
+          # password is a secret. premium seats 1-2 (E2E_COMMISSIONER_*,
+          # E2E_MANAGER_2_*) and free seats 1-2 (E2E_MANAGER_1_*, E2E_MANAGER_3_*)
+          # reuse the persona secrets already wired above.
+          E2E_POOL_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_POOL_PASSWORD || '' }}
           # Google test credentials for google-oauth.integration.spec.ts
           # The API smoke tests always run; the UI popup test is skipped when absent.
           GOOGLE_TEST_EMAIL: ${{ matrix.suite == 'integration' && secrets.GOOGLE_TEST_EMAIL || '' }}

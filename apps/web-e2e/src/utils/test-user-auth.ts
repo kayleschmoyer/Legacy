@@ -373,3 +373,125 @@ export async function getSpecUserJwt(
     password: base.password,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Tier-based login (LS-8055)
+//
+// The live-backend integration suite uses real test users. Post-LS-5030 the
+// free-tier commissioner/manager identities hit `premium-feature-gate` broadly,
+// so specs need a way to ask for a user *by access level*. A user's tier is a
+// column on `app_internal.users` (`subscription_tier` / `access_level`) with no
+// GraphQL write path — it is provisioned once in the dev DB — so tiers are
+// pinned to STABLE, pre-provisioned identities rather than the per-spec hashed
+// emails used by `getSpecUserJwt` (a freshly-registered `<persona>-<hash>@…`
+// user is always created `free`, so it could never carry a tier). The JWT-cache
+// pattern (LS-5149) still applies: `getTestUserJwt` serves these from the shared
+// disk cache, so the whole suite mints each identity's token at most once/run.
+//
+// NB: "commissioner" vs "member" vs "non-member" is a *per-league* role (who
+// owns / joins a given league), NOT a user attribute — so the matrix below only
+// varies the two global properties (`subscription_tier`, `access_level`). A spec
+// builds any role/membership combination by choosing which identity creates the
+// league and which ones join it.
+//
+// The pool (provisioned in the dev DB — see scratch/provision-tiered-users.mjs):
+//   premium: 6 seats — MANAGER_2, COMMISSIONER (existing, promoted) + 4 new.
+//            Seat 1 is MANAGER_2 because the COMMISSIONER fixture user also
+//            carries a pre-existing access_level='admin'; keeping a NON-admin
+//            premium user as seat 1 means a premium probe tests the *tier*, not
+//            the isAdmin→premium override (which the admin seats cover).
+//   free:    6 seats — MANAGER_1, MANAGER_3 (existing) + 4 new
+//   admin:   2 seats — admin-1 (free + access_level=admin → exercises the
+//            isAdmin→premium override) and admin-2 (premium + admin)
+//
+// The 4 base personas keep their own `E2E_<PERSONA>_*` credentials; the 10 new
+// pool users share `E2E_POOL_PASSWORD` and use deterministic, non-secret
+// `@test.legacysports.dev` emails (hardcoded below — the domain matches
+// `ALLOWED_TEST_EMAIL_PATTERNS` so league cleanup still recognises them).
+//
+// The token's claims reflect the tier (LS-5027 embeds `subscriptionTier` and
+// `accessLevel` in the JWT), so a spec can both authenticate as a tier and
+// assert the decoded claim.
+// ---------------------------------------------------------------------------
+
+export type Tier = 'premium' | 'free' | 'admin';
+
+/** Shared password for the 10 new pool identities (LS-8055). */
+const POOL_PASSWORD = process.env['E2E_POOL_PASSWORD'] ?? '';
+
+/** Build a new-pool identity from a deterministic local-part + the shared password. */
+function poolUser(localPart: string): TestUserCredentials {
+  return {
+    email: `${localPart}@test.legacysports.dev`,
+    password: POOL_PASSWORD,
+  };
+}
+
+/**
+ * Ordered seats per tier. Seat N (1-indexed) is stable across runs so a spec can
+ * deterministically draw distinct same-tier identities for a multi-user league.
+ */
+const TIER_SEATS: Record<Tier, TestUserCredentials[]> = {
+  premium: [
+    TEST_USERS.MANAGER_2, // seat 1 (existing, promoted → premium; non-admin)
+    TEST_USERS.COMMISSIONER, // seat 2 (existing, promoted → premium; also admin)
+    poolUser('e2e-premium-3'),
+    poolUser('e2e-premium-4'),
+    poolUser('e2e-premium-5'),
+    poolUser('e2e-premium-6'),
+  ],
+  free: [
+    TEST_USERS.MANAGER_1, // seat 1 (existing, free)
+    TEST_USERS.MANAGER_3, // seat 2 (existing, free)
+    poolUser('e2e-free-3'),
+    poolUser('e2e-free-4'),
+    poolUser('e2e-free-5'),
+    poolUser('e2e-free-6'),
+  ],
+  admin: [
+    poolUser('e2e-admin-1'), // seat 1 (access_level=admin, subscription_tier=free)
+    poolUser('e2e-admin-2'), // seat 2 (access_level=admin, subscription_tier=premium)
+  ],
+};
+
+/** Number of provisioned seats available for a tier (1-indexed max). */
+export function tierSeatCount(tier: Tier): number {
+  return TIER_SEATS[tier].length;
+}
+
+/**
+ * Obtain a JWT for a live test user selected by access-level tier + seat
+ * (LS-8055). Defaults to `('premium', 1)` so a migrating spec that just needs an
+ * un-gated user gets one with no arguments. `seat` (1-indexed) selects a
+ * distinct same-tier identity for multi-user leagues, e.g.
+ * `loginAs('premium', 2)` for a second simultaneous premium user.
+ *
+ * Reuses `getTestUserJwt`, so the token is served from the in-process +
+ * cross-process JWT cache (LS-5149).
+ *
+ * @throws if `seat` is out of range, or the backing identity's credentials are
+ *   not configured (set `E2E_POOL_PASSWORD` for the new pool, or the matching
+ *   `E2E_<PERSONA>_*` vars for the base personas, in `.env` / CI secrets).
+ */
+export async function loginAs(
+  tier: Tier = 'premium',
+  seat = 1,
+): Promise<string> {
+  const seats = TIER_SEATS[tier];
+  const creds = seats[seat - 1];
+  if (!creds) {
+    throw new Error(
+      `No ${tier} seat ${seat} — only ${seats.length} ${tier} identit${
+        seats.length === 1 ? 'y is' : 'ies are'
+      } provisioned (seats are 1-indexed).`,
+    );
+  }
+  if (!creds.email || !creds.password) {
+    throw new Error(
+      `Credentials missing for ${tier} seat ${seat}. Set E2E_POOL_PASSWORD ` +
+        `(new pool) or the matching E2E_<PERSONA>_EMAIL/PASSWORD (base ` +
+        `personas) in your .env file or CI secrets.`,
+    );
+  }
+  return getTestUserJwt(creds);
+}

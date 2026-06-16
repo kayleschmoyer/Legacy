@@ -24,6 +24,7 @@
     "player-search-stats-ui.integration.spec.ts": 90,
     "subscription-gating.integration.spec.ts": 90,
     "google-oauth.integration.spec.ts": 60,
+    "tiered-auth.integration.spec.ts": 30,
     "wait-for-join-page-helpers.contract.spec.ts": 5
   }
 }

@@ -10,13 +10,15 @@ If you need a local backend, run the lambda stack locally (`make dev`) and point
 
 ## Integration tests CAN be run locally
 
-Agents commonly assume integration auth requires credentials only available in CI. **It does not.** Test-user credentials live in the main repo's gitignored `.env` (`E2E_COMMISSIONER_EMAIL/PASSWORD`, `E2E_MANAGER_1..3_EMAIL/PASSWORD`, `VITE_OAUTH_PROXY_URL`), and the worktree bootstrap script symlinks that file into every native worktree. After running:
+Agents commonly assume integration auth requires credentials only available in CI. **It does not.** Test-user credentials live in the main repo's gitignored `.env` (`E2E_COMMISSIONER_EMAIL/PASSWORD`, `E2E_MANAGER_1..3_EMAIL/PASSWORD`, `E2E_POOL_PASSWORD`, `VITE_OAUTH_PROXY_URL`), and the worktree bootstrap script symlinks that file into every native worktree. After running:
 
 ```
 node scripts/modules-pool/link.mjs
 ```
 
 …integration tests will pick up auth automatically — `playwright.integration.config.ts` loads `<repo>/.env` and the API/UI fixtures call `getTestUserJwt()` against the live OAuth proxy to obtain JWTs at runtime. No additional setup is required for the standard fixtures (`api`, `api2`, `apiCommissioner`, `commissionerPage`, `managerPage1..3`).
+
+**Tier-based auth (LS-8055)**: to authenticate as a specific access level, use `loginAs(tier, seat = 1)` from `apps/web-e2e/src/utils/test-user-auth.ts` (defaults to `('premium', 1)`), or the `premiumJwt` / `premiumJwt2` / `freeJwt` / `freeJwt2` / `adminJwt` / `adminJwt2` API fixtures. These resolve to stable, pre-provisioned identities (not per-spec hashed emails), because a user's tier is a DB column with no GraphQL write path. The provisioned pool is **6 premium / 6 free / 2 admin**: premium seats 1-2 are the commissioner + manager-2 (promoted to `subscription_tier='premium'`), free seats 1-2 are manager-1 + manager-3, admin seat 1 is `access_level='admin'` on a _free_ subscription (exercises the isAdmin→premium override) and seat 2 is admin + premium. Seats 3-6 (and admin) are new `@test.legacysports.dev` users sharing `E2E_POOL_PASSWORD`. Use `seat` to draw distinct same-tier identities for a multi-user league (e.g. `loginAs('premium', 2)` for a premium↔premium trade). A premium token is **not** blocked by `premium-feature-gate`. Note that _commissioner vs member vs non-member is a per-league role_ (who owns/joins the league), not a property of the identity — compose it in the spec. `E2E_POOL_PASSWORD` must be present in `.env` for any seat ≥ 3 and the admin seats.
 
 Caveats:
 

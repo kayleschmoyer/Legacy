@@ -170,6 +170,10 @@ jobs:
           E2E_MANAGER_2_PASSWORD: ${{ secrets.E2E_MANAGER_2_PASSWORD }}
           E2E_MANAGER_3_EMAIL: ${{ secrets.E2E_MANAGER_3_EMAIL }}
           E2E_MANAGER_3_PASSWORD: ${{ secrets.E2E_MANAGER_3_PASSWORD }}
+          # Shared password for the 10 new tiered pool identities (LS-8055);
+          # their emails are deterministic/hardcoded. premium/free seats 1-2 reuse
+          # the E2E_COMMISSIONER_* / E2E_MANAGER_* secrets already wired above.
+          E2E_POOL_PASSWORD: ${{ secrets.E2E_POOL_PASSWORD }}
           GOOGLE_TEST_EMAIL: ${{ secrets.GOOGLE_TEST_EMAIL }}
           GOOGLE_TEST_PASSWORD: ${{ secrets.GOOGLE_TEST_PASSWORD }}
           # Playwright's json reporter reads this env var to set the output file.
