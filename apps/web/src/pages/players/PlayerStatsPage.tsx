@@ -1,6 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
-  Navigate,
   useLocation,
   useNavigate,
   useParams,
@@ -38,6 +43,15 @@ import {
 } from '@legacy-sports/graphql';
 import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
 import { useFeatureValue } from '../../context/GrowthBookProvider';
+
+// Football statistics are served by the dedicated football players browser,
+// rendered inline when the sport switcher selects NFL (LS-8104). Lazy-loaded so
+// the default MLB stats route doesn't pull the football bundle for every user.
+const FootballPlayersPageLazy = React.lazy(() =>
+  import('../football/FootballPlayersPage').then((m) => ({
+    default: m.FootballPlayersPage,
+  })),
+);
 
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
@@ -156,12 +170,21 @@ const sportSwitchButtonStyle = (active: boolean): React.CSSProperties => ({
 });
 
 /**
- * Sport switcher rendered above the (MLB-only) stats page. Surfaces a visible
- * affordance to switch to NFL, which navigates to the dedicated football
- * players page — mirroring the existing `sport=nfl` redirect (LS-8083). Only
- * rendered when football is enabled so a disabled sport is never offered.
+ * Sport switcher rendered above the stats page. Toggling between MLB and NFL
+ * updates the `sport` URL param in place (LS-8104) so the page renders the
+ * matching sport's statistics inline — giving football the same on-page stats
+ * experience as baseball, instead of redirecting away. Only rendered when
+ * football is enabled so a disabled sport is never offered.
  */
-function StatsSportSwitcher({ onSelectNfl }: { onSelectNfl: () => void }) {
+function StatsSportSwitcher({
+  active,
+  onSelectMlb,
+  onSelectNfl,
+}: {
+  active: 'mlb' | 'nfl';
+  onSelectMlb: () => void;
+  onSelectNfl: () => void;
+}) {
   return (
     <div
       style={{
@@ -186,18 +209,19 @@ function StatsSportSwitcher({ onSelectNfl }: { onSelectNfl: () => void }) {
       >
         <button
           type="button"
-          aria-pressed={true}
+          onClick={onSelectMlb}
+          aria-pressed={active === 'mlb'}
           aria-label="View MLB statistics"
-          style={sportSwitchButtonStyle(true)}
+          style={sportSwitchButtonStyle(active === 'mlb')}
         >
           MLB
         </button>
         <button
           type="button"
           onClick={onSelectNfl}
-          aria-pressed={false}
-          aria-label="Switch to NFL statistics"
-          style={sportSwitchButtonStyle(false)}
+          aria-pressed={active === 'nfl'}
+          aria-label="View NFL statistics"
+          style={sportSwitchButtonStyle(active === 'nfl')}
         >
           NFL
         </button>
@@ -225,28 +249,37 @@ export function PlayerStatsRoute() {
     !hasBaseballLeagues,
   );
 
-  // Derive sport from URL param, default to 'mlb'. Validates against known values so an
-  // unrecognised param doesn't silently corrupt filter state.
+  // Derive the active sport from the URL param, falling back to the user's
+  // saved default-sport preference. NFL renders football statistics inline
+  // (LS-8104) rather than redirecting away to /football/players. Validates
+  // against known values so an unrecognised param doesn't corrupt state.
   const sportParam = searchParams.get('sport');
-  const sport: 'mlb' | 'nfl' = sportParam === 'nfl' ? 'nfl' : 'mlb';
+  const sport: 'mlb' | 'nfl' =
+    sportParam === 'nfl'
+      ? 'nfl'
+      : sportParam === 'mlb'
+        ? 'mlb'
+        : readDefaultSport() === 'football'
+          ? 'nfl'
+          : 'mlb';
 
-  // Redirect NFL links to the football players page — this route is MLB-only.
-  useEffect(() => {
-    if (sport === 'nfl') {
-      navigate('/football/players', { replace: true });
-    }
-  }, [sport, navigate]);
-
-  // Football availability gates the visible sport switcher. Defaults to `true`
-  // (matching the route-level FootballGate) so the control isn't hidden while
-  // GrowthBook loads or in unconfigured environments.
+  // Football availability gates the visible sport switcher and the inline
+  // football view. Defaults to `true` (matching the route-level FootballGate)
+  // so the control isn't hidden while GrowthBook loads or in unconfigured
+  // environments.
   const footballEnabled = useFeatureValue('football_enabled', true);
+  const showFootball = sport === 'nfl' && footballEnabled !== false;
 
-  // Deliberate user navigation to the NFL view — pushes (not replace) so Back
-  // returns to the MLB stats page, unlike the automatic sport=nfl redirect.
-  const handleSelectNfl = useCallback(() => {
-    navigate('/football/players');
-  }, [navigate]);
+  // Switch the viewed sport by updating the `sport` URL param in place. Pushes
+  // (not replace) so Back returns to the previously viewed sport.
+  const handleSelectSport = useCallback(
+    (next: 'mlb' | 'nfl') => {
+      const params = new URLSearchParams(window.location.search);
+      params.set('sport', next);
+      setSearchParams(params);
+    },
+    [setSearchParams],
+  );
 
   // Auto-dismiss the visible toast after TOAST_DURATION_MS while leaving the
   // sr-only live region populated (screen readers re-announce changes; the
@@ -447,10 +480,39 @@ export function PlayerStatsRoute() {
     [sport],
   );
 
-  // Sport detection — redirect football users to their dedicated page.
-  // Placed after all hooks to satisfy Rules of Hooks.
-  if (readDefaultSport() === 'football') {
-    return <Navigate to="/football/players" replace />;
+  // NFL view — render the football statistics browser inline (LS-8104) instead
+  // of redirecting away, so football gets the same on-page stats experience as
+  // baseball. Placed after all hooks to satisfy Rules of Hooks.
+  if (showFootball) {
+    return (
+      <div
+        style={{
+          flex: 1,
+          backgroundColor: `var(--background, ${BG_DARK})`,
+          color: `var(--color, ${TEXT_HIGH_CONTRAST})`,
+          padding: 0,
+        }}
+      >
+        <StatsSportSwitcher
+          active="nfl"
+          onSelectMlb={() => handleSelectSport('mlb')}
+          onSelectNfl={() => handleSelectSport('nfl')}
+        />
+        <Suspense
+          fallback={
+            <div
+              role="status"
+              aria-live="polite"
+              style={{ padding: '2rem', textAlign: 'center' }}
+            >
+              Loading NFL statistics…
+            </div>
+          }
+        >
+          <FootballPlayersPageLazy />
+        </Suspense>
+      </div>
+    );
   }
 
   return (
@@ -524,7 +586,11 @@ export function PlayerStatsRoute() {
         </div>
       )}
       {footballEnabled !== false && (
-        <StatsSportSwitcher onSelectNfl={handleSelectNfl} />
+        <StatsSportSwitcher
+          active="mlb"
+          onSelectMlb={() => handleSelectSport('mlb')}
+          onSelectNfl={() => handleSelectSport('nfl')}
+        />
       )}
       <PremiumGate
         isPremium={isPremium}

@@ -22,6 +22,13 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
   PlayerStatsPage: () => null,
 }));
 
+// The football stats browser is rendered inline for the NFL view (LS-8104) and
+// lazy-loaded; mock it with a lightweight marker so the route can be asserted
+// without pulling the real (graphql/Tamagui-heavy) page into the unit test.
+jest.mock('../football/FootballPlayersPage', () => ({
+  FootballPlayersPage: () => <div data-testid="football-players-page" />,
+}));
+
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 
 jest.mock('../../components/PremiumGate', () => ({
@@ -49,36 +56,47 @@ jest.mock('../../hooks/useLeagueRosteredPlayerIds', () => ({
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('PlayerStatsRoute redirect', () => {
+describe('PlayerStatsRoute inline NFL view', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
     mockSearchParams = new URLSearchParams();
     mockFootballEnabled = true;
   });
 
-  it('redirects to /football/players when sport=nfl', () => {
+  it('renders the football stats browser inline (no redirect) when sport=nfl', async () => {
     mockSearchParams = new URLSearchParams('sport=nfl');
     render(<PlayerStatsRoute />);
-    expect(mockNavigate).toHaveBeenCalledWith('/football/players', {
-      replace: true,
-    });
+    expect(
+      await screen.findByTestId('football-players-page'),
+    ).toBeInTheDocument();
+    // Inline render replaces the old redirect to /football/players.
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('does not redirect when sport=mlb', () => {
+  it('renders the baseball stats page (not football) when sport=mlb', () => {
     mockSearchParams = new URLSearchParams('sport=mlb');
     render(<PlayerStatsRoute />);
+    expect(
+      screen.queryByTestId('football-players-page'),
+    ).not.toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('does not redirect when sport param is absent', () => {
+  it('falls back to baseball when sport=nfl but football is disabled', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockFootballEnabled = false;
     render(<PlayerStatsRoute />);
-    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId('football-players-page'),
+    ).not.toBeInTheDocument();
   });
 });
 
 describe('PlayerStatsRoute sport switcher', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
     mockSearchParams = new URLSearchParams('sport=mlb');
     mockFootballEnabled = true;
   });
@@ -89,24 +107,37 @@ describe('PlayerStatsRoute sport switcher', () => {
       screen.getByRole('button', { name: /view mlb statistics/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /switch to nfl statistics/i }),
+      screen.getByRole('button', { name: /view nfl statistics/i }),
     ).toBeInTheDocument();
   });
 
-  it('navigates to /football/players when the NFL control is clicked', () => {
+  it('updates the sport param to nfl when the NFL control is clicked', () => {
     render(<PlayerStatsRoute />);
     fireEvent.click(
-      screen.getByRole('button', { name: /switch to nfl statistics/i }),
+      screen.getByRole('button', { name: /view nfl statistics/i }),
     );
-    // Deliberate navigation pushes (no { replace: true }) so Back works.
-    expect(mockNavigate).toHaveBeenCalledWith('/football/players');
+    const params = mockSetSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(params.get('sport')).toBe('nfl');
+  });
+
+  it('updates the sport param to mlb when the MLB control is clicked', async () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    render(<PlayerStatsRoute />);
+    // NFL view renders the (lazy) football browser; wait for it before asserting
+    // the switcher, which is rendered alongside it.
+    await screen.findByTestId('football-players-page');
+    fireEvent.click(
+      screen.getByRole('button', { name: /view mlb statistics/i }),
+    );
+    const params = mockSetSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(params.get('sport')).toBe('mlb');
   });
 
   it('hides the sport switcher when football is disabled', () => {
     mockFootballEnabled = false;
     render(<PlayerStatsRoute />);
     expect(
-      screen.queryByRole('button', { name: /switch to nfl statistics/i }),
+      screen.queryByRole('button', { name: /view nfl statistics/i }),
     ).not.toBeInTheDocument();
   });
 });
