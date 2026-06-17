@@ -423,8 +423,11 @@ test.describe('Trade Block Management @regression', () => {
     // Click Save
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // Verify the mutation was called with askingPrice
-    expect(mutationCalls.length).toBeGreaterThanOrEqual(1);
+    // Verify the mutation was called with askingPrice. The SetTradeBlock
+    // mutation is dispatched asynchronously and captured by the route
+    // interceptor above, so poll rather than asserting synchronously to avoid
+    // racing the request under CI load.
+    await expect.poll(() => mutationCalls.length).toBeGreaterThanOrEqual(1);
     const lastCall = mutationCalls[mutationCalls.length - 1];
     expect(lastCall).toMatchObject({
       teamMemberId: 1,
