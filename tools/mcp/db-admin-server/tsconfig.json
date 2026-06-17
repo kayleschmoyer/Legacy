@@ -17,7 +17,8 @@
       "@legacy-sports/logging/server": ["../../../lib/logging/src/server.ts"],
       "@legacy-sports/env-utilities": [
         "../../../lib/env-utilities/src/index.ts"
-      ]
+      ],
+      "@legacy-sports/db-client/src/*": ["../../../lib/db-client/src/*"]
     }
   },
   "include": ["src/**/*.ts"],

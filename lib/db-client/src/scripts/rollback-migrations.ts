@@ -19,7 +19,15 @@ import { sql } from 'drizzle-orm';
 import postgres from 'postgres';
 import { LOGGER } from '@legacy-sports/logging';
 import { readdirSync } from 'fs';
+import { applyMigrationModule, type MigrationModule } from './migration-runner';
 import { getMigrationDatabaseConfig } from '../config/database';
+
+// `applyMigrationModule` (and its module types) now live in the dependency-light
+// `migration-runner.ts` so other packages (the hosted db-admin Lambda, LS-8119)
+// can import them without pulling in this script's credential graph. Re-exported
+// here to preserve the existing import surface.
+export { applyMigrationModule } from './migration-runner';
+export type { MigrationContext, MigrationModule } from './migration-runner';
 
 interface MigrationFile {
   filename: string;
@@ -29,26 +37,6 @@ interface MigrationFile {
 }
 
 type Command = 'up' | 'down' | 'status' | 'fresh' | 'refresh';
-
-/**
- * Context handed to a migration's `up`/`down` function. Migrations receive a
- * Drizzle instance (`db`) and, optionally, the raw `postgres` client (`sql`).
- * When a migration is applied transactionally, both point at the same
- * transaction so the migration body and the bookkeeping insert commit together.
- */
-interface MigrationContext {
-  db: ReturnType<typeof drizzle>;
-  sql: postgres.Sql;
-}
-
-/**
- * Minimal shape of an imported migration module — just the `up` function we
- * need to apply it. Migration files export both `up` and `down`; callers that
- * only apply migrations need `up`.
- */
-interface MigrationModule {
-  up: (ctx: MigrationContext) => Promise<void>;
-}
 
 // Create migrations table if it doesn't exist
 export async function ensureMigrationsTable(db: ReturnType<typeof drizzle>) {
@@ -124,44 +112,6 @@ export async function recordMigration(
     VALUES (${hash}, ${Date.now()})
     ON CONFLICT (hash) DO NOTHING;
   `);
-}
-
-/**
- * Apply a single migration module's `up()` and record its hash inside ONE
- * transaction. If `up()` throws (or the bookkeeping insert fails), the whole
- * transaction rolls back and the hash is NOT recorded — so a partially-applied
- * migration can never be marked as applied.
- *
- * Connection-agnostic by design: callers pass an already-opened `postgres`
- * client and an already-imported migration module. This lets a hosted Lambda
- * (LS-8119) evaluate a client-transpiled migration and apply it through the
- * exact same code path as the local runner.
- *
- * `hash` is the migration's tracking key — the runner keys on the migration
- * filename (e.g. "20260303_150000_add_ci_readonly_role.ts").
- */
-export async function applyMigrationModule(
-  sqlClient: postgres.Sql,
-  hash: string,
-  module: MigrationModule,
-): Promise<void> {
-  await sqlClient.begin(async (tx) => {
-    // `tx` is a TransactionSql, which is NOT assignable to postgres.Sql — it
-    // lacks the connection-management methods (CLOSE/END/PostgresError/...).
-    // A direct `tx as postgres.Sql` fails to compile (TS2352: "neither type
-    // sufficiently overlaps... convert to 'unknown' first"), so the `unknown`
-    // hop is required. Migrations only run queries on it, never lifecycle
-    // methods. The raw INSERT below still uses `tx` directly as a tagged
-    // template.
-    const txSql = tx as unknown as postgres.Sql;
-    const txDb = drizzle(txSql);
-    await module.up({ db: txDb, sql: txSql });
-    await tx`
-      INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-      VALUES (${hash}, ${Date.now()})
-      ON CONFLICT (hash) DO NOTHING
-    `;
-  });
 }
 
 // Remove migration record

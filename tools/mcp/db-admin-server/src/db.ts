@@ -11,6 +11,9 @@ import {
  * over TCP — there is no SSM tunnel. Credentials come from Secrets Manager:
  *   - `MCP_READONLY_SECRET_NAME` → the SELECT-only `mcp_readonly` role, used by
  *     `db_query` and `db_migration_status`.
+ *   - `DB_SECRET_NAME` → the `migration_user` role, used by `db_migrate` to run
+ *     migration DDL. This role CAN write — `db_migrate` is gated separately by
+ *     the `mcp/db` scope, a dev-only environment guard, and audit logging.
  *
  * Host/port/database come from `DB_HOST` / `DB_PORT` / `DB_NAME`, wired by
  * Terraform. `DB_HOST` is the RDS instance endpoint, which is formatted as
@@ -102,4 +105,44 @@ export async function getReadonlySql(): Promise<postgres.Sql> {
   });
 
   return readonlySql;
+}
+
+let migrationSql: postgres.Sql | null = null;
+
+/**
+ * Lazily create (and cache across warm Lambda invocations) a postgres
+ * connection authenticated as the `migration_user` role for `db_migrate`.
+ *
+ * Unlike `getReadonlySql`, this role can run DDL — it is the write path. Access
+ * to it is gated entirely by `db_migrate`'s own guards (the `mcp/db` scope, the
+ * dev-only environment check, and audit logging); nothing else in this server
+ * uses it.
+ *
+ * `max: 1` + `prepare: false` mirrors the local migration runner
+ * (`lib/db-client/src/scripts/rollback-migrations.ts`): a single connection for
+ * ordered migrations, and no prepared statements because DDL referencing
+ * user-defined functions does not work with them. There is intentionally NO
+ * `statement_timeout` here — schema changes (e.g. `CREATE INDEX`, backfills)
+ * can legitimately run longer than the read-query timeout.
+ */
+export async function getMigrationSql(): Promise<postgres.Sql> {
+  if (migrationSql) return migrationSql;
+
+  const creds = await readRoleSecret(requireEnv('DB_SECRET_NAME'));
+  const { host, port } = resolveHostPort();
+
+  migrationSql = postgres({
+    host,
+    port,
+    database: process.env['DB_NAME'] ?? 'postgres',
+    username: creds.username,
+    password: creds.password,
+    ssl: 'require',
+    max: 1,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    prepare: false,
+  });
+
+  return migrationSql;
 }

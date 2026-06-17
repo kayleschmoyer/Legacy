@@ -12,8 +12,10 @@ import {
 } from '@legacy-sports/mcp-bearer-auth';
 import { query } from './tools/query.js';
 import { migrationStatus } from './tools/migration-status.js';
+import { migrate } from './tools/migrate.js';
+import { extractCaller, type McpCaller } from './audit.js';
 
-function createMcpServer(): McpServer {
+function createMcpServer(caller: McpCaller): McpServer {
   const server = new McpServer({
     name: 'legacy-sports-db-admin',
     version: '1.0.0',
@@ -55,6 +57,34 @@ function createMcpServer(): McpServer {
     async (params) => migrationStatus(params),
   );
 
+  server.tool(
+    'db_migrate',
+    'Apply UNMERGED local-branch migrations to the dev database over HTTPS (no SSM tunnel). ' +
+      'The client transpiles each pending migration .ts to CJS JavaScript and sends ' +
+      '{ migrations: [{ name, hash, jsSource }] } ordered by timestamp; the server evaluates ' +
+      'each in a constrained sandbox and applies it transactionally as the migration_user role. ' +
+      'Already-applied migrations are skipped; the run stops on the first failure. ' +
+      'Returns { applied, appliedNames, skipped, success }. Dev-only.',
+    {
+      migrations: z
+        .array(
+          z.object({
+            name: z
+              .string()
+              .describe('Migration filename, e.g. "20260616_120000_add_x.ts".'),
+            hash: z.string().describe('Tracking key (the migration filename).'),
+            jsSource: z
+              .string()
+              .describe(
+                'Client-transpiled CJS source of the migration module.',
+              ),
+          }),
+        )
+        .describe('Pending migrations to apply, ordered by timestamp.'),
+    },
+    async (params) => migrate(params, caller),
+  );
+
   return server;
 }
 
@@ -93,7 +123,10 @@ export const handler = async (
     enableJsonResponse: true,
   });
 
-  const server = createMcpServer();
+  // The bearer was already verified above; decode its claims for the
+  // db_migrate audit log (LS-8119, AC4).
+  const caller = extractCaller(event.headers);
+  const server = createMcpServer(caller);
   await server.connect(transport);
 
   const response = await transport.handleRequest(request);

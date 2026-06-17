@@ -16,6 +16,13 @@ const config: Config = {
   moduleNameMapper: {
     // NodeNext resolution uses .js extensions in imports; strip them for ts-jest
     '^(\\.{1,2}/.+)\\.js$': '$1',
+    // Resolve the @legacy-sports path aliases to source for ts-jest. The
+    // db-client mapper is only used so jest can *resolve* the specifier for
+    // jest.mock(); the migrate spec replaces the module with a factory mock so
+    // the real (AWS-SDK-pulling) module never executes.
+    '^@legacy-sports/logging$': '<rootDir>/../../../lib/logging/src/index.ts',
+    '^@legacy-sports/db-client/src/(.*)\\.js$':
+      '<rootDir>/../../../lib/db-client/src/$1.ts',
   },
   coverageDirectory: '../../../coverage/tools/mcp/db-admin-server',
 };
