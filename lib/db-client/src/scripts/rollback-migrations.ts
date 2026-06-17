@@ -15,6 +15,7 @@ import { join, resolve } from 'path';
 config({ path: resolve(__dirname, '../../../../.env') });
 
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { sql } from 'drizzle-orm';
 import postgres from 'postgres';
 import { LOGGER } from '@legacy-sports/logging';
 import { readdirSync } from 'fs';
@@ -29,8 +30,28 @@ interface MigrationFile {
 
 type Command = 'up' | 'down' | 'status' | 'fresh' | 'refresh';
 
+/**
+ * Context handed to a migration's `up`/`down` function. Migrations receive a
+ * Drizzle instance (`db`) and, optionally, the raw `postgres` client (`sql`).
+ * When a migration is applied transactionally, both point at the same
+ * transaction so the migration body and the bookkeeping insert commit together.
+ */
+interface MigrationContext {
+  db: ReturnType<typeof drizzle>;
+  sql: postgres.Sql;
+}
+
+/**
+ * Minimal shape of an imported migration module — just the `up` function we
+ * need to apply it. Migration files export both `up` and `down`; callers that
+ * only apply migrations need `up`.
+ */
+interface MigrationModule {
+  up: (ctx: MigrationContext) => Promise<void>;
+}
+
 // Create migrations table if it doesn't exist
-async function ensureMigrationsTable(db: ReturnType<typeof drizzle>) {
+export async function ensureMigrationsTable(db: ReturnType<typeof drizzle>) {
   await db.execute(`CREATE SCHEMA IF NOT EXISTS drizzle;`);
 
   await db.execute(`
@@ -77,7 +98,7 @@ function getMigrationFiles(): MigrationFile[] {
 }
 
 // Get applied migrations from database
-async function getAppliedMigrations(
+export async function getAppliedMigrations(
   db: ReturnType<typeof drizzle>,
 ): Promise<string[]> {
   try {
@@ -92,18 +113,62 @@ async function getAppliedMigrations(
 }
 
 // Record migration as applied
-async function recordMigration(db: ReturnType<typeof drizzle>, hash: string) {
-  await db.execute(`
-    INSERT INTO drizzle.__drizzle_migrations (hash, created_at) 
-    VALUES ('${hash}', ${Date.now()})
+export async function recordMigration(
+  db: ReturnType<typeof drizzle>,
+  hash: string,
+) {
+  // Parameterized to keep the hash out of the SQL string — this is a public
+  // export reused by the hosted Lambda (LS-8119).
+  await db.execute(sql`
+    INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+    VALUES (${hash}, ${Date.now()})
     ON CONFLICT (hash) DO NOTHING;
   `);
 }
 
+/**
+ * Apply a single migration module's `up()` and record its hash inside ONE
+ * transaction. If `up()` throws (or the bookkeeping insert fails), the whole
+ * transaction rolls back and the hash is NOT recorded — so a partially-applied
+ * migration can never be marked as applied.
+ *
+ * Connection-agnostic by design: callers pass an already-opened `postgres`
+ * client and an already-imported migration module. This lets a hosted Lambda
+ * (LS-8119) evaluate a client-transpiled migration and apply it through the
+ * exact same code path as the local runner.
+ *
+ * `hash` is the migration's tracking key — the runner keys on the migration
+ * filename (e.g. "20260303_150000_add_ci_readonly_role.ts").
+ */
+export async function applyMigrationModule(
+  sqlClient: postgres.Sql,
+  hash: string,
+  module: MigrationModule,
+): Promise<void> {
+  await sqlClient.begin(async (tx) => {
+    // `tx` is a TransactionSql, which is NOT assignable to postgres.Sql — it
+    // lacks the connection-management methods (CLOSE/END/PostgresError/...).
+    // A direct `tx as postgres.Sql` fails to compile (TS2352: "neither type
+    // sufficiently overlaps... convert to 'unknown' first"), so the `unknown`
+    // hop is required. Migrations only run queries on it, never lifecycle
+    // methods. The raw INSERT below still uses `tx` directly as a tagged
+    // template.
+    const txSql = tx as unknown as postgres.Sql;
+    const txDb = drizzle(txSql);
+    await module.up({ db: txDb, sql: txSql });
+    await tx`
+      INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+      VALUES (${hash}, ${Date.now()})
+      ON CONFLICT (hash) DO NOTHING
+    `;
+  });
+}
+
 // Remove migration record
 async function unrecordMigration(db: ReturnType<typeof drizzle>, hash: string) {
-  await db.execute(`
-    DELETE FROM drizzle.__drizzle_migrations WHERE hash = '${hash}';
+  // Parameterized to keep the hash out of the SQL string.
+  await db.execute(sql`
+    DELETE FROM drizzle.__drizzle_migrations WHERE hash = ${hash};
   `);
 }
 
@@ -197,9 +262,9 @@ async function runRollbackCommand(command: Command, _options: string[] = []) {
   }
 }
 
-async function runMigrationsUp(
+export async function runMigrationsUp(
   db: ReturnType<typeof drizzle>,
-  _sql: postgres.Sql,
+  sqlClient: postgres.Sql,
 ) {
   const migrationFiles = getMigrationFiles();
   const appliedMigrations = await getAppliedMigrations(db);
@@ -221,10 +286,15 @@ async function runMigrationsUp(
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- checking for up() on untyped migration module
         if (migrationModule.up && typeof migrationModule.up === 'function') {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- calling untyped migration up()
-          await migrationModule.up({ db, sql: _sql });
-
-          await recordMigration(db, migration.filename);
+          // Apply up() and record the hash atomically — a migration that fails
+          // partway through is never marked as applied.
+          // Cast the untyped dynamic import to MigrationModule; the up() check
+          // above guarantees the shape.
+          await applyMigrationModule(
+            sqlClient,
+            migration.filename,
+            migrationModule as MigrationModule,
+          );
           appliedCount++;
           LOGGER.info(`✅ Applied: ${migration.filename}`);
         } else {
@@ -379,21 +449,22 @@ async function checkMigrationStatus(db: ReturnType<typeof drizzle>) {
   }
 }
 
-// Parse command line arguments
-const command = process.argv[2] as Command;
-const options = process.argv.slice(3);
-
-if (
-  !command ||
-  !['up', 'down', 'status', 'fresh', 'refresh'].includes(command)
-) {
-  console.error('Usage: tsx rollback-migrations.ts <command>');
-  console.error('Commands: up, down, status, fresh, refresh');
-  process.exit(1);
-}
-
-// Run the command if this script is executed directly
+// Run the command if this script is executed directly. Argument parsing lives
+// inside the guard so importing this module (e.g. for unit tests or the hosted
+// Lambda) never triggers process.exit.
 if (require.main === module) {
+  const command = process.argv[2] as Command;
+  const options = process.argv.slice(3);
+
+  if (
+    !command ||
+    !['up', 'down', 'status', 'fresh', 'refresh'].includes(command)
+  ) {
+    LOGGER.error('Usage: tsx rollback-migrations.ts <command>');
+    LOGGER.error('Commands: up, down, status, fresh, refresh');
+    process.exit(1);
+  }
+
   void runRollbackCommand(command, options);
 }
 
