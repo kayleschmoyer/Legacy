@@ -46,6 +46,7 @@ export const MCP_SCOPE = {
   github: 'mcp/github',
   jira: 'mcp/jira',
   ci: 'mcp/ci',
+  db: 'mcp/db',
 } as const;
 
 const RECOVERY_HINT =

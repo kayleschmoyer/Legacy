@@ -1,0 +1,56 @@
+# legacy-sports-db-admin (hosted MCP server)
+
+A hosted (Lambda + API Gateway) MCP server that provides **tunnel-free** access
+to the dev RDS database. It runs **inside the VPC**, so it reaches RDS directly
+over TCP — no SSM port-forward tunnel and no live AWS SSO session at request
+time.
+
+This is the remote twin of the local stdio `legacy-sports-db` server. Prefer
+this one when you don't have (or don't want to open) an SSM tunnel; the local
+server stays for fully-offline / Docker-Postgres workflows.
+
+## Trust model
+
+`db_query` is a SQL **console** for agents holding the `mcp/db` Cognito scope —
+it is not an end-user-facing API. The whole SQL statement IS the input, so
+parameterization does not apply (there is no separable "data" boundary). The
+boundaries that matter are:
+
+1. **OAuth scope** — `@legacy-sports/mcp-bearer-auth` enforces `mcp/db` on
+   every request; jira/github/ci-scoped tokens are rejected.
+2. **Engine-enforced role** — connections use the SELECT-only `mcp_readonly`
+   Postgres role; writes/DDL are rejected by the engine, not by app code.
+3. **READ ONLY transaction** — every query runs inside `sql.begin('READ ONLY', …)`.
+4. **Statement timeout** — connections set `statement_timeout` (default 30s,
+   `DB_STATEMENT_TIMEOUT_MS` to override) so a runaway query (e.g.
+   `SELECT pg_sleep(9999)`) is server-cancelled rather than tying up the Lambda.
+
+This mirrors the trust model of the existing local `tools/mcp/db-server`
+`db_query` tool.
+
+## Auth
+
+Same Cognito machine-credential scheme as the `legacy-sports-{jira,github,ci}`
+hosted servers. The Lambda validates a bearer carrying the **`mcp/db`** scope
+via `@legacy-sports/mcp-bearer-auth`. Clients mint the bearer per-connect with
+`scripts/mcp-mint-token.mjs` (headersHelper).
+
+## Tools
+
+| Tool                  | Description                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `db_query`            | Read-only SQL. Connects as the SELECT-only `mcp_readonly` role inside a `READ ONLY` txn.        |
+| `db_migration_status` | Applied vs pending diff. Pass local migration filenames; applied are keyed by filename.         |
+| `db_migrate`          | _(Child 5)_ Apply local migrations by sending transpiled module source; runs as migration_user. |
+
+## Environment (set by Terraform — see `terraform/main/lambda-mcp-db.tf`)
+
+- `MCP_COGNITO_ISSUER`, `MCP_COGNITO_AUDIENCE`, `MCP_OAUTH_SCOPES="openid mcp/db"`
+- `MCP_READONLY_SECRET_NAME` — Secrets Manager secret `{ username, password }` for `mcp_readonly`
+- `DB_HOST` (RDS instance endpoint `host:5432`), `DB_PORT`, `DB_NAME`
+- `DB_SECRET_NAME` — migration_user creds (used by `db_migrate`, Child 5)
+
+## Build
+
+`vite build` bundles `src/lambda.ts` → `dist/index.js` (CJS, node20), with
+`@aws-sdk/client-secrets-manager` left external (provided by the Lambda runtime).
