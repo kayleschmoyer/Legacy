@@ -56,7 +56,20 @@ export function DraftChatOverlay({
         </span>
         <button
           className="d-btn-glass"
-          style={{ padding: '4px 10px', fontSize: 12 }}
+          style={{
+            // .d-btn-glass is a full-width sidebar button (display:block;
+            // width:100%); override the layout properties so the close control
+            // renders as a compact icon button instead of stretching across
+            // the chat header.
+            width: 'auto',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 0,
+            lineHeight: 1,
+            padding: '4px 10px',
+            fontSize: 14,
+          }}
           onClick={onClose}
           aria-label="Close league chat"
         >
