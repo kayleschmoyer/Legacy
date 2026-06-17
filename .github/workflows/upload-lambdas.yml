@@ -55,6 +55,7 @@ on:
           - mcp-jira-server
           - mcp-github-server
           - mcp-ci-server
+          - mcp-db-server
       force-all:
         description: "Force build and deploy all lambdas, bypassing nx affected detection"
         required: false
@@ -383,6 +384,12 @@ jobs:
               "s3Prefix":"mcp-ci", "ssmName":"mcp-ci",
               "badgeName":"Upload MCP CI Lambda",
               "distPath":"tools/mcp/ci-server/dist", "rollbar":true
+            },
+            {
+              "project":"mcp-db-server", "dir":"tools/mcp/db-admin-server",
+              "s3Prefix":"mcp-db", "ssmName":"mcp-db",
+              "badgeName":"Upload MCP DB Lambda",
+              "distPath":"tools/mcp/db-admin-server/dist", "rollbar":true
             }
           ]'
 

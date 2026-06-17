@@ -190,6 +190,22 @@ resource "aws_ssm_parameter" "mcp_ci_lambda_version" {
   })
 }
 
+resource "aws_ssm_parameter" "mcp_db_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/mcp-db/version"
+  description = "Current version of the MCP DB server Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "mcp-db"
+  })
+}
+
 # =============================================================================
 # CI INFRASTRUCTURE PARAMETERS
 # =============================================================================
@@ -239,5 +255,6 @@ output "lambda_version_parameters" {
     mcp_jira        = aws_ssm_parameter.mcp_jira_lambda_version.name
     mcp_github      = aws_ssm_parameter.mcp_github_lambda_version.name
     mcp_ci          = aws_ssm_parameter.mcp_ci_lambda_version.name
+    mcp_db          = aws_ssm_parameter.mcp_db_lambda_version.name
   }
 }
