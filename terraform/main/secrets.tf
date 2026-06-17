@@ -499,3 +499,39 @@ resource "aws_secretsmanager_secret_version" "ci_readonly_db_credentials" {
     database = var.database_name
   })
 }
+
+# =============================================================================
+# MCP READONLY DATABASE CREDENTIALS
+# =============================================================================
+# A broad read-only PostgreSQL user used by the hosted DB-admin MCP server
+# (LS-8116) to run SELECT-only queries without a tunnel.
+# The mcp_readonly role is created by migration 20260616_150000_add_mcp_readonly_role.ts.
+
+resource "random_password" "mcp_readonly_db_password" {
+  length  = 32
+  special = false # Avoid special chars that can break PostgreSQL connection strings
+}
+
+resource "aws_secretsmanager_secret" "mcp_readonly_db_credentials" {
+  name_prefix = "${local.name_prefix}-mcp-readonly-db-creds-"
+  description = "Read-only DB credentials for the hosted DB-admin MCP server (mcp_readonly Postgres role)"
+
+  # TODO: Automatic rotation requires a rotation Lambda and a mechanism to
+  # ALTER the mcp_readonly Postgres role password in sync. See LS-784.
+
+  tags = merge(local.common_tags, {
+    Component = "mcp"
+    Purpose   = "db-admin-readonly"
+  })
+}
+
+resource "aws_secretsmanager_secret_version" "mcp_readonly_db_credentials" {
+  secret_id = aws_secretsmanager_secret.mcp_readonly_db_credentials.id
+  secret_string = jsonencode({
+    username = "mcp_readonly"
+    password = random_password.mcp_readonly_db_password.result
+    host     = aws_db_instance.postgres.address
+    port     = 5432
+    database = var.database_name
+  })
+}
