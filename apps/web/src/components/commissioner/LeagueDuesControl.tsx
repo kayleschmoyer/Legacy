@@ -147,7 +147,10 @@ export function LeagueDuesControl({
     setHasChanges(false);
   }, [settings]);
 
-  if (queryLoading && !initialized) {
+  // Gate on `initialized` (not just `queryLoading`) so we never render the
+  // form with stale `useState` defaults during the frame after the query
+  // resolves but before the sync effect runs (LS-8134).
+  if (!initialized) {
     return (
       <Card
         backgroundColor="$surfacePanel"
