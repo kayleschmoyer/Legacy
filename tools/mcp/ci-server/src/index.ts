@@ -67,7 +67,15 @@ export function createServer(): McpServer {
         .int()
         .positive()
         .optional()
-        .describe('Run ID (required when jobId is not provided)'),
+        .describe('Run ID (required when jobId and runIds are not provided)'),
+      runIds: z
+        .array(z.coerce.number().int().positive())
+        .min(1)
+        .max(10)
+        .optional()
+        .describe(
+          'Batch mode: fetch logs for up to 10 runs in one call (concurrency capped at 3). Response is { logs: { [runId]: <per-run payload> }, missing: [{ runId, reason }] } — runs whose log archives are missing (e.g. BlobNotFound 404 after GitHub log expiry) are isolated to missing[] instead of failing the whole call. Cannot be combined with jobId.',
+        ),
       jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
       jobName: z
         .string()

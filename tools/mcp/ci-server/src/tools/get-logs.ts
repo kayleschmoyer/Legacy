@@ -3,6 +3,7 @@ import type { ToolResult } from '../types.js';
 
 interface GetLogsParams {
   runId?: number;
+  runIds?: number[];
   jobId?: number;
   failedOnly?: boolean;
   attempt?: number;
@@ -91,6 +92,12 @@ function extractErrorSummary(allLines: string[]): string[] {
 /** Default hard cap on total output characters to prevent context overflow. */
 const DEFAULT_MAX_CHARS = 50_000;
 
+/** Maximum number of runs accepted in a single batch call. */
+const MAX_BATCH_RUNS = 10;
+
+/** Maximum number of concurrent run-log fetches in batch mode. */
+const BATCH_CONCURRENCY = 3;
+
 /**
  * Applies per-line and total-character limits to a set of log lines.
  * Returns the processed lines and whether any truncation occurred.
@@ -128,92 +135,182 @@ function applyCharLimits(
   return { processedLines, charTruncated };
 }
 
-export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
-  if (!params.runId && !params.jobId) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: 'Either runId or jobId is required.' }],
-    };
-  }
-
+/**
+ * Build the per-run log payload (the same JSON object the singular path
+ * returns inline). Shared between singular and batch modes so the per-run
+ * output shape stays identical.
+ */
+async function buildRunPayload(
+  runId: number | undefined,
+  params: GetLogsParams,
+): Promise<Record<string, unknown>> {
   const defaultLimit = params.errorSummary ? 10_000 : 500;
   const maxLines = params.maxLines ?? defaultLimit;
   const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
+  const streamLimit = maxLines > 0 ? maxLines : 10_000;
 
-  try {
-    const streamLimit = maxLines > 0 ? maxLines : 10_000;
-    const { lines, totalLines } = await fetchRunLogsRing(
-      {
-        runId: params.runId,
-        jobId: params.jobId,
-        failedOnly: params.failedOnly,
-        attempt: params.attempt,
-        jobName: params.jobName,
-      },
-      streamLimit,
+  const { lines, totalLines } = await fetchRunLogsRing(
+    {
+      runId,
+      jobId: params.jobId,
+      failedOnly: params.failedOnly,
+      attempt: params.attempt,
+      jobName: params.jobName,
+    },
+    streamLimit,
+  );
+
+  const base = {
+    runId: runId ?? null,
+    jobId: params.jobId ?? null,
+    jobName: params.jobName ?? null,
+    failedOnly: params.failedOnly !== false,
+    attempt: params.attempt ?? null,
+  };
+
+  if (params.errorSummary) {
+    const summary = extractErrorSummary(lines);
+    const { processedLines, charTruncated } = applyCharLimits(
+      summary,
+      params.truncateLineLength,
+      maxChars,
     );
+    return {
+      ...base,
+      errorSummary: true,
+      totalLogLines: totalLines,
+      errorLines: summary.length,
+      charTruncated,
+      logs: processedLines.join('\n'),
+    };
+  }
 
-    // When errorSummary is requested, filter to only error lines + context
-    if (params.errorSummary) {
-      const summary = extractErrorSummary(lines);
-      const { processedLines, charTruncated } = applyCharLimits(
-        summary,
-        params.truncateLineLength,
-        maxChars,
-      );
+  const { processedLines, charTruncated } = applyCharLimits(
+    lines,
+    params.truncateLineLength,
+    maxChars,
+  );
+
+  return {
+    ...base,
+    truncated: lines.length < totalLines || charTruncated,
+    charTruncated,
+    totalLines,
+    returnedLines: processedLines.length,
+    logs: processedLines.join('\n'),
+  };
+}
+
+/** Run an async mapper over items with a fixed concurrency. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    for (;;) {
+      const i = nextIndex++;
+      if (i >= items.length) return;
+      results[i] = await mapper(items[i], i);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
+  const hasRunIds = Array.isArray(params.runIds) && params.runIds.length > 0;
+
+  if (hasRunIds) {
+    if (params.jobId !== undefined) {
       return {
+        isError: true,
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                runId: params.runId,
-                jobId: params.jobId ?? null,
-                jobName: params.jobName ?? null,
-                failedOnly: params.failedOnly !== false,
-                attempt: params.attempt ?? null,
-                errorSummary: true,
-                totalLogLines: totalLines,
-                errorLines: summary.length,
-                charTruncated,
-                logs: processedLines.join('\n'),
-              },
-              null,
-              2,
-            ),
+            text: 'runIds cannot be combined with jobId; pass jobId only with a single runId.',
+          },
+        ],
+      };
+    }
+    const runIds = params.runIds as number[];
+    if (runIds.length > MAX_BATCH_RUNS) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `runIds accepts at most ${MAX_BATCH_RUNS} ids per call (received ${runIds.length}).`,
           },
         ],
       };
     }
 
-    const { processedLines, charTruncated } = applyCharLimits(
-      lines,
-      params.truncateLineLength,
-      maxChars,
+    const logs: Record<string, Record<string, unknown>> = {};
+    const missing: Array<{ runId: number; reason: string }> = [];
+
+    type Outcome =
+      | { runId: number; payload: Record<string, unknown> }
+      | { runId: number; error: string };
+
+    const outcomes = await mapWithConcurrency<number, Outcome>(
+      runIds,
+      BATCH_CONCURRENCY,
+      async (runId) => {
+        try {
+          const payload = await buildRunPayload(runId, params);
+          return { runId, payload };
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          return { runId, error: reason };
+        }
+      },
     );
+
+    for (const outcome of outcomes) {
+      if ('payload' in outcome) {
+        logs[String(outcome.runId)] = outcome.payload;
+      } else {
+        missing.push({ runId: outcome.runId, reason: outcome.error });
+      }
+    }
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              runId: params.runId,
-              jobId: params.jobId ?? null,
-              jobName: params.jobName ?? null,
-              failedOnly: params.failedOnly !== false,
-              attempt: params.attempt ?? null,
-              truncated: lines.length < totalLines || charTruncated,
-              charTruncated,
-              totalLines,
-              returnedLines: processedLines.length,
-              logs: processedLines.join('\n'),
-            },
-            null,
-            2,
-          ),
+          text: JSON.stringify({ logs, missing }, null, 2),
         },
       ],
+    };
+  }
+
+  if (!params.runId && !params.jobId) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'Either runId, runIds, or jobId is required.',
+        },
+      ],
+    };
+  }
+
+  // Singular path — preserve existing response shape (top-level fields, not
+  // wrapped in logs/missing) so existing callers keep working.
+  try {
+    const payload = await buildRunPayload(params.runId, params);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
     };
   } catch (error) {
     return {
