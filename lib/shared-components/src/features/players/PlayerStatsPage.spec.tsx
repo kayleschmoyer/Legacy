@@ -141,4 +141,21 @@ describe('stepValue (LS-7806)', () => {
     expect(stepValue(4.95, 0.05, 0.5, 5, 0.05)).toBe(5);
     expect(stepValue(0.5, -0.05, 0.5, 5, 0.05)).toBe(0.5);
   });
+
+  // LS-7135: the Min HR slider spans the career home-run domain (0–800, step 5)
+  // so users can dial in thresholds like "500+" or "700+" career HR from the UI.
+  it('steps the HR slider by 5 within the career range', () => {
+    expect(stepValue(695, 5, 0, 800, 5)).toBe(700);
+    expect(stepValue(700, -5, 0, 800, 5)).toBe(695);
+  });
+
+  it('clamps the HR slider to the career maximum', () => {
+    expect(stepValue(800, 5, 0, 800, 5)).toBe(800);
+    expect(stepValue(0, -5, 0, 800, 5)).toBe(0);
+  });
+
+  it('snaps an off-grid HR value (e.g. a hand-typed URL of 762) onto the step grid', () => {
+    expect(stepValue(762, 5, 0, 800, 5)).toBe(765);
+    expect(stepValue(762, -5, 0, 800, 5)).toBe(755);
+  });
 });

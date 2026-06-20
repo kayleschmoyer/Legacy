@@ -229,6 +229,17 @@ export interface PlayerStatsPageProps {
 // no upper bound is applied. Matches the design reference (project/stats.jsx).
 const ERA_MAX_OFF = 5;
 
+// Upper bound for the "Min Home Runs" slider. These are CAREER home-run totals, so the
+// cap must span the career domain (the all-time leader, Barry Bonds, sits at 762) rather
+// than a single-season figure. 800 gives headroom above the record so users can dial in
+// thresholds like "500+" or "700+" career HR from the UI. The URL parser already accepts
+// arbitrary values, so this only governs the slider control.
+const HR_MAX = 800;
+// Step the HR slider in increments of 5 so the wider 0–800 range stays practical to drag
+// and to tap on the native +/- stepper (760 single-unit taps would be unusable). Exact
+// off-grid values remain reachable via a hand-typed URL.
+const HR_STEP = 5;
+
 interface AppliedFilters {
   search: string;
   position: string;
@@ -1254,8 +1265,8 @@ export function PlayerStatsPage({
                 label="Min Home Runs"
                 value={minHR}
                 min={0}
-                max={75}
-                step={1}
+                max={HR_MAX}
+                step={HR_STEP}
                 format={(v) => String(v)}
                 onChange={setMinHR}
                 onCommit={applyFilters}
