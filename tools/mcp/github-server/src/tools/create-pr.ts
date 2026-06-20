@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
@@ -213,11 +214,11 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            { success: true, number: pr.number, url: pr.html_url },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            number: pr.number,
+            url: pr.html_url,
+          }),
         },
       ],
     };

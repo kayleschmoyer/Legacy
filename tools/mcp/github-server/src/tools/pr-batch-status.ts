@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
 import { FAILED_CONCLUSIONS, summarizeCIStatus } from '../types.js';
@@ -238,7 +239,7 @@ export async function prBatchStatus(
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ count: rows.length, prs: rows }, null, 2),
+          text: minifiedJson({ count: rows.length, prs: rows }),
         },
       ],
     };

@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
@@ -434,14 +435,10 @@ export async function prWhyBlocked(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              pr: { number: pr.number, title: pr.title, url: pr.url },
-              ...diagnosis,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            pr: { number: pr.number, title: pr.title, url: pr.url },
+            ...diagnosis,
+          }),
         },
       ],
     };

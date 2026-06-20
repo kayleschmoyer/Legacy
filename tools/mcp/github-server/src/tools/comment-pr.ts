@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -27,15 +28,11 @@ export async function commentPR(params: CommentPRParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              commentId: comment.id,
-              url: comment.html_url,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            commentId: comment.id,
+            url: comment.html_url,
+          }),
         },
       ],
     };

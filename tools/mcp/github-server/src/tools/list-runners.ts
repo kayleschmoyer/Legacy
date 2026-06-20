@@ -1,6 +1,18 @@
+import { markdownTable, minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+
+// Flat, uniform list → Markdown table (LS-8021). `labels` is flattened to a
+// comma-joined name list for a single cell.
+const RUNNER_COLUMNS = [
+  'id',
+  'name',
+  'os',
+  'status',
+  'busy',
+  'labels',
+] as const;
 
 interface GitHubRunner {
   id: number;
@@ -51,23 +63,16 @@ export async function listRunners(
       os: r.os,
       status: r.status,
       busy: r.busy,
-      labels: r.labels.map((l) => l.name),
+      labels: r.labels.map((l) => l.name).join(','),
     }));
 
+    const text =
+      runners.length === 0
+        ? 'No runners found.'
+        : `${markdownTable(runners, { columns: RUNNER_COLUMNS })}\n\n_totalCount: ${totalCount}_`;
+
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              totalCount,
-              runners,
-            },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text }],
     };
   } catch (error) {
     return {
@@ -75,7 +80,7 @@ export async function listRunners(
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: minifiedJson({
             ok: false,
             error: `Failed to list runners: ${error instanceof Error ? error.message : String(error)}`,
           }),

@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
@@ -101,16 +102,12 @@ export async function retriggerCheck(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              message: 'No failed check runs to retrigger.',
-              totalChecks: totalCount,
-              sha: sha.slice(0, 7),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            message: 'No failed check runs to retrigger.',
+            totalChecks: totalCount,
+            sha: sha.slice(0, 7),
+          }),
         },
       ],
     };
@@ -149,18 +146,14 @@ export async function retriggerCheck(
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            success: failed === 0,
-            pr: params.number,
-            sha: sha.slice(0, 7),
-            retriggered,
-            failed,
-            results,
-          },
-          null,
-          2,
-        ),
+        text: minifiedJson({
+          success: failed === 0,
+          pr: params.number,
+          sha: sha.slice(0, 7),
+          retriggered,
+          failed,
+          results,
+        }),
       },
     ],
   };

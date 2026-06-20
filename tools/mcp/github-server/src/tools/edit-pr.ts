@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -46,17 +47,13 @@ export async function editPR(params: EditPRParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              number: pr.number,
-              title: pr.title,
-              body: pr.body,
-              url: pr.html_url,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            number: pr.number,
+            title: pr.title,
+            body: pr.body,
+            url: pr.html_url,
+          }),
         },
       ],
     };

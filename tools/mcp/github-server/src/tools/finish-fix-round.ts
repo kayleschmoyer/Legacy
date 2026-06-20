@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -227,14 +228,10 @@ export async function finishFixRound(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              error: 'validation failed — no side effects performed',
-              validationErrors,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            error: 'validation failed — no side effects performed',
+            validationErrors,
+          }),
         },
       ],
     };
@@ -298,27 +295,23 @@ export async function finishFixRound(
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            prNumber: params.prNumber,
-            replied,
-            resolved,
-            labelApplied,
-            readyLabel,
-            replies: replyOutcomes.map((o) => ({
-              threadId: o.threadId,
-              kind: o.kind,
-              body: o.body,
-              success: o.success,
-              ...(o.commentNodeId ? { commentNodeId: o.commentNodeId } : {}),
-              ...(o.error ? { error: o.error } : {}),
-            })),
-            resolutions: resolveOutcomes,
-            errors,
-          },
-          null,
-          2,
-        ),
+        text: minifiedJson({
+          prNumber: params.prNumber,
+          replied,
+          resolved,
+          labelApplied,
+          readyLabel,
+          replies: replyOutcomes.map((o) => ({
+            threadId: o.threadId,
+            kind: o.kind,
+            body: o.body,
+            success: o.success,
+            ...(o.commentNodeId ? { commentNodeId: o.commentNodeId } : {}),
+            ...(o.error ? { error: o.error } : {}),
+          })),
+          resolutions: resolveOutcomes,
+          errors,
+        }),
       },
     ],
   };

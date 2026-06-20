@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -129,18 +130,14 @@ export async function markPRReady(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                success: true,
-                number: params.number,
-                alreadyReady: true,
-                readyForReviewLabelApplied: label.applied,
-                ...(label.error ? { labelError: label.error } : {}),
-                message: `PR #${params.number} is already marked as ready for review.`,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              success: true,
+              number: params.number,
+              alreadyReady: true,
+              readyForReviewLabelApplied: label.applied,
+              ...(label.error ? { labelError: label.error } : {}),
+              message: `PR #${params.number} is already marked as ready for review.`,
+            }),
           },
         ],
       };
@@ -164,18 +161,14 @@ export async function markPRReady(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              number: updated.number,
-              isDraft: updated.isDraft,
-              url: updated.url,
-              readyForReviewLabelApplied: label.applied,
-              ...(label.error ? { labelError: label.error } : {}),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            number: updated.number,
+            isDraft: updated.isDraft,
+            url: updated.url,
+            readyForReviewLabelApplied: label.applied,
+            ...(label.error ? { labelError: label.error } : {}),
+          }),
         },
       ],
     };

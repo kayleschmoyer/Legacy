@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest, githubGraphQL } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -58,18 +59,14 @@ export async function mergePR(params: MergePRParams): Promise<ToolResult> {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                success: true,
-                prNumber: params.number,
-                strategy: params.strategy,
-                sha: mergeResult.sha,
-                merged: mergeResult.merged,
-                output: mergeResult.message,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              success: true,
+              prNumber: params.number,
+              strategy: params.strategy,
+              sha: mergeResult.sha,
+              merged: mergeResult.merged,
+              output: mergeResult.message,
+            }),
           },
         ],
       };
@@ -103,16 +100,12 @@ export async function mergePR(params: MergePRParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              prNumber: params.number,
-              strategy: params.strategy,
-              output: `PR #${params.number} enqueued for auto-merge (squash).`,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            prNumber: params.number,
+            strategy: params.strategy,
+            output: `PR #${params.number} enqueued for auto-merge (squash).`,
+          }),
         },
       ],
     };

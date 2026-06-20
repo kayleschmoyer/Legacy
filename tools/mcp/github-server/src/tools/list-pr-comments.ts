@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -183,11 +184,12 @@ export async function listPRComments(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              { number, type, total: comments.length, comments },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              number,
+              type,
+              total: comments.length,
+              comments,
+            }),
           },
         ],
       };
@@ -203,17 +205,13 @@ export async function listPRComments(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                number,
-                type,
-                total: filtered.length,
-                filteredByPath: filePath ?? null,
-                comments: filtered,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              number,
+              type,
+              total: filtered.length,
+              filteredByPath: filePath ?? null,
+              comments: filtered,
+            }),
           },
         ],
       };
@@ -232,19 +230,15 @@ export async function listPRComments(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                number,
-                type,
-                total: mapped.length,
-                filteredBySince: since ?? null,
-                filteredByReviewId: reviewId ?? null,
-                filteredByPath: filePath ?? null,
-                comments: mapped,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              number,
+              type,
+              total: mapped.length,
+              filteredBySince: since ?? null,
+              filteredByReviewId: reviewId ?? null,
+              filteredByPath: filePath ?? null,
+              comments: mapped,
+            }),
           },
         ],
       };
@@ -274,19 +268,15 @@ export async function listPRComments(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              number,
-              type,
-              total: topLevel.length + inline.length,
-              filteredByPath: filePath ?? null,
-              filteredByReviewId: reviewId ?? null,
-              topLevel: { total: topLevel.length, comments: topLevel },
-              inline: { total: inline.length, comments: inline },
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            number,
+            type,
+            total: topLevel.length + inline.length,
+            filteredByPath: filePath ?? null,
+            filteredByReviewId: reviewId ?? null,
+            topLevel: { total: topLevel.length, comments: topLevel },
+            inline: { total: inline.length, comments: inline },
+          }),
         },
       ],
     };

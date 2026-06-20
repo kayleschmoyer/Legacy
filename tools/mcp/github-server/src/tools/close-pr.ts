@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -83,15 +84,11 @@ export async function closePR(params: ClosePRParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              number,
-              message: `PR #${number} closed${normalized ? ' with comment' : ''}`,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            number,
+            message: `PR #${number} closed${normalized ? ' with comment' : ''}`,
+          }),
         },
       ],
     };

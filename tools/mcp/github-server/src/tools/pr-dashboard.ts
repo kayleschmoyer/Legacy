@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
@@ -517,7 +518,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
             type: 'text',
             text:
               format === 'json'
-                ? JSON.stringify(emptyPayload, null, 2)
+                ? minifiedJson(emptyPayload)
                 : renderDashboardMarkdown(emptyPayload),
           },
         ],
@@ -591,7 +592,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
           type: 'text',
           text:
             format === 'json'
-              ? JSON.stringify(payload, null, 2)
+              ? minifiedJson(payload)
               : renderDashboardMarkdown(payload),
         },
       ],

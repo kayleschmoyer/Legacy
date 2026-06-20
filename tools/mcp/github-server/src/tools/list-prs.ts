@@ -1,3 +1,4 @@
+import { markdownTable, truncate } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, type GraphQLResult } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -143,6 +144,43 @@ function nodeToSummary(node: PRNode): PRSummary {
 
 const PAGE_SIZE = 100;
 
+// Flat, uniform list → Markdown table (LS-8021). Columns are pruned to the
+// fields agents consume from a PR list; `filters` (an echo of the request) and
+// `createdAt` (superseded by `updatedAt` for recency) are dropped. Nested
+// values are flattened to single cells: `author` to its login, `labels` to a
+// comma-joined name list.
+const LIST_PRS_COLUMNS = [
+  'number',
+  'title',
+  'state',
+  'branch',
+  'base',
+  'author',
+  'isDraft',
+  'reviewDecision',
+  'mergedAt',
+  'labels',
+  'updatedAt',
+  'url',
+] as const;
+
+function toRow(pr: PRSummary): Record<string, unknown> {
+  return {
+    number: pr.number,
+    title: truncate(pr.title, 80),
+    state: pr.state,
+    branch: pr.headRefName,
+    base: pr.baseRefName,
+    author: pr.author.login,
+    isDraft: pr.isDraft,
+    reviewDecision: pr.reviewDecision ?? '',
+    mergedAt: pr.mergedAt ?? '',
+    labels: pr.labels.map((l) => l.name).join(','),
+    updatedAt: pr.updatedAt,
+    url: pr.url,
+  };
+}
+
 export async function listPRs(params: ListPRsParams): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
@@ -232,17 +270,13 @@ export async function listPRs(params: ListPRsParams): Promise<ToolResult> {
       }
     }
 
+    const text =
+      allPrs.length === 0
+        ? 'No PRs found matching filters.'
+        : `${markdownTable(allPrs.map(toRow), { columns: LIST_PRS_COLUMNS })}\n\n_total: ${allPrs.length}${hasMore ? ` (limit ${limit} reached — more may exist)` : ''}_`;
+
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            { filters: params, total: allPrs.length, hasMore, prs: allPrs },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text }],
     };
   } catch (error) {
     return {

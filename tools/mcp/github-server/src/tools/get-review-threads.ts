@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -123,7 +124,7 @@ export async function getReviewThreads(
     };
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(summary) }],
     };
   } catch (error) {
     return {

@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName, tryGhAuthToken } from '../auth.js';
 import { COPILOT_BOT } from '../constants.js';
 import { githubRest } from '../github-api.js';
@@ -410,11 +411,10 @@ export async function requestReview(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            { prNumber: uniquePrs[0], results: perPrResults[0].reviewers },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            prNumber: uniquePrs[0],
+            results: perPrResults[0].reviewers,
+          }),
         },
       ],
     };
@@ -425,14 +425,10 @@ export async function requestReview(
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            total: uniquePrs.length,
-            results: perPrResults,
-          },
-          null,
-          2,
-        ),
+        text: minifiedJson({
+          total: uniquePrs.length,
+          results: perPrResults,
+        }),
       },
     ],
   };

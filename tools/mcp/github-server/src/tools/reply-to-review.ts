@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -105,16 +106,12 @@ export async function replyToReview(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                threadId,
-                commentNodeId:
-                  result.data.addPullRequestReviewThreadReply.comment.id,
-                body: result.data.addPullRequestReviewThreadReply.comment.body,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              threadId,
+              commentNodeId:
+                result.data.addPullRequestReviewThreadReply.comment.id,
+              body: result.data.addPullRequestReviewThreadReply.comment.body,
+            }),
           },
         ],
       };
@@ -144,16 +141,12 @@ export async function replyToReview(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                success: true,
-                commentDatabaseId: comment.id,
-                body: comment.body,
-                url: comment.html_url,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              success: true,
+              commentDatabaseId: comment.id,
+              body: comment.body,
+              url: comment.html_url,
+            }),
           },
         ],
       };

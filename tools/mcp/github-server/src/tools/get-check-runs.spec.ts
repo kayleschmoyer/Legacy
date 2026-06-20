@@ -60,11 +60,13 @@ describe('getCheckRuns single-sha path', () => {
 
     const result = await getCheckRuns({ sha: 'abc123' });
     expect(result.isError).toBeFalsy();
-    const body = parse((result.content[0] as { text: string }).text);
-    expect(body.sha).toBe('abc123');
-    expect(body.total).toBe(2);
-    expect(body.checkRuns).toHaveLength(2);
-    expect(body).not.toHaveProperty('missing');
+    // Single-sha results render as a token-efficient Markdown table (LS-8021):
+    // a header line plus one row per deduped run.
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('total: 2');
+    expect(text).toContain('bot-review');
+    expect(text).toContain('Build');
+    expect(text).not.toContain('missing');
   });
 
   it('resolves PR number to head SHA when sha is omitted', async () => {
@@ -73,9 +75,10 @@ describe('getCheckRuns single-sha path', () => {
 
     const result = await getCheckRuns({ prNumber: 99 });
     expect(result.isError).toBeFalsy();
-    const body = parse((result.content[0] as { text: string }).text);
-    expect(body.sha).toBe('headsha1');
-    expect(body.pr).toBe(99);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('headsha'); // sha.slice(0, 7)
+    expect(text).toContain('PR #99');
+    expect(text).toContain('bot-review');
   });
 
   it('errors when neither sha, shas, nor prNumber is provided', async () => {

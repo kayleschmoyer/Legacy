@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -62,14 +63,10 @@ export async function secretsCheck(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                checked: params.names.length,
-                results,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              checked: params.names.length,
+              results,
+            }),
           },
         ],
       };
@@ -107,14 +104,10 @@ export async function secretsCheck(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              totalCount,
-              secrets: allSecrets,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            totalCount,
+            secrets: allSecrets,
+          }),
         },
       ],
     };

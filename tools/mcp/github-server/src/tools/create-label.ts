@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -94,16 +95,12 @@ export async function createLabel(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                created: true,
-                name: result.name,
-                color: result.color,
-                description: result.description,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              created: true,
+              name: result.name,
+              color: result.color,
+              description: result.description,
+            }),
           },
         ],
       };
@@ -116,15 +113,11 @@ export async function createLabel(
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  created: false,
-                  name: params.name,
-                  message: 'Label already exists',
-                },
-                null,
-                2,
-              ),
+              text: minifiedJson({
+                created: false,
+                name: params.name,
+                message: 'Label already exists',
+              }),
             },
           ],
         };

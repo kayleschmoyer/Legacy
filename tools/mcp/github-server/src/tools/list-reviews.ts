@@ -1,6 +1,16 @@
+import { markdownTable, minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+
+// Single-PR reviews are a flat, uniform list → Markdown table (LS-8021).
+const REVIEW_COLUMNS = [
+  'reviewer',
+  'state',
+  'submittedAt',
+  'bodyLength',
+  'commentCount',
+] as const;
 
 interface ListReviewsParams {
   number?: number;
@@ -18,6 +28,9 @@ interface GitHubReview {
 }
 
 interface MappedReview {
+  // Index signature lets reviews flow into @legacy-sports/mcp-format's
+  // markdownTable (FlatRecord) while keeping the named fields typed.
+  [key: string]: unknown;
   reviewer: string;
   state: string;
   submittedAt: string;
@@ -105,17 +118,14 @@ async function listReviewsSingle(
     const latestOnly = params.latestOnly !== false;
     const filtered = applyFilters(allMapped, params.reviewer, latestOnly);
 
-    const summary = {
-      prNumber: params.number,
-      total: reviews.length,
-      returned: filtered.length,
-      reviewerFilter: params.reviewer ?? null,
-      latestOnly,
-      reviews: filtered,
-    };
+    const header = `_PR #${params.number}, total: ${reviews.length}, returned: ${filtered.length}, latestOnly: ${latestOnly}${params.reviewer ? `, reviewer: ${params.reviewer}` : ''}_`;
+    const text =
+      filtered.length === 0
+        ? `No reviews found for PR #${params.number}.`
+        : `${header}\n\n${markdownTable(filtered, { columns: REVIEW_COLUMNS })}`;
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+      content: [{ type: 'text', text }],
     };
   } catch (error) {
     return {
@@ -217,6 +227,8 @@ async function listReviewsBatch(
       reviews[prNumber] = applyFilters(mapped, params.reviewer, latestOnly);
     }
 
+    // Batch results are a PR-keyed map of review arrays → minified JSON (the
+    // nested, multi-key shape doesn't fit a single flat table).
     const summary = {
       reviews,
       missing,
@@ -226,7 +238,7 @@ async function listReviewsBatch(
     };
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(summary) }],
     };
   } catch (error) {
     return {

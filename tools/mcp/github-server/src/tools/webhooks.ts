@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -60,14 +61,10 @@ export async function webhookList(): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              count: allWebhooks.length,
-              webhooks: allWebhooks.map(formatWebhook),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            count: allWebhooks.length,
+            webhooks: allWebhooks.map(formatWebhook),
+          }),
         },
       ],
     };
@@ -142,11 +139,7 @@ export async function webhookUpdate(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            { ok: true, webhook: formatWebhook(data) },
-            null,
-            2,
-          ),
+          text: minifiedJson({ ok: true, webhook: formatWebhook(data) }),
         },
       ],
     };
@@ -186,15 +179,11 @@ export async function webhookPing(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              ok: true,
-              hookId: params.hookId,
-              message: 'Ping sent successfully.',
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            ok: true,
+            hookId: params.hookId,
+            message: 'Ping sent successfully.',
+          }),
         },
       ],
     };

@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { githubGraphQL } from '../github-api.js';
 import { resolvePullRequestNodeId } from '../pr-utils.js';
 import type { ToolResult } from '../types.js';
@@ -50,16 +51,12 @@ export async function enableAutoMerge(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              prNumber: params.prNumber,
-              mergeMethod: resolvedMethod,
-              output: `Auto-merge enabled for PR #${params.prNumber} (${resolvedMethod}). The PR will merge automatically when all required checks pass.`,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            prNumber: params.prNumber,
+            mergeMethod: resolvedMethod,
+            output: `Auto-merge enabled for PR #${params.prNumber} (${resolvedMethod}). The PR will merge automatically when all required checks pass.`,
+          }),
         },
       ],
     };

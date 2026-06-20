@@ -1,6 +1,11 @@
+import { markdownTable } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+
+// Flat, uniform list → Markdown table (LS-8021). Columns pruned to the fields
+// agents consume; `id` and `url` are dropped (labels are addressed by name).
+const LABEL_COLUMNS = ['name', 'color', 'description', 'default'] as const;
 
 interface GitHubLabel {
   id: number;
@@ -47,25 +52,20 @@ export async function listLabels(
         )
       : allLabels;
 
+    const labels = filtered.map((l) => ({
+      name: l.name,
+      color: l.color,
+      description: l.description ?? '',
+      default: l.default,
+    }));
+
+    const text =
+      labels.length === 0
+        ? 'No labels found.'
+        : `${markdownTable(labels, { columns: LABEL_COLUMNS })}\n\n_total: ${labels.length}_`;
+
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              total: filtered.length,
-              labels: filtered.map((l) => ({
-                name: l.name,
-                color: l.color,
-                description: l.description,
-                default: l.default,
-              })),
-            },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text }],
     };
   } catch (error) {
     return {

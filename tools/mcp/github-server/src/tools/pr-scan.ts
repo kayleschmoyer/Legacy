@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import { FAILED_CONCLUSIONS } from '../types.js';
@@ -594,7 +595,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
     };
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(output) }],
     };
   } catch (error) {
     return {

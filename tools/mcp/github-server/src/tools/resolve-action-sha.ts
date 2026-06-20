@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
@@ -78,7 +79,7 @@ export async function resolveActionSha(
       params.tag,
     );
     return {
-      content: [{ type: 'text', text: JSON.stringify(resolved, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(resolved) }],
     };
   } catch (error) {
     return {
@@ -120,6 +121,6 @@ export async function resolveActionShas(
   const allFailed = results.every((r) => r.status === 'rejected');
   return {
     isError: allFailed,
-    content: [{ type: 'text', text: JSON.stringify(resolved, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(resolved) }],
   };
 }

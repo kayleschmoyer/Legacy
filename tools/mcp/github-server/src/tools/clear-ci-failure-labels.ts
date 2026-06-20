@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -47,11 +48,11 @@ export async function clearCiFailureLabels(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              { prNumber: params.number, removed: [], failed: [] },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              prNumber: params.number,
+              removed: [],
+              failed: [],
+            }),
           },
         ],
       };
@@ -83,11 +84,7 @@ export async function clearCiFailureLabels(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            { prNumber: params.number, removed, failed },
-            null,
-            2,
-          ),
+          text: minifiedJson({ prNumber: params.number, removed, failed }),
         },
       ],
     };

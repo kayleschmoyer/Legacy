@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -101,19 +102,13 @@ export async function manageLabels(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              prNumber: uniquePrs[0],
-              success: failed === 0,
-              requestedLabelsAdded: params.add ?? [],
-              requestedLabelsRemoved: params.remove ?? [],
-              ...(perPrResults[0].error
-                ? { error: perPrResults[0].error }
-                : {}),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            prNumber: uniquePrs[0],
+            success: failed === 0,
+            requestedLabelsAdded: params.add ?? [],
+            requestedLabelsRemoved: params.remove ?? [],
+            ...(perPrResults[0].error ? { error: perPrResults[0].error } : {}),
+          }),
         },
       ],
     };
@@ -124,18 +119,14 @@ export async function manageLabels(
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            total: uniquePrs.length,
-            succeeded,
-            failed,
-            requestedLabelsAdded: params.add ?? [],
-            requestedLabelsRemoved: params.remove ?? [],
-            results: perPrResults,
-          },
-          null,
-          2,
-        ),
+        text: minifiedJson({
+          total: uniquePrs.length,
+          succeeded,
+          failed,
+          requestedLabelsAdded: params.add ?? [],
+          requestedLabelsRemoved: params.remove ?? [],
+          results: perPrResults,
+        }),
       },
     ],
   };

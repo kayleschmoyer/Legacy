@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFileSync } from 'node:child_process';
 import { getRepoRoot, getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
@@ -107,19 +108,15 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                success: false,
-                number,
-                branch: headRefName,
-                error:
-                  'Cross-repo (fork) PRs are not supported — cannot force-push to a fork remote',
-                headOwner: headRepository.owner.login,
-                baseOwner: baseRepository.owner.login,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              success: false,
+              number,
+              branch: headRefName,
+              error:
+                'Cross-repo (fork) PRs are not supported — cannot force-push to a fork remote',
+              headOwner: headRepository.owner.login,
+              baseOwner: baseRepository.owner.login,
+            }),
           },
         ],
       };
@@ -145,17 +142,13 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                success: false,
-                number,
-                error:
-                  'Working tree is not clean — commit or stash changes before rebasing',
-                dirtyFiles: status,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              success: false,
+              number,
+              error:
+                'Working tree is not clean — commit or stash changes before rebasing',
+              dirtyFiles: status,
+            }),
           },
         ],
       };
@@ -212,19 +205,14 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify(
-                  {
-                    success: false,
-                    number,
-                    branch: headRefName,
-                    error:
-                      'Rebase conflicts detected — manual resolution needed',
-                    conflictFiles,
-                    conflicts: output,
-                  },
-                  null,
-                  2,
-                ),
+                text: minifiedJson({
+                  success: false,
+                  number,
+                  branch: headRefName,
+                  error: 'Rebase conflicts detected — manual resolution needed',
+                  conflictFiles,
+                  conflicts: output,
+                }),
               },
             ],
           };
@@ -251,18 +239,14 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                success: true,
-                number,
-                branch: headRefName,
-                base: baseRefName,
-                message: `PR #${number} rebased onto ${baseRefName} and pushed`,
-                log: log.join('\n'),
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              success: true,
+              number,
+              branch: headRefName,
+              base: baseRefName,
+              message: `PR #${number} rebased onto ${baseRefName} and pushed`,
+              log: log.join('\n'),
+            }),
           },
         ],
       };
@@ -283,16 +267,12 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              number,
-              error: `Failed to rebase PR #${number}: ${message}`,
-              log: log.join('\n'),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: false,
+            number,
+            error: `Failed to rebase PR #${number}: ${message}`,
+            log: log.join('\n'),
+          }),
         },
       ],
     };

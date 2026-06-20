@@ -1,7 +1,22 @@
+import { markdownTable } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
 import type { ToolResult } from '../types.js';
+
+// Flat, uniform list → Markdown table (LS-8021).
+const STATUS_COLUMNS = [
+  'context',
+  'state',
+  'description',
+  'targetUrl',
+  'createdAt',
+] as const;
+
+// Guidance preserved verbatim from the prior JSON `note` field: commit statuses
+// (Statuses API) are not Check Runs, so github_retrigger_check won't find them.
+const STATUS_NOTE =
+  'These are GitHub commit statuses (Statuses API), not Check Runs (Checks API). github_retrigger_check will NOT find these. To update them, push a new commit or re-run/dispatch the workflow or external system that owns the status. Only use github_set_commit_status to correct a genuinely stale or incorrect status after verifying the underlying result, never to override required checks or branch protection intent.';
 
 interface ListCommitStatusesParams {
   sha?: string;
@@ -84,30 +99,22 @@ export async function listCommitStatuses(
       ? deduped.filter((s) => s.context === params.context)
       : deduped;
 
+    const statuses = filtered.map((s) => ({
+      context: s.context,
+      state: s.state,
+      description: s.description ?? '',
+      targetUrl: s.target_url ?? '',
+      createdAt: s.created_at,
+    }));
+
+    const header = `_sha: ${sha.slice(0, 7)}${params.prNumber !== undefined ? `, PR #${params.prNumber}` : ''}, total: ${statuses.length}_\n\n> ${STATUS_NOTE}`;
+    const text =
+      statuses.length === 0
+        ? `No commit statuses found for ${sha.slice(0, 7)}.\n\n> ${STATUS_NOTE}`
+        : `${header}\n\n${markdownTable(statuses, { columns: STATUS_COLUMNS })}`;
+
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              sha,
-              shortSha: sha.slice(0, 7),
-              ...(params.prNumber !== undefined && { pr: params.prNumber }),
-              total: filtered.length,
-              note: 'These are GitHub commit statuses (Statuses API), not Check Runs (Checks API). github_retrigger_check will NOT find these. To update them, push a new commit or re-run/dispatch the workflow or external system that owns the status. Only use github_set_commit_status to correct a genuinely stale or incorrect status after verifying the underlying result, never to override required checks or branch protection intent.',
-              statuses: filtered.map((s) => ({
-                context: s.context,
-                state: s.state,
-                description: s.description,
-                targetUrl: s.target_url,
-                createdAt: s.created_at,
-              })),
-            },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

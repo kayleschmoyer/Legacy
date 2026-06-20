@@ -266,22 +266,15 @@ describe('listReviews (LS-8166)', () => {
         ] as unknown as never)
         .mockResolvedValueOnce([] as unknown as never);
 
-      const parsed = parse(await listReviews({ number: 42 })) as {
-        prNumber: number;
-        total: number;
-        reviews: { reviewer: string; commentCount: number }[];
-      };
+      // Single-PR reviews render as a token-efficient Markdown table (LS-8021):
+      // a header line plus one row per review.
+      const text = (await listReviews({ number: 42 })).content[0].text;
 
       expect(mockedGraphQL).not.toHaveBeenCalled();
-      expect(parsed.prNumber).toBe(42);
-      expect(parsed.total).toBe(1);
-      expect(parsed.reviews[0]).toEqual({
-        reviewer: 'alice',
-        state: 'APPROVED',
-        submittedAt: '2026-01-01T00:00:00Z',
-        bodyLength: 4,
-        commentCount: 0,
-      });
+      expect(text).toContain('PR #42');
+      expect(text).toContain('total: 1');
+      // The single data row: reviewer|state|submittedAt|bodyLength|commentCount.
+      expect(text).toContain('alice|APPROVED|2026-01-01T00:00:00Z|4|0');
     });
 
     it('errors when neither `number` nor `prs` is provided', async () => {

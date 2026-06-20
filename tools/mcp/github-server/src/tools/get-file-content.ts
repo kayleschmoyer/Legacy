@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -49,16 +50,12 @@ export async function getFileContent(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              path: data.path,
-              ref,
-              sha: data.sha,
-              content,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            path: data.path,
+            ref,
+            sha: data.sha,
+            content,
+          }),
         },
       ],
     };

@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -269,20 +270,16 @@ export async function resolveThreads(
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            total: results.length,
-            resolved,
-            failed,
-            results,
-            ...(notFoundCommentIds.length > 0 ? { notFoundCommentIds } : {}),
-            recheckTriggered,
-            ...(recheckNote ? { recheckNote } : {}),
-            ...(recheckError ? { recheckError } : {}),
-          },
-          null,
-          2,
-        ),
+        text: minifiedJson({
+          total: results.length,
+          resolved,
+          failed,
+          results,
+          ...(notFoundCommentIds.length > 0 ? { notFoundCommentIds } : {}),
+          recheckTriggered,
+          ...(recheckNote ? { recheckNote } : {}),
+          ...(recheckError ? { recheckError } : {}),
+        }),
       },
     ],
   };

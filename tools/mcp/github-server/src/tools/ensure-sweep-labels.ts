@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -79,15 +80,11 @@ export async function ensureSweepLabels(): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              ensured: results.map((r) => r.name),
-              created,
-              alreadyExisted: existing,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            ensured: results.map((r) => r.name),
+            created,
+            alreadyExisted: existing,
+          }),
         },
       ],
     };

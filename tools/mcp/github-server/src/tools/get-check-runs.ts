@@ -1,4 +1,9 @@
 import { LOGGER } from '@legacy-sports/logging/server';
+import {
+  markdownTable,
+  minifiedJson,
+  truncate,
+} from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
@@ -48,6 +53,28 @@ interface SerializedCheckRun {
 }
 
 const BATCH_CONCURRENCY = 5;
+
+// Single-sha results are a flat, uniform list → Markdown table (LS-8021).
+// The nested `output` object is pruned to a truncated `summary` cell (the field
+// agents read when triaging a failure); `output.title` and `app` are dropped as
+// rarely consumed, and `startedAt` is dropped in favour of `completedAt`.
+const CHECK_RUN_COLUMNS = [
+  'name',
+  'status',
+  'conclusion',
+  'completedAt',
+  'summary',
+] as const;
+
+function checkRunRow(run: SerializedCheckRun): Record<string, unknown> {
+  return {
+    name: run.name,
+    status: run.status,
+    conclusion: run.conclusion ?? '',
+    completedAt: run.completedAt ?? '',
+    summary: truncate(run.output.summary ?? '', 200),
+  };
+}
 
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -168,23 +195,16 @@ export async function getCheckRuns(
       params.checkName,
     );
 
+    const header = `_sha: ${sha.slice(0, 7)}${params.prNumber !== undefined ? `, PR #${params.prNumber}` : ''}, total: ${deduped.length}_`;
+    const text =
+      deduped.length === 0
+        ? `No check runs found for ${sha.slice(0, 7)}.`
+        : `${header}\n\n${markdownTable(deduped.map(checkRunRow), {
+            columns: CHECK_RUN_COLUMNS,
+          })}`;
+
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              sha,
-              shortSha: sha.slice(0, 7),
-              ...(params.prNumber !== undefined && { pr: params.prNumber }),
-              total: deduped.length,
-              checkRuns: deduped,
-            },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -232,11 +252,13 @@ async function getCheckRunsBatch(
     }
   });
 
+  // Batch results are a sha-keyed map of heterogeneous arrays → minified JSON
+  // (a table doesn't fit the nested, multi-key shape).
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ checkRuns, missing }, null, 2),
+        text: minifiedJson({ checkRuns, missing }),
       },
     ],
   };

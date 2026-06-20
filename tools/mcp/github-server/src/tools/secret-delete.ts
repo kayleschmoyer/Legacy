@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -23,15 +24,11 @@ export async function secretDelete(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              name: params.name,
-              message: `Secret "${params.name}" deleted`,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            name: params.name,
+            message: `Secret "${params.name}" deleted`,
+          }),
         },
       ],
     };

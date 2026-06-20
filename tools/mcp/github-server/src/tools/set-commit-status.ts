@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import { resolveHeadShaFromPrNumber } from '../pr-utils.js';
@@ -56,17 +57,13 @@ export async function setCommitStatus(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              sha: sha.slice(0, 7),
-              context: status.context,
-              state: status.state,
-              description: status.description,
-              createdAt: status.created_at,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            sha: sha.slice(0, 7),
+            context: status.context,
+            state: status.state,
+            description: status.description,
+            createdAt: status.created_at,
+          }),
         },
       ],
     };

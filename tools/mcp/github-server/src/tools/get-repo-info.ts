@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -21,16 +22,12 @@ export async function getRepoInfo(): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              owner: data.owner.login,
-              name: data.name,
-              defaultBranch: data.default_branch,
-              url: data.html_url,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            owner: data.owner.login,
+            name: data.name,
+            defaultBranch: data.default_branch,
+            url: data.html_url,
+          }),
         },
       ],
     };

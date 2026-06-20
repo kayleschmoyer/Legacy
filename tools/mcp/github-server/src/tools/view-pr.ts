@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
 import type { ToolResult, CICheck } from '../types.js';
@@ -248,7 +249,7 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
     };
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(output) }],
     };
   } catch (error) {
     return {
