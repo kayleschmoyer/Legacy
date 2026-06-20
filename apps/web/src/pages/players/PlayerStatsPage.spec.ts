@@ -139,4 +139,47 @@ describe('buildStatsSearchParams', () => {
     });
     expect(out.has('sport')).toBe(false);
   });
+
+  it('serializes keys in deterministic alphabetical order (PST-104)', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: {
+        searchTerm: 'trout',
+        position: 'OF',
+        team: 'LAA',
+        minHomeRuns: 30,
+      },
+      sport: 'mlb',
+    });
+    // Keys must be emitted alphabetically, not in insertion order.
+    expect(out.toString()).toBe(
+      'minHomeRuns=30&pageSize=25&position=OF&searchTerm=trout&sport=mlb&team=LAA&view=combined',
+    );
+    expect([...out.keys()]).toEqual([
+      'minHomeRuns',
+      'pageSize',
+      'position',
+      'searchTerm',
+      'sport',
+      'team',
+      'view',
+    ]);
+  });
+
+  it('produces identical query strings for equivalent filter states (PST-104)', () => {
+    // Same logical state expressed with filters built in different orders must
+    // serialize to the byte-identical URL so CDN caching / dedup works.
+    const a = buildStatsSearchParams({
+      viewMode: 'hitters',
+      pageSize: 50,
+      filters: { team: 'LAA', position: 'OF', searchTerm: 'trout' },
+    });
+    const b = buildStatsSearchParams({
+      viewMode: 'hitters',
+      pageSize: 50,
+      filters: { searchTerm: 'trout', team: 'LAA', position: 'OF' },
+    });
+    expect(a.toString()).toBe(b.toString());
+  });
 });

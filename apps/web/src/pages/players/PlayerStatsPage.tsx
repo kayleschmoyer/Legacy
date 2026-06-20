@@ -109,7 +109,20 @@ export function buildStatsSearchParams(state: {
   if (state.filters.maxERA !== undefined) {
     next.set('maxERA', state.filters.maxERA.toFixed(2));
   }
-  return next;
+
+  // Serialize keys in a deterministic alphabetical order (PST-104). URLSearchParams
+  // preserves insertion order, so the same filter state could otherwise produce
+  // different query strings depending on which conditional keys were present — bad
+  // for CDN caching, analytics deduping, and back-button URL comparisons. Sort by
+  // key with a code-unit comparison (locale-independent) so the result is
+  // byte-identical across environments.
+  const sorted = new URLSearchParams();
+  for (const [key, value] of Array.from(next.entries()).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  )) {
+    sorted.append(key, value);
+  }
+  return sorted;
 }
 
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
