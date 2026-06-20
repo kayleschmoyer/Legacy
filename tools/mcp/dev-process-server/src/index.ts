@@ -12,6 +12,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import {
   isSafeFilePath,
   isSafeGitRef,
@@ -19,6 +20,14 @@ import {
   resolveChecked,
   type TestCase,
 } from './utils.js';
+import {
+  ACTION_ITEM_COLUMNS,
+  ADR_LIST_COLUMNS,
+  POSTMORTEM_RECENT_COLUMNS,
+  RFC_LIST_COLUMNS,
+  TESTPLAN_CASE_COLUMNS,
+  tableText,
+} from './format.js';
 
 // ---------------------------------------------------------------------------
 // Utilities
@@ -85,9 +94,20 @@ async function ghFetch(
   return res.json() as Promise<unknown>;
 }
 
+// Single objects / few scalars / nested or heterogeneous data → minified JSON
+// (the token-efficient default; pretty-printing only spends tokens on
+// structural whitespace). List-shaped tools render Markdown tables via
+// `text()` + the `tableText` helper instead (epic LS-8018 / LS-8019).
 function ok(data: unknown) {
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    content: [{ type: 'text' as const, text: minifiedJson(data) }],
+  };
+}
+
+// Return a pre-formatted string (e.g. a Markdown table) verbatim.
+function text(value: string) {
+  return {
+    content: [{ type: 'text' as const, text: value }],
   };
 }
 
@@ -555,7 +575,7 @@ server.tool(
     const rfcsDir = join(root, 'docs', 'rfcs');
 
     if (!existsSync(rfcsDir)) {
-      return ok({ rfcs: [] });
+      return text('No open RFCs found.');
     }
 
     const files = readdirSync(rfcsDir).filter((f) => f.endsWith('.md'));
@@ -573,7 +593,7 @@ server.tool(
       .filter((r) => r.isDraft)
       .map(({ file, title }) => ({ file, title }));
 
-    return ok({ rfcs: drafts });
+    return text(tableText(drafts, RFC_LIST_COLUMNS, 'No open RFCs found.'));
   },
 );
 
@@ -756,7 +776,7 @@ server.tool(
     const decisionsDir = join(root, 'docs', 'decisions');
 
     if (!existsSync(decisionsDir)) {
-      return ok({ adrs: [] });
+      return text('No ADRs found.');
     }
 
     const files = readdirSync(decisionsDir)
@@ -780,7 +800,7 @@ server.tool(
       ? adrs.filter((a) => a.status.startsWith(status))
       : adrs;
 
-    return ok({ adrs: filtered });
+    return text(tableText(filtered, ADR_LIST_COLUMNS, 'No ADRs found.'));
   },
 );
 
@@ -848,7 +868,16 @@ server.tool(
     }
 
     const cases = parseTestPlanCases(content);
-    return ok({ cases, total: cases.length });
+    // Map to plain rows so the shared TestCase type need not carry an index
+    // signature just to satisfy the FlatRecord table helper.
+    const rows = cases.map((c) => ({
+      text: c.text,
+      completed: c.completed,
+      isAutomated: c.isAutomated,
+      isManual: c.isManual,
+      testFile: c.testFile,
+    }));
+    return text(tableText(rows, TESTPLAN_CASE_COLUMNS, 'No test cases found.'));
   },
 );
 
@@ -1396,7 +1425,7 @@ server.tool(
       filesToScan.push(absPath);
     } else {
       if (!existsSync(postmortemsDir)) {
-        return ok({ actionItems: [] });
+        return text('No postmortem action items found.');
       }
       const files = readdirSync(postmortemsDir).filter((f) =>
         f.endsWith('.md'),
@@ -1405,6 +1434,9 @@ server.tool(
     }
 
     interface ActionItem {
+      // Index signature lets rows flow into @legacy-sports/mcp-format's
+      // FlatRecord helpers (tableText/markdownTable) while staying typed.
+      [key: string]: unknown;
       postmortem: string;
       owner: string;
       action: string;
@@ -1467,7 +1499,13 @@ server.tool(
       }
     }
 
-    return ok({ actionItems, total: actionItems.length });
+    return text(
+      tableText(
+        actionItems,
+        ACTION_ITEM_COLUMNS,
+        'No postmortem action items found.',
+      ),
+    );
   },
 );
 
@@ -1486,7 +1524,7 @@ server.tool(
     const postmortemsDir = join(root, 'docs', 'postmortems');
 
     if (!existsSync(postmortemsDir)) {
-      return ok({ postmortems: [] });
+      return text(`No postmortems in the last ${days} days.`);
     }
 
     const cutoff = new Date();
@@ -1511,7 +1549,13 @@ server.tool(
       };
     });
 
-    return ok({ postmortems, daysBack: days });
+    return text(
+      tableText(
+        postmortems,
+        POSTMORTEM_RECENT_COLUMNS,
+        `No postmortems in the last ${days} days.`,
+      ),
+    );
   },
 );
 
