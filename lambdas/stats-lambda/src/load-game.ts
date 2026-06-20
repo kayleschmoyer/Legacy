@@ -387,25 +387,38 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
                 },
               );
             } catch (scoreError) {
-              LOGGER.error(
-                `Failed to calculate scores for matchup ${message.matchupId}`,
-                {
-                  error:
-                    scoreError instanceof Error
-                      ? scoreError.message
-                      : String(scoreError),
-                  matchupId: message.matchupId,
-                },
-              );
-              captureError(
+              const scoreErrorMessage =
                 scoreError instanceof Error
-                  ? scoreError
-                  : new Error(String(scoreError)),
-                {
-                  matchupId: message.matchupId,
-                  context: 'post-stats-score-calculation',
-                },
-              );
+                  ? scoreError.message
+                  : String(scoreError);
+              // Matchup deletion between SQS enqueue and processing is a normal
+              // race (especially in dev with test data cleanup) — log a warning
+              // and skip Rollbar capture rather than alerting on a caller error.
+              const isMatchupNotFound =
+                scoreErrorMessage === `Matchup ${message.matchupId} not found`;
+              if (isMatchupNotFound) {
+                LOGGER.warn(
+                  `Skipping score calculation: matchup ${message.matchupId} no longer exists`,
+                  { matchupId: message.matchupId },
+                );
+              } else {
+                LOGGER.error(
+                  `Failed to calculate scores for matchup ${message.matchupId}`,
+                  {
+                    error: scoreErrorMessage,
+                    matchupId: message.matchupId,
+                  },
+                );
+                captureError(
+                  scoreError instanceof Error
+                    ? scoreError
+                    : new Error(String(scoreError)),
+                  {
+                    matchupId: message.matchupId,
+                    context: 'post-stats-score-calculation',
+                  },
+                );
+              }
               // Score calculation failure is non-fatal — stats are loaded,
               // scores can be recalculated later via the standalone handler
             }

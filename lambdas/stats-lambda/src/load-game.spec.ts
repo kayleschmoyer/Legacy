@@ -6,18 +6,21 @@ import type { SQSEvent, SQSRecord } from 'aws-lambda';
 
 // ── Mocks ───────────────────────────────────────────────────────────────────
 
+const mockLoggerWarn = jest.fn();
+const mockCaptureError = jest.fn();
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
     debug: jest.fn(),
-    warn: jest.fn(),
+    warn: (...args: unknown[]): unknown => mockLoggerWarn(...args),
     error: jest.fn(),
   },
 }));
 
 jest.mock('@legacy-sports/rollbar', () => ({
   addBreadcrumb: jest.fn(),
-  captureError: jest.fn(),
+  captureError: (...args: unknown[]): unknown => mockCaptureError(...args),
   getRollbarConfigFromEnv: jest.fn(() => null),
   initRollbar: jest.fn(),
   withRollbar: jest.fn((fn: unknown) => fn),
@@ -338,5 +341,24 @@ describe('load-game score calculation trigger (LS-1762)', () => {
 
     // Score calculation error is non-fatal — message should succeed
     expect(result.batchItemFailures).toEqual([]);
+  });
+
+  it('does not report to Rollbar when matchup was deleted between enqueue and processing (LS-8086)', async () => {
+    mockCalculateAndUpdateMatchupScores.mockRejectedValue(
+      new Error('Matchup 42 not found'),
+    );
+
+    const event = makeSqsEvent([makeMatchupMessage()]);
+    const result = await handler(event);
+
+    expect(result.batchItemFailures).toEqual([]);
+    expect(mockCaptureError).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'post-stats-score-calculation' }),
+    );
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('matchup 42 no longer exists'),
+      expect.objectContaining({ matchupId: 42 }),
+    );
   });
 });
