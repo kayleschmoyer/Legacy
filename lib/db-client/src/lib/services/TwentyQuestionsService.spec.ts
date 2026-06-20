@@ -6,7 +6,11 @@
  *   - startGame: stores the provided sport in the inserted game row
  */
 
-import { TwentyQuestionsService } from './TwentyQuestionsService';
+import {
+  readNumberList,
+  readStringList,
+  TwentyQuestionsService,
+} from './TwentyQuestionsService';
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { info: jest.fn(), error: jest.fn(), warn: jest.fn() },
@@ -195,5 +199,82 @@ describe('TwentyQuestionsService — startGame sport storage', () => {
     await expect(
       TwentyQuestionsService.startGame(db as never, 42, 'medium', 'baseball'),
     ).rejects.toThrow('already have an active 20 Questions game');
+  });
+});
+
+// Parameter readers back the multi-select branches of answerQuestion (LS-8131).
+// They are the single decision point that resolves `{positions:[...]}` vs the
+// legacy `{position:'C'}` shape, so unit-testing them is sufficient to lock the
+// contract — the downstream Drizzle calls (`inArray`, `or`) are framework code.
+
+describe('TwentyQuestionsService — readStringList (multi-select param reader)', () => {
+  it('returns the plural array when provided, deduped', () => {
+    expect(
+      readStringList({ positions: ['C', '1B', 'C'] }, 'positions', 'position'),
+    ).toEqual(['C', '1B']);
+  });
+
+  it('falls back to the legacy singular form for old games', () => {
+    expect(readStringList({ position: 'CF' }, 'positions', 'position')).toEqual(
+      ['CF'],
+    );
+  });
+
+  it('returns an empty list when neither form is present', () => {
+    expect(readStringList({}, 'positions', 'position')).toEqual([]);
+  });
+
+  it('drops non-string entries from the array form', () => {
+    expect(
+      readStringList({ hands: ['L', 42, null, 'R'] }, 'hands', 'hand'),
+    ).toEqual(['L', 'R']);
+  });
+
+  it('returns empty for an empty array (no implicit "match anything")', () => {
+    expect(readStringList({ teams: [] }, 'teams', 'team')).toEqual([]);
+  });
+
+  it('ignores the singular form when the plural form is present (even empty)', () => {
+    // Plural form is the authoritative signal — once a client opts into
+    // multi-select, a stale singular alongside it must not leak through.
+    expect(
+      readStringList(
+        { positions: ['C'], position: 'SS' },
+        'positions',
+        'position',
+      ),
+    ).toEqual(['C']);
+  });
+});
+
+describe('TwentyQuestionsService — readNumberList (multi-select decade reader)', () => {
+  it('returns the plural array when provided, deduped', () => {
+    expect(
+      readNumberList({ decades: [1990, 2000, 1990] }, 'decades', 'decade'),
+    ).toEqual([1990, 2000]);
+  });
+
+  it('falls back to the legacy singular form for old games', () => {
+    expect(readNumberList({ decade: 1980 }, 'decades', 'decade')).toEqual([
+      1980,
+    ]);
+  });
+
+  it('returns empty when neither form is present', () => {
+    expect(readNumberList({}, 'decades', 'decade')).toEqual([]);
+  });
+
+  it('drops non-finite or non-number entries', () => {
+    expect(
+      readNumberList(
+        { decades: [1990, 'oops', NaN, Infinity, 2010] },
+        'decades',
+        'decade',
+      ),
+    ).toEqual([1990, 2010]);
+  });
+
+  it('returns empty for an empty plural array', () => {
+    expect(readNumberList({ decades: [] }, 'decades', 'decade')).toEqual([]);
   });
 });

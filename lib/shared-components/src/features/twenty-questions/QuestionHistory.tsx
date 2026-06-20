@@ -22,6 +22,34 @@ function strVal(param: Record<string, unknown>, key: string): string {
   return '?';
 }
 
+// Read a list value supporting either the multi-select form (plural array key) or
+// the legacy single-value form (singular scalar key). Returns rendered strings.
+function readList(
+  param: Record<string, unknown>,
+  pluralKey: string,
+  singularKey: string,
+  render: (v: unknown) => string = (v) => String(v),
+): string[] {
+  const plural = param[pluralKey];
+  if (Array.isArray(plural)) {
+    return plural.map(render);
+  }
+  const single = param[singularKey];
+  if (single === null || single === undefined) return [];
+  return [render(single)];
+}
+
+function joinList(items: string[]): string {
+  if (items.length === 0) return '?';
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} or ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, or ${items[items.length - 1]}`;
+}
+
+function handLabel(h: string): string {
+  return h === 'L' ? 'left-handed' : h === 'R' ? 'right-handed' : 'switch';
+}
+
 function formatQuestion(
   category: TwentyQuestionsCategory,
   parameterJson: string,
@@ -34,25 +62,38 @@ function formatQuestion(
   }
 
   switch (category) {
-    case TwentyQuestionsCategory.Position:
-      return `Did this player ever play ${strVal(param, 'position')}?`;
-    case TwentyQuestionsCategory.Team:
-      return `Did this player ever play for ${strVal(param, 'team')}?`;
-    case TwentyQuestionsCategory.Era:
-      return `Did this player play in the ${strVal(param, 'decade')}s?`;
+    case TwentyQuestionsCategory.Position: {
+      const positions = readList(param, 'positions', 'position');
+      return `Did this player ever play ${joinList(positions)}?`;
+    }
+    case TwentyQuestionsCategory.Team: {
+      const teams = readList(param, 'teams', 'team');
+      return `Did this player ever play for ${joinList(teams)}?`;
+    }
+    case TwentyQuestionsCategory.Era: {
+      const decades = readList(
+        param,
+        'decades',
+        'decade',
+        (v) => `${String(v)}s`,
+      );
+      return `Did this player play in the ${joinList(decades)}?`;
+    }
     case TwentyQuestionsCategory.HallOfFame:
       return 'Is this player in the Hall of Fame?';
     case TwentyQuestionsCategory.StatThreshold:
       return `Did this player accumulate ${strVal(param, 'threshold')}+ career ${strVal(param, 'stat').toUpperCase()}?`;
     case TwentyQuestionsCategory.BattingHand: {
-      const hand = strVal(param, 'hand');
-      const label =
-        hand === 'L' ? 'left-handed' : hand === 'R' ? 'right-handed' : 'switch';
-      return `Does this player bat ${label}?`;
+      const labels = readList(param, 'hands', 'hand', (v) =>
+        handLabel(String(v)),
+      );
+      return `Does this player bat ${joinList(labels)}?`;
     }
     case TwentyQuestionsCategory.ThrowingHand: {
-      const hand = strVal(param, 'hand');
-      return `Does this player throw ${hand === 'L' ? 'left-handed' : 'right-handed'}?`;
+      const labels = readList(param, 'hands', 'hand', (v) =>
+        handLabel(String(v)),
+      );
+      return `Does this player throw ${joinList(labels)}?`;
     }
     case TwentyQuestionsCategory.ActiveStatus:
       return 'Is this player currently active (2023+)?';

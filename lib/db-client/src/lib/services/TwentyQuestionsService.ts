@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, or, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import type { PublicDb } from '../client/PublicDbClient';
 import * as PublicSchema from '../../drizzle/public/schema';
@@ -36,6 +36,43 @@ export interface PlayerRecord {
   allStarSelections: number;
   mvpAwards: number;
   totalGames: number;
+}
+
+// Read a list parameter that supports either the multi-select form (`pluralKey: [...]`)
+// or the legacy single-value form (`singularKey: x`) — kept so games started before
+// LS-8131 still resolve correctly. Non-empty unique values only.
+export function readStringList(
+  parameter: Record<string, unknown>,
+  pluralKey: string,
+  singularKey: string,
+): string[] {
+  const plural = parameter[pluralKey];
+  if (Array.isArray(plural)) {
+    return [
+      ...new Set(plural.filter((v): v is string => typeof v === 'string')),
+    ];
+  }
+  const single = parameter[singularKey];
+  return typeof single === 'string' ? [single] : [];
+}
+
+export function readNumberList(
+  parameter: Record<string, unknown>,
+  pluralKey: string,
+  singularKey: string,
+): number[] {
+  const plural = parameter[pluralKey];
+  if (Array.isArray(plural)) {
+    return [
+      ...new Set(
+        plural.filter(
+          (v): v is number => typeof v === 'number' && Number.isFinite(v),
+        ),
+      ),
+    ];
+  }
+  const single = parameter[singularKey];
+  return typeof single === 'number' && Number.isFinite(single) ? [single] : [];
 }
 
 // Whitelisted stat column names for stat_threshold queries (prevents SQL injection)
@@ -418,14 +455,15 @@ export class TwentyQuestionsService {
   ): Promise<boolean> {
     switch (category) {
       case 'position': {
-        const position = parameter['position'] as string;
+        const positions = readStringList(parameter, 'positions', 'position');
+        if (positions.length === 0) return false;
         const rows = await db
           .select({ playerId: PublicSchema.seasonFielding.playerId })
           .from(PublicSchema.seasonFielding)
           .where(
             and(
               eq(PublicSchema.seasonFielding.playerId, playerId),
-              eq(PublicSchema.seasonFielding.pos, position),
+              inArray(PublicSchema.seasonFielding.pos, positions),
             ),
           )
           .limit(1);
@@ -433,14 +471,15 @@ export class TwentyQuestionsService {
       }
 
       case 'team': {
-        const team = parameter['team'] as string;
+        const teams = readStringList(parameter, 'teams', 'team');
+        if (teams.length === 0) return false;
         const [battingRow] = await db
           .select({ playerId: PublicSchema.seasonBatting.playerId })
           .from(PublicSchema.seasonBatting)
           .where(
             and(
               eq(PublicSchema.seasonBatting.playerId, playerId),
-              eq(PublicSchema.seasonBatting.team, team),
+              inArray(PublicSchema.seasonBatting.team, teams),
             ),
           )
           .limit(1);
@@ -452,7 +491,7 @@ export class TwentyQuestionsService {
           .where(
             and(
               eq(PublicSchema.seasonPitching.playerId, playerId),
-              eq(PublicSchema.seasonPitching.team, team),
+              inArray(PublicSchema.seasonPitching.team, teams),
             ),
           )
           .limit(1);
@@ -460,28 +499,39 @@ export class TwentyQuestionsService {
       }
 
       case 'era': {
-        const decade = parameter['decade'] as number;
+        const decades = readNumberList(parameter, 'decades', 'decade');
+        if (decades.length === 0) return false;
+        const battingRanges = decades.map((d) =>
+          and(
+            gte(PublicSchema.seasonBatting.season, d),
+            lte(PublicSchema.seasonBatting.season, d + 9),
+          ),
+        );
         const [battingRow] = await db
           .select({ playerId: PublicSchema.seasonBatting.playerId })
           .from(PublicSchema.seasonBatting)
           .where(
             and(
               eq(PublicSchema.seasonBatting.playerId, playerId),
-              gte(PublicSchema.seasonBatting.season, decade),
-              lte(PublicSchema.seasonBatting.season, decade + 9),
+              or(...battingRanges),
             ),
           )
           .limit(1);
         if (battingRow) return true;
 
+        const pitchingRanges = decades.map((d) =>
+          and(
+            gte(PublicSchema.seasonPitching.season, d),
+            lte(PublicSchema.seasonPitching.season, d + 9),
+          ),
+        );
         const [pitchingRow] = await db
           .select({ playerId: PublicSchema.seasonPitching.playerId })
           .from(PublicSchema.seasonPitching)
           .where(
             and(
               eq(PublicSchema.seasonPitching.playerId, playerId),
-              gte(PublicSchema.seasonPitching.season, decade),
-              lte(PublicSchema.seasonPitching.season, decade + 9),
+              or(...pitchingRanges),
             ),
           )
           .limit(1);
@@ -530,23 +580,25 @@ export class TwentyQuestionsService {
       }
 
       case 'batting_hand': {
-        const hand = parameter['hand'] as string;
+        const hands = readStringList(parameter, 'hands', 'hand');
+        if (hands.length === 0) return false;
         const [player] = await db
           .select({ batHand: PublicSchema.players.batHand })
           .from(PublicSchema.players)
           .where(eq(PublicSchema.players.id, playerId))
           .limit(1);
-        return player?.batHand === hand;
+        return player?.batHand != null && hands.includes(player.batHand);
       }
 
       case 'throwing_hand': {
-        const hand = parameter['hand'] as string;
+        const hands = readStringList(parameter, 'hands', 'hand');
+        if (hands.length === 0) return false;
         const [player] = await db
           .select({ throwHand: PublicSchema.players.throwHand })
           .from(PublicSchema.players)
           .where(eq(PublicSchema.players.id, playerId))
           .limit(1);
-        return player?.throwHand === hand;
+        return player?.throwHand != null && hands.includes(player.throwHand);
       }
 
       case 'active_status': {

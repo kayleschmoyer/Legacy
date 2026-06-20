@@ -93,25 +93,28 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
   const [category, setCategory] = useState<TwentyQuestionsCategory | null>(
     null,
   );
-  const [position, setPosition] = useState('C');
-  const [team, setTeam] = useState(UNIQUE_TEAMS[0]);
-  const [decade, setDecade] = useState(1990);
+  const [positions, setPositions] = useState<string[]>([]);
+  const [teams, setTeams] = useState<string[]>([]);
+  const [decades, setDecades] = useState<number[]>([]);
   const [statPlayerType, setStatPlayerType] = useState<'batter' | 'pitcher'>(
     'batter',
   );
   const [stat, setStat] = useState('hr');
   const [threshold, setThreshold] = useState('500');
-  const [battingHand, setBattingHand] = useState('R');
-  const [throwingHand, setThrowingHand] = useState('R');
+  const [battingHands, setBattingHands] = useState<string[]>([]);
+  const [throwingHands, setThrowingHands] = useState<string[]>([]);
+
+  const toggle = <T,>(list: T[], value: T): T[] =>
+    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
   const buildParameter = (): string => {
     switch (category) {
       case TwentyQuestionsCategory.Position:
-        return JSON.stringify({ position });
+        return JSON.stringify({ positions });
       case TwentyQuestionsCategory.Team:
-        return JSON.stringify({ team });
+        return JSON.stringify({ teams });
       case TwentyQuestionsCategory.Era:
-        return JSON.stringify({ decade });
+        return JSON.stringify({ decades });
       case TwentyQuestionsCategory.HallOfFame:
         return '{}';
       case TwentyQuestionsCategory.StatThreshold:
@@ -121,9 +124,9 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
           playerType: statPlayerType,
         });
       case TwentyQuestionsCategory.BattingHand:
-        return JSON.stringify({ hand: battingHand });
+        return JSON.stringify({ hands: battingHands });
       case TwentyQuestionsCategory.ThrowingHand:
-        return JSON.stringify({ hand: throwingHand });
+        return JSON.stringify({ hands: throwingHands });
       case TwentyQuestionsCategory.ActiveStatus:
         return '{}';
       default:
@@ -131,12 +134,35 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
     }
   };
 
-  const canSubmit = category !== null && !asking;
+  // Multi-select categories require at least one option selected before asking.
+  const hasRequiredSelection = (): boolean => {
+    switch (category) {
+      case TwentyQuestionsCategory.Position:
+        return positions.length > 0;
+      case TwentyQuestionsCategory.Team:
+        return teams.length > 0;
+      case TwentyQuestionsCategory.Era:
+        return decades.length > 0;
+      case TwentyQuestionsCategory.BattingHand:
+        return battingHands.length > 0;
+      case TwentyQuestionsCategory.ThrowingHand:
+        return throwingHands.length > 0;
+      default:
+        return true;
+    }
+  };
+
+  const canSubmit = category !== null && !asking && hasRequiredSelection();
 
   const handleAsk = () => {
     if (!category) return;
     onAsk({ category, parameter: buildParameter() });
-    // Reset to no category after asking
+    // Reset selections and category after asking
+    setPositions([]);
+    setTeams([]);
+    setDecades([]);
+    setBattingHands([]);
+    setThrowingHands([]);
     setCategory(null);
   };
 
@@ -162,61 +188,80 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
         ))}
       </XStack>
 
-      {/* Category-specific controls */}
+      {/* Category-specific controls — multi-select for set-valued categories */}
       {category === TwentyQuestionsCategory.Position && (
-        <XStack flexWrap="wrap" gap="$1" testID="position-picker">
-          {POSITIONS.map((p) => (
-            <Button
-              key={p}
-              size="$2"
-              theme={position === p ? 'blue' : undefined}
-              variant={position === p ? undefined : 'outlined'}
-              onPress={() => setPosition(p)}
-              testID={`position-${p}`}
-            >
-              {p}
-            </Button>
-          ))}
-        </XStack>
+        <YStack gap="$1" testID="position-picker">
+          <Text fontSize="$2" color="$gray9">
+            Select one or more positions:
+          </Text>
+          <XStack flexWrap="wrap" gap="$1">
+            {POSITIONS.map((p) => {
+              const selected = positions.includes(p);
+              return (
+                <Button
+                  key={p}
+                  size="$2"
+                  theme={selected ? 'blue' : undefined}
+                  variant={selected ? undefined : 'outlined'}
+                  onPress={() => setPositions((cur) => toggle(cur, p))}
+                  testID={`position-${p}`}
+                >
+                  {p}
+                </Button>
+              );
+            })}
+          </XStack>
+        </YStack>
       )}
 
       {category === TwentyQuestionsCategory.Team && (
         <YStack gap="$1" testID="team-picker">
           <Text fontSize="$2" color="$gray9">
-            Select team:
+            Select one or more teams:
           </Text>
           <XStack flexWrap="wrap" gap="$1">
-            {UNIQUE_TEAMS.map((t) => (
-              <Button
-                key={t}
-                size="$2"
-                theme={team === t ? 'blue' : undefined}
-                variant={team === t ? undefined : 'outlined'}
-                onPress={() => setTeam(t)}
-                testID={`team-${t}`}
-              >
-                {t}
-              </Button>
-            ))}
+            {UNIQUE_TEAMS.map((t) => {
+              const selected = teams.includes(t);
+              return (
+                <Button
+                  key={t}
+                  size="$2"
+                  theme={selected ? 'blue' : undefined}
+                  variant={selected ? undefined : 'outlined'}
+                  onPress={() => setTeams((cur) => toggle(cur, t))}
+                  testID={`team-${t}`}
+                >
+                  {t}
+                </Button>
+              );
+            })}
           </XStack>
         </YStack>
       )}
 
       {category === TwentyQuestionsCategory.Era && (
-        <XStack flexWrap="wrap" gap="$1" testID="decade-picker">
-          {DECADES.map((d) => (
-            <Button
-              key={d}
-              size="$2"
-              theme={decade === d ? 'blue' : undefined}
-              variant={decade === d ? undefined : 'outlined'}
-              onPress={() => setDecade(d)}
-              testID={`decade-${d}`}
-            >
-              {d}s
-            </Button>
-          ))}
-        </XStack>
+        <YStack gap="$1" testID="decade-picker">
+          <Text fontSize="$2" color="$gray9">
+            Select one or more eras:
+          </Text>
+          <XStack flexWrap="wrap" gap="$1">
+            {DECADES.map((d) => {
+              const selected = decades.includes(d);
+              return (
+                <Button
+                  key={d}
+                  size="$2"
+                  theme={selected ? 'blue' : undefined}
+                  variant={selected ? undefined : 'outlined'}
+                  onPress={() => setDecades((cur) => toggle(cur, d))}
+                  testID={`decade-${d}`}
+                >
+                  {d}s
+                </Button>
+              );
+            })}
+          </XStack>
+        </YStack>
       )}
 
       {category === TwentyQuestionsCategory.StatThreshold && (
@@ -273,35 +318,41 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
 
       {category === TwentyQuestionsCategory.BattingHand && (
         <XStack gap="$2" testID="batting-hand-picker">
-          {(['L', 'R', 'S'] as const).map((h) => (
-            <Button
-              key={h}
-              size="$3"
-              theme={battingHand === h ? 'blue' : undefined}
-              variant={battingHand === h ? undefined : 'outlined'}
-              onPress={() => setBattingHand(h)}
-              testID={`batting-hand-${h}`}
-            >
-              {h === 'L' ? 'Left' : h === 'R' ? 'Right' : 'Switch'}
-            </Button>
-          ))}
+          {(['L', 'R', 'S'] as const).map((h) => {
+            const selected = battingHands.includes(h);
+            return (
+              <Button
+                key={h}
+                size="$3"
+                theme={selected ? 'blue' : undefined}
+                variant={selected ? undefined : 'outlined'}
+                onPress={() => setBattingHands((cur) => toggle(cur, h))}
+                testID={`batting-hand-${h}`}
+              >
+                {h === 'L' ? 'Left' : h === 'R' ? 'Right' : 'Switch'}
+              </Button>
+            );
+          })}
         </XStack>
       )}
 
       {category === TwentyQuestionsCategory.ThrowingHand && (
         <XStack gap="$2" testID="throwing-hand-picker">
-          {(['L', 'R'] as const).map((h) => (
-            <Button
-              key={h}
-              size="$3"
-              theme={throwingHand === h ? 'blue' : undefined}
-              variant={throwingHand === h ? undefined : 'outlined'}
-              onPress={() => setThrowingHand(h)}
-              testID={`throwing-hand-${h}`}
-            >
-              {h === 'L' ? 'Left' : 'Right'}
-            </Button>
-          ))}
+          {(['L', 'R'] as const).map((h) => {
+            const selected = throwingHands.includes(h);
+            return (
+              <Button
+                key={h}
+                size="$3"
+                theme={selected ? 'blue' : undefined}
+                variant={selected ? undefined : 'outlined'}
+                onPress={() => setThrowingHands((cur) => toggle(cur, h))}
+                testID={`throwing-hand-${h}`}
+              >
+                {h === 'L' ? 'Left' : 'Right'}
+              </Button>
+            );
+          })}
         </XStack>
       )}
 
