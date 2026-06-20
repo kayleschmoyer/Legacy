@@ -1,0 +1,341 @@
+import { startWork } from './start-work';
+
+jest.mock('@legacy-sports/logging/server', () => ({
+  LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
+
+jest.mock('../jira-api', () => ({
+  jiraRequest: jest.fn(),
+}));
+
+const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+  jiraRequest: jest.Mock;
+};
+
+function parse(result: { content: Array<{ type: string }> }) {
+  const block = result.content[0] as { type: string; text: string };
+  return JSON.parse(block.text) as Record<string, unknown>;
+}
+
+const makeIssue = (statusName = 'To Do') => ({
+  key: 'LS-1',
+  fields: {
+    status: { name: statusName },
+    assignee: null,
+  },
+});
+
+const makeTransitions = () => ({
+  transitions: [
+    { id: '21', name: 'Start Progress', to: { name: 'In Progress' } },
+    { id: '31', name: 'Done', to: { name: 'Done' } },
+  ],
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  delete process.env['JIRA_ASSIGNEE_EMAIL'];
+  delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
+
+  mockJiraRequest.mockImplementation(
+    (opts: { method: string; path: string }) => {
+      if (opts.method === 'GET' && opts.path === '/rest/api/3/myself') {
+        return Promise.resolve({
+          accountId: 'service-account',
+          displayName: 'Service Account',
+        });
+      }
+      if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+        return Promise.resolve(makeTransitions());
+      }
+      if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+        return Promise.resolve(makeIssue());
+      }
+      return Promise.resolve(undefined);
+    },
+  );
+});
+
+describe('startWork', () => {
+  it('transitions a To Do ticket to In Progress and assigns it', async () => {
+    const result = await startWork({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(data['key']).toBe('LS-1');
+    expect(data['status']).toBe('In Progress');
+    expect(data['previousStatus']).toBe('To Do');
+    expect(data['idempotent']).toBe(false);
+    expect(data['assignee']).toBe('Service Account');
+
+    const transitionPosts = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'POST' && opts.path.endsWith('/transitions'),
+    );
+    expect(transitionPosts).toHaveLength(1);
+    expect(transitionPosts[0][0].body).toEqual({
+      transition: { id: '21' },
+    });
+
+    const putAssignee = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putAssignee).toHaveLength(1);
+    expect(putAssignee[0][0].body).toEqual({ accountId: 'service-account' });
+  });
+
+  it('transitions a Backlog ticket to In Progress (previousStatus surfaced)', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/myself') {
+          return Promise.resolve({
+            accountId: 'service-account',
+            displayName: 'Service Account',
+          });
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue('Backlog'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['status']).toBe('In Progress');
+    expect(data['previousStatus']).toBe('Backlog');
+  });
+
+  it('is idempotent when the ticket is already In Progress (no transition POST)', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve({
+            key: 'LS-1',
+            fields: {
+              status: { name: 'In Progress' },
+              assignee: { displayName: 'Alice' },
+            },
+          });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(data['status']).toBe('In Progress');
+    expect(data['previousStatus']).toBe('In Progress');
+    expect(data['idempotent']).toBe(true);
+    expect(data['assignee']).toBe('Alice');
+
+    const transitionPosts = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) => opts.method === 'POST' && opts.path.endsWith('/transitions'),
+    );
+    expect(transitionPosts).toHaveLength(0);
+
+    const putAssignee = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putAssignee).toHaveLength(0);
+  });
+
+  it('refuses Done tickets with an isError result explaining why', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue('Done'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({ key: 'LS-1' });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('LS-1');
+    expect(text).toContain('Done');
+
+    const transitionPosts = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) => opts.method === 'POST' && opts.path.endsWith('/transitions'),
+    );
+    expect(transitionPosts).toHaveLength(0);
+  });
+
+  it('uses the explicit assignee param over JIRA_ASSIGNEE_EMAIL', async () => {
+    process.env['JIRA_ASSIGNEE_EMAIL'] = 'env-default@example.com';
+
+    mockJiraRequest.mockImplementation(
+      (opts: {
+        method: string;
+        path: string;
+        query?: Record<string, string>;
+      }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/user/search') {
+          const q = opts.query?.['query'];
+          return Promise.resolve([
+            { accountId: `id-for-${q}`, displayName: `User ${q}` },
+          ]);
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({
+      key: 'LS-1',
+      assignee: 'override@example.com',
+    });
+    const data = parse(result);
+
+    expect(data['status']).toBe('In Progress');
+    expect(data['assignee']).toBe('User override@example.com');
+
+    const putAssignee = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putAssignee).toHaveLength(1);
+    expect(putAssignee[0][0].body).toEqual({
+      accountId: 'id-for-override@example.com',
+    });
+  });
+
+  it('assigns from JIRA_ASSIGNEE_ACCOUNT_ID without /myself or /user/search', async () => {
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = '712020:abcd-1234';
+
+    const result = await startWork({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['status']).toBe('In Progress');
+
+    const lookupCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) =>
+        opts.path === '/rest/api/3/myself' ||
+        opts.path === '/rest/api/3/user/search',
+    );
+    expect(lookupCalls).toHaveLength(0);
+
+    const putAssignee = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putAssignee).toHaveLength(1);
+    expect(putAssignee[0][0].body).toEqual({ accountId: '712020:abcd-1234' });
+  });
+
+  it('proceeds with a warning when /myself 401s (LS-7891 scope error)', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/myself') {
+          return Promise.reject(
+            new Error(
+              'Jira API GET /rest/api/3/myself failed (401): {"code":401,"message":"Unauthorized; scope does not match"}',
+            ),
+          );
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(result.isError).not.toBe(true);
+    expect(data['status']).toBe('In Progress');
+
+    const warnings = data['warnings'] as string[];
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('Assignee update failed');
+    expect(warnings[0]).toContain('scope does not match');
+  });
+
+  it('returns an error when no In Progress transition is available', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve({
+            transitions: [{ id: '31', name: 'Done', to: { name: 'Done' } }],
+          });
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({ key: 'LS-1' });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('No "In Progress" transition');
+    expect(text).toContain('Done');
+  });
+
+  it('wraps API errors with the ticket key in the message', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.reject(new Error('404 Not Found'));
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({ key: 'LS-1' });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('LS-1');
+    expect(text).toContain('404 Not Found');
+  });
+});

@@ -19,6 +19,7 @@ import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { rolloverSync } from './tools/rollover-sync.js';
 import { claimTicket } from './tools/claim-ticket.js';
 import { getTransitions } from './tools/get-transitions.js';
+import { startWork } from './tools/start-work.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
@@ -464,6 +465,39 @@ server.tool(
       ),
   },
   async (params) => claimTicket(params),
+);
+
+// --- jira_start_work ---
+server.tool(
+  'jira_start_work',
+  'Semantic one-shot for Step 3 of the ticket spine ("Jira → In Progress"). ' +
+    'Verifies state, resolves the In Progress transition id, transitions the ticket, ' +
+    'and sets the assignee in a single call. Idempotent on already-In-Progress tickets ' +
+    '(no-op success). Refuses Done tickets with an error. ' +
+    'Returns { key, status, previousStatus, assignee, idempotent, warnings }. ' +
+    'Assignee precedence matches jira_claim_ticket: explicit `assignee` param > ' +
+    'JIRA_ASSIGNEE_EMAIL > JIRA_ASSIGNEE_ACCOUNT_ID > authenticated service account. ' +
+    'Prefer this over the four-call chain (jira_view → jira_get_transitions → ' +
+    'jira_transition → assignee PUT) for the standard "start work" flow. Use ' +
+    'jira_claim_ticket when you also need blocker checks, child summaries, or branch ' +
+    'recommendations.',
+  {
+    key: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-1234)',
+      )
+      .describe('Ticket key to start work on'),
+    assignee: z
+      .string()
+      .email()
+      .optional()
+      .describe(
+        'Email of the user to assign the ticket to. Overrides JIRA_ASSIGNEE_EMAIL.',
+      ),
+  },
+  async (params) => startWork(params),
 );
 
 // --- jira_view ---
