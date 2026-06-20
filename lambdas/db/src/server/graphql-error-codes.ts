@@ -13,6 +13,11 @@ export const CLIENT_FACING_CODES = new Set([
   'GRAPHQL_VALIDATION_FAILED',
   'GRAPHQL_PARSE_FAILED',
   'BAD_USER_INPUT',
+  // Apollo's BAD_REQUEST covers CSRF-prevention rejections and other
+  // malformed HTTP requests reaching the GraphQL endpoint. The CSRF guard
+  // working as designed against probes / misconfigured clients is not a
+  // server defect, so do not forward these to Rollbar (LS-8135).
+  'BAD_REQUEST',
   'UNAUTHENTICATED',
   'FORBIDDEN',
   'NOT_FOUND',

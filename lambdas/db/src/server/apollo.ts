@@ -67,10 +67,12 @@ export const server = new ApolloServer({
 
       if (
         code === 'GRAPHQL_VALIDATION_FAILED' ||
-        code === 'GRAPHQL_PARSE_FAILED'
+        code === 'GRAPHQL_PARSE_FAILED' ||
+        code === 'BAD_REQUEST'
       ) {
         // Validation/parse errors are expected client-input issues (including
-        // depth/complexity rejections) — log at debug to avoid production noise.
+        // depth/complexity rejections and CSRF-prevention rejections) — log at
+        // debug to avoid production noise.
         LOGGER.debug('GraphQL validation error', clientErrorContext);
       } else {
         // Auth, permission, not-found — potentially actionable, keep at warn.
