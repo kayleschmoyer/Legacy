@@ -1851,6 +1851,105 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_commit_batch',
+      description:
+        'Commit across multiple worktrees in one call. Each item is processed independently with worktree_commit semantics (refuses main, refuses .env/credentials, auto-appends Co-Authored-By). Failures do not stop remaining items. Returns { total, succeeded, failed } per LS-8033 shared convention.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          items: {
+            type: 'array',
+            description:
+              'Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend.',
+            items: {
+              type: 'object',
+              properties: {
+                worktree: {
+                  type: 'string',
+                  description:
+                    'Ticket key, absolute path, or branch name. Required — batch calls cannot fall back to the active worktree.',
+                },
+                message: {
+                  type: 'string',
+                  description:
+                    'Conventional commit message (type[(scope)]: description).',
+                },
+                files: {
+                  anyOf: [
+                    { type: 'string' as const },
+                    { type: 'array' as const, items: { type: 'string' } },
+                  ],
+                  description:
+                    'Files to stage. Same semantics as worktree_commit.files.',
+                },
+                amend: {
+                  type: 'boolean',
+                  description:
+                    'Amend previous commit. Same semantics as worktree_commit.amend.',
+                },
+              },
+              required: ['worktree'],
+            },
+            minItems: 1,
+            maxItems: 50,
+          },
+        },
+        required: ['items'],
+      },
+    },
+    {
+      name: 'worktree_push_batch',
+      description:
+        'Push multiple worktrees in one call with --force-with-lease. Each item is processed independently with worktree_push semantics (refuses main). Failures do not stop remaining items. Returns { total, succeeded, failed } per LS-8033 shared convention.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          items: {
+            type: 'array',
+            description:
+              'Per-worktree push specs (max 50). Each item accepts the same fields as worktree_push: worktree (required), setUpstream, skipLint, remoteBranch, timeoutMs.',
+            items: {
+              type: 'object',
+              properties: {
+                worktree: {
+                  type: 'string',
+                  description:
+                    'Ticket key, absolute path, or branch name. Required — batch calls cannot fall back to the active worktree.',
+                },
+                setUpstream: { type: 'boolean' },
+                skipLint: { type: 'boolean' },
+                remoteBranch: { type: 'string' },
+                timeoutMs: { type: 'number' },
+              },
+              required: ['worktree'],
+            },
+            minItems: 1,
+            maxItems: 50,
+          },
+        },
+        required: ['items'],
+      },
+    },
+    {
+      name: 'worktree_status_batch',
+      description:
+        'Get git status for multiple worktrees in one call. Each entry is processed independently with worktree_status semantics. Returns { total, succeeded, failed } per LS-8033 shared convention; successful entries include the parsed status payload (branch, modified, staged, untracked, conflicted, ahead, behind, etc.).',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktrees: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Worktrees to inspect (max 50). Each entry can be a ticket key, absolute path, directory name, or branch name. Required — batch calls cannot fall back to the active worktree.',
+            minItems: 1,
+            maxItems: 50,
+          },
+        },
+        required: ['worktrees'],
+      },
+    },
+    {
       name: 'worktree_check_ignore',
       description:
         'Check whether paths would be ignored by .gitignore rules (git check-ignore -v). ' +
@@ -2221,7 +2320,18 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
   ],
 }));
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+type CallToolResult = {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+};
+
+type CallToolRequest = {
+  params: { name: string; arguments?: Record<string, unknown> };
+};
+
+const handleCallTool = async (
+  request: CallToolRequest,
+): Promise<CallToolResult> => {
   const { name, arguments: args } = request.params;
 
   // Restore persisted active worktree on first tool call after server restart
@@ -8690,6 +8800,144 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     // -----------------------------------------------------------------------
+    // worktree_commit_batch / worktree_push_batch / worktree_status_batch
+    //
+    // Per LS-8038 / LS-8033 shared convention: accept an array, return
+    // { total, succeeded, failed } where each failed entry carries an index
+    // and key. Cap at 50. One item erroring must not fail the whole call.
+    // Implemented by delegating each item to the existing single-item
+    // handler so safety checks (refuse main, secret blocking, etc.) are
+    // inherited unchanged.
+    // -----------------------------------------------------------------------
+    case 'worktree_commit_batch':
+    case 'worktree_push_batch':
+    case 'worktree_status_batch': {
+      const BATCH_MAX = 50;
+      const singleTool = name.replace(/_batch$/, '');
+
+      // Normalize input: status_batch takes `worktrees: string[]`, the others
+      // take `items: Array<{ worktree, ... }>`.
+      let items: Array<Record<string, unknown>>;
+      if (name === 'worktree_status_batch') {
+        const { worktrees: rawWorktrees } = (args ?? {}) as {
+          worktrees?: unknown;
+        };
+        if (!Array.isArray(rawWorktrees) || rawWorktrees.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'worktrees must be a non-empty array.',
+              },
+            ],
+            isError: true,
+          };
+        }
+        items = (rawWorktrees as unknown[]).map((w) => ({ worktree: w }));
+      } else {
+        const { items: rawItems } = (args ?? {}) as { items?: unknown };
+        if (!Array.isArray(rawItems) || rawItems.length === 0) {
+          return {
+            content: [
+              { type: 'text', text: 'items must be a non-empty array.' },
+            ],
+            isError: true,
+          };
+        }
+        items = rawItems as Array<Record<string, unknown>>;
+      }
+
+      if (items.length > BATCH_MAX) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Too many entries: ${items.length} provided, maximum is ${BATCH_MAX}.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const succeeded: Array<{ index: number; key: string; result: unknown }> =
+        [];
+      const failed: Array<{ index: number; key: string; error: string }> = [];
+
+      for (let index = 0; index < items.length; index++) {
+        const item = items[index];
+        const keyRaw =
+          typeof item?.worktree === 'string' ? item.worktree.trim() : '';
+
+        if (!item || typeof item !== 'object') {
+          failed.push({
+            index,
+            key: String(keyRaw),
+            error: 'Entry must be an object.',
+          });
+          continue;
+        }
+        if (!keyRaw) {
+          failed.push({
+            index,
+            key: '',
+            error:
+              'Missing required field `worktree` — batch calls must specify the target explicitly.',
+          });
+          continue;
+        }
+
+        let result: CallToolResult;
+        try {
+          result = await handleCallTool({
+            params: { name: singleTool, arguments: item },
+          });
+        } catch (err) {
+          failed.push({
+            index,
+            key: keyRaw,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          continue;
+        }
+
+        const text = result.content?.[0]?.text ?? '';
+        if (result.isError) {
+          failed.push({ index, key: keyRaw, error: text });
+          continue;
+        }
+
+        // Successful single-item handlers return either a JSON payload or a
+        // human-readable message (e.g. "Nothing to commit — working tree is
+        // clean."). Try to parse JSON; fall back to the raw text otherwise.
+        let parsed: unknown = text;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          // not JSON — keep raw text
+        }
+        succeeded.push({ index, key: keyRaw, result: parsed });
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                total: items.length,
+                succeeded,
+                failed,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+        isError: failed.length > 0,
+      };
+    }
+
+    // -----------------------------------------------------------------------
     // worktree_check_ignore
     // -----------------------------------------------------------------------
     case 'worktree_check_ignore': {
@@ -10812,7 +11060,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         isError: true,
       };
   }
-});
+};
+
+server.setRequestHandler(CallToolRequestSchema, handleCallTool);
 
 // ---------------------------------------------------------------------------
 // Start
