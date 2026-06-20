@@ -14,6 +14,6 @@ Follow the workflow:
 4. Apply the requested fix in code
 5. Validate with `make pc`
 6. Commit and push
-7. **Resolve threads immediately after push** via `github_resolve_threads(threadIds: [...])` — include all threads you addressed, **even those where you only replied without making a code change**. GitHub does NOT auto-resolve threads when code changes. This is mandatory, not optional.
+7. **Reply + resolve + label in one call** via `github_finish_fix_round({ prNumber: <PR_NUMBER>, replies: [{ threadId, kind: "FIX", sha: "<pushed-sha>" }, ...] })` — this replaces the legacy three-tool dance (`github_reply_to_review_thread` → `github_resolve_threads` → `github_manage_labels(add: ["bot:ready-for-review"])`). It validates every reply before any side effect (FIX requires `sha`; JUSTIFY/CANNOT-COMPLY require `body`), emits FIX bodies as exactly `FIX: <sha>` (strict bot format — no trailing prose), resolves only FIX threads, and applies `bot:ready-for-review`. Partial failures surface in `errors[]` and do not block successful replies. GitHub does NOT auto-resolve threads when code changes.
 
-**Guardrails**: Never suppress lint/TS errors to satisfy a comment. Cap at 2 fix-review rounds. After resolving all threads, add `merge-when-ready` label.
+**Guardrails**: Never suppress lint/TS errors to satisfy a comment. Cap at 2 fix-review rounds. The Reviewer Bot adds `merge-when-ready` itself on APPROVED — never apply it manually.

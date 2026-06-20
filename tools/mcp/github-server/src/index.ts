@@ -58,6 +58,7 @@ import {
   resolveActionShas,
 } from './tools/resolve-action-sha.js';
 import { enableAutoMerge } from './tools/enable-auto-merge.js';
+import { finishFixRound } from './tools/finish-fix-round.js';
 import { prDiff } from './tools/pr-diff.js';
 import { getCheckRuns } from './tools/get-check-runs.js';
 
@@ -1174,6 +1175,56 @@ export function createServer(): McpServer {
       }
       return requestReview({ ...params, prs });
     },
+  );
+
+  // --- github_finish_fix_round ---
+  server.tool(
+    'github_finish_fix_round',
+    'Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies the bot:ready-for-review label that re-triggers the Reviewer Bot cycle. Validates every reply BEFORE any side effect (FIX requires `sha`, JUSTIFY/CANNOT-COMPLY require `body`) — a single invalid entry rejects the whole call. FIX reply body is emitted as exactly `FIX: <sha>` (no trailing prose — the bot is strict). JUSTIFY/CANNOT-COMPLY bodies are prefixed with the kind token if not already present. Partial failures do not block successful replies: failed replies are surfaced in `errors[]` and their threads are NOT resolved. Only FIX threads are resolved — JUSTIFY and CANNOT-COMPLY remain open for bot/human adjudication in the next cycle. Replaces the three-step github_reply_to_review_thread → github_resolve_threads → github_manage_labels(add: bot:ready-for-review) sequence.',
+    {
+      prNumber: prNumberField('prNumber').describe('PR number'),
+      replies: z
+        .array(
+          z.object({
+            threadId: z
+              .string()
+              .trim()
+              .min(1)
+              .describe('GraphQL thread node ID (PRRT_...)'),
+            kind: z
+              .enum(['FIX', 'JUSTIFY', 'CANNOT-COMPLY'])
+              .describe('Reply kind per Author Agent Contract'),
+            sha: z
+              .string()
+              .trim()
+              .min(1)
+              .optional()
+              .describe(
+                'Commit SHA the fix is committed at. Required when kind=FIX; ignored otherwise.',
+              ),
+            body: z
+              .string()
+              .trim()
+              .min(1)
+              .optional()
+              .describe(
+                'Rationale text. Required when kind=JUSTIFY or CANNOT-COMPLY; ignored for FIX.',
+              ),
+          }),
+        )
+        .min(1)
+        .max(100)
+        .describe('One entry per thread to reply to.'),
+      readyLabel: z
+        .string()
+        .trim()
+        .min(1)
+        .default('bot:ready-for-review')
+        .describe(
+          'Label to apply after replying + resolving (default: bot:ready-for-review)',
+        ),
+    },
+    async (params) => finishFixRound(params),
   );
 
   // --- github_resolve_threads ---

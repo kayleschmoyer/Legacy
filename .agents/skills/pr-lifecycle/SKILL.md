@@ -132,6 +132,8 @@ When a PR is authored by the Author Agent and reviewed by the Reviewer Bot, the 
 
 After the bot posts its Cycle 1 review, the agent must:
 
+> **Prefer the one-shot.** `github_finish_fix_round({ prNumber, replies: [{ threadId, kind: "FIX"|"JUSTIFY", sha?, body? }, ...] })` performs steps 1, 3, and 4 below in a single tool call: it validates every reply before any side effect, emits FIX bodies as exactly `FIX: <sha>` (strict bot format), resolves only the FIX threads (JUSTIFY remains open for Cycle 2 adjudication), and applies `bot:ready-for-review`. Partial reply failures surface in `errors[]` and do not block successful replies. The explicit steps below remain valid when you are mid-stream or only need part of the sequence.
+
 1. Reply to **every open thread** with exactly one of — post each reply via `github_reply_to_review_thread({ threadId: "PRRT_...", body: "..." })` (local/headless; ToolSearch: `"reply_to_review_thread"`) or `mcp__github__add_reply_to_pull_request_comment` (preferred on Claude Code on the web to avoid OAuth attribution to user's personal token):
    - `FIX: <sha>` — the fix is already committed at `<sha>`
    - `JUSTIFY: <rationale>` — the finding is incorrect or the suggestion is out of scope; explain why. **When the finding is a false positive** (the pattern is intentional, not just out of scope), also add an inline code comment at the flagged line(s) or a note in the nearest relevant doc (e.g. a `SKILL.md` or `references/` entry) explaining the intent — so future contributors and reviewers don't raise the same flag again.

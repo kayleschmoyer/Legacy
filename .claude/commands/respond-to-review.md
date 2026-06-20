@@ -45,7 +45,24 @@ Before posting any replies:
 
 Push **before** posting replies so every `FIX: <sha>` contains the real, already-pushed SHA. Do not post placeholder SHAs and edit later — editing replies conflicts with the "never edit threads" protocol.
 
-### Step 4 — Reply to each thread
+### Step 4 — Reply, resolve, and label in one call
+
+Prefer the semantic one-shot `github_finish_fix_round` over hand-rolling three separate tools. It validates every reply BEFORE any side effect (FIX requires `sha`, JUSTIFY/CANNOT-COMPLY require `body`), emits `FIX:` bodies in the exact `FIX: <sha>` format the bot requires, resolves only the FIX threads, and applies `bot:ready-for-review` — replacing Steps 4-6 in a single tool call:
+
+```
+github_finish_fix_round({
+  prNumber: PR#,
+  replies: [
+    { threadId: "PRRT_abc", kind: "FIX", sha: "<sha>" },
+    { threadId: "PRRT_def", kind: "JUSTIFY", body: "one-sentence rationale" },
+    // ...one entry per unresolved thread
+  ]
+})
+```
+
+Returns `{ replied, resolved, labelApplied, errors[] }`. Failed replies do not block successful ones — failed threads appear in `errors[]` and are NOT resolved. If `errors[]` is non-empty, surface it and retry just the affected threads. Then skip to Step 7.
+
+The legacy three-step path below remains valid if you have already started replying out-of-band.
 
 For **every** unresolved thread, post a reply using `github_reply_to_review({ threadId: "PRRT_...", body: <reply> })`.
 
