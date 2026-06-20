@@ -1,0 +1,30 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`viewRun markdown (default) renders a failing run summary with a Failed Jobs section 1`] = `
+"## Run #12345 — ❌ failed (3m 21s)
+
+**Workflow:** CI Pipeline · **Branch:** claude/foo · **Commit:** abc1234
+
+### Jobs
+| Job | Status | Duration |
+|---|---|---|
+| typecheck | ✅ | 1m 12s |
+| test | ❌ | 2m 09s |
+| build | ⏭️ skipped | — |
+
+### Failed Jobs
+- **test** — failed at step "run tests" — \`ci_get_logs runId:12345 jobId:2\`"
+`;
+
+exports[`viewRun markdown (default) renders a passing run summary with job table 1`] = `
+"## Run #12345 — ✅ success (3m 21s)
+
+**Workflow:** CI Pipeline · **Branch:** claude/foo · **Commit:** abc1234
+
+### Jobs
+| Job | Status | Duration |
+|---|---|---|
+| typecheck | ✅ | 1m 12s |
+| test | ✅ | 2m 09s |
+| build | ⏭️ skipped | — |"
+`;

@@ -280,6 +280,12 @@ export function createServer(): McpServer {
       includeJobs: coercedBoolean
         .default(true)
         .describe('Include jobs (default: true)'),
+      format: z
+        .enum(['markdown', 'json'])
+        .default('markdown')
+        .describe(
+          'Output format. "markdown" (default) returns a compact summary with a job table and a Failed Jobs section. "json" returns the full structured payload.',
+        ),
     },
     async (params) => viewRun(params),
   );
