@@ -40,14 +40,28 @@ describe('db_query (hosted, read-only)', () => {
     });
   });
 
-  it('formats table output when requested', async () => {
-    const { sql } = fakeSql([{ id: 1 }]);
+  it('formats table output as a compact Markdown table when requested', async () => {
+    const { sql } = fakeSql([
+      { id: 1, name: 'a' },
+      { id: 2, name: 'b' },
+    ]);
     mockGetReadonlySql.mockResolvedValue(sql as never);
 
     const result = await query({ query: 'SELECT id FROM x', format: 'table' });
 
-    expect(result.content[0].text).toContain('(1 rows)');
-    expect(result.content[0].text).toContain('id');
+    // Compact GFM table from the shared helper: header written once, a `---`
+    // separator row, then one pipe-joined row per record, with no alignment
+    // padding (token-efficient — epic LS-8018).
+    expect(result.content[0].text).toBe('id|name\n---|---\n1|a\n2|b\n(2 rows)');
+  });
+
+  it('reports zero rows explicitly for an empty table result', async () => {
+    const { sql } = fakeSql([]);
+    mockGetReadonlySql.mockResolvedValue(sql as never);
+
+    const result = await query({ query: 'SELECT id FROM x', format: 'table' });
+
+    expect(result.content[0].text).toBe('(0 rows)');
   });
 
   it('returns an error result when the query fails', async () => {

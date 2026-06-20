@@ -1,3 +1,4 @@
+import { markdownTable } from '@legacy-sports/mcp-format';
 import { getReadonlySql } from '../db.js';
 import { errorMessage, jsonResult, type ToolResult } from '../types.js';
 
@@ -49,6 +50,9 @@ function formatResult(
   const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
 
   if (format === 'json') {
+    // Single object wrapping a row array — minified JSON (via jsonResult). The
+    // result columns are SQL-dependent, so there is no fixed field set to prune;
+    // rowCount and columns are kept as agent-consumed metadata.
     return jsonResult({
       rows: Array.from(rows),
       rowCount: rows.length,
@@ -60,25 +64,16 @@ function formatResult(
     return { content: [{ type: 'text', text: '(0 rows)' }] };
   }
 
-  const widths = columns.map((col) =>
-    Math.max(col.length, ...rows.map((r) => String(r[col] ?? '').length)),
-  );
-
-  const header = columns.map((col, i) => col.padEnd(widths[i])).join(' | ');
-  const separator = widths.map((w) => '-'.repeat(w)).join('-+-');
-  const body = rows
-    .map((row) =>
-      columns
-        .map((col, i) => String(row[col] ?? '').padEnd(widths[i]))
-        .join(' | '),
-    )
-    .join('\n');
+  // Flat, uniform row list -> compact Markdown table via the shared helper
+  // (column headers written once, no alignment padding — epic LS-8018). The
+  // trailing row count keeps the existing affordance for agents.
+  const table = markdownTable(rows, { columns });
 
   return {
     content: [
       {
         type: 'text',
-        text: `${header}\n${separator}\n${body}\n(${rows.length} rows)`,
+        text: `${table}\n(${rows.length} rows)`,
       },
     ],
   };

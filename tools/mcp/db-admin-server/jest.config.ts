@@ -21,6 +21,8 @@ const config: Config = {
     // jest.mock(); the migrate spec replaces the module with a factory mock so
     // the real (AWS-SDK-pulling) module never executes.
     '^@legacy-sports/logging$': '<rootDir>/../../../lib/logging/src/index.ts',
+    '^@legacy-sports/mcp-format$':
+      '<rootDir>/../../../lib/mcp-format/src/index.ts',
     '^@legacy-sports/db-client/src/(.*)\\.js$':
       '<rootDir>/../../../lib/db-client/src/$1.ts',
   },
