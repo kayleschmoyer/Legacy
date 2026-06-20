@@ -715,10 +715,10 @@ export function createServer(): McpServer {
     async (params) => commentPR(params),
   );
 
-  // --- github_list_pr_comments ---
+  // --- github_list_pr_comments (consolidated) ---
   server.tool(
     'github_list_pr_comments',
-    'Read general (top-level) comments on a PR or issue. Returns author, body, created_at, and updated_at for each comment. Use the optional since parameter (ISO 8601) to filter to comments posted after a given timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/issues/{number}/comments. Pass the PR number as "prNumber" (preferred) or "number" (alias).',
+    'Read comments on a PR. Use type to scope: "all" (default) returns top-level + inline merged; "top-level" returns issue comments; "inline" returns PR review comments tied to diff lines; "review" returns inline comments with reviewId-aware filtering. Optional filters: reviewId (review/all), path (inline/review/all), since (ISO 8601). Handles pagination automatically. Pass the PR number as "prNumber" (preferred) or "number" (alias).',
     {
       prNumber: z.coerce
         .number()
@@ -732,6 +732,28 @@ export function createServer(): McpServer {
         .positive()
         .optional()
         .describe('Alias for "prNumber" — use either, not both'),
+      type: z
+        .enum(['all', 'top-level', 'inline', 'review'])
+        .optional()
+        .describe(
+          'Scope of comments to return. Default "all" returns merged top-level + inline.',
+        ),
+      reviewId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Filter inline/review comments to a specific review submission (pull_request_review_id)',
+        ),
+      path: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Filter inline/review comments to a specific file path (exact match)',
+        ),
       since: z
         .string()
         .optional()
@@ -752,14 +774,20 @@ export function createServer(): McpServer {
           ],
         };
       }
-      return listPRComments({ number: prNum, since: params.since });
+      return listPRComments({
+        number: prNum,
+        type: params.type,
+        reviewId: params.reviewId,
+        path: params.path,
+        since: params.since,
+      });
     },
   );
 
-  // --- github_list_pr_inline_comments ---
+  // --- github_list_pr_inline_comments (DEPRECATED alias) ---
   server.tool(
     'github_list_pr_inline_comments',
-    'Read inline code review comments on a PR (PRRC_* objects attached to specific diff lines). Returns id, inReplyToId, author, body, path, line, diffHunk for each comment. Use path to filter to a specific file. Use since (ISO 8601) to filter by timestamp. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/pulls/{number}/comments. For thread resolution status (resolved/unresolved), use github_get_review_threads instead.',
+    'DEPRECATED: use github_list_pr_comments with type: "inline" instead. Returns inline PR review comments; will be removed in a future release.',
     {
       number: z.coerce.number().int().positive().describe('PR number'),
       path: z
@@ -778,10 +806,10 @@ export function createServer(): McpServer {
     async (params) => listPRInlineComments(params),
   );
 
-  // --- github_list_review_comments ---
+  // --- github_list_review_comments (DEPRECATED alias) ---
   server.tool(
     'github_list_review_comments',
-    'Read inline code review comments on a PR, with optional filtering by review ID or timestamp. Use reviewId to isolate comments from a specific Copilot or human review submission (avoids mixing new and historical comments). Use since (ISO 8601) to filter by creation time. Returns id, inReplyToId, user, path, line, body, createdAt, reviewId for each comment. Handles pagination automatically. Maps to GET /repos/{owner}/{repo}/pulls/{number}/comments.',
+    'DEPRECATED: use github_list_pr_comments with type: "review" instead. Returns inline PR review comments with reviewId filtering; will be removed in a future release.',
     {
       number: z.coerce.number().int().positive().describe('PR number'),
       since: z
