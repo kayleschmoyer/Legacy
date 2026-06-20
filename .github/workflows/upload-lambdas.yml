@@ -444,6 +444,27 @@ jobs:
             fi
             echo "Affected projects: $AFFECTED_RAW"
 
+            # `nx affected` can't flag a project that didn't exist at NX_BASE,
+            # so a PR that introduces a brand-new lambda gets a free pass on
+            # the very commit that introduces it. Terraform then tries to
+            # create the new function against the placeholder SSM version
+            # ("initial") and fails with S3 NoSuchKey. Union AFFECTED_RAW with
+            # any registry project whose project.json was *added* between
+            # EFFECTIVE_BASE and HEAD.
+            ADDED_PROJECT_JSONS=$(git diff --name-status --diff-filter=A "$EFFECTIVE_BASE" HEAD -- '*/project.json' 2>/dev/null | awk '{print $2}')
+            NEW_PROJECTS=$(echo "$REGISTRY" | jq -r --arg added "$ADDED_PROJECT_JSONS" '
+              ($added | split("\n") | map(select(. != ""))) as $paths |
+              [
+                .[] | . as $entry |
+                (if ($entry.dir | contains("/")) then $entry.dir else "lambdas/" + $entry.dir end) as $projDir |
+                select($paths | index($projDir + "/project.json")) | $entry.project
+              ] | unique | .[]
+            ')
+            if [ -n "$NEW_PROJECTS" ]; then
+              echo "➕ New projects (since NX_BASE): $(echo "$NEW_PROJECTS" | paste -sd, -)"
+              AFFECTED_RAW=$(printf '%s\n%s\n' "$AFFECTED_RAW" "$NEW_PROJECTS" | awk 'NF && !seen[$0]++')
+            fi
+
             # Filter registry to only affected lambda projects
             MATRIX=$(echo "$REGISTRY" | jq -c --arg affected "$AFFECTED_RAW" '
               ($affected | split("\n") | map(select(. != ""))) as $list |
