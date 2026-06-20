@@ -61,6 +61,11 @@ import { enableAutoMerge } from './tools/enable-auto-merge.js';
 import { finishFixRound } from './tools/finish-fix-round.js';
 import { prDiff } from './tools/pr-diff.js';
 import { getCheckRuns } from './tools/get-check-runs.js';
+import { bulkMerge } from './tools/bulk-merge.js';
+import { bulkRebase } from './tools/bulk-rebase.js';
+import { bulkEdit } from './tools/bulk-edit.js';
+import { bulkComment } from './tools/bulk-comment.js';
+import { bulkReplyToReview } from './tools/bulk-reply-to-review.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -855,6 +860,99 @@ export function createServer(): McpServer {
     async (params) => editPR(params),
   );
 
+  // --- github_bulk_edit ---
+  server.tool(
+    'github_bulk_edit',
+    'Batch variant of github_edit_pr. Update title and/or body across many PRs in one call (1-50). For label changes across many PRs use github_manage_labels (it already accepts an array of PR numbers). Each item is { number, title?, body? } — at least one of title/body required per item. Returns { success, total, succeeded, failed } per the shared batch-tool convention.',
+    {
+      items: z
+        .array(
+          z.object({
+            number: prNumberField('items[].number').describe('PR number'),
+            title: z.string().trim().min(1).optional().describe('New PR title'),
+            body: z.string().optional().describe('New PR body (markdown)'),
+          }),
+        )
+        .min(1)
+        .max(50)
+        .describe('PR edits (1-50). Each entry needs at least title or body.'),
+    },
+    async (params) => bulkEdit(params),
+  );
+
+  // --- github_bulk_comment ---
+  server.tool(
+    'github_bulk_comment',
+    'Batch variant of github_comment_pr. Post a top-level comment on many PRs in one call (1-50). For sweeping the same body across PRs, the same body can simply be supplied per item. Returns { success, total, succeeded, failed } per the shared batch-tool convention.',
+    {
+      items: z
+        .array(
+          z.object({
+            number: prNumberField('items[].number').describe('PR number'),
+            body: z
+              .string()
+              .trim()
+              .min(1, 'Comment body cannot be empty')
+              .describe('Markdown body of the comment'),
+          }),
+        )
+        .min(1)
+        .max(50)
+        .describe('Comments to post (1-50).'),
+    },
+    async (params) => bulkComment(params),
+  );
+
+  // --- github_bulk_reply_to_review ---
+  server.tool(
+    'github_bulk_reply_to_review',
+    'Batch variant of github_reply_to_review. Post replies on many review threads in one call (1-50). Each reply takes EITHER threadId (GraphQL node ID) OR commentId + number/prNumber (REST) — the same resolution rules as the single-item tool, mixed within one batch. Returns { success, total, succeeded, failed } per the shared batch-tool convention. For the structured Author Agent end-of-round flow (FIX/JUSTIFY/CANNOT-COMPLY with auto-resolve), prefer github_finish_fix_round.',
+    {
+      replies: z
+        .array(
+          z.object({
+            body: z
+              .string()
+              .trim()
+              .min(1, 'Reply body cannot be empty')
+              .describe('Markdown body of the reply'),
+            threadId: z
+              .string()
+              .optional()
+              .describe(
+                'GraphQL node ID of the review thread (use this OR commentId+number, not both).',
+              ),
+            commentId: z.coerce
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .describe(
+                'Numeric REST comment databaseId. Requires number/prNumber.',
+              ),
+            number: z.coerce
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .describe(
+                'PR number — required when using commentId. Alias: prNumber.',
+              ),
+            prNumber: z.coerce
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .describe('Alias for "number".'),
+          }),
+        )
+        .min(1)
+        .max(50)
+        .describe('Replies (1-50).'),
+    },
+    async (params) => bulkReplyToReview(params),
+  );
+
   // --- github_clear_ci_failure_labels ---
   server.tool(
     'github_clear_ci_failure_labels',
@@ -981,6 +1079,30 @@ export function createServer(): McpServer {
       }
       return mergePR({ number: resolved, strategy: params.strategy });
     },
+  );
+
+  // --- github_bulk_merge ---
+  server.tool(
+    'github_bulk_merge',
+    'Batch variant of github_merge_pr. Merge many PRs in one call (1-50). Each item is { number, strategy? } where strategy defaults to "queue" (auto-merge via GraphQL) and "direct" uses admin REST merge. Returns { success, total, succeeded, failed } per the shared batch-tool convention — one PR\'s failure does not abort the rest.',
+    {
+      items: z
+        .array(
+          z.object({
+            number: prNumberField('items[].number').describe('PR number'),
+            strategy: z
+              .enum(['queue', 'direct'])
+              .optional()
+              .describe(
+                '"queue" (default) enables auto-merge; "direct" merges via admin REST.',
+              ),
+          }),
+        )
+        .min(1)
+        .max(50)
+        .describe('PRs to merge (1-50).'),
+    },
+    async (params) => bulkMerge(params),
   );
 
   // --- github_pr_enable_auto_merge ---
@@ -1159,6 +1281,20 @@ export function createServer(): McpServer {
       number: z.coerce.number().int().positive().describe('PR number'),
     },
     async (params) => rebasePR(params),
+  );
+
+  // --- github_bulk_rebase ---
+  server.tool(
+    'github_bulk_rebase',
+    "Batch variant of github_rebase_pr. Rebase many PR branches onto base and force-push (1-50). Runs sequentially because rebase mutates the local checkout. Returns { success, total, succeeded, failed } per the shared batch-tool convention — one PR's rebase conflict does not abort the rest. Conflict details are captured in the per-PR error.",
+    {
+      numbers: z
+        .array(prNumberField('numbers[]'))
+        .min(1)
+        .max(50)
+        .describe('PR numbers to rebase (1-50). Processed in order.'),
+    },
+    async (params) => bulkRebase(params),
   );
 
   // --- github_request_review ---
