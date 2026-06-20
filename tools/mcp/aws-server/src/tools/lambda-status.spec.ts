@@ -159,7 +159,7 @@ describe('lambdaStatus (batch)', () => {
       ),
     );
 
-    expect(isError).toBe(false);
+    expect(isError).toBe(true);
     const statuses = body.statuses as Record<string, unknown>;
     const missing = body.missing as Array<{
       function: string;
@@ -186,13 +186,16 @@ describe('lambdaStatus (batch)', () => {
 
   it(`rejects more than ${MAX_BATCH_FUNCTIONS} functions`, async () => {
     const runner: CommandRunner = jest.fn();
-    const eleven = Array.from({ length: 11 }, (_, i) => `fn${i}`);
+    const overCap = Array.from(
+      { length: MAX_BATCH_FUNCTIONS + 1 },
+      (_, i) => `fn${i}`,
+    );
     const { body, isError } = unwrap(
-      await lambdaStatus({ ...baseParams, functions: eleven }, runner),
+      await lambdaStatus({ ...baseParams, functions: overCap }, runner),
     );
     expect(isError).toBe(true);
     expect(body.ok).toBe(false);
-    expect(body.error).toMatch(/at most 10/);
+    expect(body.error).toMatch(new RegExp(`at most ${MAX_BATCH_FUNCTIONS}`));
     expect(runner).not.toHaveBeenCalled();
   });
 

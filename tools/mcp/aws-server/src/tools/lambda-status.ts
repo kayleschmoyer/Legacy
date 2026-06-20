@@ -53,7 +53,7 @@ const defaultRunner: CommandRunner = (cmd, args, cwd) =>
   runCommand(cmd, args, cwd);
 
 /** Maximum number of functions accepted in a single batch call. */
-export const MAX_BATCH_FUNCTIONS = 10;
+export const MAX_BATCH_FUNCTIONS = 25;
 /** Maximum number of concurrent Lambda describes in batch mode. */
 export const BATCH_CONCURRENCY = 5;
 
@@ -214,6 +214,7 @@ export async function lambdaStatus(
     });
     return {
       content: [{ type: 'text', text: JSON.stringify({ statuses, missing }) }],
+      ...(missing.length > 0 ? { isError: true } : {}),
     };
   }
 

@@ -131,7 +131,7 @@ server.tool(
 // --- aws_lambda_status ---
 server.tool(
   'aws_lambda_status',
-  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. Pass `functions: string[]` (1-10) for batch mode: per-function describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`. One failing function does not fail the others.',
+  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. Pass `functions: string[]` (1-25) for batch mode: per-function describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`. One failing function does not fail the others.',
   {
     function: z
       .string()
@@ -142,10 +142,10 @@ server.tool(
     functions: z
       .array(z.string())
       .min(1)
-      .max(10)
+      .max(25)
       .optional()
       .describe(
-        'Batch mode: 1-10 Lambda short names. Describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`.',
+        'Batch mode: 1-25 Lambda short names. Describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`.',
       ),
     environment: z
       .enum(['dev', 'prod'])
