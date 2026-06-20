@@ -299,8 +299,14 @@ jobs:
 
             # Filter to files that actually exist on disk: partial-clone checkouts
             # (filter: tree:0) may not materialise every blob from the diff range.
+            # The trailing `; true` forces the filter subshell to exit 0 regardless
+            # of the final `[ -f "$f" ]` test: under `set -o pipefail`, a missing
+            # last-sorted path would otherwise make the subshell exit 1 and fail the
+            # whole pipeline even though prettier (the rightmost stage) succeeded
+            # (LS-8207). Real prettier formatting errors still surface — they come
+            # from the `xargs ... prettier` stage, which is unaffected by this guard.
             git diff --name-only --diff-filter=ACMR -z "$BASE_SHA" "$HEAD_SHA" \
-              | (while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\0' "$f"; done) \
+              | (while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\0' "$f"; done; true) \
               | xargs -0 -r pnpm exec prettier --check --ignore-unknown
           }
           run_format 2>&1 | tee "$RUNNER_TEMP/ci-format.log"

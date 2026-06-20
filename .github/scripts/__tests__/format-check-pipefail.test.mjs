@@ -1,0 +1,94 @@
+/**
+ * Regression test for the CI `format` job pipefail bug (LS-8207).
+ *
+ * The Format Check step in .github/workflows/ci-pipeline.yml filters the PR
+ * diff down to files that actually exist on disk (partial-clone `tree:0`
+ * checkouts may not materialise every blob) before handing them to prettier:
+ *
+ *   git diff ... -z | (while read ...; do [ -f "$f" ] && printf ...; done) | xargs ... prettier
+ *
+ * Under `set -o pipefail` the pipeline takes the rightmost non-zero exit. The
+ * filter subshell's exit status is that of its LAST command — the final
+ * `[ -f "$f" ]` test. When the alphabetically-last diffed path is missing on
+ * disk, that test returns 1, which pipefail propagates, failing the whole job
+ * even though prettier (the rightmost stage) already succeeded. The fix
+ * terminates the subshell with `; true` so its exit status is always 0; real
+ * prettier failures still surface because they come from the xargs stage.
+ *
+ * Run via: node --test .github/scripts/__tests__/format-check-pipefail.test.mjs
+ * (wired into CI as a custom check by .github/checks/format-check-pipefail-tests.sh)
+ */
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const WORKFLOW = join(here, '..', '..', 'workflows', 'ci-pipeline.yml');
+
+// The existence-filter subshell exactly as it appears in the Format Check step.
+// `present` exists on disk; `absent` (which sorts last) does not, reproducing a
+// partial-clone diff whose final entry was never materialised.
+const FILTER = `(while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\\0' "$f"; done; true)`;
+const BUGGY_FILTER = `(while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\\0' "$f"; done)`;
+
+function runPipeline({ filter, downstream }) {
+  const dir = mkdtempSync(join(tmpdir(), 'ls8207-'));
+  try {
+    writeFileSync(join(dir, 'present'), '');
+    const script = `
+      set -o pipefail
+      printf 'present\\0absent\\0' \\
+        | ${filter} \\
+        | xargs -0 -r ${downstream}
+    `;
+    return spawnSync('bash', ['-c', script], { cwd: dir, encoding: 'utf8' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+describe('format-check pipefail safety net (LS-8207)', () => {
+  it('demonstrates the bug: the unguarded filter exits non-zero when the last diffed file is missing', () => {
+    // Documents the regression — `prettier` (here: `true`) succeeds, yet the
+    // pipeline still fails because the subshell ends on a failed `[ -f ]` test.
+    const result = runPipeline({ filter: BUGGY_FILTER, downstream: 'true' });
+    assert.notEqual(result.status, 0);
+  });
+
+  it('AC1: the guarded filter exits 0 when prettier succeeds and the last diffed file is missing', () => {
+    const result = runPipeline({ filter: FILTER, downstream: 'true' });
+    assert.equal(
+      result.status,
+      0,
+      `expected exit 0, got ${result.status}\n${result.stderr}`,
+    );
+  });
+
+  it('AC2: a real downstream (prettier) failure still propagates through the guarded filter', () => {
+    // `false` stands in for prettier finding a genuine formatting error; the
+    // `; true` guard must not mask it — the pipeline must still fail.
+    const result = runPipeline({ filter: FILTER, downstream: 'false' });
+    assert.notEqual(result.status, 0);
+  });
+
+  it('AC3: the workflow Format Check step contains the guarded filter and preserves the existence test', () => {
+    const yaml = readFileSync(WORKFLOW, 'utf8');
+    // The fix is present: filter subshell terminates with `; true`.
+    assert.match(
+      yaml,
+      /\[ -f "\$f" \] && printf '%s\\0' "\$f"; done; true\)/,
+      'Format Check existence-filter subshell must end with `; true` (LS-8207 fix)',
+    );
+    // The partial-clone safety net is intact: missing blobs are still skipped.
+    assert.match(
+      yaml,
+      /\[ -f "\$f" \] && printf '%s\\0' "\$f"/,
+      'Format Check must still skip diff entries whose blobs were not materialised (AC2)',
+    );
+  });
+});
