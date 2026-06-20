@@ -1399,7 +1399,7 @@ export function createServer(): McpServer {
   // --- github_get_check_runs ---
   server.tool(
     'github_get_check_runs',
-    'List check runs for a PR or commit SHA. Returns the latest run per check name — includes name, status, conclusion, output (title + summary), and app slug. Use instead of `gh api repos/.../commits/$SHA/check-runs` to inspect required status checks (bot-review, Quality Gates, Build Validation, etc.). Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    'List check runs for a PR or commit SHA. Returns the latest run per check name — includes name, status, conclusion, output (title + summary), and app slug. Use instead of `gh api repos/.../commits/$SHA/check-runs` to inspect required status checks (bot-review, Quality Gates, Build Validation, etc.). Pass the PR number as "number" (preferred) or "prNumber" (alias). For multi-commit/cross-branch inspection, pass "shas" (1-25) to fetch many commits in one call — returns { checkRuns: { [sha]: [...] }, missing: [{ sha, error }] }.',
     {
       number: z.coerce
         .number()
@@ -1421,6 +1421,14 @@ export function createServer(): McpServer {
         .describe(
           'Commit SHA (full or abbreviated). Takes precedence over prNumber/number if both are given.',
         ),
+      shas: z
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(25)
+        .optional()
+        .describe(
+          'Batch mode: 1-25 commit SHAs to fetch in parallel (concurrency capped at 5). Returns { checkRuns: { [sha]: [...] }, missing: [{ sha, error }] }. Takes precedence over sha/prNumber/number.',
+        ),
       checkName: z
         .string()
         .trim()
@@ -1435,6 +1443,7 @@ export function createServer(): McpServer {
       return getCheckRuns({
         prNumber,
         sha: params.sha,
+        shas: params.shas,
         checkName: params.checkName,
       });
     },
