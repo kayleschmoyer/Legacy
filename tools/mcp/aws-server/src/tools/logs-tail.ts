@@ -27,13 +27,54 @@ export const LAMBDA_FUNCTIONS = [
 
 export type LambdaFunction = (typeof LAMBDA_FUNCTIONS)[number];
 
-interface LogsTailParams {
-  function: string;
+/** Maximum number of functions accepted in a single batch call. */
+export const MAX_BATCH_FUNCTIONS = 10;
+/** Maximum number of concurrent CloudWatch fetches in batch mode. */
+export const BATCH_CONCURRENCY = 5;
+
+export type CommandRunner = (
+  command: string,
+  args: string[],
+  cwd: string,
+) => Promise<string>;
+
+const defaultRunner: CommandRunner = (cmd, args, cwd) =>
+  runCommand(cmd, args, cwd);
+
+interface CommonParams {
   since: string;
   filter?: string;
   environment: string;
   maxLines: number;
 }
+
+export interface LogsTailParams extends CommonParams {
+  function?: string;
+  functions?: string[];
+}
+
+export interface LogsTailSingleSuccess {
+  logGroup: string;
+  since: string;
+  filter: string | null;
+  truncated: boolean;
+  totalLines?: number;
+  shownLines?: number;
+  truncationNotice?: string;
+  logs: string;
+}
+
+export interface LogsTailSingleFailure {
+  ok: false;
+  logGroup: string;
+  error: string;
+  remedy: string | null;
+  hint: string | null;
+}
+
+export type LogsTailSingleResult =
+  | LogsTailSingleSuccess
+  | LogsTailSingleFailure;
 
 /**
  * Map a short function name to its actual CloudWatch log group name.
@@ -45,9 +86,13 @@ function toLogGroup(functionName: string, environment: string): string {
   return `/aws/lambda/legacy-sports-${environment}-${normalized}`;
 }
 
-export async function logsTail(params: LogsTailParams): Promise<ToolResult> {
+async function fetchOne(
+  fn: string,
+  params: CommonParams,
+  runner: CommandRunner,
+): Promise<LogsTailSingleResult> {
   const repoRoot = getRepoRoot();
-  const logGroup = toLogGroup(params.function, params.environment);
+  const logGroup = toLogGroup(fn, params.environment);
 
   const args = [
     'logs',
@@ -57,42 +102,30 @@ export async function logsTail(params: LogsTailParams): Promise<ToolResult> {
     params.since,
     '--no-cli-pager',
   ];
-
   if (params.filter) {
     args.push('--filter-pattern', params.filter);
   }
 
   try {
-    const output = await runCommand('aws', args, repoRoot);
+    const output = await runner('aws', args, repoRoot);
     const rawText = output || '(no log events found in the given time range)';
     const MAX_LINES = params.maxLines;
     const lines = rawText.split('\n');
     const truncated = lines.length > MAX_LINES;
     const logLines = truncated ? lines.slice(lines.length - MAX_LINES) : lines;
-    // When output is truncated, a `truncationNotice` field is added to the
-    // response describing how many lines are shown vs. total. The log content
-    // itself is never prefixed — callers should read `truncationNotice` to
-    // detect truncation.
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            logGroup,
-            since: params.since,
-            filter: params.filter ?? null,
-            truncated,
-            ...(truncated
-              ? {
-                  totalLines: lines.length,
-                  shownLines: logLines.length,
-                  truncationNotice: `Showing last ${logLines.length} of ${lines.length} lines`,
-                }
-              : {}),
-            logs: logLines.join('\n'),
-          }),
-        },
-      ],
+      logGroup,
+      since: params.since,
+      filter: params.filter ?? null,
+      truncated,
+      ...(truncated
+        ? {
+            totalLines: lines.length,
+            shownLines: logLines.length,
+            truncationNotice: `Showing last ${logLines.length} of ${lines.length} lines`,
+          }
+        : {}),
+      logs: logLines.join('\n'),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -101,27 +134,93 @@ export async function logsTail(params: LogsTailParams): Promise<ToolResult> {
         message,
       );
     const isUnknownOptionsError = /unknown options?:/i.test(message);
-
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            logGroup,
-            error: message,
-            remedy: isSsoError
-              ? 'Run `aws sso login` to re-authenticate, then retry.'
-              : isUnknownOptionsError
-                ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, since, filter, environment. Check that no unexpected fields were passed.'
-                : null,
-            hint: isUnknownOptionsError
-              ? 'Retry with only the documented aws_logs_tail input fields (function, since [default: 1h], filter [optional], environment [dev|prod, default: dev]). Remove any extra or misspelled fields.'
-              : null,
-          }),
-        },
-      ],
-      isError: true,
+      ok: false,
+      logGroup,
+      error: message,
+      remedy: isSsoError
+        ? 'Run `aws sso login` to re-authenticate, then retry.'
+        : isUnknownOptionsError
+          ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, since, filter, environment. Check that no unexpected fields were passed.'
+          : null,
+      hint: isUnknownOptionsError
+        ? 'Retry with only the documented aws_logs_tail input fields (function, since [default: 1h], filter [optional], environment [dev|prod, default: dev]). Remove any extra or misspelled fields.'
+        : null,
     };
   }
+}
+
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let idx = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (true) {
+        const i = idx++;
+        if (i >= items.length) return;
+        results[i] = await worker(items[i]);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+function toolError(message: string): ToolResult {
+  return {
+    content: [
+      { type: 'text', text: JSON.stringify({ ok: false, error: message }) },
+    ],
+    isError: true,
+  };
+}
+
+export async function logsTail(
+  params: LogsTailParams,
+  runner: CommandRunner = defaultRunner,
+): Promise<ToolResult> {
+  const fns = params.functions;
+
+  if (fns && fns.length > 0) {
+    if (params.function) {
+      return toolError(
+        'Provide either `function` (singular) or `functions` (batch), not both.',
+      );
+    }
+    if (fns.length > MAX_BATCH_FUNCTIONS) {
+      return toolError(
+        `Batch mode accepts at most ${MAX_BATCH_FUNCTIONS} functions; received ${fns.length}.`,
+      );
+    }
+
+    // Failures are isolated per-function: fetchOne catches its own errors and
+    // returns a failure object under the function's key, so one bad function
+    // never fails its peers.
+    const results = await runWithConcurrency(fns, BATCH_CONCURRENCY, (fn) =>
+      fetchOne(fn, params, runner),
+    );
+    const logs: Record<string, LogsTailSingleResult> = {};
+    fns.forEach((fn, i) => {
+      logs[fn] = results[i];
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ logs }) }],
+    };
+  }
+
+  if (!params.function) {
+    return toolError('Either `function` or `functions` must be provided.');
+  }
+
+  const result = await fetchOne(params.function, params, runner);
+  const text = JSON.stringify(result);
+  if ('ok' in result && result.ok === false) {
+    return { content: [{ type: 'text', text }], isError: true };
+  }
+  return { content: [{ type: 'text', text }] };
 }

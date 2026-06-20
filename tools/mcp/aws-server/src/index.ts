@@ -90,9 +90,22 @@ server.tool(
 // --- aws_logs_tail ---
 server.tool(
   'aws_logs_tail',
-  'Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure).',
+  'Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure). Pass `functions: string[]` (1-10) for batch mode: per-function blocks fetched concurrently (cap 5) and returned as `{ logs: { [name]: <block> } }`. One failing function does not fail the others.',
   {
-    function: z.enum(LAMBDA_FUNCTIONS).describe('Lambda function short name'),
+    function: z
+      .enum(LAMBDA_FUNCTIONS)
+      .optional()
+      .describe(
+        'Lambda function short name (singular). Provide this OR `functions`, not both.',
+      ),
+    functions: z
+      .array(z.enum(LAMBDA_FUNCTIONS))
+      .min(1)
+      .max(10)
+      .optional()
+      .describe(
+        'Batch mode: 1-10 Lambda function short names. Logs are fetched concurrently (cap 5) and returned as `{ logs: { [name]: <block> } }`.',
+      ),
     since: z
       .string()
       .default('1h')

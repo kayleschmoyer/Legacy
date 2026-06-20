@@ -10,6 +10,12 @@
       "options": {
         "command": "tsc --noEmit -p tools/mcp/aws-server/tsconfig.json"
       }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "tools/mcp/aws-server/jest.config.ts"
+      }
     }
   }
 }
