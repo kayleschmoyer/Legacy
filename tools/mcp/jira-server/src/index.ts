@@ -14,6 +14,10 @@ import { setParent } from './tools/set-parent.js';
 import { consolidatedTransition, VALID_STATUSES } from './tools/transition.js';
 import { view } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
+import { bulkEdit } from './tools/bulk-edit.js';
+import { bulkLinkIssues } from './tools/bulk-link-issues.js';
+import { bulkListChildren } from './tools/bulk-list-children.js';
+import { bulkView } from './tools/bulk-view.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { rolloverSync } from './tools/rollover-sync.js';
 import { claimTicket } from './tools/claim-ticket.js';
@@ -224,6 +228,142 @@ server.tool(
       .describe('"current" for active sprint, or numeric sprint ID'),
   },
   async (params) => editTicket(params),
+);
+
+// --- jira_bulk_edit ---
+const bulkEditTicketSchema = z.object({
+  key: z
+    .string()
+    .regex(
+      /^[A-Z][A-Z0-9_]+-\d+$/,
+      'Must be a valid Jira issue key (e.g., LS-123)',
+    )
+    .describe('Ticket key to edit'),
+  summary: z.string().optional().describe('New summary/title'),
+  description: z.string().optional().describe('New description'),
+  type: z
+    .enum(['Task', 'Bug', 'Story', 'Epic'])
+    .optional()
+    .describe('Change issue type'),
+  sprint: z
+    .string()
+    .regex(/^(?:current|\d+)$/)
+    .optional()
+    .describe('"current" for active sprint, or numeric sprint ID'),
+  parent: z
+    .string()
+    .regex(/^[A-Z][A-Z0-9_]+-\d+$/)
+    .optional()
+    .describe('Parent epic key (e.g. LS-1234)'),
+});
+
+server.tool(
+  'jira_bulk_edit',
+  'Edit up to 50 Jira tickets in one call. Each ticket must specify `key` plus at least one field (summary, description, type, sprint, parent). Returns { total, succeeded, failed } — one ticket erroring never fails the whole batch. Use when assigning N tickets to a sprint, re-parenting children, or applying any field change across multiple tickets.',
+  {
+    tickets: z
+      .array(bulkEditTicketSchema)
+      .min(1)
+      .max(50)
+      .describe('Array of ticket edits (1-50).'),
+  },
+  async (params) => bulkEdit(params),
+);
+
+// --- jira_bulk_link_issues ---
+server.tool(
+  'jira_bulk_link_issues',
+  'Create up to 50 issue links in one call. Same per-link contract as jira_link_issues — for "Blocks", inwardKey is blocked by outwardKey. Returns { total, succeeded, failed } — one link erroring never fails the whole batch.',
+  {
+    links: z
+      .array(
+        z.object({
+          inwardKey: z
+            .string()
+            .regex(
+              /^[A-Z][A-Z0-9_]+-\d+$/,
+              'Must be a valid Jira issue key (e.g., LS-123)',
+            )
+            .describe(
+              'The blocked ticket (reads inward phrase "is blocked by")',
+            ),
+          outwardKey: z
+            .string()
+            .regex(
+              /^[A-Z][A-Z0-9_]+-\d+$/,
+              'Must be a valid Jira issue key (e.g., LS-123)',
+            )
+            .describe('The blocker ticket (reads outward phrase "blocks")'),
+          linkType: z
+            .string()
+            .min(1, 'Link type must be a non-empty string')
+            .describe('Link type: "Blocks", "Relates", "Cloners", "Duplicate"'),
+        }),
+      )
+      .min(1)
+      .max(50)
+      .describe('Array of link specs (1-50).'),
+  },
+  async (params) => bulkLinkIssues(params),
+);
+
+// --- jira_bulk_list_children ---
+server.tool(
+  'jira_bulk_list_children',
+  'List children of up to 50 parent tickets in one call — replaces N serial jira_list_children round-trips when scanning multiple epics/stories. This tool does not accept a page cursor: it returns only the first page per parent (capped by `limit`). When a parent has more children than `limit`, its `nextPageToken` is returned as a truncation signal — page that specific parent with single-item jira_list_children. Returns { total, succeeded: [{parent, count, children, nextPageToken?}], failed }.',
+  {
+    keys: z
+      .array(
+        z
+          .string()
+          .regex(
+            /^[A-Z][A-Z0-9_]+-\d+$/,
+            'Must be a valid Jira issue key (e.g., LS-123)',
+          ),
+      )
+      .min(1)
+      .max(50)
+      .describe('Parent ticket keys (1-50).'),
+    status: z
+      .string()
+      .optional()
+      .describe('Filter by status (e.g. "To Do", "Done")'),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .default(25)
+      .describe('Max results per parent (default: 25, max: 100)'),
+  },
+  async (params) => bulkListChildren(params),
+);
+
+// --- jira_bulk_view ---
+server.tool(
+  'jira_bulk_view',
+  'View up to 50 Jira tickets in one call. Default format is "json" for programmatic consumption — pass format: "markdown" to embed compact markdown cards instead. Returns { total, succeeded: [{key, format, ticket}], failed }.',
+  {
+    keys: z
+      .array(
+        z
+          .string()
+          .regex(
+            /^[A-Z][A-Z0-9_]+-\d+$/,
+            'Must be a valid Jira issue key (e.g., LS-123)',
+          ),
+      )
+      .min(1)
+      .max(50)
+      .describe('Ticket keys to view (1-50).'),
+    format: z
+      .enum(['markdown', 'json'])
+      .default('json')
+      .describe(
+        'Output format per ticket. Default "json" for bulk programmatic use; "markdown" embeds the same compact card jira_view returns.',
+      ),
+  },
+  async (params) => bulkView(params),
 );
 
 // --- jira_get_comments ---
