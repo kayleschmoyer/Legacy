@@ -1,5 +1,7 @@
+import { markdownTable, pickFields } from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { extractAdfText } from '../adf.js';
+import { COMMENT_COLUMNS } from '../format.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface GetCommentsParams {
@@ -57,19 +59,18 @@ export async function getComments(
     const comments = allComments.map((c) => ({
       id: c.id,
       author: c.author.displayName,
-      body: extractAdfText(c.body),
       created: c.created,
-      updated: c.updated,
+      body: extractAdfText(c.body),
     }));
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ key, total, comments }, null, 2),
-        },
-      ],
-    };
+    const text =
+      comments.length === 0
+        ? `No comments on ${key}.`
+        : markdownTable(pickFields(comments, COMMENT_COLUMNS), {
+            columns: COMMENT_COLUMNS,
+          });
+
+    return { content: [{ type: 'text', text }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 

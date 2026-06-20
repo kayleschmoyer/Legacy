@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
@@ -227,7 +228,7 @@ export async function view(params: ViewParams): Promise<CallToolResult> {
       if (children.length > 0) {
         json.children = summarizeChildren(children);
       }
-      text = JSON.stringify(json, null, 2);
+      text = minifiedJson(json);
     } else {
       text = renderMarkdown(ticket);
     }

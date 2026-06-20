@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { searchJql, searchJqlAll } from '../jql-search.js';
 import { readBucketEpicKey, writeBucketEpicKey } from './bucket-epic.js';
@@ -450,11 +451,7 @@ export async function rolloverSync(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            { success: true, mode, report, ...details },
-            null,
-            2,
-          ),
+          text: minifiedJson({ success: true, mode, report, ...details }),
         },
       ],
     };

@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { matchesStatus } from '../locale.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -129,7 +130,7 @@ function makeResult(result: CheckBlockersResult): CallToolResult {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(result, null, 2),
+        text: minifiedJson(result),
       },
     ],
   };

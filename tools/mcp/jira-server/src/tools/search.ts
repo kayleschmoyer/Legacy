@@ -1,4 +1,10 @@
+import { markdownTable, pickFields } from '@legacy-sports/mcp-format';
 import { searchJql } from '../jql-search.js';
+import {
+  SEARCH_COLUMNS,
+  SEARCH_COMPACT_COLUMNS,
+  withNextPageHint,
+} from '../format.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface SearchParams {
@@ -44,13 +50,16 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
         summary: issue.fields.summary,
         status: issue.fields.status.name,
       }));
-      const output: Record<string, unknown> = { issues };
-      if (result.nextPageToken) {
-        output.nextPageToken = result.nextPageToken;
-      }
-      return {
-        content: [{ type: 'text', text: JSON.stringify(output) }],
-      };
+      const text =
+        issues.length === 0
+          ? 'No issues match this query.'
+          : withNextPageHint(
+              markdownTable(pickFields(issues, SEARCH_COMPACT_COLUMNS), {
+                columns: SEARCH_COMPACT_COLUMNS,
+              }),
+              result.nextPageToken,
+            );
+      return { content: [{ type: 'text', text }] };
     }
 
     const issues = result.issues.map((issue) => ({
@@ -62,22 +71,17 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
       priority: issue.fields.priority?.name ?? '',
     }));
 
-    const output: Record<string, unknown> = {
-      returned: issues.length,
-      issues,
-    };
-    if (result.nextPageToken) {
-      output.nextPageToken = result.nextPageToken;
-    }
+    const text =
+      issues.length === 0
+        ? 'No issues match this query.'
+        : withNextPageHint(
+            markdownTable(pickFields(issues, SEARCH_COLUMNS), {
+              columns: SEARCH_COLUMNS,
+            }),
+            result.nextPageToken,
+          );
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(output, null, 2),
-        },
-      ],
-    };
+    return { content: [{ type: 'text', text }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

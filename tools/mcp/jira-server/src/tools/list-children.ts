@@ -1,4 +1,6 @@
+import { markdownTable, pickFields } from '@legacy-sports/mcp-format';
 import { searchJql } from '../jql-search.js';
+import { CHILD_COLUMNS, withNextPageHint } from '../format.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface ListChildrenParams {
@@ -61,25 +63,17 @@ export async function listChildren(
       created: issue.fields.created,
     }));
 
-    const response: Record<string, unknown> = {
-      parent: key,
-      count: children.length,
-      total: children.length,
-      children,
-    };
+    const text =
+      children.length === 0
+        ? `No children found for ${key}.`
+        : withNextPageHint(
+            markdownTable(pickFields(children, CHILD_COLUMNS), {
+              columns: CHILD_COLUMNS,
+            }),
+            result.nextPageToken,
+          );
 
-    if (result.nextPageToken) {
-      response.nextPageToken = result.nextPageToken;
-    }
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(response, null, 2),
-        },
-      ],
-    };
+    return { content: [{ type: 'text', text }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

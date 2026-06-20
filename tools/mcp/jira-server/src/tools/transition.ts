@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { matchesStatus } from '../locale.js';
@@ -335,7 +336,7 @@ export async function consolidatedTransition(
   // agents that only check the top-level flag can't silently drop a partial
   // failure.
   return {
-    content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(response) }],
     ...(failedKeys.length > 0 ? { isError: true } : {}),
   };
 }

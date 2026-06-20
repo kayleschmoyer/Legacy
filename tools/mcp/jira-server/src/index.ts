@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { z } from 'zod';
 import { addComment } from './tools/add-comment.js';
 import { checkBlockers } from './tools/check-blockers.js';
@@ -76,7 +77,7 @@ server.tool(
         : 'Use built-in Atlassian MCP tools (mcp__claude_ai_Atlassian__*) for Jira operations.',
     };
     return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(result) }],
     };
   },
 );

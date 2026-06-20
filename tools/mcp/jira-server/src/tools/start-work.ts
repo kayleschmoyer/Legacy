@@ -1,4 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging/server';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { matchesStatus } from '../locale.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -198,7 +199,7 @@ function successResult(payload: {
   warnings: string[];
 }): CallToolResult {
   return {
-    content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(payload) }],
   };
 }
 

@@ -135,11 +135,21 @@ Body paragraph one.
     });
   });
 
-  it('markdown output is meaningfully smaller than JSON for the same ticket', async () => {
+  it('format: "json" is minified (no pretty-print whitespace)', async () => {
+    const out = text(await view({ key: 'LS-9000', format: 'json' }));
+    // Standard: single-ticket responses are minified JSON, never
+    // JSON.stringify(x, null, 2). Indentation would show up as newlines.
+    expect(out).not.toContain('\n');
+    expect(out.startsWith('{')).toBe(true);
+  });
+
+  it('markdown output is smaller than the minified JSON for the same ticket', async () => {
     const md = text(await view({ key: 'LS-9000' }));
     const json = text(await view({ key: 'LS-9000', format: 'json' }));
-    // Sanity check the token-delta claim from LS-8173: markdown should be at
-    // least 30% smaller than the JSON shape on a representative ticket.
-    expect(md.length).toBeLessThan(json.length * 0.7);
+    // The default markdown card stays the most compact representation even after
+    // the json branch was minified (LS-8023): it drops repeated JSON keys and
+    // punctuation, so it remains the smaller of the two on a representative
+    // ticket.
+    expect(md.length).toBeLessThan(json.length);
   });
 });

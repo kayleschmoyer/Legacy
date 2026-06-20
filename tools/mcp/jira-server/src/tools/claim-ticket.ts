@@ -1,4 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging/server';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
@@ -347,7 +348,7 @@ function makeResult(result: ClaimResult): CallToolResult {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(result, null, 2),
+        text: minifiedJson(result),
       },
     ],
   };
