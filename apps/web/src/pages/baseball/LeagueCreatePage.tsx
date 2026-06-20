@@ -828,6 +828,7 @@ function SummarySidePanel({
   f,
   teams,
 }: SummarySidePanelProps): React.JSX.Element {
+  const sportMeta = SPORTS.find((s) => s.id === f.sport) ?? SPORTS[0];
   const draftLabel = `${f.draftMode === 'live' ? 'Live' : 'Auto'} · ${
     f.selectionMethod === 'standard'
       ? 'Std'
@@ -874,7 +875,7 @@ function SummarySidePanel({
             borderColor="$borderColor"
             color="$gray9"
           >
-            Draft
+            {sportMeta.name} · Draft
           </Text>
         </XStack>
 
@@ -895,6 +896,11 @@ function SummarySidePanel({
         </YStack>
 
         <YStack>
+          <SummaryRow
+            label="Sport"
+            value={`${sportMeta.name} (${sportMeta.league})`}
+            gold
+          />
           <SummaryRow label="Teams" value={String(f.numberOfTeams)} />
           <SummaryRow label="Divisions" value={String(f.numberOfDivisions)} />
           <SummaryRow
