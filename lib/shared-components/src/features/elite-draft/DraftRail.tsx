@@ -43,6 +43,8 @@ interface DraftRailProps {
   isMyPick: boolean;
   commPickMode: boolean;
   isOwner: boolean;
+  /** Whether the user is the team general manager (gates the draft-queue query). */
+  isGeneralManager: boolean;
   draftId: number | null;
   myTeamId: number | null;
   currentOverallPick: number;
@@ -89,6 +91,7 @@ export function DraftRail({
   isMyPick,
   commPickMode,
   isOwner,
+  isGeneralManager,
   draftId,
   myTeamId,
   currentOverallPick,
@@ -195,8 +198,8 @@ export function DraftRail({
           </div>
         )}
 
-        {/* Auto-pick Queue */}
-        {draftId && myTeamId !== null && (
+        {/* Auto-pick Queue — GM-only on the server (LS-4804). */}
+        {draftId && myTeamId !== null && isGeneralManager && (
           <div className="d-rail-panel d-queue-panel">
             <div className="d-rail-panel-head">
               <h4 className="d-rail-panel-title">Auto-pick Queue</h4>
@@ -205,6 +208,7 @@ export function DraftRail({
               draftId={draftId}
               autoPickDisabled={autoPickDisabled}
               onError={onShowToast}
+              enabled={isGeneralManager}
             />
           </div>
         )}

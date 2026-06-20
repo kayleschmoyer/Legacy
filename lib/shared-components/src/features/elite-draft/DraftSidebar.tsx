@@ -59,6 +59,8 @@ interface DraftSidebarProps {
   // Commissioner
   isCommissioner: boolean;
   isOwner: boolean;
+  /** Whether the user is the team general manager (gates the draft-queue query). */
+  isGeneralManager: boolean;
   draftId: number | null;
   commPickMode: boolean;
   autoPickDisabled: boolean;
@@ -112,6 +114,7 @@ export function DraftSidebar({
   pickDeadline,
   isCommissioner,
   isOwner,
+  isGeneralManager,
   draftId,
   commPickMode,
   autoPickDisabled,
@@ -384,14 +387,16 @@ export function DraftSidebar({
         )}
       </div>
 
-      {/* Draft Queue */}
-      {draftId && myTeamId !== null && (
+      {/* Draft Queue — GM-only on the server (LS-4804). Hide for everyone else
+          so we don't fire a query we know will be rejected. */}
+      {draftId && myTeamId !== null && isGeneralManager && (
         <DraftQueuePanel
           draftId={draftId}
           autoPickDisabled={autoPickDisabled}
           onError={(msg) => {
             onShowToast(msg);
           }}
+          enabled={isGeneralManager}
         />
       )}
 

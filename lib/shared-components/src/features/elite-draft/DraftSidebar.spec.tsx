@@ -66,6 +66,7 @@ const baseProps = {
   pickDeadline: null,
   isCommissioner: false,
   isOwner: false,
+  isGeneralManager: true,
   draftId: 1,
   commPickMode: false,
   autoPickDisabled: false,

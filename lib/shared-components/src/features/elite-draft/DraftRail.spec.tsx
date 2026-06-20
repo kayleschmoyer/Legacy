@@ -24,6 +24,7 @@ const baseProps = {
   isMyPick: false,
   commPickMode: false,
   isOwner: false,
+  isGeneralManager: false,
   draftId: null,
   myTeamId: null,
   currentOverallPick: 0,

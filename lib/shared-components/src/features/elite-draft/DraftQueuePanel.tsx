@@ -18,12 +18,22 @@ interface DraftQueuePanelProps {
   draftId: number;
   autoPickDisabled?: boolean;
   onError?: (message: string) => void;
+  /**
+   * Whether the current user can view the draft queue. The server restricts
+   * `getMyDraftQueue` to `permissionLevel === 'general_manager'` — when this
+   * is false we skip the query entirely instead of firing it and discarding
+   * the FORBIDDEN response, which had been surfacing as a noisy Rollbar
+   * error (LS-4804). Defaults to true so existing call sites that already
+   * gate on permission upstream keep working.
+   */
+  enabled?: boolean;
 }
 
 export function DraftQueuePanel({
   draftId,
   autoPickDisabled,
   onError,
+  enabled = true,
 }: DraftQueuePanelProps) {
   const {
     data,
@@ -34,7 +44,7 @@ export function DraftQueuePanel({
     GET_MY_DRAFT_QUEUE,
     {
       variables: { draftId },
-      skip: !draftId,
+      skip: !draftId || !enabled,
       fetchPolicy: 'cache-and-network',
       // Suppress global error toast — FORBIDDEN is handled below by returning
       // null; other errors are surfaced via onError instead.
@@ -112,8 +122,10 @@ export function DraftQueuePanel({
     [draftId, entries, reorderQueue, refetchQueue, onError],
   );
 
-  // Non-GM users receive FORBIDDEN — hide the panel silently rather than
-  // surfacing a confusing error toast (LS-4804).
+  // Non-GM users: parent should pass enabled={false} so the query never fires
+  // (LS-4804). The FORBIDDEN error check remains as defense-in-depth in case a
+  // caller forgets to gate, or league membership changes after mount.
+  if (!enabled) return null;
   const gqlErrors =
     error != null && 'graphQLErrors' in error
       ? (error.graphQLErrors as ReadonlyArray<{

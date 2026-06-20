@@ -102,6 +102,11 @@ export function useDraftQueries({
     permLevel === 'commissioner' ||
     permLevel === 'general_manager';
   const isCommissioner = permLevel === 'owner' || permLevel === 'commissioner';
+  // Draft-queue resolver restricts reads to permissionLevel === 'general_manager'
+  // (lambdas/db/src/schema/drafts/queries.ts getMyDraftQueue). Surface the bit so
+  // the UI can skip the query for co-managers / assistants instead of firing it
+  // and swallowing a FORBIDDEN (LS-4804).
+  const isGeneralManager = permLevel === 'general_manager';
   const myTeamId = normalizeTeamId(league?.userMembership?.teamId);
 
   const teamNameById = useCallback(
@@ -514,6 +519,7 @@ export function useDraftQueries({
     permLevel,
     isOwner,
     isCommissioner,
+    isGeneralManager,
     myTeamId,
     teamNameById,
     // Draft

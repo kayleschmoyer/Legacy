@@ -546,6 +546,7 @@ export function EliteDraftBoardScreen({
           pickDeadline={ui.pickDeadline}
           isCommissioner={queries.isCommissioner}
           isOwner={queries.isOwner}
+          isGeneralManager={queries.isGeneralManager}
           draftId={queries.draftId}
           commPickMode={ui.commPickMode}
           autoPickDisabled={ui.autoPickDisabled}
@@ -630,6 +631,7 @@ export function EliteDraftBoardScreen({
           isMyPick={isMyPick}
           commPickMode={ui.commPickMode}
           isOwner={queries.isOwner}
+          isGeneralManager={queries.isGeneralManager}
           draftId={queries.draftId}
           myTeamId={queries.myTeamId}
           currentOverallPick={queries.currentPickInfo?.overallPick ?? 0}
