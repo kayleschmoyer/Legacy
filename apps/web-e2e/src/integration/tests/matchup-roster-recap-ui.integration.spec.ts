@@ -158,10 +158,19 @@ test.describe
     });
 
     await test.step('Verify "Player Matchups" card heading', async () => {
-      // MatchupRosterComparison renders an H4 with text "Player Matchups"
-      await expect(
+      // MatchupRosterComparison renders an H4 with text "Player Matchups" only
+      // once the browser-side matchup query resolves. Under nightly 3-shard load
+      // that first query can be throttled (HTTP 429), leaving the comparison
+      // unmounted; a single-shot toBeVisible then burns the phase budget while
+      // nothing re-fires the query. Reload to re-fire it — the same
+      // backend-authoritative determinism gate Phase 3 already uses for its
+      // BATTERS assertion (line ~225) and that LS-8138 applied to the sibling
+      // matchup specs (LS-8206 confirmed this content does eventually render).
+      await reloadUntilVisible(
+        page,
         page.getByRole('heading', { name: /Player Matchups/i }),
-      ).toBeVisible({ timeout: 20_000 });
+        { finalTimeoutMs: 20_000 },
+      );
     });
 
     await test.step('Verify BATTERS section header', async () => {

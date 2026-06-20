@@ -214,8 +214,18 @@ test.describe
     await page.waitForLoadState('domcontentloaded');
 
     await test.step('Page heading is visible', async () => {
-      // PlayerComparisonPage renders "Player Comparison" or similar header
-      await expect(page.getByText(/Player Comparison/i).first()).toBeVisible({
+      // The comparison page Masthead renders the heading "Compare up to four."
+      // (lib/shared-components/.../PlayerComparison.tsx Masthead, role="heading").
+      // The literal "Player Comparison" string only appears in the free-tier
+      // PremiumBanner, which is suppressed for premium users — and this phase
+      // runs on the now-premium commissioner fixture (LS-8057 flipped the
+      // commissioner to premium-by-default). The old getByText(/Player
+      // Comparison/i) assertion could therefore never match here and failed
+      // every run regardless of timing (LS-8206). Assert the real premium
+      // heading instead, which renders for premium and free alike.
+      await expect(
+        page.getByRole('heading', { name: /Compare up to four/i }),
+      ).toBeVisible({
         timeout: 30_000,
       });
     });
