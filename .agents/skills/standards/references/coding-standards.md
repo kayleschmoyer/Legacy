@@ -186,14 +186,14 @@ printf "  git rm %s\n" "$lockfile"
 printf "  git rm -- %q\n" "$lockfile"
 ```
 
-**Exit code propagation**: When invoking external commands that should block on failure (e.g., `git lfs pre-push`), propagate the exit code:
+**Exit code propagation**: When invoking external commands that should block on failure, propagate the exit code rather than swallowing it:
 
 ```bash
-# Bad -- LFS failure is silently swallowed
-git lfs pre-push "$@"
+# Bad -- terraform failure is silently swallowed
+terraform -chdir="$tf_dir" validate
 
 # Good
-git lfs pre-push "$@" || exit $?
+terraform -chdir="$tf_dir" validate || exit $?
 ```
 
 **POSIX portability**: Shell scripts intended to run on both Linux and macOS must not use GNU-specific extensions:

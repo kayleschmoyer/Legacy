@@ -1,6 +1,7 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
-# Git LFS hook stubs written to dev/null/ by git-lfs during clone/checkout
+# Stale Git LFS hook stubs (LS-8204 removed LFS, but legacy clones may have
+# these orphan files lying around if git-lfs is globally installed)
 dev/null/
 
 # compiled output
@@ -12,9 +13,11 @@ tmp
 # Remotion render output
 apps/video/out/
 
-# Database dumps - raw prod dump is too large and contains PII (stored in S3)
-# The scrubbed seed (dev-seed.dump) is tracked via Git LFS
+# Database dumps - raw prod dump is too large and contains PII (stored in S3).
+# The scrubbed dev seed (dev-seed.dump) is hosted in S3 and downloaded on
+# demand by scripts/db-restore-dev.ps1 / devcontainer post-create (LS-8204).
 resources/dev.dump
+resources/dev-seed.dump
 resources/*.dump.bak
 
 # IDEs and editors

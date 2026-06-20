@@ -100,13 +100,13 @@ Installed via `make setup-hooks` (copies `.github/hooks/pre-push` into your Git 
 
 | #   | Check / Behavior                            | Purpose                                                                      |
 | --- | ------------------------------------------- | ---------------------------------------------------------------------------- |
-| 1   | git-lfs integration                         | Ensures large files are handled via Git LFS where required                   |
+| 1   | Stray lockfile scan                         | Rejects tracked `package-lock.json` / `yarn.lock` (this repo is pnpm-only)   |
 | 2   | Conflict marker scan \*                     | Prevents pushing files that still contain unresolved merge conflict markers  |
 | 3   | Conditional `terraform validate` \*         | Validates Terraform when Terraform files are part of the push                |
 | 4   | `nx format:write` \*                        | Auto-formats code before push                                                |
 | 5   | Auto-amend + abort on formatting changes \* | Amends the last commit with formatting changes and aborts the push to review |
 
-\* Checks 2--5 only run when `node_modules` is present (i.e., a non-docs-only worktree). In docs-only worktrees without dependencies, the pre-push hook exits after the git-lfs integration step. Can be bypassed with `--no-verify`.
+\* Checks 2--5 only run when `node_modules` is present (i.e., a non-docs-only worktree). In docs-only worktrees without dependencies, the pre-push hook exits after the lockfile scan. Can be bypassed with `--no-verify`.
 
 ### Self-review gate (local)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # =============================================================================
-# scripts/db-dump-dev.ps1 - Create the scrubbed dev seed dump for the repo
+# scripts/db-dump-dev.ps1 - Create the scrubbed dev seed dump and upload to S3
 # =============================================================================
 #
 # Prerequisite: local Docker postgres must already contain the production data.
@@ -9,20 +9,28 @@
 # This script then:
 #   1. Scrubs PII from the local database (anonymizes users, clears tokens)
 #   2. Dumps the scrubbed DB to resources/dev-seed.dump
-#   3. Prints instructions to commit via Git LFS
+#   3. Uploads it to the public-read S3 location consumed by db-restore-dev
+#      (requires AWS credentials with s3:PutObject on the team_logos bucket).
 #
 # Run this whenever production data has significantly changed and you want to
-# refresh the seed dump that non-AWS devs use.
+# refresh the seed dump that non-AWS devs / codespaces / cloud agents consume.
 #
 # Usage:
-#   .\scripts\db-dump-dev.ps1
+#   .\scripts\db-dump-dev.ps1               # dump + upload
+#   .\scripts\db-dump-dev.ps1 -SkipUpload   # dump only (no S3 push)
 #
 # =============================================================================
+
+[CmdletBinding()]
+param(
+    [switch]$SkipUpload
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $SEED_FILE    = "resources\dev-seed.dump"
+$S3_URI       = "s3://legacy-sports-dev-team-logos-8c4d4e8d/dev-assets/dev-seed.dump"
 $PG_CONTAINER = "ls-postgres"
 $PG_USER      = "legacy_sports"
 $PG_DB        = "legacy_sports_dev"
@@ -104,14 +112,28 @@ $sizeMB   = [math]::Round((Get-Item $seedPath).Length / 1MB, 1)
 Write-OK "Seed dump created: ${sizeMB} MB in ${elapsed}s -> $SEED_FILE"
 
 # ---------------------------------------------------------------------------
+# Upload to S3 (public-read; consumed by db-restore-dev)
+# ---------------------------------------------------------------------------
+if (-not $SkipUpload) {
+    Write-Step "Uploading dump to $S3_URI"
+    aws s3 cp $seedPath $S3_URI --content-type application/octet-stream
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "aws s3 cp failed (exit $LASTEXITCODE). Are AWS credentials configured?"
+        exit 1
+    }
+    Write-OK "Uploaded to S3"
+}
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 Write-Host ""
 Write-Host "Done! Scrubbed seed dump is ready." -ForegroundColor Green
 Write-Host ""
-Write-Host "Commit it to the repo via Git LFS:" -ForegroundColor Cyan
-Write-Host "  git add resources/dev-seed.dump"
-Write-Host "  git commit -m 'chore(db): refresh scrubbed dev seed dump'"
-Write-Host ""
-Write-Host "Other devs can then restore it with:" -ForegroundColor Cyan
+if ($SkipUpload) {
+    Write-Host "Skipped S3 upload. To publish for other devs:" -ForegroundColor Yellow
+    Write-Host "  aws s3 cp $SEED_FILE $S3_URI --content-type application/octet-stream"
+    Write-Host ""
+}
+Write-Host "Other devs / codespaces / cloud agents restore it with:" -ForegroundColor Cyan
 Write-Host "  make db-restore-dev"

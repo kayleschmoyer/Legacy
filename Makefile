@@ -502,7 +502,7 @@ else
 	@echo "db-restore is Windows-only (PowerShell script). Run on Windows or adapt for bash."
 endif
 
-db-dump-dev: ## Restore from S3, scrub PII, dump to resources/dev-seed.dump for repo (needs AWS)
+db-dump-dev: ## Restore from prod, scrub PII, dump to resources/dev-seed.dump, upload to S3 (needs AWS)
 	@$(call echo_blue,Creating scrubbed dev seed dump...)
 ifeq ($(DETECTED_OS),Windows)
 	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)db-dump-dev.ps1
@@ -510,7 +510,7 @@ else
 	@echo "db-dump-dev is Windows-only (PowerShell script). Run on Windows or adapt for bash."
 endif
 
-db-restore-dev: ## Restore scrubbed dev seed from repo (no AWS needed - auto-pulls LFS)
+db-restore-dev: ## Restore scrubbed dev seed (downloaded from public S3 - no AWS needed)
 	@$(call echo_blue,Restoring database from dev seed dump...)
 ifeq ($(DETECTED_OS),Windows)
 	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)db-restore-dev.ps1

@@ -187,15 +187,13 @@ For developers without AWS access, restore the scrubbed anonymized seed from the
 make db-restore-dev
 ```
 
-This restores `resources/dev-seed.dump` (committed via Git LFS) into `ls-postgres`. The seed contains real game/league/player/stats data with PII replaced (usernames -> `user_N`, emails anonymized, passwords zeroed, device tokens redacted).
+This restores `resources/dev-seed.dump` into `ls-postgres`. The seed contains real game/league/player/stats data with PII replaced (usernames -> `user_N`, emails anonymized, passwords zeroed, device tokens redacted).
 
-The script auto-pulls from Git LFS if the file is a pointer stub. After restore, run:
+The dump is hosted in public-read S3 (no AWS credentials required). The script downloads it on first use and caches it at `resources/dev-seed.dump` (gitignored). Pass `-Force` to re-download. After restore, run:
 
 ```powershell
 make db-migrate   # Apply any pending migrations on top of the seed
 ```
-
-**If seed file not found**: Install Git LFS (`winget install GitHub.GitLFS ; git lfs install`), then retry.
 
 ## Create Scrubbed Dev Seed
 
@@ -210,7 +208,7 @@ make db-dump-dev   # Scrub PII and create seed
 
 1. Runs `scripts/db-scrub.ps1` -- anonymizes PII (usernames, emails, passwords, device tokens)
 2. Runs `pg_dump` -> `resources/dev-seed.dump`
-3. Prints commit instructions
+3. `aws s3 cp` the dump to the public-read S3 location consumed by `db-restore-dev`
 
 ### What Gets Scrubbed
 
@@ -220,12 +218,12 @@ make db-dump-dev   # Scrub PII and create seed
 | `app_internal.device_tokens`        | token                          | `REDACTED_N`                           |
 | `app_internal.notification_history` | entire table                   | `TRUNCATE`                             |
 
-### Commit the Seed
+### Publish the Seed
+
+`make db-dump-dev` uploads automatically (requires AWS credentials with `s3:PutObject` on the `team-logos` bucket). To publish manually after a `-SkipUpload` dump:
 
 ```powershell
-git add resources/dev-seed.dump
-git commit -m "chore(db): refresh scrubbed dev seed dump"
-git push
+aws s3 cp resources/dev-seed.dump s3://legacy-sports-dev-team-logos-8c4d4e8d/dev-assets/dev-seed.dump --content-type application/octet-stream
 ```
 
-Git LFS handles the binary automatically. To add new PII fields, edit `scripts/db-scrub.ps1` first.
+No commit is needed — the dump is not tracked in git. To add new PII fields, edit `scripts/db-scrub.ps1` first.

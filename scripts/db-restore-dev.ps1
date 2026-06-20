@@ -4,22 +4,28 @@
 # =============================================================================
 #
 # Restores resources/dev-seed.dump into the local Docker postgres container.
-# No AWS credentials required - the seed dump is committed to the repo via
-# Git LFS and contains anonymized data only (no real user PII).
+# No AWS credentials required - the seed dump is hosted publicly in S3 and
+# contains anonymized data only (no real user PII).
 #
 # Requirements:
-#   git lfs pull          (if you haven't already pulled LFS files)
 #   docker compose up -d postgres
 #
 # Usage:
-#   .\scripts\db-restore-dev.ps1
+#   .\scripts\db-restore-dev.ps1            # uses cached resources/dev-seed.dump if present
+#   .\scripts\db-restore-dev.ps1 -Force     # always re-download from S3
 #
 # =============================================================================
+
+[CmdletBinding()]
+param(
+    [switch]$Force
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $SEED_FILE    = "resources\dev-seed.dump"
+$SEED_URL     = "https://legacy-sports-dev-team-logos-8c4d4e8d.s3.us-east-1.amazonaws.com/dev-assets/dev-seed.dump"
 $PG_CONTAINER = "ls-postgres"
 $PG_USER      = "legacy_sports"
 $PG_DB        = "legacy_sports_dev"
@@ -32,30 +38,37 @@ $repoRoot = Join-Path $PSScriptRoot ".."
 $seedPath = Join-Path $repoRoot $SEED_FILE
 
 # ---------------------------------------------------------------------------
-# Ensure seed file is materialized (auto-pull from LFS if needed)
+# Ensure seed file is materialized (download from public S3 if needed)
 # ---------------------------------------------------------------------------
-$needsPull = $false
-if (-not (Test-Path $seedPath)) {
-    $needsPull = $true
-} elseif ((Get-Item $seedPath).Length -lt 1000) {
-    # File exists but is an LFS pointer stub (typically ~130 bytes)
-    $needsPull = $true
+$needsDownload = $Force.IsPresent
+if (-not $needsDownload) {
+    if (-not (Test-Path $seedPath)) {
+        $needsDownload = $true
+    } elseif ((Get-Item $seedPath).Length -lt 1000000) {
+        # File exists but is implausibly small (real dump is ~11 MB)
+        $needsDownload = $true
+    }
 }
 
-if ($needsPull) {
-    Write-Step "Seed file missing or is an LFS pointer - running git lfs pull"
-    git lfs pull
-    if ($LASTEXITCODE -ne 0) {
-        Write-Err "git lfs pull failed (exit code $LASTEXITCODE)"
-        Write-Host "  Install Git LFS: winget install GitHub.GitLFS" -ForegroundColor Yellow
+if ($needsDownload) {
+    Write-Step "Downloading seed file from S3: $SEED_URL"
+    $seedDir = Split-Path $seedPath -Parent
+    if (-not (Test-Path $seedDir)) {
+        New-Item -ItemType Directory -Path $seedDir -Force | Out-Null
+    }
+    try {
+        $ProgressPreference = "SilentlyContinue"  # speeds up Invoke-WebRequest dramatically
+        Invoke-WebRequest -Uri $SEED_URL -OutFile $seedPath -UseBasicParsing
+    } catch {
+        Write-Err "Download failed: $($_.Exception.Message)"
+        Write-Host "  Refresh the dump (requires AWS access): make db-dump-dev" -ForegroundColor Yellow
         exit 1
     }
-    if (-not (Test-Path $seedPath) -or (Get-Item $seedPath).Length -lt 1000) {
-        Write-Err "Seed file still missing after git lfs pull: $SEED_FILE"
-        Write-Host "  Create a fresh one (requires AWS access): make db-dump-dev" -ForegroundColor Yellow
+    if (-not (Test-Path $seedPath) -or (Get-Item $seedPath).Length -lt 1000000) {
+        Write-Err "Downloaded file is missing or implausibly small: $SEED_FILE"
         exit 1
     }
-    Write-OK "Seed file pulled from LFS"
+    Write-OK "Seed file downloaded"
 }
 
 $sizeMB = [math]::Round((Get-Item $seedPath).Length / 1MB, 1)

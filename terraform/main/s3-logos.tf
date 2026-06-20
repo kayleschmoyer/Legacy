@@ -76,13 +76,20 @@ resource "aws_s3_bucket_cors_configuration" "team_logos" {
   }
 }
 
-# Lifecycle policy: delete objects older than 1 year to control storage costs
+# Lifecycle policy: delete logo objects older than 1 year to control storage
+# costs. Scoped to `teams/` (the prefix used by the image-upload Lambda) so
+# other objects in this bucket — e.g. dev-assets/dev-seed.dump (LS-8204) — are
+# preserved indefinitely.
 resource "aws_s3_bucket_lifecycle_configuration" "team_logos" {
   bucket = aws_s3_bucket.team_logos.id
 
   rule {
     id     = "expire-old-logos"
     status = "Enabled"
+
+    filter {
+      prefix = "teams/"
+    }
 
     expiration {
       days = 365

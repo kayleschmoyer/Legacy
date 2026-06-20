@@ -10,7 +10,7 @@ This section applies to **all** cloud agent platforms (Claude Code on the web, C
 When running as a **cloud coding agent**:
 
 - **No worktrees/twig/acli** — work directly in the repo root. Use `git` for branches, MCP tools for Jira.
-- **No AWS access for MCP** — the hosted Jira/GitHub/CI MCP servers are reached with a Cognito machine-grant bearer (minted by copilot-setup-steps.yml), not an AWS role; the SigV4/OIDC Function-URL path was retired (LS-5093). DB MCP server uses local Docker PostgreSQL seeded from `resources/dev-seed.dump`.
+- **No AWS access for MCP** — the hosted Jira/GitHub/CI MCP servers are reached with a Cognito machine-grant bearer (minted by copilot-setup-steps.yml), not an AWS role; the SigV4/OIDC Function-URL path was retired (LS-5093). DB MCP server uses local Docker PostgreSQL seeded from `resources/dev-seed.dump` (downloaded from public S3 on devcontainer create; no AWS creds required).
 - **Linux** — `bash` shell, `/` paths. No symlinks or file locks.
 - **Native integrations (Claude Code on the web)** — Claude Code provides built-in GitHub and Atlassian connectors that work without configuring secrets. Prefer these over custom MCP servers when available.
 

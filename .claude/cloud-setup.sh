@@ -68,17 +68,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Install Git LFS (for dev-seed.dump)
-# ---------------------------------------------------------------------------
-if ! command -v git-lfs &>/dev/null && ! git lfs version &>/dev/null 2>&1; then
-  echo "Installing Git LFS..."
-  apt-get update -qq && apt-get install -y -qq git-lfs 2>&1 | tail -1
-fi
-git lfs install --skip-smudge >/dev/null 2>&1 || true
-echo "Git LFS: $(git lfs version 2>/dev/null | head -1 || echo 'installed')"
-
-# ---------------------------------------------------------------------------
-# 4. Install Node.js dependencies
+# 3. Install Node.js dependencies
 # ---------------------------------------------------------------------------
 # Required for `make pc` (lint, typecheck, test, build) on code changes.
 # Uses corepack to activate the correct pnpm version, then installs deps.
@@ -99,7 +89,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
+# 4. Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
 # ---------------------------------------------------------------------------
 # In cloud sessions, git remote URLs may be proxy URLs that don't expose the
 # real GitHub owner/repo. These env vars let the MCP server skip remote

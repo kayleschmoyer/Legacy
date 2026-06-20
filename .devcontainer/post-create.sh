@@ -23,13 +23,7 @@ echo "pnpm $(pnpm --version) activated"
 pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
-# 3. Git LFS
-# ---------------------------------------------------------------------------
-git lfs install
-git lfs pull
-
-# ---------------------------------------------------------------------------
-# 4. Start PostgreSQL via Docker Compose
+# 3. Start PostgreSQL via Docker Compose
 # ---------------------------------------------------------------------------
 if command -v docker &>/dev/null; then
   docker compose up -d postgres
@@ -49,14 +43,24 @@ if command -v docker &>/dev/null; then
   done
 
   # ---------------------------------------------------------------------------
-  # 5. Restore dev seed database
+  # 4. Restore dev seed database (downloaded from public S3; no AWS creds needed)
   # ---------------------------------------------------------------------------
   SEED_FILE="resources/dev-seed.dump"
+  SEED_URL="https://legacy-sports-dev-team-logos-8c4d4e8d.s3.us-east-1.amazonaws.com/dev-assets/dev-seed.dump"
   PG_CONTAINER="ls-postgres"
   PG_USER="legacy_sports"
   PG_DB="legacy_sports_dev"
 
-  if [ -f "$SEED_FILE" ] && [ "$(stat -c%s "$SEED_FILE" 2>/dev/null || echo 0)" -gt 1000 ]; then
+  if [ ! -f "$SEED_FILE" ] || [ "$(stat -c%s "$SEED_FILE" 2>/dev/null || echo 0)" -lt 1000000 ]; then
+    echo "Downloading dev seed from $SEED_URL..."
+    mkdir -p "$(dirname "$SEED_FILE")"
+    if ! curl -fsSL "$SEED_URL" -o "$SEED_FILE"; then
+      echo "WARNING: failed to download dev seed — DB will start empty"
+      rm -f "$SEED_FILE"
+    fi
+  fi
+
+  if [ -f "$SEED_FILE" ] && [ "$(stat -c%s "$SEED_FILE" 2>/dev/null || echo 0)" -gt 1000000 ]; then
     docker cp "$SEED_FILE" "${PG_CONTAINER}:/tmp/restore.dump"
 
     docker exec "$PG_CONTAINER" psql -U "$PG_USER" -d postgres -c \
@@ -70,11 +74,11 @@ if command -v docker &>/dev/null; then
     docker exec "$PG_CONTAINER" pg_restore -U "$PG_USER" -d "$PG_DB" --no-owner --no-privileges --clean --if-exists /tmp/restore.dump || true
     echo "Dev seed restored"
   else
-    echo "WARNING: $SEED_FILE missing or is an LFS pointer — run 'git lfs pull' manually"
+    echo "WARNING: no dev seed available — DB will start empty (migrations only)"
   fi
 
   # ---------------------------------------------------------------------------
-  # 6. Apply database migrations
+  # 5. Apply database migrations
   # ---------------------------------------------------------------------------
   pnpm --prefix lib/db-client run db:migrate || echo "WARNING: migrations failed"
 else
@@ -82,7 +86,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Create .env for MCP servers
+# 6. Create .env for MCP servers
 # ---------------------------------------------------------------------------
 if [ ! -f .env ]; then
   cat >.env <<'EOF'
