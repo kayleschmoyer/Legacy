@@ -1434,11 +1434,6 @@ function DraftPickPanel({
               {selectedOption ? `${selectedOption} · ` : ''}
               {selectedSlotId ? `slot selected` : 'choose a slot'}
             </Text>
-            {previewStatValue === 0 && (
-              <Text fontSize={11} color="$brandSeamRedLight" marginTop="$1">
-                Warning: stat value is 0 for this selection.
-              </Text>
-            )}
           </YStack>
           <YStack alignItems="flex-end">
             <Text color="$brandGoldLight" fontWeight="800" fontSize={28}>
