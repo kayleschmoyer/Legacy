@@ -129,6 +129,7 @@ test('buildTfvars: required var satisfied by baseline is not reported missing', 
     oauth_proxy_cookie_secret: 'BASE',
     jira_credentials: 'BASE',
     rollbar_access_token: 'BASE',
+    rollbar_read_access_token: 'BASE',
     stripe_secret_key: 'BASE',
     stripe_webhook_secret: 'BASE',
   };

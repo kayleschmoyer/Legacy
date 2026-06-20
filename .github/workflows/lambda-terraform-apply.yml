@@ -202,6 +202,11 @@ jobs:
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Read-scope Rollbar token consumed by the hosted mcp-rollbar Lambda
+          # (LS-8142). The Legacy Sports CLI access token currently has both
+          # read and write scopes, so we reuse the same secret for both slots
+          # until a separate read-only token is minted (LS-8200).
+          TF_VAR_rollbar_read_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           # Client-side (post_client_item) Rollbar token. Optional (defaults to "" in
           # secrets.tf); when set it materializes the github-secrets SSM param that
           # sync-github-secrets.mjs reconciles into the ROLLBAR_CLIENT_ACCESS_TOKEN
@@ -242,6 +247,11 @@ jobs:
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Read-scope Rollbar token consumed by the hosted mcp-rollbar Lambda
+          # (LS-8142). The Legacy Sports CLI access token currently has both
+          # read and write scopes, so we reuse the same secret for both slots
+          # until a separate read-only token is minted (LS-8200).
+          TF_VAR_rollbar_read_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           # Client-side (post_client_item) Rollbar token. Optional (defaults to "" in
           # secrets.tf); when set it materializes the github-secrets SSM param that
           # sync-github-secrets.mjs reconciles into the ROLLBAR_CLIENT_ACCESS_TOKEN
@@ -329,6 +339,11 @@ jobs:
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Read-scope Rollbar token consumed by the hosted mcp-rollbar Lambda
+          # (LS-8142). The Legacy Sports CLI access token currently has both
+          # read and write scopes, so we reuse the same secret for both slots
+          # until a separate read-only token is minted (LS-8200).
+          TF_VAR_rollbar_read_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           # Client-side (post_client_item) Rollbar token. Optional (defaults to "" in
           # secrets.tf); when set it materializes the github-secrets SSM param that
           # sync-github-secrets.mjs reconciles into the ROLLBAR_CLIENT_ACCESS_TOKEN
@@ -376,6 +391,11 @@ jobs:
         working-directory: terraform/main
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Read-scope Rollbar token consumed by the hosted mcp-rollbar Lambda
+          # (LS-8142). The Legacy Sports CLI access token currently has both
+          # read and write scopes, so we reuse the same secret for both slots
+          # until a separate read-only token is minted (LS-8200).
+          TF_VAR_rollbar_read_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           # Client-side (post_client_item) Rollbar token. Optional (defaults to "" in
           # secrets.tf); when set it materializes the github-secrets SSM param that
           # sync-github-secrets.mjs reconciles into the ROLLBAR_CLIENT_ACCESS_TOKEN

@@ -861,6 +861,7 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/discord-stripe-webhook-url*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/ga-api-secret*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/rollbar-access-token*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/rollbar-read-access-token*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-github-token*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-machine-client-secret*",
         ]

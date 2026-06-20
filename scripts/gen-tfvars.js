@@ -117,6 +117,10 @@ function buildTfvars(existing, envObj) {
     'rollbar_access_token',
     e('ROLLBAR_ACCESS_TOKEN'),
   );
+  const rollbarReadAccessToken = p(
+    'rollbar_read_access_token',
+    e('ROLLBAR_READ_ACCESS_TOKEN', 'ROLLBAR_ACCESS_TOKEN'),
+  );
   const rollbarWebhookSecret = p(
     'rollbar_webhook_secret',
     e('ROLLBAR_WEBHOOK_SECRET', 'TF_VAR_ROLLBAR_WEBHOOK_SECRET'),
@@ -188,6 +192,11 @@ function buildTfvars(existing, envObj) {
       'JIRA_CREDENTIALS (or JIRA_CLIENT_ID + JIRA_CLIENT_SECRET + JIRA_CLOUD_ID)',
     ],
     ['rollbar_access_token', rollbarAccessToken, 'ROLLBAR_ACCESS_TOKEN'],
+    [
+      'rollbar_read_access_token',
+      rollbarReadAccessToken,
+      'ROLLBAR_READ_ACCESS_TOKEN / ROLLBAR_ACCESS_TOKEN',
+    ],
     ['stripe_secret_key', stripeSecretKey, 'STRIPE_SECRET_KEY'],
     ['stripe_webhook_secret', stripeWebhookSecret, 'STRIPE_WEBHOOK_SECRET'],
   ];
@@ -241,6 +250,8 @@ function buildTfvars(existing, envObj) {
     `jira_credentials = ${hcl(jiraCredentials)}`,
     '',
     `rollbar_access_token = ${hcl(rollbarAccessToken)}`,
+    '',
+    `rollbar_read_access_token = ${hcl(rollbarReadAccessToken)}`,
     '',
     `rollbar_webhook_secret = ${hcl(rollbarWebhookSecret)}`,
     '',
