@@ -1303,7 +1303,7 @@ export function PlayerStatsPage({
               <StatSlider
                 label="Max ERA"
                 value={maxERA}
-                min={0.5}
+                min={0}
                 max={ERA_MAX_OFF}
                 step={0.05}
                 format={(v) => v.toFixed(2)}
