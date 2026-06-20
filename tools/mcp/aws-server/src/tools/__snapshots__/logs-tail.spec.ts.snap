@@ -1,0 +1,36 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`renderLogsAsMarkdown renders Errors section + Recent code-block (snapshot) 1`] = `
+"**logGroup**: /aws/lambda/legacy-sports-dev-graphql
+**since**: 1h
+**filter**: (none)
+**lines**: 12
+
+### Errors (6)
+
+\`\`\`
+2026-06-20T00:00:00.300Z WARN  retrying upstream (attempt 1)
+2026-06-20T00:00:00.500Z ERROR TypeError: Cannot read properties of undefined (reading "id")
+    at handler (/var/task/index.js:42:17)
+    at processTicksAndRejections (node:internal/process/task_queues.js:95:5)
+2026-06-20T00:00:01.000Z Exception in scheduled task: queue drained
+    at drain (/var/task/queue.js:9:11)
+\`\`\`
+
+### Recent (last 12 lines)
+
+\`\`\`
+2026-06-20T00:00:00.000Z START RequestId: abc
+2026-06-20T00:00:00.100Z INFO  Handling request
+2026-06-20T00:00:00.200Z DEBUG cache miss for key=foo
+2026-06-20T00:00:00.300Z WARN  retrying upstream (attempt 1)
+2026-06-20T00:00:00.400Z INFO  fetched 12 rows
+2026-06-20T00:00:00.500Z ERROR TypeError: Cannot read properties of undefined (reading "id")
+    at handler (/var/task/index.js:42:17)
+    at processTicksAndRejections (node:internal/process/task_queues.js:95:5)
+2026-06-20T00:00:00.600Z INFO  request completed in 421ms
+2026-06-20T00:00:00.700Z END RequestId: abc
+2026-06-20T00:00:01.000Z Exception in scheduled task: queue drained
+    at drain (/var/task/queue.js:9:11)
+\`\`\`"
+`;

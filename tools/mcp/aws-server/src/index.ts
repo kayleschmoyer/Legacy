@@ -90,7 +90,7 @@ server.tool(
 // --- aws_logs_tail ---
 server.tool(
   'aws_logs_tail',
-  'Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure). Pass `functions: string[]` (1-10) for batch mode: per-function blocks fetched concurrently (cap 5) and returned as `{ logs: { [name]: <block> } }`. One failing function does not fail the others.',
+  'Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure). Returns markdown by default — an `### Errors` section extracted from ERROR/WARN/Exception lines (plus stack frames) followed by a `### Recent` code-block with the last 50 lines; pass `format: "json"` for the original structured payload. Pass `functions: string[]` (1-10) for batch mode: per-function blocks fetched concurrently (cap 5); one failing function does not fail the others.',
   {
     function: z
       .enum(LAMBDA_FUNCTIONS)
@@ -123,6 +123,12 @@ server.tool(
       .default(500)
       .describe(
         'Cap output to the last N lines (default: 500, maximum: 1000). Use a smaller value for high-volume log groups to avoid token overflow.',
+      ),
+    format: z
+      .enum(['markdown', 'json'])
+      .default('markdown')
+      .describe(
+        'Output shape. `markdown` (default) groups extracted ERROR/WARN/Exception lines into a top `### Errors` section followed by a `### Recent` code-block with the last 50 log lines — far cheaper for the agent to read. `json` returns the original structured payload with the full `logs` string.',
       ),
   },
   async (params) => logsTail(params),

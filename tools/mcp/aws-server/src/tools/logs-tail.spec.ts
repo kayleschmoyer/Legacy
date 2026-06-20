@@ -5,8 +5,12 @@ jest.mock('../run-command.js', () => ({
 
 import {
   BATCH_CONCURRENCY,
+  ERROR_LINE_PATTERN,
   MAX_BATCH_FUNCTIONS,
+  RECENT_LINES,
+  extractErrorLines,
   logsTail,
+  renderLogsAsMarkdown,
   type CommandRunner,
 } from './logs-tail.js';
 
@@ -28,10 +32,22 @@ function unwrap(result: Awaited<ReturnType<typeof logsTail>>): {
   };
 }
 
+function rawText(result: Awaited<ReturnType<typeof logsTail>>): string {
+  const block = result.content[0];
+  if (!block || block.type !== 'text') {
+    throw new Error('Expected a text content block');
+  }
+  return block.text;
+}
+
+// `format: 'json'` is set explicitly here so the existing structured-shape
+// tests continue to exercise the JSON branch (the public default is now
+// `markdown`).
 const baseParams = {
   since: '1h',
   environment: 'dev',
   maxLines: 500,
+  format: 'json' as const,
 };
 
 describe('logsTail (singular)', () => {
@@ -179,5 +195,120 @@ describe('logsTail (batch)', () => {
     const { body, isError } = unwrap(await logsTail({ ...baseParams }, runner));
     expect(isError).toBe(true);
     expect(body.error).toMatch(/must be provided/);
+  });
+});
+
+const FIXTURE_LINES = [
+  '2026-06-20T00:00:00.000Z START RequestId: abc',
+  '2026-06-20T00:00:00.100Z INFO  Handling request',
+  '2026-06-20T00:00:00.200Z DEBUG cache miss for key=foo',
+  '2026-06-20T00:00:00.300Z WARN  retrying upstream (attempt 1)',
+  '2026-06-20T00:00:00.400Z INFO  fetched 12 rows',
+  '2026-06-20T00:00:00.500Z ERROR TypeError: Cannot read properties of undefined (reading "id")',
+  '    at handler (/var/task/index.js:42:17)',
+  '    at processTicksAndRejections (node:internal/process/task_queues.js:95:5)',
+  '2026-06-20T00:00:00.600Z INFO  request completed in 421ms',
+  '2026-06-20T00:00:00.700Z END RequestId: abc',
+  '2026-06-20T00:00:01.000Z Exception in scheduled task: queue drained',
+  '    at drain (/var/task/queue.js:9:11)',
+];
+
+const FIXTURE = FIXTURE_LINES.join('\n');
+
+describe('extractErrorLines', () => {
+  it('captures ERROR/WARN/Exception lines plus following stack frames', () => {
+    const extracted = extractErrorLines(FIXTURE_LINES);
+    expect(extracted).toMatchInlineSnapshot(`
+[
+  "2026-06-20T00:00:00.300Z WARN  retrying upstream (attempt 1)",
+  "2026-06-20T00:00:00.500Z ERROR TypeError: Cannot read properties of undefined (reading "id")",
+  "    at handler (/var/task/index.js:42:17)",
+  "    at processTicksAndRejections (node:internal/process/task_queues.js:95:5)",
+  "2026-06-20T00:00:01.000Z Exception in scheduled task: queue drained",
+  "    at drain (/var/task/queue.js:9:11)",
+]
+`);
+  });
+
+  it('returns an empty list when no log lines match the error pattern', () => {
+    const clean = [
+      '2026-06-20T00:00:00.000Z INFO  ok',
+      '2026-06-20T00:00:00.100Z DEBUG  cache hit',
+    ];
+    expect(clean.some((l) => ERROR_LINE_PATTERN.test(l))).toBe(false);
+    expect(extractErrorLines(clean)).toEqual([]);
+  });
+});
+
+describe('renderLogsAsMarkdown', () => {
+  it('renders Errors section + Recent code-block (snapshot)', () => {
+    const md = renderLogsAsMarkdown({
+      logGroup: '/aws/lambda/legacy-sports-dev-graphql',
+      since: '1h',
+      filter: null,
+      rawText: FIXTURE,
+      totalLines: FIXTURE_LINES.length,
+      shownLines: FIXTURE_LINES.length,
+      truncated: false,
+    });
+    expect(md).toMatchSnapshot();
+  });
+
+  it('caps the Recent section at the last 50 lines', () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `INFO line ${i}`);
+    const md = renderLogsAsMarkdown({
+      logGroup: '/aws/lambda/legacy-sports-dev-graphql',
+      since: '5m',
+      filter: 'INFO',
+      rawText: lines.join('\n'),
+      totalLines: 200,
+      shownLines: 200,
+      truncated: false,
+    });
+    expect(md).toContain(`### Recent (last ${RECENT_LINES} lines)`);
+    expect(md).toContain(`INFO line ${200 - RECENT_LINES}`);
+    expect(md).toContain('INFO line 199');
+    expect(md).not.toContain(`INFO line ${200 - RECENT_LINES - 1}\n`);
+  });
+
+  it('surfaces truncation in the header', () => {
+    const md = renderLogsAsMarkdown({
+      logGroup: '/aws/lambda/legacy-sports-dev-graphql',
+      since: '1h',
+      filter: null,
+      rawText: 'INFO only line',
+      totalLines: 1234,
+      shownLines: 500,
+      truncated: true,
+    });
+    expect(md).toContain('500 shown / 1234 total (truncated)');
+  });
+});
+
+describe('logsTail markdown integration', () => {
+  it('returns markdown by default (singular)', async () => {
+    const runner: CommandRunner = jest.fn().mockResolvedValue(FIXTURE);
+    const params = { ...baseParams, function: 'graphql', format: undefined };
+    const text = rawText(await logsTail(params, runner));
+    expect(text).toContain('### Errors');
+    expect(text).toContain('### Recent');
+    expect(text).toContain('/aws/lambda/legacy-sports-dev-graphql');
+  });
+
+  it('renders one section per function in batch markdown mode', async () => {
+    const runner: CommandRunner = jest.fn(async () => 'INFO ok');
+    const text = rawText(
+      await logsTail(
+        {
+          ...baseParams,
+          format: undefined,
+          functions: ['graphql', 'db'],
+        },
+        runner,
+      ),
+    );
+    expect(text).toContain('## graphql');
+    expect(text).toContain('## db');
+    expect(text.match(/### Errors/g)?.length).toBe(2);
   });
 });

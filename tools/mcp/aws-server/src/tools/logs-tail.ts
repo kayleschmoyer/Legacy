@@ -32,6 +32,21 @@ export const MAX_BATCH_FUNCTIONS = 10;
 /** Maximum number of concurrent CloudWatch fetches in batch mode. */
 export const BATCH_CONCURRENCY = 5;
 
+/** Number of trailing log lines included in the markdown `### Recent` section. */
+export const RECENT_LINES = 50;
+
+/**
+ * Lines matching this pattern are extracted into the markdown `### Errors`
+ * section. Covers AWS Lambda runtime errors (`ERROR`, `Error:`), warnings
+ * (`WARN`), and thrown exception traces (`Exception`).
+ */
+export const ERROR_LINE_PATTERN = /\b(ERROR|WARN|Exception)\b|Error:/;
+
+/** Lines treated as continuation of a preceding error (stack frames, etc.). */
+const STACK_FRAME_PATTERN = /^\s+(at\s|Caused by:|\.\.\.|[A-Za-z_$][\w$.]*:\s)/;
+
+export type LogsTailFormat = 'markdown' | 'json';
+
 export type CommandRunner = (
   command: string,
   args: string[],
@@ -46,6 +61,7 @@ interface CommonParams {
   filter?: string;
   environment: string;
   maxLines: number;
+  format?: LogsTailFormat;
 }
 
 export interface LogsTailParams extends CommonParams {
@@ -84,6 +100,110 @@ function toLogGroup(functionName: string, environment: string): string {
   // stats-lambda maps to stats in the log group name
   const normalized = functionName === 'stats-lambda' ? 'stats' : functionName;
   return `/aws/lambda/legacy-sports-${environment}-${normalized}`;
+}
+
+/**
+ * Extract error lines plus their trailing stack-frame continuations.
+ *
+ * An "error line" matches {@link ERROR_LINE_PATTERN}; subsequent indented lines
+ * that look like stack frames (`  at ...`, `Caused by: ...`) are grouped with
+ * the preceding error so the snippet remains readable.
+ */
+export function extractErrorLines(lines: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!ERROR_LINE_PATTERN.test(line)) continue;
+    out.push(line);
+    for (let j = i + 1; j < lines.length; j++) {
+      if (STACK_FRAME_PATTERN.test(lines[j])) {
+        out.push(lines[j]);
+      } else {
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+interface MarkdownInput {
+  logGroup: string;
+  since: string;
+  filter: string | null;
+  rawText: string;
+  totalLines: number;
+  shownLines: number;
+  truncated: boolean;
+}
+
+/**
+ * Render a CloudWatch logs payload as markdown:
+ * - `### Errors (N)` code block with extracted ERROR/WARN/Exception lines.
+ * - `### Recent` code block with the last {@link RECENT_LINES} log lines.
+ */
+export function renderLogsAsMarkdown(input: MarkdownInput): string {
+  const lines = input.rawText.split('\n');
+  const errorLines = extractErrorLines(lines);
+  const recent = lines.slice(-RECENT_LINES);
+
+  const header = [
+    `**logGroup**: ${input.logGroup}`,
+    `**since**: ${input.since}`,
+    `**filter**: ${input.filter ?? '(none)'}`,
+    input.truncated
+      ? `**lines**: ${input.shownLines} shown / ${input.totalLines} total (truncated)`
+      : `**lines**: ${input.shownLines}`,
+  ].join('\n');
+
+  const errorsBody = errorLines.length > 0 ? errorLines.join('\n') : '(none)';
+
+  return [
+    header,
+    '',
+    `### Errors (${errorLines.length})`,
+    '',
+    '```',
+    errorsBody,
+    '```',
+    '',
+    `### Recent (last ${recent.length} lines)`,
+    '',
+    '```',
+    recent.join('\n'),
+    '```',
+  ].join('\n');
+}
+
+function isFailure(
+  result: LogsTailSingleResult,
+): result is LogsTailSingleFailure {
+  return 'ok' in result && result.ok === false;
+}
+
+/** Render a single-fn `LogsTailSingleResult` as a markdown block. */
+function renderSingleResultAsMarkdown(
+  result: LogsTailSingleResult,
+  since: string,
+): string {
+  if (isFailure(result)) {
+    const parts = [
+      `**logGroup**: ${result.logGroup}`,
+      `**error**: ${result.error}`,
+    ];
+    if (result.remedy) parts.push(`**remedy**: ${result.remedy}`);
+    if (result.hint) parts.push(`**hint**: ${result.hint}`);
+    return parts.join('\n');
+  }
+  const lineCount = result.logs.split('\n').length;
+  return renderLogsAsMarkdown({
+    logGroup: result.logGroup,
+    since,
+    filter: result.filter,
+    rawText: result.logs,
+    totalLines: result.totalLines ?? lineCount,
+    shownLines: result.shownLines ?? lineCount,
+    truncated: result.truncated,
+  });
 }
 
 async function fetchOne(
@@ -141,10 +261,10 @@ async function fetchOne(
       remedy: isSsoError
         ? 'Run `aws sso login` to re-authenticate, then retry.'
         : isUnknownOptionsError
-          ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, since, filter, environment. Check that no unexpected fields were passed.'
+          ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, functions, since, filter, environment, maxLines, format. Check that no unexpected fields were passed.'
           : null,
       hint: isUnknownOptionsError
-        ? 'Retry with only the documented aws_logs_tail input fields (function, since [default: 1h], filter [optional], environment [dev|prod, default: dev]). Remove any extra or misspelled fields.'
+        ? 'Retry with only the documented aws_logs_tail input fields (function | functions, since [default: 1h], filter [optional], environment [dev|prod, default: dev], maxLines [optional], format [markdown|json, default: markdown]). Remove any extra or misspelled fields.'
         : null,
     };
   }
@@ -185,6 +305,7 @@ export async function logsTail(
   runner: CommandRunner = defaultRunner,
 ): Promise<ToolResult> {
   const fns = params.functions;
+  const format: LogsTailFormat = params.format ?? 'markdown';
 
   if (fns && fns.length > 0) {
     if (params.function) {
@@ -204,6 +325,17 @@ export async function logsTail(
     const results = await runWithConcurrency(fns, BATCH_CONCURRENCY, (fn) =>
       fetchOne(fn, params, runner),
     );
+
+    if (format === 'markdown') {
+      const body = fns
+        .map(
+          (fn, i) =>
+            `## ${fn}\n\n${renderSingleResultAsMarkdown(results[i], params.since)}`,
+        )
+        .join('\n\n');
+      return { content: [{ type: 'text', text: body }] };
+    }
+
     const logs: Record<string, LogsTailSingleResult> = {};
     fns.forEach((fn, i) => {
       logs[fn] = results[i];
@@ -218,9 +350,17 @@ export async function logsTail(
   }
 
   const result = await fetchOne(params.function, params, runner);
-  const text = JSON.stringify(result);
-  if ('ok' in result && result.ok === false) {
-    return { content: [{ type: 'text', text }], isError: true };
+  const failed = isFailure(result);
+
+  if (format === 'markdown') {
+    const text = renderSingleResultAsMarkdown(result, params.since);
+    return failed
+      ? { content: [{ type: 'text', text }], isError: true }
+      : { content: [{ type: 'text', text }] };
   }
-  return { content: [{ type: 'text', text }] };
+
+  const text = JSON.stringify(result);
+  return failed
+    ? { content: [{ type: 'text', text }], isError: true }
+    : { content: [{ type: 'text', text }] };
 }
