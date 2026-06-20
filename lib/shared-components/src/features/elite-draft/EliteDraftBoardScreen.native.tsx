@@ -498,7 +498,7 @@ export function EliteDraftBoardScreen({
   websocketUrl,
   websocketToken,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
-  const { user } = useAuth();
+  const { user, token: authToken } = useAuth();
   const isAuthenticated = !!user;
 
   const [activeTab, setActiveTab] = useState<DraftTab>('players');
@@ -581,7 +581,12 @@ export function EliteDraftBoardScreen({
     refetchQueue: queries.refetchQueue,
     refetchAutoPickStatuses: queries.refetchAutoPickStatuses,
     websocketUrl,
-    token: websocketToken,
+    // LS-8108: mirror the LS-8067 web fix — fall back to the in-memory JWT
+    // from useAuth when no explicit websocketToken prop is supplied. The
+    // native consumer (apps/app DraftBoardPage) does not pass one, so without
+    // this the draft socket defers forever and other open clients never
+    // receive live pick pushes until a manual refetch.
+    token: websocketToken ?? authToken ?? undefined,
   });
 
   const { timeRemaining } = useDraftTimer({
