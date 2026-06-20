@@ -131,12 +131,21 @@ server.tool(
 // --- aws_lambda_status ---
 server.tool(
   'aws_lambda_status',
-  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found.',
+  'Check Lambda function existence, state, runtime, and config. Returns exists:false if not found. Pass `functions: string[]` (1-10) for batch mode: per-function describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`. One failing function does not fail the others.',
   {
     function: z
       .string()
+      .optional()
       .describe(
-        'Lambda short name (e.g. "graphql", "rollbar-discord"). Expanded to legacy-sports-{env}-{name}.',
+        'Lambda short name (e.g. "graphql", "rollbar-discord"). Expanded to legacy-sports-{env}-{name}. Provide this OR `functions`, not both.',
+      ),
+    functions: z
+      .array(z.string())
+      .min(1)
+      .max(10)
+      .optional()
+      .describe(
+        'Batch mode: 1-10 Lambda short names. Describes run concurrently (cap 5) and return `{ statuses: { [name]: <entry> }, missing: [{ function, error }] }`.',
       ),
     environment: z
       .enum(['dev', 'prod'])
