@@ -413,7 +413,7 @@ describe('season-game-selector', () => {
   });
 
   describe('selectGamesForMatchup', () => {
-    it('should throw error if matchup not found', async () => {
+    it('should return empty result and not throw when matchup not found', async () => {
       const mockDb = {
         select: jest.fn().mockReturnValue({
           from: jest.fn().mockReturnValue({
@@ -425,9 +425,8 @@ describe('season-game-selector', () => {
         }),
       } as unknown as PublicDb;
 
-      await expect(selectGamesForMatchup(mockDb, 999, 1)).rejects.toThrow(
-        'Matchup 999 not found',
-      );
+      const result = await selectGamesForMatchup(mockDb, 999, 1);
+      expect(result).toEqual({ playersNeedingStatsLoading: [] });
     });
 
     it('should skip players with already selected games', async () => {

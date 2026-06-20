@@ -699,7 +699,13 @@ export async function selectGamesForMatchup(
     .then((rows) => rows[0]);
 
   if (!matchup) {
-    throw new Error(`Matchup ${matchupId} not found`);
+    // Matchup may have been deleted between SQS enqueue and processing.
+    // Treat as non-retriable: throwing here would re-drive the SQS message and
+    // spam Rollbar (LS-8145). Skip gracefully so the message is acked.
+    LOGGER.warn(
+      `Matchup ${matchupId} not found — skipping game selection (matchup may have been deleted)`,
+    );
+    return { playersNeedingStatsLoading: [] };
   }
 
   const pitcherStartsPerMatchup = matchup.pitcherStartsPerMatchup ?? 1;
