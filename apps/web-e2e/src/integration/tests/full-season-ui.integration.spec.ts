@@ -733,11 +733,13 @@ test.describe
     });
 
     await test.step('Verify matchup lineups have BATTERS and PITCHERS sections', async () => {
-      // The MatchupRosterComparison shows side-by-side lineups with
-      // section headers for "BATTERS" and "PITCHERS"
-      await expect(page.getByText('BATTERS').first()).toBeVisible({
-        timeout: 15000,
-      });
+      // The MatchupRosterComparison shows side-by-side lineups with section
+      // headers for "BATTERS" and "PITCHERS". These render only once the
+      // browser-side matchup query resolves; under nightly load that first
+      // query can be throttled (429) and the section never appears. Reload to
+      // re-fire the query before asserting (LS-8138 — backend 429s now retry in
+      // apollo-client; this is the belt-and-suspenders UI gate).
+      await reloadUntilVisible(page, page.getByText('BATTERS').first());
       await expect(page.getByText('PITCHERS').first()).toBeVisible();
 
       // The "Actual" column header confirms the lineup table is populated

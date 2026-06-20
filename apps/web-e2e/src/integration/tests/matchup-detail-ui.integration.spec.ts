@@ -312,9 +312,12 @@ test.describe
     await page.waitForLoadState('load');
 
     await test.step('WIN PROBABILITY label is visible', async () => {
-      await expect(page.getByText('WIN PROBABILITY').first()).toBeVisible({
-        timeout: 15_000,
-      });
+      // The win-probability panel renders only after the browser-side matchup
+      // query resolves; under nightly load that first request can be throttled
+      // (429), leaving the panel unmounted. Reload to re-fire it before
+      // asserting (LS-8138 — backend 429s now retry in apollo-client; this is
+      // the belt-and-suspenders UI gate).
+      await reloadUntilVisible(page, page.getByText('WIN PROBABILITY').first());
     });
 
     // Scope percentage assertions to the win-probability panel. The previous

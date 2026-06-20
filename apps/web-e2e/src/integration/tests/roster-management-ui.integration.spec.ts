@@ -338,11 +338,14 @@ test.describe
     });
 
     await test.step('Verify current team name is displayed', async () => {
-      // Wait for the Team Identity section to render — this heading only
-      // appears once getUserTeamId resolves and confirms the user has a team.
-      // Using a 30 s budget to account for Lambda cold starts in CI.
-      await expect(page.getByText('Team Identity').first()).toBeVisible({
-        timeout: 30000,
+      // The Team Identity section renders only once the browser getUserTeamId
+      // query resolves and confirms the user has a team. Under nightly load
+      // that first query can be throttled (429) and the form never mounts —
+      // which previously hung the whole test on the later "Save Name" click
+      // (120s timeout). Reload to re-fire the query before asserting, then the
+      // strict visibility check (LS-8138).
+      await reloadUntilVisible(page, page.getByText('Team Identity').first(), {
+        finalTimeoutMs: 30_000,
       });
       // Team.tsx V2 renders the name inside an <input> — use toHaveValue
       // instead of getByText, which only matches text nodes, not input values.

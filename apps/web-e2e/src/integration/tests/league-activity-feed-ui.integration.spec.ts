@@ -29,6 +29,7 @@ import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -280,6 +281,7 @@ test.describe
   test('Phase 5: Propose and accept a trade', async ({
     commissionerPage: page,
     managerPage2,
+    managerJwt2,
   }) => {
     await test.step('Navigate to trades tab', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/trades`);
@@ -401,14 +403,65 @@ test.describe
         managerPage2.getByTestId('trade-center-heading'),
       ).toBeVisible({ timeout: 15_000 });
 
-      // The trade was proposed moments ago in a separate browser context.
-      // TradingCenter uses `cache-and-network` so the query revalidates on
-      // mount — a generous wait lets the network response land before the
-      // assertion. LS-3769 removed the prior reload+retry workaround.
+      // Visibility tax (e2e-determinism antipattern #3): the trade was created
+      // in the commissioner's context moments ago. Before asserting manager 2's
+      // UI, confirm the pending offer is actually visible on manager 2's OWN
+      // read path — otherwise the browser query can mount before the receiving
+      // team's read replica reflects the write, and the Accept button never
+      // appears (the prior cache-and-network "generous wait" raced this, the
+      // dominant cause of this phase's nightly timeout — LS-8138).
+      const manager2 = await gqlFetch<{ userTeamId: number | null }>(
+        managerJwt2,
+        `query GetUserTeamId($leagueId: Int!) { userTeamId(leagueId: $leagueId) }`,
+        { leagueId: state.leagueId },
+      );
+      const manager2TeamId = manager2.userTeamId;
+      expect(
+        manager2TeamId,
+        'Manager 2 should have a team in the league',
+      ).toBeTruthy();
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              teamTradeOffers: Array<{
+                id: number;
+                status: string;
+                receivingTeamId: number;
+              }>;
+            }>(
+              managerJwt2,
+              `query GetTeamTradeOffers($teamId: Int!, $status: String) {
+                teamTradeOffers(teamId: $teamId, status: $status) {
+                  id status receivingTeamId
+                }
+              }`,
+              { teamId: manager2TeamId ?? 0, status: 'pending' },
+            ).catch(() => null);
+            return (
+              data?.teamTradeOffers.filter(
+                (t) => t.receivingTeamId === manager2TeamId,
+              ).length ?? 0
+            );
+          },
+          {
+            timeout: 30_000,
+            intervals: [1_000, 2_000, 3_000],
+            message:
+              'Pending incoming trade offer not yet visible on manager 2 read path',
+          },
+        )
+        .toBeGreaterThan(0);
+
+      // The offer is confirmed on the backend read path; reload to re-fire the
+      // TradingCenter query so the Accept button renders from fresh data
+      // (LS-8138 replaces the bare cache-and-network wait LS-3769 left behind).
       const acceptBtn = managerPage2
         .getByRole('button', { name: /Accept/i })
         .first();
-      await expect(acceptBtn).toBeVisible({ timeout: 15_000 });
+      await reloadUntilVisible(managerPage2, acceptBtn, {
+        finalTimeoutMs: 15_000,
+      });
       await acceptBtn.click();
 
       // Handle confirmation dialog if present

@@ -90,25 +90,7 @@ async function submitWaiverClaimViaUI(
   leagueId: number,
   playerName: string,
 ): Promise<void> {
-  await page.goto(`/baseball/league/${leagueId}/free-agents`);
-  await page.waitForLoadState('load');
-  await expect(page).toHaveURL(/\/free-agents/);
-
-  // Search by last name to reliably surface the specific player row.
-  // NOTE: isVisible({ timeout }) is deprecated in Playwright v1.40+ —
-  // the timeout is silently ignored.  Use waitFor() instead.
-  const searchInput = page.getByPlaceholder(/search players/i);
-  const searchVisible = await searchInput
-    .waitFor({ state: 'visible', timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (searchVisible) {
-    const lastName = playerName.split(' ').pop() ?? playerName;
-    await searchInput.fill(lastName);
-    // The 300ms search debounce + GQL round-trip + re-render is absorbed by
-    // `exactAddBtn.waitFor({ state: 'attached', ... })` below — that
-    // condition only resolves after the filtered row has rendered.
-  }
+  const lastName = playerName.split(' ').pop() ?? playerName;
 
   // Use the exact player name in the aria-label to avoid clicking a different
   // player's Add button when the search returns multiple results.
@@ -121,10 +103,43 @@ async function submitWaiverClaimViaUI(
   // the test to submit claims for the wrong player (LS-3829) seven consecutive
   // times when the target player was below the fold.
   const exactAddBtn = page.locator(`button[aria-label="Add ${playerName}"]`);
-  const isInDom = await exactAddBtn
-    .waitFor({ state: 'attached', timeout: 15_000 })
-    .then(() => true)
-    .catch(() => false);
+
+  // The free-agents list is rendered from a browser-side query that can be
+  // throttled (429) under nightly load, leaving the page empty so the Add
+  // button never mounts. Reload to re-fire the query and re-search, bounded so
+  // a genuinely-absent player still fails with the clear message below
+  // (LS-8138; backend 429s now retry in apollo-client, this is the UI-side
+  // belt-and-suspenders).
+  let isInDom = false;
+  for (let attempt = 0; attempt < 3 && !isInDom; attempt++) {
+    if (attempt === 0) {
+      await page.goto(`/baseball/league/${leagueId}/free-agents`);
+    } else {
+      await page.reload();
+    }
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL(/\/free-agents/);
+
+    // Search by last name to reliably surface the specific player row.
+    // NOTE: isVisible({ timeout }) is deprecated in Playwright v1.40+ —
+    // the timeout is silently ignored.  Use waitFor() instead.
+    const searchInput = page.getByPlaceholder(/search players/i);
+    const searchVisible = await searchInput
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (searchVisible) {
+      await searchInput.fill(lastName);
+      // The 300ms search debounce + GQL round-trip + re-render is absorbed by
+      // `exactAddBtn.waitFor({ state: 'attached', ... })` below — that
+      // condition only resolves after the filtered row has rendered.
+    }
+
+    isInDom = await exactAddBtn
+      .waitFor({ state: 'attached', timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+  }
   if (!isInDom) {
     throw new Error(
       `Add button for "${playerName}" was not found in the free-agents list. ` +

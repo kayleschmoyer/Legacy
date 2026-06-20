@@ -30,6 +30,7 @@ import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
@@ -484,11 +485,47 @@ test.describe
 
   test('Phase 6: Manager rejects the incoming trade offer', async ({
     managerPage1,
+    managerJwt1,
     commissionerJwt,
   }) => {
     // Dedicated managerPage1 context instead of switchUser — avoids the
     // AUTH_LOGOUT race documented in LS-3672/LS-3705/LS-3735 and fixed here
     // per LS-3767. The commissioner's browser context is untouched.
+
+    // Visibility tax (e2e-determinism antipattern #3): the offer was proposed
+    // in the commissioner's context in Phase 5. Before asserting manager 1's
+    // UI, confirm the pending offer is visible on manager 1's OWN read path —
+    // otherwise the TradingCenter query can mount before the receiving team's
+    // read replica reflects the write and the offer/Reject button never appears
+    // (the dominant cause of this phase's nightly timeout — LS-8138).
+    await test.step('Wait for the offer to be visible on manager 1 read path', async () => {
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              teamTradeOffers: Array<{ id: number; status: string }>;
+            }>(
+              managerJwt1,
+              `query GetTeamTradeOffers($teamId: Int!, $status: String) {
+                teamTradeOffers(teamId: $teamId, status: $status) { id status }
+              }`,
+              { teamId: state.managerTeamId, status: 'pending' },
+            ).catch(() => null);
+            return (
+              data?.teamTradeOffers.find(
+                (t) => t.id === state.proposedTradeId,
+              ) ?? null
+            );
+          },
+          {
+            timeout: 30_000,
+            intervals: [1_000, 2_000, 3_000],
+            message: `Pending trade ${state.proposedTradeId} not yet visible on manager 1 read path`,
+          },
+        )
+        .not.toBeNull();
+    });
+
     await test.step('Navigate to Trades tab as manager', async () => {
       await managerPage1.goto(`/baseball/league/${state.leagueId}/trades`);
       await managerPage1.waitForLoadState('load');
@@ -501,9 +538,14 @@ test.describe
       await expect(
         managerPage1.getByText('Incoming Offers', { exact: false }),
       ).toBeVisible({ timeout: 10000 });
-      await expect(managerPage1.getByText(/from:/i).first()).toBeVisible({
-        timeout: 15000,
-      });
+      // The offer is confirmed on the backend read path above; reload to
+      // re-fire the TradingCenter query so the incoming-offer row renders from
+      // fresh data even if the first mount was throttled (LS-8138).
+      await reloadUntilVisible(
+        managerPage1,
+        managerPage1.getByText(/from:/i).first(),
+        { finalTimeoutMs: 15_000 },
+      );
     });
 
     await test.step('Click Reject on the incoming offer', async () => {

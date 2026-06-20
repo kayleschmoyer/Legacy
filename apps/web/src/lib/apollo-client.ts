@@ -218,6 +218,31 @@ const retryLink = new RetryLink({
   },
 });
 
+// ─── Rate-limit retry link (HTTP 429 / 503) — LS-8138 ──────────────────────
+// The transient-network `retryLink` above deliberately skips HTTP responses, so
+// a 429 (Too Many Requests) or 503 (Service Unavailable) from a momentarily
+// saturated backend surfaces as a hard query failure with no retry — the UI
+// renders empty and never recovers without a manual reload. This was the
+// dominant root cause of the integration-suite "content never appears" tail:
+// under the shared live backend's load the browser's Apollo queries 429 with no
+// retry, so matchup/roster/search content never renders (the test-harness
+// `gqlFetch` calls already get Retry-After backoff via retry-with-backoff.ts,
+// but the browser app did not). A 429/503 means the request was rejected
+// *before* processing, so re-sending is safe even for mutations (no
+// double-apply). Placed innermost (just before `httpLink`) so it absorbs the
+// retries transparently below `errorLink` — a transient 429 that succeeds on
+// retry never flashes the global error toast. Bounded (max 4) with capped
+// exponential backoff + full jitter so it cannot become a retry storm.
+const rateLimitRetryLink = new RetryLink({
+  delay: { initial: 500, max: 8000, jitter: true },
+  attempts: {
+    max: 4,
+    retryIf: (error: unknown) =>
+      ServerError.is(error) &&
+      (error.statusCode === 429 || error.statusCode === 503),
+  },
+});
+
 // ─── Error link with token-refresh + retry ─────────────────────────────────
 
 export const errorLink = new ErrorLink(({ error, operation, forward }) => {
@@ -494,7 +519,7 @@ const typePolicies = {
 } as const;
 
 export const apolloClient = new ApolloClient({
-  link: from([retryLink, errorLink, authLink, httpLink]),
+  link: from([retryLink, errorLink, authLink, rateLimitRetryLink, httpLink]),
   cache: new InMemoryCache({ typePolicies }),
   defaultOptions: {
     watchQuery: {

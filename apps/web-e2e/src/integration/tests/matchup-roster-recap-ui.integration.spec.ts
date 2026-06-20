@@ -43,6 +43,7 @@
 import { expect } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { provisionCompletedMatchup } from '../helpers/provision-completed-matchup';
+import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { test } from '../fixtures/ui';
 
 // ---------------------------------------------------------------------------
@@ -174,14 +175,24 @@ test.describe
     });
 
     await test.step('Verify Actual and Proj column headers', async () => {
-      // Each section has "Actual" (gold) and "Proj" column headers
-      await expect(page.getByText('Actual').first()).toBeVisible();
-      await expect(page.getByText('Proj').first()).toBeVisible();
+      // Each section has "Actual" (gold) and "Proj" column headers. These
+      // hydrate with the comparison table's stat columns a render tick after
+      // the BATTERS/PITCHERS section headers above, so give them the same 20s
+      // budget as their siblings rather than the 5s default — the default
+      // raced the stat-column hydration under nightly load (LS-8138).
+      await expect(page.getByText('Actual').first()).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(page.getByText('Proj').first()).toBeVisible({
+        timeout: 20_000,
+      });
     });
 
     await test.step('Verify Pos column header', async () => {
       // The outer column header row has a "Pos" label for position slot
-      await expect(page.getByText('Pos').first()).toBeVisible();
+      await expect(page.getByText('Pos').first()).toBeVisible({
+        timeout: 20_000,
+      });
     });
 
     await test.step('Verify numeric score values are rendered', async () => {
@@ -207,15 +218,18 @@ test.describe
     await test.step('Navigate and wait for roster comparison to load', async () => {
       await page.goto(matchupUrl);
       await page.waitForLoadState('load');
-      // Wait for roster comparison to finish loading
-      await expect(page.getByText('BATTERS').first()).toBeVisible({
-        timeout: 20_000,
+      // The roster comparison (and its bench toggle) render only once the
+      // browser-side matchup query resolves; reload to re-fire it if the first
+      // request was throttled under load, so the "Show Bench" assertion below
+      // isn't racing an unmounted comparison (LS-8138).
+      await reloadUntilVisible(page, page.getByText('BATTERS').first(), {
+        finalTimeoutMs: 20_000,
       });
     });
 
     await test.step('"Show Bench" button is visible', async () => {
       await expect(page.getByText('Show Bench').first()).toBeVisible({
-        timeout: 10_000,
+        timeout: 15_000,
       });
     });
 
