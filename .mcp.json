@@ -89,7 +89,10 @@
         "--import",
         "tsx",
         "tools/mcp/rollbar-server/src/index.ts"
-      ]
+      ],
+      "env": {
+        "TSX_TSCONFIG_PATH": "tools/mcp/rollbar-server/tsconfig.json"
+      }
     },
     "stripe": {
       "command": "npx",

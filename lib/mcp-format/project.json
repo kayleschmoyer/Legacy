@@ -9,7 +9,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/lib/mcp-format"],
       "options": {
-        "jestConfig": "lib/mcp-format/jest.config.ts"
+        "jestConfig": "lib/mcp-format/jest.config.cts"
       }
     },
     "typecheck": {

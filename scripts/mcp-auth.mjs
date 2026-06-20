@@ -46,6 +46,7 @@
  *   MCP_JIRA_URL               — API Gateway invoke URL for legacy-sports-jira
  *   MCP_GITHUB_URL             — API Gateway invoke URL for legacy-sports-github
  *   MCP_CI_URL                 — API Gateway invoke URL for legacy-sports-ci
+ *   MCP_DB_URL                 — API Gateway invoke URL for legacy-sports-db-admin (LS-8117/LS-8139, optional)
  *
  * Also mirrors the same MCP_* vars into Claude Code settings#/env at two paths
  * so `${MCP_*}` substitution in .mcp.json resolves — and so the headersHelper
@@ -58,8 +59,8 @@
  *   <repo>/.claude/settings.local.json     — project-local; transitional safety
  *                                            net for Claude Desktop (LS-4592).
  *
- * Also mirrors the three HTTP-transport MCP server definitions
- * (legacy-sports-github/jira/ci) into ~/.claude.json#/mcpServers (user-scope,
+ * Also mirrors the four HTTP-transport MCP server definitions
+ * (legacy-sports-github/jira/ci/db-admin) into ~/.claude.json#/mcpServers (user-scope,
  * top-level). Claude Code 2.1.100 silently drops HTTP entries from project
  * .mcp.json and from ~/.claude.json#/projects.<path>.mcpServers; the top-level
  * user-scope block is the only working surface as of that release (LS-4595).
@@ -141,6 +142,7 @@ const CLAUDE_SETTINGS_MIRRORED_KEYS = [
   'MCP_JIRA_URL',
   'MCP_GITHUB_URL',
   'MCP_CI_URL',
+  'MCP_DB_URL',
 ];
 
 // HTTP-transport MCP server definitions mirrored into
@@ -165,6 +167,14 @@ const HTTP_MCP_SERVERS = [
     name: 'legacy-sports-ci',
     envKey: 'MCP_CI_URL',
     fallbackUrl: 'https://i8yjn4el7d.execute-api.us-east-1.amazonaws.com',
+  },
+  {
+    name: 'legacy-sports-db-admin',
+    envKey: 'MCP_DB_URL',
+    // No hardcoded fallback — db-admin was added later (LS-8117) and the
+    // invoke URL is unstable across initial deploys. Run `terraform apply`
+    // then re-run with --force to pull the real URL from SSM.
+    fallbackUrl: null,
   },
 ];
 
@@ -523,6 +533,7 @@ async function main() {
     ['jira', 'MCP_JIRA_URL'],
     ['github', 'MCP_GITHUB_URL'],
     ['ci', 'MCP_CI_URL'],
+    ['db', 'MCP_DB_URL'],
   ]) {
     if (!env[envKey] || FORCE_MODE) {
       const url = readApiUrlFromSsm(name, tfEnv);
@@ -556,6 +567,10 @@ async function main() {
     'MCP_JIRA_URL',
     'MCP_GITHUB_URL',
     'MCP_CI_URL',
+    // MCP_DB_URL is intentionally optional — db-admin (LS-8117) was added
+    // after the original three, and its SSM param may not exist on machines
+    // whose last `terraform apply` predates it. We still pull it above and
+    // mirror it into ~/.claude.json when present.
   ];
   const finalEnv = readEnvLocal();
   const missing = REQUIRED_VARS.filter((k) => !finalEnv[k]);
@@ -614,14 +629,18 @@ async function main() {
   // .mcp.json, so the mirror carries no static credential — the helper mints a
   // short-lived per-connect token from the machine secret in settings#/env.
   if (USER_CLAUDE_JSON_PATH) {
-    const entries = HTTP_MCP_SERVERS.map(({ name, envKey, fallbackUrl }) => ({
-      name,
-      definition: {
-        type: 'http',
-        url: finalEnv[envKey] ?? fallbackUrl,
-        headersHelper: MCP_HEADERS_HELPER,
-      },
-    }));
+    const entries = HTTP_MCP_SERVERS.map(({ name, envKey, fallbackUrl }) => {
+      const url = finalEnv[envKey] ?? fallbackUrl;
+      if (!url) return null;
+      return {
+        name,
+        definition: {
+          type: 'http',
+          url,
+          headersHelper: MCP_HEADERS_HELPER,
+        },
+      };
+    }).filter(Boolean);
     mergeMcpServersIntoUserClaudeJson(USER_CLAUDE_JSON_PATH, entries);
   } else {
     LOGGER.warn(
@@ -640,7 +659,7 @@ async function main() {
     `.claude/settings.local.json#/env mirrors the same vars (project-local; transitional safety net for Claude Desktop).`,
   );
   LOGGER.info(
-    `~/.claude.json#/mcpServers mirrors legacy-sports-{github,jira,ci} HTTP defs with the headersHelper (no static credential; Claude Code 2.1.100+ workaround).`,
+    `~/.claude.json#/mcpServers mirrors legacy-sports-{github,jira,ci,db-admin} HTTP defs with the headersHelper (no static credential; Claude Code 2.1.100+ workaround). db-admin is mirrored only when MCP_DB_URL was resolved.`,
   );
   LOGGER.info(
     'Done. Restart Claude Code for the refreshed machine credential to take effect.',
