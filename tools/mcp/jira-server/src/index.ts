@@ -469,9 +469,15 @@ server.tool(
 // --- jira_view ---
 server.tool(
   'jira_view',
-  'View ticket details including linked blockers.',
+  'View ticket details including linked blockers. Returns a compact markdown card by default; pass format: "json" for the structured shape.',
   {
     key: z.string().describe('Ticket key'),
+    format: z
+      .enum(['markdown', 'json'])
+      .optional()
+      .describe(
+        'Output format. "markdown" (default) returns a compact card optimized for agent reading; "json" returns the legacy structured shape for programmatic consumers.',
+      ),
   },
   async (params) => view(params),
 );

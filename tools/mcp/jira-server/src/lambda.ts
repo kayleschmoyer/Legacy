@@ -292,8 +292,11 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_view',
-    'View ticket details including linked blockers.',
-    { key: z.string() },
+    'View ticket details including linked blockers. Returns a compact markdown card by default; pass format: "json" for the structured shape.',
+    {
+      key: z.string(),
+      format: z.enum(['markdown', 'json']).optional(),
+    },
     async (p) => view(p),
   );
   server.tool(
