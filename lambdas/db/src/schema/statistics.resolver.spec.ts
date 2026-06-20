@@ -255,6 +255,30 @@ describe('Statistics Resolver', () => {
         }),
       );
     });
+
+    it('passes playerType filter to both data and count service calls (LS-7145)', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver(
+        {},
+        { playerType: 'hitter' },
+        emptyCtx,
+        undefined as never,
+      );
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ playerType: 'hitter' }),
+        }),
+      );
+      expect(mockStatistics.getCareerBattingStatsCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ playerType: 'hitter' }),
+        }),
+      );
+    });
   });
 
   // ── careerPitchingStats ────────────────────────────────────────────────────

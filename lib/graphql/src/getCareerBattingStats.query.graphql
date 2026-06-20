@@ -15,6 +15,7 @@ query GetCareerBattingStats(
   $searchTerm: String
   $position: String
   $team: String
+  $playerType: String
 ) {
   careerBattingStats(
     first: $first
@@ -28,6 +29,7 @@ query GetCareerBattingStats(
     searchTerm: $searchTerm
     position: $position
     team: $team
+    playerType: $playerType
   ) {
     edges {
       node {

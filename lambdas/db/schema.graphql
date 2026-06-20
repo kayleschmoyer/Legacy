@@ -3097,6 +3097,7 @@ type Query {
     minRBI: Int
     orderBy: String
     orderDirection: String
+    playerType: String
     position: String
     searchTerm: String
     team: String

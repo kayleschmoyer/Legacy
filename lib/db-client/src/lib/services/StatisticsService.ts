@@ -58,6 +58,8 @@ export interface StatisticsFilters {
   searchTerm?: string;
   position?: string;
   team?: string;
+  /** 'hitter' excludes pure pitchers; 'pitcher' keeps only pitchers (LS-7145). */
+  playerType?: string;
 }
 
 export interface SeasonStatisticsFilters {
@@ -204,6 +206,7 @@ export class StatisticsService {
       searchTerm: queryOptions.filters?.searchTerm,
       position: queryOptions.filters?.position,
       team: queryOptions.filters?.team,
+      playerType: queryOptions.filters?.playerType,
     };
 
     const options: QueryOptions = {

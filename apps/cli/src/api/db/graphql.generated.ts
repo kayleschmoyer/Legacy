@@ -3129,6 +3129,7 @@ export type QueryCareerBattingStatsArgs = {
   minRBI?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  playerType?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;

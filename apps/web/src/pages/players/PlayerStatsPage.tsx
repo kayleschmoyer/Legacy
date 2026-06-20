@@ -22,6 +22,11 @@ import type {
 } from '@legacy-sports/shared-components/players';
 import { LOGGER } from '@legacy-sports/logging';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
+import {
+  Sport,
+  useGetPlayerIdByBrefIdQuery,
+  useGetUserLeaguesQuery,
+} from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
@@ -37,11 +42,6 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { PlayerDetailModal } from '../../components/PlayerDetailModal';
-import {
-  Sport,
-  useGetPlayerIdByBrefIdQuery,
-  useGetUserLeaguesQuery,
-} from '@legacy-sports/graphql';
 import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
 import { useFeatureValue } from '../../context/GrowthBookProvider';
 

@@ -39,6 +39,31 @@ function battingTeamFilter(team: string): SQL<unknown> {
 }
 
 /**
+ * Restrict career-batting rows to a player type using the
+ * `player_eligible_positions` materialized view (LS-7145).
+ *
+ * - `'hitter'` keeps any player with at least one non-pitching eligible
+ *   position, so pure pitchers are excluded while two-way players (e.g. Ohtani,
+ *   eligible at both DH and SP) remain visible.
+ * - `'pitcher'` keeps only players eligible at a pitching slot.
+ *
+ * Pitching position codes mirror `PITCHING_POSITIONS` (`SP`, `RP`, `P`) from
+ * `@legacy-sports/utils`. Returns `undefined` for unrecognized values so callers
+ * skip an empty condition.
+ */
+export function battingPlayerTypeFilter(
+  playerType: string,
+): SQL<unknown> | undefined {
+  if (playerType === 'hitter') {
+    return sql`${PublicSchema.careerBatting.playerId} IN (SELECT player_id FROM public.player_eligible_positions WHERE position NOT IN ('SP', 'RP', 'P'))`;
+  }
+  if (playerType === 'pitcher') {
+    return sql`${PublicSchema.careerBatting.playerId} IN (SELECT player_id FROM public.player_eligible_positions WHERE position IN ('SP', 'RP', 'P'))`;
+  }
+  return undefined;
+}
+
+/**
  * Type-safe query builder using Drizzle's recommended conditional patterns
  * This approach avoids .$dynamic() by building complete queries conditionally
  * following Drizzle best practices for complex queries
@@ -58,6 +83,8 @@ export interface StatisticsQueryFilters {
   searchTerm?: string;
   position?: string;
   team?: string;
+  /** 'hitter' excludes pure pitchers; 'pitcher' keeps only pitchers (LS-7145). */
+  playerType?: string;
 }
 
 /**
@@ -238,6 +265,12 @@ export class CareerBattingQueryBuilder {
     }
     if (filters.team !== undefined) {
       battingConditions.push(battingTeamFilter(filters.team));
+    }
+    if (filters.playerType !== undefined) {
+      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
+      if (playerTypeCondition) {
+        battingConditions.push(playerTypeCondition);
+      }
     }
 
     // Determine ordering clause
@@ -536,6 +569,12 @@ export class CareerBattingQueryBuilder {
     if (filters.team !== undefined) {
       battingConditions.push(battingTeamFilter(filters.team));
     }
+    if (filters.playerType !== undefined) {
+      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
+      if (playerTypeCondition) {
+        battingConditions.push(playerTypeCondition);
+      }
+    }
 
     // Add search condition if provided
     const allConditions = [...battingConditions];
@@ -602,6 +641,12 @@ export class CareerBattingQueryBuilder {
     if (filters.team !== undefined) {
       conditions.push(battingTeamFilter(filters.team));
     }
+    if (filters.playerType !== undefined) {
+      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
+      if (playerTypeCondition) {
+        conditions.push(playerTypeCondition);
+      }
+    }
 
     // Build query using function-based approach
     const baseQuery = () =>
@@ -649,6 +694,12 @@ export class CareerBattingQueryBuilder {
     }
     if (filters.team !== undefined) {
       conditions.push(battingTeamFilter(filters.team));
+    }
+    if (filters.playerType !== undefined) {
+      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
+      if (playerTypeCondition) {
+        conditions.push(playerTypeCondition);
+      }
     }
     if (filters.position) {
       conditions.push(
@@ -710,6 +761,12 @@ export class CareerBattingQueryBuilder {
     }
     if (filters.team !== undefined) {
       conditions.push(battingTeamFilter(filters.team));
+    }
+    if (filters.playerType !== undefined) {
+      const playerTypeCondition = battingPlayerTypeFilter(filters.playerType);
+      if (playerTypeCondition) {
+        conditions.push(playerTypeCondition);
+      }
     }
     if (filters.position) {
       conditions.push(

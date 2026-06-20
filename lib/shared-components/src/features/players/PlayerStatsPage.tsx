@@ -192,6 +192,20 @@ export function stepValue(
   return Number(clamped.toFixed(6));
 }
 
+/**
+ * Resolve the `playerType` query filter for the batting grid from the active
+ * view mode (LS-7145). The Hitters tab must exclude pure pitchers, so it filters
+ * the batting query to `playerType: 'hitter'`. Combined and Pitchers leave it
+ * undefined — Combined intentionally shows every batter, and the Pitchers grid
+ * is already pitcher-only via the separate `careerPitchingStats` query. Extracted
+ * as a pure function so the mapping is unit-testable without mounting the shell.
+ */
+export function battingPlayerTypeForViewMode(
+  viewMode: 'combined' | 'hitters' | 'pitchers',
+): 'hitter' | undefined {
+  return viewMode === 'hitters' ? 'hitter' : undefined;
+}
+
 export interface PlayerStatsPageProps {
   title?: string;
   initialViewMode?: PlayerStatsViewMode;
@@ -364,8 +378,13 @@ export function PlayerStatsPage({
       minHomeRuns: appliedFilters.minHR > 0 ? appliedFilters.minHR : undefined,
       minBattingAvg:
         appliedFilters.minAVG > 0 ? appliedFilters.minAVG : undefined,
+      // The Hitters tab must exclude pure pitchers from the batting grid; the
+      // tab flags alone only toggle grid visibility (LS-7145). Two-way players
+      // (e.g. Ohtani) retain a non-pitching eligible position and so remain
+      // visible. Combined keeps everyone (playerType left undefined).
+      playerType: battingPlayerTypeForViewMode(viewMode),
     }),
-    [appliedFilters],
+    [appliedFilters, viewMode],
   );
 
   const pitchingParams = useMemo(

@@ -3135,6 +3135,7 @@ export type QueryCareerBattingStatsArgs = {
   minRBI?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
+  playerType?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
@@ -9084,6 +9085,7 @@ export type GetCareerBattingStatsQueryVariables = Exact<{
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
+  playerType?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type GetCareerBattingStatsQuery = {
@@ -22741,6 +22743,7 @@ export const GetCareerBattingStats = gql`
     $searchTerm: String
     $position: String
     $team: String
+    $playerType: String
   ) {
     careerBattingStats(
       first: $first
@@ -22754,6 +22757,7 @@ export const GetCareerBattingStats = gql`
       searchTerm: $searchTerm
       position: $position
       team: $team
+      playerType: $playerType
     ) {
       edges {
         node {
@@ -22797,6 +22801,7 @@ export const GetCareerBattingStats = gql`
  *      searchTerm: // value for 'searchTerm'
  *      position: // value for 'position'
  *      team: // value for 'team'
+ *      playerType: // value for 'playerType'
  *   },
  * });
  */

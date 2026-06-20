@@ -1,4 +1,5 @@
 import {
+  battingPlayerTypeForViewMode,
   type ClearFiltersSetters,
   createClearFiltersHandler,
   stepValue,
@@ -157,5 +158,23 @@ describe('stepValue (LS-7806)', () => {
   it('snaps an off-grid HR value (e.g. a hand-typed URL of 762) onto the step grid', () => {
     expect(stepValue(762, 5, 0, 800, 5)).toBe(765);
     expect(stepValue(762, -5, 0, 800, 5)).toBe(755);
+  });
+});
+
+// The Hitters tab must exclude pitchers from the batting grid (LS-7145). The
+// view-mode→playerType mapping drives the batting query filter; only 'hitters'
+// constrains it, so Combined keeps every batter and Pitchers relies on the
+// separate pitcher-only grid.
+describe('battingPlayerTypeForViewMode (LS-7145)', () => {
+  it("returns 'hitter' for the Hitters tab so pitchers are filtered out", () => {
+    expect(battingPlayerTypeForViewMode('hitters')).toBe('hitter');
+  });
+
+  it('returns undefined for Combined so the batting grid shows everyone', () => {
+    expect(battingPlayerTypeForViewMode('combined')).toBeUndefined();
+  });
+
+  it('returns undefined for Pitchers (the batting grid is hidden there)', () => {
+    expect(battingPlayerTypeForViewMode('pitchers')).toBeUndefined();
   });
 });

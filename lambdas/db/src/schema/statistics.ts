@@ -927,6 +927,7 @@ builder.queryField('careerBattingStats', (t) =>
       searchTerm: t.arg.string({ required: false }),
       position: t.arg.string({ required: false }),
       team: t.arg.string({ required: false }),
+      playerType: t.arg.string({ required: false }),
     },
     resolve: async (root, args) => {
       // Convert relay pagination args to offset/limit, capping at MAX_CAREER_BATTING_LIMIT
@@ -957,6 +958,7 @@ builder.queryField('careerBattingStats', (t) =>
             searchTerm: args.searchTerm || undefined,
             position: args.position || undefined,
             team: args.team || undefined,
+            playerType: args.playerType || undefined,
           },
         }),
         dbService.statistics.getCareerBattingStatsCount({
@@ -968,6 +970,7 @@ builder.queryField('careerBattingStats', (t) =>
             searchTerm: args.searchTerm || undefined,
             position: args.position || undefined,
             team: args.team || undefined,
+            playerType: args.playerType || undefined,
           },
         }),
       ]);

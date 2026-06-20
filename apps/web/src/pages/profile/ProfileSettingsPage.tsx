@@ -21,8 +21,6 @@ import {
 import { BrandIcon } from '@legacy-sports/shared-components/icons';
 import { Input, ScrollView, Spinner, styled, Theme } from 'tamagui';
 import { Monitor, Moon, Sun } from '@tamagui/lucide-icons';
-import TwoFactorSection from '../../components/profile/TwoFactorSection';
-import { PageMeta } from '../../components/PageMeta';
 import {
   useGetUserByIdQuery,
   useMyIdentitiesQuery,
@@ -30,6 +28,8 @@ import {
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
+import TwoFactorSection from '../../components/profile/TwoFactorSection';
+import { PageMeta } from '../../components/PageMeta';
 import { AvatarPicker } from '../../components/common';
 import {
   type ThemePreference,

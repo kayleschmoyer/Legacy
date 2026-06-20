@@ -1,5 +1,6 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
+  battingPlayerTypeFilter,
   getCareerBattingOrderByClause,
   type QueryOptions,
 } from './TypeSafeQueryBuilder';
@@ -75,5 +76,37 @@ describe('getCareerBattingOrderByClause', () => {
       expect(sql).toMatch(/\* 4/); // hr weight still present in numerator
       expect(sql).toMatch(/DESC NULLS LAST$/);
     });
+  });
+});
+
+// The Hitters tab must exclude pure pitchers from the batting grid while keeping
+// two-way players visible (LS-7145). The filter restricts career_batting rows via
+// the player_eligible_positions materialized view, where pitchers are stored as
+// 'SP'/'RP' rows.
+describe('battingPlayerTypeFilter (LS-7145)', () => {
+  function render(playerType: string): string | undefined {
+    const condition = battingPlayerTypeFilter(playerType);
+    return condition ? dialect.sqlToQuery(condition).sql : undefined;
+  }
+
+  it("excludes pitching positions for 'hitter' so pure pitchers drop out", () => {
+    const sql = render('hitter');
+    // Keeps any player with a non-pitching eligible position (two-way players
+    // such as Ohtani retain their DH/field rows and stay visible).
+    expect(sql).toMatch(/"career_batting"\."player_id" IN \(/);
+    expect(sql).toMatch(/player_eligible_positions/);
+    expect(sql).toMatch(/position NOT IN \('SP', 'RP', 'P'\)/);
+  });
+
+  it("keeps only pitching positions for 'pitcher'", () => {
+    const sql = render('pitcher');
+    expect(sql).toMatch(/player_eligible_positions/);
+    expect(sql).toMatch(/position IN \('SP', 'RP', 'P'\)/);
+    expect(sql).not.toMatch(/NOT IN/);
+  });
+
+  it('returns undefined for unrecognized player types (no condition added)', () => {
+    expect(battingPlayerTypeFilter('combined')).toBeUndefined();
+    expect(battingPlayerTypeFilter('')).toBeUndefined();
   });
 });
