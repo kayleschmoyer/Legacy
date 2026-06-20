@@ -47,6 +47,7 @@ export const MCP_SCOPE = {
   jira: 'mcp/jira',
   ci: 'mcp/ci',
   db: 'mcp/db',
+  rollbar: 'mcp/rollbar',
 } as const;
 
 const RECOVERY_HINT =

@@ -81,19 +81,6 @@
         "tools/mcp/dev-process-server/src/index.ts"
       ]
     },
-    "legacy-sports-rollbar": {
-      "command": "node",
-      "args": [
-        ".github/copilot/hooks/mcp-bootstrap.mjs",
-        "node",
-        "--import",
-        "tsx",
-        "tools/mcp/rollbar-server/src/index.ts"
-      ],
-      "env": {
-        "TSX_TSCONFIG_PATH": "tools/mcp/rollbar-server/tsconfig.json"
-      }
-    },
     "stripe": {
       "command": "npx",
       "args": ["-y", "@stripe/mcp@0.3.3", "--tools=all"],

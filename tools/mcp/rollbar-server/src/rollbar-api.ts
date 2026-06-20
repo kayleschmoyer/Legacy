@@ -58,7 +58,7 @@ interface RollbarRequestOptions {
 
 /** Execute a single GET against the Rollbar API and unwrap its envelope. */
 async function rollbarGetOnce<T>(opts: RollbarRequestOptions): Promise<T> {
-  const token = getRollbarToken();
+  const token = await getRollbarToken();
 
   let url = `${ROLLBAR_API_BASE}${opts.path}`;
   if (opts.query) {

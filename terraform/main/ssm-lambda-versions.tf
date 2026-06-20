@@ -206,6 +206,22 @@ resource "aws_ssm_parameter" "mcp_db_lambda_version" {
   })
 }
 
+resource "aws_ssm_parameter" "mcp_rollbar_lambda_version" {
+  name        = "/legacy-sports/${var.environment}/lambda/mcp-rollbar/version"
+  description = "Current version of the MCP Rollbar server Lambda function"
+  type        = "String"
+  value       = "initial"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  tags = merge(local.common_tags, {
+    Component = "lambda-versioning"
+    Function  = "mcp-rollbar"
+  })
+}
+
 # =============================================================================
 # CI INFRASTRUCTURE PARAMETERS
 # =============================================================================
@@ -256,5 +272,6 @@ output "lambda_version_parameters" {
     mcp_github      = aws_ssm_parameter.mcp_github_lambda_version.name
     mcp_ci          = aws_ssm_parameter.mcp_ci_lambda_version.name
     mcp_db          = aws_ssm_parameter.mcp_db_lambda_version.name
+    mcp_rollbar     = aws_ssm_parameter.mcp_rollbar_lambda_version.name
   }
 }

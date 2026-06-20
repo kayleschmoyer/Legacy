@@ -1,4 +1,7 @@
-import { ROLLBAR_READ_TOKEN_ENV } from './auth';
+import {
+  ROLLBAR_READ_TOKEN_ENV,
+  _resetRollbarTokenCacheForTests,
+} from './auth';
 import { ROLLBAR_API_BASE, rollbarGet } from './rollbar-api';
 
 describe('rollbarGet', () => {
@@ -6,6 +9,7 @@ describe('rollbarGet', () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
+    _resetRollbarTokenCacheForTests();
     process.env[ROLLBAR_READ_TOKEN_ENV] = 'read-token';
   });
 

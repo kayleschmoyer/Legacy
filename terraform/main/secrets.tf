@@ -43,6 +43,13 @@ variable "rollbar_access_token" {
   sensitive   = true
 }
 
+variable "rollbar_read_access_token" {
+  description = "Rollbar project access token with the \"read\" scope. Consumed by the hosted MCP Rollbar Lambda (LS-8142) to query the Rollbar read API. Distinct from rollbar_access_token (post_server_item / write)."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "rollbar_client_access_token" {
   description = "Rollbar post_client_item access token for browser/mobile error reporting. Used as VITE_ROLLBAR_ACCESS_TOKEN (web) and EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN (mobile). Distinct from rollbar_access_token (server-side)."
   type        = string
@@ -414,6 +421,26 @@ resource "aws_secretsmanager_secret" "rollbar_access_token" {
 resource "aws_secretsmanager_secret_version" "rollbar_access_token" {
   secret_id     = aws_secretsmanager_secret.rollbar_access_token.id
   secret_string = var.rollbar_access_token
+}
+
+# Rollbar read-scope project access token, consumed by the hosted MCP Rollbar
+# Lambda (LS-8142) to query the Rollbar read API. The Lambda receives the secret
+# NAME via ROLLBAR_READ_TOKEN_SECRET_NAME and fetches the value at cold-start.
+# Distinct from rollbar_access_token above (the post_server_item / write token
+# used by other Lambdas for error reporting). NOTE: the value is managed by
+# Terraform below, so it remains in TF state — protect the state backend
+# accordingly (same posture as rollbar_access_token).
+resource "aws_secretsmanager_secret" "rollbar_read_access_token" {
+  name        = "${var.environment}/rollbar-read-access-token"
+  description = "Rollbar read-scope project access token for the hosted MCP Rollbar server Lambda (LS-8142)"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "rollbar_read_access_token" {
+  count         = var.rollbar_read_access_token != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.rollbar_read_access_token.id
+  secret_string = var.rollbar_read_access_token
 }
 
 # =============================================================================

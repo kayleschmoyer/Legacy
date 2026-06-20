@@ -143,6 +143,7 @@ const CLAUDE_SETTINGS_MIRRORED_KEYS = [
   'MCP_GITHUB_URL',
   'MCP_CI_URL',
   'MCP_DB_URL',
+  'MCP_ROLLBAR_URL',
 ];
 
 // HTTP-transport MCP server definitions mirrored into
@@ -172,6 +173,14 @@ const HTTP_MCP_SERVERS = [
     name: 'legacy-sports-db-admin',
     envKey: 'MCP_DB_URL',
     // No hardcoded fallback — db-admin was added later (LS-8117) and the
+    // invoke URL is unstable across initial deploys. Run `terraform apply`
+    // then re-run with --force to pull the real URL from SSM.
+    fallbackUrl: null,
+  },
+  {
+    name: 'legacy-sports-rollbar',
+    envKey: 'MCP_ROLLBAR_URL',
+    // No hardcoded fallback — rollbar was added later (LS-8142) and the
     // invoke URL is unstable across initial deploys. Run `terraform apply`
     // then re-run with --force to pull the real URL from SSM.
     fallbackUrl: null,
@@ -534,6 +543,7 @@ async function main() {
     ['github', 'MCP_GITHUB_URL'],
     ['ci', 'MCP_CI_URL'],
     ['db', 'MCP_DB_URL'],
+    ['rollbar', 'MCP_ROLLBAR_URL'],
   ]) {
     if (!env[envKey] || FORCE_MODE) {
       const url = readApiUrlFromSsm(name, tfEnv);
@@ -571,6 +581,8 @@ async function main() {
     // after the original three, and its SSM param may not exist on machines
     // whose last `terraform apply` predates it. We still pull it above and
     // mirror it into ~/.claude.json when present.
+    // MCP_ROLLBAR_URL is likewise optional — added in LS-8142 alongside the
+    // stdio-to-hosted migration of legacy-sports-rollbar.
   ];
   const finalEnv = readEnvLocal();
   const missing = REQUIRED_VARS.filter((k) => !finalEnv[k]);
@@ -659,7 +671,7 @@ async function main() {
     `.claude/settings.local.json#/env mirrors the same vars (project-local; transitional safety net for Claude Desktop).`,
   );
   LOGGER.info(
-    `~/.claude.json#/mcpServers mirrors legacy-sports-{github,jira,ci,db-admin} HTTP defs with the headersHelper (no static credential; Claude Code 2.1.100+ workaround). db-admin is mirrored only when MCP_DB_URL was resolved.`,
+    `~/.claude.json#/mcpServers mirrors legacy-sports-{github,jira,ci,db-admin,rollbar} HTTP defs with the headersHelper (no static credential; Claude Code 2.1.100+ workaround). db-admin and rollbar are mirrored only when their MCP_*_URL was resolved.`,
   );
   LOGGER.info(
     'Done. Restart Claude Code for the refreshed machine credential to take effect.',

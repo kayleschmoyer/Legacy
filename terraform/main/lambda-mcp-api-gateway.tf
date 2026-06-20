@@ -52,26 +52,29 @@
 
 locals {
   mcp_servers_map = {
-    jira   = "${local.name_prefix}-mcp-jira"
-    github = "${local.name_prefix}-mcp-github"
-    ci     = "${local.name_prefix}-mcp-ci"
-    db     = "${local.name_prefix}-mcp-db"
+    jira    = "${local.name_prefix}-mcp-jira"
+    github  = "${local.name_prefix}-mcp-github"
+    ci      = "${local.name_prefix}-mcp-ci"
+    db      = "${local.name_prefix}-mcp-db"
+    rollbar = "${local.name_prefix}-mcp-rollbar"
   }
 
   # Maps each MCP server key to its Lambda invoke ARN and function name.
   # Using explicit resource references (not constructed strings) creates implicit
   # dependencies so API Gateway is not configured before the Lambdas exist.
   mcp_lambda_invoke_arns = {
-    jira   = aws_lambda_function.mcp_jira.invoke_arn
-    github = aws_lambda_function.mcp_github.invoke_arn
-    ci     = aws_lambda_function.mcp_ci.invoke_arn
-    db     = aws_lambda_function.mcp_db.invoke_arn
+    jira    = aws_lambda_function.mcp_jira.invoke_arn
+    github  = aws_lambda_function.mcp_github.invoke_arn
+    ci      = aws_lambda_function.mcp_ci.invoke_arn
+    db      = aws_lambda_function.mcp_db.invoke_arn
+    rollbar = aws_lambda_function.mcp_rollbar.invoke_arn
   }
   mcp_lambda_function_names = {
-    jira   = aws_lambda_function.mcp_jira.function_name
-    github = aws_lambda_function.mcp_github.function_name
-    ci     = aws_lambda_function.mcp_ci.function_name
-    db     = aws_lambda_function.mcp_db.function_name
+    jira    = aws_lambda_function.mcp_jira.function_name
+    github  = aws_lambda_function.mcp_github.function_name
+    ci      = aws_lambda_function.mcp_ci.function_name
+    db      = aws_lambda_function.mcp_db.function_name
+    rollbar = aws_lambda_function.mcp_rollbar.function_name
   }
 
   # Cognito OIDC issuer URL (well-known shape — JWKS lives at /.well-known/jwks.json).
@@ -288,6 +291,10 @@ resource "aws_cognito_resource_server" "mcp" {
   scope {
     scope_name        = "db"
     scope_description = "Invoke the DB MCP server"
+  }
+  scope {
+    scope_name        = "rollbar"
+    scope_description = "Invoke the Rollbar MCP server"
   }
 }
 
