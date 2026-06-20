@@ -96,6 +96,12 @@ resource "aws_lambda_function" "rollbar_discord" {
 
       # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
       ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
+
+      # LS-8203 — per-status notification behavior for Rollbar item status changes.
+      # Allowed values: "suppress" (drop the embed) | "recolor" (post a non-error embed).
+      ROLLBAR_DISCORD_RESOLVED_BEHAVIOR = "suppress"
+      ROLLBAR_DISCORD_ARCHIVED_BEHAVIOR = "suppress"
+      ROLLBAR_DISCORD_MUTED_BEHAVIOR    = "recolor"
     }
   }
 

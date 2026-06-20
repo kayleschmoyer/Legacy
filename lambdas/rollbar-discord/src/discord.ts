@@ -12,6 +12,72 @@ const COLOR_ERROR = 0xed4245; // Red
 const COLOR_WARNING = 0xfee75c; // Yellow
 const COLOR_OK = 0x57f287; // Green
 const COLOR_INFO = 0x5865f2; // Blurple
+const COLOR_MUTED = 0x99aab5; // Gray
+
+type StatusBehavior = 'suppress' | 'recolor';
+type ResolvedStatus = 'resolved' | 'archived' | 'muted';
+
+function parseBehavior(
+  raw: string | undefined,
+  fallback: StatusBehavior,
+): StatusBehavior {
+  const v = raw?.toLowerCase().trim();
+  return v === 'suppress' || v === 'recolor' ? v : fallback;
+}
+
+function behaviorFor(status: ResolvedStatus): StatusBehavior {
+  switch (status) {
+    case 'resolved':
+      return parseBehavior(
+        process.env['ROLLBAR_DISCORD_RESOLVED_BEHAVIOR'],
+        'suppress',
+      );
+    case 'archived':
+      return parseBehavior(
+        process.env['ROLLBAR_DISCORD_ARCHIVED_BEHAVIOR'],
+        'suppress',
+      );
+    case 'muted':
+      return parseBehavior(
+        process.env['ROLLBAR_DISCORD_MUTED_BEHAVIOR'],
+        'recolor',
+      );
+  }
+}
+
+/**
+ * Map a Rollbar webhook event to a closed-status when the event represents
+ * the item transitioning out of `active`. Returns null if the item is still
+ * active (new occurrence, reactivated, etc.) — those keep error-level styling.
+ */
+function getClosedStatus(event: RollbarEvent): ResolvedStatus | null {
+  // event_name signals a status change directly.
+  switch (event.event_name) {
+    case 'resolved_item':
+      return 'resolved';
+    case 'reactivated_item':
+    case 'reopened_item':
+      return null;
+  }
+  // Fall back to item.status (present on status-change webhook payloads).
+  const status = event.data.item?.status;
+  if (status === 'resolved' || status === 'archived' || status === 'muted') {
+    return status;
+  }
+  return null;
+}
+
+const STATUS_COLOR: Record<ResolvedStatus, number> = {
+  resolved: COLOR_OK,
+  archived: COLOR_MUTED,
+  muted: COLOR_MUTED,
+};
+
+const STATUS_TITLE_PREFIX: Record<ResolvedStatus, string> = {
+  resolved: 'Resolved',
+  archived: 'Archived',
+  muted: 'Muted',
+};
 
 /**
  * Normalise a Rollbar level value (string or integer) to a lowercase name.
@@ -67,6 +133,11 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
   // Drop events without any usable payload — they produce generic embeds.
   if (!item && !occurrence) return null;
 
+  const closedStatus = getClosedStatus(event);
+  if (closedStatus && behaviorFor(closedStatus) === 'suppress') {
+    return null;
+  }
+
   const level = normalizeLevel(item?.level ?? occurrence?.level);
   const environment = item?.environment ?? occurrence?.environment ?? 'unknown';
 
@@ -74,9 +145,14 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
     item?.title ??
     occurrence?.body?.trace?.exception?.message ??
     'Rollbar Event';
-  const title = scrubPii(rawTitle);
+  const scrubbedTitle = scrubPii(rawTitle);
+  const prefixedTitle = closedStatus
+    ? `[${STATUS_TITLE_PREFIX[closedStatus]}] ${scrubbedTitle}`
+    : scrubbedTitle;
   const truncatedTitle =
-    title.length > 256 ? title.slice(0, 253) + '...' : title;
+    prefixedTitle.length > 256
+      ? prefixedTitle.slice(0, 253) + '...'
+      : prefixedTitle;
 
   const fields: DiscordEmbed['fields'] = [
     { name: 'Event', value: event.event_name, inline: true },
@@ -120,7 +196,7 @@ export function formatRollbarEmbed(event: RollbarEvent): DiscordEmbed | null {
   const embed: DiscordEmbed = {
     title: truncatedTitle,
     description: description || 'No additional details',
-    color: levelToColor(level),
+    color: closedStatus ? STATUS_COLOR[closedStatus] : levelToColor(level),
     fields,
     footer: { text: 'Rollbar' },
   };

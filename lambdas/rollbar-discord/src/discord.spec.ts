@@ -189,6 +189,151 @@ describe('formatRollbarEmbed', () => {
   });
 });
 
+describe('formatRollbarEmbed status-change events (LS-8203)', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env['ROLLBAR_DISCORD_RESOLVED_BEHAVIOR'];
+    delete process.env['ROLLBAR_DISCORD_ARCHIVED_BEHAVIOR'];
+    delete process.env['ROLLBAR_DISCORD_MUTED_BEHAVIOR'];
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  // Rollbar's item-status-changed webhook shape — see
+  // https://docs.rollbar.com/docs/webhooks#item-status-changed
+  const resolvedItemEvent: RollbarEvent = {
+    event_name: 'resolved_item',
+    data: {
+      item: {
+        id: 12345,
+        counter: 42,
+        title: 'TypeError: Cannot read property "foo"',
+        level: 'error',
+        environment: 'production',
+        status: 'resolved',
+        public_item_url: 'https://rollbar.com/item/123',
+      },
+    },
+  };
+
+  it('AC1: suppresses resolved_item by default', () => {
+    expect(formatRollbarEmbed(resolvedItemEvent)).toBeNull();
+  });
+
+  it('AC1: recolors resolved_item when env override is set', () => {
+    process.env['ROLLBAR_DISCORD_RESOLVED_BEHAVIOR'] = 'recolor';
+
+    const embed = formatRollbarEmbed(resolvedItemEvent);
+
+    expect(embed).not.toBeNull();
+    expect(embed?.color).toBe(0x57f287); // green for resolved
+    expect(embed?.title.startsWith('[Resolved] ')).toBe(true);
+  });
+
+  it('AC1: suppresses item.status=archived by default', () => {
+    const event: RollbarEvent = {
+      event_name: 'item_status_changed',
+      data: {
+        item: {
+          title: 'Old error',
+          level: 'error',
+          environment: 'production',
+          status: 'archived',
+        },
+      },
+    };
+
+    expect(formatRollbarEmbed(event)).toBeNull();
+  });
+
+  it('AC4: recolors item.status=muted by default with gray + [Muted] prefix', () => {
+    const event: RollbarEvent = {
+      event_name: 'item_status_changed',
+      data: {
+        item: {
+          title: 'Noisy error',
+          level: 'error',
+          environment: 'production',
+          status: 'muted',
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    expect(embed?.color).toBe(0x99aab5); // gray
+    expect(embed?.title.startsWith('[Muted] ')).toBe(true);
+  });
+
+  it('AC4: env var can flip muted to suppress', () => {
+    process.env['ROLLBAR_DISCORD_MUTED_BEHAVIOR'] = 'suppress';
+    const event: RollbarEvent = {
+      event_name: 'item_status_changed',
+      data: {
+        item: {
+          title: 'Noisy error',
+          level: 'error',
+          environment: 'production',
+          status: 'muted',
+        },
+      },
+    };
+
+    expect(formatRollbarEmbed(event)).toBeNull();
+  });
+
+  it('AC2: new_item on an active item keeps error-red styling (no regression)', () => {
+    const event: RollbarEvent = {
+      event_name: 'new_item',
+      data: {
+        item: {
+          title: 'Live error',
+          level: 'error',
+          environment: 'production',
+          status: 'active',
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    expect(embed?.color).toBe(0xed4245); // red
+    expect(embed?.title).toBe('Live error');
+  });
+
+  it('AC2: reactivated_item keeps error-red styling even if item.status is stale', () => {
+    const event: RollbarEvent = {
+      event_name: 'reactivated_item',
+      data: {
+        item: {
+          title: 'Came back',
+          level: 'error',
+          environment: 'production',
+          status: 'resolved', // event_name wins — item is now active
+        },
+      },
+    };
+
+    const embed = formatRollbarEmbed(event);
+
+    expect(embed).not.toBeNull();
+    expect(embed?.color).toBe(0xed4245);
+    expect(embed?.title).toBe('Came back');
+  });
+
+  it('ignores invalid env override values and falls back to default', () => {
+    process.env['ROLLBAR_DISCORD_RESOLVED_BEHAVIOR'] = 'nonsense';
+    // default for resolved is suppress
+    expect(formatRollbarEmbed(resolvedItemEvent)).toBeNull();
+  });
+});
+
 describe('formatAlarmEmbed', () => {
   const baseAlarm: CloudWatchAlarm = {
     AlarmName: 'test-dlq-not-empty',

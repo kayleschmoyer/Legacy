@@ -23,6 +23,9 @@ export interface RollbarEvent {
       total_occurrences?: number;
       unique_occurrences?: number;
       public_item_url?: string;
+      // Rollbar status — present on status-change webhook payloads.
+      // See https://docs.rollbar.com/docs/webhooks#item-status-changed.
+      status?: string;
     };
     occurrence?: {
       environment?: string;
