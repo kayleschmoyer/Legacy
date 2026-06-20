@@ -30,6 +30,8 @@ You must produce a **structured Self-Review Summary** (see the template in the r
 
 > Self-review is a verification step, not a planning step. If you find yourself making significant design changes during self-review, you may have skipped the [planning phase](../planning/SKILL.md) — consider stopping and re-planning.
 
+> **Premium-gating product changes — keep test specs premium-default.** If your PR adds or changes a premium-gated feature (touches `entitlements.ts`, `requireEntitlement`, `PremiumGate`, `useIsPremium`, etc.), the E2E/integration specs covering it must default to the **premium** tier, with `free` used **only** for explicit gate assertions. A gated-feature spec that runs as `free` without asserting the gate silently inverts the feature's tested state — the LS-5030 regression. See the [Tiered Test-User Model](../testing/SKILL.md#tiered-test-user-model-premium-default-free-for-gates) (testing skill) and the [add-entitlement skill](../add-entitlement/SKILL.md).
+
 > Details: [references/self-review.md](references/self-review.md)
 
 ### Phase 2: Create PR with Jira Linkage

@@ -39,6 +39,90 @@ There are **four** test layers. Three use Jest; two use Playwright.
 | Multi-step workflow across multiple users         |      |     |     | x           |
 | Backend async processes complete correctly        |      |     |     | x           |
 
+## Tiered Test-User Model (premium-default, free for gates)
+
+Both Playwright suites share a single tiered test-user convention. Use the right tier for the right shape of test — otherwise premium-gated UI silently renders the wrong state and entire suites regress (this is what broke under LS-5030).
+
+| Tier      | Hermetic e2e identity                          | Integration identity (`loginAs`)                | When to use                                                                                |
+| --------- | ---------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `premium` | `useTier(page, 'premium')` (DEFAULT — no call) | `loginAs('premium', 1\|2\|…)` / `premiumJwt[2]` | **Default for any feature test.** Subscriber state; not blocked by `premium-feature-gate`. |
+| `free`    | `useTier(page, 'free')`                        | `loginAs('free', 1\|2\|…)` / `freeJwt[2]`       | **Only for explicit gate assertions** — "free user sees the upgrade CTA / cannot do X."    |
+| `admin`   | `useTier(page, 'admin')`                       | `loginAs('admin', 1\|2)` / `adminJwt[2]`        | Admin-only surfaces (`/admin/*`). `admin` is also treated as premium server-side.          |
+
+### The rule
+
+1. **Premium is the default.** The hermetic baseline `GetUserById` mock and the integration `api` / `api2` fixtures resolve to premium users without any opt-in. New specs touching any non-admin product surface should leave the tier alone.
+2. **`free` is for proving the gate fires.** If a spec calls `useTier(page, 'free')` or pulls `freeJwt`, it MUST contain an assertion that the gate is engaged — an upgrade CTA visible, a `PREMIUM_REQUIRED` error, a `PremiumGate` overlay, the feature disabled. A free-tier spec without a gate assertion is the LS-5030 regression in seed form: it silently flips premium-gated UI to its locked state and hides real bugs behind a passing test.
+3. **`admin` is for admin surfaces.** Use it only when the test exercises `/admin/*`, the admin override path, or admin-only resolvers. Otherwise it is a noisy strict-superset of `premium`.
+
+### Hermetic e2e — copy-paste examples
+
+```typescript
+// Premium is the DEFAULT — no opt-in needed for a feature test.
+import { test, expect } from '../fixtures/auth-enhanced';
+
+test('premium user sees the advanced filter', async ({ page }) => {
+  await page.goto('/players');
+  await expect(
+    page.getByRole('button', { name: /advanced filters/i }),
+  ).toBeVisible();
+});
+
+// Free-tier spec — MUST assert the gate.
+import { useTier } from '../fixtures/shared-mocks';
+
+test('free user is gated out of the advanced filter', async ({ page }) => {
+  await useTier(page, 'free'); // before goto
+  await page.goto('/players');
+  await expect(page.getByText(/upgrade to premium/i)).toBeVisible(); // ← gate assertion
+});
+
+// Admin-only surface.
+test('admin can reach the admin console', async ({ page }) => {
+  await useTier(page, 'admin');
+  await page.goto('/admin');
+  await expect(page.getByRole('heading', { name: /admin/i })).toBeVisible();
+});
+```
+
+`useTier` and `EntitlementTier` are exported from `apps/web-e2e/src/fixtures/shared-mocks.ts`. It pins `GetUserById` and cascades every other operation to the baseline; call it BEFORE `page.goto()`. See [shared-mocks.ts](../../../apps/web-e2e/src/fixtures/shared-mocks.ts) (LS-8056).
+
+### Live integration — copy-paste examples
+
+```typescript
+import { test, expect } from '../fixtures/api';
+
+// Premium is the default identity behind `api` / `api2`.
+test('premium user can call a premium-gated resolver', async ({
+  premiumJwt,
+}) => {
+  const result = await gqlFetchEnvelope(premiumJwt, PREMIUM_GATED_QUERY, vars);
+  expect(
+    result.errors?.some((e) => e.extensions?.code === 'PREMIUM_REQUIRED'),
+  ).toBeFalsy();
+});
+
+// Free-tier spec — MUST assert the gate fires.
+test('free user is blocked by the premium gate', async ({ freeJwt }) => {
+  const result = await gqlFetchEnvelope(freeJwt, PREMIUM_GATED_QUERY, vars);
+  expect(
+    result.errors?.some((e) => e.extensions?.code === 'PREMIUM_REQUIRED'),
+  ).toBeTruthy();
+});
+```
+
+`loginAs(tier, seat)` lives in `apps/web-e2e/src/utils/test-user-auth.ts` and powers the `premiumJwt` / `premiumJwt2` / `freeJwt` / `freeJwt2` / `adminJwt` / `adminJwt2` fixtures in `apps/web-e2e/src/integration/fixtures/api.ts`. The pool is **6 premium / 6 free / 2 admin** seats; use seats ≥ 2 when a spec needs two distinct same-tier identities in one league. See [tiered-auth.integration.spec.ts](../../../apps/web-e2e/src/integration/tests/tiered-auth.integration.spec.ts) (LS-8055).
+
+### Review-checklist guard
+
+When reviewing (self-review or PR review) any new spec, ask:
+
+- Does the spec call `useTier(page, 'free')` or use `freeJwt` / `freeJwt2`?
+- If yes: is there an assertion that the gate engages (upgrade CTA, `PREMIUM_REQUIRED` error, disabled affordance, gate overlay)?
+- If no: the spec is testing a premium-gated feature against a free user with no gate assertion. **Switch it back to the premium default** unless the gate assertion is added.
+
+This is the LS-5030 footgun in a single check — see `.agents/skills/pr-lifecycle/references/self-review.md`.
+
 ## Commands
 
 ### MCP-first (preferred)

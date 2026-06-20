@@ -50,7 +50,7 @@ Transcribe these into TaskCreate entries at the start of the work; each gates th
    - **Graceful degrade / limits** — `if (!(await hasEntitlement(context, ENTITLEMENTS.my_feature))) { … }` to branch (return a teaser, enforce a count limit) instead of throwing. Example: [`matchups/types.ts:156`](../../../lambdas/db/src/schema/matchups/types.ts) (AI recap), `leagues/mutations.ts` (league-count limit).
    - Server enforcement is the real gate — anything that returns premium _data_ must be gated here, not only in the UI.
 6. **Gate the UI.** Prefer [`useHasEntitlement(ENTITLEMENTS.my_feature)`](../../../apps/web/src/hooks/useIsPremium.ts) over `useIsPremium()` so the gate names the capability. Wrap premium content in [`PremiumGate`](../../../lib/shared-components/src/components/PremiumGate.tsx) (`isPremium` + `featureName` + `onUpgrade`). Note: `PremiumGate.featureName` is a free-text display string, _not_ an `EntitlementKey` — keep it consistent with `ENTITLEMENT_LABELS` by hand.
-7. **Test the boundary.** Add a resolver spec asserting the free tier is rejected and premium/admin passes (admins short-circuit to premium unless `impersonatedTier === 'free'`). Add or extend an e2e in `apps/web-e2e/src/tests/premium-gating.spec.ts` for the UI gate. Premium status in e2e is sourced from the `GetUserById.subscriptionTier` mock, not the JWT.
+7. **Test the boundary.** Add a resolver spec asserting the free tier is rejected and premium/admin passes (admins short-circuit to premium unless `impersonatedTier === 'free'`). Add or extend an e2e in `apps/web-e2e/src/tests/premium-gating.spec.ts` for the UI gate. Premium status in e2e is sourced from the `GetUserById.subscriptionTier` mock, not the JWT. **Follow the tiered test-user convention: feature tests default to premium (`useTier(page, 'premium')` / `loginAs('premium')` — usually no opt-in); use `free` (`useTier(page, 'free')` / `freeJwt`) ONLY in the spec that asserts the gate fires.** A gated-feature spec running as `free` with no gate assertion silently inverts the tested state (the LS-5030 regression). See the [Tiered Test-User Model](../testing/SKILL.md#tiered-test-user-model-premium-default-free-for-gates).
 8. **Validate & ship.** `make pc`, self-review, then the normal PR flow. Call out the CODEOWNERS approval requirement in the PR description.
 
 ## Gating an _existing_ feature (no new key)
@@ -59,6 +59,7 @@ Skip Steps 2–4 — reuse the existing `ENTITLEMENTS` key — and do Steps 5–
 
 ## Related skills & docs
 
+- [testing](../testing/SKILL.md#tiered-test-user-model-premium-default-free-for-gates) — the tiered test-user convention (premium-default, free only for gate assertions) your specs must follow.
 - [standards](../standards/SKILL.md) — coding standards for the resolver/UI edits.
 - [database](../database/SKILL.md) — the `subscription_tier` column is denormalized onto `app_internal.users` by the `stripe-webhook` lambda; no migration is needed to add an entitlement.
 - `docs/product/subscription-tiers.md` — authoritative tier policy (read first).

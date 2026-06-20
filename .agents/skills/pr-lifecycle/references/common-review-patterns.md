@@ -51,6 +51,7 @@ These issues appear repeatedly in reviewer bot CHANGES_REQUESTED cycles. Knowing
 | 43  | Shell variable empty after `\|\| true` pattern                   | Provide explicit fallback: `cmd \| echo "default"`                                                                                                                                                                | Manual                 |
 | 44  | PR touches `apps/web-e2e/**` without a passing Playwright report | Dispatch `run-playwright-tests.yml` or run locally; paste report URL/evidence in PR body before merge                                                                                                             | Manual                 |
 | 45  | MCP tool returns pretty-printed JSON / repeats keys per row      | Use `@legacy-sports/mcp-format`: `markdownTable` for flat uniform lists, `minifiedJson` otherwise; `pickFields`/`truncate` to prune. See [mcp-response-format.md](../../create/references/mcp-response-format.md) | Manual                 |
+| 46  | Gated-feature spec runs as `free` with no gate assertion         | Specs default to **premium** (`useTier(page, 'premium')` / `loginAs('premium')`, usually no opt-in); use `free` (`useTier(page, 'free')` / `freeJwt`) ONLY when the spec asserts the gate fires. See #46 below.   | Manual                 |
 
 ## Pattern Details
 
@@ -660,6 +661,28 @@ HAS_LABEL=$(jq -r '...' <<< "$LABELS" 2>/dev/null || echo "0")
 
 Also applies to unquoted variables in `for` loops — `for f in $pattern` expands globs and splits on spaces; quote: `for f in "$pattern"` or use an array.
 
+### #46 — Gated-feature spec runs as `free` without a gate assertion
+
+Both Playwright suites use a tiered test-user model: **premium is the default**, `free` is reserved for explicit gate assertions, `admin` for admin surfaces. A spec that exercises a premium-gated feature while authenticated as a free user **must** assert that the gate engages — otherwise it silently tests the feature's _locked_ state and a real regression in the unlocked path sails through green. This is the LS-5030 failure mode in seed form (premium-gated specs flipped to free, ~28 specs silently broke repo-wide).
+
+```typescript
+// Bad — free user on a premium feature, no gate assertion. Vacuously green.
+await useTier(page, 'free');
+await page.goto('/players/compare');
+await expect(page.getByRole('heading', { name: /compare/i })).toBeVisible(); // passes even if gate is broken
+
+// Good (feature test) — premium is the DEFAULT; usually no opt-in at all.
+await page.goto('/players/compare');
+await expect(page.getByTestId('comparison-table')).toBeVisible();
+
+// Good (gate test) — free is intentional AND the gate is asserted.
+await useTier(page, 'free');
+await page.goto('/players/compare');
+await expect(page.getByText(/upgrade to premium/i)).toBeVisible(); // ← the gate assertion
+```
+
+When reviewing: if a spec calls `useTier(page, 'free')` or pulls `freeJwt` / `freeJwt2`, confirm it asserts the gate (upgrade CTA, `PREMIUM_REQUIRED` error, disabled affordance, `PremiumGate` overlay). If not, switch it back to the premium default. Full convention + integration examples: [Tiered Test-User Model](../../testing/SKILL.md#tiered-test-user-model-premium-default-free-for-gates).
+
 ---
 
 ## Quick Self-Review Checklist (all patterns)
@@ -684,6 +707,7 @@ Before every push, scan your diff against this checklist:
 | Error messages shown to users are generic strings, not `err.message`                   | #41           |
 | Terraform resource renames use `moved {}` blocks                                       | #42           |
 | Shell variables have explicit fallbacks after `\|\| true` patterns                     | #43           |
+| Gated-feature spec defaults to premium; `free` used only with a gate assertion         | #46           |
 | No `@ts-ignore` or `eslint-disable` (fix root cause instead)                           | standards     |
 
 ---

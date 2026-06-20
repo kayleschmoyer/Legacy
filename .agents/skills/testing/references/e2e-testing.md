@@ -110,6 +110,8 @@ All fixtures extend from an `isolated` base that includes **automatic API isolat
 | `unauthTest`           | No auth — tests login flows                 |
 | `createCustomAuthTest` | Factory for custom email/accessLevel combos |
 
+> **Entitlement tier ≠ auth fixture.** The fixtures above set _who is logged in_; the **tiered test-user model** sets _what they can pay for_. For premium/free/admin entitlement state, use `useTier(page, 'premium' | 'free' | 'admin')` from `shared-mocks.ts` — **premium is the default, `free` only for explicit gate assertions.** See the [Tiered Test-User Model](../SKILL.md#tiered-test-user-model-premium-default-free-for-gates) section in the testing skill (LS-8056).
+
 ### API Isolation (automatic — 3-layer mock architecture)
 
 The production build bakes in real AWS URLs from `.env`. The `_apiIsolation` auto-fixture in `auth-enhanced.ts` intercepts **all requests not targeting port 4280**, ensuring complete network isolation.

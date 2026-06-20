@@ -38,6 +38,8 @@ There are two modes:
 - Valid authentication credentials (JWT or OAuth token)
 - Environment variables set: `INTEGRATION_BASE_URL`, `INTEGRATION_WS_URL`, `INTEGRATION_JWT`
 
+> **Authenticate by entitlement tier with `loginAs` / the tier JWT fixtures.** `loginAs('premium' | 'free' | 'admin', seat)` (from `apps/web-e2e/src/utils/test-user-auth.ts`) and the `premiumJwt` / `freeJwt` / `adminJwt` (+ `…2`) fixtures resolve to stable pre-provisioned identities. **Premium is the default; use `free` only when the test asserts a gate fires.** Full convention + examples: [Tiered Test-User Model](../SKILL.md#tiered-test-user-model-premium-default-free-for-gates) (LS-8055).
+
 ## File Layout
 
 ```
