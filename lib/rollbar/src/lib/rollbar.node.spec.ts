@@ -29,7 +29,7 @@ const loggerMock = {
 };
 jest.mock('@legacy-sports/logging', () => ({ LOGGER: loggerMock }));
 
-import { rollbar } from './rollbar.node';
+import { isClientFacingGraphQLError, rollbar } from './rollbar.node';
 
 // Typed view of the singleton's private state for test-only reset.
 type RollbarPrivateState = {
@@ -113,6 +113,78 @@ describe('NodeRollbarImplementation', () => {
       expect(loggerMock.warn).toHaveBeenCalledWith(
         'Rollbar not initialized: no access token or secret name provided',
       );
+    });
+
+    it('configures checkIgnore that drops client-facing GraphQL errors (LS-8144)', () => {
+      rollbar.init({ accessToken: 'direct-token-value', environment: 'test' });
+
+      type CheckIgnore = (
+        isUncaught: boolean,
+        args: unknown[],
+        item: Record<string, unknown>,
+      ) => boolean;
+      const ctorArg = (RollbarCtorMock.mock.calls as unknown[][])[0][0] as {
+        checkIgnore?: CheckIgnore;
+      };
+      const checkIgnore = ctorArg.checkIgnore;
+      expect(typeof checkIgnore).toBe('function');
+
+      const userInputError = Object.assign(new Error('Draft not found'), {
+        name: 'GraphQLError',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+      expect(checkIgnore!(false, [userInputError], {})).toBe(true);
+
+      const realError = new Error('database connection lost');
+      expect(checkIgnore!(false, [realError], {})).toBe(false);
+    });
+  });
+
+  describe('isClientFacingGraphQLError', () => {
+    it('returns true for GraphQLError with BAD_USER_INPUT code', () => {
+      const err = Object.assign(new Error('Draft not found'), {
+        name: 'GraphQLError',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+      expect(isClientFacingGraphQLError(err)).toBe(true);
+    });
+
+    it.each([
+      'UNAUTHENTICATED',
+      'FORBIDDEN',
+      'NOT_FOUND',
+      'PREMIUM_REQUIRED',
+      'GAME_UNAVAILABLE',
+      'GRAPHQL_VALIDATION_FAILED',
+    ])('returns true for GraphQLError with %s code', (code) => {
+      const err = Object.assign(new Error('client'), {
+        name: 'GraphQLError',
+        extensions: { code },
+      });
+      expect(isClientFacingGraphQLError(err)).toBe(true);
+    });
+
+    it('returns false for GraphQLError with an unrecognized code', () => {
+      const err = Object.assign(new Error('internal'), {
+        name: 'GraphQLError',
+        extensions: { code: 'INTERNAL_SERVER_ERROR' },
+      });
+      expect(isClientFacingGraphQLError(err)).toBe(false);
+    });
+
+    it('returns false for plain Error', () => {
+      expect(isClientFacingGraphQLError(new Error('boom'))).toBe(false);
+    });
+
+    it('returns false for null / non-objects', () => {
+      expect(isClientFacingGraphQLError(null)).toBe(false);
+      expect(isClientFacingGraphQLError(undefined)).toBe(false);
+      expect(isClientFacingGraphQLError('GraphQLError')).toBe(false);
+    });
+
+    it('returns false when extensions is missing', () => {
+      const err = Object.assign(new Error('x'), { name: 'GraphQLError' });
+      expect(isClientFacingGraphQLError(err)).toBe(false);
     });
   });
 

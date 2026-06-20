@@ -18,6 +18,44 @@ import { sanitizeContext } from './sanitize-context';
 /** Maximum number of breadcrumbs retained in memory. Oldest entries are dropped when the buffer is full. */
 const MAX_BREADCRUMBS = 100;
 
+/**
+ * GraphQL `extensions.code` values that represent expected, client-facing
+ * conditions (bad input, auth, not-found, premium gating). Errors carrying
+ * one of these codes are surfaced to the GraphQL client as-is and must NOT
+ * be reported to Rollbar — regardless of which path (LOGGER.error,
+ * captureUncaught, captureUnhandledRejections, withRollbar) routes them.
+ *
+ * Mirrors `lambdas/db/src/server/graphql-error-codes.ts`; duplicated here to
+ * keep lib/rollbar dependency-free.
+ */
+const CLIENT_FACING_GRAPHQL_CODES: ReadonlySet<string> = new Set([
+  'GRAPHQL_VALIDATION_FAILED',
+  'GRAPHQL_PARSE_FAILED',
+  'BAD_USER_INPUT',
+  'UNAUTHENTICATED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'PREMIUM_REQUIRED',
+  'GAME_UNAVAILABLE',
+  'PERSISTED_QUERY_NOT_FOUND',
+  'PERSISTED_QUERY_NOT_SUPPORTED',
+]);
+
+/**
+ * Returns true when the value is a GraphQL error whose `extensions.code` is
+ * in the client-facing set. Identified by `name === 'GraphQLError'` so we
+ * don't have to import the `graphql` package into lib/rollbar.
+ */
+export function isClientFacingGraphQLError(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const err = value as { name?: unknown; extensions?: unknown };
+  if (err.name !== 'GraphQLError') return false;
+  const extensions = err.extensions;
+  if (!extensions || typeof extensions !== 'object') return false;
+  const code = (extensions as { code?: unknown }).code;
+  return typeof code === 'string' && CLIENT_FACING_GRAPHQL_CODES.has(code);
+}
+
 class NodeRollbarImplementation implements RollbarInterface {
   private rollbar: Rollbar | null = null;
   /** In-memory breadcrumb log (Rollbar telemetry handles this internally but we keep compat). */
@@ -75,6 +113,12 @@ class NodeRollbarImplementation implements RollbarInterface {
         verbose: config.verbose ?? false,
         maxItems: config.maxItems ?? 50,
         itemsPerMinute: config.itemsPerMinute ?? 25,
+        // Drop client-facing GraphQL errors (BAD_USER_INPUT, UNAUTHENTICATED,
+        // etc.) regardless of how they reach Rollbar — including the native
+        // captureUncaught / captureUnhandledRejections hooks that bypass our
+        // LOGGER routing in apollo.ts (LS-8144).
+        checkIgnore: (_isUncaught, args) =>
+          args.some((arg) => isClientFacingGraphQLError(arg)),
         payload: {
           code_version: config.release,
         },
