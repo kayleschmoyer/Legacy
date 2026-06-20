@@ -20,6 +20,14 @@ jest.mock('../../context/GrowthBookProvider', () => ({
 
 jest.mock('@legacy-sports/shared-components/players', () => ({
   PlayerStatsPage: () => null,
+  // Mirror the shared shell's canonical mapping so the host's URL-rewrite
+  // behavior can be asserted (legacy aliases batting→hitters, pitching→pitchers;
+  // everything else → combined).
+  normalizeViewMode: (mode: string) => {
+    if (mode === 'pitching' || mode === 'pitchers') return 'pitchers';
+    if (mode === 'hitters' || mode === 'batting') return 'hitters';
+    return 'combined';
+  },
 }));
 
 // The football stats browser is rendered inline for the NFL view (LS-8104) and
@@ -139,5 +147,63 @@ describe('PlayerStatsRoute sport switcher', () => {
     expect(
       screen.queryByRole('button', { name: /view nfl statistics/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+// LS-7146 / PST-111: the URL parser used to blindly cast `view` to a
+// PlayerStatsViewMode without normalizing, so /players/stats?view=batting
+// rendered the Hitters tab while the address bar kept the `batting` alias
+// forever. The host now rewrites a legacy/aliased `view` param to its canonical
+// form on mount; canonical or absent params are left untouched.
+describe('PlayerStatsRoute view-mode URL normalization', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+  });
+
+  it('rewrites the legacy alias view=batting to canonical view=hitters', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&view=batting');
+    render(<PlayerStatsRoute />);
+    expect(mockSetSearchParams).toHaveBeenCalledTimes(1);
+    const [params, opts] = mockSetSearchParams.mock.calls[0] as [
+      URLSearchParams,
+      { replace?: boolean },
+    ];
+    expect(params.get('view')).toBe('hitters');
+    // Other params are preserved through the rewrite.
+    expect(params.get('sport')).toBe('mlb');
+    // History is replaced, not pushed, so Back doesn't return to the alias URL.
+    expect(opts).toEqual({ replace: true });
+  });
+
+  it('rewrites the legacy alias view=pitching to canonical view=pitchers', () => {
+    mockSearchParams = new URLSearchParams('view=pitching');
+    render(<PlayerStatsRoute />);
+    const [params] = mockSetSearchParams.mock.calls[0] as [URLSearchParams];
+    expect(params.get('view')).toBe('pitchers');
+  });
+
+  it('rewrites a non-canonical value (view=fielding) to view=combined', () => {
+    mockSearchParams = new URLSearchParams('view=fielding');
+    render(<PlayerStatsRoute />);
+    const [params] = mockSetSearchParams.mock.calls[0] as [URLSearchParams];
+    expect(params.get('view')).toBe('combined');
+  });
+
+  it.each(['combined', 'hitters', 'pitchers'])(
+    'does not rewrite an already-canonical view=%s',
+    (view) => {
+      mockSearchParams = new URLSearchParams(`view=${view}`);
+      render(<PlayerStatsRoute />);
+      expect(mockSetSearchParams).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not add a view param when none is present', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    render(<PlayerStatsRoute />);
+    expect(mockSetSearchParams).not.toHaveBeenCalled();
   });
 });

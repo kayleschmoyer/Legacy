@@ -12,6 +12,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import {
+  normalizeViewMode,
   PlayerStatsPage,
   type PlayerStatsViewMode,
 } from '@legacy-sports/shared-components/players';
@@ -302,10 +303,30 @@ export function PlayerStatsRoute() {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
+  // Rewrite a legacy/aliased `view` param to its canonical form so the address
+  // bar stays in sync with the rendered tab (LS-7146 / PST-111). Without this,
+  // /players/stats?view=batting renders the Hitters tab but the URL keeps the
+  // `batting` alias forever, which is confusing when the link is shared. Only
+  // rewrites when the param is present and non-canonical — an absent or already
+  // canonical `view` is left untouched. `replace` avoids polluting history.
+  useEffect(() => {
+    const rawView = searchParams.get('view');
+    if (rawView === null) return;
+    const canonical = normalizeViewMode(rawView as PlayerStatsViewMode);
+    if (rawView === canonical) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('view', canonical);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   // Parse URL parameters for initial state
   const initialState = useMemo(() => {
-    const viewMode =
-      (searchParams.get('view') as PlayerStatsViewMode) || 'combined';
+    // Run the raw `view` param through the shared shell's normalizer so the tab
+    // we render is always canonical (combined/hitters/pitchers), honoring legacy
+    // aliases (batting→hitters, pitching→pitchers) and unknown values (LS-7146).
+    const viewMode = normalizeViewMode(
+      (searchParams.get('view') as PlayerStatsViewMode) || 'combined',
+    );
     const pageSize = parseInt(searchParams.get('pageSize') || '25', 10);
     const search = searchParams.get('search') || '';
 

@@ -23,7 +23,7 @@ export type { PlayerComparisonProps } from './PlayerComparison';
 // Advanced player statistics components
 export { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
 export { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
-export { PlayerStatsPage } from './PlayerStatsPage';
+export { PlayerStatsPage, normalizeViewMode } from './PlayerStatsPage';
 
 // Career statistics services and types
 export * from './services/CareerStatsService';

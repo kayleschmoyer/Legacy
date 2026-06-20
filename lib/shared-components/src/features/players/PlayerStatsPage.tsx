@@ -227,7 +227,14 @@ interface AppliedFilters {
   maxERA: number;
 }
 
-function normalizeViewMode(
+/**
+ * Map a (possibly legacy/aliased) view mode to a canonical tab value. Legacy
+ * aliases `batting`→`hitters` and `pitching`→`pitchers` are honored, and any
+ * other value (`fielding`, unknown) falls back to `combined`. Exported so URL
+ * hosts can normalize and rewrite the `view` query param to canonical form,
+ * keeping the address bar in sync with the rendered tab (LS-7146 / PST-111).
+ */
+export function normalizeViewMode(
   mode: PlayerStatsViewMode,
 ): 'combined' | 'hitters' | 'pitchers' {
   if (mode === 'pitching' || mode === 'pitchers') return 'pitchers';
