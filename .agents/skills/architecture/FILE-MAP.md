@@ -136,17 +136,17 @@ See `.agents/skills/testing/references/db-integration-tests.md` for patterns and
 
 ## MCP Servers (`tools/mcp/`)
 
-| Server   | Root path                        | Key tools                                                                       |
-| -------- | -------------------------------- | ------------------------------------------------------------------------------- |
-| GitHub   | `tools/mcp/github-server/src/`   | `github_create_pr`, `github_resolve_threads`, `github_get_review_threads`, …    |
-| CI       | `tools/mcp/ci-server/src/`       | `ci_list_runs`, `ci_get_logs`, `ci_audit_session_bash`, `ci_rerun`, …           |
-| Worktree | `tools/mcp/worktree-server/src/` | `worktree_commit`, `worktree_push`, `worktree_set`, …                           |
-| Make     | `tools/mcp/make-server/src/`     | `make_run`, `make_worktree_create`, `make_wt_setup`, …                          |
-| Jira     | `tools/mcp/jira-server/src/`     | `jira_view`, `jira_create_ticket`, `jira_transition`, `jira_get_bucket_epic`, … |
-| Nx       | `tools/mcp/nx-server/src/`       | `nx_run`, `nx_run_affected`, `nx_show_projects`, …                              |
-| AWS      | `tools/mcp/aws-server/src/`      | `aws_ec2_instances`, `aws_logs_tail`, `aws_lambda_status`, …                    |
-| Database | `tools/mcp/db-server/src/`       | `db_migrate`, `db_query`, `db_print_schema`, …                                  |
-| Browser  | `tools/mcp/browser-server/src/`  | `browser_navigate`, `browser_screenshot`, …                                     |
+| Server   | Root path                        | Key tools                                                                            |
+| -------- | -------------------------------- | ------------------------------------------------------------------------------------ |
+| GitHub   | `tools/mcp/github-server/src/`   | `github_create_pr`, `github_resolve_threads`, `github_get_review_threads`, …         |
+| CI       | `tools/mcp/ci-server/src/`       | `ci_list_runs`, `ci_get_logs`, `ci_audit_session_bash`, `ci_rerun`, …                |
+| Worktree | `tools/mcp/worktree-server/src/` | `worktree_commit`, `worktree_push`, `worktree_set`, …                                |
+| Make     | `tools/mcp/make-server/src/`     | `make_run`, `make_worktree_create`, `make_wt_setup`, …                               |
+| Jira     | `tools/mcp/jira-server/src/`     | `jira_view`, `jira_create_ticket`, `jira_transition`, `jira_get_bucket_epic`, …      |
+| Nx       | `tools/mcp/nx-server/src/`       | `nx_run`, `nx_run_affected`, `nx_show_projects`, …                                   |
+| AWS      | `tools/mcp/aws-server/src/`      | `aws_ec2_instances`, `aws_logs_tail`, `aws_lambda_status`, …                         |
+| Database | `tools/mcp/db-admin-server/src/` | `db_query`, `db_migration_status`, `db_migrate` (hosted; reaches dev RDS over HTTPS) |
+| Browser  | `tools/mcp/browser-server/src/`  | `browser_navigate`, `browser_screenshot`, …                                          |
 
 ---
 

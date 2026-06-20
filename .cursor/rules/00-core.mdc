@@ -48,7 +48,7 @@ not connected, not that bash is the right tool.
 ## Workflow discipline
 
 - Run `make pc` (via `make_run`) and self-review every changed file before pushing.
-- Run DB migrations (`db_migration_status` → `db_migrate`) before validating.
+- Run DB migrations (`pnpm --prefix lib/db-client run db:status` → `db:up`) before validating.
 - Work is not done until the PR is **merged** and the Jira ticket is **Done** — a PR
   left in draft is skipped by every downstream actor.
 

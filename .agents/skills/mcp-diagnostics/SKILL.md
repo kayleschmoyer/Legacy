@@ -58,7 +58,7 @@ test -f .github/copilot/hooks/mcp-bootstrap.mjs && echo "bootstrap: OK" || echo 
 ### Check 4 — server source files present
 
 ```bash
-for srv in worktree-server github-server jira-server make-server nx-server db-server ci-server aws-server browser-server; do
+for srv in worktree-server github-server jira-server make-server nx-server ci-server aws-server browser-server; do
   test -f "tools/mcp/${srv}/src/index.ts" \
     && echo "${srv}: OK" \
     || echo "${srv}: MISSING — tools/mcp/${srv}/src/index.ts"

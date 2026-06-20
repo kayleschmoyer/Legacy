@@ -300,7 +300,7 @@ test(
 // --- certs/ directory symlinking (linkDir) -----------------------------------
 // link.mjs symlinks the main repo's certs/ directory into the worktree after
 // linking node_modules. This is needed so DB_CERT_PATH resolves correctly for
-// db-client SSL connections (db_migration_status, db_migrate, etc.).
+// db-client SSL connections (pnpm --prefix lib/db-client run db:status / db:up).
 
 test(
   'links certs/ directory from main into the worktree',

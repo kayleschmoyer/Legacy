@@ -703,5 +703,5 @@ These are not review findings — they are CI check failures from the reviewer i
 
 - **Symptom**: this single check is failing in CI; the PR otherwise looks fine. Often appears on long-running PRs.
 - **Root cause**: a migration was added to `main` after this branch diverged; the workflow detects the gap.
-- **Recovery**: rebase to current `main`, run `db_migrate(worktreePath: "<wt>")` locally to confirm a clean apply, then push. Do **not** add a no-op migration — the fix is purely the rebase.
+- **Recovery**: rebase to current `main`, run `pnpm --prefix lib/db-client run db:up` locally to confirm a clean apply, then push. Do **not** add a no-op migration — the fix is purely the rebase.
 - **Reference PRs**: #4315, #4259 (2026-05-26 sweep).

@@ -24,7 +24,7 @@ description: 'Validate backend changes (resolvers, migrations, Lambda logic) aga
 
 | What you changed                             | Validation approach                                                            | Services needed              |
 | -------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------- |
-| Migration only (`lib/db-client/migrations/`) | `db_migrate` + `db_migration_status` MCP tools                                 | Docker Postgres only         |
+| Migration only (`lib/db-client/migrations/`) | `pnpm --prefix lib/db-client run db:up` + `db:status`                          | Docker Postgres only         |
 | Resolver logic (existing behavior)           | Jest integration tests via `nx_run(project: "db", target: "test:integration")` | None (uses in-memory SQLite) |
 | New/changed query — want real Postgres proof | Start GraphQL, send test query via curl                                        | Docker Postgres + GraphQL    |
 | Resolver + frontend wiring                   | Start GraphQL + web, run targeted Playwright integration test                  | Postgres + GraphQL + Web     |
@@ -34,29 +34,17 @@ description: 'Validate backend changes (resolvers, migrations, Lambda logic) aga
 
 ### Migration-Only Validation
 
-Use MCP tools — no HTTP services needed, just a running Postgres:
+No HTTP services needed, just a running Postgres:
 
 ```powershell
 docker compose up -d postgres        # start Postgres container
 docker compose exec -T postgres pg_isready -U postgres -d postgres -h localhost -p 5432  # wait until Postgres is ready
+pnpm --prefix lib/db-client run db:up        # apply pending migrations
+pnpm --prefix lib/db-client run db:status    # confirm "Applied N new migrations" or "No new migrations"
+pnpm exec nx run db:print-schema             # regenerate GraphQL schema from Pothos (only needed if resolver/type definitions changed)
 ```
 
-Then validate via MCP:
-
-```
-db_migrate()                          # apply pending migrations
-db_migration_status()                 # confirm "Applied N new migrations" or "No new migrations"
-db_print_schema()                     # regenerate GraphQL schema from Pothos (only needed if resolver/type definitions changed)
-```
-
-Shell fallback:
-
-```powershell
-pnpm --prefix lib/db-client run db:up
-pnpm --prefix lib/db-client run db:status
-```
-
-> **Note:** The shell fallback reads database connection settings from the repo root `.env` (not `.env.docker`). Ensure `.env` has `DATABASE_URL` pointing at `localhost:5432` when validating against the Docker Postgres container, otherwise these commands may hit a different database or fail to resolve the `postgres` hostname.
+> **Note:** These commands read database connection settings from the repo root `.env` (not `.env.docker`). Ensure `.env` has `DATABASE_URL` pointing at `localhost:5432` when validating against the Docker Postgres container, otherwise they may hit a different database or fail to resolve the `postgres` hostname.
 
 ### Resolver Validation (Jest Integration Tests)
 

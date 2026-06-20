@@ -53,7 +53,7 @@ MCP servers that use Pattern B are registered in Nx under the name `mcp-<server-
 | `tools/mcp/jira-server`     | `mcp-jira-server`              | B       |
 | `tools/mcp/github-server`   | `mcp-github-server`            | B       |
 | `tools/mcp/ci-server`       | `mcp-ci-server`                | B       |
-| `tools/mcp/db-server`       | `mcp-db-server`                | B       |
+| `tools/mcp/db-admin-server` | `mcp-db-admin-server`          | B       |
 | `tools/mcp/make-server`     | `mcp-make-server`              | B       |
 | `tools/mcp/aws-server`      | `mcp-aws-server`               | B       |
 | `tools/mcp/worktree-server` | `mcp-worktree-server`          | B       |
@@ -82,7 +82,7 @@ nx_show_projects()   # MCP tool — lists all registered Nx project names
 ### Naming
 
 - Tool names use **snake_case** with a domain prefix: `jira_create_ticket`, `db_query`, `worktree_list`
-- Server names use **kebab-case**: `jira-server`, `db-server`, `worktree-server`
+- Server names use **kebab-case**: `jira-server`, `db-admin-server`, `worktree-server`
 
 ### Descriptions
 
@@ -123,8 +123,8 @@ If your server needs to:
 
 | Need                       | Pattern                                                                                                     |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Run shell commands         | See `db-server/src/run-command.ts` — `execFile` with timeout                                                |
-| Connect to PostgreSQL      | See `db-server/src/db-connection.ts` — lazy `postgres` pool                                                 |
+| Run shell commands         | See `make-server/src/run-make.ts` — `execFile` with timeout                                                 |
+| Connect to PostgreSQL      | See `db-admin-server/src/db.ts` — lazy `postgres` pool                                                      |
 | Call Jira REST API         | See `jira-server/src/jira-api.ts` — fetch with Basic Auth                                                   |
 | Read Atlassian credentials | See `jira-server/src/netrc.ts` — parse `~/.netrc`                                                           |
 | Run acli commands          | See `jira-server/src/acli.ts` — `execFile` wrapper                                                          |

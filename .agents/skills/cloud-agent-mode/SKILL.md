@@ -66,7 +66,7 @@ The "cloud agent" label covers three distinct configurations with very different
 | Open draft PR             | `github_create_pr({ title, body, draft: true })`                                                                                                                                              | `mcp__github__create_pull_request({ owner, repo, head, base, title, body, draft: true })`                                             |
 | Apply `agent-in-progress` | `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })`                                                                                                                          | same custom call — **no built-in equivalent**                                                                                         |
 | Continuation checkpoint   | `continuation_post({ pr: <PR#>, ... })`                                                                                                                                                       | same                                                                                                                                  |
-| Migrations                | `db_migration_status()` → `db_migrate()`                                                                                                                                                      | (Docker absent on default CC web — see degraded mode)                                                                                 |
+| Migrations                | `pnpm --prefix lib/db-client run db:status` → `db:up` (or hosted `db_migrate` MCP)                                                                                                            | (Docker absent on default CC web — see degraded mode)                                                                                 |
 | Validate                  | Seven `pc-*` chunks **in order**, foreground each: `make_run({ target: "pc-db-prep" })` → `… pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build` (no `make pc`) | Seven `pc-*` chunks **in order** via Bash: `make pc-db-prep` → `make pc-typecheck` → … → `make pc-build` (no `make pc`)               |
 | Mark ready                | `github_mark_pr_ready({ number: <PR#> })` (applies `bot:ready-for-review`)                                                                                                                    | `mcp__github__update_pull_request({ draft: false })` **then** `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` |
 | Jira In Review            | `jira_transition({ key, status: "In Review" })`                                                                                                                                               | same / Atlassian plugin                                                                                                               |
@@ -462,17 +462,17 @@ Copilot Coding Agent **does** support custom stdio MCP servers via the Settings 
 
 ### Available MCP servers in Copilot cloud
 
-| Server                  | Available      | Notes                                                                                                                                                                  |
-| ----------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-github`  | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_GITHUB_BEARER`) minted by copilot-setup-steps.yml — no GH_TOKEN required in env |
-| `legacy-sports-ci`      | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_CI_BEARER`)                                                                     |
-| `legacy-sports-jira`    | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_JIRA_BEARER`); Jira credentials in Secrets Manager — no Jira env vars required  |
-| `legacy-sports-nx`      | ✅             | pnpm install run by copilot-setup-steps.yml                                                                                                                            |
-| `legacy-sports-make`    | ✅             | Same as above                                                                                                                                                          |
-| `legacy-sports-db`      | ✅             | `DATABASE_URL` exported by copilot-setup-steps.yml                                                                                                                     |
-| `legacy-sports-browser` | ⚠️ needs setup | Not included by default; to enable: add `npx playwright install chromium` to copilot-setup-steps.yml then add the server entry to the cloud MCP config                 |
-| `worktree`              | ✅             | git/run tools work (ping/run/push/stabilize); twig-dependent tools (worktree_rebase, worktree_clean, worktree_remove_batch) excluded from cloud config via allow-list  |
-| `legacy-sports-aws`     | ❌             | Full AWS SSO access not available; cloud agents no longer use an AWS role for MCP (bearer auth replaced SigV4) — use `ci_get_logs` for CI log access                   |
+| Server                   | Available      | Notes                                                                                                                                                                  |
+| ------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-github`   | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_GITHUB_BEARER`) minted by copilot-setup-steps.yml — no GH_TOKEN required in env |
+| `legacy-sports-ci`       | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_CI_BEARER`)                                                                     |
+| `legacy-sports-jira`     | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_JIRA_BEARER`); Jira credentials in Secrets Manager — no Jira env vars required  |
+| `legacy-sports-nx`       | ✅             | pnpm install run by copilot-setup-steps.yml                                                                                                                            |
+| `legacy-sports-make`     | ✅             | Same as above                                                                                                                                                          |
+| `legacy-sports-db-admin` | ✅             | Hosted on AWS (API Gateway + Lambda); called with a Cognito machine-grant bearer (`MCP_DB_ADMIN_BEARER`); reaches dev RDS over HTTPS — no tunnel needed                |
+| `legacy-sports-browser`  | ⚠️ needs setup | Not included by default; to enable: add `npx playwright install chromium` to copilot-setup-steps.yml then add the server entry to the cloud MCP config                 |
+| `worktree`               | ✅             | git/run tools work (ping/run/push/stabilize); twig-dependent tools (worktree_rebase, worktree_clean, worktree_remove_batch) excluded from cloud config via allow-list  |
+| `legacy-sports-aws`      | ❌             | Full AWS SSO access not available; cloud agents no longer use an AWS role for MCP (bearer auth replaced SigV4) — use `ci_get_logs` for CI log access                   |
 
 > **Auth note**: all three hosted servers are reached over their API Gateway endpoints with a short-lived Cognito machine-grant bearer in the `Authorization` header (minted per task by `copilot-setup-steps.yml` from `MCP_MACHINE_CLIENT_SECRET`; LS-5093 / RFC AC-A6). If a server is unreachable, verify that `MCP_{JIRA,GITHUB,CI}_URL` and `MCP_MACHINE_CLIENT_{ID,SECRET}` + `MCP_AUTH_COGNITO_DOMAIN` are set as copilot environment secrets and that the bearer-minting step succeeded in the bootstrap logs.
 
@@ -486,7 +486,7 @@ ci_auth_status()          # legacy-sports-ci (hosted — same)
 jira_auth_status()        # legacy-sports-jira (hosted — configured: true means Lambda reachable + Jira creds loaded)
 make_ping()               # legacy-sports-make
 nx_check_package_health() # legacy-sports-nx (doubles as health check)
-db_check_health()         # legacy-sports-db
+db_query({ query: "SELECT 1" })  # legacy-sports-db-admin smoke test
 worktree_ping()           # worktree
 ```
 
@@ -669,7 +669,7 @@ searchJiraIssuesUsingJql(..., startAt: 100)
 ## Available MCP Servers in Cloud
 
 - `legacy-sports-ci` — CI log queries, workflow reruns (hosted on AWS; called over API Gateway with a Cognito machine-grant bearer)
-- `legacy-sports-db` — local Docker Postgres queries, migrations, schema generation
+- `legacy-sports-db-admin` — dev RDS queries + migration application via HTTPS (hosted on AWS; called over API Gateway with a Cognito machine-grant bearer)
 - `legacy-sports-jira` — ticket CRUD, transitions, blocker checks (hosted on AWS; called over API Gateway with a Cognito machine-grant bearer; Jira credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native Atlassian tools (`mcp__claude_ai_Atlassian__*`) are an alternative that requires no secrets
 - `legacy-sports-github` — PR and review lifecycle management (hosted on AWS; called over API Gateway with a Cognito machine-grant bearer; GitHub credentials in Secrets Manager — no env vars needed). On Claude Code on the web, Claude's native GitHub connector is an alternative that requires no secrets
 - `legacy-sports-nx` — Nx project discovery, affected analysis, and target execution

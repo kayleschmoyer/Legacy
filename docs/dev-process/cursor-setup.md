@@ -27,10 +27,12 @@ Cursor does **not** auto-enable project MCP servers. After opening the repo:
 2. Cursor reads [`.cursor/mcp.json`](../../.cursor/mcp.json) and lists every server.
 3. Toggle each on and approve the trust prompt.
 
-The **local stdio** servers (`worktree`, `legacy-sports-db`, `-aws`, `-nx`, `-make`,
-`-browser`, `legacy-sports-ci-local`) connect immediately once `node_modules` exists —
+The **local stdio** servers (`worktree`, `-aws`, `-nx`, `-make`, `-browser`,
+`legacy-sports-ci-local`) connect immediately once `node_modules` exists —
 they cover the tools that otherwise become bash: `make_run`, `worktree_*`, `nx_run`,
-`db_*`, etc. **These are the highest-value servers for reducing bash usage.**
+etc. **These are the highest-value servers for reducing bash usage.** Database
+operations now run via the hosted `legacy-sports-db-admin` server (`db_query`,
+`db_migration_status`, `db_migrate`) or shell commands.
 
 The **hosted HTTP** servers (`legacy-sports-github`, `-jira`, `-ci`) additionally need
 bearer tokens — see the next step.

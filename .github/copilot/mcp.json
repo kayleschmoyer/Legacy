@@ -5,17 +5,6 @@
       "url": "$MCP_CI_URL",
       "headers": { "Authorization": "Bearer $MCP_CI_BEARER" }
     },
-    "legacy-sports-db": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        ".github/copilot/hooks/mcp-bootstrap.mjs",
-        "node",
-        "--import",
-        "tsx",
-        "tools/mcp/db-server/src/index.ts"
-      ]
-    },
     "legacy-sports-jira": {
       "type": "http",
       "url": "$MCP_JIRA_URL",

@@ -125,8 +125,8 @@ if (isHealthy(slotNm)) {
 // hook relied on before the pool became the default resolver. The .env link is
 // what lets agents run integration tests (playwright.integration.config.ts loads
 // <repo>/.env) and pick up MCP_* credentials. The certs/ link is required so
-// db-client tooling (db_migration_status, db_migrate, etc.) can resolve
-// DB_CERT_PATH for SSL connections. Failures here are non-fatal: node_modules —
+// db-client tooling (pnpm --prefix lib/db-client run db:status / db:up) can
+// resolve DB_CERT_PATH for SSL connections. Failures here are non-fatal: node_modules —
 // the primary mission — is already linked.
 linkSecretEnvFiles();
 

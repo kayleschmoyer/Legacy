@@ -15,7 +15,7 @@ This skill covers the complete PR lifecycle: creation, self-review, review fixin
 
 1. On a non-main branch with Jira ticket key in branch name
 2. Changed files are formatted (`pnpm exec prettier --check .`)
-3. Pending migrations applied (`db_migrate` or `pnpm --prefix lib/db-client run db:up`)
+3. Pending migrations applied (`pnpm --prefix lib/db-client run db:up`)
 4. `make pc` passes
 
 > **CRITICAL: Run `make pc` before pushing.** Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time. Minimum alternative: `make format && make lint-fix && make typecheck`.

@@ -312,7 +312,7 @@ Follow the full [worktree-workflow skill](../worktree-workflow/SKILL.md):
 
     **5b. Code review.** Then invoke the `/review` skill to catch rule violations and common review patterns. This is not optional reading — execute `Skill(skill: "review")` and let it run its full checklist (project rules, code quality scan, reuse check, and common Copilot patterns). Fix all issues it identifies before moving to step 7.
 
-6.  **Validate**: `db_migration_status(worktreePath: "$wt")` + `db_migrate(worktreePath: "$wt")`, then `make_run(target: "pc", worktreePath: "$wt")`. Shell fallback: `make pc`
+6.  **Validate**: `pnpm --prefix lib/db-client run db:status` + `db:up`, then `make_run(target: "pc", worktreePath: "$wt")`. Shell fallback: `make pc`
 
     > **Precondition for validation: a single `make_run(target: "pc")` call.** It runs all steps in one shot and handles formatter auto-commits internally. Running `format` / `lint` / `typecheck` / `test` individually multiplies turns and bypasses the auto-commit logic. If `make pc` fails, read the `steps[]` JSON to find the failing step and fix the code — you may run that specific target to iterate faster — then finish with a full `make_run(target: "pc")` pass before pushing.
 

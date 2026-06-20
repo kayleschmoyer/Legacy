@@ -5,9 +5,10 @@ to the dev RDS database. It runs **inside the VPC**, so it reaches RDS directly
 over TCP — no SSM port-forward tunnel and no live AWS SSO session at request
 time.
 
-This is the remote twin of the local stdio `legacy-sports-db` server. Prefer
-this one when you don't have (or don't want to open) an SSM tunnel; the local
-server stays for fully-offline / Docker-Postgres workflows.
+This is the only DB MCP server. The previous local stdio `legacy-sports-db`
+server has been removed (LS-8143). For fully-offline / local Docker Postgres
+operations (migration apply, schema regeneration, dev seed restore) use the
+shell commands documented in `.agents/skills/database/SKILL.md`.
 
 ## Trust model
 
@@ -25,8 +26,8 @@ boundaries that matter are:
    `DB_STATEMENT_TIMEOUT_MS` to override) so a runaway query (e.g.
    `SELECT pg_sleep(9999)`) is server-cancelled rather than tying up the Lambda.
 
-This mirrors the trust model of the existing local `tools/mcp/db-server`
-`db_query` tool.
+This is the trust model of the previous local `tools/mcp/db-server` `db_query`
+tool, which has been removed in favour of this hosted server.
 
 ## Auth
 

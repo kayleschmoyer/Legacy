@@ -319,20 +319,15 @@ git push -u origin HEAD
 ### Step 6b: Apply Pending Migrations 🚨 Required
 
 **Always do this step — even if you think no migrations were added.**
-Run `db_migration_status` to check, then apply any pending migrations before running `make pc`.
+Check status, then apply any pending migrations before running `make pc`.
 Tests may depend on the updated schema, so migrations must be applied first.
 
 ```
-# MCP tools (preferred)
-db_migration_status(worktreePath: "$wt")
-db_migrate(worktreePath: "$wt")
-
-# Shell fallback
 pnpm --prefix $wt/lib/db-client run db:status
 pnpm --prefix $wt/lib/db-client run db:up
 ```
 
-Confirm the MCP response contains `"applied": N` (with N >= 0) or the shell output shows `Applied N new migrations` / `No new migrations to apply`.
+Confirm the output shows `Applied N new migrations` or `No new migrations to apply`.
 If it throws an error, fix the migration SQL, re-commit, push, and re-run.
 
 > 🛑 **Blocked here? Do NOT open the PR.** A PR with an unapplied migration leaves the
@@ -469,8 +464,8 @@ worktree_push(worktree: "LS-####", setUpstream: true)
 # Shell fallback: git -C $wt add . ; git -C $wt commit -m "feat(scope): msg (LS-####)" ; git -C $wt push -u origin HEAD
 
 # 5. Migrations + validate
-db_migration_status(worktreePath: "$wt")
-db_migrate(worktreePath: "$wt")
+pnpm --prefix $wt/lib/db-client run db:status
+pnpm --prefix $wt/lib/db-client run db:up
 make -C $wt pc
 
 # 6. PR + Jira (DO NOT stop at make pc) — MCP tools primary

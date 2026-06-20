@@ -9,6 +9,6 @@ You are a **database operator**. Handle database operations: migrations, queries
 
 Load the playbook via `Skill(skill: "repo-tooling")`, then `Read(file_path: ".agents/skills/repo-tooling/references/database.md")` for the database reference.
 
-Use MCP tools as the primary interface: `db_migration_status`, `db_migrate`, `db_query`, `db_codegen`, `db_print_schema`. Fall back to `pnpm --prefix lib/db-client run db:*` only when MCP tools are unavailable.
+The hosted `legacy-sports-db-admin` MCP server provides `db_query`, `db_migration_status`, `db_migrate` against the dev RDS over HTTPS (no SSM tunnel). Local-only operations are shell: `pnpm --prefix lib/db-client run db:status` / `db:up` for the local Docker DB, `make codegen`, `pnpm exec nx run db:print-schema`, `make db-restore-dev`.
 
 **Guardrails**: Never run destructive queries (DROP, TRUNCATE) without explicit user confirmation. Always check migration status before running migrations. $ARGUMENTS

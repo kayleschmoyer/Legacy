@@ -190,7 +190,7 @@ Update Drizzle models in `lib/db-client/src/drizzle/public/models/`.
 
 ## Running Migrations
 
-> **MCP alternative**: Prefer `db_migration_status` and `db_migrate` MCP tools (see mcp-db skill) -- they return structured results and work from any directory.
+> The hosted `legacy-sports-db-admin` MCP server exposes `db_migration_status` and `db_migrate` for the dev RDS (over HTTPS, no tunnel). For local Docker Postgres, use the shell commands below.
 
 ```powershell
 cd lib/db-client

@@ -66,21 +66,17 @@ The server supports OAuth 2.0 service account authentication (`client_credential
 
 See AGENTS.md for Jira auth-aware routing and MCP-first usage patterns.
 
-### db-server
+### db-admin-server
 
-> **Server ID:** `legacy-sports-db`
+> **Server ID:** `legacy-sports-db-admin` (hosted on AWS Lambda + API Gateway)
 
-Database operations with built-in safety guardrails:
+Database operations against the dev RDS over HTTPS — no SSM tunnel required:
 
-- **db_migration_status** — Check pending database migration status
-- **db_migrate** — Apply pending database migrations
-- **db_query** — Execute ad-hoc SQL queries (read-only by default)
-- **db_print_schema** — Regenerate `schema.graphql` from Pothos schema
-- **db_check_health** — Pre-flight health check (Docker, Postgres, migrations)
-- **db_codegen** — Run GraphQL codegen via Nx affected (optional print-schema first)
-- **db_restore_dev_seed** — Restore `resources/dev-seed.dump` into local DB (destructive, explicit confirmation required)
+- **db_query** — Read-only SQL via the SELECT-only `mcp_readonly` role inside a READ ONLY txn
+- **db_migration_status** — Applied vs pending diff (client passes local migration filenames)
+- **db_migrate** — Apply UNMERGED local migrations (client transpiles `.ts` to CJS, server applies transactionally)
 
-See `.agents/skills/repo-tooling/SKILL.md` for usage.
+See `tools/mcp/db-admin-server/README.md` and `.agents/skills/database/SKILL.md` for usage.
 
 ### worktree-server
 
@@ -181,15 +177,15 @@ Requires `ROLLBAR_READ_ACCESS_TOKEN` (a Rollbar `read`-scope project access toke
 
 Some servers depend on infrastructure that is unavailable in the GitHub Copilot cloud agent environment. Use this table when deciding which servers you can call:
 
-| Server ID               | Local (Windows dev) | Cloud agent (Copilot) | Notes                                                                                                                                                                        |
-| ----------------------- | :-----------------: | :-------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `legacy-sports-ci`      |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                                                       |
-| `legacy-sports-db`      |         ✅          |          ✅           | Cloud uses local Docker PostgreSQL seeded from `resources/dev-seed.dump` (downloaded from public S3 on devcontainer create)                                                  |
-| `legacy-sports-jira`    |         ✅          |  ✅ (needs secrets)   | OAuth 2.0: `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID`. Legacy: `JIRA_EMAIL` + `JIRA_API_TOKEN`. Scopes: `read:jira-work`, `write:jira-work`                   |
-| `legacy-sports-github`  |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                                                       |
-| `legacy-sports-nx`      |         ✅          |          ✅           | Uses `pnpm exec nx`; available after `pnpm install`                                                                                                                          |
-| `worktree`              |         ✅          |   ✅ (with caveats)   | Cloud: git/run tools work (ping/run/push/stabilize); twig-dependent tools (worktree_rebase, worktree_clean, worktree_remove_batch) excluded from cloud config via allow-list |
-| `legacy-sports-make`    |         ✅          |          ✅           | Uses `make` CLI; worktree-create/wt-setup are Windows-only                                                                                                                   |
-| `legacy-sports-aws`     |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead                                    |
-| `legacy-sports-browser` |         ✅          |          ✅           | Requires Playwright browsers installed; cloud needs `npx playwright install chromium` in setup steps                                                                         |
-| `legacy-sports-rollbar` |         ✅          |  ✅ (needs secrets)   | Requires `ROLLBAR_READ_ACCESS_TOKEN` (Rollbar `read`-scope token) in the environment; cloud has it only if the secret is provided                                            |
+| Server ID                | Local (Windows dev) | Cloud agent (Copilot) | Notes                                                                                                                                                                        |
+| ------------------------ | :-----------------: | :-------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `legacy-sports-ci`       |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                                                       |
+| `legacy-sports-db-admin` |         ✅          |          ✅           | Hosted on Lambda + API Gateway; reaches dev RDS over HTTPS via Cognito machine-grant bearer (no SSM tunnel)                                                                  |
+| `legacy-sports-jira`     |         ✅          |  ✅ (needs secrets)   | OAuth 2.0: `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID`. Legacy: `JIRA_EMAIL` + `JIRA_API_TOKEN`. Scopes: `read:jira-work`, `write:jira-work`                   |
+| `legacy-sports-github`   |         ✅          |          ✅           | Uses `gh` CLI; authenticated via GitHub token in cloud                                                                                                                       |
+| `legacy-sports-nx`       |         ✅          |          ✅           | Uses `pnpm exec nx`; available after `pnpm install`                                                                                                                          |
+| `worktree`               |         ✅          |   ✅ (with caveats)   | Cloud: git/run tools work (ping/run/push/stabilize); twig-dependent tools (worktree_rebase, worktree_clean, worktree_remove_batch) excluded from cloud config via allow-list |
+| `legacy-sports-make`     |         ✅          |          ✅           | Uses `make` CLI; worktree-create/wt-setup are Windows-only                                                                                                                   |
+| `legacy-sports-aws`      |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead                                    |
+| `legacy-sports-browser`  |         ✅          |          ✅           | Requires Playwright browsers installed; cloud needs `npx playwright install chromium` in setup steps                                                                         |
+| `legacy-sports-rollbar`  |         ✅          |  ✅ (needs secrets)   | Requires `ROLLBAR_READ_ACCESS_TOKEN` (Rollbar `read`-scope token) in the environment; cloud has it only if the secret is provided                                            |

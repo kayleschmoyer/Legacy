@@ -9,35 +9,28 @@
 
 ## Steps
 
-### 1. Pre-flight health check
+### 1. Check migration status
 
 ```
-db_check_health()
+pnpm --prefix lib/db-client run db:status
 ```
 
-Confirms Docker is running, Postgres is reachable, and the migration runner can connect. Fix any failures here before proceeding.
+Reports DB reachability and pending migration count. If Docker isn't running or `DATABASE_URL` is unset, this is where you'll find out — fix the root cause and retry.
 
-### 2. Check migration status
+- No pending migrations → skip to step 4.
+- Pending migrations → proceed to step 2.
 
-```
-db_migration_status(worktreePath: "<absolute worktree path>")
-```
-
-- `needsMigration: false` → nothing pending; skip to step 5.
-- `needsMigration: true` → proceed to step 3.
-- Tool unavailable → shell fallback: `pnpm --prefix lib/db-client run db:status`
-
-### 3. Apply migrations
+### 2. Apply migrations
 
 ```
-db_migrate(worktreePath: "<absolute worktree path>")
+pnpm --prefix lib/db-client run db:up
 ```
 
-Confirm the response contains `"applied": N` (N ≥ 0) or `"No new migrations to apply"`. Any other result is a failure — do not proceed to `make pc`.
+Confirm the output reports `Applied N new migrations` or `No new migrations to apply`. Any other result is a failure — do not proceed to `make pc`.
 
-Shell fallback: `pnpm --prefix lib/db-client run db:up`
+To apply against the dev RDS without an SSM tunnel, use the hosted `db_migrate` MCP tool (`mcp__legacy-sports-db-admin__db_migrate`) — it transpiles local migrations and POSTs them to the in-VPC server.
 
-### 4. Verify (spot-check)
+### 3. Verify (spot-check)
 
 Confirm the expected tables or columns exist by substituting the literal table name from your migration:
 
@@ -47,7 +40,7 @@ db_query(query: "SELECT column_name FROM information_schema.columns WHERE table_
 
 Replace `game_football_passing_stats` with the exact table name defined in your migration file.
 
-### 5. Update Drizzle schema models
+### 4. Update Drizzle schema models
 
 After applying, update the corresponding model files under `lib/db-client/src/drizzle/public/models/`. Migrations and Drizzle models must stay in sync.
 
@@ -62,7 +55,6 @@ After applying, update the corresponding model files under `lib/db-client/src/dr
 | `relation already exists`             | Add `IF NOT EXISTS` guard to the migration's `up()`               |
 | `enum label already exists`           | Idempotent — safe to ignore; the value was already added          |
 | `Cannot rollback enum value`          | Expected — PostgreSQL can't remove enum values; `down` must throw |
-| MCP tool not found                    | Shell fallback: `pnpm --prefix lib/db-client run db:up`           |
 | AWS SSO expired (dump/restore only)   | Stop and prompt the user — `aws sso login` is user-only           |
 
 ---

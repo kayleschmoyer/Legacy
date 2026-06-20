@@ -68,6 +68,6 @@ Migrations are the highest-risk normal work. They run once, in production, often
 
 ## Related skills
 
-- [repo-tooling](../../repo-tooling/SKILL.md) — `db_migrate` MCP tool and operational migration commands
+- [repo-tooling](../../repo-tooling/SKILL.md) — operational migration commands
 - [terraform-local-apply](../../terraform-local-apply/SKILL.md) — infra apply mechanics
 - [infrastructure](../../infrastructure/SKILL.md)

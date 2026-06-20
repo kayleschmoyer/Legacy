@@ -2,27 +2,32 @@
 
 ## Overview
 
-The `legacy-sports-db` MCP server is the primary interface for all database operations. Fall back to CLI commands when MCP is unavailable.
+`db_query` is served by the hosted `legacy-sports-db-admin` MCP server (in-VPC, no SSM tunnel). All other DB operations are shell commands — there is no stdio DB server.
 
-## MCP Tools (Primary)
+## Operations
 
-| Tool                  | Purpose                                         | Key Parameters                                                |
-| --------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| `db_check_health`     | Pre-flight check (Docker, Postgres, migrations) | none                                                          |
-| `db_migration_status` | Check for pending migrations                    | `worktreePath?`                                               |
-| `db_migrate`          | Apply pending migrations                        | `worktreePath?`                                               |
-| `db_query`            | Ad-hoc SQL (read-only by default)               | `query` (required), `format?`, `allowWrite?`                  |
-| `db_print_schema`     | Regenerate schema.graphql                       | `worktreePath?`                                               |
-| `db_codegen`          | GraphQL codegen after schema changes            | `worktreePath?`, `printSchemaFirst?`, `base?`, `skipNxCache?` |
-| `db_restore_dev_seed` | Restore dev seed (destructive)                  | `confirmDestructive` (required `true`), `runMigrationsAfter?` |
+| Operation                      | Command                                                                |
+| ------------------------------ | ---------------------------------------------------------------------- |
+| Ad-hoc SQL (read-only)         | `db_query` (hosted MCP)                                                |
+| Check pending migrations       | `pnpm --prefix lib/db-client run db:status`                            |
+| Apply pending migrations       | `pnpm --prefix lib/db-client run db:up`                                |
+| Apply migrations to dev RDS    | `db_migrate` (hosted MCP, transpiles local `.ts` and POSTs over HTTPS) |
+| Migration diff vs applied      | `db_migration_status` (hosted MCP; pass local migration filenames)     |
+| Regenerate `schema.graphql`    | `pnpm exec nx run db:print-schema`                                     |
+| GraphQL codegen after schema   | `make codegen`                                                         |
+| Restore dev seed (DESTRUCTIVE) | `make db-restore-dev`                                                  |
+| Restore from S3 prod dump      | `make db-restore` (AWS required)                                       |
+| Dump to S3                     | `make db-dump`                                                         |
+| Scrub-and-dump dev seed        | `make db-dump-dev`                                                     |
+| Interactive psql               | `pnpm --prefix lib/db-client run db:psql`                              |
 
 ## Common Workflows
 
 ### Check and Apply Migrations (Before `make pc`)
 
-1. `db_migration_status` -> check for pending migrations
-2. If `needsMigration` is true -> `db_migrate`
-3. Confirm `success` before continuing
+1. `pnpm --prefix lib/db-client run db:status` → check for pending migrations
+2. If pending → `pnpm --prefix lib/db-client run db:up`
+3. Confirm `Applied N new migrations` or `No new migrations to apply` before continuing
 
 ### Write a New Migration
 
@@ -38,13 +43,13 @@ Critical rules (violating any causes the migration to be silently skipped):
 | **Signature** | `up({ db }: { db: PgDatabase<any> })`         | `up(db: NodePgDatabase)`                   |
 | **SQL calls** | `db.execute(\`...\`)` (plain string)          | `db.execute(sql\`...\`)` (tagged template) |
 
-After creating a migration: update the Drizzle schema model in `lib/db-client/src/drizzle/public/models/`, then run `db_migrate` to apply it locally.
+After creating a migration: update the Drizzle schema model in `lib/db-client/src/drizzle/public/models/`, then apply locally with `pnpm --prefix lib/db-client run db:up`.
 
 > Full migration patterns and code examples: [db-migration-patterns-and-operations.md](db-migration-patterns-and-operations.md)
 
 ### Ad-hoc Query
 
-Use `db_query` MCP tool (preferred) or CLI fallback:
+Use the hosted `db_query` MCP tool. CLI fallback:
 
 ```powershell
 powershell -File .\scripts\db-query.ps1 -Query "SELECT * FROM matchups LIMIT 10" -Format json
@@ -52,8 +57,8 @@ powershell -File .\scripts\db-query.ps1 -Query "SELECT * FROM matchups LIMIT 10"
 
 ### Regenerate Schema After Pothos Changes
 
-1. `db_print_schema` -> regenerate schema.graphql
-2. If changed -> `db_codegen` with `printSchemaFirst: false`
+1. `pnpm exec nx run db:print-schema` → regenerate schema.graphql
+2. If changed → `make codegen`
 3. Verify: `make typecheck`
 
 ### Dump Production Data to S3
@@ -70,7 +75,7 @@ make db-dump-dev       # Scrubbed dev seed (after db-restore)
 ```powershell
 make db-restore        # From S3 production dump (AWS required)
 make db-restore-dev    # From scrubbed dev seed (no AWS)
-make db-migrate        # Apply pending migrations after restore
+pnpm --prefix lib/db-client run db:up   # Apply pending migrations after restore
 ```
 
 ## Schema Reference
@@ -90,24 +95,12 @@ SELECT * FROM public.leagues WHERE id = 16;
 
 > Full schema reference (tables, columns, views, functions): [db-schema-reference.md](db-schema-reference.md)
 
-## CLI Fallback
-
-When MCP tools are unavailable:
-
-```powershell
-pnpm --prefix lib/db-client run db:status    # Check migration status
-pnpm --prefix lib/db-client run db:up        # Apply migrations
-.\scripts\db-query.ps1 -Query "..."          # Run SQL
-pnpm --prefix lib/db-client run db:psql      # Interactive shell
-```
-
 ## Configuration
 
-MCP server registered in `.vscode/mcp.json`. Requires `.env` with `DATABASE_URL` and Docker running.
+Hosted `db_query` / `db_migrate` need `MCP_DB_ADMIN_URL` + `MCP_DB_ADMIN_BEARER` (set by the MCP client on connect). Shell commands need `.env` with `DATABASE_URL` and Docker running.
 
 | Issue                       | Fix                                               |
 | --------------------------- | ------------------------------------------------- |
 | `DATABASE_URL is not set`   | Copy `.env` from main repo or run `make wt-setup` |
 | Postgres connection refused | Start Docker: `docker compose up -d postgres`     |
-| Migration status fails      | Ensure `lib/db-client` exists and `.env` loaded   |
 | AWS SSO expired (dump)      | `aws sso login`                                   |

@@ -181,12 +181,10 @@ git add lambdas/db/schema.graphql lib/**/graphql.generated.ts
 ### `Verify All Migrations Applied`
 
 ```bash
-# MCP
-db_migrate()
-
-# CLI
 pnpm --prefix lib/db-client run db:up
 ```
+
+The hosted `legacy-sports-db-admin` MCP server's `db_migrate` tool applies UNMERGED local migrations to the dev RDS over HTTPS.
 
 ### `Naming Lint` (W3)
 

@@ -24,7 +24,7 @@
     "",
     "  The following are NOT needed as secrets here — set automatically by copilot-setup-steps.yml:",
     "    GH_TOKEN / GITHUB_TOKEN — generated from the Agent Author GitHub App",
-    "    DATABASE_URL + DB_* + USE_LOCAL_CREDENTIALS — local Docker Postgres for the db MCP server",
+    "    DATABASE_URL + DB_* + USE_LOCAL_CREDENTIALS — local Docker Postgres for shell-based DB ops",
     "    MCP_{JIRA,GITHUB,CI}_BEARER — minted per task from MCP_MACHINE_CLIENT_SECRET",
     "",
     "  Jira / GitHub credentials are NOT needed as environment secrets — they are stored in AWS",
@@ -100,18 +100,6 @@
         "--import",
         "tsx",
         "tools/mcp/make-server/src/index.ts"
-      ],
-      "tools": ["*"]
-    },
-    "legacy-sports-db": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        ".github/copilot/hooks/mcp-bootstrap.mjs",
-        "node",
-        "--import",
-        "tsx",
-        "tools/mcp/db-server/src/index.ts"
       ],
       "tools": ["*"]
     }

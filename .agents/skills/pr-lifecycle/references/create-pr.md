@@ -20,7 +20,7 @@ Then create the draft PR (see [Command](#command) below) and apply `agent-in-pro
 
 ### Gate B — before marking the PR ready (the validated gate)
 
-3. **Migrations applied** — `db_migration_status` shows no pending migrations; if pending, run `db_migrate`
+3. **Migrations applied** — `pnpm --prefix lib/db-client run db:status` shows no pending migrations; if pending, run `pnpm --prefix lib/db-client run db:up`
 4. **Validation passes** — validation exits cleanly; if `format:write` changes files, commit them and re-run. Locally, `make pc` (or `make_run({ target: "pc" })`) is fine. In **cloud** sessions, do **not** run `make pc` — run the seven `pc-*` chunks **in order**, foreground each (`pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`), so each call finishes inside the ~60s MCP transport window; checkpoint after each (LS-7906). See [`cloud-agent-mode/SKILL.md`](../../cloud-agent-mode/SKILL.md).
 5. **Bug-fix verification** — if the branch contains `fix(` or the Jira ticket type is Bug, the PR body **must** include a `## Verification` section with before/after evidence. Stop and collect evidence before marking ready if missing. See [bug-verification-templates.md](bug-verification-templates.md) for the required format per bug category.
 

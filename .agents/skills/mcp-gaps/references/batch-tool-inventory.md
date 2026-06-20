@@ -183,10 +183,10 @@ single-shot. **No batch variant warranted** beyond the existing `terraform_state
 `browser_dev_*`, `browser_navigate`, `browser_screenshot(_upload)`, `browser_cleanup` are inherently sequential
 single-session operations. **No gap.**
 
-### db-server (9 tools) — no ticket
+### db-admin-server (3 tools) — no ticket
 
-`db_migrate`, `db_migration_status`, `db_query`, `db_codegen`, `db_check_health`, etc. are one-shot per session;
-`db_query` already runs arbitrary multi-statement SQL. **No gap.**
+`db_query`, `db_migration_status`, `db_migrate` are one-shot per session; `db_query` already runs arbitrary
+multi-statement SQL. **No gap.**
 
 ---
 

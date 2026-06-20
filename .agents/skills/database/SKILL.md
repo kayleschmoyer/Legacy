@@ -9,22 +9,27 @@ description: 'All local database operations: running migrations, ad-hoc queries,
 
 - Writing or applying a new migration
 - Checking whether migrations are pending before `make pc`
-- Running ad-hoc SQL against the local dev database
+- Running ad-hoc SQL against the dev database
 - Inspecting or regenerating the schema
 - Dumping or restoring the database
 - Troubleshooting database connectivity
 
-## MCP Tools (Primary)
+## Tools
 
-| Tool                  | Purpose                                         | Key Parameters                                                                                                      |
-| --------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `db_check_health`     | Pre-flight (Docker, Postgres, migration runner) | none                                                                                                                |
-| `db_migration_status` | Check for pending migrations                    | `worktreePath?`                                                                                                     |
-| `db_migrate`          | Apply pending migrations                        | `worktreePath?`                                                                                                     |
-| `db_query`            | Ad-hoc SQL (read-only by default)               | `query`, `format?`, `allowWrite?` _(internal dev use on local DB only — never pass external/user input as `query`)_ |
-| `db_print_schema`     | Regenerate schema.graphql                       | `worktreePath?`                                                                                                     |
-| `db_codegen`          | GraphQL codegen after schema changes            | `worktreePath?`, `printSchemaFirst?`                                                                                |
-| `db_restore_dev_seed` | Restore dev seed (destructive)                  | `confirmDestructive: true`                                                                                          |
+The hosted `legacy-sports-db-admin` MCP server is the only DB MCP server. It reaches the dev RDS over HTTPS with no SSM tunnel. Everything else is a shell command.
+
+| Operation                      | Command                                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Ad-hoc SQL (read-only)         | `db_query` (hosted MCP, `mcp__legacy-sports-db-admin__db_query`)                                |
+| Check pending migrations       | `pnpm --prefix lib/db-client run db:status`                                                     |
+| Apply pending migrations       | `pnpm --prefix lib/db-client run db:up`                                                         |
+| Apply migrations to dev RDS    | `db_migrate` (hosted MCP, transpiles local `.ts` and POSTs to the server — no tunnel)           |
+| Migration applied/pending diff | `db_migration_status` (hosted MCP; pass local migration filenames)                              |
+| Regenerate `schema.graphql`    | `pnpm exec nx run db:print-schema`                                                              |
+| GraphQL codegen after schema   | `make codegen`                                                                                  |
+| Restore dev seed (DESTRUCTIVE) | `make db-restore-dev` (Windows; runs `scripts/db-restore-dev.ps1`)                              |
+| Pre-flight health check        | `pnpm --prefix lib/db-client run db:status` (reports DB reachability + pending migration count) |
+| Look up a user                 | `db_query` with a SELECT on `users` (no dedicated tool)                                         |
 
 ## Decision Tree
 
@@ -36,16 +41,6 @@ description: 'All local database operations: running migrations, ad-hoc queries,
 | Dumping or restoring data                | [repo-tooling/references/database.md](../repo-tooling/references/database.md) — Dump/Restore sections     |
 | Schema table/column reference            | [repo-tooling/references/db-schema-reference.md](../repo-tooling/references/db-schema-reference.md)       |
 
-## CLI Fallback
-
-When MCP tools are unavailable:
-
-```bash
-pnpm --prefix lib/db-client run db:status   # check migration status
-pnpm --prefix lib/db-client run db:up       # apply migrations
-scripts/db-query.ps1 -Query "..."           # ad-hoc SQL
-```
-
 ## Configuration
 
 Requires Docker running and `.env` with `DATABASE_URL`. If missing:
@@ -54,6 +49,8 @@ Requires Docker running and `.env` with `DATABASE_URL`. If missing:
 | ------------------------- | ------------------------------------------------------ |
 | `DATABASE_URL is not set` | Copy `.env` from main repo root or run `make wt-setup` |
 | Connection refused        | `docker compose up -d postgres` (from main repo root)  |
+
+The hosted `db_query` / `db_migrate` MCP tools additionally need `MCP_DB_ADMIN_URL` + `MCP_DB_ADMIN_BEARER` (minted per-connect by the MCP client). See [`tools/mcp/db-admin-server/README.md`](../../../tools/mcp/db-admin-server/README.md).
 
 ## Related Skills
 

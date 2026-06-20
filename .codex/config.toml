@@ -18,10 +18,6 @@ args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "t
 command = "node"
 args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/nx-server/src/index.ts"]
 
-[mcp_servers.legacy-sports-db]
-command = "node"
-args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/db-server/src/index.ts"]
-
 [mcp_servers.legacy-sports-ci]
 command = "node"
 args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/ci-server/src/index.ts"]

@@ -93,9 +93,9 @@ jobs:
             echo "GITHUB_TOKEN=${APP_TOKEN}"
           } >> "$GITHUB_ENV"
 
-      # Local Postgres for the legacy-sports-db MCP server. db-client reads the
-      # DB_* vars individually when USE_LOCAL_CREDENTIALS=true (bypasses the AWS
-      # Secrets Manager lookup and SSL setup) — see lib/db-client config.
+      # Local Postgres for shell-based DB ops (pnpm --prefix lib/db-client run db:*).
+      # db-client reads the DB_* vars individually when USE_LOCAL_CREDENTIALS=true
+      # (bypasses the AWS Secrets Manager lookup and SSL setup) — see lib/db-client config.
       - name: Run database migrations (local Postgres)
         env:
           USE_LOCAL_CREDENTIALS: "true"

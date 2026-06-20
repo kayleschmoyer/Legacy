@@ -244,7 +244,7 @@ The migration is **expand → backfill → contract**, so each phase ships indep
 
 - Drop `users.discord_id` / `discord_username` / `discord_avatar` once all reads go through `user_identities` and a bake period confirms no regressions.
 
-Each phase is its own PR/ticket. Phases 1 and 3 are migrations (High risk — touches auth + schema; follow the migration entrypoint and run `db_migrate` + "Verify Migrations Applied" on the dev RDS). Phase 2 carries the behavioral risk and needs the fullest test coverage.
+Each phase is its own PR/ticket. Phases 1 and 3 are migrations (High risk — touches auth + schema; follow the migration entrypoint and run `pnpm --prefix lib/db-client run db:up` + "Verify Migrations Applied" on the dev RDS). Phase 2 carries the behavioral risk and needs the fullest test coverage.
 
 ---
 
@@ -253,7 +253,7 @@ Each phase is its own PR/ticket. Phases 1 and 3 are migrations (High risk — to
 - Unit: `resolveOrCreateUser` truth table (new user / returning identity / email-owner conflict / link / canonical rule #3) per provider.
 - Unit: canonical re-derivation on unlink; `setCanonicalEmail` constraint + verification gating.
 - Integration: full Discord/Google/Apple sign-in then cross-provider link in `apps/web-e2e/src/integration/tests/` (live backend) — assert one user row, two identity rows, unchanged canonical email.
-- Migration: backfill correctness on a dev-seed restore (`db_restore_dev_seed` → run Phase 1 → assert identity rows).
+- Migration: backfill correctness on a dev-seed restore (`make db-restore-dev` → run Phase 1 → assert identity rows).
 
 ---
 

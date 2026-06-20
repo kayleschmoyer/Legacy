@@ -20,7 +20,7 @@ Quick lookup for every check agents encounter on a PR — what it validates, why
 | `CI: Quality Gates` label                       | `CI: Quality Gates`          | Blocks CI Pipeline       | `ci-pipeline.yml` quality-gates           | `make pc` (fallback — see below)                                             |
 | `CI: Migration Immutability` label              | `CI: Migration Immutability` | Blocks CI Pipeline       | `ci-pipeline.yml` quality-gates           | Revert the modified migration file                                           |
 | `GraphQL Schema & Codegen` check run fails      | `CI: Schema Drift`           | **Yes** (when triggered) | `check-schema.yml`                        | `pnpm exec nx run db:print-schema && pnpm run codegen`                       |
-| `Verify All Migrations Applied` check run fails | `CI: Migration`              | **Yes** (when triggered) | `check-migrations-applied.yml`            | `db_migrate()` or `pnpm --prefix lib/db-client run db:up`                    |
+| `Verify All Migrations Applied` check run fails | `CI: Migration`              | **Yes** (when triggered) | `check-migrations-applied.yml`            | `pnpm --prefix lib/db-client run db:up` (or hosted `db_migrate` MCP)         |
 | `No Merge Conflicts` check run fails            | `CI: Conflicts`              | **Yes**                  | `check-conflicts.yml`                     | `worktree_rebase()` or `git rebase origin/main`                              |
 | `bot-review` commit status = failure            | _(none)_                     | **Yes**                  | `copilot-auto-approve.yml`                | Fix unresolved Copilot review threads — see [fix-reviews.md](fix-reviews.md) |
 | Security Scanning check run fails               | `CI: Security`               | No (advisory)            | `security-scanning.yml`                   | See [Security Scanning](#security-scanning-ci-security) below                |
@@ -229,14 +229,10 @@ git add lib/**/graphql.generated.ts     # commit any updated generated files
 **Fix:**
 
 ```bash
-# MCP (preferred)
-db_migrate()   # or db_migrate_tunnel() if connecting from local
-
-# Shell fallback
 pnpm --prefix lib/db-client run db:up
 ```
 
-After applying, verify with `db_migration_status()`. The check will re-run on the next push.
+The hosted `legacy-sports-db-admin` MCP server's `db_migrate` tool applies UNMERGED local migrations to the dev RDS over HTTPS (no SSM tunnel). After applying, verify with `pnpm --prefix lib/db-client run db:status`. The check will re-run on the next push.
 
 > **Note:** This check requires a self-hosted runner. If the check fails with `"This workflow requires a self-hosted runner"`, the PR author does not have write permission or the runner is offline — contact the repo owner.
 

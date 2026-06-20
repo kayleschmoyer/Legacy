@@ -201,7 +201,7 @@ These summaries were previously inline in AGENTS.md:
 
 - **GraphQL API**: Lives in `lambdas/db` (Apollo Server on Lambda). Schema changes require Drizzle migrations in `lib/db-client/migrations/` and regenerating types via `make codegen`.
 - **Cross-platform components**: `lib/shared-components/src/platform-components/` -- `.native.ts` files are auto-resolved by Metro. The `__PLATFORM_COMPONENTS__` magic string is used for build-time resolution of more complex platform splits.
-- **Database**: Drizzle ORM with PostgreSQL. Schema lives in `lib/db-client`. Always run `db_migration_status` and `db_migrate` MCP tools before `make pc`. Sport-specific stat tables exist for both baseball and football — see [multi-sport architecture](../../docs/architecture/multi-sport.md).
+- **Database**: Drizzle ORM with PostgreSQL. Schema lives in `lib/db-client`. Always run `pnpm --prefix lib/db-client run db:status` then `db:up` before `make pc`. Hosted `legacy-sports-db-admin` MCP server (`db_query`, `db_migration_status`, `db_migrate`) reaches dev RDS over HTTPS. Sport-specific stat tables exist for both baseball and football — see [multi-sport architecture](../../docs/architecture/multi-sport.md).
 - **Logging**: Import `LOGGER` from `@legacy-sports/logging`. ESLint enforces `no-console`.
 - **Testing**: Unit/integration: Jest (`make test`). Web E2E: Playwright (hermetic -- `route.fulfill()` only). Mobile E2E: WebdriverIO.
 - **Multi-sport**: `leagues.sport` and `players.sport` are the canonical sport discriminators. `SPORT_CONFIGS` in `lib/shared-components/src/config/sports.ts` holds per-sport UI config (positions, stat labels, colors). Basketball and hockey entries exist as future scaffolding.

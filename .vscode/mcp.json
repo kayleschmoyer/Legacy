@@ -19,19 +19,6 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env.local"
     },
-    "legacy-sports-db": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        ".github/copilot/hooks/mcp-bootstrap.mjs",
-        "node",
-        "--import",
-        "tsx",
-        "tools/mcp/db-server/src/index.ts"
-      ],
-      "cwd": "${workspaceFolder}",
-      "envFile": "${workspaceFolder}/.env.local"
-    },
     "legacy-sports-jira": {
       "type": "http",
       "url": "https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com",
