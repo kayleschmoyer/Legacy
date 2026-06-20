@@ -18,13 +18,13 @@ import { listChildren } from './tools/list-children.js';
 import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
-import { transition, VALID_STATUSES } from './tools/transition.js';
+import { consolidatedTransition, VALID_STATUSES } from './tools/transition.js';
 import { view } from './tools/view.js';
-import { bulkTransition } from './tools/bulk-transition.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { claimTicket } from './tools/claim-ticket.js';
 import { getTransitions } from './tools/get-transitions.js';
+import { jiraKeysSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
 import {
   MCP_SCOPE,
@@ -219,49 +219,60 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_transition',
-    'Transition ticket(s) to a new status.',
+    "Transition ticket(s) to a new status. Accepts a single key or an array (1-50). When action='claim', performs the assignee-set + transition atomically (replaces jira_claim_ticket).",
     {
-      key: z.preprocess(
-        (v) => {
-          if (typeof v === 'string') {
-            try {
-              const p = JSON.parse(v);
-              if (Array.isArray(p)) return p;
-            } catch {
-              /* not json */
-            }
-          }
-          return v;
-        },
-        z.union([
-          z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
-          z
-            .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
-            .min(1)
-            .max(50),
-        ]),
-      ),
+      keys: jiraKeysSchema.optional(),
+      key: jiraKeysSchema.optional(),
       status: z.enum(VALID_STATUSES),
+      action: z.enum(['transition', 'claim']).default('transition'),
+      assignee: z.string().email().optional(),
       cascade: z.boolean().default(false),
     },
     async (params) => {
-      if (Array.isArray(params.key)) {
-        if (params.cascade)
-          return {
-            isError: true,
-            content: [
-              {
-                type: 'text',
-                text: 'cascade=true not supported for multiple keys.',
-              },
-            ],
-          };
-        return bulkTransition({ keys: params.key, status: params.status });
+      const keys = params.keys ?? params.key;
+      if (keys === undefined) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                error: 'Either `keys` or `key` is required.',
+              }),
+            },
+          ],
+        };
       }
-      return transition({
-        key: params.key,
+      return consolidatedTransition({
+        keys,
         status: params.status,
+        action: params.action,
         cascade: params.cascade,
+        assignee: params.assignee,
+      });
+    },
+  );
+  server.tool(
+    'jira_bulk_transition',
+    'DEPRECATED: use `jira_transition({ keys, status })`.',
+    {
+      keys: z
+        .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
+        .min(1)
+        .max(50),
+      status: z.enum(VALID_STATUSES),
+    },
+    async (params) => {
+      process.stderr.write(
+        '[legacy-sports-jira] DEPRECATION: jira_bulk_transition is deprecated; use jira_transition({ keys, status }).\n',
+      );
+      return consolidatedTransition({
+        keys: params.keys,
+        status: params.status,
+        action: 'transition',
+        deprecation:
+          'jira_bulk_transition is deprecated; use jira_transition({ keys, status }).',
       });
     },
   );
@@ -273,22 +284,18 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_claim_ticket',
-    'Atomically read, validate, and claim a Jira ticket. ' +
-      'Fetches ticket details, checks blockers, warns on open children, then transitions to "In Progress". ' +
-      'Returns action: "PROCEED" (claimed), "STOP" (blocked/done/in-review/no-transition), or "ALREADY_CLAIMED" (already In Progress). ' +
-      'On a successful claim the ticket is assigned to the `assignee` email if provided, else the JIRA_ASSIGNEE_EMAIL env var, else the JIRA_ASSIGNEE_ACCOUNT_ID env var, else the authenticated service account. ' +
-      'Use this instead of separate jira_view + jira_transition calls at the start of a ticket workflow.',
+    'DEPRECATED: use `jira_transition({ keys, status: "In Progress", action: "claim" })`. ' +
+      'Kept as a thin alias for one release. Returns action: "PROCEED", "STOP", or "ALREADY_CLAIMED".',
     {
       key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
-      assignee: z
-        .string()
-        .email()
-        .optional()
-        .describe(
-          'Email of the user to assign the ticket to. Overrides the JIRA_ASSIGNEE_EMAIL env var. Defaults to JIRA_ASSIGNEE_ACCOUNT_ID, then the service account, when unset.',
-        ),
+      assignee: z.string().email().optional(),
     },
-    async (p) => claimTicket(p),
+    async (p) => {
+      process.stderr.write(
+        '[legacy-sports-jira] DEPRECATION: jira_claim_ticket is deprecated; use jira_transition({ keys, status: "In Progress", action: "claim" }).\n',
+      );
+      return claimTicket(p);
+    },
   );
   server.tool(
     'jira_view',

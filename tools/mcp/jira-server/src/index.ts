@@ -11,15 +11,15 @@ import { listChildren } from './tools/list-children.js';
 import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
-import { transition, VALID_STATUSES } from './tools/transition.js';
+import { consolidatedTransition, VALID_STATUSES } from './tools/transition.js';
 import { view } from './tools/view.js';
-import { bulkTransition } from './tools/bulk-transition.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { rolloverSync } from './tools/rollover-sync.js';
 import { claimTicket } from './tools/claim-ticket.js';
 import { getTransitions } from './tools/get-transitions.js';
 import { startWork } from './tools/start-work.js';
+import { jiraKeysSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
@@ -349,75 +349,86 @@ server.tool(
 // --- jira_transition ---
 server.tool(
   'jira_transition',
-  'Transition one or more tickets to a new status. Accepts a single key or an array of keys. ' +
+  'Transition one or more tickets to a new status. Accepts a single key or an array (1-50). ' +
     'Supports forward (In Progress/In Review/Done) and backward (To Do/Backlog) transitions; ' +
     "the transition id is resolved dynamically from the issue's available workflow transitions, " +
-    'and an actionable error listing the available targets is returned if the workflow disallows it ' +
-    '(e.g. resetting a stale-claim ticket from In Progress back to To Do). ' +
+    'and an actionable error listing the available targets is returned if the workflow disallows it. ' +
     'When using a single key, cascade=true auto-transitions open subtasks to Done. ' +
-    'On Done, warns about open subtasks.',
+    "When action='claim' (single key, status='In Progress'), atomically validates blockers, " +
+    'sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED ' +
+    'plus the full ticket details — replaces the deprecated jira_claim_ticket). ' +
+    'Returns `{ success, results: { [key]: { status?, error?, ... } } }`.',
   {
-    key: z
-      .preprocess(
-        (v) => {
-          if (typeof v === 'string') {
-            try {
-              const parsed = JSON.parse(v);
-              if (Array.isArray(parsed)) return parsed;
-            } catch {
-              // not JSON — treat as single key string
-            }
-          }
-          return v;
-        },
-        z.union([
-          z
-            .string()
-            .regex(
-              /^[A-Z][A-Z0-9_]+-\d+$/,
-              'Must be a valid Jira issue key (e.g., LS-1137)',
-            ),
-          z
-            .array(
-              z
-                .string()
-                .regex(
-                  /^[A-Z][A-Z0-9_]+-\d+$/,
-                  'Each key must be a valid Jira issue key (e.g., LS-1137)',
-                ),
-            )
-            .min(1)
-            .max(50),
-        ]),
-      )
-      .describe('Ticket key (string) or array of ticket keys'),
+    keys: jiraKeysSchema.optional(),
+    key: jiraKeysSchema.optional().describe('Deprecated: use `keys`.'),
     status: z.enum(VALID_STATUSES).describe('Target status'),
+    action: z
+      .enum(['transition', 'claim'])
+      .default('transition')
+      .describe(
+        "'transition' (default): plain state change. 'claim': atomic blocker-check + assignee-set + transition to In Progress (current jira_claim_ticket behavior).",
+      ),
+    assignee: z
+      .string()
+      .email()
+      .optional()
+      .describe(
+        "Only used when action='claim'. Email of the user to assign the ticket to. Overrides JIRA_ASSIGNEE_EMAIL.",
+      ),
     cascade: z
       .boolean()
       .default(false)
       .describe(
-        'Auto-transition open subtasks to Done (default: false). Only applies when key is a single string.',
+        'Auto-transition open subtasks to Done (default: false). Only applies to single-key transitions.',
       ),
   },
   async (params) => {
-    if (Array.isArray(params.key)) {
-      if (params.cascade) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: 'text',
-              text: 'cascade=true is not supported when transitioning multiple keys. Set cascade=false or pass a single key.',
-            },
-          ],
-        };
-      }
-      return bulkTransition({ keys: params.key, status: params.status });
+    const keys = params.keys ?? params.key;
+    if (keys === undefined) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: false,
+              error: 'Either `keys` or `key` is required.',
+            }),
+          },
+        ],
+      };
     }
-    return transition({
-      key: params.key,
+    return consolidatedTransition({
+      keys,
       status: params.status,
+      action: params.action,
       cascade: params.cascade,
+      assignee: params.assignee,
+    });
+  },
+);
+
+// --- jira_bulk_transition (deprecated alias) ---
+server.tool(
+  'jira_bulk_transition',
+  'DEPRECATED: use `jira_transition({ keys, status })`. Kept as a thin alias for one release.',
+  {
+    keys: z
+      .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
+      .min(1)
+      .max(50),
+    status: z.enum(VALID_STATUSES),
+  },
+  async (params) => {
+    process.stderr.write(
+      '[legacy-sports-jira] DEPRECATION: jira_bulk_transition is deprecated; use jira_transition({ keys, status }) instead.\n',
+    );
+    return consolidatedTransition({
+      keys: params.keys,
+      status: params.status,
+      action: 'transition',
+      deprecation:
+        'jira_bulk_transition is deprecated; use jira_transition({ keys, status }) instead.',
     });
   },
 );
@@ -440,14 +451,13 @@ server.tool(
   async (params) => getTransitions(params),
 );
 
-// --- jira_claim_ticket ---
+// --- jira_claim_ticket (deprecated alias) ---
 server.tool(
   'jira_claim_ticket',
-  'Atomically read, validate, and claim a Jira ticket. ' +
-    'Fetches ticket details, checks blockers, warns on open children, then transitions to "In Progress". ' +
-    'Returns action: "PROCEED" (claimed), "STOP" (blocked/done/in-review/no-transition), or "ALREADY_CLAIMED" (already In Progress). ' +
-    'On a successful claim the ticket is assigned to the `assignee` email if provided, else the JIRA_ASSIGNEE_EMAIL env var, else the JIRA_ASSIGNEE_ACCOUNT_ID env var, else the authenticated service account. ' +
-    'Use this instead of separate jira_view + jira_transition calls at the start of a ticket workflow.',
+  'DEPRECATED: use `jira_transition({ keys, status: "In Progress", action: "claim" })`. ' +
+    'Kept as a thin alias for one release. ' +
+    'Atomically reads, validates, and claims a Jira ticket. ' +
+    'Returns action: "PROCEED", "STOP", or "ALREADY_CLAIMED".',
   {
     key: z
       .string()
@@ -461,10 +471,15 @@ server.tool(
       .email()
       .optional()
       .describe(
-        'Email of the user to assign the ticket to. Overrides the JIRA_ASSIGNEE_EMAIL env var. Defaults to JIRA_ASSIGNEE_ACCOUNT_ID, then the service account, when unset.',
+        'Email of the user to assign the ticket to. Overrides the JIRA_ASSIGNEE_EMAIL env var.',
       ),
   },
-  async (params) => claimTicket(params),
+  async (params) => {
+    process.stderr.write(
+      '[legacy-sports-jira] DEPRECATION: jira_claim_ticket is deprecated; use jira_transition({ keys, status: "In Progress", action: "claim" }) instead.\n',
+    );
+    return claimTicket(params);
+  },
 );
 
 // --- jira_start_work ---
