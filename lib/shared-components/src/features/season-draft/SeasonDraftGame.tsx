@@ -29,6 +29,7 @@ import {
   useGetSeasonDraftGameQuery,
   useGetSeasonDraftGameStatValueLazyQuery,
   useMakeSeasonDraftPickMutation,
+  useProcessExpiredSeasonDraftPickMutation,
   useSearchPlayersForDraftLazyQuery,
   useStartSeasonDraftGameMutation,
   useTriggerSeasonDraftStatLoadingMutation,
@@ -215,6 +216,28 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const [triggerStatLoading] = useTriggerSeasonDraftStatLoadingMutation();
   const [startGameMutation] = useStartSeasonDraftGameMutation();
   const [cancelGameMutation] = useCancelSeasonDraftGameMutation();
+  const [processExpiredPickMutation] =
+    useProcessExpiredSeasonDraftPickMutation();
+
+  // Track which deadline timestamps we've already nudged so the on-zero
+  // forfeit fires at most once per deadline, even with multiple clients.
+  const nudgedDeadlinesRef = useRef<Set<string>>(new Set());
+  const handleDeadlineExpired = useCallback(
+    (deadline: string) => {
+      if (nudgedDeadlinesRef.current.has(deadline)) return;
+      nudgedDeadlinesRef.current.add(deadline);
+      void processExpiredPickMutation({ variables: { gameId } }).then(
+        () => {
+          void refetchGame();
+        },
+        (error: unknown) => {
+          const err = error instanceof Error ? error : new Error(String(error));
+          LOGGER.error('Failed to process expired pick', err);
+        },
+      );
+    },
+    [processExpiredPickMutation, gameId, refetchGame],
+  );
 
   const selectedPlayerRef = useRef(selectedPlayer);
   selectedPlayerRef.current = selectedPlayer;
@@ -807,6 +830,7 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
                   <PickDeadlineCountdown
                     deadline={gameState.currentPickDeadline}
                     totalSeconds={gameState.pickDeadlineSeconds}
+                    onExpired={handleDeadlineExpired}
                   />
                 )}
             </YStack>
@@ -1888,22 +1912,37 @@ function PillButton({
 interface PickDeadlineCountdownProps {
   deadline: string;
   totalSeconds: number;
+  onExpired?: (deadline: string) => void;
 }
 
 function PickDeadlineCountdown({
   deadline,
   totalSeconds,
+  onExpired,
 }: PickDeadlineCountdownProps): React.JSX.Element {
   const [remaining, setRemaining] = useState(() => {
     const end = new Date(deadline).getTime();
     return Math.max(0, Math.ceil((end - Date.now()) / 1000));
   });
 
+  const onExpiredRef = useRef(onExpired);
+  onExpiredRef.current = onExpired;
+  const firedRef = useRef(false);
+  useEffect(() => {
+    firedRef.current = false;
+  }, [deadline]);
+
   useEffect(() => {
     const tick = () => {
       const end = new Date(deadline).getTime();
-      setRemaining(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
+      const next = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      setRemaining(next);
+      if (next === 0 && !firedRef.current) {
+        firedRef.current = true;
+        onExpiredRef.current?.(deadline);
+      }
     };
+    tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
   }, [deadline]);

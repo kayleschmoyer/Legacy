@@ -1,0 +1,7 @@
+# Forfeit an expired Season Draft Game pick. Client nudge fired when the
+# on-the-clock countdown reaches zero — the server re-verifies the deadline
+# and skips the player's turn, leaving an unfilled roster slot as the
+# penalty.
+mutation ProcessExpiredSeasonDraftPick($gameId: Int!) {
+  processExpiredSeasonDraftPick(gameId: $gameId)
+}

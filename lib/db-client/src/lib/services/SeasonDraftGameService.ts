@@ -1091,11 +1091,143 @@ export class SeasonDraftGameService {
       .set({ currentTurn: nextTurn, currentPickDeadline: nextDeadline })
       .where(eq(PublicSchema.seasonDraftGames.id, params.gameId));
 
-    // Check if game is complete (all slots filled)
-    const totalSlots = game.numPlayers * 9; // 9 positions per player
-    const totalPicks = pickCount.length + 1;
+    // Check if game is complete (all roster slots filled — including any
+    // slots forfeited via deadline expiry, which have isFilled=true but no
+    // pick row).
+    await this.completeGameIfAllSlotsFilled(db, params.gameId);
 
-    if (totalPicks >= totalSlots) {
+    LOGGER.info(
+      `Pick made in game ${params.gameId}: Player ${params.playerId}, Season ${params.season}, Position ${params.position}, Stat Value: ${statValue}`,
+    );
+  }
+
+  /**
+   * Process an expired pick deadline.
+   *
+   * Penalty for running out of time: the current player forfeits one roster
+   * slot. The first unfilled slot is marked filled with no pick row (so it
+   * scores 0 and renders as "Empty"), the turn advances to the next player,
+   * and the deadline is reset. Idempotent — safe to call from any client as
+   * a nudge whenever a countdown hits zero; only acts if the deadline is
+   * actually in the past.
+   *
+   * Returns true if a forfeit was applied, false if the deadline is not
+   * expired or the game is not in the drafting phase.
+   */
+  static async processExpiredPick(
+    db: PublicDb,
+    gameId: number,
+  ): Promise<boolean> {
+    const applied = await db.transaction(async (tx) => {
+      // Lock the game row to serialize concurrent nudges from multiple
+      // clients — without this, two countdown-zero firings could both advance
+      // the turn.
+      const gameRows = await tx.execute(
+        sql`SELECT id, status, current_turn, num_players, pick_deadline_seconds, current_pick_deadline
+            FROM season_draft_games WHERE id = ${gameId} FOR UPDATE`,
+      );
+      const game = (
+        gameRows as unknown as Array<{
+          id: number;
+          status: string;
+          current_turn: number;
+          num_players: number;
+          pick_deadline_seconds: number;
+          current_pick_deadline: Date | string | null;
+        }>
+      )[0];
+
+      if (!game || game.status !== 'drafting') return false;
+      if (!game.current_pick_deadline) return false;
+      const deadlineMs = new Date(game.current_pick_deadline).getTime();
+      if (deadlineMs > Date.now()) return false;
+
+      // Current player whose deadline expired.
+      const [currentPlayer] = await tx
+        .select()
+        .from(PublicSchema.seasonDraftPlayers)
+        .where(
+          and(
+            eq(PublicSchema.seasonDraftPlayers.gameId, gameId),
+            eq(PublicSchema.seasonDraftPlayers.draftOrder, game.current_turn),
+          ),
+        )
+        .limit(1);
+
+      if (currentPlayer) {
+        const [firstUnfilled] = await tx
+          .select()
+          .from(PublicSchema.seasonDraftRosterSlots)
+          .where(
+            and(
+              eq(
+                PublicSchema.seasonDraftRosterSlots.seasonDraftPlayerId,
+                currentPlayer.id,
+              ),
+              eq(PublicSchema.seasonDraftRosterSlots.isFilled, false),
+            ),
+          )
+          .orderBy(PublicSchema.seasonDraftRosterSlots.id)
+          .limit(1);
+
+        if (firstUnfilled) {
+          await tx
+            .update(PublicSchema.seasonDraftRosterSlots)
+            .set({ isFilled: true })
+            .where(
+              eq(PublicSchema.seasonDraftRosterSlots.id, firstUnfilled.id),
+            );
+        }
+      }
+
+      const nextTurn = (game.current_turn + 1) % game.num_players;
+      const nextDeadline = new Date(
+        Date.now() + game.pick_deadline_seconds * 1000,
+      ).toISOString();
+      await tx
+        .update(PublicSchema.seasonDraftGames)
+        .set({ currentTurn: nextTurn, currentPickDeadline: nextDeadline })
+        .where(eq(PublicSchema.seasonDraftGames.id, gameId));
+
+      return true;
+    });
+
+    if (applied) {
+      LOGGER.info(
+        `Season Draft Game ${gameId}: pick deadline expired, slot forfeited`,
+      );
+      await this.completeGameIfAllSlotsFilled(db, gameId);
+    }
+
+    return applied;
+  }
+
+  /**
+   * Mark the game completed if every roster slot is filled. Filled slots
+   * include both real picks and slots forfeited via deadline expiry.
+   */
+  private static async completeGameIfAllSlotsFilled(
+    db: PublicDb,
+    gameId: number,
+  ): Promise<void> {
+    const [unfilled] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(PublicSchema.seasonDraftRosterSlots)
+      .innerJoin(
+        PublicSchema.seasonDraftPlayers,
+        eq(
+          PublicSchema.seasonDraftRosterSlots.seasonDraftPlayerId,
+          PublicSchema.seasonDraftPlayers.id,
+        ),
+      )
+      .where(
+        and(
+          eq(PublicSchema.seasonDraftPlayers.gameId, gameId),
+          eq(PublicSchema.seasonDraftRosterSlots.isFilled, false),
+        ),
+      );
+
+    if ((unfilled?.count ?? 0) === 0) {
       await db
         .update(PublicSchema.seasonDraftGames)
         .set({
@@ -1103,14 +1235,10 @@ export class SeasonDraftGameService {
           completedAt: new Date().toISOString(),
           currentPickDeadline: null,
         })
-        .where(eq(PublicSchema.seasonDraftGames.id, params.gameId));
+        .where(eq(PublicSchema.seasonDraftGames.id, gameId));
 
-      LOGGER.info(`Season Draft Game ${params.gameId} completed`);
+      LOGGER.info(`Season Draft Game ${gameId} completed`);
     }
-
-    LOGGER.info(
-      `Pick made in game ${params.gameId}: Player ${params.playerId}, Season ${params.season}, Position ${params.position}, Stat Value: ${statValue}`,
-    );
   }
 
   /**

@@ -1866,6 +1866,8 @@ export type Mutation = {
   pauseDraft?: Maybe<Draft>;
   placeBid?: Maybe<AuctionState>;
   postLeagueAnnouncement?: Maybe<LeagueChatMessage>;
+  /** Forfeit the current pick if its deadline has passed. The current player loses one roster slot (penalty for running out of time) and the turn advances. Idempotent — safe for any participant to nudge when their countdown hits zero. */
+  processExpiredSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
@@ -2290,6 +2292,10 @@ export type MutationPlaceBidArgs = {
 export type MutationPostLeagueAnnouncementArgs = {
   leagueId: Scalars['Int']['input'];
   messageText: Scalars['String']['input'];
+};
+
+export type MutationProcessExpiredSeasonDraftPickArgs = {
+  gameId: Scalars['Int']['input'];
 };
 
 export type MutationProcessWaiverClaimsArgs = {

@@ -5,6 +5,7 @@ import {
   useGetSeasonDraftGameQuery,
   useGetSeasonDraftGameStatValueLazyQuery,
   useMakeSeasonDraftPickMutation,
+  useProcessExpiredSeasonDraftPickMutation,
   useSearchPlayersForDraftLazyQuery,
   useStartSeasonDraftGameMutation,
   useTriggerSeasonDraftStatLoadingMutation,
@@ -21,6 +22,7 @@ const mockCancelMutation = jest.fn();
 const mockStartMutation = jest.fn();
 const mockMakePickMutation = jest.fn();
 const mockTriggerStatMutation = jest.fn();
+const mockProcessExpiredMutation = jest.fn().mockResolvedValue({});
 const mockRefetch = jest.fn().mockResolvedValue({});
 
 jest.mock('@legacy-sports/graphql');
@@ -126,6 +128,11 @@ function setupDefaultMocks() {
     .mocked(useStartSeasonDraftGameMutation)
     .mockReturnValue([mockStartMutation] as unknown as ReturnType<
       typeof useStartSeasonDraftGameMutation
+    >);
+  jest
+    .mocked(useProcessExpiredSeasonDraftPickMutation)
+    .mockReturnValue([mockProcessExpiredMutation] as unknown as ReturnType<
+      typeof useProcessExpiredSeasonDraftPickMutation
     >);
   jest
     .mocked(useSearchPlayersForDraftLazyQuery)

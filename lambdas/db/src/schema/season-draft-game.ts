@@ -775,6 +775,25 @@ builder.mutationFields((t) => ({
     },
   }),
 
+  processExpiredSeasonDraftPick: t.field({
+    type: 'Boolean',
+    description:
+      'Forfeit the current pick if its deadline has passed. The current player loses one roster slot (penalty for running out of time) and the turn advances. Idempotent — safe for any participant to nudge when their countdown hits zero.',
+    args: {
+      gameId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      return await SeasonDraftGameService.processExpiredPick(
+        context.db,
+        args.gameId,
+      );
+    },
+  }),
+
   cancelSeasonDraftGame: t.field({
     type: 'Boolean',
     description:

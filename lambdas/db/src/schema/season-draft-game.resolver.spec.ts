@@ -38,6 +38,7 @@ describe('Season Draft Game Resolver', () => {
       startGame: jest.fn().mockResolvedValue(undefined),
       makePick: jest.fn().mockResolvedValue(undefined),
       cancelGame: jest.fn().mockResolvedValue(undefined),
+      processExpiredPick: jest.fn().mockResolvedValue(true),
       checkPlayerHasStats: jest.fn().mockResolvedValue(false),
       getPlayerBrefId: jest.fn().mockResolvedValue('johndoXX01'),
       getStatValueForPlayerSeasonPosition: jest.fn().mockResolvedValue(25),
@@ -733,6 +734,48 @@ describe('Season Draft Game Resolver', () => {
         message: expect.stringContaining('Failed to load player stats'),
         extensions: { code: 'GAME_UNAVAILABLE' },
       });
+    });
+  });
+
+  // ── processExpiredSeasonDraftPick mutation ────────────────────────────────
+
+  describe('processExpiredSeasonDraftPick mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('processExpiredSeasonDraftPick');
+      await expect(
+        resolver({}, { gameId: 1 }, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('forfeits the expired pick and returns the service result', async () => {
+      mockSeasonDraftGameService.processExpiredPick.mockResolvedValueOnce(true);
+      const resolver = getMutation('processExpiredSeasonDraftPick');
+      const result = await resolver(
+        {},
+        { gameId: 7 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+      expect(
+        mockSeasonDraftGameService.processExpiredPick,
+      ).toHaveBeenCalledWith(mockDb, 7);
+    });
+
+    it('returns false when the deadline has not actually expired', async () => {
+      mockSeasonDraftGameService.processExpiredPick.mockResolvedValueOnce(
+        false,
+      );
+      const resolver = getMutation('processExpiredSeasonDraftPick');
+      const result = await resolver(
+        {},
+        { gameId: 7 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBe(false);
     });
   });
 
