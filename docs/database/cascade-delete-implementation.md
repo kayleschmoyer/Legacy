@@ -91,7 +91,7 @@ Player data is reference/master data and should never be deleted when leagues/te
 
 ### Self-References
 
-- `league_scoring_profiles.copied_from_profile_id` → NO CASCADE (keeps audit trail)
+- `league_scoring_profiles.copied_from_profile_id` → SET NULL (preserves the copied profile but clears the provenance pointer; LS-8137). Was NO ACTION, but that pinned a source league's profile whenever another still-living league's profile was copied from it, so deleting the source league raised a 23503 FK violation that `deleteAllLeagues`/`deleteLeague` surfaced as an opaque "Internal server error".
 - `matchup_messages.reply_to_message_id` → SET NULL (preserves messages)
 
 ### User References

@@ -110,11 +110,14 @@ export const leagueScoringProfiles = pgTable(
         foreignColumns: [leagues.id],
         name: 'league_scoring_profiles_league_fk',
       }).onDelete('cascade'),
+      // SET NULL (not NO ACTION): a profile may be copied_from another league's
+      // profile, so deleting the source league must not be pinned by the
+      // surviving copy. The provenance pointer is cleared instead (LS-8137).
       copiedFromForeignKey: foreignKey({
         columns: [table.copiedFromProfileId],
         foreignColumns: [table.id],
         name: 'league_scoring_profiles_copied_from_fk',
-      }),
+      }).onDelete('set null'),
       leagueIdx: index('league_scoring_profiles_league_idx').on(table.leagueId),
       defaultUnique: uniqueIndex('league_scoring_profiles_unique_default')
         .on(table.leagueId)

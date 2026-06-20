@@ -57,6 +57,13 @@ test.describe
     // Reset the per-spec commissioner's free-tier weekly mock-draft usage so
     // MockDraftPage renders the setup form (not LimitReachedScreen) regardless
     // of leftover mock-draft leagues from prior runs (LS-7872).
+    //
+    // LS-8137: this reset previously 500'd ("Internal server error") when the
+    // commissioner owned a rolled-over league chain — `deleteAllLeagues` hit a
+    // 23503 FK violation because `league_scoring_profiles.copied_from_profile_id`
+    // was `ON DELETE NO ACTION`. That FK is now `ON DELETE SET NULL`, so the
+    // reset succeeds deterministically. This touch also opts the spec into the
+    // `run:integration` suite so the live-backend fix is verified on the PR.
     await resetMockDraftUsage(apiCommissioner);
   });
 
