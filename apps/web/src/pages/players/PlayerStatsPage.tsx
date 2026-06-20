@@ -60,6 +60,27 @@ const MAX_GRAPHQL_INT = 2147483647;
 const SEARCH_PARAM_MAX_LENGTH = 64;
 
 /**
+ * Parse an integer URL search param and clamp it to MAX_GRAPHQL_INT (the
+ * 32-bit signed INT ceiling GraphQL accepts). The clamp is good defense
+ * against query errors, but silently rewriting the user's requested filter to
+ * ~2B is surprising — so emit a LOGGER.warn when the clamp actually triggers
+ * (PST-102 / LS-7142). Out-of-range values still clamp as before; NaN passes
+ * through unchanged (parseInt returned no digits) to preserve existing
+ * behavior. Exported for unit testing.
+ */
+export function parseClampedInt(raw: string, paramName: string): number {
+  const parsed = parseInt(raw, 10);
+  if (parsed > MAX_GRAPHQL_INT) {
+    LOGGER.warn(
+      `[PlayerStatsRoute] ${paramName} value exceeds GraphQL INT max; clamping`,
+      { paramName, requested: parsed, clampedTo: MAX_GRAPHQL_INT },
+    );
+    return MAX_GRAPHQL_INT;
+  }
+  return parsed;
+}
+
+/**
  * Sanitize a URL search parameter value before forwarding to filters.
  * Strips control characters (U+0000–U+001F, U+007F–U+009F) and enforces a
  * maximum length to prevent injection via string-concatenating audit paths.
@@ -370,28 +391,20 @@ export function PlayerStatsRoute() {
     const searchTerm = sanitizeSearchParam(searchParams.get('searchTerm'));
 
     // Apply batting filters
-    if (minHR)
-      filters.minHomeRuns = Math.min(parseInt(minHR, 10), MAX_GRAPHQL_INT);
-    if (maxHR)
-      filters.maxHomeRuns = Math.min(parseInt(maxHR, 10), MAX_GRAPHQL_INT);
-    if (minRBI)
-      filters.minRBI = Math.min(parseInt(minRBI, 10), MAX_GRAPHQL_INT);
-    if (maxRBI)
-      filters.maxRBI = Math.min(parseInt(maxRBI, 10), MAX_GRAPHQL_INT);
+    if (minHR) filters.minHomeRuns = parseClampedInt(minHR, 'minHomeRuns');
+    if (maxHR) filters.maxHomeRuns = parseClampedInt(maxHR, 'maxHomeRuns');
+    if (minRBI) filters.minRBI = parseClampedInt(minRBI, 'minRBI');
+    if (maxRBI) filters.maxRBI = parseClampedInt(maxRBI, 'maxRBI');
     if (minAVG) filters.minBattingAvg = parseFloat(minAVG);
     if (maxAVG) filters.maxBattingAvg = parseFloat(maxAVG);
 
     // Apply pitching filters
     if (minERA) filters.minERA = parseFloat(minERA);
     if (maxERA) filters.maxERA = parseFloat(maxERA);
-    if (minWins)
-      filters.minWins = Math.min(parseInt(minWins, 10), MAX_GRAPHQL_INT);
-    if (maxWins)
-      filters.maxWins = Math.min(parseInt(maxWins, 10), MAX_GRAPHQL_INT);
-    if (minSO)
-      filters.minStrikeouts = Math.min(parseInt(minSO, 10), MAX_GRAPHQL_INT);
-    if (maxSO)
-      filters.maxStrikeouts = Math.min(parseInt(maxSO, 10), MAX_GRAPHQL_INT);
+    if (minWins) filters.minWins = parseClampedInt(minWins, 'minWins');
+    if (maxWins) filters.maxWins = parseClampedInt(maxWins, 'maxWins');
+    if (minSO) filters.minStrikeouts = parseClampedInt(minSO, 'minStrikeouts');
+    if (maxSO) filters.maxStrikeouts = parseClampedInt(maxSO, 'maxStrikeouts');
 
     // Apply player info filters
     if (position) filters.position = position;

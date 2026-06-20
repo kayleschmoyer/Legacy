@@ -1,4 +1,60 @@
-import { buildStatsSearchParams, sanitizeSearchParam } from './PlayerStatsPage';
+import { LOGGER } from '@legacy-sports/logging';
+import {
+  buildStatsSearchParams,
+  parseClampedInt,
+  sanitizeSearchParam,
+} from './PlayerStatsPage';
+
+const MAX_GRAPHQL_INT = 2147483647;
+
+describe('parseClampedInt', () => {
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    warnSpy = jest.spyOn(LOGGER, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('returns in-range values unchanged without warning', () => {
+    expect(parseClampedInt('30', 'minHomeRuns')).toBe(30);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns MAX_GRAPHQL_INT exactly without warning (boundary)', () => {
+    expect(parseClampedInt(String(MAX_GRAPHQL_INT), 'minHomeRuns')).toBe(
+      MAX_GRAPHQL_INT,
+    );
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('clamps an overflowing value to MAX_GRAPHQL_INT', () => {
+    // PST-102 repro: ?minHomeRuns=99999999999 was silently truncated to ~2B
+    expect(parseClampedInt('99999999999', 'minHomeRuns')).toBe(MAX_GRAPHQL_INT);
+  });
+
+  it('warns when the clamp triggers (PST-102 / LS-7142)', () => {
+    parseClampedInt('99999999999', 'minHomeRuns');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('minHomeRuns'),
+      expect.objectContaining({
+        paramName: 'minHomeRuns',
+        requested: 99999999999,
+        clampedTo: MAX_GRAPHQL_INT,
+      }),
+    );
+  });
+
+  it('passes NaN through unchanged without warning (no digits)', () => {
+    expect(Number.isNaN(parseClampedInt('not-a-number', 'minHomeRuns'))).toBe(
+      true,
+    );
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
 
 describe('sanitizeSearchParam', () => {
   it('returns null for null input', () => {
