@@ -56,6 +56,28 @@ interface RollbarRequestOptions {
   query?: Record<string, string | number | undefined>;
 }
 
+/**
+ * Error thrown when the Rollbar API rejects a write with 401/403 — typically
+ * because the project access token lacks the `write` scope. Callers can catch
+ * this to surface an actionable scope hint instead of a generic API error.
+ */
+export class RollbarWriteScopeError extends Error {
+  readonly status: number;
+  constructor(status: number, body: string) {
+    super(
+      `Rollbar API rejected the write with HTTP ${status} — the token in ` +
+        `${ROLLBAR_READ_TOKEN_SECRET_NAME_HINT} likely lacks the "write" scope. ` +
+        `Rotate it for a token with both "read" and "write" scopes ` +
+        `(Rollbar → Project Settings → Access Tokens). Response: ${sanitizeErrorBody(body)}`,
+    );
+    this.status = status;
+    this.name = 'RollbarWriteScopeError';
+  }
+}
+
+const ROLLBAR_READ_TOKEN_SECRET_NAME_HINT =
+  'dev/rollbar-read-access-token (ROLLBAR_READ_TOKEN_SECRET_NAME)';
+
 /** Execute a single GET against the Rollbar API and unwrap its envelope. */
 async function rollbarGetOnce<T>(opts: RollbarRequestOptions): Promise<T> {
   const token = await getRollbarToken();
@@ -121,4 +143,61 @@ export async function rollbarGet<T>(opts: RollbarRequestOptions): Promise<T> {
     );
     return rollbarGetOnce<T>(opts);
   }
+}
+
+interface RollbarPatchOptions {
+  /** Path under the API base, e.g. `/item/12345/`. */
+  path: string;
+  /** JSON body to send. */
+  body: Record<string, unknown>;
+}
+
+/**
+ * Execute an authenticated PATCH against the Rollbar REST API and unwrap its
+ * envelope. Throws {@link RollbarWriteScopeError} on 401/403 so callers can
+ * surface an actionable "token lacks write scope" hint. Not retried — PATCH is
+ * not idempotent in the general case, even though Rollbar's status mutation is.
+ */
+export async function rollbarPatch<T>(opts: RollbarPatchOptions): Promise<T> {
+  const token = await getRollbarToken();
+
+  const url = `${ROLLBAR_API_BASE}${opts.path}`;
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'X-Rollbar-Access-Token': token,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(opts.body),
+  });
+
+  const text = await response.text();
+
+  if (response.status === 401 || response.status === 403) {
+    throw new RollbarWriteScopeError(response.status, text);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Rollbar API PATCH ${opts.path} failed (${response.status}): ${sanitizeErrorBody(text)}`,
+    );
+  }
+
+  let envelope: RollbarEnvelope<T>;
+  try {
+    envelope = JSON.parse(text) as RollbarEnvelope<T>;
+  } catch {
+    throw new Error(
+      `Rollbar API PATCH ${opts.path} returned non-JSON response: ${sanitizeErrorBody(text)}`,
+    );
+  }
+
+  if (envelope.err !== 0) {
+    throw new Error(
+      `Rollbar API PATCH ${opts.path} returned err=${envelope.err}: ${envelope.message ?? 'unknown error'}`,
+    );
+  }
+
+  return envelope.result as T;
 }

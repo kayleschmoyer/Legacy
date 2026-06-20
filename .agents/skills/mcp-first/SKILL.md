@@ -22,6 +22,7 @@ description: Per-server MCP-first operation mapping — which MCP tools to prefe
 | `legacy-sports-aws`         | CloudWatch log tailing, AWS SSO status checks                                                                  |
 | `legacy-sports-browser`     | Dev server lifecycle, headless screenshots, GitHub image upload                                                |
 | `legacy-sports-dev-process` | RFC, ADR, test-plan, repro, continuation-plan, and postmortem artifact management                              |
+| `legacy-sports-rollbar`     | Rollbar item triage (list/get/occurrences/top-active) and status mutation via `rollbar_set_status` (write)     |
 | `claude_ai_Stripe`          | Claude Code built-in Stripe integration                                                                        |
 | `claude_ai_Atlassian`       | Jira + Confluence via OAuth 2.1. Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`                              |
 

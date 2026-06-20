@@ -14,6 +14,7 @@ import { ROLLBAR_READ_TOKEN_ENV, tryGetRollbarToken } from './auth.js';
 import { listItems } from './tools/list-items.js';
 import { getItem } from './tools/get-item.js';
 import { listOccurrences } from './tools/list-occurrences.js';
+import { setStatus } from './tools/set-status.js';
 import { topActiveItems } from './tools/top-active-items.js';
 
 function createMcpServer(): McpServer {
@@ -115,6 +116,24 @@ function createMcpServer(): McpServer {
         .describe('Results per page (Rollbar default 20, max 100)'),
     },
     async (params) => listOccurrences(params),
+  );
+
+  server.tool(
+    'rollbar_set_status',
+    'Set the status of a Rollbar item by internal id or per-project counter. WRITE — requires a token with the "write" scope (see rollbar_auth_status). Returns the updated item JSON.',
+    {
+      id: z.number().int().positive().optional().describe('Internal item id'),
+      counter: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Per-project item counter (shown in the Rollbar item URL)'),
+      status: z
+        .enum(['active', 'resolved', 'muted', 'archived'])
+        .describe('Target status for the item'),
+    },
+    async (params) => setStatus(params),
   );
 
   server.tool(

@@ -2,17 +2,18 @@
 
 > **Server ID:** `legacy-sports-rollbar` (hosted HTTP)
 
-Read-only access to [Rollbar](https://rollbar.com) error tracking data, so agents can triage production errors during debugging workflows the same way they read Jira/GitHub/CI data.
+Access to [Rollbar](https://rollbar.com) error tracking data, so agents can triage production errors and reconcile item state during debugging workflows the same way they read Jira/GitHub/CI data.
 
-This is the read complement to the project's existing **write** integration (`lib/rollbar` for error reporting, `lambdas/rollbar-discord` for alerting). It performs **no writes** — there are no resolve/mute/delete tools.
+This complements the project's reporting integration (`lib/rollbar` for error reporting, `lambdas/rollbar-discord` for alerting). Read tools require a token with the `read` scope; `rollbar_set_status` additionally requires the `write` scope.
 
 ## Tools
 
-- **rollbar_auth_status** — Check whether the read token is configured. Call first.
+- **rollbar_auth_status** — Check whether the access token is configured. Call first.
 - **rollbar_list_items** — List items (deduplicated errors), filterable by status, level, environment, or search query.
 - **rollbar_get_item** — Fetch one item by internal `id` or by its per-project `counter` (the number in the item URL).
 - **rollbar_list_occurrences** — List recent occurrences (instances) of an item, each with a truncated message summary.
 - **rollbar_top_active_items** — The dashboard "top active items" view, each with its summed recent occurrence count.
+- **rollbar_set_status** — Set an item's status (`active` / `resolved` / `muted` / `archived`) by `id` or `counter`. Requires a token with the `write` scope; returns a clear scope hint on HTTP 401/403.
 
 ## Deployment
 
@@ -36,7 +37,7 @@ aws secretsmanager put-secret-value \
   --secret-string <your-rollbar-read-token>
 ```
 
-Generate the token in **Rollbar → Project Settings → Access Tokens** — choose (or create) a token with the **`read`** scope. It is distinct from the `post_server_item` / `post_client_item` write tokens used by `lib/rollbar`.
+Generate the token in **Rollbar → Project Settings → Access Tokens** — choose (or create) a project access token with the **`read`** scope (and **`write`** as well if you want `rollbar_set_status` to work). It is distinct from the `post_server_item` / `post_client_item` write tokens used by `lib/rollbar`, which are dedicated post-only tokens.
 
 Local unit tests and any direct invocation can also supply the token via the `ROLLBAR_READ_ACCESS_TOKEN` env var, which is checked before Secrets Manager.
 
