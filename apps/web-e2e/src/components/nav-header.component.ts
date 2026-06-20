@@ -13,20 +13,28 @@ import { BaseComponent } from '../base/base.component';
  * Locators are private; the component exposes semantic surfaces (ADR-0015 §1).
  * The header drives interaction and verification — it has no plain-data to read
  * — so only the actions and assertions surfaces are populated:
- *   • actions  — `clickLogo()`, `goMobile()`, `openMobileMenu()`,
- *                `closeMobileMenu()`, `clickMobileMenuItem(text)`
+ *   • actions  — `clickLogo()`, `clickNavItem(name)`, `goMobile()`,
+ *                `openMobileMenu()`, `closeMobileMenu()`,
+ *                `clickMobileMenuItem(text)`, `openUserProfileMenu()`,
+ *                `clickUserProfileMenuItem(text)`, `openHelpMenu()`,
+ *                `closeHelpMenuWithEscape()`
  *   • asserts  — `expectVisible()`, `expectLogo()`, `expectPrimaryNavVisible()`,
  *                `expectNavItem(name)`, `expectHamburgerVisible()`,
  *                `expectHamburgerHidden()`, `expectCloseButtonVisible()`,
  *                `expectMobileMenuVisible()`, `expectMobileMenuHidden()`,
  *                `expectMobileMenuItem(text)`, `expectCollapsed()`,
- *                `expectExpanded()`
+ *                `expectExpanded()`, `expectUserProfileMenuVisible()`,
+ *                `expectUserProfileMenuItem(text)`, `expectHelpMenuVisible()`,
+ *                `expectHelpMenuHidden()`
  *
- * Scoping note: the desktop header, brand, primary nav, and hamburger live
- * inside the `banner` root, so those locators scope to `this.root`. The mobile
- * drawer renders through `createPortal(..., document.body)` (it escapes the
- * nav's sticky stacking context), so it is **outside** the banner subtree and
- * must be located via `this.page`.
+ * Scoping note: the desktop header, brand, primary nav, hamburger,
+ * user-profile dropdown, and Help & support menu live inside the `banner` root,
+ * so those locators scope to `this.root`. The user-profile dropdown and Help
+ * menu are `position: absolute` inside their respective banner-anchored
+ * containers (not portaled). The mobile drawer renders through
+ * `createPortal(..., document.body)` (it escapes the nav's sticky stacking
+ * context), so it is **outside** the banner subtree and must be located via
+ * `this.page`.
  *
  * It carries no mocking or data setup — that stays in fixtures and route
  * handlers (ADR-0015 §6).
@@ -44,6 +52,14 @@ export class NavHeader extends BaseComponent {
   readonly #closeMenuButton: Locator;
   readonly #mobileNav: Locator;
 
+  // ── User-profile dropdown (inside the banner root) ────────────────
+  readonly #userProfileTrigger: Locator;
+  readonly #userProfileDropdown: Locator;
+
+  // ── Help & support menu (inside the banner root) ──────────────────
+  readonly #helpMenuButton: Locator;
+  readonly #helpMenu: Locator;
+
   constructor(root: Locator) {
     super(root);
 
@@ -60,6 +76,14 @@ export class NavHeader extends BaseComponent {
     this.#mobileNav = this.page.getByRole('navigation', {
       name: /mobile navigation/i,
     });
+
+    this.#userProfileTrigger = root.getByTestId('user-profile-trigger');
+    this.#userProfileDropdown = root.getByTestId('user-profile-dropdown');
+
+    this.#helpMenuButton = root.getByRole('button', {
+      name: /help & support/i,
+    });
+    this.#helpMenu = root.getByRole('menu', { name: /help & support/i });
   }
 
   // ── Actions ──────────────────────────────────────────────────────
@@ -95,6 +119,39 @@ export class NavHeader extends BaseComponent {
   /** Click a link/item inside the open mobile drawer, located by its text. */
   async clickMobileMenuItem(text: string | RegExp): Promise<void> {
     await this.#mobileNav.getByText(text).first().click();
+  }
+
+  /**
+   * Click a primary-nav pill link by its accessible name and wait for the
+   * resulting navigation to settle.
+   */
+  async clickNavItem(name: string | RegExp): Promise<void> {
+    await this.#primaryNav.getByRole('link', { name }).click();
+    await this.page.waitForLoadState('load');
+  }
+
+  /** Open the desktop user-profile dropdown via its trigger button. */
+  async openUserProfileMenu(): Promise<void> {
+    await this.#userProfileTrigger.click();
+  }
+
+  /**
+   * Click an item in the open user-profile dropdown by its visible text and
+   * wait for the resulting navigation to settle.
+   */
+  async clickUserProfileMenuItem(text: string | RegExp): Promise<void> {
+    await this.#userProfileDropdown.getByText(text).click();
+    await this.page.waitForLoadState('load');
+  }
+
+  /** Open the Help & support menu via its trigger button. */
+  async openHelpMenu(): Promise<void> {
+    await this.#helpMenuButton.click();
+  }
+
+  /** Close the Help & support menu by pressing Escape. */
+  async closeHelpMenuWithEscape(): Promise<void> {
+    await this.page.keyboard.press('Escape');
   }
 
   // ── Assertions ───────────────────────────────────────────────────
@@ -173,5 +230,27 @@ export class NavHeader extends BaseComponent {
       'aria-expanded',
       'true',
     );
+  }
+
+  /** Assert the desktop user-profile dropdown is open and visible. */
+  async expectUserProfileMenuVisible(): Promise<void> {
+    await expect(this.#userProfileDropdown).toBeVisible({ timeout: 10000 });
+  }
+
+  /** Assert an item with the given text is visible in the user-profile dropdown. */
+  async expectUserProfileMenuItem(text: string | RegExp): Promise<void> {
+    await expect(this.#userProfileDropdown.getByText(text)).toBeVisible({
+      timeout: 10000,
+    });
+  }
+
+  /** Assert the Help & support menu is open and visible. */
+  async expectHelpMenuVisible(): Promise<void> {
+    await expect(this.#helpMenu).toBeVisible({ timeout: 10000 });
+  }
+
+  /** Assert the Help & support menu is closed / not visible. */
+  async expectHelpMenuHidden(): Promise<void> {
+    await expect(this.#helpMenu).not.toBeVisible({ timeout: 5000 });
   }
 }
