@@ -10,6 +10,7 @@ import { getPlaywrightReport } from './tools/get-playwright-report.js';
 import { getPlaywrightTestResult } from './tools/get-playwright-test-result.js';
 import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
+import { retryFailed } from './tools/retry-failed.js';
 import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
@@ -187,6 +188,32 @@ export function createServer(): McpServer {
       debug: coercedBoolean.default(false).describe('Enable debug logging'),
     },
     async (params) => rerun({ ...params, failedOnly: true }),
+  );
+
+  server.tool(
+    'ci_retry_failed',
+    'Semantic one-shot for the triage-then-rerun loop: identifies failed jobs in a run, ' +
+      'fetches a short error snippet from the original logs, and triggers a rerun of just ' +
+      'the failed jobs. Returns { originalRunId, originalAttempt, newRunId, newAttempt, ' +
+      'failedJobsRerun, originalLogSnippet, url }. Errors clearly when there are no failed ' +
+      'jobs to rerun (so it never silently no-ops). Replaces the manual chain ' +
+      'ci_view_run → ci_view_run_jobs → ci_get_logs → ci_rerun_failed_jobs.',
+    {
+      runId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe(
+          'Run ID. Use the "id" field from ci_list_runs output ("databaseId" is an alias for the same value).',
+        ),
+      withFreshLogs: coercedBoolean
+        .default(false)
+        .describe(
+          'Include a follow-up hint in the response pointing at the ci_get_logs call ' +
+            'that will fetch fresh failure logs once the new attempt completes.',
+        ),
+    },
+    async (params) => retryFailed(params),
   );
 
   server.tool(
