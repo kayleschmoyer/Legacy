@@ -75,12 +75,22 @@ server.tool(
 // --- db_migration_status ---
 server.tool(
   'db_migration_status',
-  'Prefer this over `pnpm --prefix lib/db-client run db:status` via shell. Check pending migration status. Returns applied/pending counts.',
+  'Prefer this over `pnpm --prefix lib/db-client run db:status` via shell. Check pending migration status. Returns applied/pending counts. Pass worktreePaths (1-25) to check several worktrees in one call (concurrency cap 5) — returns { status: { [worktreePath]: <status> }, missing: [{ worktreePath, reason }] }.',
   {
     worktreePath: z
       .string()
       .optional()
-      .describe('Worktree path (default: repo root)'),
+      .describe(
+        'Worktree path (default: repo root). Ignored when worktreePaths is provided.',
+      ),
+    worktreePaths: z
+      .array(z.string())
+      .min(1)
+      .max(25)
+      .optional()
+      .describe(
+        'Batch mode: 1-25 worktree paths to check in parallel (concurrency cap 5). Per-worktree errors (missing path, unreadable journal) are isolated into missing[].',
+      ),
   },
   async (params) => migrationStatus(params),
 );
