@@ -1,0 +1,29 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`renderDashboardMarkdown renders a 10-PR mixed-state fixture as markdown (snapshot) 1`] = `
+"## PR Dashboard — 10 open, 0 draft, 6 blocked
+
+| PR | Title | Branch | CI | Reviews | Threads | Ready? |
+|---|---|---|---|---|---|---|
+| #1001 | feat(stats): add weekly leaders panel | claude/ls-1001-weekly-leaders | ✅ | approved | 0 unresolved | Yes |
+| #1002 | fix(auth): handle expired refresh tokens | claude/ls-1002-refresh | ❌ 2 fail | changes req | 3 unresolved | No |
+| #1003 | chore(deps): bump zod to 3.24 | dependabot/npm_and_yarn/zod-3.24.0 | ✅ | — | 0 unresolved | No |
+| #1004 | feat(design): standings page redesign | claude/ls-1004-standings | ⏳ pending | review req | 0 unresolved | No |
+| #1005 | refactor(graphql): consolidate fragments | claude/ls-1005-fragments | ✅ | approved | 1 unresolved | No |
+| #1006 | fix(web): hydration mismatch on /scores | claude/ls-1006-hydration | ❌ 1 fail | approved | 0 unresolved | No |
+| #1007 | feat(api): add /api/standings endpoint | claude/ls-1007-standings-api | — | — | 0 unresolved | No |
+| #1008 | docs(architecture): document the multi-sport sport discrimi… | claude/ls-1008-multi-sport-docs | ✅ | approved | 0 unresolved | Yes |
+| #1009 | feat(mobile): add favorites tab | claude/ls-1009-favorites | ✅ | review req | 2 unresolved+ | No |
+| #1010 | fix(db): migration for nullable team_id | claude/ls-1010-team-id-nullable | ❌ 4 fail | changes req | 7 unresolved | No |
+
+### Blocked PRs
+- #1002 — 2 CI failures, 3 unresolved threads, changes requested
+- #1003 — merge conflict
+- #1005 — 1 unresolved thread
+- #1006 — 1 CI failure
+- #1009 — 2 unresolved threads
+- #1010 — merge conflict, 4 CI failures, 7 unresolved threads, changes requested
+
+_2 draft(s) excluded · 1 PR(s) with stale checks · 1 PR(s) had stale CI checks that were deduplicated (#1008). Use github_pr_batch_status for job-level CI details on these PRs._
+"
+`;

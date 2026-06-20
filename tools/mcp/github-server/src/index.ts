@@ -1045,7 +1045,7 @@ export function createServer(): McpServer {
   // --- github_pr_dashboard ---
   server.tool(
     'github_pr_dashboard',
-    'Triage dashboard: open PRs with mergeable status, CI state, unresolved threads, labels, and summary counts.',
+    'Triage dashboard: open PRs with mergeable status, CI state, unresolved threads, labels, and summary counts. Default output is a compact markdown table (PR/Title/Branch/CI/Reviews/Threads/Ready) with a Blocked PRs section; pass format:"json" for the full structured payload.',
     {
       state: z
         .enum(['open', 'closed', 'merged', 'all'])
@@ -1064,6 +1064,12 @@ export function createServer(): McpServer {
         .default(true)
         .describe(
           'Exclude draft PRs from dashboard results (default: true). Draft PRs are being worked on by their creating agent.',
+        ),
+      format: z
+        .enum(['markdown', 'json'])
+        .default('markdown')
+        .describe(
+          'Output format. "markdown" (default) returns a triage table with summary counts and a Blocked PRs section — ~40-60% fewer tokens than JSON. "json" returns the full structured payload (summary, prs[], recommendBatchStatus) for programmatic callers.',
         ),
     },
     async (params) => prDashboard(params),

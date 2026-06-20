@@ -10,6 +10,7 @@ interface PRDashboardParams {
   label?: string;
   limit?: number;
   excludeDrafts?: boolean;
+  format?: 'markdown' | 'json';
 }
 
 interface PRNode {
@@ -54,6 +55,47 @@ interface BatchReviewThreadsResponse {
 }
 
 type CIStatus = 'pass' | 'fail' | 'pending' | 'none';
+
+export interface DashboardRow {
+  number: number;
+  title: string;
+  branch: string;
+  base: string;
+  author: string;
+  isDraft: boolean;
+  mergeable: string;
+  ciStatus: CIStatus;
+  ciFailingCount: number;
+  hadStaleChecks: boolean;
+  reviewDecision: string | null;
+  unresolvedThreads: number;
+  totalThreads: number;
+  threadCountTruncated: boolean;
+  labels: string[];
+  updatedAt: string;
+  url: string;
+}
+
+export interface DashboardSummary {
+  total: number;
+  conflicting: number;
+  ciFailing: number;
+  ciPending: number;
+  ciPassing: number;
+  withUnresolvedThreads: number;
+  drafts: number;
+  approved: number;
+  withStaleChecks: number;
+}
+
+export interface DashboardPayload {
+  summary: DashboardSummary;
+  draftsExcluded?: number;
+  recommendBatchStatus: boolean;
+  note?: string;
+  prs: DashboardRow[];
+  message?: string;
+}
 
 // GraphQL state enum values
 function mapState(state: string): string {
@@ -168,6 +210,172 @@ async function fetchReviewThreadCounts(
   return counts;
 }
 
+// ── Markdown rendering ────────────────────────────────────────────────────────
+
+// Pipes and newlines break GitHub-flavored markdown tables. The dashboard
+// targets agent triage, so trim aggressively rather than HTML-escape.
+function cellSafe(text: string, maxLen = 60): string {
+  const collapsed = text.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+  return collapsed.length > maxLen
+    ? `${collapsed.slice(0, maxLen - 1)}…`
+    : collapsed;
+}
+
+function formatCI(row: DashboardRow): string {
+  switch (row.ciStatus) {
+    case 'pass':
+      return '✅';
+    case 'fail':
+      return row.ciFailingCount > 0
+        ? `❌ ${row.ciFailingCount} fail`
+        : '❌ fail';
+    case 'pending':
+      return '⏳ pending';
+    default:
+      return '—';
+  }
+}
+
+function formatReviews(row: DashboardRow): string {
+  switch (row.reviewDecision) {
+    case 'APPROVED':
+      return 'approved';
+    case 'CHANGES_REQUESTED':
+      return 'changes req';
+    case 'REVIEW_REQUIRED':
+      return 'review req';
+    default:
+      return '—';
+  }
+}
+
+function formatThreads(row: DashboardRow): string {
+  if (row.unresolvedThreads < 0) return '?';
+  const base = `${row.unresolvedThreads} unresolved`;
+  return row.threadCountTruncated ? `${base}+` : base;
+}
+
+function isReady(row: DashboardRow): boolean {
+  return (
+    row.mergeable === 'MERGEABLE' &&
+    row.ciStatus === 'pass' &&
+    row.unresolvedThreads === 0 &&
+    row.reviewDecision === 'APPROVED'
+  );
+}
+
+interface BlockedReason {
+  row: DashboardRow;
+  reasons: string[];
+}
+
+function blockedReasons(row: DashboardRow): string[] {
+  const reasons: string[] = [];
+  if (row.mergeable === 'CONFLICTING') reasons.push('merge conflict');
+  if (row.ciStatus === 'fail') {
+    reasons.push(
+      row.ciFailingCount > 0
+        ? `${row.ciFailingCount} CI failure${row.ciFailingCount === 1 ? '' : 's'}`
+        : 'CI failing',
+    );
+  }
+  if (row.unresolvedThreads > 0) {
+    reasons.push(
+      `${row.unresolvedThreads} unresolved thread${row.unresolvedThreads === 1 ? '' : 's'}`,
+    );
+  }
+  if (row.reviewDecision === 'CHANGES_REQUESTED') {
+    reasons.push('changes requested');
+  }
+  return reasons;
+}
+
+export function renderDashboardMarkdown(payload: DashboardPayload): string {
+  const { summary, prs, draftsExcluded, note, message } = payload;
+
+  const blocked: BlockedReason[] = prs
+    .map((row) => ({ row, reasons: blockedReasons(row) }))
+    .filter((b) => b.reasons.length > 0);
+
+  const lines: string[] = [];
+  lines.push(
+    `## PR Dashboard — ${summary.total} open, ${summary.drafts} draft, ${blocked.length} blocked`,
+  );
+  lines.push('');
+
+  if (prs.length === 0) {
+    lines.push(message ?? 'No PRs found matching filters.');
+    lines.push('');
+    return lines.join('\n');
+  }
+
+  lines.push('| PR | Title | Branch | CI | Reviews | Threads | Ready? |');
+  lines.push('|---|---|---|---|---|---|---|');
+  for (const row of prs) {
+    lines.push(
+      `| #${row.number} | ${cellSafe(row.title)} | ${cellSafe(row.branch, 40)} | ${formatCI(row)} | ${formatReviews(row)} | ${formatThreads(row)} | ${isReady(row) ? 'Yes' : 'No'} |`,
+    );
+  }
+
+  if (blocked.length > 0) {
+    lines.push('');
+    lines.push('### Blocked PRs');
+    for (const { row, reasons } of blocked) {
+      lines.push(`- #${row.number} — ${reasons.join(', ')}`);
+    }
+  }
+
+  const extras: string[] = [];
+  if (draftsExcluded && draftsExcluded > 0) {
+    extras.push(`${draftsExcluded} draft(s) excluded`);
+  }
+  if (summary.withStaleChecks > 0) {
+    extras.push(`${summary.withStaleChecks} PR(s) with stale checks`);
+  }
+  if (note) extras.push(note);
+  if (extras.length > 0) {
+    lines.push('');
+    lines.push(`_${extras.join(' · ')}_`);
+  }
+
+  lines.push('');
+  return lines.join('\n');
+}
+
+function buildPayload(
+  rows: DashboardRow[],
+  draftsExcluded: number,
+): DashboardPayload {
+  const summary: DashboardSummary = {
+    total: rows.length,
+    conflicting: rows.filter((r) => r.mergeable === 'CONFLICTING').length,
+    ciFailing: rows.filter((r) => r.ciStatus === 'fail').length,
+    ciPending: rows.filter((r) => r.ciStatus === 'pending').length,
+    ciPassing: rows.filter((r) => r.ciStatus === 'pass').length,
+    withUnresolvedThreads: rows.filter((r) => r.unresolvedThreads > 0).length,
+    drafts: rows.filter((r) => r.isDraft).length,
+    approved: rows.filter((r) => r.reviewDecision === 'APPROVED').length,
+    withStaleChecks: rows.filter((r) => r.hadStaleChecks).length,
+  };
+
+  const recommendBatchStatus = summary.withStaleChecks > 0;
+  const stalePRNumbers = rows
+    .filter((r) => r.hadStaleChecks)
+    .map((r) => r.number);
+
+  return {
+    summary,
+    ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
+    recommendBatchStatus,
+    ...(recommendBatchStatus
+      ? {
+          note: `${summary.withStaleChecks} PR(s) had stale CI checks that were deduplicated (${stalePRNumbers.map((n) => `#${n}`).join(', ')}). Use github_pr_batch_status for job-level CI details on these PRs.`,
+        }
+      : {}),
+    prs: rows,
+  };
+}
+
 export async function prDashboard(
   params: PRDashboardParams,
 ): Promise<ToolResult> {
@@ -175,6 +383,7 @@ export async function prDashboard(
     const repo = await getRepoOwnerName();
     const limit = params.limit ?? 30;
     const statesStr = mapState(params.state ?? 'open');
+    const format = params.format ?? 'markdown';
 
     // Build query with optional filters
     const sanitizedLabel = params.label?.replace(/"/g, '\\"') ?? '';
@@ -285,31 +494,31 @@ query($owner: String!, $repo: String!, $first: Int!) {
     }
 
     if (prNodes.length === 0) {
+      const emptyPayload: DashboardPayload = {
+        summary: {
+          total: 0,
+          conflicting: 0,
+          ciFailing: 0,
+          ciPending: 0,
+          ciPassing: 0,
+          withUnresolvedThreads: 0,
+          drafts: 0,
+          approved: 0,
+          withStaleChecks: 0,
+        },
+        ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
+        recommendBatchStatus: false,
+        prs: [],
+        message: 'No PRs found matching filters.',
+      };
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                summary: {
-                  total: 0,
-                  conflicting: 0,
-                  ciFailing: 0,
-                  ciPending: 0,
-                  ciPassing: 0,
-                  withUnresolvedThreads: 0,
-                  drafts: 0,
-                  approved: 0,
-                  withStaleChecks: 0,
-                },
-                ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
-                recommendBatchStatus: false,
-                prs: [],
-                message: 'No PRs found matching filters.',
-              },
-              null,
-              2,
-            ),
+            text:
+              format === 'json'
+                ? JSON.stringify(emptyPayload, null, 2)
+                : renderDashboardMarkdown(emptyPayload),
           },
         ],
       };
@@ -342,9 +551,10 @@ query($owner: String!, $repo: String!, $first: Int!) {
     });
 
     // Build dashboard rows
-    const rows = prNodes.map((pr, i) => {
+    const rows: DashboardRow[] = prNodes.map((pr, i) => {
       const ci = ciPartitions[i];
       const ciStatus: CIStatus = ci ? ciStatusFromPartition(ci) : 'none';
+      const ciFailingCount = ci?.failing.length ?? 0;
       const hadStaleChecks = ci?.hadDuplicateRuns ?? false;
       const threads = threadCounts[pr.number] ?? {
         total: -1,
@@ -361,6 +571,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
         isDraft: pr.isDraft,
         mergeable: pr.mergeable,
         ciStatus,
+        ciFailingCount,
         hadStaleChecks,
         reviewDecision: pr.reviewDecision,
         unresolvedThreads: threads.unresolved,
@@ -372,43 +583,16 @@ query($owner: String!, $repo: String!, $first: Int!) {
       };
     });
 
-    // Compute summary counts
-    const summary = {
-      total: rows.length,
-      conflicting: rows.filter((r) => r.mergeable === 'CONFLICTING').length,
-      ciFailing: rows.filter((r) => r.ciStatus === 'fail').length,
-      ciPending: rows.filter((r) => r.ciStatus === 'pending').length,
-      ciPassing: rows.filter((r) => r.ciStatus === 'pass').length,
-      withUnresolvedThreads: rows.filter((r) => r.unresolvedThreads > 0).length,
-      drafts: rows.filter((r) => r.isDraft).length,
-      approved: rows.filter((r) => r.reviewDecision === 'APPROVED').length,
-      withStaleChecks: rows.filter((r) => r.hadStaleChecks).length,
-    };
-
-    const recommendBatchStatus = summary.withStaleChecks > 0;
-    const stalePRNumbers = rows
-      .filter((r) => r.hadStaleChecks)
-      .map((r) => r.number);
+    const payload = buildPayload(rows, draftsExcluded);
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              summary,
-              ...(draftsExcluded > 0 ? { draftsExcluded } : {}),
-              recommendBatchStatus,
-              ...(recommendBatchStatus
-                ? {
-                    note: `${summary.withStaleChecks} PR(s) had stale CI checks that were deduplicated (${stalePRNumbers.map((n) => `#${n}`).join(', ')}). Use github_pr_batch_status for job-level CI details on these PRs.`,
-                  }
-                : {}),
-              prs: rows,
-            },
-            null,
-            2,
-          ),
+          text:
+            format === 'json'
+              ? JSON.stringify(payload, null, 2)
+              : renderDashboardMarkdown(payload),
         },
       ],
     };
