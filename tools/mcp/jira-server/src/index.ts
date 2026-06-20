@@ -370,9 +370,31 @@ server.tool(
 // --- jira_get_comments ---
 server.tool(
   'jira_get_comments',
-  'Fetch all comments on a ticket, ordered by creation date.',
+  'Fetch all comments on a ticket, ordered by creation date. Single-key mode (`key`) returns a Markdown table. Batch mode (`keys`, 1-50) returns `{ comments: { [key]: [...] }, missing: [key, ...] }` with per-ticket failures isolated to `missing[]`.',
   {
-    key: z.string().describe('Ticket key'),
+    key: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-1137)',
+      )
+      .optional()
+      .describe('Single ticket key. Provide either `key` or `keys`, not both.'),
+    keys: z
+      .array(
+        z
+          .string()
+          .regex(
+            /^[A-Z][A-Z0-9_]+-\d+$/,
+            'Each key must be a valid Jira issue key (e.g., LS-1137)',
+          ),
+      )
+      .min(1)
+      .max(50)
+      .optional()
+      .describe(
+        'Batch mode: 1-50 ticket keys. Returns `{ comments: { [key]: [...] }, missing: [...] }`.',
+      ),
   },
   async (params) => getComments(params),
 );

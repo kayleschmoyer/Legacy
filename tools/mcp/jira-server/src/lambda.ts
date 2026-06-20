@@ -175,8 +175,18 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_get_comments',
-    'Fetch all comments on a ticket.',
-    { key: z.string() },
+    'Fetch all comments on a ticket. Single-key (`key`) returns a Markdown table; batch (`keys`, 1-50) returns `{ comments, missing }`.',
+    {
+      key: z
+        .string()
+        .regex(/^[A-Z][A-Z0-9_]+-\d+$/)
+        .optional(),
+      keys: z
+        .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
+        .min(1)
+        .max(50)
+        .optional(),
+    },
     async (p) => getComments(p),
   );
   server.tool(
