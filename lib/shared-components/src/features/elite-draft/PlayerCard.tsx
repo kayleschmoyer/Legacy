@@ -252,6 +252,13 @@ export const PlayerCard = React.memo(function PlayerCard({
         <div className="d-card-actions">
           <button
             className={`d-draft-btn ${isDrafting ? 'drafting' : isMyPick ? (isCommPick ? 'force-pick' : 'can-draft') : 'waiting'}`}
+            // Stable, unique handle for the draft action keyed by player.id.
+            // The accessible name ("Draft <name> now") is NOT unique — the live
+            // player pool spans every era since 1876, so two different players
+            // can share a name, which trips a Playwright strict-mode violation
+            // when selecting by accessible name (LS-8136). player.id is unique
+            // and follows the player across draft-board re-renders.
+            data-testid={`draft-now-${player.id}`}
             onClick={() => onDraft(player.id)}
             disabled={!isMyPick || isDrafting}
             aria-disabled={!isMyPick || isDrafting}

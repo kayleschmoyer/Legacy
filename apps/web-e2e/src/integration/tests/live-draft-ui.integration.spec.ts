@@ -466,6 +466,14 @@ test.describe
             });
           const btnCount = await allDraftBtns.count().catch(() => 0);
           let ariaLabel: string | null = null;
+          // Capture the chosen button's player-id-keyed data-testid alongside
+          // its accessible name. The name ("Draft <player> now") is NOT unique
+          // — two different players in the live pool can share a name (the data
+          // spans every era since 1876), so re-deriving the click target by
+          // accessible name trips a Playwright strict-mode violation when the
+          // pool holds a name collision (LS-8136). data-testid is keyed by
+          // player.id and resolves to exactly one button.
+          let pickTestId: string | null = null;
           for (let i = 0; i < btnCount; i++) {
             const btn = allDraftBtns.nth(i);
             const visible = await btn.isVisible().catch(() => false);
@@ -476,6 +484,7 @@ test.describe
               .replace(/\s+now$/i, '');
             if (playerName && draftedPlayers.has(playerName)) continue;
             ariaLabel = btnLabel;
+            pickTestId = await btn.getAttribute('data-testid');
             break;
           }
 
@@ -486,14 +495,24 @@ test.describe
             );
             const pickStart = Date.now();
 
-            // Click by stable aria-label rather than by nth-index position.
-            // Targeting by name survives draft board re-renders at round
-            // boundaries — the named button reappears at its correct position
-            // after the re-render without Playwright spinning on a stale index
-            // (LS-4305). An 8 s timeout bounds the click in the rare case the
-            // player is picked by someone else between scan and dispatch.
-            await page
-              .getByRole('button', { name: ariaLabel, exact: true })
+            // Click by the player-id-keyed data-testid rather than by
+            // nth-index position OR accessible name. Targeting a stable handle
+            // survives draft board re-renders at round boundaries — the button
+            // reappears at its correct position after the re-render without
+            // Playwright spinning on a stale index (LS-4305). Unlike the
+            // accessible name, data-testid is unique per player even when two
+            // players in the live pool share a name, so it cannot trip a
+            // strict-mode violation (LS-8136). Fall back to the exact
+            // accessible name (scoped with .first() to stay single-match) only
+            // if the testid attribute is somehow absent. An 8 s timeout bounds
+            // the click in the rare case the player is picked by someone else
+            // between scan and dispatch.
+            const pickButton = pickTestId
+              ? page.getByTestId(pickTestId)
+              : page
+                  .getByRole('button', { name: ariaLabel, exact: true })
+                  .first();
+            await pickButton
               .click({ force: true, timeout: 8_000 })
               .catch((e: Error) => {
                 if (e.name !== 'TimeoutError') throw e;
