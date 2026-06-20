@@ -18,6 +18,16 @@ args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "t
 command = "node"
 args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/nx-server/src/index.ts"]
 
+# Hosted tunnel-free DB admin (LS-8114/LS-8117). Unlike the github/jira/ci hosted
+# servers — which are dual-mode and run here as local stdio via their src/index.ts —
+# the db-admin server is HTTP-only (tools/mcp/db-admin-server/src/lambda.ts, no stdio
+# entrypoint), so it cannot use the local-stdio pattern. Codex reaches it over HTTP
+# with a static bearer (bearer_token_env_var) — mint MCP_DB_BEARER via
+# `node scripts/mcp-cursor-bearers.mjs` (same ~24h token the Cursor surface uses).
+[mcp_servers.legacy-sports-db-admin]
+url = "https://wj2t3l5mjf.execute-api.us-east-1.amazonaws.com"
+bearer_token_env_var = "MCP_DB_BEARER"
+
 [mcp_servers.legacy-sports-ci]
 command = "node"
 args = [".github/copilot/hooks/mcp-bootstrap.mjs", "node", "--import", "tsx", "tools/mcp/ci-server/src/index.ts"]

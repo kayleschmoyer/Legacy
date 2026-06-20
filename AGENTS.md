@@ -203,6 +203,8 @@ See [`docs/dev-process/skill-routing.md`](docs/dev-process/skill-routing.md) for
 
 See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server tool mapping, and load-order notes. Always prefer MCP tools over shell commands.
 
+**Database access:** the hosted `legacy-sports-db-admin` server is the DB MCP server — it reaches the dev RDS **tunnel-free** (no SSM tunnel, no live AWS SSO) via a Cognito `mcp/db` bearer and serves `db_query` / `db_migration_status` / `db_migrate`. Local Docker Postgres is driven via shell for offline ops. See `.agents/skills/database/SKILL.md`.
+
 **Which environment am I in?** See [`docs/dev-process/llm-environments.md`](docs/dev-process/llm-environments.md) for the agent environment matrix and auth details.
 
 **Pre-flight auth check**: call `auth_check_all` at the start of any workflow that requires GitHub, Jira, AWS, or CI access. If `allAuthenticated: false`, surface the `hint` and stop. See `.agents/skills/credentials/SKILL.md`.

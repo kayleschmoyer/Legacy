@@ -30,16 +30,16 @@ Cursor does **not** auto-enable project MCP servers. After opening the repo:
 The **local stdio** servers (`worktree`, `-aws`, `-nx`, `-make`, `-browser`,
 `legacy-sports-ci-local`) connect immediately once `node_modules` exists —
 they cover the tools that otherwise become bash: `make_run`, `worktree_*`, `nx_run`,
-etc. **These are the highest-value servers for reducing bash usage.** Database
-operations now run via the hosted `legacy-sports-db-admin` server (`db_query`,
-`db_migration_status`, `db_migrate`) or shell commands.
+etc. **These are the highest-value servers for reducing bash usage.**
 
-The **hosted HTTP** servers (`legacy-sports-github`, `-jira`, `-ci`) additionally need
-bearer tokens — see the next step.
+The **hosted HTTP** servers (`legacy-sports-github`, `-jira`, `-ci`, `-db-admin`)
+additionally need bearer tokens — see the next step. Database operations run via the
+hosted `legacy-sports-db-admin` server (`db_query`, `db_migration_status`, `db_migrate`)
+or shell commands.
 
-## 3. Hosted-server credentials (GitHub / Jira / CI)
+## 3. Hosted-server credentials (GitHub / Jira / CI / DB-admin)
 
-These three run behind Cognito-fronted API Gateways. **Cursor cannot complete an OAuth
+These run behind Cognito-fronted API Gateways. **Cursor cannot complete an OAuth
 flow against them** (Cognito has no Dynamic Client Registration, and our OAuth-connector
 path is claude.ai-specific). So `.cursor/mcp.json` injects a **static bearer** per server
 via Cursor's `${env:VAR}` header substitution, which reads from the shell environment
@@ -47,7 +47,7 @@ that launched Cursor.
 
 You first need the machine credential in `.env.local` (one time) — see
 [mcp-connector-access.md → Track A](./mcp-connector-access.md). Then, **before launching
-Cursor**, mint and export the three bearers:
+Cursor**, mint and export the bearers:
 
 **PowerShell (Windows):**
 
@@ -63,7 +63,7 @@ eval "$(node scripts/mcp-cursor-bearers.mjs --bash)"
 cursor .
 ```
 
-This sets `MCP_GITHUB_BEARER`, `MCP_JIRA_BEARER`, and `MCP_CI_BEARER`.
+This sets `MCP_GITHUB_BEARER`, `MCP_JIRA_BEARER`, `MCP_CI_BEARER`, and `MCP_DB_BEARER`.
 
 > **Tokens are short-lived (~24h) and Cursor does not auto-refresh them.** When the
 > hosted servers start returning 401, re-run the command above and reload the MCP

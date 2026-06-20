@@ -24,6 +24,11 @@
       "url": "https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com",
       "oauth": { "clientId": "467i999ffpfja2vav4dilqk5lm" }
     },
+    "legacy-sports-db-admin": {
+      "type": "http",
+      "url": "https://wj2t3l5mjf.execute-api.us-east-1.amazonaws.com",
+      "oauth": { "clientId": "467i999ffpfja2vav4dilqk5lm" }
+    },
     "worktree": {
       "type": "stdio",
       "command": "node",

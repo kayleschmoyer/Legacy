@@ -44,6 +44,7 @@ const BEARER_ENV = Object.freeze({
   'legacy-sports-ci': 'MCP_CI_BEARER',
   'legacy-sports-jira': 'MCP_JIRA_BEARER',
   'legacy-sports-github': 'MCP_GITHUB_BEARER',
+  'legacy-sports-db-admin': 'MCP_DB_BEARER',
 });
 
 function pickFlavor(argv) {

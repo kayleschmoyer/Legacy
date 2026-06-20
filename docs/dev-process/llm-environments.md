@@ -13,13 +13,13 @@ here.
 
 ## Support matrix
 
-| Environment                             | Config file                                            | Hosted-server (GitHub/Jira/CI) auth                                                   | Status                                                  |
-| --------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **Claude Code** (local + web)           | `.mcp.json` + OAuth connectors registered in claude.ai | OAuth, **pre-registered** connector client                                            | ✅ Primary                                              |
-| **Copilot Coding Agent** (cloud)        | `.github/copilot/mcp.json`                             | Static **machine bearer** (Cognito `client_credentials`, minted in CI)                | ✅ Supported                                            |
-| **VS Code** (Copilot Chat / agent mode) | `.vscode/mcp.json`                                     | OAuth, **static `oauth.clientId`**                                                    | ✅ Supported                                            |
-| **Cursor**                              | `.cursor/mcp.json` + `.cursor/rules/`                  | Static **bearer header** via `${env:MCP_*_BEARER}`                                    | ✅ Supported (see [cursor-setup.md](./cursor-setup.md)) |
-| **OpenAI Codex**                        | `.codex/config.toml`                                   | **Local stdio only** (runs GitHub/Jira/CI servers locally; hosted endpoints not used) | ⚠️ Partial                                              |
+| Environment                             | Config file                                            | Hosted-server (GitHub/Jira/CI) auth                                                                                              | Status                                                  |
+| --------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Claude Code** (local + web)           | `.mcp.json` + OAuth connectors registered in claude.ai | OAuth, **pre-registered** connector client                                                                                       | ✅ Primary                                              |
+| **Copilot Coding Agent** (cloud)        | `.github/copilot/mcp.json`                             | Static **machine bearer** (Cognito `client_credentials`, minted in CI)                                                           | ✅ Supported                                            |
+| **VS Code** (Copilot Chat / agent mode) | `.vscode/mcp.json`                                     | OAuth, **static `oauth.clientId`**                                                                                               | ✅ Supported                                            |
+| **Cursor**                              | `.cursor/mcp.json` + `.cursor/rules/`                  | Static **bearer header** via `${env:MCP_*_BEARER}`                                                                               | ✅ Supported (see [cursor-setup.md](./cursor-setup.md)) |
+| **OpenAI Codex**                        | `.codex/config.toml`                                   | **Local stdio** for GitHub/Jira/CI (run locally); **static bearer** (`bearer_token_env_var`) for the HTTP-only `db-admin` server | ⚠️ Partial                                              |
 
 All five also run the local **stdio** servers (`worktree`, `make`, `nx`, `db`,
 `aws`, `browser`, …) via the shared `.github/copilot/hooks/mcp-bootstrap.mjs`
@@ -66,7 +66,7 @@ Upstream tracking:
 ### How each works around it today
 
 - **Cursor → static bearer.** `.cursor/mcp.json` injects `Bearer ${env:MCP_*_BEARER}`; tokens are minted by `scripts/mcp-cursor-bearers.mjs`. Trade-off: ~24h tokens, no auto-refresh (re-mint + reload). Full guide: [cursor-setup.md](./cursor-setup.md).
-- **Codex → local stdio.** `.codex/config.toml` runs the GitHub/Jira/CI servers as local subprocesses instead of hitting the hosted gateway, so OAuth never enters the picture. (Codex also supports a `bearer_token_env_var` per server, so the Cursor-style static-bearer approach is available if hosted access is ever wanted.)
+- **Codex → local stdio.** `.codex/config.toml` runs the GitHub/Jira/CI servers as local subprocesses instead of hitting the hosted gateway, so OAuth never enters the picture. The one exception is `legacy-sports-db-admin`, which is HTTP-only (no stdio entrypoint) and so is registered with `url` + `bearer_token_env_var = "MCP_DB_BEARER"` — the Cursor-style static-bearer approach (mint via `scripts/mcp-cursor-bearers.mjs`).
 
 ### How to actually close the gap (future work, not done)
 

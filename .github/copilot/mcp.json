@@ -10,6 +10,11 @@
       "url": "$MCP_JIRA_URL",
       "headers": { "Authorization": "Bearer $MCP_JIRA_BEARER" }
     },
+    "legacy-sports-db-admin": {
+      "type": "http",
+      "url": "$MCP_DB_URL",
+      "headers": { "Authorization": "Bearer $MCP_DB_BEARER" }
+    },
     "worktree": {
       "type": "stdio",
       "command": "node",

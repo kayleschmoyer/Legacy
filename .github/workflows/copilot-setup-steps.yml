@@ -6,13 +6,13 @@ name: Copilot Setup Steps
 # by every MCP server subprocess it launches.
 #
 # MCP authentication (RFC docs/rfcs/draft-seamless-mcp-auth.md, Track A — AC-A6):
-#   The three hosted MCP servers (legacy-sports-{github,jira,ci}) are reached
+#   The hosted MCP servers (legacy-sports-{github,jira,ci,db-admin}) are reached
 #   through their Cognito-fronted API Gateway endpoints with a short-lived
 #   machine-grant bearer. This workflow mints one token per server scope
-#   (mcp/jira, mcp/github, mcp/ci) from the long-lived Cognito client_credentials
-#   secret and exports them as MCP_{JIRA,GITHUB,CI}_BEARER; the committed Copilot
-#   MCP config (.github/copilot/copilot-cloud-mcp-config.json) sends each bearer
-#   in the server's Authorization header.
+#   (mcp/jira, mcp/github, mcp/ci, mcp/db) from the long-lived Cognito
+#   client_credentials secret and exports them as MCP_{JIRA,GITHUB,CI,DB}_BEARER;
+#   the committed Copilot MCP config (.github/copilot/copilot-cloud-mcp-config.json)
+#   sends each bearer in the server's Authorization header.
 #
 #   This replaces the retired SigV4/OIDC path (AWS_IAM Lambda Function URLs +
 #   the mcp_invoke IAM policy, deleted in LS-5093 / RFC AC-A7, GAP-9). The long-
@@ -24,7 +24,7 @@ name: Copilot Setup Steps
 #   MCP_MACHINE_CLIENT_ID         — Cognito client_credentials client id   (SSM /…/mcp/cognito/machine-client-id)
 #   MCP_MACHINE_CLIENT_SECRET     — Cognito client_credentials secret       (Secrets Manager <env>/mcp-machine-client-secret)
 #   MCP_AUTH_COGNITO_DOMAIN       — Cognito hosted-UI domain (token endpoint base)
-#   MCP_JIRA_URL / MCP_GITHUB_URL / MCP_CI_URL — the three API Gateway invoke URLs
+#   MCP_JIRA_URL / MCP_GITHUB_URL / MCP_CI_URL / MCP_DB_URL — the API Gateway invoke URLs
 #
 # GitHub Copilot Coding Agent runs the `copilot-setup-steps` job by name before
 # every task regardless of triggers. `workflow_dispatch` is added only so the
@@ -134,11 +134,13 @@ jobs:
           MCP_JIRA_URL: ${{ secrets.MCP_JIRA_URL }}
           MCP_GITHUB_URL: ${{ secrets.MCP_GITHUB_URL }}
           MCP_CI_URL: ${{ secrets.MCP_CI_URL }}
+          MCP_DB_URL: ${{ secrets.MCP_DB_URL }}
         run: |
           {
             echo "MCP_JIRA_URL=${MCP_JIRA_URL}"
             echo "MCP_GITHUB_URL=${MCP_GITHUB_URL}"
             echo "MCP_CI_URL=${MCP_CI_URL}"
+            echo "MCP_DB_URL=${MCP_DB_URL}"
           } >> "$GITHUB_ENV"
 
       # JIRA_ASSIGNEE_EMAIL: when set, jira_claim_ticket auto-assigns claimed

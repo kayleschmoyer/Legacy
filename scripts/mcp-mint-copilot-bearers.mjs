@@ -64,7 +64,12 @@ async function main() {
   const lines = [];
   for (const [serverName, scope] of Object.entries(SERVER_SCOPES)) {
     const token = await mintToken({ ...cfg, scope });
-    const key = `MCP_${serverName.replace('legacy-sports-', '').toUpperCase()}_BEARER`;
+    // Derive the env-var key from the scope (`mcp/<name>` -> `MCP_<NAME>_BEARER`)
+    // rather than the server name, so aliased servers like `legacy-sports-db-admin`
+    // (scope `mcp/db`) collapse to the canonical `MCP_DB_BEARER` and avoid the
+    // shell-illegal hyphen a raw server-name slug would produce (`MCP_DB-ADMIN_BEARER`).
+    const scopeSuffix = scope.split('/').pop() ?? serverName;
+    const key = `MCP_${scopeSuffix.toUpperCase()}_BEARER`;
     // Mask the token so it never appears verbatim in the Actions run log.
     LOGGER.info(`::add-mask::${token}`);
     lines.push(`${key}=${token}`);

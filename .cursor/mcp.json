@@ -8,6 +8,10 @@
       "url": "https://1vsogmvhh9.execute-api.us-east-1.amazonaws.com",
       "headers": { "Authorization": "Bearer ${env:MCP_JIRA_BEARER}" }
     },
+    "legacy-sports-db-admin": {
+      "url": "https://wj2t3l5mjf.execute-api.us-east-1.amazonaws.com",
+      "headers": { "Authorization": "Bearer ${env:MCP_DB_BEARER}" }
+    },
     "legacy-sports-github": {
       "url": "https://lhnqee219k.execute-api.us-east-1.amazonaws.com",
       "headers": { "Authorization": "Bearer ${env:MCP_GITHUB_BEARER}" }
