@@ -23,6 +23,40 @@ If the user just says "make a ticket for X" and X is clear, you do not need a wo
 - **Before creating a ticket interactively, show the draft and get confirmation.** A hallucinated scope written to Jira is worse than no ticket. Exception: when another skill calls this one autonomously (e.g. `work-ticket` enriching an underspecified ticket), skip confirmation and announce in one line what you are filing.
 - **Before submitting, set `sprint: "current"`.** Tickets created without it land off-board and are invisible to the team. Always pass it unless the user names a specific sprint id.
 - **Before filing more than ~3 related tickets, reach for `jira_bulk_create_tickets`** (up to 50 in one call) instead of looping `jira_create_ticket` — it is one round-trip and avoids the per-call rate-limit pressure that one-at-a-time loops create.
+- **Before setting a `parent`, confirm the parent is exactly one level above the child** (see [Hierarchy](#hierarchy) below). Setting a Task as a child of a Story 400s with `"Please select valid parent issue"` — Story and Task are peers, not parent and child. If the desired grouping crosses levels, use the [umbrella grouping pattern](#umbrella-grouping-pattern).
+
+## Hierarchy
+
+Jira's standard issue-type hierarchy has three levels. **Parenting is only valid one level at a time.**
+
+| Level   | Types                  | Can parent…          |
+| ------- | ---------------------- | -------------------- |
+| **L1**  | `Epic`                 | any L0 type          |
+| **L0**  | `Story`, `Task`, `Bug` | only `Subtask` (L-1) |
+| **L-1** | `Subtask`              | nothing              |
+
+Rules that fall out of this:
+
+- An `Epic` can parent a `Story`, `Task`, or `Bug` — this is the normal pattern (e.g. bucket epics like `LS-2981` parenting work tickets).
+- A `Story` **cannot** parent a `Task` or `Bug`. They sit at the same level. Trying it (via `parent: "<story-key>"`) returns HTTP 400 `"Please select valid parent issue"`.
+- An `Epic` **cannot** parent another `Epic`. Epics are top-level; nest Epics with the `is part of` / `Relates` link, not a parent.
+- Hierarchy levels themselves are only editable on **Jira Premium company-managed projects** (Settings → Issues → Issue type hierarchy). This workspace is team-managed, so the three levels above are fixed — work within them.
+
+### Umbrella grouping pattern
+
+When a body of work needs an organizing entry but the children must be first-class engineering tickets (Task / Bug / Story) that already live under an existing bucket Epic — for example, sub-themes of `LS-2981` (mcp-gaps) — use this pattern:
+
+1. **Create the umbrella as a `Story`** parented to the bucket Epic (`parent: "LS-2981"`). Give it a description that frames the goal, scope, and acceptance criteria of the whole sub-theme.
+2. **Create each child as a `Task` (or `Bug` / `Story`)** parented to the **same bucket Epic** — not to the umbrella Story. Children are siblings of the umbrella under the Epic.
+3. **Link each child to the umbrella Story** with `jira_link_issues`, using `Relates` (or `is part of` where the workflow supports it):
+
+   ```
+   jira_link_issues({ inwardKey: "<child-key>", outwardKey: "<umbrella-key>", linkType: "Relates" })
+   ```
+
+   Reads: "child is related to umbrella." `inwardKey` is the ticket the link appears _on_; the inward/outward ordering is the same convention used for `Blocks` (see Shared mechanics below).
+
+This keeps every work ticket first-class for `/work-ticket`, sweep skills, and dashboards while still giving humans a single Story to navigate from when they want the sub-theme view.
 
 ## Shared mechanics
 

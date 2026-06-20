@@ -169,6 +169,8 @@ docs/agents/qa-coverage/jira-page-epics/pages/<page>/features/<feature>/feature.
 
 Only when the user wants to group related Stories/Tasks. Do not auto-select for a single change.
 
+> **Parenting:** An Epic can parent any L0 type (Story / Task / Bug) but cannot parent another Epic. If you need an organizing layer between an Epic and its child Tasks, use the [umbrella grouping pattern](../SKILL.md#umbrella-grouping-pattern) — a Story sibling under the Epic, linked from the children with `Relates`. See [Hierarchy](../SKILL.md#hierarchy) for the full rules.
+
 ```
 Overview:
 <What body of work this epic groups and the outcome when all children land.>

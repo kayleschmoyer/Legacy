@@ -88,7 +88,7 @@ Ask for confirmation or changes:
 
 ### Step 4: Create child tickets
 
-After user confirmation, create each child ticket in dependency order:
+After user confirmation, create each child ticket in dependency order. **Confirm `parent` is one level above the child** — see [create-ticket SKILL.md → Hierarchy](../create-ticket/SKILL.md#hierarchy). If the parent ticket is a Story (not an Epic), children cannot use `parent: "<story-key>"`; parent them to the Story's own parent Epic instead and link to the Story with `Relates` (the [umbrella grouping pattern](../create-ticket/SKILL.md#umbrella-grouping-pattern)).
 
 ```
 jira_create_ticket({
