@@ -1,9 +1,10 @@
 import { getRepoOwnerName } from '../auth.js';
-import { githubRest } from '../github-api.js';
+import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface ListReviewsParams {
-  number: number;
+  number?: number;
+  prs?: number[];
   reviewer?: string;
   latestOnly?: boolean;
 }
@@ -14,6 +15,14 @@ interface GitHubReview {
   state: string;
   submitted_at: string;
   body: string;
+}
+
+interface MappedReview {
+  reviewer: string;
+  state: string;
+  submittedAt: string;
+  bodyLength: number;
+  commentCount: number;
 }
 
 async function fetchReviewCommentCount(
@@ -37,8 +46,32 @@ async function fetchReviewCommentCount(
   return count;
 }
 
-export async function listReviews(
-  params: ListReviewsParams,
+function applyFilters(
+  reviews: MappedReview[],
+  reviewer: string | undefined,
+  latestOnly: boolean,
+): MappedReview[] {
+  let result = reviews;
+  if (reviewer) {
+    const reviewerLower = reviewer.toLowerCase();
+    result = result.filter((r) => r.reviewer.toLowerCase() === reviewerLower);
+  }
+  if (latestOnly) {
+    const seen = new Map<string, MappedReview>();
+    for (const r of result) {
+      const existing = seen.get(r.reviewer);
+      if (!existing || r.submittedAt > existing.submittedAt) {
+        seen.set(r.reviewer, r);
+      }
+    }
+    result = Array.from(seen.values());
+  }
+  return result;
+}
+
+async function listReviewsSingle(
+  params: Required<Pick<ListReviewsParams, 'number'>> &
+    Pick<ListReviewsParams, 'reviewer' | 'latestOnly'>,
 ): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
@@ -58,48 +91,27 @@ export async function listReviews(
       page++;
     }
 
-    let mapped = reviews.map((r) => ({
-      id: r.id,
+    const totalCounts = await Promise.all(
+      reviews.map((r) => fetchReviewCommentCount(path, r.id)),
+    );
+    const allMapped: MappedReview[] = reviews.map((r, i) => ({
       reviewer: r.user?.login ?? 'unknown',
       state: r.state,
       submittedAt: r.submitted_at,
       bodyLength: r.body.length,
+      commentCount: totalCounts[i],
     }));
 
-    if (params.reviewer) {
-      const reviewerLower = params.reviewer.toLowerCase();
-      mapped = mapped.filter((r) => r.reviewer.toLowerCase() === reviewerLower);
-    }
-
     const latestOnly = params.latestOnly !== false;
-    if (latestOnly) {
-      const seen = new Map<string, (typeof mapped)[number]>();
-      for (const r of mapped) {
-        const existing = seen.get(r.reviewer);
-        if (!existing || r.submittedAt > existing.submittedAt) {
-          seen.set(r.reviewer, r);
-        }
-      }
-      mapped = Array.from(seen.values());
-    }
-
-    const withComments = await Promise.all(
-      mapped.map(async (r) => ({
-        reviewer: r.reviewer,
-        state: r.state,
-        submittedAt: r.submittedAt,
-        bodyLength: r.bodyLength,
-        commentCount: await fetchReviewCommentCount(path, r.id),
-      })),
-    );
+    const filtered = applyFilters(allMapped, params.reviewer, latestOnly);
 
     const summary = {
       prNumber: params.number,
       total: reviews.length,
-      returned: withComments.length,
+      returned: filtered.length,
       reviewerFilter: params.reviewer ?? null,
       latestOnly,
-      reviews: withComments,
+      reviews: filtered,
     };
 
     return {
@@ -117,3 +129,151 @@ export async function listReviews(
     };
   }
 }
+
+interface BatchReviewNode {
+  author: { login: string } | null;
+  state: string;
+  submittedAt: string;
+  body: string;
+  comments: { totalCount: number };
+}
+
+type BatchResponse = Record<
+  string,
+  {
+    number: number;
+    reviews: { nodes: BatchReviewNode[]; totalCount: number };
+  } | null
+>;
+
+// Per-PR review cap for batch mode. GitHub GraphQL caps `first` at 100.
+// 100 is well above the realistic review count for any single PR in this
+// repo (bot + 1-2 human reviewers, occasionally re-reviews) — the batch
+// caller (sweep agents) wants the latest reviewer states, not full history.
+// PRs that exceed the cap surface in `truncated` so callers can fall back
+// to the single-PR REST path if they actually need the full list.
+const BATCH_REVIEWS_PER_PR = 100;
+
+function buildBatchQuery(prs: number[]): string {
+  const aliases = prs
+    .map(
+      (n) => `
+  pr${n}: pullRequest(number: ${n}) {
+    number
+    reviews(first: ${BATCH_REVIEWS_PER_PR}) {
+      totalCount
+      nodes {
+        author { login }
+        state
+        submittedAt
+        body
+        comments { totalCount }
+      }
+    }
+  }`,
+    )
+    .join('');
+  return `query($owner: String!, $repo: String!) {
+  repository(owner: $owner, name: $repo) {${aliases}
+  }
+}`;
+}
+
+async function listReviewsBatch(
+  params: Required<Pick<ListReviewsParams, 'prs'>> &
+    Pick<ListReviewsParams, 'reviewer' | 'latestOnly'>,
+): Promise<ToolResult> {
+  try {
+    const repo = await getRepoOwnerName();
+    const query = buildBatchQuery(params.prs);
+
+    const result = await githubGraphQL<{
+      repository: BatchResponse;
+    }>(query, { owner: repo.owner, repo: repo.name });
+
+    const repoData = result.data.repository;
+    const latestOnly = params.latestOnly !== false;
+
+    const reviews: Record<number, MappedReview[]> = {};
+    const missing: number[] = [];
+    const truncated: number[] = [];
+
+    for (const prNumber of params.prs) {
+      const node = repoData?.[`pr${prNumber}`];
+      if (!node) {
+        missing.push(prNumber);
+        continue;
+      }
+      if (node.reviews.totalCount > BATCH_REVIEWS_PER_PR) {
+        truncated.push(prNumber);
+      }
+      const mapped: MappedReview[] = node.reviews.nodes.map((r) => ({
+        reviewer: r.author?.login ?? 'unknown',
+        state: r.state,
+        submittedAt: r.submittedAt,
+        bodyLength: r.body.length,
+        commentCount: r.comments.totalCount,
+      }));
+      reviews[prNumber] = applyFilters(mapped, params.reviewer, latestOnly);
+    }
+
+    const summary = {
+      reviews,
+      missing,
+      truncated,
+      reviewerFilter: params.reviewer ?? null,
+      latestOnly,
+    };
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+    };
+  } catch (error) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `Failed to list reviews for PRs [${params.prs.join(', ')}]: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
+}
+
+export async function listReviews(
+  params: ListReviewsParams,
+): Promise<ToolResult> {
+  if (params.prs !== undefined) {
+    if (params.prs.length === 0) {
+      return {
+        isError: true,
+        content: [
+          { type: 'text', text: '`prs` must contain at least one PR number' },
+        ],
+      };
+    }
+    return listReviewsBatch({
+      prs: params.prs,
+      reviewer: params.reviewer,
+      latestOnly: params.latestOnly,
+    });
+  }
+
+  if (params.number === undefined) {
+    return {
+      isError: true,
+      content: [
+        { type: 'text', text: 'Must provide either `number` or `prs`' },
+      ],
+    };
+  }
+
+  return listReviewsSingle({
+    number: params.number,
+    reviewer: params.reviewer,
+    latestOnly: params.latestOnly,
+  });
+}
+
+export const __test = { buildBatchQuery };

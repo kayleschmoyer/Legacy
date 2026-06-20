@@ -614,9 +614,22 @@ export function createServer(): McpServer {
   // --- github_list_reviews ---
   server.tool(
     'github_list_reviews',
-    'List reviews on a PR. Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix).',
+    'List reviews on a PR (or many PRs in one batched GraphQL call). Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix). Pass `prs: number[]` (1-50) to fetch reviews for many PRs in one GraphQL round-trip; the response is `{ reviews: { [prNumber]: [...] }, missing: number[], truncated: number[] }`. Batch mode caps reviews at 100 per PR (GraphQL `first` limit); PRs whose totalCount exceeds the cap are listed in `truncated` so callers can fall back to single-PR mode if they need the full history.',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('PR number (single-PR mode). Use `prs` for batch mode.'),
+      prs: z
+        .array(z.coerce.number().int().positive())
+        .min(1)
+        .max(50)
+        .optional()
+        .describe(
+          'Batch mode: PR numbers (1-50). When provided, reviews for all PRs are fetched in one batched GraphQL call and returned as a map keyed by PR number. Bad PR numbers are reported in `missing` and do not fail the whole call.',
+        ),
       reviewer: z
         .string()
         .trim()
