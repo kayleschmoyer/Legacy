@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { state } from '../state.js';
+import { jsonResult, minifiedJson } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 export interface ScreenshotParams {
@@ -17,18 +18,10 @@ export async function screenshot(
   const { name, fullPage, selector } = params;
 
   if (!state.page || state.page.isClosed()) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: 'No active page. Call browser_navigate first.',
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      { ok: false, error: 'No active page. Call browser_navigate first.' },
+      true,
+    );
   }
 
   // Determine output directory: worktree .screenshots or a temp dir
@@ -41,7 +34,19 @@ export async function screenshot(
     mkdirSync(screenshotDir, { recursive: true });
   }
 
-  const filePath = join(screenshotDir, `${name}.png`);
+  // Sanitize `name` into a bare filename before joining it onto screenshotDir.
+  // `basename` strips any directory components and the charset filter neutralizes
+  // anything left (e.g. a Windows `\` on a POSIX host), so a value like
+  // `../../../etc/passwd` can't escape the screenshots directory (path traversal).
+  const safeName = basename(name).replace(/[^a-zA-Z0-9._-]/g, '_');
+  if (!safeName || safeName === '.' || safeName === '..') {
+    return jsonResult(
+      { ok: false, error: `Invalid screenshot name: ${name}` },
+      true,
+    );
+  }
+
+  const filePath = join(screenshotDir, `${safeName}.png`);
 
   try {
     if (selector) {
@@ -50,18 +55,10 @@ export async function screenshot(
         timeout: 10_000,
       });
       if (!element) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                ok: false,
-                error: `Selector not found: ${selector}`,
-              }),
-            },
-          ],
-          isError: true,
-        };
+        return jsonResult(
+          { ok: false, error: `Selector not found: ${selector}` },
+          true,
+        );
       }
       await element.screenshot({ path: filePath });
     } else {
@@ -76,14 +73,16 @@ export async function screenshot(
     const imageBuffer = await readFile(filePath);
     const base64 = imageBuffer.toString('base64');
 
+    // `name` is dropped: it is `basename(path)` and the agent already has the
+    // full `path` (which it passes to browser_screenshot_upload). `fullPage` and
+    // `selector` confirm which capture mode ran, so they are kept.
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: minifiedJson({
             ok: true,
             path: filePath,
-            name,
             fullPage: fullPage ?? false,
             selector: selector ?? null,
             url: state.page.url(),
@@ -98,18 +97,10 @@ export async function screenshot(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Screenshot failed: ${message}`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      { ok: false, error: `Screenshot failed: ${message}` },
+      true,
+    );
   }
 }
 

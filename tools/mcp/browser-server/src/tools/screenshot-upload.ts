@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { runCommand, getRepoRoot } from '../run-command.js';
+import { jsonResult } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 export interface ScreenshotUploadParams {
@@ -51,18 +52,10 @@ export async function screenshotUpload(
   const { screenshotPath } = params;
 
   if (!existsSync(screenshotPath)) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `File not found: ${screenshotPath}`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      { ok: false, error: `File not found: ${screenshotPath}` },
+      true,
+    );
   }
 
   // Validate file extension — only allow image files
@@ -70,18 +63,13 @@ export async function screenshotUpload(
     .slice(screenshotPath.lastIndexOf('.'))
     .toLowerCase();
   if (!ALLOWED_EXTENSIONS.has(ext)) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Disallowed file type "${ext}". Only image files are permitted: ${[...ALLOWED_EXTENSIONS].join(', ')}`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      {
+        ok: false,
+        error: `Disallowed file type "${ext}". Only image files are permitted: ${[...ALLOWED_EXTENSIONS].join(', ')}`,
+      },
+      true,
+    );
   }
 
   // Validate path — block uploads from sensitive directories
@@ -90,18 +78,13 @@ export async function screenshotUpload(
     normalized.includes(`/${seg}`),
   );
   if (blockedSegment) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Refusing to upload from sensitive path containing "${blockedSegment}".`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      {
+        ok: false,
+        error: `Refusing to upload from sensitive path containing "${blockedSegment}".`,
+      },
+      true,
+    );
   }
 
   const repoRoot = getRepoRoot();
@@ -131,52 +114,35 @@ export async function screenshotUpload(
     const asset = release.assets.find((a) => a.name === filename);
 
     if (!asset) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              ok: false,
-              error: `Upload succeeded but could not find asset URL for ${filename}`,
-              remedy:
-                'The file was uploaded. Try browser_screenshot_upload again or check gh release view agent-screenshots.',
-            }),
-          },
-        ],
-        isError: true,
-      };
+      return jsonResult(
+        {
+          ok: false,
+          error: `Upload succeeded but could not find asset URL for ${filename}`,
+          remedy:
+            'The file was uploaded. Try browser_screenshot_upload again or check gh release view agent-screenshots.',
+        },
+        true,
+      );
     }
 
     const markdownImage = `![${filename.replace('.png', '')}](${asset.url})`;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: true,
-            filename,
-            url: asset.url,
-            markdown: markdownImage,
-          }),
-        },
-      ],
-    };
+    return jsonResult({
+      ok: true,
+      filename,
+      url: asset.url,
+      markdown: markdownImage,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Upload failed: ${message}`,
-            remedy:
-              'Ensure gh CLI is authenticated (gh auth status) and has repo scope.',
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      {
+        ok: false,
+        error: `Upload failed: ${message}`,
+        remedy:
+          'Ensure gh CLI is authenticated (gh auth status) and has repo scope.',
+      },
+      true,
+    );
   }
 }

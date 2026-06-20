@@ -4,6 +4,7 @@ import { createConnection } from 'node:net';
 import { join } from 'node:path';
 import { allocatePort } from '../port-manager.js';
 import { state } from '../state.js';
+import { jsonResult } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 export const DEV_SERVER_TIMEOUT_MESSAGE = 'Dev server did not become ready';
@@ -126,34 +127,18 @@ export async function devServerStart(
 
   // Validate worktree path exists
   if (!existsSync(worktreePath)) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Path does not exist: ${worktreePath}`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      { ok: false, error: `Path does not exist: ${worktreePath}` },
+      true,
+    );
   }
 
   // Check for package.json (basic sanity check)
   if (!existsSync(join(worktreePath, 'package.json'))) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `No package.json found at: ${worktreePath}`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      { ok: false, error: `No package.json found at: ${worktreePath}` },
+      true,
+    );
   }
 
   const port = params.port ?? (await allocatePort());
@@ -161,19 +146,14 @@ export async function devServerStart(
   // Check if port is already tracked
   if (state.devServers.has(port)) {
     const existing = state.devServers.get(port)!;
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Port ${port} already in use by dev server for ${existing.worktreePath} (pid ${existing.pid})`,
-            remedy: `Stop the existing server with browser_dev_stop({ port: ${port} }) first.`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      {
+        ok: false,
+        error: `Port ${port} already in use by dev server for ${existing.worktreePath} (pid ${existing.pid})`,
+        remedy: `Stop the existing server with browser_dev_stop({ port: ${port} }) first.`,
+      },
+      true,
+    );
   }
 
   // Pre-check: verify the nx binary exists in the worktree's node_modules.
@@ -182,20 +162,15 @@ export async function devServerStart(
   const nxBin = join(worktreePath, 'node_modules', '.bin', 'nx');
   const nxBinCmd = nxBin + '.cmd';
   if (!existsSync(nxBin) && !existsSync(nxBinCmd)) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `nx binary not found at ${nxBin}. The worktree's node_modules may not be set up.`,
-            remedy:
-              'Run `node scripts/modules-pool/link.mjs` or `make install` inside the worktree to restore node_modules, then retry.',
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      {
+        ok: false,
+        error: `nx binary not found at ${nxBin}. The worktree's node_modules may not be set up.`,
+        remedy:
+          'Run `node scripts/modules-pool/link.mjs` or `make install` inside the worktree to restore node_modules, then retry.',
+      },
+      true,
+    );
   }
 
   const outputTail = new OutputTail(OUTPUT_TAIL_BYTES);
@@ -226,18 +201,10 @@ export async function devServerStart(
     );
 
     if (!child.pid) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              ok: false,
-              error: 'Failed to spawn dev server process',
-            }),
-          },
-        ],
-        isError: true,
-      };
+      return jsonResult(
+        { ok: false, error: 'Failed to spawn dev server process' },
+        true,
+      );
     }
 
     attachOutputCapture(child, outputTail);
@@ -256,41 +223,31 @@ export async function devServerStart(
     // Wait for the server to be ready (or for the child to exit early)
     await waitForReadyOrExit(child, port, timeoutMs);
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: true,
-            port,
-            pid: child.pid,
-            worktreePath,
-            url: `http://localhost:${port}`,
-          }),
-        },
-      ],
-    };
+    // Single-object actionable result of a "start" action — `url` is the
+    // primary affordance here (not a repeated list row), so it is kept.
+    return jsonResult({
+      ok: true,
+      port,
+      pid: child.pid,
+      worktreePath,
+      url: `http://localhost:${port}`,
+    });
   } catch (err) {
     // Clean up tracked state if startup failed
     state.devServers.delete(port);
     const message = err instanceof Error ? err.message : String(err);
     const isTimeout = message.startsWith(DEV_SERVER_TIMEOUT_MESSAGE);
     const tail = outputTail.toString();
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Failed to start dev server: ${message}`,
-            processOutputTail: tail || '(no output captured)',
-            remedy: isTimeout
-              ? `The server did not start in time. Inspect processOutputTail above for the last ${OUTPUT_TAIL_BYTES} bytes of nx/Vite output. Common causes: (a) Vite bound only to ::1 or 127.0.0.1 — the probe checks both, so see if the "Local:" line ever printed; (b) node_modules symlink broken (run \`node scripts/modules-pool/link.mjs\` or \`make install\`); (c) stale process holding the port (run \`make kill-stale\`). Retry with a larger timeoutMs (e.g. 180000) if the machine is slow.`
-              : 'Check that the worktree has node_modules installed (`node scripts/modules-pool/link.mjs` or `make install`) and that the port is not in use.',
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      {
+        ok: false,
+        error: `Failed to start dev server: ${message}`,
+        processOutputTail: tail || '(no output captured)',
+        remedy: isTimeout
+          ? `The server did not start in time. Inspect processOutputTail above for the last ${OUTPUT_TAIL_BYTES} bytes of nx/Vite output. Common causes: (a) Vite bound only to ::1 or 127.0.0.1 — the probe checks both, so see if the "Local:" line ever printed; (b) node_modules symlink broken (run \`node scripts/modules-pool/link.mjs\` or \`make install\`); (c) stale process holding the port (run \`make kill-stale\`). Retry with a larger timeoutMs (e.g. 180000) if the machine is slow.`
+          : 'Check that the worktree has node_modules installed (`node scripts/modules-pool/link.mjs` or `make install`) and that the port is not in use.',
+      },
+      true,
+    );
   }
 }

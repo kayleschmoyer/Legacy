@@ -1,4 +1,6 @@
+import { pickFields } from '@legacy-sports/mcp-format';
 import { state } from '../state.js';
+import { jsonResult } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 export interface DevServerStopParams {
@@ -43,17 +45,7 @@ export async function devServerStop(
   if (all) {
     const servers = Array.from(state.devServers.values());
     if (servers.length === 0) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              ok: true,
-              message: 'No dev servers running.',
-            }),
-          },
-        ],
-      };
+      return jsonResult({ ok: true, message: 'No dev servers running.' });
     }
     const stopped: number[] = [];
     for (const server of servers) {
@@ -61,18 +53,11 @@ export async function devServerStop(
       state.devServers.delete(server.port);
       stopped.push(server.port);
     }
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: true,
-            stopped,
-            message: `Stopped ${stopped.length} dev server(s).`,
-          }),
-        },
-      ],
-    };
+    return jsonResult({
+      ok: true,
+      stopped,
+      message: `Stopped ${stopped.length} dev server(s).`,
+    });
   }
 
   // Find the server to stop
@@ -89,35 +74,28 @@ export async function devServerStop(
       : worktreePath
         ? `worktree ${worktreePath}`
         : 'no criteria';
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `No tracked dev server found for ${hint}.`,
-            tracked: Array.from(state.devServers.values()),
-          }),
-        },
-      ],
-      isError: true,
-    };
+    // `tracked` lets the agent pick a valid stop target — it needs the
+    // identifiers (port/worktreePath/pid), not `startedAt`, so that is pruned.
+    return jsonResult(
+      {
+        ok: false,
+        error: `No tracked dev server found for ${hint}.`,
+        tracked: pickFields(
+          Array.from(state.devServers.values()).map((s) => ({ ...s })),
+          ['port', 'worktreePath', 'pid'],
+        ),
+      },
+      true,
+    );
   }
 
   await killProcess(target.pid);
   state.devServers.delete(target.port);
 
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          ok: true,
-          stopped: target.port,
-          pid: target.pid,
-          worktreePath: target.worktreePath,
-        }),
-      },
-    ],
-  };
+  return jsonResult({
+    ok: true,
+    stopped: target.port,
+    pid: target.pid,
+    worktreePath: target.worktreePath,
+  });
 }

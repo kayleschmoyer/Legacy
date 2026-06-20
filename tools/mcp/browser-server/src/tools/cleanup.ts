@@ -1,5 +1,6 @@
 import { state } from '../state.js';
 import { devServerStop } from './dev-server-stop.js';
+import { jsonResult } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 export async function cleanup(): Promise<ToolResult> {
@@ -33,15 +34,8 @@ export async function cleanup(): Promise<ToolResult> {
     results.push(`Stopped ${serverCount} dev server(s)`);
   }
 
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          ok: true,
-          actions: results.length > 0 ? results : ['Nothing to clean up'],
-        }),
-      },
-    ],
-  };
+  return jsonResult({
+    ok: true,
+    actions: results.length > 0 ? results : ['Nothing to clean up'],
+  });
 }

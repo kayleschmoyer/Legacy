@@ -7,8 +7,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true
+    "declaration": true,
+    "paths": {
+      "@legacy-sports/mcp-format": ["../../../lib/mcp-format/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts"]
 }

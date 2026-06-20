@@ -1,5 +1,7 @@
 import { createConnection } from 'node:net';
+import { pick } from '@legacy-sports/mcp-format';
 import { state } from '../state.js';
+import { DEV_SERVER_FIELDS, jsonResult } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 const SCAN_PORT_START = 4200;
@@ -38,30 +40,22 @@ async function scanForExternalServers(): Promise<
 }
 
 export async function devServerStatus(): Promise<ToolResult> {
-  const managed = Array.from(state.devServers.values()).map((s) => ({
-    ...s,
-    managed: true,
-    url: `http://localhost:${s.port}`,
-  }));
+  const managed = Array.from(state.devServers.values()).map((s) =>
+    pick({ ...s, managed: true }, DEV_SERVER_FIELDS),
+  );
 
   const external = await scanForExternalServers();
 
-  const servers = [
-    ...managed,
-    ...external.map((s) => ({ ...s, url: `http://localhost:${s.port}` })),
-  ];
+  // Heterogeneous list (managed rows carry worktreePath/pid/startedAt, scanned
+  // rows only port/managed) nested in a scalar-bearing object -> minified JSON,
+  // not a table. `url` is dropped from every row: it is the derived
+  // `http://localhost:${port}` and port is present. See format.ts.
+  const servers = [...managed, ...external];
 
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          count: servers.length,
-          servers,
-          browserActive: state.browser !== null,
-          pageUrl: state.page?.url() ?? null,
-        }),
-      },
-    ],
-  };
+  return jsonResult({
+    count: servers.length,
+    servers,
+    browserActive: state.browser !== null,
+    pageUrl: state.page?.url() ?? null,
+  });
 }

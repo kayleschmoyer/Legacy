@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import { state } from '../state.js';
+import { jsonResult } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 export interface NavigateParams {
@@ -95,35 +96,23 @@ export async function navigate(params: NavigateParams): Promise<ToolResult> {
     const status = response?.status() ?? null;
     const title = await state.page.title();
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: true,
-            url: state.page.url(),
-            status,
-            title,
-            viewport: viewport ?? { width: 1280, height: 720 },
-          }),
-        },
-      ],
-    };
+    return jsonResult({
+      ok: true,
+      url: state.page.url(),
+      status,
+      title,
+      viewport: viewport ?? { width: 1280, height: 720 },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Navigation failed: ${message}`,
-            remedy:
-              'Ensure the dev server is running (browser_dev_start) and the URL is correct.',
-          }),
-        },
-      ],
-      isError: true,
-    };
+    return jsonResult(
+      {
+        ok: false,
+        error: `Navigation failed: ${message}`,
+        remedy:
+          'Ensure the dev server is running (browser_dev_start) and the URL is correct.',
+      },
+      true,
+    );
   }
 }
