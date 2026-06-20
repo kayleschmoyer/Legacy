@@ -191,6 +191,62 @@ Once 3 consecutive nightly runs hit 0 failures / 0 flakies, the maintenance poli
 - [UI Integration Patterns](references/ui-integration-patterns.md) -- Playwright+Tamagui interaction patterns
 - [UI Serial Phases](references/ui-serial-phases.md) -- serial phase template, switchUser helper, decision table
 
+## Semantic Page Object Model (ADR-0015)
+
+Hermetic Playwright specs under `apps/web-e2e/src/tests/` use a **three-layer semantic Page Object Model** (ADR-0015). Selectors live in the page object layer; specs call semantic verbs.
+
+| Layer          | Location                       | Owns                                                            |
+| -------------- | ------------------------------ | --------------------------------------------------------------- |
+| **Base**       | `apps/web-e2e/src/base/`       | Shared primitives — `BasePage`, `BaseComponent` building blocks |
+| **Components** | `apps/web-e2e/src/components/` | Reusable UI surfaces (`NavHeader`, `PremiumGate`, `Toast`, ...) |
+| **Pages**      | `apps/web-e2e/src/pages/`      | Route-scoped objects (`DraftPage`, `LeaguePage`, `PlayersPage`) |
+| **Spec**       | `apps/web-e2e/src/tests/`      | Calls semantic verbs on the page object — **no raw selectors**  |
+
+**Selector ban in spec files (LS-8096 — ESLint enforced):**
+
+The `apps/web-e2e/.eslintrc.js` `no-restricted-syntax` rule bans these calls in migrated `*.spec.ts` files (selectors must move into the page object layer):
+
+- `getByTestId(...)`
+- `getByRole(...)`
+- `getByPlaceholder(...)`
+- `getByText(...)`
+- `locator(...)`
+
+The rule is currently scoped to the migrated specs by basename — see the final override in `apps/web-e2e/.eslintrc.js` for the list. When migrating a new spec to the semantic POM, **add its basename** to that override; once every spec under `src/tests/` is migrated, widen `files` to `src/tests/**/*.spec.ts` and delete the per-file list.
+
+> **Why basename globs + extended LAST:** ESLint legacy-config overrides do not merge `no-restricted-syntax` — the later override replaces the rule list entirely (LS-7947 clobber hazard). The LS-8096 override uses **basename globs** to form a distinct override key, lands **last** in the array so it wins on matched files, and **re-spreads the LS-4458 spec rules** so those checks remain active.
+
+**Writing a new spec under the semantic POM:**
+
+```ts
+// spec file — no selectors, only semantic verbs from the page object
+import { expect, test } from '../fixtures/pages';
+
+test('player can be added to compare', async ({ playersPage }) => {
+  await playersPage.goto();
+  await playersPage.search('mike trout');
+  await playersPage.addToCompare('Mike Trout');
+  await expect(playersPage.compareTray).toContainPlayer('Mike Trout');
+});
+```
+
+```ts
+// pages/players.page.ts — selectors live here, behind verbs
+export class PlayersPage extends BasePage {
+  async search(query: string) {
+    await this.page.getByTestId('player-search-input').fill(query);
+  }
+  async addToCompare(name: string) {
+    await this.page
+      .getByRole('row', { name })
+      .getByRole('button', { name: /compare/i })
+      .click();
+  }
+}
+```
+
+If a spec needs a one-off selector that does not yet belong on the page object, the right move is to add the verb to the page object — not to suppress the lint rule.
+
 ## Integration vs E2E Directory Distinction
 
 `apps/web-e2e/` contains two distinct test suites with different network contracts:

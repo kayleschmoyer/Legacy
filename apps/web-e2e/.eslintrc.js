@@ -51,6 +51,39 @@ const ls4456PageObjectRules = [
   },
 ];
 
+// LS-8096 ban selector-based queries in spec files — enforces the semantic
+// Page Object Model from ADR-0015. Selectors are allowed only in the page
+// object layer (base/, components/, pages/); spec files call semantic verbs
+// (e.g. `draftPage.pick(player)`) so a selector change touches one POM file,
+// not every spec.
+const ls8096NoSelectorsInSpecsRules = [
+  {
+    selector: "CallExpression[callee.property.name='getByTestId']",
+    message:
+      'LS-8096: getByTestId is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb (e.g. `draftPage.pick(player)`). See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='getByRole']",
+    message:
+      'LS-8096: getByRole is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb. See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='getByPlaceholder']",
+    message:
+      'LS-8096: getByPlaceholder is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb. See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='getByText']",
+    message:
+      'LS-8096: getByText is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb. See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='locator']",
+    message:
+      'LS-8096: locator() is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb. See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+];
+
 const ls4461IntegrationRules = [
   {
     selector:
@@ -136,6 +169,48 @@ module.exports = {
       files: ['src/pages/**/*.ts', 'src/**/helpers/**/*.ts'],
       rules: {
         'no-restricted-syntax': ['error', ...ls4456PageObjectRules],
+      },
+    },
+    {
+      // LS-8096: ban selector-based queries in migrated hermetic specs.
+      // Scoped via **basename globs** (distinct override key) and listed
+      // LAST so it wins the legacy-config "last-override-wins" merge for
+      // `no-restricted-syntax` on these files (per LS-7947 clobber hazard).
+      // Because the earlier `src/tests/**/*.spec.ts` override would
+      // otherwise replace this rule list, we re-spread the LS-4458 rules
+      // here so all checks remain active on the matched specs. As more
+      // specs are migrated to the semantic POM (ADR-0015), add their
+      // basename to this list; once every spec under `src/tests/` is
+      // migrated, widen `files` to `src/tests/**/*.spec.ts` and delete
+      // the per-file list.
+      files: [
+        'draft-selection-workflow.spec.ts',
+        'join-league.spec.ts',
+        'league-creation-advanced.spec.ts',
+        'league-creation-football.spec.ts',
+        'league-detail-tabs.spec.ts',
+        'league-discovery.spec.ts',
+        'mobile-responsive-nav.spec.ts',
+        'navigation.spec.ts',
+        'player-brefid-route.spec.ts',
+        'player-comparison-best-indicator.spec.ts',
+        'player-comparison-career-achievements.spec.ts',
+        'player-comparison-color-chips.spec.ts',
+        'player-comparison-empty-minimum-states.spec.ts',
+        'player-comparison-fantasy-scoring.spec.ts',
+        'player-comparison-stats-charts.spec.ts',
+        'player-comparison.spec.ts',
+        'player-detail-bio-career-arc.spec.ts',
+        'player-detail-modal.spec.ts',
+        'player-stats-mocked.spec.ts',
+        'player-stats.spec.ts',
+      ],
+      rules: {
+        'no-restricted-syntax': [
+          'error',
+          ...ls4458SpecRules,
+          ...ls8096NoSelectorsInSpecsRules,
+        ],
       },
     },
   ],
