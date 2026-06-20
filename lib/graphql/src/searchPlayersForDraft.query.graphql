@@ -1,8 +1,13 @@
-# Search for players by name scoped to the draft's sport
+# Search for players by name scoped to the draft's sport.
+#
+# Uses the un-gated `searchPlayers` field (aliased to `players` to keep the
+# client response shape stable) — the `players(search:)` query gates on the
+# premium `player_comparison` entitlement (LS-7019), which incorrectly blocked
+# free-tier users from searching during a season draft (LS-8127).
 #import "./player.fragment.graphql"
 
 query SearchPlayersForDraft($search: String!, $limit: Int, $sport: Sport) {
-  players(search: $search, limit: $limit, sport: $sport) {
+  players: searchPlayers(searchTerm: $search, limit: $limit, sport: $sport) {
     ...Player
   }
 }

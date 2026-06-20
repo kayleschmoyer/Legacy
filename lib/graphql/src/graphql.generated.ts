@@ -29748,7 +29748,7 @@ export type SearchPlayersForDisclosureQueryResult = Apollo.QueryResult<
 >;
 export const SearchPlayersForDraft = gql`
   query SearchPlayersForDraft($search: String!, $limit: Int, $sport: Sport) {
-    players(search: $search, limit: $limit, sport: $sport) {
+    players: searchPlayers(searchTerm: $search, limit: $limit, sport: $sport) {
       ...Player
     }
   }
