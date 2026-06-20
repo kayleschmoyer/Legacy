@@ -305,7 +305,13 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
         (p): p is PlayerSuggestion => p.id != null,
       );
       setSuggestions(players);
-    } catch (_e) {
+    } catch (e) {
+      // Apollo Client v4 rejects a lazy query's promise with an AbortError when
+      // a newer keystroke triggers a fresh searchPlayers call before the prior
+      // one resolves (the older link subscription is unsubscribed by reobserve).
+      // The newer call will populate suggestions, so swallow that race quietly
+      // rather than flashing "Could not search players" while the user is typing.
+      if (e instanceof Error && e.name === 'AbortError') return;
       setSuggestions([]);
       setErrorMsg('Could not search players. Please try again.');
     }
