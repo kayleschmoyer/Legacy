@@ -1,4 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Pressable } from 'react-native';
 import { Text, YStack } from 'tamagui';
 import { PlayerFragment } from './PlayersApi';
@@ -35,10 +41,77 @@ const FONT_BODY = "'Literata', serif";
  */
 const STATS_TABLE_CSS = `
   .pp-table-wrap {
-    overflow-x: auto;
+    position: relative;
     border-radius: 14px;
     border: 1px solid ${OUTLINE_SUBTLE};
     background: ${SURFACE_CARD};
+    /* Clip the inner scroller and the edge fades to the rounded corners. The
+     * horizontal scroll lives on .pp-table-scroll so the fade overlays below
+     * can stay pinned to the wrap's edges instead of scrolling away. */
+    overflow: hidden;
+  }
+  .pp-table-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
+    border-radius: inherit;
+  }
+  /* Right-edge gradient that fades the last visible column into the card
+   * surface — the affordance that tells the user more columns exist off-screen
+   * (MOB-014). Hidden by default; revealed via .can-scroll-right when the
+   * scroller is not yet at its rightmost extent. */
+  .pp-table-fade-right {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 44px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    background: linear-gradient(to right, transparent, ${SURFACE_CARD});
+    z-index: 2;
+  }
+  .pp-table-wrap.can-scroll-right .pp-table-fade-right {
+    opacity: 1;
+  }
+  /* Depth cue behind the sticky player column once the table has been scrolled
+   * right, so the leftmost column reads as floating above the scrolled stats. */
+  .pp-table-wrap.can-scroll-left thead th.player-col,
+  .pp-table-wrap.can-scroll-left tbody td.player-cell {
+    box-shadow: 6px 0 8px -4px ${withAlpha(BG_DARK, 0.55)};
+  }
+  /* One-shot "swipe to see more" hint. Only rendered while the table is
+   * scrollable AND the user has not scrolled yet; it disappears after the first
+   * horizontal scroll. Decorative (aria-hidden) — the scroll region itself
+   * carries the semantics for assistive tech. */
+  .pp-scroll-hint {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    display: none;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: ${SURFACE_PANEL};
+    border: 1px solid ${OUTLINE_SUBTLE};
+    color: ${TEXT_MUTED};
+    font-family: ${FONT_DISPLAY};
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .pp-scroll-hint .pp-scroll-hint-arrow {
+    color: ${BRAND_GOLD_LIGHT};
+    font-size: 12px;
+  }
+  .pp-table-wrap.can-scroll-right.at-scroll-start .pp-scroll-hint {
+    display: inline-flex;
   }
   .pp-table {
     width: 100%;
@@ -254,6 +327,28 @@ export function sortPlayers(
   return next;
 }
 
+/** Horizontal-scroll affordance state for the stats table (MOB-014 / LS-7578).
+ *  Exported for unit testing — derives whether the scroller sits at its left
+ *  and/or right extent from raw scroll metrics so the component can show the
+ *  right-edge fade, the sticky-column shadow, and the "swipe" hint at the right
+ *  moments. A table that is not wide enough to scroll reports both ends reached
+ *  (no affordance shown). `epsilon` absorbs sub-pixel rounding from zoom / DPI. */
+export function computeScrollAffordance(
+  scrollLeft: number,
+  scrollWidth: number,
+  clientWidth: number,
+  epsilon = 1,
+): { atStart: boolean; atEnd: boolean } {
+  const maxScroll = scrollWidth - clientWidth;
+  if (maxScroll <= epsilon) {
+    return { atStart: true, atEnd: true };
+  }
+  return {
+    atStart: scrollLeft <= epsilon,
+    atEnd: scrollLeft >= maxScroll - epsilon,
+  };
+}
+
 /** Format a stat cell value. Em-dash for missing data so the column spacing
  *  still reads as a leaderboard slot. */
 function renderCell(col: StatColumn, player: PlayerFragment): string {
@@ -281,6 +376,36 @@ export function PlayersStatsTable({
     () => sortPlayers(players, sortKey, sortDir, columns),
     [players, sortKey, sortDir, columns],
   );
+
+  // Horizontal-scroll affordance (MOB-014 / LS-7578). Measure the scroller and
+  // toggle the right-edge fade, sticky-column shadow, and swipe hint based on
+  // how far the user has scrolled. Initialised to "both ends reached" so no
+  // affordance flashes before the first measurement.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scroll, setScroll] = useState<{ atStart: boolean; atEnd: boolean }>({
+    atStart: true,
+    atEnd: true,
+  });
+
+  const updateScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setScroll(
+      computeScrollAffordance(el.scrollLeft, el.scrollWidth, el.clientWidth),
+    );
+  }, []);
+
+  useEffect(() => {
+    updateScroll();
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    // Re-measure when the viewport or the table's own width changes (column
+    // count, container resize, font load) so the affordance stays accurate.
+    const observer = new ResizeObserver(updateScroll);
+    observer.observe(el);
+    return () => observer.disconnect();
+    // sorted.length / columns.length re-run the effect when the table reflows.
+  }, [updateScroll, sorted.length, columns.length]);
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -357,123 +482,144 @@ export function PlayersStatsTable({
     }
   };
 
+  const wrapClassName =
+    'pp-table-wrap' +
+    (!scroll.atEnd ? ' can-scroll-right' : '') +
+    (!scroll.atStart ? ' can-scroll-left' : '') +
+    (scroll.atStart ? ' at-scroll-start' : '');
+
   return (
     <YStack className="pp-table-host">
       <style>{STATS_TABLE_CSS}</style>
       <div
-        className="pp-table-wrap"
+        className={wrapClassName}
         role="region"
         aria-label="Player statistics table"
       >
-        <table
-          className="pp-table"
-          style={{ backgroundColor: BG_DARK }}
-          aria-rowcount={sorted.length + 1}
+        <div
+          className="pp-table-scroll"
+          ref={scrollRef}
+          onScroll={updateScroll}
         >
-          <thead>
-            <tr>
-              <th
-                scope="col"
-                role="button"
-                tabIndex={0}
-                className={
-                  'player-col sortable ' +
-                  (sortKey === PLAYER_COLUMN_KEY ? 'sorted' : '')
-                }
-                aria-sort={
-                  sortKey === PLAYER_COLUMN_KEY
-                    ? sortDir === 'asc'
-                      ? 'ascending'
-                      : 'descending'
-                    : 'none'
-                }
-                onClick={() => handleSort(PLAYER_COLUMN_KEY)}
-                onKeyDown={keyHandlerFor(PLAYER_COLUMN_KEY)}
-              >
-                Player
-                {sortKey === PLAYER_COLUMN_KEY && (
-                  <span className="pp-arrow" aria-hidden="true">
-                    {arrow}
-                  </span>
-                )}
-              </th>
-              {columns.map((c) => (
+          <table
+            className="pp-table"
+            style={{ backgroundColor: BG_DARK }}
+            aria-rowcount={sorted.length + 1}
+          >
+            <thead>
+              <tr>
                 <th
-                  key={c.key}
                   scope="col"
                   role="button"
                   tabIndex={0}
-                  className={'sortable ' + (sortKey === c.key ? 'sorted' : '')}
+                  className={
+                    'player-col sortable ' +
+                    (sortKey === PLAYER_COLUMN_KEY ? 'sorted' : '')
+                  }
                   aria-sort={
-                    sortKey === c.key
+                    sortKey === PLAYER_COLUMN_KEY
                       ? sortDir === 'asc'
                         ? 'ascending'
                         : 'descending'
                       : 'none'
                   }
-                  onClick={() => handleSort(c.key)}
-                  onKeyDown={keyHandlerFor(c.key)}
+                  onClick={() => handleSort(PLAYER_COLUMN_KEY)}
+                  onKeyDown={keyHandlerFor(PLAYER_COLUMN_KEY)}
                 >
-                  {c.label}
-                  {sortKey === c.key && (
+                  Player
+                  {sortKey === PLAYER_COLUMN_KEY && (
                     <span className="pp-arrow" aria-hidden="true">
                       {arrow}
                     </span>
                   )}
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((player) => {
-              const onSelect = onPlayerSelect;
-              return (
-                <tr
-                  key={player.id}
-                  role={onSelect ? 'button' : undefined}
-                  tabIndex={onSelect ? 0 : undefined}
-                  style={{ cursor: onSelect ? 'pointer' : 'default' }}
-                  onClick={onSelect ? () => onSelect(player) : undefined}
-                  onKeyDown={
-                    onSelect
-                      ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onSelect(player);
+                {columns.map((c) => (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    role="button"
+                    tabIndex={0}
+                    className={
+                      'sortable ' + (sortKey === c.key ? 'sorted' : '')
+                    }
+                    aria-sort={
+                      sortKey === c.key
+                        ? sortDir === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                    onClick={() => handleSort(c.key)}
+                    onKeyDown={keyHandlerFor(c.key)}
+                  >
+                    {c.label}
+                    {sortKey === c.key && (
+                      <span className="pp-arrow" aria-hidden="true">
+                        {arrow}
+                      </span>
+                    )}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((player) => {
+                const onSelect = onPlayerSelect;
+                return (
+                  <tr
+                    key={player.id}
+                    role={onSelect ? 'button' : undefined}
+                    tabIndex={onSelect ? 0 : undefined}
+                    style={{ cursor: onSelect ? 'pointer' : 'default' }}
+                    onClick={onSelect ? () => onSelect(player) : undefined}
+                    onKeyDown={
+                      onSelect
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onSelect(player);
+                            }
                           }
-                        }
-                      : undefined
-                  }
-                >
-                  <td className="player-cell">
-                    <div className="ppt-row-id">
-                      <div className="ppt-name">
-                        <span className="ppt-mug" aria-hidden="true">
-                          {initialsOf(player)}
-                        </span>
-                        {fullName(player) || 'Unknown Player'}
+                        : undefined
+                    }
+                  >
+                    <td className="player-cell">
+                      <div className="ppt-row-id">
+                        <div className="ppt-name">
+                          <span className="ppt-mug" aria-hidden="true">
+                            {initialsOf(player)}
+                          </span>
+                          {fullName(player) || 'Unknown Player'}
+                        </div>
+                        {player.brefId && (
+                          <div className="ppt-sub">{player.brefId}</div>
+                        )}
                       </div>
-                      {player.brefId && (
-                        <div className="ppt-sub">{player.brefId}</div>
-                      )}
-                    </div>
-                  </td>
-                  {columns.map((c) => (
-                    <td
-                      key={c.key}
-                      className={
-                        (c.lead ? 'lead' : '') +
-                        (sortKey === c.key ? ' sorted' : '')
-                      }
-                    >
-                      {renderCell(c, player)}
                     </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    {columns.map((c) => (
+                      <td
+                        key={c.key}
+                        className={
+                          (c.lead ? 'lead' : '') +
+                          (sortKey === c.key ? ' sorted' : '')
+                        }
+                      >
+                        {renderCell(c, player)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="pp-table-fade-right" aria-hidden="true" />
+        <div className="pp-scroll-hint" aria-hidden="true">
+          Swipe
+          <span className="pp-scroll-hint-arrow" aria-hidden="true">
+            ›
+          </span>
+        </div>
       </div>
     </YStack>
   );

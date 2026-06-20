@@ -1,9 +1,14 @@
+import React from 'react';
+import { render } from '@testing-library/react';
 import {
   BASEBALL_STAT_COLUMNS,
+  computeScrollAffordance,
+  PlayersStatsTable,
   sortPlayers,
   type StatColumn,
 } from './PlayersStatsTable';
 import type { PlayerFragment } from './PlayersApi';
+import { Platform } from '../../platform-components';
 
 // Unit tests for the sort comparator used by PlayersStatsTable (LS-4653). The
 // comparator is exported so we can verify ordering without mounting the
@@ -117,6 +122,106 @@ describe('sortPlayers (LS-4653)', () => {
     expect(sorted.map((p) => p.id)).toEqual([1, 2, 3]);
   });
 });
+
+describe('computeScrollAffordance (LS-7578 / MOB-014)', () => {
+  it('reports both ends reached when the table is not wide enough to scroll', () => {
+    // scrollWidth <= clientWidth → no horizontal overflow, so no affordance.
+    expect(computeScrollAffordance(0, 300, 375)).toEqual({
+      atStart: true,
+      atEnd: true,
+    });
+    expect(computeScrollAffordance(0, 375, 375)).toEqual({
+      atStart: true,
+      atEnd: true,
+    });
+  });
+
+  it('flags more-to-the-right at the start of a scrollable table', () => {
+    // 900px of content in a 375px viewport, scrolled to the far left.
+    expect(computeScrollAffordance(0, 900, 375)).toEqual({
+      atStart: true,
+      atEnd: false,
+    });
+  });
+
+  it('flags both directions while scrolled in the middle', () => {
+    expect(computeScrollAffordance(200, 900, 375)).toEqual({
+      atStart: false,
+      atEnd: false,
+    });
+  });
+
+  it('flags only more-to-the-left once scrolled to the far right', () => {
+    // maxScroll = 900 - 375 = 525.
+    expect(computeScrollAffordance(525, 900, 375)).toEqual({
+      atStart: false,
+      atEnd: true,
+    });
+  });
+
+  it('absorbs sub-pixel rounding at both extents via epsilon', () => {
+    // Just shy of the rightmost extent still counts as "at end".
+    expect(computeScrollAffordance(524.4, 900, 375)).toEqual({
+      atStart: false,
+      atEnd: true,
+    });
+    // A hair away from zero still counts as "at start".
+    expect(computeScrollAffordance(0.6, 900, 375)).toEqual({
+      atStart: true,
+      atEnd: false,
+    });
+  });
+});
+
+// The scroll affordance is a web-only treatment — on native the component
+// renders a stacked, non-scrolling summary (no horizontal-scroll problem), so
+// these DOM assertions only run under the web test project.
+const describeWeb = Platform.OS === 'web' ? describe : describe.skip;
+
+describeWeb(
+  'PlayersStatsTable scroll affordance DOM (LS-7578 / MOB-014)',
+  () => {
+    const players: PlayerFragment[] = [
+      {
+        __typename: 'Player',
+        id: 1,
+        firstName: 'Babe',
+        lastName: 'Ruth',
+        brefId: 'ruthba01',
+        statsLastFetchedAt: null,
+      },
+      {
+        __typename: 'Player',
+        id: 2,
+        firstName: 'Hank',
+        lastName: 'Aaron',
+        brefId: 'aaronha01',
+        statsLastFetchedAt: null,
+      },
+    ];
+
+    it('renders the scroll container, right-edge fade, and swipe hint on web', () => {
+      const { container } = render(<PlayersStatsTable players={players} />);
+      // The table now scrolls inside a dedicated container so the edge fade can
+      // stay pinned to the wrap (MOB-014).
+      expect(container.querySelector('.pp-table-scroll')).not.toBeNull();
+      expect(container.querySelector('.pp-table-fade-right')).not.toBeNull();
+      expect(container.querySelector('.pp-scroll-hint')).not.toBeNull();
+    });
+
+    it('starts at scroll-start with no right-overflow class until measured wide', () => {
+      const { container } = render(<PlayersStatsTable players={players} />);
+      const wrap = container.querySelector('.pp-table-wrap');
+      expect(wrap).not.toBeNull();
+      // jsdom reports zero layout metrics, so the scroller measures as
+      // non-scrollable: it sits at the start and never gains the can-scroll-left
+      // class. The affordance toggling itself is verified by
+      // computeScrollAffordance above.
+      expect(wrap?.classList.contains('at-scroll-start')).toBe(true);
+      expect(wrap?.classList.contains('can-scroll-left')).toBe(false);
+    });
+  },
+);
 
 describe('BASEBALL_STAT_COLUMNS (LS-4653)', () => {
   it('exposes the AC1 columns in order', () => {
