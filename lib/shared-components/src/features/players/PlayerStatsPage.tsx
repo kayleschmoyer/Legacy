@@ -1,5 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, TextInput } from 'react-native';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  AccessibilityInfo,
+  Modal,
+  Pressable,
+  ScrollView,
+  TextInput,
+} from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
 import type { CareerPitchingFragment } from '@legacy-sports/graphql';
 import { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
@@ -10,7 +22,7 @@ import type {
   PlayerWithStats,
 } from './PlayerStatsTypes';
 import type { PlayerCareerStats } from './services/CareerStatsService';
-import { Platform } from '../../platform-components';
+import { Animated, Platform } from '../../platform-components';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -1317,10 +1329,7 @@ export function PlayerStatsPage({
           <>
             {/* ── Batting table ─────────────────────────────────────── */}
             {showBatting && (
-              <YStack
-                key={battingKey}
-                className={Platform.OS === 'web' ? 'ps-tabContent' : undefined}
-              >
+              <TabContentFade key={battingKey}>
                 <PlayerStatsDataGrid
                   title="MLB Career Batting Leaders"
                   initialParams={battingParams}
@@ -1337,15 +1346,12 @@ export function PlayerStatsPage({
                     showAvailabilityFilter ? rosteredPlayerIds : undefined
                   }
                 />
-              </YStack>
+              </TabContentFade>
             )}
 
             {/* ── Pitching table ────────────────────────────────────── */}
             {showPitching && (
-              <YStack
-                key={pitchingKey}
-                className={Platform.OS === 'web' ? 'ps-tabContent' : undefined}
-              >
+              <TabContentFade key={pitchingKey}>
                 <PitchingStatsDataGrid
                   title="MLB Career Pitching Leaders"
                   initialParams={pitchingParams}
@@ -1362,13 +1368,73 @@ export function PlayerStatsPage({
                     showAvailabilityFilter ? rosteredPlayerIds : undefined
                   }
                 />
-              </YStack>
+              </TabContentFade>
             )}
           </>
         )}
       </YStack>
     </YStack>
   );
+}
+
+// ── Tab content transition ──────────────────────────────────────────────────────
+
+// Matches the web `ps-fadeIn` keyframe duration so both platforms crossfade alike.
+const TAB_FADE_DURATION_MS = 140;
+
+/**
+ * Crossfades tab content (batting ⇄ pitching) when the active tab changes.
+ * Web relies on the `ps-tabContent` CSS keyframe (which honors
+ * prefers-reduced-motion); native has no CSS classes, so it fades opacity in
+ * via the Animated API — and honors the OS "Reduce Motion" setting just as the
+ * web `@media (prefers-reduced-motion: reduce)` rule does. Callers remount this
+ * via a `key` to retrigger the fade.
+ */
+function TabContentFade({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const opacity = useRef(
+    new Animated.Value(Platform.OS === 'web' ? 1 : 0),
+  ).current;
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let cancelled = false;
+    // Native-driver fade runs on the UI thread and never sets JS state, so no
+    // teardown is required (matches the Animated usage across this library).
+    const runFade = () => {
+      if (cancelled) return;
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: TAB_FADE_DURATION_MS,
+        useNativeDriver: true,
+      }).start();
+    };
+    // Mirror web's prefers-reduced-motion bypass: when the OS "Reduce Motion"
+    // setting is on, show content immediately instead of fading. Fall back to
+    // the fade if the setting can't be read.
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((reduceMotion) => {
+        if (cancelled) return;
+        if (reduceMotion) {
+          opacity.setValue(1);
+        } else {
+          runFade();
+        }
+      })
+      .catch(runFade);
+    return () => {
+      cancelled = true;
+    };
+  }, [opacity]);
+
+  if (Platform.OS === 'web') {
+    return <YStack className="ps-tabContent">{children}</YStack>;
+  }
+
+  return <Animated.View style={{ opacity }}>{children}</Animated.View>;
 }
 
 // ── Conditional state primitives ───────────────────────────────────────────────
