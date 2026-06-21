@@ -5,6 +5,7 @@ import {
   migrateStatsSearchParams,
   parseClampedInt,
   parsePageSize,
+  parseStatsSearchParams,
   readStatsFormat,
   sanitizeSearchParam,
   URL_SCHEMA_VERSION,
@@ -349,6 +350,111 @@ describe('buildStatsSearchParams', () => {
       filters: {},
     });
     expect(out.get('v')).toBe(String(URL_SCHEMA_VERSION));
+  });
+
+  // PST-040 / LS-7120: the serializer used to write only minHomeRuns,
+  // minBattingAvg, and maxERA, dropping every other filter the parser reads.
+  // It must now write every filter key so deep links survive an edit.
+  it('writes all hitter min/max filters the parser reads (PST-040)', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'hitters',
+      pageSize: 25,
+      filters: {
+        minHomeRuns: 5,
+        maxHomeRuns: 50,
+        minRBI: 10,
+        maxRBI: 120,
+        minBattingAvg: 0.25,
+        maxBattingAvg: 0.35,
+      },
+    });
+    expect(out.get('minHomeRuns')).toBe('5');
+    expect(out.get('maxHomeRuns')).toBe('50');
+    expect(out.get('minRBI')).toBe('10');
+    expect(out.get('maxRBI')).toBe('120');
+    expect(out.get('minBattingAvg')).toBe('0.250');
+    expect(out.get('maxBattingAvg')).toBe('0.350');
+  });
+
+  it('writes all pitcher min/max filters the parser reads (PST-040)', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'pitchers',
+      pageSize: 25,
+      filters: {
+        minERA: 2.5,
+        maxERA: 4,
+        minWins: 5,
+        maxWins: 25,
+        minStrikeouts: 100,
+        maxStrikeouts: 300,
+      },
+    });
+    expect(out.get('minERA')).toBe('2.50');
+    expect(out.get('maxERA')).toBe('4.00');
+    expect(out.get('minWins')).toBe('5');
+    expect(out.get('maxWins')).toBe('25');
+    expect(out.get('minStrikeouts')).toBe('100');
+    expect(out.get('maxStrikeouts')).toBe('300');
+  });
+});
+
+describe('parseStatsSearchParams ↔ buildStatsSearchParams roundtrip', () => {
+  // PST-040 / LS-7120: parser(serializer(state)) === state. Before the fix the
+  // serializer dropped 9 of the 12 numeric filters, so any deep-linked filter
+  // was silently lost the moment another control fired onFiltersChange.
+  it('losslessly round-trips every filter the page supports', () => {
+    const state = {
+      viewMode: 'pitchers' as const,
+      pageSize: 50,
+      filters: {
+        // Hitter filters — AVG values chosen to survive 3-decimal formatting.
+        minHomeRuns: 5,
+        maxHomeRuns: 50,
+        minRBI: 10,
+        maxRBI: 120,
+        minBattingAvg: 0.25,
+        maxBattingAvg: 0.35,
+        // Pitcher filters — the keys PST-040 reported lost; ERA values chosen to
+        // survive 2-decimal formatting.
+        minERA: 2.5,
+        maxERA: 4,
+        minWins: 5,
+        maxWins: 25,
+        minStrikeouts: 100,
+        maxStrikeouts: 300,
+        // Player-info string filters.
+        position: 'OF',
+        team: 'NYY',
+        playerType: 'pitcher',
+        searchTerm: 'cole',
+      },
+    };
+
+    const parsed = parseStatsSearchParams(buildStatsSearchParams(state));
+
+    expect(parsed.viewMode).toBe(state.viewMode);
+    expect(parsed.pageSize).toBe(state.pageSize);
+    expect(parsed.filters).toEqual(state.filters);
+  });
+
+  it('round-trips a pitcher-only deep link without dropping filters (PST-040 repro)', () => {
+    // The exact repro from the ticket: ?view=pitchers&minWins=20&maxERA=3.5 must
+    // survive being re-serialized after a filter is touched.
+    const initial = parseStatsSearchParams(
+      new URLSearchParams('view=pitchers&minWins=20&maxERA=3.5'),
+    );
+    expect(initial.filters.minWins).toBe(20);
+    expect(initial.filters.maxERA).toBe(3.5);
+
+    // Re-serialize the parsed state (what handleFiltersChange does on any change)
+    // and confirm minWins is still present.
+    const reserialized = buildStatsSearchParams({
+      viewMode: initial.viewMode,
+      pageSize: initial.pageSize,
+      filters: initial.filters,
+    });
+    expect(reserialized.get('minWins')).toBe('20');
+    expect(reserialized.get('maxERA')).toBe('3.50');
   });
 });
 

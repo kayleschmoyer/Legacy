@@ -226,14 +226,50 @@ export function buildStatsSearchParams(state: {
   if (state.filters.team) next.set('team', state.filters.team);
   if (state.filters.playerType)
     next.set('playerType', state.filters.playerType);
+  // Career batting filters. Every key written here must be one the initialState
+  // parser reads back, otherwise the URL roundtrip is lossy (PST-040 / LS-7120):
+  // a filter applied on load is dropped the moment any control fires
+  // onFiltersChange and the truncated URL replaces the original. Integer counts
+  // serialize as plain strings; AVG uses 3 decimals per the documented contract.
   if (state.filters.minHomeRuns !== undefined) {
     next.set('minHomeRuns', String(state.filters.minHomeRuns));
+  }
+  if (state.filters.maxHomeRuns !== undefined) {
+    next.set('maxHomeRuns', String(state.filters.maxHomeRuns));
+  }
+  if (state.filters.minRBI !== undefined) {
+    next.set('minRBI', String(state.filters.minRBI));
+  }
+  if (state.filters.maxRBI !== undefined) {
+    next.set('maxRBI', String(state.filters.maxRBI));
   }
   if (state.filters.minBattingAvg !== undefined) {
     next.set('minBattingAvg', state.filters.minBattingAvg.toFixed(3));
   }
+  if (state.filters.maxBattingAvg !== undefined) {
+    next.set('maxBattingAvg', state.filters.maxBattingAvg.toFixed(3));
+  }
+
+  // Career pitching filters. ERA uses 2 decimals per the contract; Wins and
+  // Strikeouts are integer counts. These were parsed but never written before
+  // PST-040, making pitcher deep-links one-shot.
+  if (state.filters.minERA !== undefined) {
+    next.set('minERA', state.filters.minERA.toFixed(2));
+  }
   if (state.filters.maxERA !== undefined) {
     next.set('maxERA', state.filters.maxERA.toFixed(2));
+  }
+  if (state.filters.minWins !== undefined) {
+    next.set('minWins', String(state.filters.minWins));
+  }
+  if (state.filters.maxWins !== undefined) {
+    next.set('maxWins', String(state.filters.maxWins));
+  }
+  if (state.filters.minStrikeouts !== undefined) {
+    next.set('minStrikeouts', String(state.filters.minStrikeouts));
+  }
+  if (state.filters.maxStrikeouts !== undefined) {
+    next.set('maxStrikeouts', String(state.filters.maxStrikeouts));
   }
 
   // Serialize keys in a deterministic alphabetical order (PST-104). URLSearchParams
@@ -249,6 +285,90 @@ export function buildStatsSearchParams(state: {
     sorted.append(key, value);
   }
   return sorted;
+}
+
+/**
+ * Parse a URL search-param snapshot back into the page's initial state — the
+ * inverse of {@link buildStatsSearchParams}. Migrates legacy/unversioned URLs to
+ * the current schema first (PST-101), then reads every filter key the page
+ * supports. Every key read here must be one {@link buildStatsSearchParams}
+ * writes, otherwise the roundtrip is lossy (PST-040 / LS-7120). Exported so the
+ * parser ↔ serializer roundtrip can be unit-tested directly.
+ */
+export function parseStatsSearchParams(searchParams: URLSearchParams): {
+  viewMode: PlayerStatsViewMode;
+  pageSize: number;
+  search: string;
+  filters: Partial<PlayerStatsFilters>;
+} {
+  // Upgrade older/unversioned URLs to the current schema before reading any
+  // filter keys, so bookmarks minted under a prior schema resolve to the
+  // equivalent filters instead of being silently misinterpreted (PST-101).
+  const params = migrateStatsSearchParams(searchParams);
+
+  // Run the raw `view` param through the shared shell's normalizer so the tab
+  // we render is always canonical (combined/hitters/pitchers), honoring legacy
+  // aliases (batting→hitters, pitching→pitchers) and unknown values (LS-7146).
+  const viewMode = normalizeViewMode(
+    (params.get('view') as PlayerStatsViewMode) || 'combined',
+  );
+  const pageSize = parsePageSize(params.get('pageSize'));
+  const search = params.get('search') || '';
+
+  // Parse filters from URL
+  const filters: Partial<PlayerStatsFilters> = {};
+
+  // Career batting filters
+  const minHR = params.get('minHomeRuns');
+  const maxHR = params.get('maxHomeRuns');
+  const minRBI = params.get('minRBI');
+  const maxRBI = params.get('maxRBI');
+  const minAVG = params.get('minBattingAvg');
+  const maxAVG = params.get('maxBattingAvg');
+
+  // Career pitching filters
+  const minERA = params.get('minERA');
+  const maxERA = params.get('maxERA');
+  const minWins = params.get('minWins');
+  const maxWins = params.get('maxWins');
+  const minSO = params.get('minStrikeouts');
+  const maxSO = params.get('maxStrikeouts');
+
+  // Player info filters — sanitized to strip control chars and cap length
+  const position = sanitizeSearchParam(params.get('position'));
+  const team = sanitizeSearchParam(params.get('team'));
+  const playerType: PlayerStatsFilters['playerType'] =
+    sanitizeSearchParam(params.get('playerType')) ?? undefined;
+  const searchTerm = sanitizeSearchParam(params.get('searchTerm'));
+
+  // Apply batting filters
+  if (minHR) filters.minHomeRuns = parseClampedInt(minHR, 'minHomeRuns');
+  if (maxHR) filters.maxHomeRuns = parseClampedInt(maxHR, 'maxHomeRuns');
+  if (minRBI) filters.minRBI = parseClampedInt(minRBI, 'minRBI');
+  if (maxRBI) filters.maxRBI = parseClampedInt(maxRBI, 'maxRBI');
+  if (minAVG) filters.minBattingAvg = parseFloat(minAVG);
+  if (maxAVG) filters.maxBattingAvg = parseFloat(maxAVG);
+
+  // Apply pitching filters
+  if (minERA) filters.minERA = parseFloat(minERA);
+  if (maxERA) filters.maxERA = parseFloat(maxERA);
+  if (minWins) filters.minWins = parseClampedInt(minWins, 'minWins');
+  if (maxWins) filters.maxWins = parseClampedInt(maxWins, 'maxWins');
+  if (minSO) filters.minStrikeouts = parseClampedInt(minSO, 'minStrikeouts');
+  if (maxSO) filters.maxStrikeouts = parseClampedInt(maxSO, 'maxStrikeouts');
+
+  // Apply player info filters
+  if (position) filters.position = position;
+  if (team) filters.team = team;
+  if (playerType) filters.playerType = playerType;
+  if (searchTerm) filters.searchTerm = searchTerm;
+
+  return {
+    viewMode,
+    pageSize,
+    search,
+    filters,
+  };
 }
 
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
@@ -490,76 +610,10 @@ export function PlayerStatsRoute() {
   }, [searchParams, setSearchParams]);
 
   // Parse URL parameters for initial state
-  const initialState = useMemo(() => {
-    // Upgrade older/unversioned URLs to the current schema before reading any
-    // filter keys, so bookmarks minted under a prior schema resolve to the
-    // equivalent filters instead of being silently misinterpreted (PST-101).
-    const params = migrateStatsSearchParams(searchParams);
-
-    // Run the raw `view` param through the shared shell's normalizer so the tab
-    // we render is always canonical (combined/hitters/pitchers), honoring legacy
-    // aliases (batting→hitters, pitching→pitchers) and unknown values (LS-7146).
-    const viewMode = normalizeViewMode(
-      (params.get('view') as PlayerStatsViewMode) || 'combined',
-    );
-    const pageSize = parsePageSize(params.get('pageSize'));
-    const search = params.get('search') || '';
-
-    // Parse filters from URL
-    const filters: Partial<PlayerStatsFilters> = {};
-
-    // Career batting filters
-    const minHR = params.get('minHomeRuns');
-    const maxHR = params.get('maxHomeRuns');
-    const minRBI = params.get('minRBI');
-    const maxRBI = params.get('maxRBI');
-    const minAVG = params.get('minBattingAvg');
-    const maxAVG = params.get('maxBattingAvg');
-
-    // Career pitching filters
-    const minERA = params.get('minERA');
-    const maxERA = params.get('maxERA');
-    const minWins = params.get('minWins');
-    const maxWins = params.get('maxWins');
-    const minSO = params.get('minStrikeouts');
-    const maxSO = params.get('maxStrikeouts');
-
-    // Player info filters — sanitized to strip control chars and cap length
-    const position = sanitizeSearchParam(params.get('position'));
-    const team = sanitizeSearchParam(params.get('team'));
-    const playerType: PlayerStatsFilters['playerType'] =
-      sanitizeSearchParam(params.get('playerType')) ?? undefined;
-    const searchTerm = sanitizeSearchParam(params.get('searchTerm'));
-
-    // Apply batting filters
-    if (minHR) filters.minHomeRuns = parseClampedInt(minHR, 'minHomeRuns');
-    if (maxHR) filters.maxHomeRuns = parseClampedInt(maxHR, 'maxHomeRuns');
-    if (minRBI) filters.minRBI = parseClampedInt(minRBI, 'minRBI');
-    if (maxRBI) filters.maxRBI = parseClampedInt(maxRBI, 'maxRBI');
-    if (minAVG) filters.minBattingAvg = parseFloat(minAVG);
-    if (maxAVG) filters.maxBattingAvg = parseFloat(maxAVG);
-
-    // Apply pitching filters
-    if (minERA) filters.minERA = parseFloat(minERA);
-    if (maxERA) filters.maxERA = parseFloat(maxERA);
-    if (minWins) filters.minWins = parseClampedInt(minWins, 'minWins');
-    if (maxWins) filters.maxWins = parseClampedInt(maxWins, 'maxWins');
-    if (minSO) filters.minStrikeouts = parseClampedInt(minSO, 'minStrikeouts');
-    if (maxSO) filters.maxStrikeouts = parseClampedInt(maxSO, 'maxStrikeouts');
-
-    // Apply player info filters
-    if (position) filters.position = position;
-    if (team) filters.team = team;
-    if (playerType) filters.playerType = playerType;
-    if (searchTerm) filters.searchTerm = searchTerm;
-
-    return {
-      viewMode,
-      pageSize,
-      search,
-      filters,
-    };
-  }, [searchParams]);
+  const initialState = useMemo(
+    () => parseStatsSearchParams(searchParams),
+    [searchParams],
+  );
 
   const handlePlayerDetails = useCallback(
     (player: PlayerWithStats) => {
