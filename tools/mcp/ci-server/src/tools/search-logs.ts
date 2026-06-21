@@ -1,3 +1,4 @@
+import { formatLogSearch, type LogMatch } from '../format.js';
 import { fetchRunLogs } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
@@ -14,11 +15,32 @@ interface SearchLogsParams {
   limitMatches?: number;
 }
 
-interface LogMatch {
-  lineNumber: number;
-  line: string;
-  before: string[];
-  after: string[];
+/**
+ * Hard cap on a user-supplied regex pattern. Log-search patterns are short by
+ * nature; a very long pattern is both unnecessary and a ReDoS smell.
+ */
+const MAX_PATTERN_LENGTH = 1000;
+
+/**
+ * Heuristic guard against catastrophic-backtracking (ReDoS) patterns. Node has
+ * no synchronous way to time-box a regex execution, so we reject the pattern
+ * *shapes* that cause exponential backtracking before compiling: a parenthesised
+ * group that itself contains an unbounded quantifier and is in turn quantified
+ * (e.g. `(a+)+`, `(a*)*`, `(a+)*`, `(a+){2,}`). Returns a human-readable reason,
+ * or `null` when the pattern is acceptable. Only applies when `isRegex` is set —
+ * literal substring search (the default) carries no backtracking risk.
+ */
+function unsafePatternReason(pattern: string): string | null {
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    return `pattern too long (${pattern.length} > ${MAX_PATTERN_LENGTH} characters)`;
+  }
+  // A group containing an unbounded quantifier (`+`, `*`, or `{`), immediately
+  // followed by another unbounded quantifier — the classic ReDoS shape.
+  const nestedQuantifier = /\([^()]*[+*{][^()]*\)[+*{]/;
+  if (nestedQuantifier.test(pattern)) {
+    return 'pattern contains nested quantifiers (possible ReDoS); simplify the pattern or set isRegex=false for a literal substring search';
+  }
+  return null;
 }
 
 function buildMatcher(params: SearchLogsParams): (line: string) => boolean {
@@ -47,15 +69,41 @@ export async function searchLogs(
     };
   }
 
+  // Reject ReDoS-prone regex patterns before touching the logs. Only matters
+  // when isRegex is set; literal substring search has no backtracking risk.
+  if (params.isRegex) {
+    const reason = unsafePatternReason(params.pattern);
+    if (reason) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: `Unsafe regex pattern: ${reason}.` }],
+      };
+    }
+  }
+
   const contextBefore = params.contextBefore ?? 3;
   const contextAfter = params.contextAfter ?? 3;
   const limitMatches = params.limitMatches ?? 10;
+
+  let isMatch: (line: string) => boolean;
+  try {
+    isMatch = buildMatcher(params);
+  } catch (error) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `Invalid regex pattern "${params.pattern}": ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
 
   try {
     const rawLogs = await fetchRunLogs(params);
     const lines = rawLogs.split(/\r?\n/);
     const matches: LogMatch[] = [];
-    const isMatch = buildMatcher(params);
     let totalMatches = 0;
 
     for (const [index, line] of lines.entries()) {
@@ -80,21 +128,16 @@ export async function searchLogs(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
+          text: formatLogSearch(
             {
               runId: params.runId,
               jobId: params.jobId ?? null,
-              failedOnly: params.failedOnly !== false,
               pattern: params.pattern,
-              isRegex: params.isRegex ?? false,
-              caseSensitive: params.caseSensitive ?? false,
               totalMatches,
               returnedMatches: matches.length,
               truncated: totalMatches > matches.length,
-              matches,
             },
-            null,
-            2,
+            matches,
           ),
         },
       ],

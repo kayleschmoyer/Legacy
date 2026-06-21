@@ -6,6 +6,7 @@ import {
   resolveProjectSlug,
   type SessionJsonl,
 } from '../session-files.js';
+import { formatSessionStats } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 export interface SessionStatsParams {
@@ -283,7 +284,7 @@ export async function sessionStats(
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ project: projectSlug, ...parentStats }, null, 2),
+        text: formatSessionStats({ project: projectSlug, ...parentStats }),
       },
     ],
   };

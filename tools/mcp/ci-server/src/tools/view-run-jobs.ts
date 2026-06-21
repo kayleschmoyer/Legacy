@@ -1,3 +1,4 @@
+import { formatRunJobs } from '../format.js';
 import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
@@ -95,11 +96,7 @@ export async function viewRunJobs(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            { runId: params.runId, summary, jobs: mapped },
-            null,
-            2,
-          ),
+          text: formatRunJobs(params.runId, summary, mapped, includeSteps),
         },
       ],
     };

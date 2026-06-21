@@ -16,6 +16,9 @@ const config: Config = {
   moduleNameMapper: {
     // NodeNext resolution uses .js extensions in imports; strip them for ts-jest
     '^(\\.{1,2}/.+)\\.js$': '$1',
+    // Resolve the shared format-helper path alias to source for ts-jest.
+    '^@legacy-sports/mcp-format$':
+      '<rootDir>/../../../lib/mcp-format/src/index.ts',
   },
   coverageDirectory: '../../../coverage/tools/mcp/ci-server',
 };

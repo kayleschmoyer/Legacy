@@ -8,7 +8,7 @@
 
 import { homedir } from 'node:os';
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, resolve, sep } from 'node:path';
 
 /** Locate the ~/.claude/projects directory; throws if it does not exist. */
 export function findClaudeProjectsDir(): string {
@@ -88,6 +88,18 @@ export function resolveProjectSlug(
     // in (e.g. "../foo" -> "foo"), and the strict regex rejects the rest.
     const safe = assertSafeSlug(basename(explicit));
     const safeDir = join(projectsDir, safe);
+    // Defence in depth: canonicalise both paths and confirm the resolved
+    // directory is still contained within projectsDir. assertSafeSlug already
+    // makes traversal impossible; this guard ensures that holds even if the
+    // allow-list is ever loosened, and makes the containment invariant explicit
+    // at the path sink.
+    const baseDir = resolve(projectsDir);
+    const resolvedDir = resolve(safeDir);
+    if (resolvedDir !== baseDir && !resolvedDir.startsWith(baseDir + sep)) {
+      throw new Error(
+        `Resolved project path escapes the projects directory: ${JSON.stringify(resolvedDir)}`,
+      );
+    }
     if (!existsSync(safeDir) || !statSync(safeDir).isDirectory()) {
       throw new Error(
         `Project directory for slug "${safe}" does not exist under ${projectsDir}`,

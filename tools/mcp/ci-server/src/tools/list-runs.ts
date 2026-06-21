@@ -1,4 +1,5 @@
 import { basename } from 'node:path';
+import { formatRunList } from '../format.js';
 import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
@@ -176,20 +177,7 @@ export async function listRuns(params: ListRunsParams): Promise<ToolResult> {
     const runs = data.workflow_runs.slice(0, limit).map(mapRun);
 
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              filters: params,
-              count: runs.length,
-              runs,
-            },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text: formatRunList(runs) }],
     };
   } catch (error) {
     return {
