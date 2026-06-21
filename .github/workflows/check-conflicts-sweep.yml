@@ -177,21 +177,52 @@ jobs:
             # Sync "CI: Conflicts" label to match the merge-test result.
             # Mirrors the label management in check-conflicts.yml so agents and
             # sweep-prs consumers see a consistent label state after main advances.
-            if [ "$CONCLUSION" = "failure" ] && [ "$HAS_CONFLICT_LABEL" != "true" ]; then
-              printf '{"labels":["CI: Conflicts"]}' \
-                | gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels" -X POST --input - > /dev/null \
-                || echo "::warning::Failed to add 'CI: Conflicts' label to PR #${PR_NUM}"
-              # Comment only on the absent→present label transition so a PR
-              # that stays conflicted across multiple sweeps isn't re-commented.
-              BODY="⚠️ This PR has merge conflicts with \`${BASE_REF}\` after ${BASE_SHA:0:7} landed."
+            #
+            # Comment idempotency keys off a hidden marker, NOT the label. The
+            # label is written by multiple actors (this sweep, check-conflicts.yml,
+            # ci-pipeline's replace-all-labels PUT, and agents), so its
+            # absent->present edge can't guarantee a single comment — it caused
+            # PRs to be re-commented on every base push (LS-8229). Find the one
+            # sticky comment by marker and create-or-update it in place instead.
+            MARKER='<!-- conflict-notice -->'
+            EXISTING_COMMENT_ID=$(gh api --paginate \
+              "repos/${GH_REPO}/issues/${PR_NUM}/comments" \
+              --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" 2>/dev/null \
+              | head -1 || true)
+
+            if [ "$CONCLUSION" = "failure" ]; then
+              # Label add is idempotent; gate only to skip a redundant POST that
+              # would otherwise count against the secondary rate limit.
+              if [ "$HAS_CONFLICT_LABEL" != "true" ]; then
+                printf '{"labels":["CI: Conflicts"]}' \
+                  | gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels" -X POST --input - > /dev/null \
+                  || echo "::warning::Failed to add 'CI: Conflicts' label to PR #${PR_NUM}"
+              fi
+              # Sticky comment: create once, then update in place on later sweeps.
+              BODY="${MARKER}"$'\n'"⚠️ This PR has merge conflicts with \`${BASE_REF}\` after ${BASE_SHA:0:7} landed."
               BODY="$BODY Rebase or merge \`${BASE_REF}\` into your branch to resolve them."
               BODY="$BODY The \`CI: Conflicts\` label will be removed automatically once the conflicts are resolved."
-              printf '%s' "$BODY" | jq -R '{"body": .}' \
-                | gh api "repos/${GH_REPO}/issues/${PR_NUM}/comments" -X POST --input - > /dev/null \
-                || echo "::warning::Failed to post conflict comment on PR #${PR_NUM}"
-            elif [ "$CONCLUSION" = "success" ] && [ "$HAS_CONFLICT_LABEL" = "true" ]; then
-              gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels/CI%3A%20Conflicts" \
-                -X DELETE > /dev/null 2>&1 \
-                || echo "::warning::Failed to remove 'CI: Conflicts' label from PR #${PR_NUM}"
+              # jq -R -s slurps the whole (multi-line) body into one JSON string.
+              if [ -n "$EXISTING_COMMENT_ID" ]; then
+                printf '%s' "$BODY" | jq -R -s '{"body": .}' \
+                  | gh api "repos/${GH_REPO}/issues/comments/${EXISTING_COMMENT_ID}" -X PATCH --input - > /dev/null \
+                  || echo "::warning::Failed to update conflict comment on PR #${PR_NUM}"
+              else
+                printf '%s' "$BODY" | jq -R -s '{"body": .}' \
+                  | gh api "repos/${GH_REPO}/issues/${PR_NUM}/comments" -X POST --input - > /dev/null \
+                  || echo "::warning::Failed to post conflict comment on PR #${PR_NUM}"
+              fi
+            else
+              # Mergeable — remove stale label and delete the sticky comment.
+              if [ "$HAS_CONFLICT_LABEL" = "true" ]; then
+                gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels/CI%3A%20Conflicts" \
+                  -X DELETE > /dev/null 2>&1 \
+                  || echo "::warning::Failed to remove 'CI: Conflicts' label from PR #${PR_NUM}"
+              fi
+              if [ -n "$EXISTING_COMMENT_ID" ]; then
+                gh api "repos/${GH_REPO}/issues/comments/${EXISTING_COMMENT_ID}" \
+                  -X DELETE > /dev/null 2>&1 \
+                  || echo "::warning::Failed to delete stale conflict comment on PR #${PR_NUM}"
+              fi
             fi
           done <<< "$PR_NUMBERS"

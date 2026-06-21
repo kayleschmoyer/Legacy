@@ -153,6 +153,13 @@ jobs:
             const mergeable = process.env.MERGEABLE === 'true';
 
             const label = 'CI: Conflicts';
+            // Hidden marker that uniquely identifies the sticky conflict comment.
+            // Comment idempotency keys off THIS marker, never the label — the
+            // label is a multi-writer flag (this workflow, the base-push sweep,
+            // ci-pipeline's replace-all-labels PUT, and agents) so its
+            // absent->present edge is unreliable as a "comment once" signal and
+            // caused both duplicate comments and silently-dropped ones (LS-8229).
+            const MARKER = '<!-- conflict-notice -->';
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
             const hasLabel = pr.labels.some(l => l.name === label);
 
@@ -172,28 +179,48 @@ jobs:
               }
             }
 
+            // Locate the existing sticky conflict comment (if any) by marker.
+            async function findConflictComment() {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: prNumber, per_page: 100,
+              });
+              return comments.find(c => (c.body ?? '').includes(MARKER)) ?? null;
+            }
+
             if (!mergeable) {
+              // Label add is idempotent; gate only to skip a redundant API call.
               if (!hasLabel) {
                 await withRetry(() => github.rest.issues.addLabels({
                   owner, repo, issue_number: prNumber, labels: [label],
                 }));
                 core.info(`Label added: ${label}`);
-                // Comment only when the label transitions from absent to
-                // present, so repeated pushes on a still-conflicted PR don't
-                // spam the thread. Non-fatal: the step still reports the
-                // conflict via core.setFailed below even if this fails.
-                try {
+              }
+              // Sticky comment: create once, then update in place. Keying on the
+              // marker (not the label) guarantees exactly one conflict comment
+              // regardless of how often the label is toggled. Non-fatal: the
+              // step still reports the conflict via core.setFailed below.
+              const body =
+                `${MARKER}\n` +
+                '⚠️ This PR has merge conflicts with the base branch. ' +
+                'Rebase or merge the base branch into your branch to resolve them. ' +
+                'The `CI: Conflicts` label will be removed automatically once the conflicts are resolved.';
+              try {
+                const existing = await findConflictComment();
+                if (!existing) {
                   await withRetry(() => github.rest.issues.createComment({
-                    owner, repo, issue_number: prNumber,
-                    body:
-                      '⚠️ This PR has merge conflicts with the base branch. ' +
-                      'Rebase or merge the base branch into your branch to resolve them. ' +
-                      'The `CI: Conflicts` label will be removed automatically once the conflicts are resolved.',
+                    owner, repo, issue_number: prNumber, body,
                   }));
                   core.info('Conflict comment posted.');
-                } catch (e) {
-                  core.warning(`Failed to post conflict comment on PR #${prNumber}: ${e.message}`);
+                } else if ((existing.body ?? '') !== body) {
+                  await withRetry(() => github.rest.issues.updateComment({
+                    owner, repo, comment_id: existing.id, body,
+                  }));
+                  core.info('Conflict comment updated in place.');
+                } else {
+                  core.info('Conflict comment already present; nothing to do.');
                 }
+              } catch (e) {
+                core.warning(`Failed to upsert conflict comment on PR #${prNumber}: ${e.message}`);
               }
               core.setFailed(
                 'This PR has merge conflicts with the base branch. ' +
@@ -218,5 +245,17 @@ jobs:
                   throw e;
                 }
               }
+            }
+            // Delete the sticky conflict comment now that the PR is mergeable.
+            try {
+              const existing = await findConflictComment();
+              if (existing) {
+                await withRetry(() => github.rest.issues.deleteComment({
+                  owner, repo, comment_id: existing.id,
+                }));
+                core.info('Stale conflict comment removed.');
+              }
+            } catch (e) {
+              core.warning(`Failed to remove conflict comment on PR #${prNumber}: ${e.message}`);
             }
             core.info('No merge conflicts detected.');
