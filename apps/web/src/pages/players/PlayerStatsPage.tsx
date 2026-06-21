@@ -230,7 +230,7 @@ export function buildStatsSearchParams(state: {
 
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
 
-function readStatsFormat(): 'standard' | 'expanded' {
+export function readStatsFormat(): 'standard' | 'expanded' {
   try {
     const raw = localStorage.getItem(PREFS_STORAGE_KEY);
     if (!raw) return 'standard';
@@ -242,7 +242,16 @@ function readStatsFormat(): 'standard' | 'expanded' {
       return parsed.statsFormat;
     }
     return 'standard';
-  } catch {
+  } catch (err) {
+    // localStorage can hold corrupted JSON (browser extensions, manual DevTools
+    // edits). Log a warning so a silently reverted preference is debuggable
+    // instead of vanishing, then fall back to the default. (LS-7139 / PST-091)
+    // Per the project logging convention, the Error instance is the second
+    // argument and extra context goes in the third (.github/reviewer-rules.md).
+    const error = err instanceof Error ? err : new Error(String(err));
+    LOGGER.warn('readStatsFormat parse failed', error, {
+      storageKey: PREFS_STORAGE_KEY,
+    });
     return 'standard';
   }
 }

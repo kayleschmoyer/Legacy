@@ -4,11 +4,13 @@ import {
   buildStatsSearchParams,
   migrateStatsSearchParams,
   parseClampedInt,
+  readStatsFormat,
   sanitizeSearchParam,
   URL_SCHEMA_VERSION,
 } from './PlayerStatsPage';
 
 const MAX_GRAPHQL_INT = 2147483647;
+const PREFS_STORAGE_KEY = 'ls_user_preferences';
 
 describe('parseClampedInt', () => {
   let warnSpy: jest.SpyInstance;
@@ -56,6 +58,56 @@ describe('parseClampedInt', () => {
       true,
     );
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('readStatsFormat', () => {
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    localStorage.clear();
+    warnSpy = jest.spyOn(LOGGER, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    localStorage.clear();
+  });
+
+  it('returns the stored preference when valid', () => {
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({ statsFormat: 'expanded' }),
+    );
+    expect(readStatsFormat()).toBe('expanded');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('defaults to standard when nothing is stored', () => {
+    expect(readStatsFormat()).toBe('standard');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('defaults to standard for an unrecognized stored value without warning', () => {
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({ statsFormat: 'bogus' }),
+    );
+    expect(readStatsFormat()).toBe('standard');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs a warning and falls back to standard when stored JSON is corrupted', () => {
+    localStorage.setItem(PREFS_STORAGE_KEY, '{ not valid json');
+    expect(readStatsFormat()).toBe('standard');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'readStatsFormat parse failed',
+      expect.any(Error),
+      expect.objectContaining({
+        storageKey: PREFS_STORAGE_KEY,
+      }),
+    );
   });
 });
 
