@@ -14,6 +14,7 @@ import {
   pageSizeOptionsForViewMode,
   parseSliderValue,
   SLIDER_COMMIT_DEBOUNCE_MS,
+  sliderFillPct,
   stepValue,
 } from './PlayerStatsPage';
 
@@ -522,5 +523,38 @@ describe('battingSortFilter (LS-7115)', () => {
       sortBy: 'homeRuns',
       sortDir: 'asc',
     });
+  });
+});
+
+// sliderFillPct drives the slider fill width / `--pct` CSS variable for both the
+// web range input (StatSlider) and the native −/+ stepper track (NativeRangeStepper).
+// It must never emit NaN/Infinity, which render as the invalid CSS length 'NaN%'
+// (silently dropped by Chrome, treated as 0% by Firefox) — see PST-080 (LS-7134).
+describe('sliderFillPct (LS-7134)', () => {
+  it('computes the fill percentage for a value within range', () => {
+    expect(sliderFillPct(5, 0, 10)).toBe(50);
+    expect(sliderFillPct(0, 0, 75)).toBe(0);
+    expect(sliderFillPct(75, 0, 75)).toBe(100);
+  });
+
+  it('returns 0 instead of NaN when max === min (degenerate range)', () => {
+    expect(sliderFillPct(5, 5, 5)).toBe(0);
+    expect(Number.isNaN(sliderFillPct(5, 5, 5))).toBe(false);
+  });
+
+  it('returns 0 instead of Infinity when value is outside a zero-width range', () => {
+    // (value - min) is non-zero while (max - min) is zero → naive division is Infinity.
+    const result = sliderFillPct(10, 5, 5);
+    expect(result).toBe(0);
+    expect(Number.isFinite(result)).toBe(true);
+  });
+
+  it('returns 0 when max < min (inverted range)', () => {
+    expect(sliderFillPct(5, 10, 2)).toBe(0);
+  });
+
+  it('clamps the result to the [0, 100] range', () => {
+    expect(sliderFillPct(-5, 0, 10)).toBe(0);
+    expect(sliderFillPct(20, 0, 10)).toBe(100);
   });
 });

@@ -358,6 +358,25 @@ export interface PlayerStatsExportData {
   pitching: readonly CareerPitchingFragment[];
 }
 
+/**
+ * Computes a slider's fill percentage (0–100) for `value` within `[min, max]`.
+ * Guards the denominator: when `max <= min` the range is degenerate (a future
+ * config bug could pass `max === min`), so the naive `(value - min) / (max - min)`
+ * would divide by zero and yield `NaN`/`Infinity` — which renders as the invalid
+ * CSS length `NaN%` (silently dropped by Chrome, treated as `0%` by Firefox).
+ * Defaults to `0` in that case and clamps the result to `[0, 100]` so the fill
+ * width is always a valid percentage. Extracted as a pure function so the
+ * arithmetic is unit-testable without mounting the page (LS-7134).
+ */
+export function sliderFillPct(value: number, min: number, max: number): number {
+  const range = max - min;
+  if (range <= 0) {
+    return 0;
+  }
+  const pct = Math.round(((value - min) / range) * 100);
+  return Math.min(100, Math.max(0, pct));
+}
+
 export interface PlayerStatsPageProps {
   title?: string;
   initialViewMode?: PlayerStatsViewMode;
@@ -2611,7 +2630,7 @@ function StatSlider({
   onChange,
   onCommit,
 }: StatSliderProps) {
-  const pct = Math.round(((value - min) / (max - min)) * 100);
+  const pct = sliderFillPct(value, min, max);
 
   // Debounce the keyboard commit path: onKeyUp fires once per arrow-key press,
   // so holding an arrow would otherwise commit (remount grid + refetch) per
@@ -2889,7 +2908,7 @@ function NativeRangeStepper({
     [value, min, max, step, onChange, onCommit],
   );
 
-  const pct = Math.round(((value - min) / (max - min)) * 100);
+  const pct = sliderFillPct(value, min, max);
 
   return (
     <XStack style={{ gap: 12, alignItems: 'center' }}>
