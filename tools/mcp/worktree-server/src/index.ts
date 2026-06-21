@@ -32,6 +32,18 @@ import {
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
+import {
+  type BranchEntry,
+  formatBranchList,
+  formatCommitLog,
+  formatDiffStat,
+  formatObject,
+  formatRemoteBranches,
+  formatWorktreeList,
+  parseNumstat,
+  type RemoteBranchRow,
+  type WorktreeListEntry,
+} from './format';
 
 // ---------------------------------------------------------------------------
 // Constants & state
@@ -3232,7 +3244,9 @@ const handleCallTool = async (
         // staged=true → git diff --cached (index vs HEAD)
         // staged=false/omitted → git diff <base> (working tree vs base ref)
         const gitArgs = staged ? ['diff', '--cached'] : ['diff', base];
-        if (stat) gitArgs.push('--stat');
+        // --numstat (machine-readable: "ins\tdel\tpath") instead of --stat
+        // (padded bar-chart) so the summary renders as a compact MD table.
+        if (stat) gitArgs.push('--numstat');
         if (nameOnly) gitArgs.push('--name-only');
         if (paths?.length) {
           gitArgs.push('--');
@@ -3251,6 +3265,15 @@ const handleCallTool = async (
                   ? 'No staged changes (index is clean).'
                   : `No differences found between ${base} and the working tree.`,
               },
+            ],
+          };
+        }
+
+        // Stat summary -> compact Markdown table (parsed from --numstat).
+        if (stat) {
+          return {
+            content: [
+              { type: 'text', text: formatDiffStat(parseNumstat(trimmed)) },
             ],
           };
         }
@@ -3421,18 +3444,14 @@ const handleCallTool = async (
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(
-                    {
-                      count: 0,
-                      totalRemote: 0,
-                      truncated: false,
-                      ...(merged ? { mergedInto: merged } : {}),
-                      compareBase,
-                      branches: [],
-                    },
-                    null,
-                    2,
-                  ),
+                  text: formatRemoteBranches({
+                    rows: [],
+                    count: 0,
+                    totalRemote: 0,
+                    truncated: false,
+                    compareBase,
+                    mergedInto: merged,
+                  }),
                 },
               ],
             };
@@ -3444,12 +3463,7 @@ const handleCallTool = async (
           const truncated = branches.length > maxBranches;
 
           // Get ahead/behind counts relative to compareBase for each branch
-          const results: Array<{
-            branch: string;
-            ahead: number;
-            behind: number;
-            lastCommitDate: string;
-          }> = [];
+          const results: RemoteBranchRow[] = [];
           for (const branch of cappedBranches) {
             if (branch === compareBase || branch === 'origin/HEAD') continue;
             try {
@@ -3497,18 +3511,14 @@ const handleCallTool = async (
             content: [
               {
                 type: 'text',
-                text: JSON.stringify(
-                  {
-                    count: results.length,
-                    totalRemote: branches.length,
-                    truncated,
-                    ...(merged ? { mergedInto: merged } : {}),
-                    compareBase,
-                    branches: results,
-                  },
-                  null,
-                  2,
-                ),
+                text: formatRemoteBranches({
+                  rows: results,
+                  count: results.length,
+                  totalRemote: branches.length,
+                  truncated,
+                  compareBase,
+                  mergedInto: merged,
+                }),
               },
             ],
           };
@@ -3528,43 +3538,42 @@ const handleCallTool = async (
 
       // Default: list local worktrees
       const worktrees = getWorktrees();
-      const activeLabel = activeWorktree
-        ? `\nActive worktree: ${activeWorktree}`
-        : '\nNo active worktree set.';
+      const activeFooter = activeWorktree
+        ? `_Active worktree: ${activeWorktree}_`
+        : '_No active worktree set._';
 
       if (worktrees.length === 0) {
         return {
           content: [
-            {
-              type: 'text',
-              text: `No worktrees found.${activeLabel}`,
-            },
+            { type: 'text', text: `No worktrees found.\n\n${activeFooter}` },
           ],
         };
       }
 
-      const lines = worktrees.map((w) => {
-        const nmStatus = w.hasLinkedNodeModules
-          ? `node_modules: symlinked -> ${w.nodeModulesTarget}`
+      const rows: WorktreeListEntry[] = worktrees.map((w) => {
+        const nodeModules = w.hasLinkedNodeModules
+          ? `symlinked -> ${w.nodeModulesTarget}`
           : existsSync(join(w.path, 'node_modules'))
-            ? 'node_modules: independent'
-            : 'node_modules: missing';
-        const lockStatus = w.lock
+            ? 'independent'
+            : 'missing';
+        const lock = w.lock
           ? w.lockStale
-            ? `Lock: STALE (agent: ${w.lock.agent}, acquired: ${w.lock.acquired})`
-            : `Lock: ACTIVE (agent: ${w.lock.agent}, task: ${w.lock.task ?? 'n/a'}, acquired: ${w.lock.acquired})`
-          : 'Lock: none';
-        return [
-          w.key,
-          `  Path:   ${w.path}`,
-          `  Branch: ${w.branch ?? 'unknown'}`,
-          `  ${nmStatus}`,
-          `  ${lockStatus}`,
-        ].join('\n');
+            ? `STALE (agent: ${w.lock.agent}, acquired: ${w.lock.acquired})`
+            : `ACTIVE (agent: ${w.lock.agent}, task: ${w.lock.task ?? 'n/a'}, acquired: ${w.lock.acquired})`
+          : 'none';
+        return {
+          key: w.key,
+          path: w.path,
+          branch: w.branch ?? 'unknown',
+          nodeModules,
+          lock,
+        };
       });
 
       return {
-        content: [{ type: 'text', text: lines.join('\n\n') + activeLabel }],
+        content: [
+          { type: 'text', text: formatWorktreeList(rows, activeFooter) },
+        ],
       };
     }
 
@@ -3719,9 +3728,14 @@ const handleCallTool = async (
 
             return commit;
           });
+        // --stat carries nested per-file children -> minified JSON; the flat
+        // commit list -> Markdown table.
         return {
           content: [
-            { type: 'text', text: JSON.stringify({ commits }, null, 2) },
+            {
+              type: 'text',
+              text: stat ? formatObject({ commits }) : formatCommitLog(commits),
+            },
           ],
         };
       } catch (err: unknown) {
@@ -6354,7 +6368,7 @@ const handleCallTool = async (
         };
 
         return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: formatObject(result) }],
         };
       } catch (err: unknown) {
         const e = err as { stdout?: string; stderr?: string };
@@ -10605,23 +10619,8 @@ const handleCallTool = async (
 
       if (!includeLocal && !includeRemote) {
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                { branches: [], total: 0, filter: filter ?? null },
-                null,
-                2,
-              ),
-            },
-          ],
+          content: [{ type: 'text', text: formatBranchList([], filter) }],
         };
-      }
-
-      interface BranchEntry {
-        name: string;
-        type: 'local' | 'remote';
-        current: boolean;
       }
 
       const branches: BranchEntry[] = [];
@@ -10686,16 +10685,7 @@ const handleCallTool = async (
       }
 
       return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              { branches, total: branches.length, filter: filter ?? null },
-              null,
-              2,
-            ),
-          },
-        ],
+        content: [{ type: 'text', text: formatBranchList(branches, filter) }],
       };
     }
 
