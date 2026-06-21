@@ -1,7 +1,9 @@
 import { LOGGER } from '@legacy-sports/logging';
 import {
   applyParamRenames,
+  buildExportPayload,
   buildStatsSearchParams,
+  MAX_EXPORT_BYTES,
   migrateStatsSearchParams,
   parseClampedInt,
   parsePageSize,
@@ -9,6 +11,7 @@ import {
   readStatsFormat,
   sanitizeSearchParam,
   URL_SCHEMA_VERSION,
+  utf8ByteLength,
 } from './PlayerStatsPage';
 
 const MAX_GRAPHQL_INT = 2147483647;
@@ -455,6 +458,106 @@ describe('parseStatsSearchParams ↔ buildStatsSearchParams roundtrip', () => {
     });
     expect(reserialized.get('minWins')).toBe('20');
     expect(reserialized.get('maxERA')).toBe('3.50');
+  });
+});
+
+describe('utf8ByteLength', () => {
+  it('counts ASCII as one byte per char', () => {
+    expect(utf8ByteLength('abc')).toBe(3);
+    expect(utf8ByteLength('')).toBe(0);
+  });
+
+  it('counts 2-byte characters (e.g. é)', () => {
+    expect(utf8ByteLength('é')).toBe(2);
+  });
+
+  it('counts 3-byte characters (e.g. €)', () => {
+    expect(utf8ByteLength('€')).toBe(3);
+  });
+
+  it('counts 4-byte surrogate-pair characters once (e.g. 😀)', () => {
+    // '😀' is two UTF-16 code units (a surrogate pair) but a single 4-byte
+    // UTF-8 sequence — it must not be double-counted.
+    expect('😀'.length).toBe(2);
+    expect(utf8ByteLength('😀')).toBe(4);
+  });
+
+  it('sums mixed-width content', () => {
+    expect(utf8ByteLength('a€😀')).toBe(1 + 3 + 4);
+  });
+});
+
+describe('buildExportPayload', () => {
+  const FIXED_TS = '2026-06-21T00:00:00.000Z';
+
+  // AC3: within-cap exports serialize correctly and round-trip.
+  it('serializes the export payload with filters, viewMode and metadata', () => {
+    const { ok, json, bytes } = buildExportPayload(
+      { searchTerm: 'trout', position: 'OF' },
+      'hitters',
+      FIXED_TS,
+    );
+    expect(ok).toBe(true);
+    expect(bytes).toBeGreaterThan(0);
+    const parsed = JSON.parse(json) as {
+      viewMode: string;
+      filters: Record<string, unknown>;
+      exportedAt: string;
+      totalFilters: number;
+    };
+    expect(parsed.viewMode).toBe('hitters');
+    expect(parsed.filters).toEqual({ searchTerm: 'trout', position: 'OF' });
+    expect(parsed.exportedAt).toBe(FIXED_TS);
+    expect(parsed.totalFilters).toBe(2);
+  });
+
+  // AC1/AC3: a realistic filtered export is comfortably within the cap.
+  it('reports ok for a realistic small payload', () => {
+    const { ok } = buildExportPayload({}, 'combined', FIXED_TS);
+    expect(ok).toBe(true);
+  });
+
+  // AC1/AC2: an oversized payload is flagged as not ok so the caller can refuse.
+  it('flags a payload that exceeds MAX_EXPORT_BYTES as not ok (PST-012)', () => {
+    // Inflate the payload past the cap via an oversized filter value.
+    const huge = 'x'.repeat(MAX_EXPORT_BYTES + 1);
+    const { ok, bytes } = buildExportPayload(
+      { searchTerm: huge },
+      'combined',
+      FIXED_TS,
+    );
+    expect(bytes).toBeGreaterThan(MAX_EXPORT_BYTES);
+    expect(ok).toBe(false);
+  });
+
+  // Byte length (not string length) is used so multi-byte chars are counted.
+  it('measures size in UTF-8 bytes, not string length', () => {
+    // '😀' is 1 string code point but 4 UTF-8 bytes; a 2-char surrogate pair.
+    const { bytes } = buildExportPayload(
+      { searchTerm: '😀' },
+      'combined',
+      FIXED_TS,
+    );
+    const charLength = JSON.stringify(
+      {
+        viewMode: 'combined',
+        filters: { searchTerm: '😀' },
+        exportedAt: FIXED_TS,
+        totalFilters: 1,
+      },
+      null,
+      2,
+    ).length;
+    // UTF-8 byte count exceeds the JS string length for multi-byte content.
+    expect(bytes).toBeGreaterThan(charLength);
+  });
+
+  it('defaults exportedAt to an ISO timestamp when omitted', () => {
+    const { json } = buildExportPayload({}, 'combined');
+    const parsed = JSON.parse(json) as { exportedAt: string };
+    expect(parsed.exportedAt).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
   });
 });
 

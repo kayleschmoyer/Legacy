@@ -371,6 +371,82 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
   };
 }
 
+/**
+ * Maximum serialized size (in bytes) the client-side JSON export will write to a
+ * Blob. The export path is a synchronous `JSON.stringify` + `Blob` + object-URL
+ * download — it holds the entire payload in memory and blocks the main thread.
+ * With no upper bound, a large export (e.g. once row data is included per
+ * PST-011) could freeze the tab or exhaust memory (PST-012 / LS-7110). Past this
+ * cap the client refuses the download and asks the user to narrow filters
+ * instead of locking up. 5 MB is comfortably larger than any realistic filtered
+ * export today while still bounding the worst case.
+ */
+export const MAX_EXPORT_BYTES = 5 * 1024 * 1024;
+
+export interface ExportPayloadResult {
+  /** Whether the serialized payload is within MAX_EXPORT_BYTES. */
+  ok: boolean;
+  /** Pretty-printed JSON payload. */
+  json: string;
+  /** Serialized size in bytes (UTF-8 encoded). */
+  bytes: number;
+}
+
+/**
+ * Compute the UTF-8 byte length of a string without relying on `TextEncoder` or
+ * `Blob` — both are absent from the jsdom test environment, and this keeps the
+ * size check deterministic and portable. Multi-byte characters (e.g. player
+ * names with diacritics) and surrogate pairs are counted at their real byte
+ * cost, so the result matches the actual `Blob` size produced at download time.
+ * Exported for unit testing.
+ */
+export function utf8ByteLength(str: string): number {
+  let bytes = 0;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code < 0x80) {
+      bytes += 1;
+    } else if (code < 0x800) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      // High surrogate: combines with the following low surrogate into a single
+      // 4-byte sequence. Advance past the low surrogate so it isn't recounted.
+      bytes += 4;
+      i++;
+    } else {
+      bytes += 3;
+    }
+  }
+  return bytes;
+}
+
+/**
+ * Serialize the player-stats export payload and enforce an upper size bound.
+ *
+ * Returns the serialized JSON alongside its byte size and an `ok` flag so the
+ * caller can refuse an oversized download instead of blocking the main thread
+ * with an unbounded `JSON.stringify` + `Blob` (PST-012 / LS-7110). Size is
+ * measured in UTF-8 bytes, not string length, because multi-byte characters
+ * (e.g. player names with diacritics) inflate the actual Blob size beyond the
+ * character count. `exportedAt` is injectable so the serialization is
+ * deterministic under test. Exported for unit testing.
+ */
+export function buildExportPayload(
+  filters: PlayerStatsFilters,
+  viewMode: PlayerStatsViewMode,
+  exportedAt: string = new Date().toISOString(),
+): ExportPayloadResult {
+  const exportData = {
+    viewMode,
+    filters,
+    exportedAt,
+    totalFilters: Object.keys(filters as Record<string, unknown>).length,
+  };
+  const json = JSON.stringify(exportData, null, 2);
+  const bytes = utf8ByteLength(json);
+  return { ok: bytes <= MAX_EXPORT_BYTES, json, bytes };
+}
+
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
 
 export function readStatsFormat(): 'standard' | 'expanded' {
@@ -625,17 +701,24 @@ export function PlayerStatsRoute() {
   // Handle export functionality
   const handleExport = useCallback(
     (filters: PlayerStatsFilters, viewMode: PlayerStatsViewMode) => {
-      // Create export parameters
-      const exportData = {
-        viewMode,
-        filters,
-        exportedAt: new Date().toISOString(),
-        totalFilters: Object.keys(filters as Record<string, unknown>).length,
-      };
+      // Serialize with an upper size bound. The download path is a synchronous
+      // stringify + Blob that blocks the main thread; refusing an oversized
+      // payload here prevents a large export from freezing the tab or
+      // exhausting memory (PST-012 / LS-7110).
+      const { ok, json, bytes } = buildExportPayload(filters, viewMode);
+      if (!ok) {
+        LOGGER.warn(
+          'Player statistics export exceeded size cap; refusing download',
+          { bytes, cap: MAX_EXPORT_BYTES },
+        );
+        setLiveMsg(
+          'Export is too large to download here. Narrow your filters and try again.',
+        );
+        return;
+      }
 
       // Create downloadable file
-      const dataStr = JSON.stringify(exportData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const dataBlob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
 
       // Create download link
@@ -647,7 +730,7 @@ export function PlayerStatsRoute() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      LOGGER.info('Exported player statistics:', exportData);
+      LOGGER.info('Exported player statistics', { bytes });
       setLiveMsg('Player statistics exported. Download started.');
     },
     [],
