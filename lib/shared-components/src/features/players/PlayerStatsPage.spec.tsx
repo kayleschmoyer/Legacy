@@ -2,6 +2,7 @@ import {
   battingPlayerTypeForViewMode,
   type ClearFiltersSetters,
   createClearFiltersHandler,
+  enforceSearchMinLength,
   parseSliderValue,
   stepValue,
 } from './PlayerStatsPage';
@@ -159,6 +160,37 @@ describe('stepValue (LS-7806)', () => {
   it('snaps an off-grid HR value (e.g. a hand-typed URL of 762) onto the step grid', () => {
     expect(stepValue(762, 5, 0, 800, 5)).toBe(765);
     expect(stepValue(762, -5, 0, 800, 5)).toBe(755);
+  });
+});
+
+// enforceSearchMinLength gates the committed search term so the documented
+// "min 2 chars" placeholder is actually enforced — a single character must not
+// fire the GraphQL query on submit (PST-061 / LS-7127).
+describe('enforceSearchMinLength (LS-7127)', () => {
+  it('drops a single-character search so it is treated as no search', () => {
+    expect(enforceSearchMinLength('a')).toBe('');
+  });
+
+  it('drops an empty search', () => {
+    expect(enforceSearchMinLength('')).toBe('');
+  });
+
+  it('drops a single character padded with whitespace (trim-aware)', () => {
+    expect(enforceSearchMinLength('  a  ')).toBe('');
+  });
+
+  it('keeps a search that meets the two-character minimum', () => {
+    expect(enforceSearchMinLength('ab')).toBe('ab');
+  });
+
+  it('keeps a longer search term unchanged', () => {
+    expect(enforceSearchMinLength('trout')).toBe('trout');
+  });
+
+  it('preserves surrounding whitespace once the trimmed term meets the minimum', () => {
+    // Only the length gate is applied here; the term itself is committed as-is so
+    // existing query-build behavior (which coalesces empty strings) is unchanged.
+    expect(enforceSearchMinLength('  ab  ')).toBe('  ab  ');
   });
 });
 

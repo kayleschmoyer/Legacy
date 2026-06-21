@@ -257,6 +257,11 @@ export interface PlayerStatsPageProps {
 // no upper bound is applied. Matches the design reference (project/stats.jsx).
 const ERA_MAX_OFF = 5;
 
+// Minimum search length enforced before a search term is committed to a query.
+// The toolbar placeholder advertises this minimum, so it is the single source of
+// truth for both the placeholder copy and the commit-time guard (PST-061 / LS-7127).
+const MIN_SEARCH_LENGTH = 2;
+
 // Upper bound for the "Min Home Runs" slider. These are CAREER home-run totals, so the
 // cap must span the career domain (the all-time leader, Barry Bonds, sits at 762) rather
 // than a single-season figure. 800 gives headroom above the record so users can dial in
@@ -291,6 +296,20 @@ export function normalizeViewMode(
   if (mode === 'pitching' || mode === 'pitchers') return 'pitchers';
   if (mode === 'hitters' || mode === 'batting') return 'hitters';
   return 'combined';
+}
+
+/**
+ * Enforce the documented minimum search length before a term reaches the applied
+ * filter snapshot. The toolbar placeholder advertises "min 2 chars", but the
+ * field previously committed any value — pressing Enter with a single character
+ * fired the GraphQL query (PST-061 / LS-7127). Returns the term unchanged when it
+ * meets {@link MIN_SEARCH_LENGTH} after trimming surrounding whitespace, or an
+ * empty string otherwise so callers treat a sub-minimum entry as "no search".
+ * Extracted as a pure function so the guard is unit-testable without mounting the
+ * page shell.
+ */
+export function enforceSearchMinLength(search: string): string {
+  return search.trim().length >= MIN_SEARCH_LENGTH ? search : '';
 }
 
 /**
@@ -348,7 +367,7 @@ export function PlayerStatsPage({
   // Separate draft vs. applied state avoids mid-input query flicker and
   // removes the need for eslint-disable on useMemo dependency arrays.
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(() => ({
-    search: initialFilters.searchTerm ?? '',
+    search: enforceSearchMinLength(initialFilters.searchTerm ?? ''),
     position: initialFilters.position ?? 'All Positions',
     team: initialFilters.team ?? 'All Teams',
     pageSize: initialPageSize,
@@ -359,7 +378,10 @@ export function PlayerStatsPage({
 
   const applyFilters = useCallback(() => {
     setAppliedFilters({
-      search,
+      // Enforce the documented minimum length so a single-character term never
+      // fires the query on submit; sub-minimum entries commit as "no search"
+      // while leaving the other filters free to apply (PST-061 / LS-7127).
+      search: enforceSearchMinLength(search),
       position,
       team,
       pageSize,
@@ -875,7 +897,7 @@ export function PlayerStatsPage({
               value={search}
               onChangeText={setSearch}
               onSubmitEditing={applyFilters}
-              placeholder="Search player name · min 2 chars"
+              placeholder={`Search player name · min ${MIN_SEARCH_LENGTH} chars`}
               placeholderTextColor={FG4}
               style={{
                 flex: 1,
