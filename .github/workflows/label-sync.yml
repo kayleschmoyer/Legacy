@@ -19,7 +19,7 @@ jobs:
     name: Sync labels
     # Guard against workflow_dispatch from non-main branches mutating repo-wide labels
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read

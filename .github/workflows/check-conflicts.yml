@@ -12,7 +12,9 @@ name: "Check Merge Conflicts"
 on:
   pull_request:
     # Include 'edited' to re-run when the PR base branch is retargeted.
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    # 'ready_for_review' omitted: synchronize already fires on every commit
+    # (even while draft), so the result is always current when a PR goes live.
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -29,6 +31,32 @@ permissions:
   pull-requests: write
 
 jobs:
+  # LS-1652: Restrict self-hosted runners to PR authors with write permission
+  check-runner-access:
+    name: "Resolve Runner Label"
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      runner-label: ${{ steps.resolve.outputs.runner-label }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: .github/actions/resolve-runner-label
+      - name: Generate App Token
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+      - name: Resolve Runner Label
+        id: resolve
+        uses: ./.github/actions/resolve-runner-label
+        with:
+          runner-label: ${{ vars.CI_RUNNER_LABEL }}
+          github-token: ${{ steps.app-token.outputs.token || github.token }}
+
   sha-sanity:
     name: "🔐 SHA Sanity Check"
     runs-on: ubuntu-latest
@@ -61,8 +89,8 @@ jobs:
 
   check-conflicts:
     name: "No Merge Conflicts"
-    needs: [sha-sanity]
-    runs-on: ubuntu-latest
+    needs: [sha-sanity, check-runner-access]
+    runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 5
     outputs:
       mergeable: ${{ steps.test-merge.outputs.mergeable }}

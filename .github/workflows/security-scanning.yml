@@ -11,6 +11,11 @@ on:
         required: false
         type: string
         default: "comprehensive"
+      runner-label:
+        description: "Runner label to use for compute-heavy jobs (sast-scan, dependency-scan)"
+        required: false
+        type: string
+        default: "ubuntu-latest"
 
 permissions:
   actions: read
@@ -131,8 +136,7 @@ jobs:
 
   dependency-scan:
     name: "Dependency Vulnerability Scan"
-    # LS-3884: lockfile parsing + OSV/Snyk CLI — no self-hosted infra needed
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || 'ubuntu-latest' }}
     timeout-minutes: 10
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-dependency-scan == 'true'
@@ -480,8 +484,7 @@ jobs:
 
   sast-scan:
     name: "Static Application Security Testing"
-    # LS-3884: ESLint security rules + CodeQL — no self-hosted infra needed
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: security-scan-plan
     if: needs.security-scan-plan.outputs.run-sast-scan == 'true'

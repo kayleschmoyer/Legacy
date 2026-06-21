@@ -372,6 +372,7 @@ jobs:
     with:
       # Scan type is determined by what changed: deps → dependency scan, code → SAST/secrets, both → comprehensive
       scan_type: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_type || needs.determine-scope.outputs.security-scan-type }}
+      runner-label: ${{ needs.determine-scope.outputs.runner-label }}
     secrets: inherit
 
   # ============================================================================
@@ -382,7 +383,7 @@ jobs:
     name: "🏷️ Label PR"
     needs: [determine-scope, security-scanning]
     if: "!cancelled() && needs.determine-scope.result != 'skipped' && github.event.pull_request.number"
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
     timeout-minutes: 3
     steps:
       - name: "Label PR on Security Failure"
@@ -455,7 +456,7 @@ jobs:
       needs.determine-scope.result != 'skipped' &&
       needs.ci-pipeline.outputs.overall-status == 'success' &&
       github.event.pull_request.number
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
     steps:
       - name: Generate GitHub App Token
         id: generate-token
@@ -575,7 +576,7 @@ jobs:
       !cancelled() &&
       github.event_name == 'pull_request_review' &&
       needs.ci-pipeline.outputs.overall-status == 'failure'
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
     steps:
       - name: Remove merge-when-ready label
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -640,7 +641,7 @@ jobs:
       needs.determine-scope.result != 'skipped' &&
       needs.ci-pipeline.result == 'cancelled' &&
       github.event.pull_request.number
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: "Detect and report runner shutdown"

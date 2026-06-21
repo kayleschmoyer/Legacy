@@ -28,7 +28,7 @@ ci-pipeline   security-scanning (conditional)
 - `workflow_dispatch` — two paths: (1) direct manual dispatch with configurable `security-scan-type` input; (2) triggered by `ci-run-label.yml` when the `ci:run` label is added — that workflow removes the label then dispatches the orchestrator. Keeping `labeled` out of the orchestrator's trigger list prevents non-`ci:run` label events from occupying the concurrency group and displacing queued `synchronize` runs (LS-7752)
 - `merge_group` — always runs CI + security
 
-**Post-pipeline jobs** (all run on `ubuntu-latest` regardless of self-hosted runner state):
+**Post-pipeline jobs** (run on `${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}` — self-hosted when available, otherwise `ubuntu-latest`):
 
 - `label-pr` — applies `CI: Security` label on security failures
 - `remove-merge-label-on-failure` — removes `merge-when-ready` when CI fails
@@ -106,13 +106,17 @@ Reports are published to `playwright-report/manual-<run_number>/` on GitHub Page
 
 ### Parallel Checks (Separate Workflows)
 
-These run independently from the orchestrator, triggered directly by PR events:
+These run independently from the orchestrator, triggered directly by PR events. PR-triggered workflows use a `check-runner-access` pre-job (Pattern A, LS-1652) that resolves the runner label — external contributors always get `ubuntu-latest`; internal team members get the self-hosted runner. `security-scanning.yml` is the exception: it is dispatched by the orchestrator via `workflow_call` and receives the already-resolved `runner-label` as an input rather than running its own pre-job.
 
-| Workflow                       | Trigger                     | Purpose                                              |
-| ------------------------------ | --------------------------- | ---------------------------------------------------- |
-| `check-schema.yml`             | PR (GraphQL file changes)   | Schema drift detection + codegen compatibility       |
-| `check-migrations-applied.yml` | PR (migration file changes) | Verifies all migrations are applied to production DB |
-| `security-scanning.yml`        | Dispatched by orchestrator  | Dependency audit, SAST, secret scanning              |
+| Workflow                       | Trigger                          | Runner resolution                  | Purpose                                              |
+| ------------------------------ | -------------------------------- | ---------------------------------- | ---------------------------------------------------- |
+| `check-schema.yml`             | PR (GraphQL file changes)        | `check-runner-access` pre-job      | Schema drift detection + codegen compatibility       |
+| `check-migrations-applied.yml` | PR (migration file changes)      | `check-runner-access` pre-job      | Verifies all migrations are applied to production DB |
+| `check-conflicts.yml`          | PR (opened/sync/reopened/edited) | `check-runner-access` pre-job      | Merge conflict detection                             |
+| `integration-advisory.yml`     | PR (opened/sync/reopened)        | `check-runner-access` pre-job      | Advisory comment recommending integration specs      |
+| `jira-link-check.yml`          | PR (7 event types)               | `check-runner-access` pre-job      | Validates `<!-- jira-link -->` marker in PR body     |
+| `review.yml`                   | PR (opened/ready/labeled/sync)   | `check-runner-access` pre-job      | Reviewer bot W1                                      |
+| `security-scanning.yml`        | Dispatched by orchestrator       | `runner-label` workflow_call input | Dependency audit, SAST, secret scanning              |
 
 ### CI Failure Labels
 
