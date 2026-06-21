@@ -663,6 +663,174 @@ const sportSwitchButtonStyle = (active: boolean): React.CSSProperties => ({
   cursor: active ? 'default' : 'pointer',
 });
 
+const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
+const FONT_BODY = "'Literata', serif";
+const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
+
+const NFL_HEADER_FG_MUTED = '#9CAAC5';
+const NFL_HEADER_FG_DIM = '#6C80BA';
+const NFL_HEADER_OUTLINE = '#1C2740';
+
+const nflGoldButtonStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '10px 16px',
+  minHeight: 40,
+  borderRadius: 12,
+  border: `1px solid ${withAlpha(BRAND_GOLD, 0.4)}`,
+  background: withAlpha(BRAND_GOLD, 0.08),
+  color: BRAND_GOLD_LIGHT,
+  fontFamily: FONT_DISPLAY,
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  cursor: 'pointer',
+};
+
+/**
+ * Editorial hero rendered above the inline NFL stats view (LS-8132) so the
+ * football route matches the MLB stats page's branded header pattern instead
+ * of dropping straight into the football browser's bare title row.
+ */
+function NflStatsHeader({
+  urlPreview,
+  onShare,
+}: {
+  urlPreview: string;
+  onShare: () => void;
+}) {
+  return (
+    <div
+      style={{
+        maxWidth: 1280,
+        width: '100%',
+        margin: '0 auto',
+        padding: '32px 24px 0',
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 24,
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          minWidth: 240,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: BRAND_GOLD_LIGHT,
+          }}
+        >
+          Players · League Archive
+        </span>
+        <h1
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: 800,
+            fontSize: 'clamp(40px, 4.4vw, 60px)',
+            lineHeight: 1,
+            letterSpacing: '-0.02em',
+            color: WHITE,
+            margin: 0,
+          }}
+        >
+          NFL Player Statistics
+        </h1>
+        <p
+          style={{
+            fontFamily: FONT_BODY,
+            fontSize: 17,
+            lineHeight: 1.55,
+            color: NFL_HEADER_FG_MUTED,
+            maxWidth: '64ch',
+            margin: 0,
+          }}
+        >
+          Every active and recent NFL player. Filter by position, compare
+          seasons, and find the next addition to your dynasty roster.
+        </p>
+        <div
+          style={{
+            marginTop: 14,
+            padding: '8px 14px',
+            background: 'rgba(13,21,38,0.6)',
+            border: `1px solid ${NFL_HEADER_OUTLINE}`,
+            borderRadius: 8,
+            maxWidth: '100%',
+            overflow: 'hidden',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontWeight: 700,
+              fontSize: 10,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: NFL_HEADER_FG_DIM,
+              flexShrink: 0,
+            }}
+          >
+            URL
+          </span>
+          <span
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: 12,
+              color: NFL_HEADER_FG_MUTED,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            }}
+          >
+            {urlPreview}
+          </span>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onShare}
+        aria-label="Share NFL player statistics link"
+        style={nflGoldButtonStyle}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={BRAND_GOLD_LIGHT}
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="6" cy="12" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+        </svg>
+        Share
+      </button>
+    </div>
+  );
+}
+
 /**
  * Sport switcher rendered above the stats page. Toggling between MLB and NFL
  * updates the `sport` URL param in place (LS-8104) so the page renders the
@@ -1029,8 +1197,37 @@ export function PlayerStatsRoute() {
 
   // NFL view — render the football statistics browser inline (LS-8104) instead
   // of redirecting away, so football gets the same on-page stats experience as
-  // baseball. Placed after all hooks to satisfy Rules of Hooks.
+  // baseball. Wraps the football browser in the same editorial header pattern
+  // used by the MLB stats page (LS-8132) so the two sports share UI patterns.
+  // Placed after all hooks to satisfy Rules of Hooks.
   if (showFootball) {
+    const nflUrlPreview = `/players/stats?${searchParams.toString()}`;
+    const handleNflShare = () => {
+      const url = `${window.location.origin}/players/stats?${searchParams.toString()}`;
+      void (async () => {
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: 'NFL Player Statistics - Legacy Sports',
+              text: 'Check out these NFL player statistics from Legacy Sports',
+              url,
+            });
+          } else if (navigator.clipboard) {
+            await navigator.clipboard.writeText(url);
+            setLiveMsg('Link copied to clipboard.');
+          } else {
+            setLiveMsg('Could not share link. Please copy the URL manually.');
+          }
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') return;
+          LOGGER.error(
+            'Error sharing NFL stats:',
+            error instanceof Error ? error : String(error),
+          );
+        }
+      })();
+    };
+
     return (
       <div
         style={{
@@ -1040,11 +1237,16 @@ export function PlayerStatsRoute() {
           padding: 0,
         }}
       >
+        <PageMeta
+          title="NFL Player Statistics"
+          description="Browse career and season statistics for every NFL player available in your Legacy Sports fantasy league."
+        />
         <StatsSportSwitcher
           active="nfl"
           onSelectMlb={() => handleSelectSport('mlb')}
           onSelectNfl={() => handleSelectSport('nfl')}
         />
+        <NflStatsHeader urlPreview={nflUrlPreview} onShare={handleNflShare} />
         <Suspense
           fallback={
             <div
@@ -1056,7 +1258,7 @@ export function PlayerStatsRoute() {
             </div>
           }
         >
-          <FootballPlayersPageLazy />
+          <FootballPlayersPageLazy showHeader={false} />
         </Suspense>
       </div>
     );

@@ -603,7 +603,18 @@ function parsePositions(raw: string | null): FootballPosition[] {
     .filter((s): s is FootballPosition => s !== '' && VALID_POSITIONS.has(s));
 }
 
-export function FootballPlayersPage() {
+export interface FootballPlayersPageProps {
+  /**
+   * Render the page's built-in "Football Players" hero. Defaults to true for
+   * the standalone /football/players route; set to false when embedded under
+   * another page that supplies its own editorial header (LS-8132).
+   */
+  showHeader?: boolean;
+}
+
+export function FootballPlayersPage({
+  showHeader = true,
+}: FootballPlayersPageProps = {}) {
   const navigate = useNavigate();
   const media = useMedia();
   // Multi-select positions are URL-synced via the `position` search param,
@@ -890,28 +901,30 @@ export function FootballPlayersPage() {
       />
 
       {/* Header */}
-      <YStack
-        paddingHorizontal={24}
-        paddingTop={32}
-        paddingBottom={20}
-        gap={4}
-        style={{
-          background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.25)} 0%, transparent 100%)`,
-        }}
-      >
-        <Text
-          fontSize={28}
-          fontWeight="800"
-          color={TEXT_PRIMARY}
-          fontFamily={FONT_DISPLAY}
-          letterSpacing={-0.5}
+      {showHeader && (
+        <YStack
+          paddingHorizontal={24}
+          paddingTop={32}
+          paddingBottom={20}
+          gap={4}
+          style={{
+            background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.25)} 0%, transparent 100%)`,
+          }}
         >
-          Football Players
-        </Text>
-        <Text fontSize={14} color={TEXT_MUTED} fontFamily={FONT_BODY}>
-          Browse, search, and filter NFL players
-        </Text>
-      </YStack>
+          <Text
+            fontSize={28}
+            fontWeight="800"
+            color={TEXT_PRIMARY}
+            fontFamily={FONT_DISPLAY}
+            letterSpacing={-0.5}
+          >
+            Football Players
+          </Text>
+          <Text fontSize={14} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+            Browse, search, and filter NFL players
+          </Text>
+        </YStack>
+      )}
 
       {/* Filters */}
       <YStack

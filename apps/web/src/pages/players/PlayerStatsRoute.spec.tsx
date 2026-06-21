@@ -169,6 +169,23 @@ describe('PlayerStatsRoute inline NFL view', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
+  // LS-8132: the inline NFL view wraps the football browser in the same
+  // editorial hero pattern used by the MLB stats page so the two sports share
+  // UI conventions instead of diverging.
+  it('renders an editorial "NFL Player Statistics" header for the inline NFL view', async () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-players-page');
+    expect(
+      screen.getByRole('heading', { name: /nfl player statistics/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: /share nfl player statistics link/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('renders the baseball stats page (not football) when sport=mlb', () => {
     mockSearchParams = new URLSearchParams('sport=mlb');
     render(<PlayerStatsRoute />);
