@@ -221,6 +221,18 @@ export function parseStatsSortParams(
 }
 
 /**
+ * Sanitize a string before interpolating it into a download filename segment
+ * (`link.download`). Strips everything outside `[a-z0-9-]` so an arbitrary
+ * value can never inject slashes or dot-segments into the download path
+ * (PST-013). `viewMode` is constrained to a fixed union today, but a future
+ * user-named-views feature could route arbitrary text here — Firefox has
+ * historically honored embedded slashes in `download`, so sanitize defensively.
+ */
+export function sanitizeFilenameSegment(value: string): string {
+  return value.replace(/[^a-z0-9-]/gi, '');
+}
+
+/**
  * Build URL search params from a committed filter snapshot. Exported for unit
  * testing — the host component wraps this with `setSearchParams(...)`.
  *
@@ -868,7 +880,7 @@ export function PlayerStatsRoute() {
       const link = document.createElement('a');
       try {
         link.href = url;
-        link.download = `player-stats-${viewMode}-${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `player-stats-${sanitizeFilenameSegment(viewMode)}-${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(link);
         link.click();
       } finally {

@@ -11,6 +11,7 @@ import {
   parseStatsSortParams,
   readStatsFormat,
   readVisibleColumnsPref,
+  sanitizeFilenameSegment,
   sanitizeSearchParam,
   URL_SCHEMA_VERSION,
   utf8ByteLength,
@@ -197,6 +198,45 @@ describe('sanitizeSearchParam', () => {
 
   it('preserves printable special characters', () => {
     expect(sanitizeSearchParam('Mike Trout (OF)')).toBe('Mike Trout (OF)');
+  });
+});
+
+describe('sanitizeFilenameSegment', () => {
+  // AC2: every current viewMode value round-trips unchanged (no filename regression).
+  it.each([
+    'batting',
+    'pitching',
+    'fielding',
+    'combined',
+    'hitters',
+    'pitchers',
+  ])('passes the current viewMode "%s" through unchanged', (viewMode) => {
+    expect(sanitizeFilenameSegment(viewMode)).toBe(viewMode);
+  });
+
+  // AC1 / AC3: a hostile value cannot inject slashes or dot-segments into the path.
+  it('strips forward slashes (PST-013: Firefox honors embedded slashes)', () => {
+    expect(sanitizeFilenameSegment('../../etc/passwd')).toBe('etcpasswd');
+  });
+
+  it('strips backslashes and dot-segments', () => {
+    expect(sanitizeFilenameSegment('..\\..\\windows')).toBe('windows');
+  });
+
+  it('strips dots so no path/extension segment can be injected', () => {
+    expect(sanitizeFilenameSegment('a.b.c')).toBe('abc');
+  });
+
+  it('preserves hyphens and is case-insensitive over the alphabet', () => {
+    expect(sanitizeFilenameSegment('Saved-View-1')).toBe('Saved-View-1');
+  });
+
+  it('strips whitespace and other punctuation', () => {
+    expect(sanitizeFilenameSegment('my view!@#$%')).toBe('myview');
+  });
+
+  it('returns an empty string when nothing survives sanitization', () => {
+    expect(sanitizeFilenameSegment('/././')).toBe('');
   });
 });
 
