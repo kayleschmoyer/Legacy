@@ -10,10 +10,12 @@ import { getPlaywrightReport } from './tools/get-playwright-report.js';
 import { getPlaywrightTestResult } from './tools/get-playwright-test-result.js';
 import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
+import { rerunBatch } from './tools/rerun-batch.js';
 import { retryFailed } from './tools/retry-failed.js';
 import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
+import { viewRunBatch } from './tools/view-run-batch.js';
 import { viewRunJobs } from './tools/view-run-jobs.js';
 import { workflowInfo } from './tools/workflow-info.js';
 import { workflowSetState } from './tools/workflow-state.js';
@@ -191,6 +193,30 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    'ci_rerun_batch',
+    'Batch variant of ci_rerun: rerun several runs in one call (e.g. re-validating multiple PRs after a shared root-cause fix). ' +
+      'Accepts an array of run IDs (max 50); each run is rerun independently so one run erroring does not fail the whole call. ' +
+      'Returns the standard partial-failure shape { success, total, succeeded: [...], failed: [{ index, runId, error }] }. ' +
+      'Keep ci_rerun for single-run use.',
+    {
+      runIds: z
+        .array(z.coerce.number().int().positive())
+        .min(1)
+        .max(50)
+        .describe(
+          'Run IDs to rerun (1-50). Use the "id" field from ci_list_runs output ("databaseId" is an alias).',
+        ),
+      failedOnly: coercedBoolean
+        .default(true)
+        .describe(
+          'Rerun only failed jobs of each run (default: true). Set false to rerun the entire run.',
+        ),
+      debug: coercedBoolean.default(false).describe('Enable debug logging'),
+    },
+    async (params) => rerunBatch(params),
+  );
+
+  server.tool(
     'ci_retry_failed',
     'Semantic one-shot for the triage-then-rerun loop: identifies failed jobs in a run, ' +
       'fetches a short error snippet from the original logs, and triggers a rerun of just ' +
@@ -288,6 +314,27 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => viewRun(params),
+  );
+
+  server.tool(
+    'ci_view_run_batch',
+    'Batch variant of ci_view_run: inspect several runs in one call (e.g. checking CI status across multiple PRs before merging). ' +
+      'Accepts an array of run IDs (max 50); each run is fetched independently so one run erroring does not fail the whole call. ' +
+      'Returns the standard partial-failure shape { success, total, succeeded: [...], failed: [{ index, runId, error }] }. ' +
+      'Use ci_view_run for a single run or when targeting a specific attempt (attempt is not supported here).',
+    {
+      runIds: z
+        .array(z.coerce.number().int().positive())
+        .min(1)
+        .max(50)
+        .describe(
+          'Run IDs to inspect (1-50). Use the "id" field from ci_list_runs output ("databaseId" is an alias).',
+        ),
+      includeJobs: coercedBoolean
+        .default(true)
+        .describe('Include jobs for each run (default: true)'),
+    },
+    async (params) => viewRunBatch(params),
   );
 
   server.tool(
