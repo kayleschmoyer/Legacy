@@ -62,6 +62,24 @@ export async function applyMigrationModule(
     // methods. The raw INSERT below still uses `tx` directly as a tagged
     // template.
     const txSql = tx as unknown as postgres.Sql;
+    // postgres.js transaction clients (created by `Sql(handler)`) do not carry
+    // the `.options` bag that the top-level connection holds — `.options` is
+    // attached only to the parent connection instance. drizzle-orm's
+    // `construct()` reads `client.options.parsers`/`.serializers` to install
+    // its transparent date/timestamp parsers (drizzle-orm/postgres-js/
+    // driver.js), so building a Drizzle instance from the bare transaction
+    // client throws "Cannot read properties of undefined (reading 'parsers')"
+    // (LS-8141, a regression from LS-8118 routing every migration through this
+    // transactional path). Borrow the parent connection's options onto the tx
+    // so the per-tx Drizzle can construct; the parsers it installs are
+    // idempotent and identical to what a Drizzle instance built on the parent
+    // connection would set.
+    const txWithOptions = txSql as unknown as { options?: unknown };
+    if (txWithOptions.options === undefined) {
+      txWithOptions.options = (
+        sqlClient as unknown as { options?: unknown }
+      ).options;
+    }
     const txDb = drizzle(txSql);
     await module.up({ db: txDb, sql: txSql });
     await tx`
