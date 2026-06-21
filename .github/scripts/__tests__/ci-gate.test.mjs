@@ -92,11 +92,39 @@ describe('ci-gate — computeGateConclusion folds inputs', () => {
     assert.ok(failing.some((f) => f.startsWith('test')));
   });
 
-  it('treats cancelled as failure (the duplicate-cancelled root cause)', () => {
+  it('excludes cancelled jobs from the verdict — NOT a failure (LS-8219)', () => {
+    // A cancelled granular job is a superseded/post-merge duplicate, not a real
+    // failure. With every other job passing the gate must resolve success.
     const results = { ...allPass(), lint: 'cancelled' };
-    const { conclusion, failing } = computeGateConclusion(results);
+    const { conclusion, failing, ignored } = computeGateConclusion(results);
+    assert.strictEqual(conclusion, 'success');
+    assert.deepStrictEqual(failing, []);
+    assert.deepStrictEqual(ignored, ['lint']);
+  });
+
+  it('cancelled duplicate + superseding success → SUCCESS, not FAILURE (LS-8219 regression)', () => {
+    // Reproduces PR #5540 / #5098 / #5440 / #5465: a post-merge override run (or
+    // concurrency-cancelled duplicate) is SIGINT'd mid-flight, so its granular
+    // jobs report `cancelled` even though every test project had already passed.
+    // The aggregate must NOT latch a fresh red on the (already-green) SHA.
+    const results = {
+      ...allPass(),
+      test: 'cancelled', // exit-130 SIGINT after all Jest projects passed
+      e2e: 'cancelled', // concurrency-cancelled duplicate shard
+    };
+    const { conclusion, failing, ignored } = computeGateConclusion(results);
+    assert.strictEqual(conclusion, 'success');
+    assert.deepStrictEqual(failing, []);
+    assert.deepStrictEqual(ignored.sort(), ['e2e', 'test']);
+  });
+
+  it('a real failure alongside a cancelled job still fails (cancelled excluded, failure counted)', () => {
+    const results = { ...allPass(), test: 'cancelled', build: 'failure' };
+    const { conclusion, failing, ignored } = computeGateConclusion(results);
     assert.strictEqual(conclusion, 'failure');
-    assert.ok(failing.some((f) => f.startsWith('lint')));
+    assert.ok(failing.some((f) => f.startsWith('build')));
+    assert.ok(!failing.some((f) => f.startsWith('test')));
+    assert.deepStrictEqual(ignored, ['test']);
   });
 
   it('treats a missing required input as failure (fail-safe)', () => {
@@ -146,6 +174,29 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
     assert.strictEqual(calls.statuses.length, 1);
     assert.strictEqual(calls.statuses[0].state, 'failure');
     assert.match(calls.statuses[0].description, /build/);
+  });
+
+  it('posts SUCCESS (not FAILURE) for a cancelled post-merge duplicate run (LS-8219 regression)', async () => {
+    // The SHA is still current (the gating run already merged it) but a duplicate
+    // post-merge run was SIGINT'd, so its jobs report `cancelled`. The aggregate
+    // must post success — never a fresh red — for this already-green SHA.
+    const { github, calls } = makeGithub({ currentSha: HEAD_SHA });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), test: 'cancelled', e2e: 'cancelled' },
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(
+      calls.statuses[0].state,
+      'success',
+      'a cancelled duplicate run must not post a fresh FAILURE on a green SHA',
+    );
+    assert.strictEqual(calls.statuses[0].sha, HEAD_SHA);
+    assert.deepStrictEqual(res.ignored.sort(), ['e2e', 'test']);
   });
 
   it('no-ops (posts nothing) when the PR head advanced — SHA-currency guard', async () => {
