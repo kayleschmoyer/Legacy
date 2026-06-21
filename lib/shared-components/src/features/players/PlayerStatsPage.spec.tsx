@@ -1,10 +1,13 @@
 import {
   battingPlayerTypeForViewMode,
+  battingSortFilter,
   buildShareUrl,
   clampPageSizeForViewMode,
   type ClearFiltersSetters,
   createClearFiltersHandler,
   createDebouncedCommit,
+  DEFAULT_BATTING_SORT_BY,
+  DEFAULT_BATTING_SORT_DIR,
   enforceSearchMinLength,
   pageSizeOptionsForViewMode,
   parseSliderValue,
@@ -434,5 +437,31 @@ describe('clampPageSizeForViewMode (LS-7117)', () => {
   it('passes 100 through unchanged for the single-grid views', () => {
     expect(clampPageSizeForViewMode(100, 'hitters')).toBe(100);
     expect(clampPageSizeForViewMode(100, 'pitchers')).toBe(100);
+  });
+});
+
+// battingSortFilter decides whether the batting sort is persisted to the URL
+// (LS-7115 / PST-022). Default sort is omitted so default links stay clean; any
+// other sort is included so a shared link restores the user's chosen sort.
+describe('battingSortFilter (LS-7115)', () => {
+  it('omits the sort when it matches the default (clean default URLs)', () => {
+    expect(
+      battingSortFilter(DEFAULT_BATTING_SORT_BY, DEFAULT_BATTING_SORT_DIR),
+    ).toEqual({});
+  });
+
+  it('includes a non-default sort field', () => {
+    expect(battingSortFilter('battingAverage', 'desc')).toEqual({
+      sortBy: 'battingAverage',
+      sortDir: 'desc',
+    });
+  });
+
+  it('includes the default field when the direction is non-default', () => {
+    // homeRuns asc differs from the homeRuns/desc default, so it must persist.
+    expect(battingSortFilter('homeRuns', 'asc')).toEqual({
+      sortBy: 'homeRuns',
+      sortDir: 'asc',
+    });
   });
 });

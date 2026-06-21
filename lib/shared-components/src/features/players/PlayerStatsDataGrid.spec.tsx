@@ -19,6 +19,8 @@ import {
 } from '@testing-library/react';
 import { MockedResponse } from '@apollo/client/testing/react';
 import {
+  BATTING_SORT_FIELDS,
+  isValidBattingSortField,
   PlayerStatsDataGrid,
   type PlayerStatsDataGridProps,
 } from './PlayerStatsDataGrid';
@@ -788,9 +790,10 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
       },
     };
 
+    const onSortChange = jest.fn();
     render(
       <TestWrapper mocks={[initialMock, avgSortMock, playersQueryMock]}>
-        <PlayerStatsDataGrid {...defaultProps} />
+        <PlayerStatsDataGrid {...defaultProps} onSortChange={onSortChange} />
       </TestWrapper>,
     );
 
@@ -810,6 +813,11 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
       expect(screen.getByText('AvgSorted Leader')).toBeInTheDocument();
     });
     expect(screen.queryByText('Player 1486')).not.toBeInTheDocument();
+
+    // The host is notified with the mapped GraphQL field + direction so the sort
+    // can be persisted to the URL (LS-7115). The AVG column maps to
+    // 'battingAverage'; first click sorts descending.
+    expect(onSortChange).toHaveBeenCalledWith('battingAverage', 'desc');
   });
 });
 
@@ -1111,5 +1119,33 @@ describe('PlayerStatsDataGrid - Editorial reskin (LS-4615)', () => {
       'aria-label',
       'Loading player statistics...',
     );
+  });
+});
+
+// =============================================================================
+// Sort-field validation (LS-7115 / PST-022)
+// =============================================================================
+
+describe('isValidBattingSortField (LS-7115)', () => {
+  test('accepts known GraphQL sort fields', () => {
+    expect(isValidBattingSortField('homeRuns')).toBe(true);
+    expect(isValidBattingSortField('battingAverage')).toBe(true);
+    expect(isValidBattingSortField('lastName')).toBe(true);
+    expect(isValidBattingSortField('ops')).toBe(true);
+  });
+
+  test('rejects unknown / garbage fields so they never reach GraphQL', () => {
+    expect(isValidBattingSortField('notARealField')).toBe(false);
+    expect(isValidBattingSortField('')).toBe(false);
+    // Raw UI column keys are not valid sort fields — only their mapped values.
+    expect(isValidBattingSortField('formattedBattingAverage')).toBe(false);
+  });
+
+  test('BATTING_SORT_FIELDS holds the deduped mapped sort fields', () => {
+    // 'homeRuns'→'homeRuns', AVG variants→'battingAverage', etc. Deduped, so the
+    // three lastName aliases collapse to a single entry.
+    expect(BATTING_SORT_FIELDS.has('battingAverage')).toBe(true);
+    expect(BATTING_SORT_FIELDS.has('lastName')).toBe(true);
+    expect(BATTING_SORT_FIELDS.has('formattedBattingAverage')).toBe(false);
   });
 });

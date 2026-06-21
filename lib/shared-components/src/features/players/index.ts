@@ -21,13 +21,20 @@ export {
 export type { PlayerComparisonProps } from './PlayerComparison';
 
 // Advanced player statistics components
-export { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
+export {
+  PlayerStatsDataGrid,
+  BATTING_SORT_FIELDS,
+  isValidBattingSortField,
+} from './PlayerStatsDataGrid';
 export { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
 export {
   normalizeViewMode,
   PlayerStatsPage,
   STATS_COLUMN_GROUPS,
   STATS_TOGGLEABLE_COLUMN_KEYS,
+  battingSortFilter,
+  DEFAULT_BATTING_SORT_BY,
+  DEFAULT_BATTING_SORT_DIR,
 } from './PlayerStatsPage';
 
 // Column-visibility helpers + serialization (LS-7105 / PST-001)

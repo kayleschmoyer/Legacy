@@ -318,6 +318,33 @@ export function createDebouncedCommit(
   };
 }
 
+// Default batting sort — mirrors DEFAULT_CAREER_STATS_PARAMS in CareerStatsService.
+// When the active sort equals this default it is omitted from the URL so default
+// links stay clean; any other sort is persisted so a shared link restores it
+// (LS-7115 / PST-022).
+export const DEFAULT_BATTING_SORT_BY = 'homeRuns';
+export const DEFAULT_BATTING_SORT_DIR: 'asc' | 'desc' = 'desc';
+
+/**
+ * Returns the sort portion of a filter snapshot to persist to the URL: the
+ * `sortBy`/`sortDir` pair when it differs from the batting default, or an empty
+ * object when it matches (so default views produce clean URLs). Exported as a
+ * pure function so the include/omit logic is unit-testable without mounting the
+ * page (LS-7115).
+ */
+export function battingSortFilter(
+  sortBy: string,
+  sortDir: 'asc' | 'desc',
+): Pick<PlayerStatsFilters, 'sortBy' | 'sortDir'> {
+  if (
+    sortBy === DEFAULT_BATTING_SORT_BY &&
+    sortDir === DEFAULT_BATTING_SORT_DIR
+  ) {
+    return {};
+  }
+  return { sortBy, sortDir };
+}
+
 export interface PlayerStatsPageProps {
   title?: string;
   initialViewMode?: PlayerStatsViewMode;
@@ -455,6 +482,8 @@ export function enforceSearchMinLength(search: string): string {
 export function buildShareUrl(
   viewMode: 'combined' | 'hitters' | 'pitchers',
   filters: AppliedFilters,
+  sortBy: string = DEFAULT_BATTING_SORT_BY,
+  sortDir: 'asc' | 'desc' = DEFAULT_BATTING_SORT_DIR,
 ): string {
   const params = new URLSearchParams({
     view: viewMode,
@@ -471,6 +500,13 @@ export function buildShareUrl(
   }
   if (filters.maxERA < ERA_MAX_OFF) {
     params.set('maxERA', filters.maxERA.toFixed(2));
+  }
+  // Persist the active batting sort so the shared link restores it (LS-7115);
+  // the default sort is omitted to keep the URL clean.
+  const sortFilter = battingSortFilter(sortBy, sortDir);
+  if (sortFilter.sortBy) {
+    params.set('sortBy', sortFilter.sortBy);
+    params.set('sortDir', sortFilter.sortDir ?? DEFAULT_BATTING_SORT_DIR);
   }
   return `/players/stats?${params.toString()}`;
 }
@@ -543,6 +579,18 @@ export function PlayerStatsPage({
   const [availabilityFilter, setAvailabilityFilter] = useState<
     'all' | 'free_agents' | 'rostered'
   >(initialFilters.availabilityFilter ?? 'all');
+
+  // ── Batting sort state (persisted to URL) ──────────────────────
+  // Seeded from the initial filters (i.e. the URL) so arriving from a link like
+  // "rookies sorted by AVG" loads sorted by AVG instead of the hard-coded HR
+  // default. The grid owns its in-session sort and writes back through
+  // onSortChange, which updates this state and round-trips to the URL (LS-7115).
+  const [sortBy, setSortBy] = useState(
+    () => initialFilters.sortBy ?? DEFAULT_BATTING_SORT_BY,
+  );
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
+    () => initialFilters.sortDir ?? DEFAULT_BATTING_SORT_DIR,
+  );
 
   // ── Toolbar draft state (not applied until applyFilters()) ─────
   const [search, setSearch] = useState(initialFilters.searchTerm ?? '');
@@ -630,8 +678,11 @@ export function PlayerStatsPage({
   const battingParams = useMemo(
     () => ({
       first: appliedFilters.pageSize,
-      orderBy: 'homeRuns',
-      orderDirection: 'desc' as const,
+      // Sort comes from URL-seeded state (LS-7115), not a hard-coded HR default,
+      // so deep links and reloads honor the user's chosen sort. The grid keeps
+      // its own in-session sort and notifies us via onSortChange.
+      orderBy: sortBy,
+      orderDirection: sortDir,
       minGames: 0,
       searchTerm: appliedFilters.search || undefined,
       position:
@@ -649,7 +700,18 @@ export function PlayerStatsPage({
       // visible. Combined keeps everyone (playerType left undefined).
       playerType: battingPlayerTypeForViewMode(viewMode),
     }),
-    [appliedFilters, viewMode],
+    [appliedFilters, viewMode, sortBy, sortDir],
+  );
+
+  // Persist the grid's sort selection so onFiltersChange mirrors it to the URL.
+  // Maps the GraphQL field straight back, so it round-trips into orderBy on
+  // reload (LS-7115).
+  const handleBattingSortChange = useCallback(
+    (nextSortBy: string, nextSortDir: 'asc' | 'desc') => {
+      setSortBy(nextSortBy);
+      setSortDir(nextSortDir);
+    },
+    [],
   );
 
   const pitchingParams = useMemo(
@@ -688,12 +750,16 @@ export function PlayerStatsPage({
     if (appliedFilters.maxERA < ERA_MAX_OFF) {
       filters.maxERA = appliedFilters.maxERA;
     }
+    // Persist the batting sort when it differs from the default so a shared link
+    // restores the chosen sort (LS-7115). Default sort is omitted to keep URLs
+    // clean.
+    Object.assign(filters, battingSortFilter(sortBy, sortDir));
     onFiltersChange({
       viewMode,
       pageSize: appliedFilters.pageSize,
       filters,
     });
-  }, [appliedFilters, viewMode, onFiltersChange]);
+  }, [appliedFilters, viewMode, sortBy, sortDir, onFiltersChange]);
 
   // ── Player click handlers ──────────────────────────────────────
   const handleBattingPlayerClick = useCallback(
@@ -758,8 +824,10 @@ export function PlayerStatsPage({
     // the uncommitted toolbar draft, so the shared link matches what the sender
     // sees on screen. Sharing draft state leaked un-committed edits — e.g. a
     // typed-but-not-entered search term — into the recipient's view (LS-7131).
-    onShare(buildShareUrl(viewMode, appliedFilters));
-  }, [onShare, viewMode, appliedFilters]);
+    // The active batting sort is threaded through so the link restores it too
+    // (LS-7115).
+    onShare(buildShareUrl(viewMode, appliedFilters, sortBy, sortDir));
+  }, [onShare, viewMode, appliedFilters, sortBy, sortDir]);
 
   // ── Visibility flags ───────────────────────────────────────────
   const showBatting = viewMode === 'combined' || viewMode === 'hitters';
@@ -856,8 +924,24 @@ export function PlayerStatsPage({
     if (minHR > 0) params.push(`minHomeRuns=${minHR}`);
     if (minAVG > 0) params.push(`minBattingAvg=${minAVG.toFixed(3)}`);
     if (maxERA < ERA_MAX_OFF) params.push(`maxERA=${maxERA.toFixed(2)}`);
+    const sortFilter = battingSortFilter(sortBy, sortDir);
+    if (sortFilter.sortBy) {
+      params.push(`sortBy=${sortFilter.sortBy}`);
+      params.push(`sortDir=${sortFilter.sortDir}`);
+    }
     return `/players/stats?${params.join('&')}`;
-  }, [viewMode, pageSize, search, position, team, minHR, minAVG, maxERA]);
+  }, [
+    viewMode,
+    pageSize,
+    search,
+    position,
+    team,
+    minHR,
+    minAVG,
+    maxERA,
+    sortBy,
+    sortDir,
+  ]);
 
   return (
     <YStack flex={1} style={{ backgroundColor: BG_PAGE }}>
@@ -1789,6 +1873,7 @@ export function PlayerStatsPage({
                   title="MLB Career Batting Leaders"
                   initialParams={battingParams}
                   onPlayerSelect={handleBattingPlayerClick}
+                  onSortChange={handleBattingSortChange}
                   showSearch={false}
                   showFilters={false}
                   showSorting={true}

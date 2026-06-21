@@ -8,6 +8,7 @@ import {
   parseClampedInt,
   parsePageSize,
   parseStatsSearchParams,
+  parseStatsSortParams,
   readStatsFormat,
   readVisibleColumnsPref,
   sanitizeSearchParam,
@@ -560,6 +561,69 @@ describe('buildExportPayload', () => {
     expect(parsed.exportedAt).toMatch(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
     );
+  });
+});
+
+describe('buildStatsSearchParams sort (LS-7115)', () => {
+  it('persists batting sort when present (LS-7115)', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'hitters',
+      pageSize: 25,
+      filters: { sortBy: 'battingAverage', sortDir: 'asc' },
+    });
+    expect(out.get('sortBy')).toBe('battingAverage');
+    expect(out.get('sortDir')).toBe('asc');
+  });
+
+  it('omits sort keys when no sort filter is present (clean default URLs)', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'hitters',
+      pageSize: 25,
+      filters: {},
+    });
+    expect(out.has('sortBy')).toBe(false);
+    expect(out.has('sortDir')).toBe(false);
+  });
+
+  it('defaults sortDir to desc when only sortBy is supplied (LS-7115)', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'hitters',
+      pageSize: 25,
+      filters: { sortBy: 'ops' },
+    });
+    expect(out.get('sortBy')).toBe('ops');
+    expect(out.get('sortDir')).toBe('desc');
+  });
+});
+
+describe('parseStatsSortParams (LS-7115)', () => {
+  it('parses a valid sort field with explicit direction', () => {
+    expect(
+      parseStatsSortParams(
+        new URLSearchParams('sortBy=battingAverage&sortDir=asc'),
+      ),
+    ).toEqual({ sortBy: 'battingAverage', sortDir: 'asc' });
+  });
+
+  it('defaults direction to desc when sortDir is absent or not asc', () => {
+    expect(
+      parseStatsSortParams(new URLSearchParams('sortBy=homeRuns')),
+    ).toEqual({ sortBy: 'homeRuns', sortDir: 'desc' });
+    expect(
+      parseStatsSortParams(new URLSearchParams('sortBy=homeRuns&sortDir=junk')),
+    ).toEqual({ sortBy: 'homeRuns', sortDir: 'desc' });
+  });
+
+  it('ignores an unknown sort field so garbage never reaches GraphQL', () => {
+    expect(
+      parseStatsSortParams(new URLSearchParams('sortBy=evilField&sortDir=asc')),
+    ).toBeNull();
+  });
+
+  it('returns null when sortBy is absent', () => {
+    expect(
+      parseStatsSortParams(new URLSearchParams('view=hitters')),
+    ).toBeNull();
   });
 });
 

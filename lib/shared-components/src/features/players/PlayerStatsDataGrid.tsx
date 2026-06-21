@@ -148,6 +148,12 @@ export interface PlayerStatsDataGridProps {
   rosteredPlayerIds?: ReadonlySet<number>;
   /** Availability filter value — client-side applied after fetching. */
   availabilityFilter?: 'all' | 'free_agents' | 'rostered';
+  /**
+   * Notifies the host when the user changes sort via a column header so the
+   * sort can be persisted to the URL (LS-7115 / PST-022). Reports the mapped
+   * GraphQL sort field (not the raw column key) and the direction.
+   */
+  onSortChange?: (sortBy: string, sortDir: 'asc' | 'desc') => void;
 }
 
 // =============================================================================
@@ -210,6 +216,25 @@ export const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   fantasyPoints: 'totalScore',
   fantasyPointsPerGame: 'avgPointsPerGame',
 };
+
+/**
+ * The set of valid GraphQL sort fields the batting grid can sort by — the
+ * deduped values of {@link COLUMN_TO_SORT_FIELD_MAP}. Exported so URL hosts can
+ * validate an untrusted `sortBy` query param before forwarding it to the grid /
+ * GraphQL, instead of passing arbitrary strings through (LS-7115 / PST-022).
+ */
+export const BATTING_SORT_FIELDS: ReadonlySet<string> = new Set(
+  Object.values(COLUMN_TO_SORT_FIELD_MAP),
+);
+
+/**
+ * Type guard for a batting sort field parsed from an untrusted source (e.g. a
+ * URL query param). Returns true only for fields the grid actually supports
+ * (LS-7115).
+ */
+export function isValidBattingSortField(field: string): boolean {
+  return BATTING_SORT_FIELDS.has(field);
+}
 
 /**
  * Predefined column configuration for career batting (hitter) statistics.
@@ -415,6 +440,7 @@ export function PlayerStatsDataGrid({
   visibleColumns,
   rosteredPlayerIds,
   availabilityFilter,
+  onSortChange,
 }: PlayerStatsDataGridProps): React.ReactElement {
   // =============================================================================
   // State Management
@@ -476,8 +502,12 @@ export function PlayerStatsDataGrid({
         orderDirection,
         after: undefined,
       }); // Reset to first page
+      // Propagate to the host so the new sort can be mirrored to the URL,
+      // keeping "share current view" fidelity (LS-7115). Reports the mapped
+      // GraphQL field so it round-trips straight back into orderBy on reload.
+      onSortChange?.(sortField, orderDirection);
     },
-    [updateQueryParams],
+    [updateQueryParams, onSortChange],
   );
 
   // Debounce ref for search

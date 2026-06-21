@@ -24,6 +24,13 @@ export interface PlayerStatsFilters {
   // Search functionality
   searchTerm?: string;
 
+  // Sort persistence — the batting grid's sort column + direction so a shared
+  // URL restores the user's chosen sort instead of reverting to the HR default
+  // (LS-7115 / PST-022). `sortBy` is the GraphQL sort field (e.g. 'homeRuns',
+  // 'battingAverage'); `sortDir` is the order direction.
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+
   // Pitching statistics filters
   minWins?: number;
   maxWins?: number;

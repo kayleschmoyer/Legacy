@@ -12,6 +12,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import {
+  isValidBattingSortField,
   normalizeViewMode,
   parseVisibleColumns,
   PlayerStatsPage,
@@ -204,6 +205,22 @@ export function sanitizeSearchParam(value: string | null): string | null {
 }
 
 /**
+ * Parse the batting sort from URL params (LS-7115 / PST-022). Returns the
+ * `sortBy`/`sortDir` pair only when `sortBy` is a recognized batting sort field
+ * — an unknown/garbage value is ignored so it never reaches GraphQL. `sortDir`
+ * defaults to `desc` unless an explicit `asc` is supplied. Exported for unit
+ * testing.
+ */
+export function parseStatsSortParams(
+  params: URLSearchParams,
+): { sortBy: string; sortDir: 'asc' | 'desc' } | null {
+  const sortBy = sanitizeSearchParam(params.get('sortBy'));
+  if (!sortBy || !isValidBattingSortField(sortBy)) return null;
+  const sortDir = params.get('sortDir') === 'asc' ? 'asc' : 'desc';
+  return { sortBy, sortDir };
+}
+
+/**
  * Build URL search params from a committed filter snapshot. Exported for unit
  * testing — the host component wraps this with `setSearchParams(...)`.
  *
@@ -280,6 +297,15 @@ export function buildStatsSearchParams(state: {
   }
   if (state.filters.maxStrikeouts !== undefined) {
     next.set('maxStrikeouts', String(state.filters.maxStrikeouts));
+  }
+  // Persist the batting sort so a shared link restores the user's chosen sort
+  // instead of reverting to the HR default (LS-7115 / PST-022). The shared shell
+  // only populates these when the sort differs from the default, so a default
+  // view stays clean. Both keys are written together so the URL never carries a
+  // partial sort spec.
+  if (state.filters.sortBy) {
+    next.set('sortBy', state.filters.sortBy);
+    next.set('sortDir', state.filters.sortDir ?? 'desc');
   }
 
   // Serialize keys in a deterministic alphabetical order (PST-104). URLSearchParams
@@ -381,6 +407,14 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
   if (team) filters.team = team;
   if (playerType) filters.playerType = playerType;
   if (searchTerm) filters.searchTerm = searchTerm;
+
+  // Apply batting sort from URL so deep links / reloads restore the chosen
+  // sort instead of the hard-coded HR default (LS-7115 / PST-022).
+  const sort = parseStatsSortParams(params);
+  if (sort) {
+    filters.sortBy = sort.sortBy;
+    filters.sortDir = sort.sortDir;
+  }
 
   return {
     viewMode,
