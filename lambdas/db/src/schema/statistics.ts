@@ -911,6 +911,29 @@ SeasonFieldingRef.implement({
 // and return a 502 (LS-3113).
 const MAX_CAREER_BATTING_LIMIT = 5_000;
 
+// Maximum length of the free-text `searchTerm` filter. The value flows into an
+// `ILIKE '%term%'` pattern, so an oversized term wastes DB compute for no benefit
+// (matches longer than any player name can never gain new results). The web
+// client already caps at 64 chars, but the resolver must not trust the client —
+// a crafted request could forward a multi-megabyte term straight into the LIKE
+// scan (PST-063 / LS-7129). Cap (don't reject) so an over-long paste still
+// returns sensible matches on its leading 64 chars.
+const MAX_SEARCH_TERM_LENGTH = 64;
+
+/**
+ * Bound the free-text `searchTerm` resolver argument before it reaches the
+ * database `ILIKE '%term%'` query. Returns `undefined` for empty/absent input
+ * (preserving the existing `args.searchTerm || undefined` semantics) and
+ * truncates anything longer than MAX_SEARCH_TERM_LENGTH. Exported for unit
+ * testing.
+ */
+export function capSearchTerm(
+  value: string | null | undefined,
+): string | undefined {
+  if (!value) return undefined;
+  return value.slice(0, MAX_SEARCH_TERM_LENGTH);
+}
+
 // Career batting statistics with relay-style pagination and totalCount
 builder.queryField('careerBattingStats', (t) =>
   t.field({
@@ -943,6 +966,9 @@ builder.queryField('careerBattingStats', (t) =>
         ? parseInt(Buffer.from(args.after, 'base64').toString())
         : 0;
 
+      // Bound the free-text term length before it reaches the ILIKE scan (PST-063).
+      const searchTerm = capSearchTerm(args.searchTerm);
+
       // Get data and total count in parallel
       const [data, totalCount] = await Promise.all([
         dbService.statistics.getCareerBattingStats({
@@ -955,7 +981,7 @@ builder.queryField('careerBattingStats', (t) =>
             minHomeRuns: args.minHomeRuns || undefined,
             minRBI: args.minRBI || undefined,
             minBattingAvg: args.minBattingAvg || undefined,
-            searchTerm: args.searchTerm || undefined,
+            searchTerm,
             position: args.position || undefined,
             team: args.team || undefined,
             playerType: args.playerType || undefined,
@@ -967,7 +993,7 @@ builder.queryField('careerBattingStats', (t) =>
             minHomeRuns: args.minHomeRuns || undefined,
             minRBI: args.minRBI || undefined,
             minBattingAvg: args.minBattingAvg || undefined,
-            searchTerm: args.searchTerm || undefined,
+            searchTerm,
             position: args.position || undefined,
             team: args.team || undefined,
             playerType: args.playerType || undefined,
@@ -1026,7 +1052,8 @@ builder.queryField('careerPitchingStats', (t) =>
           minGames: args.minGames || undefined,
           minWins: args.minWins || undefined,
           minStrikeouts: args.minStrikeouts || undefined,
-          searchTerm: args.searchTerm || undefined,
+          // Bound the free-text term length before the ILIKE scan (PST-063).
+          searchTerm: capSearchTerm(args.searchTerm),
           position: args.position || undefined,
           team: args.team || undefined,
         },
@@ -1052,7 +1079,8 @@ builder.queryField('careerPitchingStatsCount', (t) =>
         minGames: args.minGames || undefined,
         minWins: args.minWins || undefined,
         minStrikeouts: args.minStrikeouts || undefined,
-        searchTerm: args.searchTerm || undefined,
+        // Bound the free-text term length before the ILIKE scan (PST-063).
+        searchTerm: capSearchTerm(args.searchTerm),
         position: args.position || undefined,
         team: args.team || undefined,
       });

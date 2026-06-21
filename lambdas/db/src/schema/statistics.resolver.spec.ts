@@ -279,6 +279,32 @@ describe('Statistics Resolver', () => {
         }),
       );
     });
+
+    it('caps an over-long searchTerm at 64 chars for both data and count (PST-063)', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const longTerm = 'a'.repeat(5000);
+      const resolver = getQuery('careerBattingStats');
+      await resolver(
+        {},
+        { searchTerm: longTerm },
+        emptyCtx,
+        undefined as never,
+      );
+
+      const expectedTerm = 'a'.repeat(64);
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ searchTerm: expectedTerm }),
+        }),
+      );
+      expect(mockStatistics.getCareerBattingStatsCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ searchTerm: expectedTerm }),
+        }),
+      );
+    });
   });
 
   // ── careerPitchingStats ────────────────────────────────────────────────────
@@ -321,6 +347,24 @@ describe('Statistics Resolver', () => {
         }),
       );
     });
+
+    it('caps an over-long searchTerm at 64 chars (PST-063)', async () => {
+      mockStatistics.getCareerPitchingStats.mockResolvedValueOnce([]);
+
+      const resolver = getQuery('careerPitchingStats');
+      await resolver(
+        {},
+        { searchTerm: 'b'.repeat(5000) },
+        emptyCtx,
+        undefined as never,
+      );
+
+      expect(mockStatistics.getCareerPitchingStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({ searchTerm: 'b'.repeat(64) }),
+        }),
+      );
+    });
   });
 
   // ── careerPitchingStatsCount ───────────────────────────────────────────────
@@ -349,6 +393,22 @@ describe('Statistics Resolver', () => {
       expect(result).toBe(7);
       expect(mockStatistics.countCareerPitchingStats).toHaveBeenCalledWith(
         expect.objectContaining({ team: 'LAD' }),
+      );
+    });
+
+    it('caps an over-long searchTerm at 64 chars (PST-063)', async () => {
+      mockStatistics.countCareerPitchingStats.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerPitchingStatsCount');
+      await resolver(
+        {},
+        { searchTerm: 'c'.repeat(5000) },
+        emptyCtx,
+        undefined as never,
+      );
+
+      expect(mockStatistics.countCareerPitchingStats).toHaveBeenCalledWith(
+        expect.objectContaining({ searchTerm: 'c'.repeat(64) }),
       );
     });
   });
