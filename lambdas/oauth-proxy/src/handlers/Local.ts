@@ -67,6 +67,12 @@ function zodErrorToResponse(error: ZodError): APIGatewayProxyResult {
   return errorResponse(400, message);
 }
 
+// Cache a dummy bcrypt hash at module init to equalize handleLogin timing
+// across the user-found and user-not-found branches (LGN-018 / LS-6673).
+// Without this the missing-user path returns ~0 ms while the existing-user
+// path waits for bcrypt (~250 ms), giving a clean email-enumeration oracle.
+const DUMMY_PASSWORD_HASH: Promise<string> = hashPassword('__dummy_timing__');
+
 export const handleLogin = async (
   event: APIGatewayEvent,
 ): Promise<APIGatewayProxyResult> => {
@@ -114,6 +120,9 @@ export const handleLogin = async (
     const user = await getUserByEmail(db, email);
 
     if (!user?.passwordHash) {
+      // Always run bcrypt to prevent user-enumeration via response timing
+      // (LGN-018). The result is discarded — the branch always returns 401.
+      await testPassword(password, await DUMMY_PASSWORD_HASH);
       await recordFailedLogin(email);
       LOGGER.warn('login.failed', {
         audit: true,

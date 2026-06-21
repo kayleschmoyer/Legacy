@@ -172,6 +172,52 @@ describe('handleLogin', () => {
     expect(result.statusCode).toBe(400);
   });
 
+  describe('timing-enumeration prevention (LGN-018 / LS-6673)', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockIsLoginLocked.mockResolvedValue({
+        locked: false,
+        retryAfterSeconds: 0,
+      });
+    });
+
+    it('always calls testPassword even when the user is not found', async () => {
+      mockGetUserByEmail.mockResolvedValue(null);
+      // testPassword is mocked — the dummy-hash bcrypt call must still be issued.
+      mockTestPassword.mockResolvedValue(false);
+
+      const result = await handleLogin(
+        makeEvent({
+          email: 'nonexistent@example.com',
+          password: 'password123456',
+        }),
+      );
+
+      expect(result.statusCode).toBe(401);
+      // The timing-equalisation call must fire even though the user didn't exist.
+      expect(mockTestPassword).toHaveBeenCalledTimes(1);
+    });
+
+    it('always calls testPassword when the user has no passwordHash', async () => {
+      mockGetUserByEmail.mockResolvedValue({
+        id: 9,
+        email: 'sso-user@example.com',
+        passwordHash: null,
+      } as unknown as Awaited<ReturnType<typeof getUserByEmail>>);
+      mockTestPassword.mockResolvedValue(false);
+
+      const result = await handleLogin(
+        makeEvent({
+          email: 'sso-user@example.com',
+          password: 'password123456',
+        }),
+      );
+
+      expect(result.statusCode).toBe(401);
+      expect(mockTestPassword).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('successful login (LGN-029 billing hint)', () => {
     const validBody = { email: 'user@example.com', password: 'correct-pass' };
 
