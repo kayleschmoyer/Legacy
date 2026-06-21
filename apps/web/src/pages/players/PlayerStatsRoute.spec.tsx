@@ -8,6 +8,12 @@ const mockNavigate = jest.fn();
 const mockSetSearchParams = jest.fn();
 let mockSearchParams = new URLSearchParams();
 let mockFootballEnabled = true;
+let mockIsAuthenticated = true;
+let mockAuthLoading = false;
+const mockUseGetUserLeaguesQuery = jest.fn(() => ({
+  data: null,
+  loading: false,
+}));
 
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
@@ -69,8 +75,16 @@ jest.mock('../../components/PlayerDetailModal', () => ({
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetPlayerIdByBrefIdQuery: () => ({ data: null, loading: false }),
-  useGetUserLeaguesQuery: () => ({ data: null, loading: false }),
+  useGetUserLeaguesQuery: (options?: unknown) =>
+    mockUseGetUserLeaguesQuery(options as never),
   Sport: { Baseball: 'Baseball', Football: 'Football' },
+}));
+
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useAuth: () => ({
+    isAuthenticated: mockIsAuthenticated,
+    isLoading: mockAuthLoading,
+  }),
 }));
 
 jest.mock('../../hooks/useLeagueRosteredPlayerIds', () => ({
@@ -353,5 +367,52 @@ describe('PlayerStatsRoute share fallback', () => {
     expect(
       screen.queryByLabelText(/shareable link to copy/i),
     ).not.toBeInTheDocument();
+  });
+});
+
+// PST-070 / LS-7130: `/players/stats` is a public, shareable route, but the
+// `userLeagues` query is auth-gated and throws AuthenticationError for
+// signed-out visitors — surfacing an opaque global auth-error toast when a
+// shared link is opened by an anonymous recipient. The route now skips the
+// auth-gated query unless the visitor is authenticated.
+describe('PlayerStatsRoute public-link auth gating (PST-070)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockUseGetUserLeaguesQuery.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+    mockIsAuthenticated = true;
+    mockAuthLoading = false;
+  });
+
+  it('skips the auth-gated userLeagues query for signed-out visitors', () => {
+    mockIsAuthenticated = false;
+    mockAuthLoading = false;
+    render(<PlayerStatsRoute />);
+    const options = mockUseGetUserLeaguesQuery.mock.calls[0]?.[0] as
+      | { skip?: boolean }
+      | undefined;
+    expect(options?.skip).toBe(true);
+  });
+
+  it('skips the auth-gated userLeagues query while auth is still resolving', () => {
+    mockIsAuthenticated = false;
+    mockAuthLoading = true;
+    render(<PlayerStatsRoute />);
+    const options = mockUseGetUserLeaguesQuery.mock.calls[0]?.[0] as
+      | { skip?: boolean }
+      | undefined;
+    expect(options?.skip).toBe(true);
+  });
+
+  it('runs the userLeagues query for authenticated visitors', () => {
+    mockIsAuthenticated = true;
+    mockAuthLoading = false;
+    render(<PlayerStatsRoute />);
+    const options = mockUseGetUserLeaguesQuery.mock.calls[0]?.[0] as
+      | { skip?: boolean }
+      | undefined;
+    expect(options?.skip).toBe(false);
   });
 });

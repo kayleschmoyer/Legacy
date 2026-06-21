@@ -22,6 +22,7 @@ import type {
 } from '@legacy-sports/shared-components/players';
 import { LOGGER } from '@legacy-sports/logging';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   Sport,
   useGetPlayerIdByBrefIdQuery,
@@ -389,10 +390,24 @@ export function PlayerStatsRoute() {
   const [shareFallbackUrl, setShareFallbackUrl] = React.useState('');
   const isPremium = useHasEntitlement(ENTITLEMENTS.advanced_search_filters);
 
+  // `/players/stats` is a PUBLIC, shareable route (LS-3548) — a shared link can
+  // be opened by a signed-out recipient. Track auth state so we never fire
+  // auth-gated queries for anonymous visitors.
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
   // Check if the user is in at least one baseball league — availability filter
   // is only surfaced when this is true.
+  //
+  // PST-070 (LS-7130): `userLeagues` is auth-gated and throws
+  // AuthenticationError for signed-out users. On a public shared link this
+  // surfaced an opaque global auth-error toast to the recipient. Skip the query
+  // for anonymous visitors (and while auth is still resolving, to avoid a
+  // premature fire before `isAuthenticated` settles) — the career stats grids
+  // are already public-readable, and the league availability filter is
+  // meaningless without a session.
   const { data: leaguesData } = useGetUserLeaguesQuery({
     fetchPolicy: 'cache-first',
+    skip: !isAuthenticated || authLoading,
   });
   const hasBaseballLeagues = (leaguesData?.userLeagues ?? []).some(
     (l) => l.sport === Sport.Baseball,
