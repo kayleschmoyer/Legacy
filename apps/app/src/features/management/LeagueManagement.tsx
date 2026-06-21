@@ -29,6 +29,7 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
+import { useSubscription } from '../subscription/useSubscription';
 
 function LeagueCommissionerTools({
   leagueId,
@@ -40,6 +41,7 @@ function LeagueCommissionerTools({
   onBack: () => void;
 }) {
   const userInfo = useAuthorizedUserInfo();
+  const { isPremium } = useSubscription();
 
   const {
     data: leagueData,
@@ -160,6 +162,7 @@ function LeagueCommissionerTools({
               leagueId={leagueId}
               draftStatus={league.draftStatus}
               playerPool={league.playerPool}
+              isPremium={isPremium}
               onSuccess={handleSuccess}
               onError={handleError}
             />

@@ -457,7 +457,7 @@ export function LeagueSettingsControl({
             <H4 margin={0}>League Settings</H4>
             <Text fontSize="$2" color="$gray10">
               {isLocked
-                ? 'Settings are locked \u2014 the season is in progress.'
+                ? 'Settings are locked — the season is in progress.'
                 : 'Configure matchup settings for the league. Changes apply to future scheduled matchups.'}
             </Text>
           </YStack>
@@ -840,70 +840,80 @@ export function LeagueSettingsControl({
             <>
               <Separator />
 
-              {/* Playoff Format */}
-              <PremiumGate
-                isPremium={isPremium}
-                featureName="Advanced Playoff Format"
-                featureDescription="Unlock 6-team and 8-team playoff brackets with wildcard rounds for deeper post-season competition."
-                onUpgrade={onUpgrade}
-              >
-                <YStack gap="$2">
-                  <YStack gap="$1">
-                    <Text fontSize="$3" fontWeight="600" color="$color">
-                      Playoff Format
-                    </Text>
-                    <Text fontSize="$2" color="$gray10">
-                      Number of teams that qualify for the playoffs. 6-team
-                      includes a wildcard round; 8-team has two wildcard rounds.
-                    </Text>
-                  </YStack>
-                  <XStack gap="$2" flexWrap="wrap">
-                    {PLAYOFF_FORMAT_OPTIONS.map((option) => {
-                      const isSelected = playoffFormat === option.value;
-                      return (
-                        <Button
-                          key={option.value}
-                          size="$3"
-                          theme={isSelected ? 'active' : 'alt2'}
-                          backgroundColor={
-                            isSelected
-                              ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
-                              : '$gray3'
-                          }
-                          borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                          borderWidth={1}
-                          borderRadius="$3"
-                          onPress={() =>
-                            handlePlayoffFormatChange(option.value)
-                          }
-                          disabled={saving}
-                          opacity={saving ? 0.5 : 1}
-                          icon={isSelected ? <Check size={14} /> : undefined}
-                          aria-pressed={isSelected}
-                          aria-label={`Playoff format: ${option.label}`}
-                          hoverStyle={
-                            saving
-                              ? undefined
-                              : {
-                                  backgroundColor: isSelected
-                                    ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                                    : '$gray4',
-                                }
-                          }
-                        >
-                          <Text
-                            fontSize="$2"
-                            fontWeight={isSelected ? '700' : '400'}
-                            color={isSelected ? 'white' : '$color'}
-                          >
-                            {option.label}
-                          </Text>
-                        </Button>
-                      );
-                    })}
-                  </XStack>
+              {/* Playoff Format — 4-team is free; 6-team and 8-team require premium */}
+              <YStack gap="$2">
+                <YStack gap="$1">
+                  <Text fontSize="$3" fontWeight="600" color="$color">
+                    Playoff Format
+                  </Text>
+                  <Text fontSize="$2" color="$gray10">
+                    Number of teams that qualify for the playoffs. 6-team
+                    includes a wildcard round; 8-team has two wildcard rounds.
+                    {!isPremium && (
+                      <Text fontSize="$2" color="$gray10">
+                        {' '}
+                        Advanced formats (6-team, 8-team) require a premium
+                        subscription.
+                      </Text>
+                    )}
+                  </Text>
                 </YStack>
-              </PremiumGate>
+                <XStack gap="$2" flexWrap="wrap">
+                  {PLAYOFF_FORMAT_OPTIONS.map((option) => {
+                    const isSelected = playoffFormat === option.value;
+                    const isAdvanced =
+                      option.value === '6-team' || option.value === '8-team';
+                    const isFormatLocked = isAdvanced && !isPremium;
+                    return (
+                      <Button
+                        key={option.value}
+                        size="$3"
+                        theme={isSelected ? 'active' : 'alt2'}
+                        backgroundColor={
+                          isSelected
+                            ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                            : '$gray3'
+                        }
+                        borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                        borderWidth={1}
+                        borderRadius="$3"
+                        onPress={() => {
+                          if (isFormatLocked) return;
+                          handlePlayoffFormatChange(option.value);
+                        }}
+                        disabled={saving || isFormatLocked}
+                        opacity={saving || isFormatLocked ? 0.5 : 1}
+                        icon={
+                          isFormatLocked ? (
+                            <Lock size={12} color="$gray10" />
+                          ) : isSelected ? (
+                            <Check size={14} />
+                          ) : undefined
+                        }
+                        aria-pressed={isSelected}
+                        aria-label={`Playoff format: ${option.label}${isFormatLocked ? ' (premium)' : ''}`}
+                        hoverStyle={
+                          saving || isFormatLocked
+                            ? undefined
+                            : {
+                                backgroundColor: isSelected
+                                  ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                                  : '$gray4',
+                              }
+                        }
+                      >
+                        <Text
+                          fontSize="$2"
+                          fontWeight={isSelected ? '700' : '400'}
+                          color={isSelected ? 'white' : '$color'}
+                        >
+                          {option.label}
+                        </Text>
+                      </Button>
+                    );
+                  })}
+                </XStack>
+              </YStack>
 
               <Separator />
 
