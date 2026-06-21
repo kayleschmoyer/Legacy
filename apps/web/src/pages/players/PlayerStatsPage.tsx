@@ -59,6 +59,12 @@ const MAX_GRAPHQL_INT = 2147483647;
 
 const SEARCH_PARAM_MAX_LENGTH = 64;
 
+// Allowed page sizes for the player-stats grid — mirrors the selector rendered
+// in PlayerStatsDataGrid ([10, 25, 50, 100]). Kept as a typed tuple so the
+// default (25) is provably a member of the set.
+const ALLOWED_PAGE_SIZES = [10, 25, 50, 100] as const;
+const DEFAULT_PAGE_SIZE = 25;
+
 /**
  * Parse an integer URL search param and clamp it to MAX_GRAPHQL_INT (the
  * 32-bit signed INT ceiling GraphQL accepts). The clamp is good defense
@@ -78,6 +84,22 @@ export function parseClampedInt(raw: string, paramName: string): number {
     return MAX_GRAPHQL_INT;
   }
   return parsed;
+}
+
+/**
+ * Parse the `pageSize` URL search param and validate it against the page-size
+ * allow-list. The selector only offers 10/25/50/100, but the value is also
+ * URL-driven — a hand-edited or injected `?pageSize=99999` would otherwise be
+ * forwarded verbatim to the GraphQL query as `first: 99999`, and `?pageSize=abc`
+ * would yield `NaN` and propagate downstream (PST-031 / LS-7118). Any value
+ * outside the allow-list — including non-numeric input and an absent param —
+ * falls back to DEFAULT_PAGE_SIZE (25). Exported for unit testing.
+ */
+export function parsePageSize(raw: string | null): number {
+  const parsed = parseInt(raw ?? '', 10);
+  return (ALLOWED_PAGE_SIZES as readonly number[]).includes(parsed)
+    ? parsed
+    : DEFAULT_PAGE_SIZE;
 }
 
 /**
@@ -465,7 +487,7 @@ export function PlayerStatsRoute() {
     const viewMode = normalizeViewMode(
       (params.get('view') as PlayerStatsViewMode) || 'combined',
     );
-    const pageSize = parseInt(params.get('pageSize') || '25', 10);
+    const pageSize = parsePageSize(params.get('pageSize'));
     const search = params.get('search') || '';
 
     // Parse filters from URL

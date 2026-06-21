@@ -4,6 +4,7 @@ import {
   buildStatsSearchParams,
   migrateStatsSearchParams,
   parseClampedInt,
+  parsePageSize,
   readStatsFormat,
   sanitizeSearchParam,
   URL_SCHEMA_VERSION,
@@ -108,6 +109,50 @@ describe('readStatsFormat', () => {
         storageKey: PREFS_STORAGE_KEY,
       }),
     );
+  });
+});
+
+describe('parsePageSize', () => {
+  // AC3: valid allow-list values pass through unchanged.
+  it('passes allow-list values through unchanged', () => {
+    expect(parsePageSize('10')).toBe(10);
+    expect(parsePageSize('25')).toBe(25);
+    expect(parsePageSize('50')).toBe(50);
+    expect(parsePageSize('100')).toBe(100);
+  });
+
+  // AC3: an absent param defaults to 25.
+  it('defaults to 25 when the param is absent', () => {
+    expect(parsePageSize(null)).toBe(25);
+  });
+
+  // AC1: out-of-allow-list numeric values fall back to 25.
+  it('falls back to 25 for an out-of-allow-list value (PST-031: 99999)', () => {
+    expect(parsePageSize('99999')).toBe(25);
+  });
+
+  it('falls back to 25 for a small out-of-allow-list value (PST-031: 7)', () => {
+    expect(parsePageSize('7')).toBe(25);
+  });
+
+  // AC2: non-numeric input (parseInt → NaN) falls back to 25.
+  it('falls back to 25 for non-numeric input (PST-031: abc → NaN)', () => {
+    expect(parsePageSize('abc')).toBe(25);
+  });
+
+  it('falls back to 25 for an empty string', () => {
+    expect(parsePageSize('')).toBe(25);
+  });
+
+  it('falls back to 25 for a numeric prefix that parseInt would coerce (e.g. "30abc")', () => {
+    // parseInt('30abc') === 30 which is NOT in the allow-list, so it falls back.
+    // (A prefix that parses to an allowed value, e.g. "25abc" → 25, would pass.)
+    expect(parsePageSize('30abc')).toBe(25);
+  });
+
+  it('falls back to 25 for negative or zero values', () => {
+    expect(parsePageSize('-25')).toBe(25);
+    expect(parsePageSize('0')).toBe(25);
   });
 });
 
