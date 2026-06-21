@@ -330,6 +330,14 @@ const HR_MAX = 800;
 // off-grid values remain reachable via a hand-typed URL.
 const HR_STEP = 5;
 
+// Rows-per-page choices for the toolbar selector.
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+// In 'combined' view both the batting and pitching grids render simultaneously, so a
+// pageSize of N paints 2×N rows in a single, un-virtualized layout (PST-030 / LS-7117).
+// Cap the largest page size out of combined view to keep peak row count bounded — the
+// 100-row option stays available in the single-grid Hitters/Pitchers modes.
+const COMBINED_MAX_PAGE_SIZE = 50;
+
 interface AppliedFilters {
   search: string;
   position: string;
@@ -406,6 +414,35 @@ export function buildShareUrl(
 }
 
 /**
+ * Rows-per-page options available for the given view mode (PST-030 / LS-7117).
+ * 'combined' renders both grids at once, so the 100-row option is withheld there to
+ * keep peak un-virtualized row count bounded; single-grid modes keep the full set.
+ * Pure so the cap is unit-testable without mounting the Tamagui shell.
+ */
+export function pageSizeOptionsForViewMode(
+  viewMode: 'combined' | 'hitters' | 'pitchers',
+): number[] {
+  return viewMode === 'combined'
+    ? PAGE_SIZE_OPTIONS.filter((n) => n <= COMBINED_MAX_PAGE_SIZE)
+    : [...PAGE_SIZE_OPTIONS];
+}
+
+/**
+ * Clamp a requested page size to what the given view mode allows (PST-030 / LS-7117).
+ * In 'combined' view anything above COMBINED_MAX_PAGE_SIZE is reduced to the cap so a
+ * carried-over or deep-linked pageSize=100 cannot paint 200 rows across both grids;
+ * single-grid modes pass the value through unchanged. Pure for unit-testing.
+ */
+export function clampPageSizeForViewMode(
+  pageSize: number,
+  viewMode: 'combined' | 'hitters' | 'pitchers',
+): number {
+  return viewMode === 'combined' && pageSize > COMBINED_MAX_PAGE_SIZE
+    ? COMBINED_MAX_PAGE_SIZE
+    : pageSize;
+}
+
+/**
  * Player Statistics Page Component
  *
  * Editorial header with Combined/Hitters/Pitchers view tabs, unified toolbar
@@ -448,7 +485,14 @@ export function PlayerStatsPage({
     initialFilters.position ?? 'All Positions',
   );
   const [team, setTeam] = useState(initialFilters.team ?? 'All Teams');
-  const [pageSize, setPageSize] = useState(initialPageSize);
+  // Clamp the initial page size for combined view so a deep-linked view=combined
+  // & pageSize=100 cannot mount 200 rows across both grids (PST-030 / LS-7117).
+  const [pageSize, setPageSize] = useState(() =>
+    clampPageSizeForViewMode(
+      initialPageSize,
+      normalizeViewMode(initialViewMode),
+    ),
+  );
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // ── Advanced filter draft state ────────────────────────────────
@@ -463,7 +507,10 @@ export function PlayerStatsPage({
     search: enforceSearchMinLength(initialFilters.searchTerm ?? ''),
     position: initialFilters.position ?? 'All Positions',
     team: initialFilters.team ?? 'All Teams',
-    pageSize: initialPageSize,
+    pageSize: clampPageSizeForViewMode(
+      initialPageSize,
+      normalizeViewMode(initialViewMode),
+    ),
     minHR: initialFilters.minHomeRuns ?? 0,
     minAVG: initialFilters.minBattingAvg ?? 0,
     maxERA: initialFilters.maxERA ?? ERA_MAX_OFF,
@@ -483,6 +530,22 @@ export function PlayerStatsPage({
       maxERA,
     });
   }, [search, position, team, pageSize, minHR, minAVG, maxERA]);
+
+  // Switching view modes must re-clamp the page size: entering 'combined' with a
+  // carried-over pageSize=100 would paint 200 rows across both grids (PST-030 /
+  // LS-7117). Clamp both the draft and the committed snapshot so the active grids
+  // shrink immediately, without waiting for the next applyFilters() commit.
+  const handleViewModeChange = useCallback(
+    (next: 'combined' | 'hitters' | 'pitchers') => {
+      setViewMode(next);
+      setPageSize((cur) => clampPageSizeForViewMode(cur, next));
+      setAppliedFilters((cur) => {
+        const clamped = clampPageSizeForViewMode(cur.pageSize, next);
+        return clamped === cur.pageSize ? cur : { ...cur, pageSize: clamped };
+      });
+    },
+    [],
+  );
 
   // Stringify-based key forces grid unmount/remount on each filter commit,
   // which triggers a fresh GraphQL query with the new initialParams.
@@ -613,6 +676,10 @@ export function PlayerStatsPage({
   // ── Visibility flags ───────────────────────────────────────────
   const showBatting = viewMode === 'combined' || viewMode === 'hitters';
   const showPitching = viewMode === 'combined' || viewMode === 'pitchers';
+
+  // Rows-per-page options narrow to exclude 100 in 'combined' view (PST-030 /
+  // LS-7117), where both grids render at once and 100 would paint 200 rows.
+  const pageSizeOptions = pageSizeOptionsForViewMode(viewMode);
 
   // ── URL preview — matches the URL params that apps/web persists ─
   const urlPreview = useMemo(() => {
@@ -884,7 +951,7 @@ export function PlayerStatsPage({
             return (
               <Pressable
                 key={id}
-                onPress={() => setViewMode(id)}
+                onPress={() => handleViewModeChange(id)}
                 role="tab"
                 accessibilityRole="tab"
                 aria-selected={selected}
@@ -1180,7 +1247,7 @@ export function PlayerStatsPage({
                   setAppliedFilters((cur) => ({ ...cur, pageSize: next }));
                 }}
               >
-                {[10, 25, 50, 100].map((n) => (
+                {pageSizeOptions.map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
@@ -1190,7 +1257,7 @@ export function PlayerStatsPage({
               <NativeSelect
                 label="Rows"
                 value={String(pageSize)}
-                options={['10', '25', '50', '100']}
+                options={pageSizeOptions.map(String)}
                 onChange={(next) => {
                   const n = Number(next);
                   setPageSize(n);

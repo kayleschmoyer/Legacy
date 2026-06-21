@@ -1,10 +1,12 @@
 import {
   battingPlayerTypeForViewMode,
   buildShareUrl,
+  clampPageSizeForViewMode,
   type ClearFiltersSetters,
   createClearFiltersHandler,
   createDebouncedCommit,
   enforceSearchMinLength,
+  pageSizeOptionsForViewMode,
   parseSliderValue,
   SLIDER_COMMIT_DEBOUNCE_MS,
   stepValue,
@@ -391,5 +393,46 @@ describe('buildShareUrl (LS-7131)', () => {
   it('omits maxERA when it sits at the off-sentinel', () => {
     const applied = { ...APPLIED_DEFAULTS, maxERA: 5 };
     expect(buildShareUrl('combined', applied)).not.toContain('maxERA');
+  });
+});
+
+// PST-030 / LS-7117: 'combined' view renders both the batting and pitching grids
+// at once with no virtualization, so a pageSize of 100 paints 200 rows in one
+// layout. The 100-row option is withheld in combined view and any carried-over or
+// deep-linked pageSize=100 is clamped to 50; single-grid modes keep the full set.
+describe('pageSizeOptionsForViewMode (LS-7117)', () => {
+  it('withholds the 100-row option in combined view', () => {
+    expect(pageSizeOptionsForViewMode('combined')).toEqual([10, 25, 50]);
+  });
+
+  it('keeps the full option set for the single-grid Hitters view', () => {
+    expect(pageSizeOptionsForViewMode('hitters')).toEqual([10, 25, 50, 100]);
+  });
+
+  it('keeps the full option set for the single-grid Pitchers view', () => {
+    expect(pageSizeOptionsForViewMode('pitchers')).toEqual([10, 25, 50, 100]);
+  });
+
+  it('returns a fresh array so callers cannot mutate the shared option list', () => {
+    const first = pageSizeOptionsForViewMode('hitters');
+    first.push(250);
+    expect(pageSizeOptionsForViewMode('hitters')).toEqual([10, 25, 50, 100]);
+  });
+});
+
+describe('clampPageSizeForViewMode (LS-7117)', () => {
+  it('clamps a pageSize above the cap down to 50 in combined view', () => {
+    expect(clampPageSizeForViewMode(100, 'combined')).toBe(50);
+  });
+
+  it('leaves pageSizes at or below the cap unchanged in combined view', () => {
+    expect(clampPageSizeForViewMode(50, 'combined')).toBe(50);
+    expect(clampPageSizeForViewMode(25, 'combined')).toBe(25);
+    expect(clampPageSizeForViewMode(10, 'combined')).toBe(10);
+  });
+
+  it('passes 100 through unchanged for the single-grid views', () => {
+    expect(clampPageSizeForViewMode(100, 'hitters')).toBe(100);
+    expect(clampPageSizeForViewMode(100, 'pitchers')).toBe(100);
   });
 });
