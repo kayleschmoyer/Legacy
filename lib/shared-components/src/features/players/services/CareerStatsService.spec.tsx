@@ -203,6 +203,67 @@ describe('CareerStatsService - Data Transformation', () => {
       expect(result.formattedOPS).toBe('1.000');
     });
   });
+
+  // ===========================================================================
+  // OPS formula verification — PST-023 / LS-7116
+  //
+  // OPS is conventionally On-Base Percentage + Slugging Percentage. The client
+  // transform (transformCareerStats) computes `ops = onBasePercentage +
+  // sluggingPercentage` from the server-provided OBP/SLG fields; there is no
+  // separate server-side `ops` field in the GraphQL CareerBatting type that
+  // could drift. These cases lock in `ops === obp + slg` (to 3 decimals) for a
+  // sample of canonical seasons so a future typo in the formula is caught.
+  // ===========================================================================
+  describe('OPS == OBP + SLG (canonical seasons)', () => {
+    const canonicalSeasons: ReadonlyArray<{
+      readonly label: string;
+      readonly obp: number;
+      readonly slg: number;
+      readonly expectedOps: string;
+    }> = [
+      // 2001 Barry Bonds: .515 OBP + .863 SLG = 1.378 OPS
+      {
+        label: '2001 Barry Bonds',
+        obp: 0.515,
+        slg: 0.863,
+        expectedOps: '1.378',
+      },
+      // 1920 Babe Ruth: .532 OBP + .847 SLG = 1.379 OPS
+      { label: '1920 Babe Ruth', obp: 0.532, slg: 0.847, expectedOps: '1.379' },
+      // 1941 Ted Williams: .553 OBP + .735 SLG = 1.288 OPS
+      {
+        label: '1941 Ted Williams',
+        obp: 0.553,
+        slg: 0.735,
+        expectedOps: '1.288',
+      },
+      // 2004 Barry Bonds: .609 OBP + .812 SLG = 1.421 OPS
+      {
+        label: '2004 Barry Bonds',
+        obp: 0.609,
+        slg: 0.812,
+        expectedOps: '1.421',
+      },
+    ];
+
+    test.each(canonicalSeasons)(
+      '$label: ops equals obp + slg to 3 decimals',
+      ({ obp, slg, expectedOps }) => {
+        const result = transformCareerStats({
+          ...mockEmptyPlayerStats,
+          onBasePercentage: obp,
+          sluggingPercentage: slg,
+        });
+
+        // OPS must equal OBP + SLG (the defining identity), to 3 decimals.
+        expect(result.ops).toBeCloseTo(obp + slg, 3);
+        // The formatted (3-decimal) OPS must match the canonical reference value
+        // and the formatted OBP + SLG sum.
+        expect(result.formattedOPS).toBe(expectedOps);
+        expect(result.formattedOPS).toBe((obp + slg).toFixed(3));
+      },
+    );
+  });
 });
 
 // =============================================================================
