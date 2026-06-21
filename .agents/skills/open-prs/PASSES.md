@@ -314,10 +314,10 @@ The most common CI failure is **type errors from stale branches** — errors tha
 **After every successful CI fix push**, remove all `ci-failure-*` labels from the PR. The CI system re-adds them automatically if CI fails again, so clearing them avoids stale labels misleading the next sweep pass.
 
 ```
-github_clear_ci_failure_labels(number: <PR#>)
+github_manage_labels(prNumber: <PR#>, clearPattern: 'ci-failure-*')
 ```
 
-Call this after push succeeds — not before — so a failed push doesn't prematurely clear the labels. The tool fetches current labels, filters to `ci-failure-*`, and removes all matches in one call. It no-ops cleanly if none are present.
+Call this after push succeeds — not before — so a failed push doesn't prematurely clear the labels. The tool fetches current labels, glob-matches against the pattern, and removes all matches in one call. It no-ops cleanly if none are present.
 
 The `github_pr_scan` tool syncs these labels automatically (`applyLabels: true`) on each scan, but it only runs at pass boundaries. Removing labels inline after each fix keeps the scan snapshot accurate during a pass and prevents the orchestrator from re-queuing an already-fixed PR.
 
@@ -330,7 +330,7 @@ If automated classification returns `unknown` or the auto-fix doesn't resolve th
 3. Apply the fix based on error category
 4. Validate: `make pc`
 5. Commit and push
-6. **Remove CI failure labels**: `github_clear_ci_failure_labels(number: <PR#>)` — the CI system will re-add them if the fix didn't hold
+6. **Remove CI failure labels**: `github_manage_labels(prNumber: <PR#>, clearPattern: 'ci-failure-*')` — the CI system will re-add them if the fix didn't hold
 7. If the fix attempt fails, comment on the PR with the diagnosed root cause and what was attempted. Only label `requires-human-review` if the failure requires something outside agent reach — otherwise leave it unlabeled for a future sweep. The PR is now **settled**.
 
 ### Pending CI

@@ -18,7 +18,6 @@ import { getRepoInfo } from './tools/get-repo-info.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
 import { listPRs } from './tools/list-prs.js';
 import { listReviews } from './tools/list-reviews.js';
-import { clearCiFailureLabels } from './tools/clear-ci-failure-labels.js';
 import { manageLabels } from './tools/manage-labels.js';
 import { markPRReady } from './tools/mark-pr-ready.js';
 import { mergePR } from './tools/merge-pr.js';
@@ -953,45 +952,10 @@ export function createServer(): McpServer {
     async (params) => bulkReplyToReview(params),
   );
 
-  // --- github_clear_ci_failure_labels ---
-  server.tool(
-    'github_clear_ci_failure_labels',
-    'Remove all ci-failure-* labels from a PR. Use after successfully fixing and pushing a CI fix — the CI system will re-add labels if the fix did not hold. No-ops if no ci-failure-* labels are present. Pass the PR number via "number" or its alias "prNumber".',
-    {
-      number: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe('PR number'),
-      prNumber: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe('Alias for "number" — use either, not both.'),
-    },
-    async (params) => {
-      const resolvedNumber = params.number ?? params.prNumber;
-      if (!resolvedNumber) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: 'text',
-              text: 'Missing required parameter: provide "number" or "prNumber" (PR number).',
-            },
-          ],
-        };
-      }
-      return clearCiFailureLabels({ number: resolvedNumber });
-    },
-  );
-
   // --- github_manage_labels ---
   server.tool(
     'github_manage_labels',
-    'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one or more PRs. Pass a single PR number via "prNumber", or one or more PR numbers via "prs". When multiple PRs are given, all get the same label changes.',
+    'Prefer this over `gh pr edit --add-label` via shell. Add or remove labels on one or more PRs. Pass a single PR number via "prNumber", or one or more PR numbers via "prs". When multiple PRs are given, all get the same label changes. Use "clearPattern" (glob, e.g. "ci-failure-*") to remove all labels matching a pattern — composes with "add" and "remove".',
     {
       prs: z
         .preprocess(
@@ -1020,6 +984,12 @@ export function createServer(): McpServer {
         ),
       add: labelList.optional().describe('Labels to add'),
       remove: labelList.optional().describe('Labels to remove'),
+      clearPattern: z
+        .string()
+        .optional()
+        .describe(
+          'Glob pattern — labels matching this are removed (e.g. "ci-failure-*"). Composes with "add" and "remove".',
+        ),
     },
     async (params) => {
       const prs =
@@ -1036,7 +1006,12 @@ export function createServer(): McpServer {
           ],
         };
       }
-      return manageLabels({ prs, add: params.add, remove: params.remove });
+      return manageLabels({
+        prs,
+        add: params.add,
+        remove: params.remove,
+        clearPattern: params.clearPattern,
+      });
     },
   );
 

@@ -3,10 +3,41 @@ import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
+interface GitHubLabel {
+  name: string;
+}
+
 interface ManageLabelsParams {
   prs: number[];
   add?: string[];
   remove?: string[];
+  /** Glob pattern — labels matching this are removed (e.g. 'ci-failure-*'). Composes with remove[]. */
+  clearPattern?: string;
+}
+
+/** Convert a simple glob pattern (* = any chars, ? = one char) to a RegExp. */
+export function globToRegex(pattern: string): RegExp {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^${escaped}$`);
+}
+
+async function fetchPrLabels(basePath: string): Promise<string[]> {
+  const allNames: string[] = [];
+  let page = 1;
+  while (true) {
+    const pageLabels = await githubRest<GitHubLabel[]>({
+      method: 'GET',
+      path: basePath,
+      query: { per_page: '100', page: String(page) },
+    });
+    for (const l of pageLabels) allNames.push(l.name);
+    if (pageLabels.length < 100) break;
+    page++;
+  }
+  return allNames;
 }
 
 /** Add or remove labels on one or more PRs. Accepts a single PR number or an array. */
@@ -15,21 +46,26 @@ export async function manageLabels(
 ): Promise<ToolResult> {
   const uniquePrs = [...new Set(params.prs)];
 
-  if (!params.add?.length && !params.remove?.length) {
+  if (!params.add?.length && !params.remove?.length && !params.clearPattern) {
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: 'No labels to add or remove. Provide at least one of "add" or "remove".',
+          text: 'No labels to add or remove. Provide at least one of "add", "remove", or "clearPattern".',
         },
       ],
     };
   }
 
+  const clearRegex = params.clearPattern
+    ? globToRegex(params.clearPattern)
+    : null;
+
   const perPrResults: Array<{
     prNumber: number;
     success: boolean;
+    clearedLabels: string[];
     error?: string;
   }> = [];
 
@@ -44,6 +80,20 @@ export async function manageLabels(
         batch.map(async (prNumber) => {
           const basePath = `/repos/${repo.owner}/${repo.name}/issues/${prNumber}/labels`;
           try {
+            // Build effective remove list: explicit removes + pattern-matched labels
+            const effectiveRemove: string[] = [...(params.remove ?? [])];
+            const clearedLabels: string[] = [];
+
+            if (clearRegex) {
+              const currentLabels = await fetchPrLabels(basePath);
+              for (const name of currentLabels) {
+                if (clearRegex.test(name) && !effectiveRemove.includes(name)) {
+                  effectiveRemove.push(name);
+                  clearedLabels.push(name);
+                }
+              }
+            }
+
             if (params.add?.length) {
               await githubRest({
                 method: 'POST',
@@ -51,28 +101,26 @@ export async function manageLabels(
                 body: { labels: params.add },
               });
             }
-            if (params.remove?.length) {
-              for (const label of params.remove) {
-                try {
-                  await githubRest({
-                    method: 'DELETE',
-                    path: `${basePath}/${encodeURIComponent(label)}`,
-                  });
-                } catch (removeErr) {
-                  // 404 = label not on PR, 422 = already removed — safe to ignore
-                  const msg =
-                    removeErr instanceof Error ? removeErr.message : '';
-                  if (!msg.includes('(404)') && !msg.includes('(422)')) {
-                    throw removeErr;
-                  }
+            for (const label of effectiveRemove) {
+              try {
+                await githubRest({
+                  method: 'DELETE',
+                  path: `${basePath}/${encodeURIComponent(label)}`,
+                });
+              } catch (removeErr) {
+                // 404 = label not on PR, 422 = already removed — safe to ignore
+                const msg = removeErr instanceof Error ? removeErr.message : '';
+                if (!msg.includes('(404)') && !msg.includes('(422)')) {
+                  throw removeErr;
                 }
               }
             }
-            return { prNumber, success: true };
+            return { prNumber, success: true, clearedLabels };
           } catch (error) {
             return {
               prNumber,
               success: false,
+              clearedLabels: [],
               error: error instanceof Error ? error.message : String(error),
             };
           }
@@ -97,6 +145,7 @@ export async function manageLabels(
 
   // For single-PR calls, emit a flatter response shape
   if (uniquePrs.length === 1) {
+    const r = perPrResults[0];
     return {
       isError: failed > 0,
       content: [
@@ -107,7 +156,10 @@ export async function manageLabels(
             success: failed === 0,
             requestedLabelsAdded: params.add ?? [],
             requestedLabelsRemoved: params.remove ?? [],
-            ...(perPrResults[0].error ? { error: perPrResults[0].error } : {}),
+            ...(r.clearedLabels.length
+              ? { clearedLabels: r.clearedLabels }
+              : {}),
+            ...(r.error ? { error: r.error } : {}),
           }),
         },
       ],
@@ -125,7 +177,10 @@ export async function manageLabels(
           failed,
           requestedLabelsAdded: params.add ?? [],
           requestedLabelsRemoved: params.remove ?? [],
-          results: perPrResults,
+          results: perPrResults.map(({ clearedLabels, ...r }) => ({
+            ...r,
+            ...(clearedLabels.length ? { clearedLabels } : {}),
+          })),
         }),
       },
     ],

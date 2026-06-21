@@ -148,7 +148,7 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
           - type_error / test_failure / unknown: load skills/debugging/SKILL.md for diagnosis
        3. Validate all code changes: make -C <path> pc (REQUIRED — never skip)
        4. Commit and push: worktree_commit / worktree_push
-       5. Remove stale CI failure labels: github_clear_ci_failure_labels(number: <PR#>)
+       5. Remove stale CI failure labels: github_manage_labels(prNumber: <PR#>, clearPattern: 'ci-failure-*')
        6. Release sweep-claimed on exit (success OR failure):
           github_manage_labels(number: <PR#>, remove: ["sweep-claimed"])
        7. If unfixable, comment with diagnosed root cause and what was attempted — do not remove labels
