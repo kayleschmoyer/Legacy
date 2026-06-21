@@ -392,6 +392,20 @@ class PlayerDetailSurface {
     await expect(this.#dialog.getByTestId('player-detail-error')).toBeVisible();
   }
 
+  /** Assert the eligible-positions band is NOT visible. */
+  async expectEligiblePositionsNotVisible(): Promise<void> {
+    await expect(
+      this.#dialog.getByTestId('eligible-positions'),
+    ).not.toBeVisible();
+  }
+
+  /** Assert the career-batting summary card is NOT visible. */
+  async expectCareerBattingCardNotVisible(): Promise<void> {
+    await expect(
+      this.#dialog.getByTestId('career-batting-card'),
+    ).not.toBeVisible();
+  }
+
   /**
    * Assert text is visible within the modal. `exact` matches the whole node;
    * `first` (default true) resolves strict-mode collisions on repeated labels.
