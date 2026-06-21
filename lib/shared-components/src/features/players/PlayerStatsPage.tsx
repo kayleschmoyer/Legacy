@@ -220,6 +220,63 @@ export function parseSliderValue(raw: string): number | null {
   return Number.isFinite(next) ? next : null;
 }
 
+/**
+ * Slider commits are debounced by this many ms. A fast drag or a held arrow key
+ * (`onKeyUp` fires once per keystroke) would otherwise commit — and remount the
+ * grid + refire the GraphQL query — once per keystroke (LS-7128 / PST-062).
+ */
+export const SLIDER_COMMIT_DEBOUNCE_MS = 250;
+
+export interface DebouncedCommit {
+  /**
+   * Schedule a commit `delayMs` after the most recent call, replacing any
+   * still-pending commit so a burst of calls collapses into one.
+   */
+  trigger: () => void;
+  /** Fire a pending commit immediately; no-op when nothing is pending. */
+  flush: () => void;
+  /** Drop any pending commit without firing it. */
+  cancel: () => void;
+}
+
+/**
+ * Wraps `commit` in a trailing-edge debounce. The slider previously bound
+ * `applyFilters` straight to `onKeyUp`/`onMouseUp`/`onTouchEnd`, so holding an
+ * arrow key fired one commit — one grid remount + GraphQL refetch — per
+ * keystroke (LS-7128). Routing the keyboard path through `trigger` collapses a
+ * burst of keyups into a single commit, while `flush` lets a terminal event
+ * (blur) commit a pending value without waiting out the delay. Extracted as a
+ * pure factory so the coalescing is unit-testable without mounting the page.
+ */
+export function createDebouncedCommit(
+  commit: () => void,
+  delayMs: number = SLIDER_COMMIT_DEBOUNCE_MS,
+): DebouncedCommit {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const cancel = (): void => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  return {
+    trigger: () => {
+      cancel();
+      timer = setTimeout(() => {
+        timer = null;
+        commit();
+      }, delayMs);
+    },
+    flush: () => {
+      if (timer !== null) {
+        cancel();
+        commit();
+      }
+    },
+    cancel,
+  };
+}
+
 export interface PlayerStatsPageProps {
   title?: string;
   initialViewMode?: PlayerStatsViewMode;
@@ -1834,6 +1891,26 @@ interface StatSliderProps {
   onCommit: () => void;
 }
 
+/**
+ * Stable {@link DebouncedCommit} bound to the latest `commit` callback. The
+ * debounce instance is created once (per `delayMs`) so its pending timer
+ * survives re-renders, while a ref keeps it calling the current `commit`
+ * without rebuilding the timer. Any pending commit is cancelled on unmount.
+ */
+function useDebouncedCommit(
+  commit: () => void,
+  delayMs: number = SLIDER_COMMIT_DEBOUNCE_MS,
+): DebouncedCommit {
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  const debounced = useMemo(
+    () => createDebouncedCommit(() => commitRef.current(), delayMs),
+    [delayMs],
+  );
+  useEffect(() => debounced.cancel, [debounced]);
+  return debounced;
+}
+
 function StatSlider({
   label,
   value,
@@ -1845,6 +1922,17 @@ function StatSlider({
   onCommit,
 }: StatSliderProps) {
   const pct = Math.round(((value - min) / (max - min)) * 100);
+
+  // Debounce the keyboard commit path: onKeyUp fires once per arrow-key press,
+  // so holding an arrow would otherwise commit (remount grid + refetch) per
+  // keystroke. Mouse/touch release are terminal single events and commit
+  // immediately (cancelling any pending debounce); blur flushes a pending
+  // keyboard commit so leaving the control doesn't wait out the delay (LS-7128).
+  const debouncedCommit = useDebouncedCommit(onCommit);
+  const commitImmediately = useCallback(() => {
+    debouncedCommit.cancel();
+    onCommit();
+  }, [debouncedCommit, onCommit]);
 
   return (
     <YStack style={{ gap: 8 }}>
@@ -1889,9 +1977,10 @@ function StatSlider({
               onChange(next);
             }
           }}
-          onMouseUp={onCommit}
-          onTouchEnd={onCommit}
-          onKeyUp={onCommit}
+          onMouseUp={commitImmediately}
+          onTouchEnd={commitImmediately}
+          onKeyUp={debouncedCommit.trigger}
+          onBlur={debouncedCommit.flush}
         />
       ) : (
         <NativeRangeStepper

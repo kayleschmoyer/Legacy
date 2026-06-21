@@ -3,8 +3,10 @@ import {
   buildShareUrl,
   type ClearFiltersSetters,
   createClearFiltersHandler,
+  createDebouncedCommit,
   enforceSearchMinLength,
   parseSliderValue,
+  SLIDER_COMMIT_DEBOUNCE_MS,
   stepValue,
 } from './PlayerStatsPage';
 
@@ -192,6 +194,94 @@ describe('enforceSearchMinLength (LS-7127)', () => {
     // Only the length gate is applied here; the term itself is committed as-is so
     // existing query-build behavior (which coalesces empty strings) is unchanged.
     expect(enforceSearchMinLength('  ab  ')).toBe('  ab  ');
+  });
+});
+
+// Sliders auto-apply on commit, and onKeyUp fires once per arrow-key press, so
+// holding an arrow used to fire applyFilters (grid remount + GraphQL refetch)
+// per keystroke (LS-7128 / PST-062). createDebouncedCommit coalesces the
+// keyboard burst into a single commit; flush/cancel cover the terminal-event
+// (blur / mouse release) paths.
+describe('createDebouncedCommit (LS-7128)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it('coalesces a burst of triggers (held arrow key) into a single commit', () => {
+    const commit = jest.fn();
+    const { trigger } = createDebouncedCommit(commit, 250);
+
+    // 10 rapid onKeyUp events, each well within the debounce window. Before the
+    // fix this path committed once per keystroke; now nothing fires mid-burst.
+    for (let i = 0; i < 10; i++) {
+      trigger();
+      jest.advanceTimersByTime(20);
+    }
+    expect(commit).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(250);
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('commits once the delay elapses with no further triggers', () => {
+    const commit = jest.fn();
+    const { trigger } = createDebouncedCommit(commit, 250);
+
+    trigger();
+    jest.advanceTimersByTime(249);
+    expect(commit).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('flush fires a pending commit immediately and cancels the scheduled one', () => {
+    const commit = jest.fn();
+    const { trigger, flush } = createDebouncedCommit(commit, 250);
+
+    trigger();
+    flush();
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    // The originally scheduled timer must not fire a second commit.
+    jest.advanceTimersByTime(250);
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('flush is a no-op when no commit is pending', () => {
+    const commit = jest.fn();
+    const { flush } = createDebouncedCommit(commit, 250);
+
+    flush();
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('cancel drops a pending commit without firing it', () => {
+    const commit = jest.fn();
+    const { trigger, cancel } = createDebouncedCommit(commit, 250);
+
+    trigger();
+    cancel();
+    jest.advanceTimersByTime(250);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('defaults to the 250ms slider debounce window', () => {
+    expect(SLIDER_COMMIT_DEBOUNCE_MS).toBe(250);
+
+    const commit = jest.fn();
+    const { trigger } = createDebouncedCommit(commit);
+
+    trigger();
+    jest.advanceTimersByTime(SLIDER_COMMIT_DEBOUNCE_MS - 1);
+    expect(commit).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    expect(commit).toHaveBeenCalledTimes(1);
   });
 });
 
