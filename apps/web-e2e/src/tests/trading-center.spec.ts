@@ -584,6 +584,10 @@ test.describe('Trades tab — trade block interactions @regression', () => {
 
     await page.getByRole('button', { name: 'Remove' }).click();
 
-    expect(mutationCalls).toContain('SetTradeBlock');
+    // The SetTradeBlock mutation is dispatched asynchronously and captured by
+    // the route interceptor above, so poll rather than asserting synchronously
+    // to avoid racing the request under CI load (mirrors the Set Price flow /
+    // LS-8123 fix).
+    await expect.poll(() => mutationCalls).toContain('SetTradeBlock');
   });
 });
