@@ -365,6 +365,7 @@ export type CareerPitching = {
   __typename?: 'CareerPitching';
   balks?: Maybe<Scalars['Int']['output']>;
   baseOnBalls?: Maybe<Scalars['Int']['output']>;
+  basesOnBallsPerNine?: Maybe<Scalars['Float']['output']>;
   battersFaced?: Maybe<Scalars['Int']['output']>;
   completeGames?: Maybe<Scalars['Int']['output']>;
   earnedRuns?: Maybe<Scalars['Int']['output']>;
@@ -389,6 +390,7 @@ export type CareerPitching = {
   saves?: Maybe<Scalars['Int']['output']>;
   shutouts?: Maybe<Scalars['Int']['output']>;
   strikeouts?: Maybe<Scalars['Int']['output']>;
+  strikeoutsPerNine?: Maybe<Scalars['Float']['output']>;
   whip?: Maybe<Scalars['Float']['output']>;
   wildPitches?: Maybe<Scalars['Int']['output']>;
   winPercentage?: Maybe<Scalars['Float']['output']>;

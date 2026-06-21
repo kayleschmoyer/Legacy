@@ -504,6 +504,32 @@ CareerPitchingRef.implement({
         return ip === 0 ? null : (stats.h + stats.bb) / ip;
       },
     }),
+    // Strikeouts per nine innings (K/9 = 9 * SO / IP), with IP derived from
+    // outsRecorded (IP = outsRecorded / 3). Guards against division by zero
+    // when no outs have been recorded (IP = 0). Mirrors SeasonPitching's
+    // precomputed strikeoutsPerNine so career and season views agree.
+    strikeoutsPerNine: t.field({
+      type: 'Float',
+      nullable: true,
+      resolve: (stats) => {
+        if (stats.so == null || !stats.outsRecorded) return null;
+        const ip = stats.outsRecorded / 3;
+        return ip === 0 ? null : (9 * stats.so) / ip;
+      },
+    }),
+    // Walks per nine innings (BB/9 = 9 * BB / IP), with IP derived from
+    // outsRecorded (IP = outsRecorded / 3). Guards against division by zero
+    // when no outs have been recorded (IP = 0). Mirrors SeasonPitching's
+    // precomputed basesOnBallsPerNine so career and season views agree.
+    basesOnBallsPerNine: t.field({
+      type: 'Float',
+      nullable: true,
+      resolve: (stats) => {
+        if (stats.bb == null || !stats.outsRecorded) return null;
+        const ip = stats.outsRecorded / 3;
+        return ip === 0 ? null : (9 * stats.bb) / ip;
+      },
+    }),
     // Player relationship
     player: t.field({
       type: 'Player',

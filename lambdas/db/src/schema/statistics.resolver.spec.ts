@@ -764,4 +764,148 @@ describe('Statistics Resolver', () => {
       expect(result).toBeNull();
     });
   });
+
+  // ── CareerPitching.strikeoutsPerNine (K/9) field resolver ──────────────────
+
+  describe('CareerPitching.strikeoutsPerNine (K/9) field resolver', () => {
+    function getStrikeoutsPerNineResolver() {
+      const type = schema.getType('CareerPitching') as GraphQLObjectType;
+      if (!type) throw new Error('CareerPitching type not found');
+      const resolve = type.getFields()['strikeoutsPerNine']?.resolve;
+      if (!resolve)
+        throw new Error('CareerPitching.strikeoutsPerNine resolver not found');
+      return resolve;
+    }
+
+    it('computes K/9 = 9 * SO / IP from strikeouts and outs recorded', () => {
+      const resolve = getStrikeoutsPerNineResolver();
+      // 300 SO, 750 outs = 250 IP → K/9 = 9 * 300 / 250 = 10.8
+      const result = resolve(
+        { so: 300, outsRecorded: 750 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeCloseTo(10.8, 5);
+    });
+
+    it('matches a known historical season (Pedro Martinez 2000: 284 SO, 217 IP)', () => {
+      const resolve = getStrikeoutsPerNineResolver();
+      // 2000 season: 284 SO over 217.0 IP (651 outs) → K/9 ≈ 11.779
+      const result = resolve(
+        { so: 284, outsRecorded: 651 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeCloseTo((9 * 284) / 217, 5);
+      expect(result).toBeCloseTo(11.779, 3);
+    });
+
+    it('returns null when strikeouts is null', () => {
+      const resolve = getStrikeoutsPerNineResolver();
+      const result = resolve(
+        { so: null, outsRecorded: 750 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('returns null when outsRecorded is null', () => {
+      const resolve = getStrikeoutsPerNineResolver();
+      const result = resolve(
+        { so: 300, outsRecorded: null },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('returns null when outsRecorded is zero (IP = 0) to avoid division by zero', () => {
+      const resolve = getStrikeoutsPerNineResolver();
+      const result = resolve(
+        { so: 300, outsRecorded: 0 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+  });
+
+  // ── CareerPitching.basesOnBallsPerNine (BB/9) field resolver ───────────────
+
+  describe('CareerPitching.basesOnBallsPerNine (BB/9) field resolver', () => {
+    function getBasesOnBallsPerNineResolver() {
+      const type = schema.getType('CareerPitching') as GraphQLObjectType;
+      if (!type) throw new Error('CareerPitching type not found');
+      const resolve = type.getFields()['basesOnBallsPerNine']?.resolve;
+      if (!resolve)
+        throw new Error(
+          'CareerPitching.basesOnBallsPerNine resolver not found',
+        );
+      return resolve;
+    }
+
+    it('computes BB/9 = 9 * BB / IP from walks and outs recorded', () => {
+      const resolve = getBasesOnBallsPerNineResolver();
+      // 50 BB, 750 outs = 250 IP → BB/9 = 9 * 50 / 250 = 1.8
+      const result = resolve(
+        { bb: 50, outsRecorded: 750 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeCloseTo(1.8, 5);
+    });
+
+    it('matches a known historical season (Greg Maddux 1997: 20 BB, 232.2 IP)', () => {
+      const resolve = getBasesOnBallsPerNineResolver();
+      // 1997 season: 20 BB over 232.2 IP (698 outs) → BB/9 ≈ 0.774
+      const result = resolve(
+        { bb: 20, outsRecorded: 698 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeCloseTo((9 * 20) / (698 / 3), 5);
+      expect(result).toBeCloseTo(0.774, 3);
+    });
+
+    it('returns null when walks is null', () => {
+      const resolve = getBasesOnBallsPerNineResolver();
+      const result = resolve(
+        { bb: null, outsRecorded: 750 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('returns null when outsRecorded is null', () => {
+      const resolve = getBasesOnBallsPerNineResolver();
+      const result = resolve(
+        { bb: 50, outsRecorded: null },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('returns null when outsRecorded is zero (IP = 0) to avoid division by zero', () => {
+      const resolve = getBasesOnBallsPerNineResolver();
+      const result = resolve(
+        { bb: 50, outsRecorded: 0 },
+        {},
+        emptyCtx,
+        undefined as never,
+      );
+      expect(result).toBeNull();
+    });
+  });
 });
