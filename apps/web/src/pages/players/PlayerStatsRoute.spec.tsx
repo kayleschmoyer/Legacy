@@ -40,21 +40,39 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
   // clipboard/manual-copy fallback) can be exercised. The shared component
   // passes a relative URL; the host prepends origin + sport. Also capture the
   // onPlayerDetails callback so a player click can be simulated directly.
+  //
+  // `canExport` is surfaced (data-testid="can-export") so the host's
+  // premium-gating wiring (PST-010 / LS-7108) can be asserted, and an Export
+  // trigger is always rendered (it ignores `canExport`) so the host's own
+  // handleExport premium guard can be exercised directly — proving export never
+  // runs for a free viewer even if the handler is reached.
   PlayerStatsPage: (props: {
     onShare?: (relativeUrl: string) => void;
     onPlayerDetails?: (player: { id: string | number }) => void;
+    onExport?: (filters: unknown, viewMode: string) => void;
+    canExport?: boolean;
     [key: string]: unknown;
   }) => {
     mockStatsPageProps = props;
     mockOnPlayerDetailsRef.current = props.onPlayerDetails;
     return (
-      <button
-        type="button"
-        data-testid="share-button"
-        onClick={() => props.onShare?.('/players/stats?view=combined')}
-      >
-        Share
-      </button>
+      <>
+        <button
+          type="button"
+          data-testid="share-button"
+          onClick={() => props.onShare?.('/players/stats?view=combined')}
+        >
+          Share
+        </button>
+        <div data-testid="can-export">{String(props.canExport)}</div>
+        <button
+          type="button"
+          data-testid="export-button"
+          onClick={() => props.onExport?.({}, 'combined')}
+        >
+          Export
+        </button>
+      </>
     );
   },
   // Mirror the shared shell's canonical mapping so the host's URL-rewrite
@@ -88,9 +106,10 @@ jest.mock('../../components/PremiumGate', () => ({
   PremiumGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+let mockHasEntitlement = true;
 jest.mock('../../hooks/useIsPremium', () => ({
-  useIsPremium: () => true,
-  useHasEntitlement: () => true,
+  useIsPremium: () => mockHasEntitlement,
+  useHasEntitlement: () => mockHasEntitlement,
 }));
 
 jest.mock('../../components/PlayerDetailModal', () => ({
@@ -125,6 +144,12 @@ jest.mock('@legacy-sports/logging', () => ({
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+// Default every test to a premium viewer; suites that need a free viewer opt in
+// by setting mockHasEntitlement = false in their own (inner) beforeEach/test.
+beforeEach(() => {
+  mockHasEntitlement = true;
+});
 
 describe('PlayerStatsRoute inline NFL view', () => {
   beforeEach(() => {
@@ -514,6 +539,8 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
   }
 
   it('revokes the object URL on a successful export', () => {
+    // Premium viewer (default) so the export actually runs.
+    mockHasEntitlement = true;
     const onExport = getOnExport();
     onExport({}, 'combined');
 
@@ -523,6 +550,7 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
   });
 
   it('revokes the object URL even when the link click throws', () => {
+    mockHasEntitlement = true;
     const onExport = getOnExport();
     const clickSpy = jest
       .spyOn(HTMLAnchorElement.prototype, 'click')
@@ -543,6 +571,7 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
   });
 
   it('revokes a distinct URL for every export across repeated exports', () => {
+    mockHasEntitlement = true;
     const onExport = getOnExport();
 
     for (let i = 0; i < 50; i++) {
@@ -556,5 +585,55 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
     const revoked = revokeObjectURL.mock.calls.map((c) => c[0]);
     expect(new Set(revoked)).toEqual(new Set(created));
     expect(revoked).toHaveLength(new Set(revoked).size);
+  });
+});
+
+// PST-010 / LS-7108: the Export JSON action previously ran unconditionally for
+// any viewer — handleExport had no premium check, no PremiumGate awareness, and
+// the page-level gate only blurs/blocks pointer events (a keyboard user could
+// still trigger it). The host now hides the Export button for non-premium
+// viewers (canExport) and guards handleExport so the client-side download never
+// runs without entitlement.
+describe('PlayerStatsRoute export premium gating (PST-010 / LS-7108)', () => {
+  let createObjectURL: jest.Mock;
+
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+    mockIsAuthenticated = true;
+    mockAuthLoading = false;
+    // jsdom does not implement object-URL APIs; stub them so handleExport's
+    // download path can run and be observed.
+    createObjectURL = jest.fn(() => 'blob:mock');
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = jest.fn();
+  });
+
+  it('grants the export capability (canExport=true) to premium viewers', () => {
+    mockHasEntitlement = true;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('can-export')).toHaveTextContent('true');
+  });
+
+  it('withholds the export capability (canExport=false) from non-premium viewers', () => {
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('can-export')).toHaveTextContent('false');
+  });
+
+  it('runs the client-side export for premium viewers', () => {
+    mockHasEntitlement = true;
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('export-button'));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not run the client-side export for non-premium viewers, even if the handler is reached', () => {
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('export-button'));
+    expect(createObjectURL).not.toHaveBeenCalled();
   });
 });

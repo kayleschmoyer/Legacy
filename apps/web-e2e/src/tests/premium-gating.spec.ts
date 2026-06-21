@@ -18,6 +18,7 @@ import { enableFootball, useTier } from '../fixtures/shared-mocks';
 
 const GATE = 'premium-feature-gate';
 const UPGRADE_CTA = /upgrade to premium/i;
+const EXPORT_BUTTON = /export player statistics as json/i;
 
 test.describe('Premium gating — free user @critical', () => {
   test('Player Stats page is gated for free users', async ({ page }) => {
@@ -28,6 +29,13 @@ test.describe('Premium gating — free user @critical', () => {
     await expect(
       page.getByRole('button', { name: UPGRADE_CTA }).first(),
     ).toBeVisible();
+
+    // PST-010 / LS-7108: Export is a premium action. The page-level gate only
+    // blurs/blocks pointer events (leaving a keyboard path), so the Export
+    // button must not be rendered at all for a free viewer.
+    await expect(page.getByRole('button', { name: EXPORT_BUTTON })).toHaveCount(
+      0,
+    );
   });
 
   test('View Game Logs page is gated for free users', async ({ page }) => {
@@ -75,5 +83,19 @@ test.describe('Premium gating — premium user @critical', () => {
     // No lock overlay; the player-ID input is interactive (not behind the gate).
     await expect(page.getByTestId(GATE)).toHaveCount(0);
     await expect(page.getByPlaceholder('Enter player ID')).toBeVisible();
+  });
+
+  test('Player Stats Export JSON is available to premium users', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await page.goto('/players/stats');
+
+    // No lock overlay, and the premium Export action is rendered (PST-010 /
+    // LS-7108 — premium viewers keep full export).
+    await expect(page.getByTestId(GATE)).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: EXPORT_BUTTON }),
+    ).toBeVisible();
   });
 });

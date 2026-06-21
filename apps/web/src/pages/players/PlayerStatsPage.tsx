@@ -799,6 +799,13 @@ export function PlayerStatsRoute() {
   // Handle export functionality
   const handleExport = useCallback(
     (filters: PlayerStatsFilters, viewMode: PlayerStatsViewMode) => {
+      // Export is a premium feature (PST-010 / LS-7108). The Export button is
+      // already hidden for non-premium viewers (canExport below), but guard the
+      // handler too so the client-side download can never run for a free user
+      // even if reached programmatically or via a keyboard activation path that
+      // the page-level PremiumGate's pointer-event block does not cover.
+      if (!isPremium) return;
+
       // Serialize with an upper size bound. The download path is a synchronous
       // stringify + Blob that blocks the main thread; refusing an oversized
       // payload here prevents a large export from freezing the tab or
@@ -838,7 +845,7 @@ export function PlayerStatsRoute() {
       LOGGER.info('Exported player statistics', { bytes });
       setLiveMsg('Player statistics exported. Download started.');
     },
-    [],
+    [isPremium],
   );
 
   // Mirror committed filter state into URL params so reload restores the view.
@@ -1113,6 +1120,7 @@ export function PlayerStatsRoute() {
           initialPageSize={initialState.pageSize}
           showHeader={true}
           showActions={true}
+          canExport={isPremium}
           statsFormat={statsFormat}
           initialVisibleColumns={visibleColumns}
           onVisibleColumnsChange={handleVisibleColumnsChange}

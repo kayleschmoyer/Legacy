@@ -325,6 +325,15 @@ export interface PlayerStatsPageProps {
   initialPageSize?: number;
   showHeader?: boolean;
   showActions?: boolean;
+  /**
+   * Whether the Export action is available to the current viewer. Export of
+   * player statistics is a premium capability (PST-010 / LS-7108): when the host
+   * marks the viewer as not entitled (`false`), the Export button is hidden and
+   * {@link PlayerStatsPageProps.onExport} is never invoked. Defaults to `true` so
+   * callers that do not gate export are unaffected. The Share button is
+   * independent and remains governed solely by `showActions`.
+   */
+  canExport?: boolean;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
   /**
@@ -512,6 +521,7 @@ export function PlayerStatsPage({
   initialPageSize = 25,
   showHeader = true,
   showActions = true,
+  canExport = true,
   statsFormat = 'expanded',
   initialVisibleColumns = null,
   onVisibleColumnsChange,
@@ -715,7 +725,12 @@ export function PlayerStatsPage({
 
   // ── Export / share ─────────────────────────────────────────────
   const handleExport = useCallback(() => {
-    if (!onExport) return;
+    // Export is a premium capability (PST-010 / LS-7108). Bail out when the host
+    // has not granted it: the page-level PremiumGate only blurs content and
+    // disables pointer events, which still leaves a keyboard-activation path to
+    // this handler. Guarding here ensures the export never runs for a non-entitled
+    // viewer regardless of how the (now hidden) button was reached.
+    if (!onExport || !canExport) return;
     const filters: PlayerStatsFilters = {
       searchTerm: search || undefined,
       position: position !== 'All Positions' ? position : undefined,
@@ -725,7 +740,17 @@ export function PlayerStatsPage({
       maxERA: maxERA < ERA_MAX_OFF ? maxERA : undefined,
     };
     onExport(filters, viewMode);
-  }, [onExport, search, position, team, minHR, minAVG, maxERA, viewMode]);
+  }, [
+    onExport,
+    canExport,
+    search,
+    position,
+    team,
+    minHR,
+    minAVG,
+    maxERA,
+    viewMode,
+  ]);
 
   const handleShare = useCallback(() => {
     if (!onShare) return;
@@ -1022,30 +1047,34 @@ export function PlayerStatsPage({
                   )}
                   <Text style={GOLD_ACCENT_BUTTON_LABEL_STYLE}>Share</Text>
                 </Pressable>
-                <Pressable
-                  onPress={handleExport}
-                  accessibilityRole="button"
-                  accessibilityLabel="Export player statistics as JSON"
-                  style={GOLD_ACCENT_BUTTON_STYLE}
-                >
-                  {Platform.OS === 'web' && (
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke={BRAND_GOLD_LIGHT}
-                      strokeWidth="2"
-                    >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                  )}
-                  <Text style={GOLD_ACCENT_BUTTON_LABEL_STYLE}>
-                    Export JSON
-                  </Text>
-                </Pressable>
+                {/* Export is premium-gated (PST-010 / LS-7108): only rendered when
+                    the host grants the export capability. */}
+                {canExport && (
+                  <Pressable
+                    onPress={handleExport}
+                    accessibilityRole="button"
+                    accessibilityLabel="Export player statistics as JSON"
+                    style={GOLD_ACCENT_BUTTON_STYLE}
+                  >
+                    {Platform.OS === 'web' && (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={BRAND_GOLD_LIGHT}
+                        strokeWidth="2"
+                      >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                    )}
+                    <Text style={GOLD_ACCENT_BUTTON_LABEL_STYLE}>
+                      Export JSON
+                    </Text>
+                  </Pressable>
+                )}
               </XStack>
             )}
           </XStack>
