@@ -249,6 +249,21 @@ export type StatColumn = {
   lead?: boolean;
 };
 
+/** Format a batting average in baseball convention: three decimal places with
+ *  the leading zero stripped for sub-1.000 values (`0.305` → `.305`), while a
+ *  perfect `1.000` keeps its leading integer (`1.000`). Negative or non-finite
+ *  inputs — which a batting average can never legitimately be, but which a server
+ *  bug could surface — are clamped to the `0` floor so the cell never renders a
+ *  stray `-0.001` or `NaN` (PST-021 / LS-7114). Exported for unit testing. */
+export function formatBattingAverage(value: number): string {
+  // Clamp the floor: a batting average is bounded at [0, 1.000], so anything
+  // below 0 (or non-finite) collapses to 0 — never a leading "-" or "NaN".
+  const clamped = Number.isFinite(value) && value > 0 ? value : 0;
+  // Strip only the leading zero of a sub-1.000 average; "1.000" (a perfect
+  // game) has no leading "0" for the anchor to match, so its integer survives.
+  return clamped.toFixed(3).replace(/^0/, '');
+}
+
 /** Default baseball stat columns. Mirrors the `BA / HR / R / RBI / SB` set
  *  called out in LS-4653 AC1. Each `getValue` reads the corresponding field
  *  from `player.careerBatting` (wired through the Player GraphQL fragment in
@@ -259,7 +274,7 @@ export const BASEBALL_STAT_COLUMNS: StatColumn[] = [
     label: 'AVG',
     lead: true,
     getValue: (p) => p.careerBatting?.battingAverage ?? null,
-    format: (v) => v.toFixed(3).replace(/^0/, ''),
+    format: formatBattingAverage,
   },
   {
     key: 'hr',

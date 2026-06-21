@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 import {
   BASEBALL_STAT_COLUMNS,
   computeScrollAffordance,
+  formatBattingAverage,
   PlayersStatsTable,
   sortPlayers,
   type StatColumn,
@@ -244,6 +245,42 @@ describe('BASEBALL_STAT_COLUMNS (LS-4653)', () => {
     const avg = BASEBALL_STAT_COLUMNS.find((c) => c.key === 'avg');
     expect(avg?.format?.(0.305)).toBe('.305');
     expect(avg?.format?.(0.342)).toBe('.342');
+  });
+});
+
+describe('formatBattingAverage (PST-021 / LS-7114)', () => {
+  it('strips the leading zero for sub-1.000 averages', () => {
+    expect(formatBattingAverage(0.305)).toBe('.305');
+    expect(formatBattingAverage(0.342)).toBe('.342');
+    expect(formatBattingAverage(0.25)).toBe('.250');
+    expect(formatBattingAverage(0.1)).toBe('.100');
+  });
+
+  it('renders a zero average as ".000"', () => {
+    expect(formatBattingAverage(0)).toBe('.000');
+  });
+
+  it('preserves the leading integer for a perfect 1.000 average', () => {
+    // Perfect-game edge: "1.000" has no leading "0" to strip.
+    expect(formatBattingAverage(1)).toBe('1.000');
+  });
+
+  it('clamps negative values to the 0 floor (no leading "-")', () => {
+    // A negative-from-bug value must never render as "-0.001" / "-.001".
+    expect(formatBattingAverage(-0.001)).toBe('.000');
+    expect(formatBattingAverage(-0.25)).toBe('.000');
+    expect(formatBattingAverage(-1)).toBe('.000');
+  });
+
+  it('clamps non-finite values to the 0 floor (no "NaN")', () => {
+    expect(formatBattingAverage(Number.NaN)).toBe('.000');
+    expect(formatBattingAverage(Number.POSITIVE_INFINITY)).toBe('.000');
+    expect(formatBattingAverage(Number.NEGATIVE_INFINITY)).toBe('.000');
+  });
+
+  it('rounds to three decimal places', () => {
+    expect(formatBattingAverage(0.30449)).toBe('.304');
+    expect(formatBattingAverage(0.9999)).toBe('1.000');
   });
 });
 
