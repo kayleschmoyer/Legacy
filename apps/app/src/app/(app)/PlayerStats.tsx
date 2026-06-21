@@ -11,6 +11,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import { PremiumGate } from '../../features/subscription/PremiumGate';
 import { useSubscription } from '../../features/subscription/useSubscription';
+import { useStatsFormat } from '../../common/utilities/useStatsFormat';
 
 // Web origin used to turn the shared component's relative share path into a
 // fully-qualified deep link (matches the SalaryCapManagementCard pattern).
@@ -210,6 +211,12 @@ export default function PlayerStatsScreen() {
   const params = useLocalSearchParams();
   const { isPremium } = useSubscription();
 
+  // Read the user's saved stats-format preference instead of hardcoding it, so a
+  // premium user who chose 'expanded' (or 'standard') on the Preferences screen
+  // sees the matching column set — at parity with web (LS-7106 / PST-002). The
+  // hook re-reads on screen focus, picking up changes made on Preferences.
+  const statsFormat = useStatsFormat();
+
   // Hydrate initial filter/view/page state from the expo-router search params so
   // the view is restored after app backgrounding, expo-router state replacement,
   // or process kill, and so a link shared from web/mobile opens pre-filtered
@@ -313,7 +320,7 @@ export default function PlayerStatsScreen() {
         onFiltersChange={handleFiltersChange}
         showHeader={true}
         showActions={true}
-        statsFormat="expanded"
+        statsFormat={statsFormat}
       />
     </PremiumGate>
   );

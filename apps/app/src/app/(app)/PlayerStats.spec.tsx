@@ -37,6 +37,13 @@ jest.mock('../../features/subscription/useSubscription', () => ({
   useSubscription: () => ({ isPremium: true }),
 }));
 
+// Stats-format preference is now read from storage via useStatsFormat (LS-7106);
+// mock it so the screen renders with a controllable value per test.
+let mockStatsFormat: 'standard' | 'expanded' = 'standard';
+jest.mock('../../common/utilities/useStatsFormat', () => ({
+  useStatsFormat: () => mockStatsFormat,
+}));
+
 let capturedOnPlayerDetails: ((player: PlayerWithStats) => void) | undefined;
 let capturedOnShare: ((url: string) => void) | undefined;
 let capturedOnExport:
@@ -108,6 +115,7 @@ jest.mock('@legacy-sports/shared-components', () => {
 describe('PlayerStatsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockStatsFormat = 'standard';
     mockSearchParams = {};
     capturedOnPlayerDetails = undefined;
     capturedOnShare = undefined;
@@ -121,13 +129,22 @@ describe('PlayerStatsScreen', () => {
   it('renders without crashing', () => {
     render(<PlayerStatsScreen />);
     expect(
-      screen.getByTestId('player-stats-page-header-actions-expanded'),
+      screen.getByTestId('player-stats-page-header-actions-standard'),
     ).toBeTruthy();
   });
 
-  it('enables actions and premium (expanded) columns for parity with web', () => {
+  it('drives statsFormat from the saved preference instead of hardcoding it (LS-7106)', () => {
+    // Default (no stored preference) resolves to 'standard', matching web.
+    mockStatsFormat = 'standard';
+    const { unmount } = render(<PlayerStatsScreen />);
+    expect(
+      screen.getByTestId('player-stats-page-header-actions-standard'),
+    ).toBeTruthy();
+    unmount();
+
+    // A premium user who chose 'expanded' on Preferences gets the expanded set.
+    mockStatsFormat = 'expanded';
     render(<PlayerStatsScreen />);
-    // testID encodes showHeader=true, showActions=true, statsFormat="expanded"
     expect(
       screen.getByTestId('player-stats-page-header-actions-expanded'),
     ).toBeTruthy();
