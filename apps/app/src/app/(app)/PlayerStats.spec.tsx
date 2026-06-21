@@ -12,6 +12,7 @@ import PlayerStatsScreen, {
   buildStatsParams,
   parseStatsParams,
   sanitizeSearchParam,
+  toPlayerDetailIdParam,
 } from './PlayerStats';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -153,6 +154,75 @@ describe('PlayerStatsScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/PlayerDetail',
       params: { playerId: '99', playerName: 'Shohei Ohtani' },
+    });
+  });
+
+  it('forwards a brefId string identifier through to PlayerDetail (PST-052)', () => {
+    render(<PlayerStatsScreen />);
+
+    const mockPlayer = {
+      id: 'troutmi01',
+      name: 'Mike Trout',
+    } as PlayerWithStats;
+    capturedOnPlayerDetails?.(mockPlayer);
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/PlayerDetail',
+      params: { playerId: 'troutmi01', playerName: 'Mike Trout' },
+    });
+  });
+
+  it('does not navigate when player.id is missing — avoids pushing String(undefined) (PST-052)', () => {
+    render(<PlayerStatsScreen />);
+
+    // A mixed/future schema can yield an undefined id; the old blind
+    // String(player.id) pushed the literal 'undefined' and crashed the detail
+    // screen. The guard must refuse to navigate instead.
+    const mockPlayer = {
+      id: undefined,
+      name: 'Ghost Player',
+    } as unknown as PlayerWithStats;
+    capturedOnPlayerDetails?.(mockPlayer);
+
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  describe('toPlayerDetailIdParam', () => {
+    it('accepts a positive numeric id and returns its string form', () => {
+      expect(toPlayerDetailIdParam(7)).toBe('7');
+    });
+
+    it('accepts a strict-integer string id', () => {
+      expect(toPlayerDetailIdParam('42')).toBe('42');
+    });
+
+    it('treats a non-numeric string as a brefId (trimmed + lower-cased)', () => {
+      expect(toPlayerDetailIdParam('  TroutMi01 ')).toBe('troutmi01');
+    });
+
+    it('rejects undefined, null, and empty/whitespace ids', () => {
+      expect(toPlayerDetailIdParam(undefined)).toBeNull();
+      expect(toPlayerDetailIdParam(null)).toBeNull();
+      expect(toPlayerDetailIdParam('')).toBeNull();
+      expect(toPlayerDetailIdParam('   ')).toBeNull();
+    });
+
+    it('rejects the literal "undefined"/"null"/"NaN" tokens a blind coercion produces', () => {
+      // These are the exact strings String(undefined)/String(null)/String(NaN)
+      // yield (PST-052). They are never valid identifiers, so the guard must
+      // reject them rather than forward them as a brefId.
+      expect(toPlayerDetailIdParam('undefined')).toBeNull();
+      expect(toPlayerDetailIdParam('null')).toBeNull();
+      expect(toPlayerDetailIdParam('NaN')).toBeNull();
+    });
+
+    it('rejects zero, negative, non-finite, and out-of-range numeric ids', () => {
+      expect(toPlayerDetailIdParam(0)).toBeNull();
+      expect(toPlayerDetailIdParam(-5)).toBeNull();
+      expect(toPlayerDetailIdParam(Number.NaN)).toBeNull();
+      expect(toPlayerDetailIdParam(2147483648)).toBeNull();
+      expect(toPlayerDetailIdParam('0')).toBeNull();
+      expect(toPlayerDetailIdParam('2147483648')).toBeNull();
     });
   });
 

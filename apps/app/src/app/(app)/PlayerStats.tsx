@@ -31,6 +31,55 @@ const VIEW_MODES: ReadonlySet<PlayerStatsViewMode> = new Set([
   'pitchers',
 ]);
 
+// Literal tokens that a blind `String(player.id)` coercion produces for a
+// missing/NaN id. They are never valid identifiers, so the guard rejects them
+// rather than forwarding them as a brefId (PST-052 / LS-7125).
+const INVALID_ID_TOKENS: ReadonlySet<string> = new Set([
+  'undefined',
+  'null',
+  'nan',
+]);
+
+/**
+ * Resolve a `PlayerWithStats.id` into a validated route param for the
+ * PlayerDetail screen. `PlayerWithStats.id` is typed `number | string`, so the
+ * previous blind `String(player.id)` coercion could forward the literal
+ * `'undefined'`/`'NaN'` for a missing id (mixed/future schema) and crash the
+ * detail screen (PST-052). This guard mirrors the web wrapper's
+ * `PlayerDetailPage` validation:
+ *  - a positive integer id (number, or a strict `/^\d+$/` string) within the
+ *    GraphQL Int range is returned in canonical string form;
+ *  - a non-numeric, non-empty string is treated as a Baseball-Reference id
+ *    (brefId), trimmed and lower-cased to match web's brefId normalization;
+ *  - anything else (undefined, null, empty/whitespace, the `'undefined'`/
+ *    `'null'`/`'NaN'` tokens, zero/negative, non-finite, or out-of-range)
+ *    returns `null` so the caller can skip navigation.
+ *
+ * Exported for unit testing.
+ */
+export function toPlayerDetailIdParam(
+  id: number | string | null | undefined,
+): string | null {
+  // Numeric ids: accept finite positive integers within the GraphQL Int range.
+  if (typeof id === 'number') {
+    return Number.isSafeInteger(id) && id > 0 && id <= MAX_GRAPHQL_INT
+      ? String(id)
+      : null;
+  }
+  if (typeof id !== 'string') return null;
+  const trimmed = id.trim();
+  if (trimmed === '') return null;
+  if (INVALID_ID_TOKENS.has(trimmed.toLowerCase())) return null;
+  // A strict integer string is a numeric id (mirrors web's `/^\d+$/` split);
+  // range-check it the same way as a numeric id.
+  if (/^\d+$/.test(trimmed)) {
+    const parsed = Number(trimmed);
+    return parsed > 0 && parsed <= MAX_GRAPHQL_INT ? String(parsed) : null;
+  }
+  // Non-numeric string → brefId. Normalize like web (trim + lower-case).
+  return trimmed.toLowerCase();
+}
+
 /**
  * Read a single expo-router search param value. expo-router returns
  * `string | string[]` per key; take the first element of arrays and reject
@@ -184,9 +233,21 @@ export default function PlayerStatsScreen() {
 
   const handlePlayerDetails = useCallback(
     (player: PlayerWithStats) => {
+      // Validate the id before navigating (PST-052). Forwarding a blindly
+      // String()-coerced id let a missing/garbage id push the literal
+      // 'undefined'/'NaN' and crash the detail screen; the guard returns null
+      // for those and for out-of-range ids, and normalizes brefId strings.
+      const playerId = toPlayerDetailIdParam(player.id);
+      if (playerId === null) {
+        LOGGER.warn(
+          '[PlayerStats] skipping PlayerDetail navigation for invalid player id',
+          { id: player.id },
+        );
+        return;
+      }
       router.push({
         pathname: '/PlayerDetail',
-        params: { playerId: String(player.id), playerName: player.name },
+        params: { playerId, playerName: player.name },
       });
     },
     [router],
