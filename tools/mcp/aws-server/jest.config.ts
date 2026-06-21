@@ -12,6 +12,9 @@ const config: Config = {
   },
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    // Resolve the shared package path alias to source for ts-jest.
+    '^@legacy-sports/mcp-format$':
+      '<rootDir>/../../../lib/mcp-format/src/index.ts',
   },
 };
 

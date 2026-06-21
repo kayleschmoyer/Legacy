@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 import { errorResult } from '../aws-error.js';
@@ -227,15 +228,16 @@ export async function describeSecurityGroups(
       outboundRules: (sg.IpPermissionsEgress ?? []).map(formatPermission),
     }));
 
+    // Each group nests inbound/outbound rule objects -> minified JSON.
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            { count: groups.length, securityGroups: groups },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            ok: true,
+            count: groups.length,
+            securityGroups: groups,
+          }),
         },
       ],
     };

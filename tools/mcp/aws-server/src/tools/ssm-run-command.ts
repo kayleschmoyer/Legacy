@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -83,9 +84,14 @@ export async function ssmRunCommand(
     };
   }
 
-  // Validate commands for shell metacharacters to prevent injection.
-  // Newlines and quotes are also blocked to prevent shell injection since
-  // runCommand executes with shell: true when passing --parameters to the AWS CLI.
+  // Validate timeout range
+  const effectiveTimeout = Math.max(10, Math.min(timeout, 3600));
+
+  // Validate commands for shell metacharacters to prevent injection, at the
+  // interpolation boundary: `commands` is the only user-controlled value that
+  // reaches `aws ssm send-command --parameters` below (there is no --comment
+  // argument), and runCommand executes with shell: true. Newlines and quotes
+  // are blocked alongside shell operators.
   const SHELL_METACHAR_RE = /[\n\r"'`$;&|<>(){}\\]/;
   const badCommand = commands.find((cmd) => SHELL_METACHAR_RE.test(cmd));
   if (badCommand !== undefined) {
@@ -102,9 +108,6 @@ export async function ssmRunCommand(
       isError: true,
     };
   }
-
-  // Validate timeout range
-  const effectiveTimeout = Math.max(10, Math.min(timeout, 3600));
 
   // Build the --parameters argument as raw JSON.
   // This value is passed as a single argv entry, so shell-style quoting must
@@ -221,20 +224,16 @@ export async function ssmRunCommand(
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  ok: status === 'Success',
-                  commandId,
-                  instanceId,
-                  status,
-                  statusDetails: invocationData.StatusDetails ?? null,
-                  exitCode: invocationData.ResponseCode ?? null,
-                  stdout: invocationData.StandardOutputContent?.trim() ?? '',
-                  stderr: invocationData.StandardErrorContent?.trim() ?? '',
-                },
-                null,
-                2,
-              ),
+              text: minifiedJson({
+                ok: status === 'Success',
+                commandId,
+                instanceId,
+                status,
+                statusDetails: invocationData.StatusDetails ?? null,
+                exitCode: invocationData.ResponseCode ?? null,
+                stdout: invocationData.StandardOutputContent?.trim() ?? '',
+                stderr: invocationData.StandardErrorContent?.trim() ?? '',
+              }),
             },
           ],
           isError: status !== 'Success',

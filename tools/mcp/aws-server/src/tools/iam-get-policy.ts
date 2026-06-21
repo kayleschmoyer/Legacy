@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -29,6 +30,17 @@ interface PolicyMetadata {
   UpdateDate?: string;
 }
 
+/**
+ * IAM policy ARN allowlist. `runCommand` executes with `shell: true`, so the
+ * ARN must be validated before interpolation into `aws iam get-policy
+ * --policy-arn <arn>` to prevent shell injection. Matches both AWS-managed
+ * (`arn:aws:iam::aws:policy/...`) and customer-managed
+ * (`arn:aws:iam::123456789012:policy/...`) ARNs across partitions
+ * (aws / aws-cn / aws-us-gov), allowing the legal IAM name/path characters.
+ */
+const SAFE_POLICY_ARN_RE =
+  /^arn:aws(?:-[a-z]+)?:iam::(?:aws|\d{12}):policy\/[A-Za-z0-9+=,.@_/-]+$/;
+
 const SSO_ERROR_PATTERN =
   /sso session.*expired|sso.*expired|credentials.*expired|InvalidClientTokenId|ExpiredToken/i;
 
@@ -41,6 +53,21 @@ export async function iamGetPolicy(
 ): Promise<ToolResult> {
   const repoRoot = getRepoRoot();
   const { policyArn, listVersions = false } = params;
+
+  if (!SAFE_POLICY_ARN_RE.test(policyArn)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error: `Invalid policyArn "${policyArn}": must be a valid IAM policy ARN (e.g. arn:aws:iam::123456789012:policy/MyPolicy or arn:aws:iam::aws:policy/ReadOnlyAccess).`,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
 
   // Step 1: fetch policy metadata to get the default version ID
   let policyMeta: PolicyMetadata;
@@ -188,7 +215,8 @@ export async function iamGetPolicy(
     result.versions = versions;
   }
 
+  // Single object with a nested policy `document` -> minified JSON.
   return {
-    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(result) }],
   };
 }

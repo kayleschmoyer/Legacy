@@ -1,4 +1,5 @@
 import { join, relative, resolve } from 'node:path';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -16,10 +17,34 @@ interface TerraformOutputValue {
 
 type TerraformOutputMap = Record<string, TerraformOutputValue>;
 
+/**
+ * Terraform output identifiers are `[a-zA-Z0-9_-]`. Although requested `keys`
+ * are only used for in-JS filtering here (never passed to the CLI), validate
+ * them at the trust boundary so a metacharacter-bearing name can never reach a
+ * `shell: true` command path if this tool is later extended.
+ */
+const SAFE_TF_OUTPUT_NAME_RE = /^[A-Za-z0-9_-]+$/;
+
 export async function terraformOutput(
   params: TerraformOutputParams,
 ): Promise<ToolResult> {
   const repoRoot = getRepoRoot();
+
+  const invalidKey = params.keys?.find((k) => !SAFE_TF_OUTPUT_NAME_RE.test(k));
+  if (invalidKey !== undefined) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            error: `Invalid output name "${invalidKey}": Terraform output names may only contain letters, digits, underscores, and hyphens.`,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
 
   // Reject absolute paths and validate that the resolved directory stays
   // within the repo root to prevent path traversal attacks.
@@ -82,11 +107,16 @@ export async function terraformOutput(
           )
         : unwrapped;
 
+    // Heterogeneous map of Terraform output values -> minified JSON. The
+    // response is a bare `{ outputName: value }` map (keys come from Terraform
+    // state, filtered in JS above — never passed to the CLI), so no `ok`
+    // envelope is added: an `ok` key would collide with a real output named
+    // `ok`. Success is signalled by the absence of `isError` on the ToolResult.
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
+          text: minifiedJson(result),
         },
       ],
     };

@@ -6,9 +6,15 @@ import {
   isAbsolute as pathIsAbsolute,
 } from 'node:path';
 import { writeFileSync, chmodSync, mkdirSync, realpathSync } from 'node:fs';
+import {
+  markdownTable,
+  minifiedJson,
+  pickFields,
+} from '@legacy-sports/mcp-format';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 import { SSO_ERROR_PATTERN, ssoRemedy } from '../aws-error.js';
+import { SECRET_LIST_COLUMNS } from '../format.js';
 
 // ---------------------------------------------------------------------------
 // Input validation
@@ -118,26 +124,22 @@ export async function describeSecret(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              ok: true,
-              arn: data.ARN,
-              name: data.Name,
-              description: data.Description ?? null,
-              kmsKeyId: data.KmsKeyId ?? null,
-              rotationEnabled: data.RotationEnabled ?? false,
-              lastChangedDate: data.LastChangedDate ?? null,
-              lastAccessedDate: data.LastAccessedDate ?? null,
-              tags: Object.fromEntries(
-                (data.Tags ?? [])
-                  .filter((t) => t.Key !== undefined)
-                  .map((t) => [t.Key!, t.Value ?? '']),
-              ),
-              versionCount: Object.keys(data.VersionIdsToStages ?? {}).length,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            ok: true,
+            arn: data.ARN,
+            name: data.Name,
+            description: data.Description ?? null,
+            kmsKeyId: data.KmsKeyId ?? null,
+            rotationEnabled: data.RotationEnabled ?? false,
+            lastChangedDate: data.LastChangedDate ?? null,
+            lastAccessedDate: data.LastAccessedDate ?? null,
+            tags: Object.fromEntries(
+              (data.Tags ?? [])
+                .filter((t) => t.Key !== undefined)
+                .map((t) => [t.Key!, t.Value ?? '']),
+            ),
+            versionCount: Object.keys(data.VersionIdsToStages ?? {}).length,
+          }),
         },
       ],
     };
@@ -556,17 +558,15 @@ export async function listSecrets(
       description: s.Description ?? null,
       lastChangedDate: s.LastChangedDate ?? null,
     }));
+    // Flat, uniform list -> Markdown table (column headers written once).
+    const text =
+      secrets.length === 0
+        ? 'No secrets found.'
+        : markdownTable(pickFields(secrets, SECRET_LIST_COLUMNS), {
+            columns: SECRET_LIST_COLUMNS,
+          });
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            { ok: true, count: secrets.length, secrets },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text }],
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

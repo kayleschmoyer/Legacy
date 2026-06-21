@@ -1,6 +1,12 @@
+import {
+  markdownTable,
+  minifiedJson,
+  pickFields,
+} from '@legacy-sports/mcp-format';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 import { SSO_ERROR_PATTERN, errorResult, ssoRemedy } from '../aws-error.js';
+import { EC2_INSTANCE_COLUMNS } from '../format.js';
 
 // ---------------------------------------------------------------------------
 // aws_ec2_instances
@@ -99,17 +105,17 @@ export async function ec2Instances(
       architecture: i.Architecture,
     }));
 
+    // Flat, uniform list -> Markdown table (column headers written once). The
+    // unadvertised `architecture` field is pruned by EC2_INSTANCE_COLUMNS.
+    const text =
+      formatted.length === 0
+        ? 'No EC2 instances found.'
+        : markdownTable(pickFields(formatted, EC2_INSTANCE_COLUMNS), {
+            columns: EC2_INSTANCE_COLUMNS,
+          });
+
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            { count: formatted.length, instances: formatted },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text }],
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -239,16 +245,13 @@ export async function ec2DescribeImage(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                imageId: image.ImageId ?? '',
-                tag,
-                value: value ?? null,
-                found: value !== undefined,
-              },
-              null,
-              2,
-            ),
+            text: minifiedJson({
+              ok: true,
+              imageId: image.ImageId ?? '',
+              tag,
+              value: value ?? null,
+              found: value !== undefined,
+            }),
           },
         ],
       };
@@ -258,20 +261,17 @@ export async function ec2DescribeImage(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              imageId: image.ImageId ?? '',
-              name: image.Name,
-              creationDate: image.CreationDate,
-              state: image.State,
-              architecture: image.Architecture,
-              ownerId: image.OwnerId,
-              description: image.Description ?? null,
-              tags: tagsObject,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            ok: true,
+            imageId: image.ImageId ?? '',
+            name: image.Name,
+            creationDate: image.CreationDate,
+            state: image.State,
+            architecture: image.Architecture,
+            ownerId: image.OwnerId,
+            description: image.Description ?? null,
+            tags: tagsObject,
+          }),
         },
       ],
     };
@@ -342,15 +342,12 @@ export async function ec2ConsoleOutput(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              instanceId: data.InstanceId,
-              timestamp: data.Timestamp ?? null,
-              output: rawOutput ?? '(no console output available)',
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            ok: true,
+            instanceId: data.InstanceId,
+            timestamp: data.Timestamp ?? null,
+            output: rawOutput ?? '(no console output available)',
+          }),
         },
       ],
     };
@@ -413,6 +410,14 @@ interface SsmParameterValue {
 
 const SSM_RESOLVE_PREFIX = 'resolve:ssm:';
 
+/**
+ * SSM parameter name allowlist. `runCommand` executes with `shell: true`, so the
+ * resolved name must be validated before interpolation into `aws ssm
+ * get-parameter --name <param>` to prevent shell injection. SSM names are
+ * alphanumerics plus `_.-/`, optionally leading-slash-qualified.
+ */
+const SAFE_SSM_PARAM_RE = /^\/?[A-Za-z0-9_.\-/]+$/;
+
 async function resolveSsmParam(
   raw: string,
   cwd: string,
@@ -427,6 +432,15 @@ async function resolveSsmParam(
     colonIdx > 0 && /^\d+$/.test(rest.slice(colonIdx + 1))
       ? rest.slice(0, colonIdx)
       : rest;
+  // Refuse to query an SSM name containing shell metacharacters — it is
+  // interpolated into a shell: true runCommand below.
+  if (!SAFE_SSM_PARAM_RE.test(param)) {
+    return {
+      resolved: raw,
+      ssmParam: param,
+      ssmError: `Invalid SSM parameter name "${param}"; refusing to query (only alphanumerics and _.-/ are allowed).`,
+    };
+  }
   try {
     const ssmOutput = await runCommand(
       'aws',
@@ -583,11 +597,11 @@ export async function ec2LaunchTemplateInspect(
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          { count: results.length, launchTemplates: results },
-          null,
-          2,
-        ),
+        text: minifiedJson({
+          ok: true,
+          count: results.length,
+          launchTemplates: results,
+        }),
       },
     ],
   };
@@ -774,25 +788,22 @@ export async function ec2NetworkInspect(
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            environment,
-            vpc: {
-              id: vpc.VpcId,
-              cidr: vpc.CidrBlock,
-              name: vpcTags.Name ?? null,
-              tags: vpcTags,
-            },
-            subnets: finalSubnets,
-            counts: {
-              public: finalSubnets.public.length,
-              private: finalSubnets.private.length,
-              database: finalSubnets.database.length,
-            },
+        text: minifiedJson({
+          ok: true,
+          environment,
+          vpc: {
+            id: vpc.VpcId,
+            cidr: vpc.CidrBlock,
+            name: vpcTags.Name ?? null,
+            tags: vpcTags,
           },
-          null,
-          2,
-        ),
+          subnets: finalSubnets,
+          counts: {
+            public: finalSubnets.public.length,
+            private: finalSubnets.private.length,
+            database: finalSubnets.database.length,
+          },
+        }),
       },
     ],
   };
