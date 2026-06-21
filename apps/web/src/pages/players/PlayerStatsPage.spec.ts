@@ -9,9 +9,11 @@ import {
   parsePageSize,
   parseStatsSearchParams,
   readStatsFormat,
+  readVisibleColumnsPref,
   sanitizeSearchParam,
   URL_SCHEMA_VERSION,
   utf8ByteLength,
+  writeVisibleColumnsPref,
 } from './PlayerStatsPage';
 
 const MAX_GRAPHQL_INT = 2147483647;
@@ -631,5 +633,158 @@ describe('migrateStatsSearchParams', () => {
     const out = migrateStatsSearchParams(input);
     expect(out).not.toBe(input);
     expect(input.has('v')).toBe(false);
+  });
+});
+
+// LS-7105 / PST-001: per-column visibility persists to the `cols` URL param and
+// localStorage, merging with the statsFormat preset on load.
+describe('column visibility — cols URL param', () => {
+  it('omits cols when no explicit selection exists', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: {},
+    });
+    expect(out.has('cols')).toBe(false);
+
+    const outNull = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: {},
+      visibleColumns: null,
+    });
+    expect(outNull.has('cols')).toBe(false);
+  });
+
+  it('writes a comma-separated cols list for an explicit selection', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'hitters',
+      pageSize: 25,
+      filters: {},
+      visibleColumns: ['homeRuns', 'rbi'],
+    });
+    expect(out.get('cols')).toBe('homeRuns,rbi');
+  });
+
+  it('writes the none sentinel when every column is hidden', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'hitters',
+      pageSize: 25,
+      filters: {},
+      visibleColumns: [],
+    });
+    expect(out.get('cols')).toBe('none');
+  });
+
+  it('parses an absent cols param to null (preset default)', () => {
+    const parsed = parseStatsSearchParams(new URLSearchParams('view=hitters'));
+    expect(parsed.visibleColumns).toBeNull();
+  });
+
+  it('parses a cols list, dropping unknown keys', () => {
+    const parsed = parseStatsSearchParams(
+      new URLSearchParams('view=hitters&cols=homeRuns,bogus,era'),
+    );
+    expect(parsed.visibleColumns).toEqual(['homeRuns', 'era']);
+  });
+
+  it('parses the none sentinel to an explicit empty selection', () => {
+    const parsed = parseStatsSearchParams(
+      new URLSearchParams('view=hitters&cols=none'),
+    );
+    expect(parsed.visibleColumns).toEqual([]);
+  });
+
+  it('round-trips an explicit selection through build → parse', () => {
+    const selection = ['homeRuns', 'era', 'strikeouts'];
+    const parsed = parseStatsSearchParams(
+      buildStatsSearchParams({
+        viewMode: 'combined',
+        pageSize: 50,
+        filters: {},
+        visibleColumns: selection,
+      }),
+    );
+    expect(parsed.visibleColumns).toEqual(selection);
+  });
+
+  it('round-trips the explicit empty selection (none) through build → parse', () => {
+    const parsed = parseStatsSearchParams(
+      buildStatsSearchParams({
+        viewMode: 'combined',
+        pageSize: 50,
+        filters: {},
+        visibleColumns: [],
+      }),
+    );
+    expect(parsed.visibleColumns).toEqual([]);
+  });
+});
+
+describe('readVisibleColumnsPref / writeVisibleColumnsPref', () => {
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    localStorage.clear();
+    warnSpy = jest.spyOn(LOGGER, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    localStorage.clear();
+  });
+
+  it('returns null when nothing is stored', () => {
+    expect(readVisibleColumnsPref()).toBeNull();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('round-trips an explicit selection', () => {
+    writeVisibleColumnsPref(['homeRuns', 'era']);
+    expect(readVisibleColumnsPref()).toEqual(['homeRuns', 'era']);
+  });
+
+  it('round-trips the explicit empty selection', () => {
+    writeVisibleColumnsPref([]);
+    expect(readVisibleColumnsPref()).toEqual([]);
+  });
+
+  it('clears the stored selection when given null', () => {
+    writeVisibleColumnsPref(['homeRuns']);
+    writeVisibleColumnsPref(null);
+    expect(readVisibleColumnsPref()).toBeNull();
+  });
+
+  it('preserves other preference keys when writing', () => {
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({ statsFormat: 'expanded', defaultSport: 'football' }),
+    );
+    writeVisibleColumnsPref(['homeRuns']);
+    const stored = JSON.parse(
+      localStorage.getItem(PREFS_STORAGE_KEY) ?? '{}',
+    ) as Record<string, unknown>;
+    expect(stored.statsFormat).toBe('expanded');
+    expect(stored.defaultSport).toBe('football');
+    expect(stored.statsVisibleColumns).toBe('homeRuns');
+  });
+
+  it('drops stale keys not in the column set on read', () => {
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({ statsVisibleColumns: 'homeRuns,bogus' }),
+    );
+    expect(readVisibleColumnsPref()).toEqual(['homeRuns']);
+  });
+
+  it('logs a warning and returns null when stored JSON is corrupted', () => {
+    localStorage.setItem(PREFS_STORAGE_KEY, '{ not valid json');
+    expect(readVisibleColumnsPref()).toBeNull();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'readVisibleColumnsPref parse failed',
+      expect.any(Error),
+      expect.objectContaining({ storageKey: PREFS_STORAGE_KEY }),
+    );
   });
 });

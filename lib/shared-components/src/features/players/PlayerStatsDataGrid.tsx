@@ -34,6 +34,7 @@ import {
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
 import { getPageRange } from './paginationUtils';
+import { resolveVisibleColumns } from './columnVisibility';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -137,6 +138,12 @@ export interface PlayerStatsDataGridProps {
   testId?: string;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
+  /**
+   * Explicit per-column visibility selection (column keys to show). When
+   * provided it overrides the `statsFormat` preset; the Player column is always
+   * kept. When omitted, the `statsFormat` preset is used (LS-7105 / PST-001).
+   */
+  visibleColumns?: readonly string[];
   /** Set of player IDs considered rostered in the user's fantasy leagues (for availability filtering). */
   rosteredPlayerIds?: ReadonlySet<number>;
   /** Availability filter value — client-side applied after fetching. */
@@ -146,6 +153,9 @@ export interface PlayerStatsDataGridProps {
 // =============================================================================
 // Column Configuration
 // =============================================================================
+
+/** Key of the always-visible player-name column (never hidden by the picker). */
+export const BATTING_NAME_COLUMN_KEY = 'displayName';
 
 /**
  * Mapping from UI column keys to GraphQL sort field names
@@ -208,7 +218,7 @@ export const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
  * cell, so it is not a separate column. Team is not available on the underlying
  * PlayerCareerStats data model and is omitted from this slice.
  */
-const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
+export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
   {
     key: 'displayName',
     label: 'Player',
@@ -402,6 +412,7 @@ export function PlayerStatsDataGrid({
   className,
   testId = 'player-stats-data-grid',
   statsFormat = 'expanded',
+  visibleColumns,
   rosteredPlayerIds,
   availabilityFilter,
 }: PlayerStatsDataGridProps): React.ReactElement {
@@ -633,12 +644,19 @@ export function PlayerStatsDataGrid({
   // Responsive Column Filtering
   // =============================================================================
 
-  const visibleColumns = useMemo(() => {
-    if (statsFormat === 'standard') {
-      return CAREER_STATS_COLUMNS.filter((col) => col.priority === 'high');
-    }
-    return CAREER_STATS_COLUMNS;
-  }, [statsFormat]);
+  // Columns to render: an explicit per-column selection (LS-7105) overrides the
+  // statsFormat preset; the Player column is always kept. When no selection is
+  // provided this is byte-identical to the prior statsFormat-only behaviour.
+  const displayColumns = useMemo(
+    () =>
+      resolveVisibleColumns(
+        CAREER_STATS_COLUMNS,
+        statsFormat,
+        visibleColumns,
+        BATTING_NAME_COLUMN_KEY,
+      ),
+    [statsFormat, visibleColumns],
+  );
 
   const displayData = useMemo(() => {
     if (
@@ -861,7 +879,7 @@ export function PlayerStatsDataGrid({
           }}
           paddingVertical="$2"
         >
-          {visibleColumns.map((column) => {
+          {displayColumns.map((column) => {
             const sortField =
               COLUMN_TO_SORT_FIELD_MAP[column.key as string] || column.key;
             const isActiveSortColumn = queryParams.orderBy === sortField;
@@ -973,7 +991,7 @@ export function PlayerStatsDataGrid({
                   }}
                   paddingVertical="$2"
                 >
-                  {visibleColumns.map((column) => {
+                  {displayColumns.map((column) => {
                     const isNameCol = column.key === 'displayName';
                     return (
                       <XStack
@@ -1120,7 +1138,7 @@ export function PlayerStatsDataGrid({
                 onPress={() => handleRowClick(player)}
                 cursor="pointer"
               >
-                {visibleColumns.map((column) => {
+                {displayColumns.map((column) => {
                   const isNameCol = column.key === 'displayName';
                   const raw = player[column.key];
                   const cellValue = column.formatter

@@ -13,8 +13,11 @@ import {
 } from 'react-router-dom';
 import {
   normalizeViewMode,
+  parseVisibleColumns,
   PlayerStatsPage,
   type PlayerStatsViewMode,
+  serializeVisibleColumns,
+  STATS_TOGGLEABLE_COLUMN_KEYS,
 } from '@legacy-sports/shared-components/players';
 import type {
   PlayerStatsFilters,
@@ -212,6 +215,8 @@ export function buildStatsSearchParams(state: {
   pageSize: number;
   filters: PlayerStatsFilters;
   sport?: 'mlb' | 'nfl';
+  /** Explicit per-column visibility selection; `null`/omitted ⇒ no `cols` key. */
+  visibleColumns?: readonly string[] | null;
 }): URLSearchParams {
   const next = new URLSearchParams();
   // Stamp the schema version so a bookmark of this URL is recoverable if the
@@ -220,6 +225,11 @@ export function buildStatsSearchParams(state: {
   next.set('view', state.viewMode);
   next.set('pageSize', String(state.pageSize));
   if (state.sport) next.set('sport', state.sport);
+  // Column-visibility selection (LS-7105 / PST-001). Only written when an
+  // explicit selection exists; an explicit "hide everything" serializes to the
+  // `none` sentinel so it round-trips distinctly from "no selection".
+  const colsParam = serializeVisibleColumns(state.visibleColumns ?? null);
+  if (colsParam !== null) next.set('cols', colsParam);
   if (state.filters.searchTerm)
     next.set('searchTerm', state.filters.searchTerm);
   if (state.filters.position) next.set('position', state.filters.position);
@@ -300,6 +310,8 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
   pageSize: number;
   search: string;
   filters: Partial<PlayerStatsFilters>;
+  /** Per-column visibility selection from `cols` (`null` ⇒ preset default). */
+  visibleColumns: string[] | null;
 } {
   // Upgrade older/unversioned URLs to the current schema before reading any
   // filter keys, so bookmarks minted under a prior schema resolve to the
@@ -314,6 +326,13 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
   );
   const pageSize = parsePageSize(params.get('pageSize'));
   const search = params.get('search') || '';
+
+  // Per-column visibility (LS-7105). Validated against the real column set so a
+  // hand-edited `cols` param can't inject unknown keys.
+  const visibleColumns = parseVisibleColumns(
+    params.get('cols'),
+    STATS_TOGGLEABLE_COLUMN_KEYS,
+  );
 
   // Parse filters from URL
   const filters: Partial<PlayerStatsFilters> = {};
@@ -368,6 +387,7 @@ export function parseStatsSearchParams(searchParams: URLSearchParams): {
     pageSize,
     search,
     filters,
+    visibleColumns,
   };
 }
 
@@ -472,6 +492,58 @@ export function readStatsFormat(): 'standard' | 'expanded' {
       storageKey: PREFS_STORAGE_KEY,
     });
     return 'standard';
+  }
+}
+
+/**
+ * Read the persisted per-column visibility selection from localStorage
+ * (LS-7105 / PST-001). Stored as the same serialized string used in the URL
+ * (`a,b` or the `none` sentinel) under the shared preferences object. Returns
+ * `null` when absent/corrupt — the caller then falls back to the statsFormat
+ * preset. Validated against the real column set so stale keys are dropped.
+ */
+export function readVisibleColumnsPref(): string[] | null {
+  try {
+    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { statsVisibleColumns?: unknown };
+    return typeof parsed.statsVisibleColumns === 'string'
+      ? parseVisibleColumns(
+          parsed.statsVisibleColumns,
+          STATS_TOGGLEABLE_COLUMN_KEYS,
+        )
+      : null;
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    LOGGER.warn('readVisibleColumnsPref parse failed', error, {
+      storageKey: PREFS_STORAGE_KEY,
+    });
+    return null;
+  }
+}
+
+/**
+ * Persist the per-column visibility selection to localStorage, merging into the
+ * shared preferences object without clobbering other keys (statsFormat,
+ * defaultSport). `null` clears the stored selection. Failures are logged and
+ * swallowed — a persistence miss must not break the page.
+ */
+export function writeVisibleColumnsPref(cols: string[] | null): void {
+  try {
+    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    const parsed = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>;
+    const serialized = serializeVisibleColumns(cols);
+    if (serialized === null) {
+      delete parsed.statsVisibleColumns;
+    } else {
+      parsed.statsVisibleColumns = serialized;
+    }
+    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(parsed));
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    LOGGER.warn('writeVisibleColumnsPref failed', error, {
+      storageKey: PREFS_STORAGE_KEY,
+    });
   }
 }
 
@@ -691,6 +763,32 @@ export function PlayerStatsRoute() {
     [searchParams],
   );
 
+  // Per-column visibility selection (LS-7105 / PST-001). Seeded from the `cols`
+  // URL param, falling back to the localStorage preference; `null` ⇒ use the
+  // statsFormat preset. Only seeded once (matching the initialFilters pattern);
+  // subsequent updates flow through handleVisibleColumnsChange.
+  const [visibleColumns, setVisibleColumns] = useState<string[] | null>(
+    () => initialState.visibleColumns ?? readVisibleColumnsPref(),
+  );
+
+  // Persist a column-visibility change to both the URL (`cols`) and localStorage
+  // so the selection survives reload and is shareable. `null` resets to preset.
+  const handleVisibleColumnsChange = useCallback(
+    (cols: string[] | null) => {
+      setVisibleColumns(cols);
+      writeVisibleColumnsPref(cols);
+      const params = new URLSearchParams(window.location.search);
+      const serialized = serializeVisibleColumns(cols);
+      if (serialized === null) {
+        params.delete('cols');
+      } else {
+        params.set('cols', serialized);
+      }
+      setSearchParams(params, { replace: true });
+    },
+    [setSearchParams],
+  );
+
   const handlePlayerDetails = useCallback(
     (player: PlayerWithStats) => {
       navigate(`/players/${player.id}`);
@@ -751,11 +849,16 @@ export function PlayerStatsRoute() {
       pageSize: number;
       filters: PlayerStatsFilters;
     }) => {
-      setSearchParams(buildStatsSearchParams({ ...state, sport }), {
-        replace: true,
-      });
+      // Carry the current column-visibility selection through so a filter change
+      // (which rebuilds the whole param set) never drops the `cols` key.
+      setSearchParams(
+        buildStatsSearchParams({ ...state, sport, visibleColumns }),
+        {
+          replace: true,
+        },
+      );
     },
-    [setSearchParams, sport],
+    [setSearchParams, sport, visibleColumns],
   );
 
   // Handle share functionality — shared component passes a relative URL; prepend origin here.
@@ -1011,6 +1114,8 @@ export function PlayerStatsRoute() {
           showHeader={true}
           showActions={true}
           statsFormat={statsFormat}
+          initialVisibleColumns={visibleColumns}
+          onVisibleColumnsChange={handleVisibleColumnsChange}
           onPlayerDetails={handlePlayerDetails}
           onExport={handleExport}
           onShare={handleShare}

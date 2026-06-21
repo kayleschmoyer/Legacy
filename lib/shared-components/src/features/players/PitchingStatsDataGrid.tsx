@@ -35,6 +35,7 @@ import {
   useGetCareerPitchingStatsQuery,
 } from '@legacy-sports/graphql';
 import { getPageRange } from './paginationUtils';
+import { resolveVisibleColumns } from './columnVisibility';
 import { formatPositionsPlayed } from './services/CareerStatsService';
 
 // ─── Brand color constants (mirror apps/web/src/constants/colors.ts) ──────────
@@ -119,11 +120,20 @@ export interface PitchingStatsDataGridProps {
   testId?: string;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
+  /**
+   * Explicit per-column visibility selection (column keys to show). When
+   * provided it overrides the `statsFormat` preset; the Player column is always
+   * kept. When omitted, the `statsFormat` preset is used (LS-7105 / PST-001).
+   */
+  visibleColumns?: readonly string[];
   /** Set of player IDs considered rostered in the user's fantasy leagues (for availability filtering). */
   rosteredPlayerIds?: ReadonlySet<number>;
   /** Availability filter value — client-side applied after fetching. */
   availabilityFilter?: 'all' | 'free_agents' | 'rostered';
 }
+
+/** Key of the always-visible player-name column (never hidden by the picker). */
+export const PITCHING_NAME_COLUMN_KEY = 'playerName';
 
 // =============================================================================
 // Helpers
@@ -349,6 +359,7 @@ export function PitchingStatsDataGrid({
   className,
   testId = 'pitching-stats-data-grid',
   statsFormat = 'expanded',
+  visibleColumns,
   rosteredPlayerIds,
   availabilityFilter,
 }: PitchingStatsDataGridProps): React.ReactElement {
@@ -545,12 +556,19 @@ export function PitchingStatsDataGrid({
   const hasNextPage = currentOffset + pageSize < totalCount;
   const hasPreviousPage = currentOffset > 0;
 
-  const visibleColumns = useMemo(() => {
-    if (statsFormat === 'standard') {
-      return PITCHING_STATS_COLUMNS.filter((col) => col.priority === 'high');
-    }
-    return PITCHING_STATS_COLUMNS;
-  }, [statsFormat]);
+  // Columns to render: an explicit per-column selection (LS-7105) overrides the
+  // statsFormat preset; the Player column is always kept. When no selection is
+  // provided this is byte-identical to the prior statsFormat-only behaviour.
+  const displayColumns = useMemo(
+    () =>
+      resolveVisibleColumns(
+        PITCHING_STATS_COLUMNS,
+        statsFormat,
+        visibleColumns,
+        PITCHING_NAME_COLUMN_KEY,
+      ),
+    [statsFormat, visibleColumns],
+  );
 
   // =============================================================================
   // Render Helpers
@@ -742,7 +760,7 @@ export function PitchingStatsDataGrid({
           paddingVertical="$2"
           paddingHorizontal="$3"
         >
-          {visibleColumns.map((column) => {
+          {displayColumns.map((column) => {
             const sortField =
               COLUMN_TO_SORT_FIELD_MAP[column.key] || column.key;
             const isActiveSortColumn = queryParams.orderBy === sortField;
@@ -901,7 +919,7 @@ export function PitchingStatsDataGrid({
                   onPress={() => player && handleRowClick(player)}
                   cursor="pointer"
                 >
-                  {visibleColumns.map((column) => {
+                  {displayColumns.map((column) => {
                     const isNameCol = column.key === 'playerName';
                     const cellValue =
                       column.key === 'playerName'

@@ -14,8 +14,23 @@ import {
 } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
 import type { CareerPitchingFragment } from '@legacy-sports/graphql';
-import { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
-import { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
+import {
+  BATTING_NAME_COLUMN_KEY,
+  CAREER_STATS_COLUMNS,
+  PlayerStatsDataGrid,
+} from './PlayerStatsDataGrid';
+import {
+  PITCHING_NAME_COLUMN_KEY,
+  PITCHING_STATS_COLUMNS,
+  PitchingStatsDataGrid,
+} from './PitchingStatsDataGrid';
+import {
+  buildToggleableColumns,
+  type ColumnGroup,
+  presetVisibleKeys,
+  type ToggleableColumn,
+  toggleColumnKey,
+} from './columnVisibility';
 import type {
   PlayerStatsFilters,
   PlayerStatsViewMode,
@@ -124,6 +139,32 @@ const MLB_TEAMS = [
   'TOR',
   'WSN',
 ];
+
+/**
+ * Column groups (batting + pitching) paired with their always-visible name
+ * column key. Drives the column-visibility picker and the host's `cols`
+ * URL/storage validation (LS-7105 / PST-001).
+ */
+export const STATS_COLUMN_GROUPS: readonly ColumnGroup[] = [
+  { columns: CAREER_STATS_COLUMNS, nameKey: BATTING_NAME_COLUMN_KEY },
+  { columns: PITCHING_STATS_COLUMNS, nameKey: PITCHING_NAME_COLUMN_KEY },
+];
+
+/**
+ * Every toggleable stat-column key across both grids (name columns excluded),
+ * de-duplicated. Exported so the host can validate a hand-edited `cols` URL
+ * param / stale localStorage against the real column set.
+ */
+export const STATS_TOGGLEABLE_COLUMN_KEYS: readonly string[] =
+  buildToggleableColumns(
+    STATS_COLUMN_GROUPS as ReadonlyArray<
+      ColumnGroup<{
+        key: string;
+        label: string;
+        priority: 'high' | 'medium' | 'low';
+      }>
+    >,
+  ).map((c) => c.key);
 
 /**
  * Shell-level conditional state. When omitted, the data grid renders and
@@ -286,6 +327,18 @@ export interface PlayerStatsPageProps {
   showActions?: boolean;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
+  /**
+   * Initial per-column visibility selection (column keys to show). `null` /
+   * omitted means "no explicit selection" — the `statsFormat` preset is used as
+   * the baseline (LS-7105 / PST-001). The host seeds this from the `cols` URL
+   * param and localStorage.
+   */
+  initialVisibleColumns?: readonly string[] | null;
+  /**
+   * Fired when the user toggles a column or resets to the preset. `null` signals
+   * a reset (clear the persisted selection); an array is the new explicit set.
+   */
+  onVisibleColumnsChange?: (visibleColumns: string[] | null) => void;
   /** Force a shell-level state card (loading / error / empty) instead of the data grid. */
   state?: PlayerStatsShellState;
   /** Retry handler used by the error state. */
@@ -460,6 +513,8 @@ export function PlayerStatsPage({
   showHeader = true,
   showActions = true,
   statsFormat = 'expanded',
+  initialVisibleColumns = null,
+  onVisibleColumnsChange,
   state,
   onRetry,
   onClearFilters,
@@ -494,6 +549,14 @@ export function PlayerStatsPage({
     ),
   );
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // ── Column visibility (LS-7105) ────────────────────────────────
+  // `null` = no explicit selection (use the statsFormat preset); an array = the
+  // explicit set of stat-column keys to show. The picker panel toggles open.
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<string[] | null>(() =>
+    initialVisibleColumns ? [...initialVisibleColumns] : null,
+  );
 
   // ── Advanced filter draft state ────────────────────────────────
   const [minHR, setMinHR] = useState(initialFilters.minHomeRuns ?? 0);
@@ -681,6 +744,83 @@ export function PlayerStatsPage({
   // LS-7117), where both grids render at once and 100 would paint 200 rows.
   const pageSizeOptions = pageSizeOptionsForViewMode(viewMode);
 
+  // ── Column picker derived state (LS-7105) ──────────────────────
+  // Groups for the currently-visible grids drive the picker list; the seed for
+  // an explicit selection spans BOTH grids so switching tabs never strands a
+  // grid with an empty column set.
+  const activeColumnGroups = useMemo<readonly ColumnGroup[]>(() => {
+    const groups: ColumnGroup[] = [];
+    if (showBatting) {
+      groups.push({
+        columns: CAREER_STATS_COLUMNS,
+        nameKey: BATTING_NAME_COLUMN_KEY,
+      });
+    }
+    if (showPitching) {
+      groups.push({
+        columns: PITCHING_STATS_COLUMNS,
+        nameKey: PITCHING_NAME_COLUMN_KEY,
+      });
+    }
+    return groups;
+  }, [showBatting, showPitching]);
+
+  const toggleableColumns = useMemo<ToggleableColumn[]>(
+    () =>
+      buildToggleableColumns(
+        activeColumnGroups as ReadonlyArray<
+          ColumnGroup<{
+            key: string;
+            label: string;
+            priority: 'high' | 'medium' | 'low';
+          }>
+        >,
+      ),
+    [activeColumnGroups],
+  );
+
+  // Keys the statsFormat preset shows for the active view — drives the picker
+  // checkbox state when there is no explicit selection yet.
+  const activePresetKeys = useMemo(
+    () => presetVisibleKeys(activeColumnGroups, statsFormat),
+    [activeColumnGroups, statsFormat],
+  );
+
+  // Seed spanning BOTH grids — materialized into the explicit selection on the
+  // first toggle so the persisted set stays complete across tab switches.
+  const fullPresetKeys = useMemo(
+    () => presetVisibleKeys(STATS_COLUMN_GROUPS, statsFormat),
+    [statsFormat],
+  );
+
+  // The set actually reflected by the checkboxes: the explicit selection, or the
+  // preset baseline when none exists.
+  const effectiveVisibleKeys = useMemo(
+    () => new Set(visibleColumns ?? activePresetKeys),
+    [visibleColumns, activePresetKeys],
+  );
+
+  const isColumnCustomized = visibleColumns !== null;
+
+  const handleToggleColumn = useCallback(
+    (key: string) => {
+      setVisibleColumns((current) => {
+        const next = toggleColumnKey(current, key, fullPresetKeys);
+        onVisibleColumnsChange?.(next);
+        return next;
+      });
+    },
+    [fullPresetKeys, onVisibleColumnsChange],
+  );
+
+  const handleResetColumns = useCallback(() => {
+    setVisibleColumns(null);
+    onVisibleColumnsChange?.(null);
+  }, [onVisibleColumnsChange]);
+
+  // Explicit selection passed down to the grids (undefined ⇒ statsFormat preset).
+  const gridVisibleColumns = visibleColumns ?? undefined;
+
   // ── URL preview — matches the URL params that apps/web persists ─
   const urlPreview = useMemo(() => {
     const params: string[] = [`view=${viewMode}`, `pageSize=${pageSize}`];
@@ -738,6 +878,7 @@ export function PlayerStatsPage({
           @media (max-width: 640px) {
             .ps-adv-grid { grid-template-columns: 1fr; }
           }
+          .ps-col-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); column-gap: 20px; }
         `}</style>
       )}
 
@@ -1282,57 +1423,134 @@ export function PlayerStatsPage({
             )}
           </YStack>
 
-          {/* Advanced toggle */}
-          <Pressable
-            onPress={() => setAdvancedOpen((v) => !v)}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: advancedOpen }}
-            style={{
-              paddingVertical: 10,
-              paddingHorizontal: 16,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderStyle: 'solid',
-              borderColor: advancedOpen ? BRAND_NAVY_LIGHT : OUTLINE_DEFAULT,
-              backgroundColor: advancedOpen
-                ? 'rgba(27,58,92,0.35)'
-                : 'transparent',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              minHeight: 44,
-            }}
-          >
-            {Platform.OS === 'web' && (
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={advancedOpen ? TEXT_PRIMARY : FG3}
-                strokeWidth="2"
-              >
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-            )}
-            <Text
+          {/* Advanced + Columns toggles — one grid cell so the toolbar's column
+              template stays intact (the picker panel renders below). */}
+          <XStack gap={8} alignItems="center" flexWrap="wrap">
+            {/* Advanced toggle */}
+            <Pressable
+              onPress={() => setAdvancedOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: advancedOpen }}
               style={{
-                fontFamily: FONT_DISPLAY,
-                fontWeight: '700',
-                fontSize: 12,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: advancedOpen ? TEXT_PRIMARY : FG3,
-                whiteSpace: 'nowrap',
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderStyle: 'solid',
+                borderColor: advancedOpen ? BRAND_NAVY_LIGHT : OUTLINE_DEFAULT,
+                backgroundColor: advancedOpen
+                  ? 'rgba(27,58,92,0.35)'
+                  : 'transparent',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                minHeight: 44,
               }}
             >
-              Advanced
-            </Text>
-            <Text style={{ fontSize: 10, color: FG3 }}>
-              {advancedOpen ? '▴' : '▾'}
-            </Text>
-          </Pressable>
+              {Platform.OS === 'web' && (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={advancedOpen ? TEXT_PRIMARY : FG3}
+                  strokeWidth="2"
+                >
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+              )}
+              <Text
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: '700',
+                  fontSize: 12,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: advancedOpen ? TEXT_PRIMARY : FG3,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Advanced
+              </Text>
+              <Text style={{ fontSize: 10, color: FG3 }}>
+                {advancedOpen ? '▴' : '▾'}
+              </Text>
+            </Pressable>
+
+            {/* Columns toggle — opens the per-column visibility picker (LS-7105) */}
+            <Pressable
+              onPress={() => setColumnsOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel="Toggle column visibility"
+              accessibilityState={{ expanded: columnsOpen }}
+              testID="column-picker-toggle"
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderStyle: 'solid',
+                borderColor: columnsOpen
+                  ? BRAND_NAVY_LIGHT
+                  : isColumnCustomized
+                    ? withAlpha(BRAND_GOLD, 0.5)
+                    : OUTLINE_DEFAULT,
+                backgroundColor: columnsOpen
+                  ? 'rgba(27,58,92,0.35)'
+                  : isColumnCustomized
+                    ? withAlpha(BRAND_GOLD, 0.08)
+                    : 'transparent',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                minHeight: 44,
+              }}
+            >
+              {Platform.OS === 'web' && (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={columnsOpen ? TEXT_PRIMARY : FG3}
+                  strokeWidth="2"
+                >
+                  <line x1="3" y1="3" x2="3" y2="21" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                  <line x1="15" y1="3" x2="15" y2="21" />
+                  <line x1="21" y1="3" x2="21" y2="21" />
+                </svg>
+              )}
+              <Text
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: '700',
+                  fontSize: 12,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: columnsOpen ? TEXT_PRIMARY : FG3,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Columns
+              </Text>
+              <Text style={{ fontSize: 10, color: FG3 }}>
+                {columnsOpen ? '▴' : '▾'}
+              </Text>
+            </Pressable>
+          </XStack>
         </XStack>
+
+        {/* ── Column visibility picker ───────────────────────────────── */}
+        {columnsOpen && (
+          <ColumnPickerPanel
+            columns={toggleableColumns}
+            visibleKeys={effectiveVisibleKeys}
+            customized={isColumnCustomized}
+            onToggle={handleToggleColumn}
+            onReset={handleResetColumns}
+          />
+        )}
 
         {/* ── Availability filter ────────────────────────────────────── */}
         {showAvailabilityFilter && (
@@ -1547,6 +1765,7 @@ export function PlayerStatsPage({
                   showSorting={true}
                   showPagination={true}
                   statsFormat={statsFormat}
+                  visibleColumns={gridVisibleColumns}
                   availabilityFilter={
                     showAvailabilityFilter ? availabilityFilter : undefined
                   }
@@ -1569,6 +1788,7 @@ export function PlayerStatsPage({
                   showSorting={true}
                   showPagination={true}
                   statsFormat={statsFormat}
+                  visibleColumns={gridVisibleColumns}
                   availabilityFilter={
                     showAvailabilityFilter ? availabilityFilter : undefined
                   }
@@ -1941,6 +2161,154 @@ function EmptyCard({ onClear }: EmptyCardProps) {
           </Text>
         </Pressable>
       )}
+    </YStack>
+  );
+}
+
+// ── Column visibility picker ────────────────────────────────────────────────────
+
+interface ColumnPickerPanelProps {
+  columns: ToggleableColumn[];
+  /** Keys currently shown (explicit selection, or the preset baseline). */
+  visibleKeys: ReadonlySet<string>;
+  /** True when an explicit selection exists — gates the "Reset columns" link. */
+  customized: boolean;
+  onToggle: (key: string) => void;
+  onReset: () => void;
+}
+
+/**
+ * Per-column show/hide picker (LS-7105 / PST-001). Rendered inline beneath the
+ * toolbar — mirrors the Advanced panel's treatment — so it works identically on
+ * web and native without a popover/portal dependency. Each row is a checkbox
+ * toggling a single stat column; "Reset columns" clears the selection back to
+ * the statsFormat preset.
+ */
+function ColumnPickerPanel({
+  columns,
+  visibleKeys,
+  customized,
+  onToggle,
+  onReset,
+}: ColumnPickerPanelProps) {
+  return (
+    <YStack
+      testID="column-picker-panel"
+      className={Platform.OS === 'web' ? 'ps-adv-panel' : undefined}
+      style={{
+        padding: '18px 20px',
+        background: SURFACE_CARD,
+        border: `1px solid ${OUTLINE_SUBTLE}`,
+        borderRadius: 16,
+        gap: 14,
+      }}
+    >
+      <XStack justifyContent="space-between" alignItems="center">
+        <Text
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontWeight: '700',
+            fontSize: 11,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: BRAND_GOLD_LIGHT,
+          }}
+        >
+          Visible Columns
+        </Text>
+        {customized && (
+          <Pressable
+            onPress={onReset}
+            accessibilityRole="button"
+            accessibilityLabel="Reset columns to default"
+            testID="column-picker-reset"
+            style={{
+              backgroundColor: 'transparent',
+              paddingVertical: 4,
+              paddingHorizontal: 8,
+              borderRadius: 6,
+            }}
+          >
+            <Text
+              style={{
+                color: BRAND_GOLD_LIGHT,
+                fontFamily: FONT_BODY,
+                fontSize: 13,
+                fontWeight: '500',
+              }}
+            >
+              Reset columns
+            </Text>
+          </Pressable>
+        )}
+      </XStack>
+      <XStack
+        className={Platform.OS === 'web' ? 'ps-col-grid' : undefined}
+        style={{
+          display: Platform.OS === 'web' ? 'grid' : 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        {columns.map((col) => {
+          const checked = visibleKeys.has(col.key);
+          return (
+            <Pressable
+              key={col.key}
+              onPress={() => onToggle(col.key)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked }}
+              accessibilityLabel={`${col.label} column`}
+              testID={`column-toggle-${col.key}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                paddingVertical: 6,
+                minHeight: 36,
+              }}
+            >
+              <YStack
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 5,
+                  borderWidth: 1,
+                  borderStyle: 'solid',
+                  borderColor: checked ? BRAND_GOLD : OUTLINE_DEFAULT,
+                  backgroundColor: checked
+                    ? withAlpha(BRAND_GOLD, 0.2)
+                    : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {checked && (
+                  <Text
+                    style={{
+                      color: BRAND_GOLD_LIGHT,
+                      fontSize: 13,
+                      lineHeight: 14,
+                    }}
+                  >
+                    ✓
+                  </Text>
+                )}
+              </YStack>
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontFamily: FONT_BODY,
+                  fontSize: 14,
+                  color: checked ? TEXT_PRIMARY : FG3,
+                }}
+              >
+                {col.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </XStack>
     </YStack>
   );
 }

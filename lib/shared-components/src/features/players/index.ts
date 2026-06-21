@@ -23,7 +23,20 @@ export type { PlayerComparisonProps } from './PlayerComparison';
 // Advanced player statistics components
 export { PlayerStatsDataGrid } from './PlayerStatsDataGrid';
 export { PitchingStatsDataGrid } from './PitchingStatsDataGrid';
-export { PlayerStatsPage, normalizeViewMode } from './PlayerStatsPage';
+export {
+  normalizeViewMode,
+  PlayerStatsPage,
+  STATS_COLUMN_GROUPS,
+  STATS_TOGGLEABLE_COLUMN_KEYS,
+} from './PlayerStatsPage';
+
+// Column-visibility helpers + serialization (LS-7105 / PST-001)
+export {
+  NO_COLUMNS_SENTINEL,
+  parseVisibleColumns,
+  serializeVisibleColumns,
+} from './columnVisibility';
+export type { StatsFormat } from './columnVisibility';
 
 // Career statistics services and types
 export * from './services/CareerStatsService';

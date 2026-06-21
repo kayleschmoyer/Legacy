@@ -65,6 +65,14 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
     if (mode === 'hitters' || mode === 'batting') return 'hitters';
     return 'combined';
   },
+  // Column-visibility helpers consumed by the host's URL parse/serialize +
+  // localStorage paths (LS-7105 / PST-001). Lightweight stand-ins are enough for
+  // the route-level assertions here.
+  STATS_TOGGLEABLE_COLUMN_KEYS: ['homeRuns', 'era', 'strikeouts'],
+  parseVisibleColumns: (raw: string | null) =>
+    raw == null || raw === '' ? null : raw === 'none' ? [] : raw.split(','),
+  serializeVisibleColumns: (cols: readonly string[] | null) =>
+    cols === null ? null : cols.length === 0 ? 'none' : cols.join(','),
 }));
 
 // The football stats browser is rendered inline for the NFL view (LS-8104) and
