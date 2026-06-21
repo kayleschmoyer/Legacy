@@ -206,6 +206,20 @@ export function battingPlayerTypeForViewMode(
   return viewMode === 'hitters' ? 'hitter' : undefined;
 }
 
+/**
+ * Parses a raw range-input value into a finite number, rejecting `NaN`/±Infinity
+ * at the setter boundary. Browser range inputs are well-behaved, but malformed
+ * states (e.g. the value cleared via devtools) can yield `Number('') === 0` or a
+ * `NaN` that would otherwise propagate into filter state and on toward GraphQL.
+ * Returns `null` for any non-finite parse so callers can ignore the change and
+ * keep the prior valid value (LS-7137). Extracted as a pure function so the guard
+ * is unit-testable without mounting the page.
+ */
+export function parseSliderValue(raw: string): number | null {
+  const next = Number(raw);
+  return Number.isFinite(next) ? next : null;
+}
+
 export interface PlayerStatsPageProps {
   title?: string;
   initialViewMode?: PlayerStatsViewMode;
@@ -1827,9 +1841,14 @@ function StatSlider({
           step={step}
           value={value}
           style={{ '--pct': `${pct}%` } as React.CSSProperties}
-          onChange={(e) =>
-            onChange(Number((e.target as HTMLInputElement).value))
-          }
+          onChange={(e) => {
+            const next = parseSliderValue((e.target as HTMLInputElement).value);
+            // Reject NaN/±Infinity at the setter boundary so corrupted input
+            // never reaches filter state (LS-7137).
+            if (next !== null) {
+              onChange(next);
+            }
+          }}
           onMouseUp={onCommit}
           onTouchEnd={onCommit}
           onKeyUp={onCommit}

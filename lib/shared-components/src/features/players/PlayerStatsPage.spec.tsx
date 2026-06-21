@@ -2,6 +2,7 @@ import {
   battingPlayerTypeForViewMode,
   type ClearFiltersSetters,
   createClearFiltersHandler,
+  parseSliderValue,
   stepValue,
 } from './PlayerStatsPage';
 
@@ -176,5 +177,29 @@ describe('battingPlayerTypeForViewMode (LS-7145)', () => {
 
   it('returns undefined for Pitchers (the batting grid is hidden there)', () => {
     expect(battingPlayerTypeForViewMode('pitchers')).toBeUndefined();
+  });
+});
+
+// parseSliderValue guards the StatSlider onChange boundary (LS-7137 / PST-083).
+// A corrupted range-input value (e.g. cleared via devtools) must never push NaN
+// into filter state where it would propagate toward GraphQL. The guard returns
+// null for any non-finite parse so callers ignore the change and keep the prior
+// valid value.
+describe('parseSliderValue (LS-7137)', () => {
+  it('parses well-formed numeric strings', () => {
+    expect(parseSliderValue('0')).toBe(0);
+    expect(parseSliderValue('42')).toBe(42);
+    expect(parseSliderValue('0.295')).toBe(0.295);
+    expect(parseSliderValue('-3')).toBe(-3);
+  });
+
+  it('rejects NaN-producing input by returning null', () => {
+    expect(parseSliderValue('not-a-number')).toBeNull();
+    expect(parseSliderValue('abc')).toBeNull();
+  });
+
+  it('rejects ±Infinity by returning null', () => {
+    expect(parseSliderValue('Infinity')).toBeNull();
+    expect(parseSliderValue('-Infinity')).toBeNull();
   });
 });
