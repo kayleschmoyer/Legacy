@@ -1,8 +1,11 @@
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  applyParamRenames,
   buildStatsSearchParams,
+  migrateStatsSearchParams,
   parseClampedInt,
   sanitizeSearchParam,
+  URL_SCHEMA_VERSION,
 } from './PlayerStatsPage';
 
 const MAX_GRAPHQL_INT = 2147483647;
@@ -208,9 +211,11 @@ describe('buildStatsSearchParams', () => {
       },
       sport: 'mlb',
     });
-    // Keys must be emitted alphabetically, not in insertion order.
+    // Keys must be emitted alphabetically, not in insertion order. The schema
+    // version flag `v` (URL_SCHEMA_VERSION) is part of every written URL and
+    // sorts between `team` and `view`.
     expect(out.toString()).toBe(
-      'minHomeRuns=30&pageSize=25&position=OF&searchTerm=trout&sport=mlb&team=LAA&view=combined',
+      'minHomeRuns=30&pageSize=25&position=OF&searchTerm=trout&sport=mlb&team=LAA&v=1&view=combined',
     );
     expect([...out.keys()]).toEqual([
       'minHomeRuns',
@@ -219,6 +224,7 @@ describe('buildStatsSearchParams', () => {
       'searchTerm',
       'sport',
       'team',
+      'v',
       'view',
     ]);
   });
@@ -237,5 +243,87 @@ describe('buildStatsSearchParams', () => {
       filters: { searchTerm: 'trout', team: 'LAA', position: 'OF' },
     });
     expect(a.toString()).toBe(b.toString());
+  });
+
+  it('stamps the current URL schema version (v) on every written URL', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: {},
+    });
+    expect(out.get('v')).toBe(String(URL_SCHEMA_VERSION));
+  });
+});
+
+describe('applyParamRenames', () => {
+  it('relabels matching keys and preserves their values', () => {
+    const out = applyParamRenames(
+      new URLSearchParams('minHomeRuns=30&view=hitters'),
+      { minHomeRuns: 'minHR' },
+    );
+    expect(out.get('minHR')).toBe('30');
+    expect(out.has('minHomeRuns')).toBe(false);
+    // Unmapped keys pass through untouched.
+    expect(out.get('view')).toBe('hitters');
+  });
+
+  it('is a no-op when the rename map is empty', () => {
+    const out = applyParamRenames(
+      new URLSearchParams('minERA=3.5&team=NYY'),
+      {},
+    );
+    expect(out.get('minERA')).toBe('3.5');
+    expect(out.get('team')).toBe('NYY');
+  });
+
+  it('preserves repeated keys', () => {
+    const out = applyParamRenames(new URLSearchParams('team=NYY&team=BOS'), {});
+    expect(out.getAll('team')).toEqual(['NYY', 'BOS']);
+  });
+});
+
+describe('migrateStatsSearchParams', () => {
+  it('stamps v on an unversioned (legacy) URL and preserves filter values', () => {
+    const out = migrateStatsSearchParams(
+      new URLSearchParams('view=hitters&minHomeRuns=30&team=NYY'),
+    );
+    expect(out.get('v')).toBe(String(URL_SCHEMA_VERSION));
+    // v1 renames nothing, so legacy keys/values round-trip unchanged.
+    expect(out.get('view')).toBe('hitters');
+    expect(out.get('minHomeRuns')).toBe('30');
+    expect(out.get('team')).toBe('NYY');
+  });
+
+  it('passes a current-version URL through unchanged', () => {
+    const out = migrateStatsSearchParams(
+      new URLSearchParams(`v=${URL_SCHEMA_VERSION}&view=pitchers&maxERA=3.50`),
+    );
+    expect(out.get('v')).toBe(String(URL_SCHEMA_VERSION));
+    expect(out.get('view')).toBe('pitchers');
+    expect(out.get('maxERA')).toBe('3.50');
+  });
+
+  it('treats a garbage version flag as legacy', () => {
+    const out = migrateStatsSearchParams(
+      new URLSearchParams('v=not-a-number&minBattingAvg=0.300'),
+    );
+    expect(out.get('v')).toBe(String(URL_SCHEMA_VERSION));
+    expect(out.get('minBattingAvg')).toBe('0.300');
+  });
+
+  it('does not downgrade a newer version written by a future client', () => {
+    const future = URL_SCHEMA_VERSION + 5;
+    const out = migrateStatsSearchParams(
+      new URLSearchParams(`v=${future}&someFutureKey=1`),
+    );
+    expect(out.get('v')).toBe(String(future));
+    expect(out.get('someFutureKey')).toBe('1');
+  });
+
+  it('returns a new instance without mutating the input', () => {
+    const input = new URLSearchParams('view=combined');
+    const out = migrateStatsSearchParams(input);
+    expect(out).not.toBe(input);
+    expect(input.has('v')).toBe(false);
   });
 });

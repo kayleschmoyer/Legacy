@@ -53,6 +53,7 @@ Clicking a player row opens `PlayerDetailModal` (full stat breakdown).
 
 | Param                             | Values                        |
 | --------------------------------- | ----------------------------- |
+| `v`                               | URL schema version (e.g. `1`) |
 | `view`                            | combined / hitters / pitchers |
 | `pageSize`                        | 10 / 25 / 50 / 100            |
 | `search`                          | free-text                     |
@@ -68,6 +69,34 @@ Clicking a player row opens `PlayerDetailModal` (full stat breakdown).
 | `minStrikeouts` / `maxStrikeouts` | SO range                      |
 
 All numeric values clamped to `MAX_GRAPHQL_INT = 2,147,483,647`.
+
+---
+
+## URL Schema Versioning & Deprecation Policy
+
+Every URL the page writes carries a `v` flag (`URL_SCHEMA_VERSION`, currently `1`)
+identifying the param schema it was minted under. On read, `migrateStatsSearchParams`
+upgrades the incoming params to the current schema **before** any filter key is
+parsed, so a bookmark created under an older schema resolves to the equivalent
+filters instead of being silently misinterpreted (PST-101).
+
+- **Unversioned URLs** (no `v`) are treated as the pre-versioning schema and
+  migrated to v1 (which renames nothing — v1 is the original key set).
+- **Garbage `v` values** are treated as legacy.
+- **Newer `v` than this client understands** is left untouched (forward-compatible).
+
+**Deprecation policy — when changing the param contract:**
+
+1. Bump `URL_SCHEMA_VERSION` in `PlayerStatsPage.tsx`.
+2. Append a rename map to `SCHEMA_MIGRATIONS` for the version step — index = the
+   _source_ version (e.g. a v1 → v2 rename goes at `SCHEMA_MIGRATIONS[1]`).
+   Example: renaming `minHomeRuns` → `minHR` adds `{ minHomeRuns: 'minHR' }`.
+3. **Never edit an existing migration entry or repurpose an old key in place** —
+   old bookmarks depend on it staying stable.
+
+Splits (e.g. `maxERA` → season vs career) are handled by extending the migration
+step beyond a plain rename; keep the transform in `SCHEMA_MIGRATIONS` so the
+upgrade path stays declarative and testable.
 
 ---
 

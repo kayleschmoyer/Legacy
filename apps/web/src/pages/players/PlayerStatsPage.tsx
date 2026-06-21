@@ -81,6 +81,85 @@ export function parseClampedInt(raw: string, paramName: string): number {
 }
 
 /**
+ * Current version of the URL query-param schema for this page.
+ *
+ * Bump this whenever a breaking change is made to the param contract — a filter
+ * key is renamed, a key is split into two, or a value's format changes. Every
+ * URL written by {@link buildStatsSearchParams} carries this as the `v` param so
+ * the schema a bookmark was created under is recoverable later.
+ *
+ * Deprecation policy: never delete or repurpose an old key's meaning in place.
+ * When the schema changes, leave the previous behaviour described by a migration
+ * step (see {@link SCHEMA_MIGRATIONS}) so URLs minted under the old schema keep
+ * resolving to the equivalent new filters instead of breaking silently (PST-101).
+ */
+export const URL_SCHEMA_VERSION = 1;
+
+type ParamRenames = Record<string, string>;
+
+/**
+ * Ordered key-rename maps that upgrade a URL from one schema version to the next.
+ *
+ * The array index is the *source* version: `SCHEMA_MIGRATIONS[0]` upgrades an
+ * unversioned (pre-`v=1`) URL to v1, `SCHEMA_MIGRATIONS[1]` would upgrade v1 → v2,
+ * and so on. v1 is the original key set — it shipped before the `v` flag existed,
+ * so the v0 → v1 step renames nothing.
+ *
+ * When a future change renames a filter key (e.g. `minHomeRuns` → `minHR`) or
+ * splits one (e.g. `maxERA` → `maxSeasonERA`), bump {@link URL_SCHEMA_VERSION}
+ * and append the rename map for that step, e.g. `{ minHomeRuns: 'minHR' }`. Never
+ * edit an existing entry — old bookmarks depend on it staying stable.
+ */
+const SCHEMA_MIGRATIONS: ParamRenames[] = [
+  // v0 (unversioned) → v1: no key renames.
+  {},
+];
+
+/**
+ * Apply a key-rename map to a search-param snapshot, returning a new instance.
+ * Values (and repeated keys) are preserved; only matching keys are relabeled.
+ * Exported so the rename mechanism can be unit-tested in isolation.
+ */
+export function applyParamRenames(
+  params: URLSearchParams,
+  renames: ParamRenames,
+): URLSearchParams {
+  const out = new URLSearchParams();
+  for (const [key, value] of params.entries()) {
+    out.append(renames[key] ?? key, value);
+  }
+  return out;
+}
+
+/**
+ * Upgrade a URL search-param snapshot to the current schema version.
+ *
+ * Reads the `v` flag (absent ⇒ legacy/pre-`v=1`), applies each migration step in
+ * order, and stamps the result with the current version. Unknown/garbage `v`
+ * values are treated as legacy; a *newer* version than this client understands is
+ * left untouched (forward-compatible — a future client wrote it). Old bookmarked
+ * URLs are migrated here instead of being silently misinterpreted (PST-101).
+ */
+export function migrateStatsSearchParams(
+  input: URLSearchParams,
+): URLSearchParams {
+  const rawVersion = input.get('v');
+  const parsed = rawVersion === null ? 0 : Number.parseInt(rawVersion, 10);
+  let version = Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+  let params = new URLSearchParams(input.toString());
+  while (version < URL_SCHEMA_VERSION && SCHEMA_MIGRATIONS[version]) {
+    params = applyParamRenames(params, SCHEMA_MIGRATIONS[version]);
+    version += 1;
+  }
+  // Stamp the schema we resolved to, but never downgrade a future version we
+  // didn't understand (leave a newer client's `v` intact).
+  if (version <= URL_SCHEMA_VERSION) {
+    params.set('v', String(URL_SCHEMA_VERSION));
+  }
+  return params;
+}
+
+/**
  * Sanitize a URL search parameter value before forwarding to filters.
  * Strips control characters (U+0000–U+001F, U+007F–U+009F) and enforces a
  * maximum length to prevent injection via string-concatenating audit paths.
@@ -112,6 +191,9 @@ export function buildStatsSearchParams(state: {
   sport?: 'mlb' | 'nfl';
 }): URLSearchParams {
   const next = new URLSearchParams();
+  // Stamp the schema version so a bookmark of this URL is recoverable if the
+  // param contract changes later (migrated by migrateStatsSearchParams on read).
+  next.set('v', String(URL_SCHEMA_VERSION));
   next.set('view', state.viewMode);
   next.set('pageSize', String(state.pageSize));
   if (state.sport) next.set('sport', state.sport);
@@ -355,40 +437,45 @@ export function PlayerStatsRoute() {
 
   // Parse URL parameters for initial state
   const initialState = useMemo(() => {
+    // Upgrade older/unversioned URLs to the current schema before reading any
+    // filter keys, so bookmarks minted under a prior schema resolve to the
+    // equivalent filters instead of being silently misinterpreted (PST-101).
+    const params = migrateStatsSearchParams(searchParams);
+
     // Run the raw `view` param through the shared shell's normalizer so the tab
     // we render is always canonical (combined/hitters/pitchers), honoring legacy
     // aliases (batting→hitters, pitching→pitchers) and unknown values (LS-7146).
     const viewMode = normalizeViewMode(
-      (searchParams.get('view') as PlayerStatsViewMode) || 'combined',
+      (params.get('view') as PlayerStatsViewMode) || 'combined',
     );
-    const pageSize = parseInt(searchParams.get('pageSize') || '25', 10);
-    const search = searchParams.get('search') || '';
+    const pageSize = parseInt(params.get('pageSize') || '25', 10);
+    const search = params.get('search') || '';
 
     // Parse filters from URL
     const filters: Partial<PlayerStatsFilters> = {};
 
     // Career batting filters
-    const minHR = searchParams.get('minHomeRuns');
-    const maxHR = searchParams.get('maxHomeRuns');
-    const minRBI = searchParams.get('minRBI');
-    const maxRBI = searchParams.get('maxRBI');
-    const minAVG = searchParams.get('minBattingAvg');
-    const maxAVG = searchParams.get('maxBattingAvg');
+    const minHR = params.get('minHomeRuns');
+    const maxHR = params.get('maxHomeRuns');
+    const minRBI = params.get('minRBI');
+    const maxRBI = params.get('maxRBI');
+    const minAVG = params.get('minBattingAvg');
+    const maxAVG = params.get('maxBattingAvg');
 
     // Career pitching filters
-    const minERA = searchParams.get('minERA');
-    const maxERA = searchParams.get('maxERA');
-    const minWins = searchParams.get('minWins');
-    const maxWins = searchParams.get('maxWins');
-    const minSO = searchParams.get('minStrikeouts');
-    const maxSO = searchParams.get('maxStrikeouts');
+    const minERA = params.get('minERA');
+    const maxERA = params.get('maxERA');
+    const minWins = params.get('minWins');
+    const maxWins = params.get('maxWins');
+    const minSO = params.get('minStrikeouts');
+    const maxSO = params.get('maxStrikeouts');
 
     // Player info filters — sanitized to strip control chars and cap length
-    const position = sanitizeSearchParam(searchParams.get('position'));
-    const team = sanitizeSearchParam(searchParams.get('team'));
+    const position = sanitizeSearchParam(params.get('position'));
+    const team = sanitizeSearchParam(params.get('team'));
     const playerType: PlayerStatsFilters['playerType'] =
-      sanitizeSearchParam(searchParams.get('playerType')) ?? undefined;
-    const searchTerm = sanitizeSearchParam(searchParams.get('searchTerm'));
+      sanitizeSearchParam(params.get('playerType')) ?? undefined;
+    const searchTerm = sanitizeSearchParam(params.get('searchTerm'));
 
     // Apply batting filters
     if (minHR) filters.minHomeRuns = parseClampedInt(minHR, 'minHomeRuns');
