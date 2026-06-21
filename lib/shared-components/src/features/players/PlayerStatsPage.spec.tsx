@@ -1,4 +1,5 @@
 import {
+  type AppliedFilters,
   battingPlayerTypeForViewMode,
   battingSortFilter,
   buildShareUrl,
@@ -9,6 +10,7 @@ import {
   DEFAULT_BATTING_SORT_BY,
   DEFAULT_BATTING_SORT_DIR,
   enforceSearchMinLength,
+  hasPendingFilterChanges,
   pageSizeOptionsForViewMode,
   parseSliderValue,
   SLIDER_COMMIT_DEBOUNCE_MS,
@@ -294,6 +296,63 @@ describe('createDebouncedCommit (LS-7128)', () => {
 // view-mode→playerType mapping drives the batting query filter; only 'hitters'
 // constrains it, so Combined keeps every batter and Pitchers relies on the
 // separate pitcher-only grid.
+// hasPendingFilterChanges drives the toolbar's Apply button (LS-7126). LS-7126
+// unified every toolbar control on a single draft model: nothing applies on
+// change anymore — Position/Team/Rows used to bypass the draft/applied split and
+// apply instantly while search/sliders stayed in draft. The Apply button is the
+// explicit commit, enabled only when the draft snapshot diverges from the
+// applied snapshot.
+describe('hasPendingFilterChanges (LS-7126)', () => {
+  const base: AppliedFilters = {
+    search: '',
+    position: 'All Positions',
+    team: 'All Teams',
+    pageSize: 25,
+    minHR: 0,
+    minAVG: 0,
+    maxERA: 5,
+  };
+
+  it('returns false when the draft equals the applied snapshot', () => {
+    expect(hasPendingFilterChanges(base, { ...base })).toBe(false);
+  });
+
+  it('detects a pending search edit (the bug: typed name left unapplied)', () => {
+    expect(hasPendingFilterChanges({ ...base, search: 'ruth' }, base)).toBe(
+      true,
+    );
+  });
+
+  it('detects a pending position change (now drafted, not instant)', () => {
+    expect(hasPendingFilterChanges({ ...base, position: 'SP' }, base)).toBe(
+      true,
+    );
+  });
+
+  it('detects a pending team change (now drafted, not instant)', () => {
+    expect(hasPendingFilterChanges({ ...base, team: 'NYY' }, base)).toBe(true);
+  });
+
+  it('detects a pending rows-per-page change (now drafted, not instant)', () => {
+    expect(hasPendingFilterChanges({ ...base, pageSize: 50 }, base)).toBe(true);
+  });
+
+  it('detects pending advanced slider edits (minHR / minAVG / maxERA)', () => {
+    expect(hasPendingFilterChanges({ ...base, minHR: 500 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minAVG: 0.3 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxERA: 3 }, base)).toBe(true);
+  });
+
+  it('returns true when several controls have pending edits at once', () => {
+    expect(
+      hasPendingFilterChanges(
+        { ...base, search: 'judge', position: 'OF', pageSize: 100 },
+        base,
+      ),
+    ).toBe(true);
+  });
+});
+
 describe('battingPlayerTypeForViewMode (LS-7145)', () => {
   it("returns 'hitter' for the Hitters tab so pitchers are filtered out", () => {
     expect(battingPlayerTypeForViewMode('hitters')).toBe('hitter');

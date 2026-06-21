@@ -448,7 +448,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 // 100-row option stays available in the single-grid Hitters/Pitchers modes.
 const COMBINED_MAX_PAGE_SIZE = 50;
 
-interface AppliedFilters {
+export interface AppliedFilters {
   search: string;
   position: string;
   team: string;
@@ -456,6 +456,34 @@ interface AppliedFilters {
   minHR: number;
   minAVG: number;
   maxERA: number;
+}
+
+/**
+ * True when the draft toolbar snapshot differs from the committed (applied)
+ * snapshot — i.e. the user has pending filter edits that have not been applied
+ * yet. Drives the toolbar's "Apply" button enabled/emphasis state.
+ *
+ * LS-7126 unified the toolbar on a single draft model: every control (search,
+ * Position/Team/Rows selects, and the advanced sliders) writes only to draft
+ * state, and an explicit Apply button commits the whole snapshot. Previously
+ * Position/Team/Rows bypassed the draft/applied separation and applied on
+ * change, so a typed-but-unsubmitted search silently stayed unapplied — the
+ * "worst of both" mixed model the bug describes. Extracted as a pure function so
+ * the dirty-check is unit-testable without mounting the page shell.
+ */
+export function hasPendingFilterChanges(
+  draft: AppliedFilters,
+  applied: AppliedFilters,
+): boolean {
+  return (
+    draft.search !== applied.search ||
+    draft.position !== applied.position ||
+    draft.team !== applied.team ||
+    draft.pageSize !== applied.pageSize ||
+    draft.minHR !== applied.minHR ||
+    draft.minAVG !== applied.minAVG ||
+    draft.maxERA !== applied.maxERA
+  );
 }
 
 /**
@@ -659,20 +687,36 @@ export function PlayerStatsPage({
     maxERA: initialFilters.maxERA ?? ERA_MAX_OFF,
   }));
 
+  // Single draft snapshot, mirroring the committed AppliedFilters shape. Every
+  // toolbar control writes only to draft state; applyFilters() commits the whole
+  // snapshot at once so all controls share one apply model (LS-7126).
+  const draftFilters = useMemo<AppliedFilters>(
+    () => ({ search, position, team, pageSize, minHR, minAVG, maxERA }),
+    [search, position, team, pageSize, minHR, minAVG, maxERA],
+  );
+
+  // The snapshot that Apply actually commits. Enforces the documented minimum
+  // search length so a single-character term never fires the query on submit;
+  // sub-minimum entries commit as "no search" while the other filters still apply
+  // (PST-061 / LS-7127). Used for both the commit and the dirty-check so a
+  // sub-minimum search does not leave Apply stuck "enabled" after a commit.
+  const committedDraft = useMemo<AppliedFilters>(
+    () => ({
+      ...draftFilters,
+      search: enforceSearchMinLength(draftFilters.search),
+    }),
+    [draftFilters],
+  );
+
   const applyFilters = useCallback(() => {
-    setAppliedFilters({
-      // Enforce the documented minimum length so a single-character term never
-      // fires the query on submit; sub-minimum entries commit as "no search"
-      // while leaving the other filters free to apply (PST-061 / LS-7127).
-      search: enforceSearchMinLength(search),
-      position,
-      team,
-      pageSize,
-      minHR,
-      minAVG,
-      maxERA,
-    });
-  }, [search, position, team, pageSize, minHR, minAVG, maxERA]);
+    setAppliedFilters(committedDraft);
+  }, [committedDraft]);
+
+  // Enables/emphasizes the Apply button only when there are uncommitted edits.
+  const hasPendingChanges = useMemo(
+    () => hasPendingFilterChanges(committedDraft, appliedFilters),
+    [committedDraft, appliedFilters],
+  );
 
   // Switching view modes must re-clamp the page size: entering 'combined' with a
   // carried-over pageSize=100 would paint 200 rows across both grids (PST-030 /
@@ -1424,9 +1468,7 @@ export function PlayerStatsPage({
                 className="ps-select-native"
                 value={position}
                 onChange={(e) => {
-                  const next = (e.target as HTMLSelectElement).value;
-                  setPosition(next);
-                  setAppliedFilters((cur) => ({ ...cur, position: next }));
+                  setPosition((e.target as HTMLSelectElement).value);
                 }}
               >
                 {POSITIONS.map((p) => (
@@ -1440,10 +1482,7 @@ export function PlayerStatsPage({
                 label="Position"
                 value={position}
                 options={POSITIONS}
-                onChange={(next) => {
-                  setPosition(next);
-                  setAppliedFilters((cur) => ({ ...cur, position: next }));
-                }}
+                onChange={setPosition}
               />
             )}
             {Platform.OS === 'web' && (
@@ -1492,9 +1531,7 @@ export function PlayerStatsPage({
                 className="ps-select-native"
                 value={team}
                 onChange={(e) => {
-                  const next = (e.target as HTMLSelectElement).value;
-                  setTeam(next);
-                  setAppliedFilters((cur) => ({ ...cur, team: next }));
+                  setTeam((e.target as HTMLSelectElement).value);
                 }}
               >
                 {MLB_TEAMS.map((t) => (
@@ -1508,10 +1545,7 @@ export function PlayerStatsPage({
                 label="Team"
                 value={team}
                 options={MLB_TEAMS}
-                onChange={(next) => {
-                  setTeam(next);
-                  setAppliedFilters((cur) => ({ ...cur, team: next }));
-                }}
+                onChange={setTeam}
               />
             )}
             {Platform.OS === 'web' && (
@@ -1560,9 +1594,7 @@ export function PlayerStatsPage({
                 className="ps-select-native"
                 value={pageSize}
                 onChange={(e) => {
-                  const next = Number((e.target as HTMLSelectElement).value);
-                  setPageSize(next);
-                  setAppliedFilters((cur) => ({ ...cur, pageSize: next }));
+                  setPageSize(Number((e.target as HTMLSelectElement).value));
                 }}
               >
                 {pageSizeOptions.map((n) => (
@@ -1577,9 +1609,7 @@ export function PlayerStatsPage({
                 value={String(pageSize)}
                 options={pageSizeOptions.map(String)}
                 onChange={(next) => {
-                  const n = Number(next);
-                  setPageSize(n);
-                  setAppliedFilters((cur) => ({ ...cur, pageSize: n }));
+                  setPageSize(Number(next));
                 }}
               />
             )}
@@ -1600,9 +1630,54 @@ export function PlayerStatsPage({
             )}
           </YStack>
 
-          {/* Advanced + Columns toggles — one grid cell so the toolbar's column
-              template stays intact (the picker panel renders below). */}
+          {/* Apply + Advanced + Columns actions — one grid cell so the toolbar's
+              column template stays intact (the picker panel renders below). */}
           <XStack gap={8} alignItems="center" flexWrap="wrap">
+            {/* Apply — the single explicit commit affordance for the unified
+                draft model (LS-7126). Disabled until a control has uncommitted
+                edits; Enter in the search box and clearing it remain shortcuts
+                that commit the same full draft snapshot. */}
+            <Pressable
+              testID="apply-filters-button"
+              onPress={applyFilters}
+              disabled={!hasPendingChanges}
+              accessibilityRole="button"
+              accessibilityLabel="Apply filters"
+              accessibilityState={{ disabled: !hasPendingChanges }}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderStyle: 'solid',
+                borderColor: hasPendingChanges
+                  ? withAlpha(BRAND_GOLD, 0.5)
+                  : OUTLINE_DEFAULT,
+                backgroundColor: hasPendingChanges
+                  ? withAlpha(BRAND_GOLD, 0.12)
+                  : 'transparent',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                minHeight: 44,
+                opacity: hasPendingChanges ? 1 : 0.55,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: '700',
+                  fontSize: 12,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: hasPendingChanges ? BRAND_GOLD_LIGHT : FG3,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Apply
+              </Text>
+            </Pressable>
             {/* Advanced toggle */}
             <Pressable
               onPress={() => setAdvancedOpen((v) => !v)}
