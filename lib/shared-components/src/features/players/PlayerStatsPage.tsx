@@ -313,6 +313,42 @@ export function enforceSearchMinLength(search: string): string {
 }
 
 /**
+ * Serialize a committed filter snapshot into the shareable relative URL.
+ *
+ * Reads the *applied* snapshot — the committed state that actually drives the
+ * grid queries — never the uncommitted toolbar draft. This guarantees a shared
+ * link always reflects what the sender currently sees on screen: typing a
+ * search term without pressing Enter (or otherwise committing) must not leak
+ * into the shared URL (LS-7131 / PST-071). Extracted as a pure function so the
+ * serialization is unit-testable without mounting the page shell.
+ *
+ * The caller is responsible for prepending the origin — this stays free of
+ * `window.location` so it remains safe on native.
+ */
+export function buildShareUrl(
+  viewMode: 'combined' | 'hitters' | 'pitchers',
+  filters: AppliedFilters,
+): string {
+  const params = new URLSearchParams({
+    view: viewMode,
+    pageSize: String(filters.pageSize),
+  });
+  if (filters.search) params.set('search', filters.search);
+  if (filters.position !== 'All Positions') {
+    params.set('position', filters.position);
+  }
+  if (filters.team !== 'All Teams') params.set('team', filters.team);
+  if (filters.minHR > 0) params.set('minHomeRuns', String(filters.minHR));
+  if (filters.minAVG > 0) {
+    params.set('minBattingAvg', filters.minAVG.toFixed(3));
+  }
+  if (filters.maxERA < ERA_MAX_OFF) {
+    params.set('maxERA', filters.maxERA.toFixed(2));
+  }
+  return `/players/stats?${params.toString()}`;
+}
+
+/**
  * Player Statistics Page Component
  *
  * Editorial header with Combined/Hitters/Pitchers view tabs, unified toolbar
@@ -510,30 +546,12 @@ export function PlayerStatsPage({
 
   const handleShare = useCallback(() => {
     if (!onShare) return;
-    const params = new URLSearchParams({
-      view: viewMode,
-      pageSize: String(pageSize),
-    });
-    if (search) params.set('search', search);
-    if (position !== 'All Positions') params.set('position', position);
-    if (team !== 'All Teams') params.set('team', team);
-    if (minHR > 0) params.set('minHomeRuns', String(minHR));
-    if (minAVG > 0) params.set('minBattingAvg', minAVG.toFixed(3));
-    if (maxERA < ERA_MAX_OFF) params.set('maxERA', maxERA.toFixed(2));
-    // Build relative URL — the caller is responsible for prepending the origin.
-    // This keeps the shared component free of window.location (safe for native).
-    onShare(`/players/stats?${params.toString()}`);
-  }, [
-    onShare,
-    viewMode,
-    pageSize,
-    search,
-    position,
-    team,
-    minHR,
-    minAVG,
-    maxERA,
-  ]);
+    // Serialize the *applied* snapshot (what the grid is actually showing), not
+    // the uncommitted toolbar draft, so the shared link matches what the sender
+    // sees on screen. Sharing draft state leaked un-committed edits — e.g. a
+    // typed-but-not-entered search term — into the recipient's view (LS-7131).
+    onShare(buildShareUrl(viewMode, appliedFilters));
+  }, [onShare, viewMode, appliedFilters]);
 
   // ── Visibility flags ───────────────────────────────────────────
   const showBatting = viewMode === 'combined' || viewMode === 'hitters';

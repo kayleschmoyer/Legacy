@@ -1,5 +1,6 @@
 import {
   battingPlayerTypeForViewMode,
+  buildShareUrl,
   type ClearFiltersSetters,
   createClearFiltersHandler,
   enforceSearchMinLength,
@@ -233,5 +234,72 @@ describe('parseSliderValue (LS-7137)', () => {
   it('rejects ±Infinity by returning null', () => {
     expect(parseSliderValue('Infinity')).toBeNull();
     expect(parseSliderValue('-Infinity')).toBeNull();
+  });
+});
+
+// buildShareUrl powers the header "Share" button (LS-7131 / PST-071). It must
+// serialize the *applied* filter snapshot — what the grid is actually showing —
+// so a shared link can never diverge from what the sender sees on screen. The
+// previous implementation read the uncommitted toolbar draft, leaking
+// typed-but-not-entered edits into the recipient's view.
+describe('buildShareUrl (LS-7131)', () => {
+  const APPLIED_DEFAULTS = {
+    search: '',
+    position: 'All Positions',
+    team: 'All Teams',
+    pageSize: 25,
+    minHR: 0,
+    minAVG: 0,
+    maxERA: 5, // ERA_MAX_OFF — no upper bound applied
+  };
+
+  it('serializes only view + pageSize when no filters are applied', () => {
+    expect(buildShareUrl('combined', APPLIED_DEFAULTS)).toBe(
+      '/players/stats?view=combined&pageSize=25',
+    );
+  });
+
+  it('regression: shares the applied snapshot, never the draft (PST-071)', () => {
+    // Scenario from the ticket: the user previously applied an empty search
+    // (grid shows everyone), then types "Ohtani" without pressing Enter. The
+    // applied snapshot — what buildShareUrl receives — still has search="", so
+    // the shared URL must NOT include the un-committed "Ohtani" term.
+    const applied = { ...APPLIED_DEFAULTS, search: '' };
+    expect(buildShareUrl('combined', applied)).toBe(
+      '/players/stats?view=combined&pageSize=25',
+    );
+    expect(buildShareUrl('combined', applied)).not.toContain('Ohtani');
+  });
+
+  it('serializes a committed search term', () => {
+    const applied = { ...APPLIED_DEFAULTS, search: 'Ohtani' };
+    expect(buildShareUrl('hitters', applied)).toBe(
+      '/players/stats?view=hitters&pageSize=25&search=Ohtani',
+    );
+  });
+
+  it('omits position/team sentinels and serializes real selections', () => {
+    const applied = { ...APPLIED_DEFAULTS, position: 'SP', team: 'NYY' };
+    const url = buildShareUrl('pitchers', applied);
+    expect(url).toContain('position=SP');
+    expect(url).toContain('team=NYY');
+  });
+
+  it('serializes advanced ranges with their display precision', () => {
+    const applied = {
+      ...APPLIED_DEFAULTS,
+      minHR: 500,
+      minAVG: 0.3,
+      maxERA: 3.25,
+    };
+    const url = buildShareUrl('combined', applied);
+    expect(url).toContain('minHomeRuns=500');
+    expect(url).toContain('minBattingAvg=0.300');
+    expect(url).toContain('maxERA=3.25');
+  });
+
+  it('omits maxERA when it sits at the off-sentinel', () => {
+    const applied = { ...APPLIED_DEFAULTS, maxERA: 5 };
+    expect(buildShareUrl('combined', applied)).not.toContain('maxERA');
   });
 });
