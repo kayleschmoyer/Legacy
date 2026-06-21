@@ -130,6 +130,13 @@ export interface PitchingStatsDataGridProps {
   rosteredPlayerIds?: ReadonlySet<number>;
   /** Availability filter value — client-side applied after fetching. */
   availabilityFilter?: 'all' | 'free_agents' | 'rostered';
+  /**
+   * Fired with the rows currently displayed (after the availability filter is
+   * applied) whenever they change. Lets a host surface the loaded result set —
+   * e.g. so an Export action serializes the actual pitching rows the user is
+   * looking at rather than just the filter spec (PST-011 / LS-7109).
+   */
+  onDataLoaded?: (rows: readonly CareerPitchingFragment[]) => void;
 }
 
 /** Key of the always-visible player-name column (never hidden by the picker). */
@@ -362,6 +369,7 @@ export function PitchingStatsDataGrid({
   visibleColumns,
   rosteredPlayerIds,
   availabilityFilter,
+  onDataLoaded,
 }: PitchingStatsDataGridProps): React.ReactElement {
   // =============================================================================
   // State Management
@@ -420,6 +428,14 @@ export function PitchingStatsDataGrid({
       (p) => p != null && rosteredPlayerIds.has(p.playerId ?? -1),
     );
   }, [pitchingData, availabilityFilter, rosteredPlayerIds]);
+
+  // Surface the currently displayed rows to the host so an Export action can
+  // serialize the actual result set instead of only the filter spec
+  // (PST-011 / LS-7109). Fires on every change to the visible rows; callers
+  // pass a stable (memoized) handler to avoid redundant invocations.
+  useEffect(() => {
+    onDataLoaded?.(displayPitchingData);
+  }, [displayPitchingData, onDataLoaded]);
 
   const { data: countData } = useGetCareerPitchingStatsCountQuery({
     variables: {

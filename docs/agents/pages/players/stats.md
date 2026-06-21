@@ -34,18 +34,18 @@ Clicking a player row opens `PlayerDetailModal` (full stat breakdown).
 
 ## Filters & Controls
 
-| Control            | Description                                     |
-| ------------------ | ----------------------------------------------- |
-| Search box         | Player name (min 2 chars, debounced)            |
-| Position dropdown  | Filter by position (e.g., SS)                   |
-| Team dropdown      | Filter by MLB team                              |
-| Player type        | hitter / pitcher / all                          |
-| View mode tabs     | Combined / Hitters / Pitchers                   |
-| Page size selector | 10 · 25 · 50 · 100 rows                         |
-| Stat range sliders | Min/max for HR, RBI, AVG, ERA, Wins, Strikeouts |
-| Column visibility  | Expand/collapse columns                         |
-| Export button      | Download JSON with current filters              |
-| Share button       | Copy URL or Web Share API                       |
+| Control            | Description                                        |
+| ------------------ | -------------------------------------------------- |
+| Search box         | Player name (min 2 chars, debounced)               |
+| Position dropdown  | Filter by position (e.g., SS)                      |
+| Team dropdown      | Filter by MLB team                                 |
+| Player type        | hitter / pitcher / all                             |
+| View mode tabs     | Combined / Hitters / Pitchers                      |
+| Page size selector | 10 · 25 · 50 · 100 rows                            |
+| Stat range sliders | Min/max for HR, RBI, AVG, ERA, Wins, Strikeouts    |
+| Column visibility  | Expand/collapse columns                            |
+| Export button      | Download JSON of the visible rows + active filters |
+| Share button       | Copy URL or Web Share API                          |
 
 ---
 

@@ -21,6 +21,7 @@ import {
   STATS_TOGGLEABLE_COLUMN_KEYS,
 } from '@legacy-sports/shared-components/players';
 import type {
+  PlayerStatsExportData,
   PlayerStatsFilters,
   PlayerWithStats,
 } from '@legacy-sports/shared-components/players';
@@ -487,28 +488,58 @@ export function utf8ByteLength(str: string): number {
 }
 
 /**
- * Serialize the player-stats export payload and enforce an upper size bound.
+ * The serializable shape written to the exported JSON file.
  *
- * Returns the serialized JSON alongside its byte size and an `ok` flag so the
- * caller can refuse an oversized download instead of blocking the main thread
- * with an unbounded `JSON.stringify` + `Blob` (PST-012 / LS-7110). Size is
- * measured in UTF-8 bytes, not string length, because multi-byte characters
- * (e.g. player names with diacritics) inflate the actual Blob size beyond the
- * character count. `exportedAt` is injectable so the serialization is
- * deterministic under test. Exported for unit testing.
+ * Carries the filter context the original stub exported (`viewMode`, `filters`,
+ * `exportedAt`, `totalFilters`) so the file stays self-describing, plus the
+ * actual player rows the user is looking at under `players` — the original stub
+ * exported only the filter spec, which made the feature useless (PST-011 /
+ * LS-7109). `rowCount` is the total number of exported rows across both grids.
+ */
+export interface PlayerStatsExportPayload {
+  viewMode: PlayerStatsViewMode;
+  filters: PlayerStatsFilters;
+  exportedAt: string;
+  totalFilters: number;
+  rowCount: number;
+  players: {
+    batting: readonly unknown[];
+    pitching: readonly unknown[];
+  };
+}
+
+/**
+ * Build and serialize the player-stats export payload, enforcing an upper size
+ * bound. Includes the actual rows the user is looking at under `players`
+ * (PST-011 / LS-7109) alongside the self-describing filter context, then
+ * stringifies and measures the UTF-8 byte size so the caller can refuse an
+ * oversized download instead of blocking the main thread with an unbounded
+ * `JSON.stringify` + `Blob` (PST-012 / LS-7110). Size is measured in UTF-8
+ * bytes, not string length, because multi-byte characters (e.g. player names
+ * with diacritics) inflate the actual Blob size beyond the character count.
+ * `exportedAt` is injectable so the serialization is deterministic under test.
+ * Exported for unit testing.
  */
 export function buildExportPayload(
   filters: PlayerStatsFilters,
   viewMode: PlayerStatsViewMode,
+  data: PlayerStatsExportData,
   exportedAt: string = new Date().toISOString(),
 ): ExportPayloadResult {
-  const exportData = {
+  const batting = data.batting ?? [];
+  const pitching = data.pitching ?? [];
+  const payload: PlayerStatsExportPayload = {
     viewMode,
     filters,
     exportedAt,
     totalFilters: Object.keys(filters as Record<string, unknown>).length,
+    rowCount: batting.length + pitching.length,
+    players: {
+      batting,
+      pitching,
+    },
   };
-  const json = JSON.stringify(exportData, null, 2);
+  const json = JSON.stringify(payload, null, 2);
   const bytes = utf8ByteLength(json);
   return { ok: bytes <= MAX_EXPORT_BYTES, json, bytes };
 }
@@ -842,6 +873,19 @@ export function PlayerStatsRoute() {
     [navigate],
   );
 
+  // Latest visible rows surfaced by the shared PlayerStatsPage via
+  // onVisibleRowsChange — read at export time so the download contains the
+  // actual rows the user is looking at (PST-011 / LS-7109). Held in a ref so
+  // grid fetches don't re-render this route, and so onExport keeps its original
+  // (filters, viewMode) signature instead of growing a data parameter.
+  const exportDataRef = React.useRef<PlayerStatsExportData>({
+    batting: [],
+    pitching: [],
+  });
+  const handleVisibleRowsChange = useCallback((data: PlayerStatsExportData) => {
+    exportDataRef.current = data;
+  }, []);
+
   // Handle export functionality
   const handleExport = useCallback(
     (filters: PlayerStatsFilters, viewMode: PlayerStatsViewMode) => {
@@ -852,11 +896,16 @@ export function PlayerStatsRoute() {
       // the page-level PremiumGate's pointer-event block does not cover.
       if (!isPremium) return;
 
-      // Serialize with an upper size bound. The download path is a synchronous
-      // stringify + Blob that blocks the main thread; refusing an oversized
-      // payload here prevents a large export from freezing the tab or
-      // exhausting memory (PST-012 / LS-7110).
-      const { ok, json, bytes } = buildExportPayload(filters, viewMode);
+      // Serialize the visible rows (PST-011 / LS-7109) with an upper size bound.
+      // The download path is a synchronous stringify + Blob that blocks the main
+      // thread; refusing an oversized payload here prevents a large export from
+      // freezing the tab or exhausting memory (PST-012 / LS-7110). The rows are
+      // captured from the grids via onVisibleRowsChange (see exportDataRef).
+      const { ok, json, bytes } = buildExportPayload(
+        filters,
+        viewMode,
+        exportDataRef.current,
+      );
       if (!ok) {
         LOGGER.warn(
           'Player statistics export exceeded size cap; refusing download',
@@ -888,6 +937,8 @@ export function PlayerStatsRoute() {
         URL.revokeObjectURL(url);
       }
 
+      // Log a compact summary (byte size), not the full row set — the payload
+      // now carries the entire visible result set and would flood the logs.
       LOGGER.info('Exported player statistics', { bytes });
       setLiveMsg('Player statistics exported. Download started.');
     },
@@ -1172,6 +1223,7 @@ export function PlayerStatsRoute() {
           onVisibleColumnsChange={handleVisibleColumnsChange}
           onPlayerDetails={handlePlayerDetails}
           onExport={handleExport}
+          onVisibleRowsChange={handleVisibleRowsChange}
           onShare={handleShare}
           onFiltersChange={handleFiltersChange}
           showAvailabilityFilter={hasBaseballLeagues}

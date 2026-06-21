@@ -345,6 +345,19 @@ export function battingSortFilter(
   return { sortBy, sortDir };
 }
 
+/**
+ * The currently displayed result set, surfaced to a host via
+ * {@link PlayerStatsPageProps.onVisibleRowsChange} so it can serialize the
+ * actual player rows the user is looking at — not just the filter spec (PST-011
+ * / LS-7109). Only the rows for the visible tab(s) are populated: the Hitters
+ * tab fills `batting`, the Pitchers tab fills `pitching`, and Combined fills
+ * both. A tab that is not shown contributes an empty array.
+ */
+export interface PlayerStatsExportData {
+  batting: readonly PlayerCareerStats[];
+  pitching: readonly CareerPitchingFragment[];
+}
+
 export interface PlayerStatsPageProps {
   title?: string;
   initialViewMode?: PlayerStatsViewMode;
@@ -386,6 +399,14 @@ export interface PlayerStatsPageProps {
     filters: PlayerStatsFilters,
     viewMode: PlayerStatsViewMode,
   ) => void;
+  /**
+   * Fired with the rows currently visible in the grid(s) whenever they change
+   * (data load or tab switch). Lets a host cache the result set so its
+   * {@link onExport} handler can serialize the actual rows the user is looking
+   * at rather than just the filter spec (PST-011 / LS-7109). Kept separate from
+   * {@link onExport} so the export callback's signature stays unchanged.
+   */
+  onVisibleRowsChange?: (data: PlayerStatsExportData) => void;
   onShare?: (url: string) => void;
   /** Fired when the committed filter snapshot changes so the host can mirror to URL params. */
   onFiltersChange?: (state: {
@@ -566,6 +587,7 @@ export function PlayerStatsPage({
   onClearFilters,
   onPlayerDetails,
   onExport,
+  onVisibleRowsChange,
   onShare,
   onFiltersChange,
   showAvailabilityFilter = false,
@@ -790,6 +812,48 @@ export function PlayerStatsPage({
   );
 
   // ── Export / share ─────────────────────────────────────────────
+  // Latest displayed rows from each grid, captured via the grids' onDataLoaded
+  // callback. Held in refs (not state) because they feed the export through a
+  // host callback and must not trigger re-renders of the page on every grid
+  // fetch (PST-011 / LS-7109).
+  const battingRowsRef = useRef<readonly PlayerCareerStats[]>([]);
+  const pitchingRowsRef = useRef<readonly CareerPitchingFragment[]>([]);
+
+  // Surface the rows for whichever tab(s) are visible to the host so it can
+  // serialize the actual result set, not just the filter spec. A hidden grid is
+  // unmounted, so its ref may hold stale rows — gate on the active view.
+  const emitVisibleRows = useCallback(() => {
+    if (!onVisibleRowsChange) return;
+    const isBattingVisible = viewMode === 'combined' || viewMode === 'hitters';
+    const isPitchingVisible =
+      viewMode === 'combined' || viewMode === 'pitchers';
+    onVisibleRowsChange({
+      batting: isBattingVisible ? battingRowsRef.current : [],
+      pitching: isPitchingVisible ? pitchingRowsRef.current : [],
+    });
+  }, [onVisibleRowsChange, viewMode]);
+
+  const handleBattingDataLoaded = useCallback(
+    (rows: readonly PlayerCareerStats[]) => {
+      battingRowsRef.current = rows;
+      emitVisibleRows();
+    },
+    [emitVisibleRows],
+  );
+  const handlePitchingDataLoaded = useCallback(
+    (rows: readonly CareerPitchingFragment[]) => {
+      pitchingRowsRef.current = rows;
+      emitVisibleRows();
+    },
+    [emitVisibleRows],
+  );
+
+  // Re-emit when the visible tab changes so the host's cached rows reflect the
+  // active tab even when no new grid data arrives (PST-011 / LS-7109).
+  useEffect(() => {
+    emitVisibleRows();
+  }, [emitVisibleRows]);
+
   const handleExport = useCallback(() => {
     // Export is a premium capability (PST-010 / LS-7108). Bail out when the host
     // has not granted it: the page-level PremiumGate only blurs content and
@@ -1886,6 +1950,7 @@ export function PlayerStatsPage({
                   rosteredPlayerIds={
                     showAvailabilityFilter ? rosteredPlayerIds : undefined
                   }
+                  onDataLoaded={handleBattingDataLoaded}
                 />
               </TabContentFade>
             )}
@@ -1909,6 +1974,7 @@ export function PlayerStatsPage({
                   rosteredPlayerIds={
                     showAvailabilityFilter ? rosteredPlayerIds : undefined
                   }
+                  onDataLoaded={handlePitchingDataLoaded}
                 />
               </TabContentFade>
             )}

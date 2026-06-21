@@ -1,4 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
+import type { PlayerStatsExportData } from '@legacy-sports/shared-components/players';
 import {
   applyParamRenames,
   buildExportPayload,
@@ -532,12 +533,14 @@ describe('utf8ByteLength', () => {
 
 describe('buildExportPayload', () => {
   const FIXED_TS = '2026-06-21T00:00:00.000Z';
+  const EMPTY_DATA: PlayerStatsExportData = { batting: [], pitching: [] };
 
   // AC3: within-cap exports serialize correctly and round-trip.
   it('serializes the export payload with filters, viewMode and metadata', () => {
     const { ok, json, bytes } = buildExportPayload(
       { searchTerm: 'trout', position: 'OF' },
       'hitters',
+      EMPTY_DATA,
       FIXED_TS,
     );
     expect(ok).toBe(true);
@@ -556,7 +559,7 @@ describe('buildExportPayload', () => {
 
   // AC1/AC3: a realistic filtered export is comfortably within the cap.
   it('reports ok for a realistic small payload', () => {
-    const { ok } = buildExportPayload({}, 'combined', FIXED_TS);
+    const { ok } = buildExportPayload({}, 'combined', EMPTY_DATA, FIXED_TS);
     expect(ok).toBe(true);
   });
 
@@ -567,6 +570,7 @@ describe('buildExportPayload', () => {
     const { ok, bytes } = buildExportPayload(
       { searchTerm: huge },
       'combined',
+      EMPTY_DATA,
       FIXED_TS,
     );
     expect(bytes).toBeGreaterThan(MAX_EXPORT_BYTES);
@@ -579,6 +583,7 @@ describe('buildExportPayload', () => {
     const { bytes } = buildExportPayload(
       { searchTerm: '😀' },
       'combined',
+      EMPTY_DATA,
       FIXED_TS,
     );
     const charLength = JSON.stringify(
@@ -587,6 +592,8 @@ describe('buildExportPayload', () => {
         filters: { searchTerm: '😀' },
         exportedAt: FIXED_TS,
         totalFilters: 1,
+        rowCount: 0,
+        players: { batting: [], pitching: [] },
       },
       null,
       2,
@@ -596,7 +603,7 @@ describe('buildExportPayload', () => {
   });
 
   it('defaults exportedAt to an ISO timestamp when omitted', () => {
-    const { json } = buildExportPayload({}, 'combined');
+    const { json } = buildExportPayload({}, 'combined', EMPTY_DATA);
     const parsed = JSON.parse(json) as { exportedAt: string };
     expect(parsed.exportedAt).toMatch(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
@@ -890,5 +897,99 @@ describe('readVisibleColumnsPref / writeVisibleColumnsPref', () => {
       expect.any(Error),
       expect.objectContaining({ storageKey: PREFS_STORAGE_KEY }),
     );
+  });
+});
+
+describe('buildExportPayload (PST-011 / LS-7109)', () => {
+  // Minimal row stand-ins — buildExportPayload only counts and passes rows
+  // through, so the exact GraphQL shape is irrelevant to its contract.
+  const battingRows = [
+    { playerId: 1, displayName: 'Gerrit Cole' },
+    { playerId: 2, displayName: 'Aaron Judge' },
+  ] as unknown as PlayerStatsExportData['batting'];
+  const pitchingRows = [
+    { playerId: 3 },
+  ] as unknown as PlayerStatsExportData['pitching'];
+
+  const FIXED_AT = '2026-06-21T00:00:00.000Z';
+
+  // The serialized payload shape (parsed back out of the `json` field that
+  // buildExportPayload returns alongside its size-cap metadata).
+  interface ParsedPayload {
+    viewMode: string;
+    filters: Record<string, unknown>;
+    exportedAt: string;
+    totalFilters: number;
+    rowCount: number;
+    players: {
+      batting: { playerId: number; displayName?: string }[];
+      pitching: { playerId: number }[];
+    };
+  }
+
+  it('includes the actual player rows, not just the filter spec', () => {
+    // Repro of the bug: the previous stub serialized only
+    // { viewMode, filters, exportedAt, totalFilters } with no rows.
+    const { json } = buildExportPayload(
+      { position: 'SP', team: 'NYY' },
+      'pitchers',
+      { batting: [], pitching: pitchingRows },
+      FIXED_AT,
+    );
+    const parsed = JSON.parse(json) as ParsedPayload;
+    expect(parsed.players.pitching).toEqual(pitchingRows);
+    expect(parsed.rowCount).toBe(1);
+  });
+
+  it('preserves the self-describing filter context', () => {
+    const filters = { position: 'SP', team: 'NYY', minHomeRuns: 10 };
+    const { json } = buildExportPayload(
+      filters,
+      'combined',
+      { batting: battingRows, pitching: pitchingRows },
+      FIXED_AT,
+    );
+    const parsed = JSON.parse(json) as ParsedPayload;
+    expect(parsed.viewMode).toBe('combined');
+    expect(parsed.filters).toEqual(filters);
+    expect(parsed.exportedAt).toBe(FIXED_AT);
+    expect(parsed.totalFilters).toBe(3);
+  });
+
+  it('counts rows across both grids for combined view', () => {
+    const { json } = buildExportPayload(
+      {},
+      'combined',
+      { batting: battingRows, pitching: pitchingRows },
+      FIXED_AT,
+    );
+    const parsed = JSON.parse(json) as ParsedPayload;
+    expect(parsed.players.batting).toEqual(battingRows);
+    expect(parsed.players.pitching).toEqual(pitchingRows);
+    expect(parsed.rowCount).toBe(3);
+  });
+
+  it('defaults exportedAt to an ISO timestamp when omitted', () => {
+    const { json } = buildExportPayload({}, 'hitters', {
+      batting: battingRows,
+      pitching: [],
+    });
+    const parsed = JSON.parse(json) as ParsedPayload;
+    expect(parsed.exportedAt).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
+  });
+
+  it('round-trips through JSON.stringify with the rows intact', () => {
+    const { json } = buildExportPayload(
+      { team: 'NYY' },
+      'hitters',
+      { batting: battingRows, pitching: [] },
+      FIXED_AT,
+    );
+    const parsed = JSON.parse(json) as ParsedPayload;
+    expect(parsed.players.batting).toHaveLength(2);
+    expect(parsed.players.batting[0].displayName).toBe('Gerrit Cole');
+    expect(parsed.rowCount).toBe(2);
   });
 });
