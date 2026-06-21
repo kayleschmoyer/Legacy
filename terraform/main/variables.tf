@@ -192,13 +192,13 @@ variable "stripe_grace_period_days" {
 variable "api_gateway_throttle_rate_limit" {
   description = "API Gateway REST stage default throttle rate limit in requests per second (steady token-bucket rate; with method_path = \"*/*\" this applies to all REST resources/methods in the stage, including GraphQL, OAuth, Stats, Game Selection, /badge, etc.)"
   type        = number
-  default     = 50 # 50 req/sec = ~3 000 req/min across all clients
+  default     = 150 # 150 req/sec = ~9 000 req/min across all clients (LS-8217: ~3x headroom for CI integration bursts; RDS Proxy queues to db.t3.micro, well under AWS account default 10k rps)
 }
 
 variable "api_gateway_throttle_burst_limit" {
   description = "API Gateway REST stage default throttle burst limit (token-bucket burst capacity: how many requests can temporarily exceed the steady rate; not a max concurrent in-flight/Lambda concurrency value)"
   type        = number
-  default     = 200
+  default     = 600 # LS-8217: raised 200->600 alongside rate limit so CI integration shards can burst without 429 THROTTLED
 }
 
 variable "monthly_budget_amount" {

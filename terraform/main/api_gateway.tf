@@ -204,7 +204,7 @@ resource "aws_api_gateway_stage" "main" {
 
 # Stage-level throttle defaults — applied to all REST endpoints (GraphQL, OAuth,
 # Stats, Game Selection, /badge, etc).  Similar approach to websocket.tf but with
-# lower limits (REST 50 rps / 200 burst vs WS 100 rps / 500 burst).
+# REST limits (150 rps / 600 burst, see var defaults) vs WS 100 rps / 500 burst.
 # For per-IP rate limiting, pair this with an AWS WAF Web ACL (see LS-789).
 # Note: throttling_burst_limit is the token-bucket burst capacity (how many requests
 # can temporarily exceed the steady rate), not a Lambda concurrency limit.
