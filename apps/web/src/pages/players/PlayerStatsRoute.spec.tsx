@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { PlayerStatsRoute } from './PlayerStatsPage';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -15,6 +15,12 @@ const mockUseGetUserLeaguesQuery = jest.fn(() => ({
   loading: false,
 }));
 
+// Captures the `onPlayerDetails` callback the host passes to the shared shell so
+// a player click can be simulated directly (the shell renders null in tests).
+const mockOnPlayerDetailsRef: {
+  current?: (player: { id: string | number }) => void;
+} = {};
+
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
   useSearchParams: () => [mockSearchParams, mockSetSearchParams],
@@ -27,20 +33,26 @@ jest.mock('../../context/GrowthBookProvider', () => ({
 jest.mock('@legacy-sports/shared-components/players', () => ({
   // Expose a Share affordance so the host's onShare handler (and its
   // clipboard/manual-copy fallback) can be exercised. The shared component
-  // passes a relative URL; the host prepends origin + sport.
+  // passes a relative URL; the host prepends origin + sport. Also capture the
+  // onPlayerDetails callback so a player click can be simulated directly.
   PlayerStatsPage: ({
     onShare,
+    onPlayerDetails,
   }: {
     onShare?: (relativeUrl: string) => void;
-  }) => (
-    <button
-      type="button"
-      data-testid="share-button"
-      onClick={() => onShare?.('/players/stats?view=combined')}
-    >
-      Share
-    </button>
-  ),
+    onPlayerDetails?: (player: { id: string | number }) => void;
+  }) => {
+    mockOnPlayerDetailsRef.current = onPlayerDetails;
+    return (
+      <button
+        type="button"
+        data-testid="share-button"
+        onClick={() => onShare?.('/players/stats?view=combined')}
+      >
+        Share
+      </button>
+    );
+  },
   // Mirror the shared shell's canonical mapping so the host's URL-rewrite
   // behavior can be asserted (legacy aliases batting→hitters, pitching→pitchers;
   // everything else → combined).
@@ -414,5 +426,39 @@ describe('PlayerStatsRoute public-link auth gating (PST-070)', () => {
       | { skip?: boolean }
       | undefined;
     expect(options?.skip).toBe(false);
+  });
+});
+
+// PST-050 / LS-7123: a player click used to coerce the id with
+// `parseInt(player.id, 10)`, so a brefId-style string id (e.g. 'troutmi01')
+// silently became NaN and opened the detail view for player NaN. The host now
+// navigates to the raw id and the `/players/:id` route validates it
+// (strict /^\d+$/ check, brefId fallback). These regression tests lock in that
+// the click handler never produces a NaN id again.
+describe('PlayerStatsRoute player click id handling (PST-050)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+    mockOnPlayerDetailsRef.current = undefined;
+  });
+
+  it('navigates to the raw brefId-style string id without coercing it to NaN', () => {
+    render(<PlayerStatsRoute />);
+    act(() => {
+      mockOnPlayerDetailsRef.current?.({ id: 'troutmi01' });
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/players/troutmi01');
+    // The old parseInt path would have routed to /players/NaN.
+    expect(mockNavigate).not.toHaveBeenCalledWith('/players/NaN');
+  });
+
+  it('navigates to a numeric id unchanged', () => {
+    render(<PlayerStatsRoute />);
+    act(() => {
+      mockOnPlayerDetailsRef.current?.({ id: 12345 });
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/players/12345');
   });
 });
