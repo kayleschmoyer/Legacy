@@ -39,9 +39,24 @@ Then work through all steps in order. Detailed code examples for each step: [ref
 | 6   | Lambda IAM policy (Secrets Manager access)      |       —       |           ✅           |
 | 7   | Lambda `environment.variables` in `lambda-*.tf` |      ✅       |    ✅ (secret name)    |
 | 8   | Lambda runtime code                             |      ✅       |     ✅ (SDK fetch)     |
-| 9   | GitHub Actions repository secret                |       —       |           ✅           |
+| 9   | GitHub Actions repository secret (see note ↓)   |       —       |           ✅           |
 | 10  | CI workflow `TF_VAR_*` + validation             |       —       |           ✅           |
 | 11  | `terraform apply`                               |      ✅       |           ✅           |
+
+> **Step 9 — propagate AWS → GitHub in one call.** Once the secret exists in AWS Secrets Manager (step 4 applied), set the matching GitHub secret with the `secret_sync_to_github` MCP tool — it reads from AWS and writes to GitHub server-side without the value ever appearing in any tool argument or response. Supports all three scopes:
+>
+> ```
+> # Repo Actions secret (default)
+> secret_sync_to_github(secretId: "my-api-key", repoSecret: "MY_API_KEY")
+>
+> # Dependabot
+> secret_sync_to_github(secretId: "my-api-key", repoSecret: "MY_API_KEY", scope: "dependabot")
+>
+> # Environment secret
+> secret_sync_to_github(secretId: "prod/my-api-key", repoSecret: "MY_API_KEY", scope: "environment", env: "production")
+> ```
+>
+> See [`secrets-handling`](../secrets-handling/SKILL.md) Pattern 2 for full details.
 
 ---
 

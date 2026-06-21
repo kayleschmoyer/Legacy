@@ -19,6 +19,7 @@ import {
   getSecretValue,
   listSecrets,
 } from './tools/secretsmanager.js';
+import { syncSecretToGithub } from './tools/sync-to-github.js';
 import { ssmGet } from './tools/ssm-get.js';
 import { ssmRunCommand } from './tools/ssm-run-command.js';
 import { ssoLogin } from './tools/sso-login.js';
@@ -271,6 +272,47 @@ server.tool(
       ),
   },
   async (params) => listSecrets(params),
+);
+
+// --- secret_sync_to_github ---
+server.tool(
+  'secret_sync_to_github',
+  'Atomically propagate a value from AWS Secrets Manager to a GitHub secret without the value ever crossing the agent transcript. Fetches the AWS secret server-side, pipes it via stdin to `gh secret set` (which handles libsodium encryption), and returns only metadata. Supports repo (default), environment (--env), and dependabot scopes. The canonical "never embed secrets in tool calls" pattern — use this instead of pairing aws_secretsmanager_get_secret_value with github_secret_set.',
+  {
+    secretId: z
+      .string()
+      .describe(
+        'AWS secret ID or name (e.g. "mlb-data-api-key" or "dev/mlb-data-api-key"). Short IDs are prefixed with the environment.',
+      ),
+    repoSecret: z
+      .string()
+      .describe(
+        'GitHub secret name (e.g. "AGENT_AUTHOR_APP_PRIVATE_KEY"). Must match /^[A-Za-z_][A-Za-z0-9_]*$/ and must not start with "GITHUB_".',
+      ),
+    environment: z
+      .enum(['dev', 'prod'])
+      .default('dev')
+      .describe('AWS environment prefix for short secretIds (default: dev).'),
+    env: z
+      .string()
+      .optional()
+      .describe(
+        'GitHub environment name. Required when scope="environment", ignored otherwise.',
+      ),
+    scope: z
+      .enum(['repo', 'environment', 'dependabot'])
+      .default('repo')
+      .describe(
+        'GitHub secret scope: "repo" = Actions repository secret (default); "environment" = environment secret (requires env); "dependabot" = Dependabot secret.',
+      ),
+    repo: z
+      .string()
+      .optional()
+      .describe(
+        'GitHub repository in "owner/name" form. Defaults to the current repo as resolved by the gh CLI.',
+      ),
+  },
+  async (params) => syncSecretToGithub(params),
 );
 
 // --- aws_sso_status ---

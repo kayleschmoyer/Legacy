@@ -59,7 +59,24 @@ EOT
 
 Use the `Write` tool (not a shell `cat >>`) to produce this safely, and never inline the key content in the tool call — write a placeholder and ask the user to fill it in.
 
-### Pattern 2: Use `github_secret_set` MCP tool with `valueFile`
+### Pattern 2 (preferred for AWS → GitHub propagation): `secret_sync_to_github`
+
+When the source of truth for a secret is AWS Secrets Manager and the destination is a GitHub secret (the most common case for this repo), use the `secret_sync_to_github` MCP tool (`mcp__legacy-sports-aws__secret_sync_to_github`). It does both halves in a single server-side step — the value is read from AWS and written to GitHub without ever appearing in any tool argument or response:
+
+```
+# Repo Actions secret (default scope)
+secret_sync_to_github(secretId: "github-app-key-base64", repoSecret: "AGENT_AUTHOR_APP_PRIVATE_KEY")
+
+# Dependabot secret
+secret_sync_to_github(secretId: "npm-publish-token", repoSecret: "NPM_TOKEN", scope: "dependabot")
+
+# Environment secret
+secret_sync_to_github(secretId: "prod/stripe-api-key", repoSecret: "STRIPE_API_KEY", scope: "environment", env: "production")
+```
+
+The tool returns `{ ok: true, synced: true, secretId, repoSecret, scope }` and emits an audit log line (`synced <secretId> → <repoSecret>`, no value). Use this in preference to the two-call pair below — every call to `aws_secretsmanager_get_secret_value` followed by `github_secret_set` writes the secret to a file in the workspace, which is a (smaller) exposure surface this tool avoids entirely.
+
+### Pattern 3: Use `github_secret_set` MCP tool with `valueFile`
 
 The `github_secret_set` tool (MCP: `mcp__legacy-sports-github__github_secret_set`) has both a `value` string parameter and a `valueFile` parameter. **Always prefer `valueFile`** — pass the path to a file containing the secret instead of embedding the value directly:
 
@@ -76,7 +93,7 @@ github_secret_set(name: "MY_SECRET", valueFile: "<your-path>/secret.txt")
  Alternatively, set it directly via the GitHub UI at Settings → Secrets and Variables → Actions."
 ```
 
-### Pattern 3: `secrets.auto.tfvars` population
+### Pattern 4: `secrets.auto.tfvars` population
 
 When populating `secrets.auto.tfvars`, never write actual values through Edit/Write tools. Instead:
 

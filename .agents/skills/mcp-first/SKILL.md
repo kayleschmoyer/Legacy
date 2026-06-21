@@ -252,6 +252,7 @@ Use `aws_logs_tail` instead of `aws logs tail` via Bash, and `aws_sso_status` to
 | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `aws apigateway get-rest-apis` / `get-resources` / `get-method` (v1 REST APIs)                                 | `aws_apigateway_inspect({ path?, environment })` — v1 REST API inspector                                                                                                                                                          |
 | `aws apigatewayv2 get-apis` / `get-routes` / `get-authorizers` / `get-integrations` (v2 HTTP & WebSocket APIs) | `aws_apigatewayv2_inspect({ apiNameFilter?, includeRoutes?, includeAuthorizers?, includeIntegrations? })` — v2 inspector; covers MCP HTTP APIs and the WebSocket API in a single call. Read-only; mutations go through terraform. |
+| `aws secretsmanager get-secret-value …` then `gh secret set …` (AWS → GitHub secret propagation)               | `secret_sync_to_github({ secretId, repoSecret, env?, scope?: 'repo'\|'environment'\|'dependabot', repo? })` — single call; value never crosses the agent transcript. Supports all three GitHub secret scopes.                     |
 
 ## Claude Built-in Integrations
 
