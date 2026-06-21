@@ -247,6 +247,12 @@ export function buildStatsSearchParams(state: {
   sport?: 'mlb' | 'nfl';
   /** Explicit per-column visibility selection; `null`/omitted ⇒ no `cols` key. */
   visibleColumns?: readonly string[] | null;
+  /**
+   * Selected-player deep link (PST-051 / LS-7124). When the detail modal is open
+   * its `playerId` is threaded through here so a filter commit doesn't strip the
+   * shareable selection from the URL. Included in the deterministic sort below.
+   */
+  playerId?: string | null;
 }): URLSearchParams {
   const next = new URLSearchParams();
   // Stamp the schema version so a bookmark of this URL is recoverable if the
@@ -255,6 +261,7 @@ export function buildStatsSearchParams(state: {
   next.set('view', state.viewMode);
   next.set('pageSize', String(state.pageSize));
   if (state.sport) next.set('sport', state.sport);
+  if (state.playerId) next.set('playerId', state.playerId);
   // Column-visibility selection (LS-7105 / PST-001). Only written when an
   // explicit selection exists; an explicit "hide everything" serializes to the
   // `none` sentinel so it round-trips distinctly from "no selection".
@@ -1034,12 +1041,57 @@ export function PlayerStatsRoute() {
     [setSearchParams],
   );
 
+  // Selected-player deep link (PST-051 / LS-7124). The detail modal opens in
+  // place over the filtered list when `?playerId=X` is present — by a row click
+  // or restored on reload of a shared link — so the URL is a shareable "player X
+  // within these filters" deep link. Validated the same way as PlayerDetailPage's
+  // numeric `:id` (positive, safe, ≤ GraphQL INT); a non-numeric value is ignored
+  // so the modal never opens for a garbage param.
+  const playerIdParam = searchParams.get('playerId');
+  const selectedPlayerId = useMemo(() => {
+    if (!playerIdParam) return null;
+    const parsed = Number.parseInt(playerIdParam, 10);
+    return Number.isSafeInteger(parsed) &&
+      parsed > 0 &&
+      parsed <= MAX_GRAPHQL_INT
+      ? parsed
+      : null;
+  }, [playerIdParam]);
+
   const handlePlayerDetails = useCallback(
     (player: PlayerWithStats) => {
-      navigate(`/players/${player.id}`);
+      // "Both": a numeric id opens the detail modal in place via `?playerId`,
+      // preserving the active filters (PST-051 / LS-7124). A non-numeric,
+      // brefId-style id (e.g. 'troutmi01') can't be represented as a numeric
+      // `?playerId`, so fall back to the standalone `/players/:id` route with the
+      // raw id — never coerced to NaN (PST-050 / LS-7123). Pushing history means
+      // Back closes the modal / returns to the list.
+      const rawId = String(player.id);
+      if (/^\d+$/.test(rawId)) {
+        const params = new URLSearchParams(searchParams);
+        params.set('playerId', rawId);
+        setSearchParams(params);
+      } else {
+        navigate(`/players/${rawId}`);
+      }
     },
-    [navigate],
+    [searchParams, setSearchParams, navigate],
   );
+
+  // Close the in-place modal by stripping only the playerId param; filters are
+  // untouched. Replaces history so re-opening doesn't stack duplicate entries.
+  const handleClosePlayerDetails = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('playerId');
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // "Ability to navigate externally": open the standalone, full-page
+  // `/players/:id` route for the player shown in the modal. The modal surfaces
+  // this affordance via `onViewFullPage` (PST-050 + PST-051 reconciliation).
+  const handleViewFullPage = useCallback(() => {
+    if (selectedPlayerId !== null) navigate(`/players/${selectedPlayerId}`);
+  }, [navigate, selectedPlayerId]);
 
   // Latest visible rows surfaced by the shared PlayerStatsPage via
   // onVisibleRowsChange — read at export time so the download contains the
@@ -1121,16 +1173,23 @@ export function PlayerStatsRoute() {
       pageSize: number;
       filters: PlayerStatsFilters;
     }) => {
-      // Carry the current column-visibility selection through so a filter change
-      // (which rebuilds the whole param set) never drops the `cols` key.
+      // Carry the current column-visibility selection AND any open player deep
+      // link through so a filter change (which rebuilds the whole param set, and
+      // fires on mount too) never drops the `cols` key or the `playerId` modal
+      // selection (PST-051 / LS-7124).
       setSearchParams(
-        buildStatsSearchParams({ ...state, sport, visibleColumns }),
+        buildStatsSearchParams({
+          ...state,
+          sport,
+          visibleColumns,
+          playerId: searchParams.get('playerId'),
+        }),
         {
           replace: true,
         },
       );
     },
-    [setSearchParams, sport, visibleColumns],
+    [searchParams, setSearchParams, sport, visibleColumns],
   );
 
   // Handle share functionality — shared component passes a relative URL; prepend origin here.
@@ -1432,6 +1491,26 @@ export function PlayerStatsRoute() {
           rosteredPlayerIds={baseballRosteredIds}
         />
       </PremiumGate>
+      {/* Routable player detail modal (PST-051 / LS-7124). Rendered in place over
+          the filtered list when ?playerId=X is present — opened by a row click or
+          restored on reload of a shared deep link — and offers an "open full
+          page" affordance (onViewFullPage) to navigate externally to the
+          standalone /players/:id route (PST-050 reconciliation). Gated on the
+          same entitlement as the stats list, since the modal surfaces premium
+          career stats and /players/:id already handles the non-premium case. The
+          modal resolves the player's name from its own query, so the deep-link
+          mount (no name in the URL) renders correctly with a fallback. */}
+      {isPremium && selectedPlayerId !== null && (
+        <PlayerDetailModal
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) handleClosePlayerDetails();
+          }}
+          playerId={selectedPlayerId}
+          playerName="Player details"
+          onViewFullPage={handleViewFullPage}
+        />
+      )}
     </div>
   );
 }

@@ -113,7 +113,24 @@ jest.mock('../../hooks/useIsPremium', () => ({
 }));
 
 jest.mock('../../components/PlayerDetailModal', () => ({
-  PlayerDetailModal: () => null,
+  PlayerDetailModal: ({
+    playerId,
+    onOpenChange,
+    onViewFullPage,
+  }: {
+    playerId: number | null;
+    onOpenChange: (open: boolean) => void;
+    onViewFullPage?: () => void;
+  }) => (
+    <div data-testid="player-detail-modal" data-player-id={String(playerId)}>
+      <button data-testid="close-modal" onClick={() => onOpenChange(false)}>
+        close
+      </button>
+      <button data-testid="view-full-page" onClick={() => onViewFullPage?.()}>
+        full page
+      </button>
+    </div>
+  ),
 }));
 
 jest.mock('@legacy-sports/graphql', () => ({
@@ -485,10 +502,12 @@ describe('PlayerStatsRoute public-link auth gating (PST-070)', () => {
 
 // PST-050 / LS-7123: a player click used to coerce the id with
 // `parseInt(player.id, 10)`, so a brefId-style string id (e.g. 'troutmi01')
-// silently became NaN and opened the detail view for player NaN. The host now
-// navigates to the raw id and the `/players/:id` route validates it
-// (strict /^\d+$/ check, brefId fallback). These regression tests lock in that
-// the click handler never produces a NaN id again.
+// silently became NaN and opened the detail view for player NaN. A non-numeric
+// id still navigates to the raw id (the `/players/:id` route validates it via a
+// strict /^\d+$/ check + brefId fallback) — never coerced to NaN. A NUMERIC id
+// now opens the in-place modal instead of navigating (PST-051 reconciliation,
+// below); these tests lock in that the click never produces a NaN id and that a
+// brefId still routes externally.
 describe('PlayerStatsRoute player click id handling (PST-050)', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
@@ -508,12 +527,108 @@ describe('PlayerStatsRoute player click id handling (PST-050)', () => {
     expect(mockNavigate).not.toHaveBeenCalledWith('/players/NaN');
   });
 
-  it('navigates to a numeric id unchanged', () => {
+  it('opens the in-place modal for a numeric id (no external navigation)', () => {
     render(<PlayerStatsRoute />);
     act(() => {
       mockOnPlayerDetailsRef.current?.({ id: 12345 });
     });
-    expect(mockNavigate).toHaveBeenCalledWith('/players/12345');
+    // Numeric click now writes ?playerId and opens the modal in place; it no
+    // longer navigates away (PST-051 / LS-7124).
+    expect(mockNavigate).not.toHaveBeenCalled();
+    const params = mockSetSearchParams.mock.calls[0]?.[0] as URLSearchParams;
+    expect(params.get('playerId')).toBe('12345');
+  });
+});
+
+// PST-051 / LS-7124: the row-click detail modal was not a routable URL, so a
+// shared link lost the selected-player context. The host now mirrors the
+// selected player to a `playerId` search param: a numeric click opens the modal
+// in place (preserving filters), closing strips it, a reload of ?playerId=X
+// auto-opens it, and the modal offers an "open full page" affordance to navigate
+// externally to /players/:id (the "both" reconciliation with PST-050).
+describe('PlayerStatsRoute player deep link (PST-051)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+    mockHasEntitlement = true;
+    mockStatsPageProps = {};
+    mockOnPlayerDetailsRef.current = undefined;
+  });
+
+  it('auto-opens the detail modal for the player in ?playerId on mount (AC3)', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&playerId=42');
+    render(<PlayerStatsRoute />);
+    const modal = screen.getByTestId('player-detail-modal');
+    expect(modal).toBeInTheDocument();
+    expect(modal).toHaveAttribute('data-player-id', '42');
+  });
+
+  it('does not render the modal when no playerId param is present', () => {
+    render(<PlayerStatsRoute />);
+    expect(screen.queryByTestId('player-detail-modal')).not.toBeInTheDocument();
+  });
+
+  it('does not render the modal for an invalid playerId param', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&playerId=not-a-number');
+    render(<PlayerStatsRoute />);
+    expect(screen.queryByTestId('player-detail-modal')).not.toBeInTheDocument();
+  });
+
+  it('writes ?playerId on a numeric row click while preserving filters (AC1, AC4)', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&position=OF');
+    render(<PlayerStatsRoute />);
+    act(() => {
+      mockOnPlayerDetailsRef.current?.({ id: 42 });
+    });
+    const [params, opts] = mockSetSearchParams.mock.calls[0] as [
+      URLSearchParams,
+      unknown,
+    ];
+    expect(params.get('playerId')).toBe('42');
+    // Existing filter context is carried through unchanged.
+    expect(params.get('position')).toBe('OF');
+    // Opening pushes (no replace) so Back closes the modal.
+    expect(opts).toBeUndefined();
+  });
+
+  it('strips ?playerId when the modal closes, keeping filters (AC2, AC4)', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&playerId=42&position=OF');
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('close-modal'));
+    const [params, opts] = mockSetSearchParams.mock.calls[0] as [
+      URLSearchParams,
+      { replace?: boolean },
+    ];
+    expect(params.has('playerId')).toBe(false);
+    expect(params.get('position')).toBe('OF');
+    expect(opts).toEqual({ replace: true });
+  });
+
+  it('preserves an open playerId across a filter commit (AC3 guard)', () => {
+    // The shared list fires onFiltersChange from a mount effect; if the rebuild
+    // dropped playerId it would close the deep-linked modal on reload.
+    mockSearchParams = new URLSearchParams('sport=mlb&playerId=42');
+    render(<PlayerStatsRoute />);
+    act(() => {
+      (mockStatsPageProps.onFiltersChange as (state: unknown) => void)?.({
+        viewMode: 'combined',
+        pageSize: 25,
+        filters: {},
+      });
+    });
+    const params = mockSetSearchParams.mock.calls.at(
+      -1,
+    )?.[0] as URLSearchParams;
+    expect(params.get('playerId')).toBe('42');
+  });
+
+  it('navigates externally to /players/:id from the modal "open full page" affordance', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&playerId=42');
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('view-full-page'));
+    expect(mockNavigate).toHaveBeenCalledWith('/players/42');
   });
 });
 

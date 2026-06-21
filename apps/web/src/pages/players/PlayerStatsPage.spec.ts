@@ -390,6 +390,45 @@ describe('buildStatsSearchParams', () => {
     expect(a.toString()).toBe(b.toString());
   });
 
+  it('includes playerId in the URL, in alphabetical order, when provided (PST-051)', () => {
+    const out = buildStatsSearchParams({
+      viewMode: 'combined',
+      pageSize: 25,
+      filters: { position: 'OF' },
+      sport: 'mlb',
+      playerId: '42',
+    });
+    expect(out.get('playerId')).toBe('42');
+    // playerId sorts between pageSize and position — the deterministic ordering
+    // (PST-104) must hold with the deep-link param present.
+    expect([...out.keys()]).toEqual([
+      'pageSize',
+      'playerId',
+      'position',
+      'sport',
+      'v',
+      'view',
+    ]);
+  });
+
+  it('omits playerId from the URL when null/absent (PST-051)', () => {
+    expect(
+      buildStatsSearchParams({
+        viewMode: 'combined',
+        pageSize: 25,
+        filters: {},
+        playerId: null,
+      }).has('playerId'),
+    ).toBe(false);
+    expect(
+      buildStatsSearchParams({
+        viewMode: 'combined',
+        pageSize: 25,
+        filters: {},
+      }).has('playerId'),
+    ).toBe(false);
+  });
+
   it('stamps the current URL schema version (v) on every written URL', () => {
     const out = buildStatsSearchParams({
       viewMode: 'combined',

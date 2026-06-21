@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
-import { X } from '@tamagui/lucide-icons';
+import { ExternalLink, X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetAllPlayerSeasonStatsQuery,
@@ -59,6 +59,13 @@ export interface PlayerDetailModalProps {
   open: boolean;
   /** Callback when the modal should close */
   onOpenChange: (open: boolean) => void;
+  /**
+   * Optional "open full page" affordance (PST-051 / LS-7124). When provided, an
+   * external-link button is rendered in the header that navigates to the
+   * standalone `/players/:id` route. Omitted when the modal *is* the full page
+   * (PlayerDetailPage), where the affordance would be redundant.
+   */
+  onViewFullPage?: () => void;
 }
 
 interface SeasonRow {
@@ -497,6 +504,7 @@ export function PlayerDetailModal({
   position,
   open,
   onOpenChange,
+  onViewFullPage,
 }: PlayerDetailModalProps) {
   LOGGER.debug('[PlayerDetailModal] render', { playerId, playerName, open });
 
@@ -841,6 +849,21 @@ export function PlayerDetailModal({
               <Eyebrow>{eyebrowText}</Eyebrow>
               <EditorialHeading>{resolvedPlayerName}</EditorialHeading>
             </YStack>
+            {onViewFullPage && (
+              <Button
+                size="$3"
+                circular
+                icon={ExternalLink}
+                aria-label="Open full page"
+                onPress={onViewFullPage}
+                backgroundColor={withAlpha(WHITE, 0.08)}
+                borderColor={STATS_BORDER}
+                borderWidth={1}
+                color={TEXT_INTERFACE}
+                hoverStyle={{ backgroundColor: withAlpha(WHITE, 0.14) }}
+                pressStyle={{ backgroundColor: withAlpha(WHITE, 0.18) }}
+              />
+            )}
             <Button
               size="$3"
               circular
