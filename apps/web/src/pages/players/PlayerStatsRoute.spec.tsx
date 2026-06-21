@@ -19,7 +19,22 @@ jest.mock('../../context/GrowthBookProvider', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/players', () => ({
-  PlayerStatsPage: () => null,
+  // Expose a Share affordance so the host's onShare handler (and its
+  // clipboard/manual-copy fallback) can be exercised. The shared component
+  // passes a relative URL; the host prepends origin + sport.
+  PlayerStatsPage: ({
+    onShare,
+  }: {
+    onShare?: (relativeUrl: string) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="share-button"
+      onClick={() => onShare?.('/players/stats?view=combined')}
+    >
+      Share
+    </button>
+  ),
   // Mirror the shared shell's canonical mapping so the host's URL-rewrite
   // behavior can be asserted (legacy aliases batting→hitters, pitching→pitchers;
   // everything else → combined).
@@ -60,6 +75,15 @@ jest.mock('@legacy-sports/graphql', () => ({
 
 jest.mock('../../hooks/useLeagueRosteredPlayerIds', () => ({
   useLeagueRosteredPlayerIds: () => ({ playerIds: new Set(), loading: false }),
+}));
+
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: {
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+  },
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -205,5 +229,129 @@ describe('PlayerStatsRoute view-mode URL normalization', () => {
     mockSearchParams = new URLSearchParams('sport=mlb');
     render(<PlayerStatsRoute />);
     expect(mockSetSearchParams).not.toHaveBeenCalled();
+  });
+});
+
+// LS-7132 / PST-072: when native share throws a non-AbortError AND the
+// clipboard write also fails (or clipboard is unavailable), the toast used to
+// show prose only ("Could not share link. Please copy the URL manually.") with
+// no URL — leaving the user no way to recover. The host now renders the URL
+// inline, pre-selected, so it can be copied manually.
+describe('PlayerStatsRoute share fallback', () => {
+  const originalShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+  const originalClipboard = Object.getOwnPropertyDescriptor(
+    navigator,
+    'clipboard',
+  );
+
+  const setShare = (value: unknown) =>
+    Object.defineProperty(navigator, 'share', {
+      value,
+      configurable: true,
+      writable: true,
+    });
+  const setClipboard = (value: unknown) =>
+    Object.defineProperty(navigator, 'clipboard', {
+      value,
+      configurable: true,
+      writable: true,
+    });
+
+  // The host builds the absolute URL from origin + relative path + sport. jsdom
+  // origin is http://localhost; the mocked share button passes
+  // /players/stats?view=combined and sport=mlb is appended.
+  const EXPECTED_URL = 'http://localhost/players/stats?view=combined&sport=mlb';
+
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+  });
+
+  afterEach(() => {
+    // jsdom leaves `share` undefined and `clipboard` non-configurable by
+    // default, so restore the captured descriptor when present and otherwise
+    // reset to `undefined` (no `delete` needed — both reads check truthiness).
+    Object.defineProperty(
+      navigator,
+      'share',
+      originalShare ?? { value: undefined, configurable: true, writable: true },
+    );
+    Object.defineProperty(
+      navigator,
+      'clipboard',
+      originalClipboard ?? {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      },
+    );
+  });
+
+  it('renders the URL inline (pre-selected) when share and clipboard both fail', async () => {
+    setShare(jest.fn().mockRejectedValue(new Error('share unavailable')));
+    setClipboard({
+      writeText: jest.fn().mockRejectedValue(new Error('clipboard blocked')),
+    });
+
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('share-button'));
+
+    const input = await screen.findByLabelText(/shareable link to copy/i);
+    expect(input).toHaveValue(EXPECTED_URL);
+    expect(input).toHaveAttribute('readonly');
+    // The message renders in both the sr-only live region and the visible toast.
+    expect(
+      screen.getAllByText(
+        /could not share link\. copy the url below manually/i,
+      ),
+    ).not.toHaveLength(0);
+  });
+
+  it('renders the URL inline when native share fails and clipboard is unavailable', async () => {
+    setShare(jest.fn().mockRejectedValue(new Error('share unavailable')));
+    setClipboard(undefined);
+
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('share-button'));
+
+    const input = await screen.findByLabelText(/shareable link to copy/i);
+    expect(input).toHaveValue(EXPECTED_URL);
+  });
+
+  it('swallows AbortError (user dismissed the share sheet) — no toast, no URL', async () => {
+    const abort = new Error('aborted');
+    abort.name = 'AbortError';
+    setShare(jest.fn().mockRejectedValue(abort));
+    setClipboard({ writeText: jest.fn() });
+
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('share-button'));
+
+    // Give the rejected promise a tick to settle, then assert nothing surfaced.
+    await Promise.resolve();
+    expect(
+      screen.queryByLabelText(/shareable link to copy/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/could not share link/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the copied confirmation (no URL fallback) when clipboard succeeds after share fails', async () => {
+    setShare(jest.fn().mockRejectedValue(new Error('share unavailable')));
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    setClipboard({ writeText });
+
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('share-button'));
+
+    // The confirmation renders in both the sr-only live region and the toast.
+    expect(
+      await screen.findAllByText(/link copied to clipboard/i),
+    ).not.toHaveLength(0);
+    expect(writeText).toHaveBeenCalledWith(EXPECTED_URL);
+    expect(
+      screen.queryByLabelText(/shareable link to copy/i),
+    ).not.toBeInTheDocument();
   });
 });

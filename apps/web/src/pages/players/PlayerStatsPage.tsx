@@ -360,6 +360,11 @@ export function PlayerStatsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [liveMsg, setLiveMsg] = React.useState('');
+  // When sharing fails terminally (native share errors AND clipboard write
+  // fails or is unavailable) the user has no way to recover from the prose-only
+  // toast. Holding the URL here lets us render it inline, pre-selected, so it
+  // can be copied manually (LS-7132 / PST-072).
+  const [shareFallbackUrl, setShareFallbackUrl] = React.useState('');
   const isPremium = useHasEntitlement(ENTITLEMENTS.advanced_search_filters);
 
   // Check if the user is in at least one baseball league — availability filter
@@ -411,10 +416,13 @@ export function PlayerStatsRoute() {
   // sr-only live region populated (screen readers re-announce changes; the
   // visible affordance is the confirmation for sighted users).
   useEffect(() => {
-    if (!liveMsg) return undefined;
+    // Keep the toast up indefinitely while the manual-copy fallback URL is
+    // showing — auto-dismissing it would defeat the whole point (the user
+    // needs time to select and copy the link).
+    if (!liveMsg || shareFallbackUrl) return undefined;
     const timer = window.setTimeout(() => setLiveMsg(''), TOAST_DURATION_MS);
     return () => window.clearTimeout(timer);
-  }, [liveMsg]);
+  }, [liveMsg, shareFallbackUrl]);
 
   // Stats format preference from user settings
   const [statsFormat, setStatsFormat] = useState<'standard' | 'expanded'>(
@@ -578,6 +586,14 @@ export function PlayerStatsRoute() {
       params.set('sport', sport);
       const url = `${window.location.origin}${path}?${params.toString()}`;
       setLiveMsg('');
+      setShareFallbackUrl('');
+      // Terminal failure: neither native share nor clipboard worked. Surface the
+      // URL inline (pre-selected) so the user can copy it manually instead of
+      // hunting through the address bar (LS-7132).
+      const showManualCopyFallback = () => {
+        setLiveMsg('Could not share link. Copy the URL below manually.');
+        setShareFallbackUrl(url);
+      };
       void (async () => {
         try {
           if (navigator.share) {
@@ -590,7 +606,7 @@ export function PlayerStatsRoute() {
             await navigator.clipboard.writeText(url);
             setLiveMsg('Link copied to clipboard.');
           } else {
-            setLiveMsg('Could not share link. Please copy the URL manually.');
+            showManualCopyFallback();
           }
         } catch (error) {
           // AbortError means the user dismissed the native share sheet — not an error
@@ -612,10 +628,10 @@ export function PlayerStatsRoute() {
                   ? clipboardError
                   : String(clipboardError),
               );
-              setLiveMsg('Could not share link. Please copy the URL manually.');
+              showManualCopyFallback();
             }
           } else {
-            setLiveMsg('Could not share link. Please copy the URL manually.');
+            showManualCopyFallback();
           }
         }
       })();
@@ -701,31 +717,97 @@ export function PlayerStatsRoute() {
             zIndex: 60,
             background: SURFACE_CARD,
             border: `1px solid ${withAlpha(BRAND_GOLD, 0.4)}`,
-            borderRadius: 9999,
-            padding: '12px 20px 12px 16px',
+            borderRadius: shareFallbackUrl ? 14 : 9999,
+            padding: shareFallbackUrl ? '12px 16px' : '12px 20px 12px 16px',
             color: BRAND_GOLD_LIGHT,
             fontFamily: "'Literata', serif",
             fontSize: 14,
             fontWeight: 600,
-            display: 'inline-flex',
-            alignItems: 'center',
+            display: shareFallbackUrl ? 'flex' : 'inline-flex',
+            flexDirection: shareFallbackUrl ? 'column' : 'row',
+            alignItems: shareFallbackUrl ? 'stretch' : 'center',
             gap: 10,
+            maxWidth: shareFallbackUrl
+              ? 'min(420px, calc(100vw - 32px))'
+              : undefined,
             boxShadow: '0 12px 32px rgba(0, 0, 0, 0.35)',
             animation: 'ls-stats-toast-in 180ms ease forwards',
           }}
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={BRAND_GOLD}
-            strokeWidth="2"
-            aria-hidden="true"
+          <div
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}
           >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          {liveMsg}
+            {/* Success uses a check; the manual-copy fallback is an error state,
+                so a check would be misleading — show a warning glyph instead. */}
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={shareFallbackUrl ? BRAND_SEAM_RED : BRAND_GOLD}
+              strokeWidth="2"
+              aria-hidden="true"
+              style={{ flexShrink: 0 }}
+            >
+              {shareFallbackUrl ? (
+                <>
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </>
+              ) : (
+                <polyline points="20 6 9 17 4 12" />
+              )}
+            </svg>
+            {liveMsg}
+          </div>
+          {shareFallbackUrl && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                ref={(node) => {
+                  // Pre-select the URL so the user can copy immediately, per the
+                  // ticket recommendation ("URL pre-selected").
+                  if (node) node.select();
+                }}
+                readOnly
+                value={shareFallbackUrl}
+                aria-label="Shareable link to copy"
+                onFocus={(event) => event.currentTarget.select()}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  background: BG_DARK,
+                  border: `1px solid ${withAlpha(BRAND_GOLD, 0.3)}`,
+                  borderRadius: 8,
+                  padding: '8px 10px',
+                  color: TEXT_HIGH_CONTRAST,
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  fontWeight: 400,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setShareFallbackUrl('');
+                  setLiveMsg('');
+                }}
+                aria-label="Dismiss"
+                style={{
+                  flexShrink: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  color: BRAND_GOLD_LIGHT,
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  lineHeight: 1,
+                  padding: 4,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
       )}
       {footballEnabled !== false && (
