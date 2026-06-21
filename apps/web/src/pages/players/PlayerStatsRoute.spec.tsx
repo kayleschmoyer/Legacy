@@ -30,24 +30,28 @@ jest.mock('../../context/GrowthBookProvider', () => ({
   useFeatureValue: () => mockFootballEnabled,
 }));
 
+// Capture the props the route passes to the shared PlayerStatsPage so tests can
+// drive callbacks (e.g. onExport) directly. Prefixed with `mock` so the hoisted
+// jest.mock factory is allowed to reference it.
+let mockStatsPageProps: Record<string, unknown> = {};
 jest.mock('@legacy-sports/shared-components/players', () => ({
-  // Expose a Share affordance so the host's onShare handler (and its
+  // Capture the props the host passes (so onExport can be driven directly) and
+  // expose a Share affordance so the host's onShare handler (and its
   // clipboard/manual-copy fallback) can be exercised. The shared component
   // passes a relative URL; the host prepends origin + sport. Also capture the
   // onPlayerDetails callback so a player click can be simulated directly.
-  PlayerStatsPage: ({
-    onShare,
-    onPlayerDetails,
-  }: {
+  PlayerStatsPage: (props: {
     onShare?: (relativeUrl: string) => void;
     onPlayerDetails?: (player: { id: string | number }) => void;
+    [key: string]: unknown;
   }) => {
-    mockOnPlayerDetailsRef.current = onPlayerDetails;
+    mockStatsPageProps = props;
+    mockOnPlayerDetailsRef.current = props.onPlayerDetails;
     return (
       <button
         type="button"
         data-testid="share-button"
-        onClick={() => onShare?.('/players/stats?view=combined')}
+        onClick={() => props.onShare?.('/players/stats?view=combined')}
       >
         Share
       </button>
@@ -460,5 +464,89 @@ describe('PlayerStatsRoute player click id handling (PST-050)', () => {
       mockOnPlayerDetailsRef.current?.({ id: 12345 });
     });
     expect(mockNavigate).toHaveBeenCalledWith('/players/12345');
+  });
+});
+
+// Export resource-cleanup lifecycle (LS-7660 / GAP-002). The export path creates
+// a Blob object URL, clicks a programmatic <a>, and must ALWAYS revoke the URL —
+// including the error path — so repeated/concurrent exports never leak URLs.
+describe('PlayerStatsRoute export object-URL cleanup', () => {
+  const createObjectURL = jest.fn<string, [Blob]>();
+  const revokeObjectURL = jest.fn<void, [string]>();
+  let urlSeq = 0;
+
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+    mockStatsPageProps = {};
+
+    urlSeq = 0;
+    createObjectURL.mockReset();
+    revokeObjectURL.mockReset();
+    createObjectURL.mockImplementation(() => `blob:mock-${++urlSeq}`);
+    // jsdom does not implement the object-URL APIs — install spies for the test.
+    (
+      URL as unknown as { createObjectURL: typeof createObjectURL }
+    ).createObjectURL = createObjectURL;
+    (
+      URL as unknown as { revokeObjectURL: typeof revokeObjectURL }
+    ).revokeObjectURL = revokeObjectURL;
+  });
+
+  function getOnExport(): (filters: unknown, viewMode: string) => void {
+    render(<PlayerStatsRoute />);
+    const onExport = mockStatsPageProps.onExport as (
+      filters: unknown,
+      viewMode: string,
+    ) => void;
+    expect(typeof onExport).toBe('function');
+    return onExport;
+  }
+
+  it('revokes the object URL on a successful export', () => {
+    const onExport = getOnExport();
+    onExport({}, 'combined');
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-1');
+  });
+
+  it('revokes the object URL even when the link click throws', () => {
+    const onExport = getOnExport();
+    const clickSpy = jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {
+        throw new Error('blocked');
+      });
+
+    try {
+      expect(() => onExport({}, 'combined')).toThrow('blocked');
+      // Cleanup still runs on the error path — no leaked object URL.
+      expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-1');
+      // The transient <a> is removed even when click throws.
+      expect(document.querySelector('a[download]')).toBeNull();
+    } finally {
+      clickSpy.mockRestore();
+    }
+  });
+
+  it('revokes a distinct URL for every export across repeated exports', () => {
+    const onExport = getOnExport();
+
+    for (let i = 0; i < 50; i++) {
+      onExport({}, 'combined');
+    }
+
+    expect(createObjectURL).toHaveBeenCalledTimes(50);
+    expect(revokeObjectURL).toHaveBeenCalledTimes(50);
+    // Every created URL was revoked exactly once (no leaks, no double-revoke).
+    const created = createObjectURL.mock.results.map((r) => String(r.value));
+    const revoked = revokeObjectURL.mock.calls.map((c) => c[0]);
+    expect(new Set(revoked)).toEqual(new Set(created));
+    expect(revoked).toHaveLength(new Set(revoked).size);
   });
 });

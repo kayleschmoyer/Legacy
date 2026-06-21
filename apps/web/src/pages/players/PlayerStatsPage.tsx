@@ -721,14 +721,21 @@ export function PlayerStatsRoute() {
       const dataBlob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
 
-      // Create download link
+      // Create download link. The object URL is revoked in a `finally` so the
+      // resource is released on EVERY export — including the error path where
+      // appendChild/click throws — preventing leaked object URLs across repeated
+      // or concurrent exports (LS-7660). Each export owns its own `url`, so
+      // concurrent exports clean up independently.
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `player-stats-${viewMode}-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      try {
+        link.href = url;
+        link.download = `player-stats-${viewMode}-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+      } finally {
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
 
       LOGGER.info('Exported player statistics', { bytes });
       setLiveMsg('Player statistics exported. Download started.');
