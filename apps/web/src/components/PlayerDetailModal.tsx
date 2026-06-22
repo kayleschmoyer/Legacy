@@ -366,6 +366,7 @@ function EditorialTab({
       hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.08) }}
       onPress={onPress}
       data-testid={`tab-${tabKey}`}
+      style={{ scrollSnapAlign: 'start' }}
     >
       <Text
         color={active ? TEXT_INTERFACE : TEXT_SECONDARY}
@@ -1147,22 +1148,39 @@ export function PlayerDetailModal({
           {/* ── Tabs ── */}
           {!!displayData && !error && availableTabs.length > 0 && (
             <>
-              <XStack
+              <YStack
                 marginTop={28}
                 borderBottomWidth={1}
                 borderBottomColor={STATS_BORDER}
-                overflow="scroll"
+                position="relative"
+                overflow="hidden"
               >
-                {availableTabs.map((tab) => (
-                  <EditorialTab
-                    key={tab.key}
-                    label={tab.label}
-                    tabKey={tab.key}
-                    active={activeTab === tab.key}
-                    onPress={() => setActiveTab(tab.key)}
-                  />
-                ))}
-              </XStack>
+                <XStack
+                  overflow="scroll"
+                  style={{ scrollSnapType: 'x mandatory' }}
+                >
+                  {availableTabs.map((tab) => (
+                    <EditorialTab
+                      key={tab.key}
+                      label={tab.label}
+                      tabKey={tab.key}
+                      active={activeTab === tab.key}
+                      onPress={() => setActiveTab(tab.key)}
+                    />
+                  ))}
+                </XStack>
+                <YStack
+                  position="absolute"
+                  top={0}
+                  right={0}
+                  bottom={0}
+                  width={48}
+                  pointerEvents="none"
+                  style={{
+                    background: `linear-gradient(to right, transparent, ${BG_DARK})`,
+                  }}
+                />
+              </YStack>
 
               {/* Career Arc */}
               {activeTab === 'career-arc' && (

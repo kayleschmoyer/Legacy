@@ -61,7 +61,7 @@ const PITCHER_SEASON_STATS = {
 /**
  * Pitcher-only player (Max Scherzer), two seasons for row-ordering checks.
  * 2024 ERA: (48 × 9) / 117 = 3.69
- * 2023 ERA: (44 × 9) / 155 = 2.55
+ * 2023 ERA: (44 × 9) / 155 = 2.55  [earnedRunAverage set to '2.55' to match]
  */
 const MULTI_SEASON_PITCHER_STATS = {
   data: {
@@ -122,7 +122,7 @@ const MULTI_SEASON_PITCHER_STATS = {
 
 /**
  * Two-way player (Shohei Ohtani): 1 batting season (2024) + 1 pitching season (2023).
- * Pitching ERA check: (35 × 9) / ipToDecimalInnings(132) = 315/132 = 2.39
+ * Pitching ERA check: (35 × 9) / ipToDecimalInnings(132) = 315/132 = 2.39  [earnedRunAverage set to '2.39' to match]
  */
 const TWO_WAY_SEASON_STATS = {
   data: {
@@ -258,7 +258,7 @@ const MULTI_SEASON_CAREER_ARC = {
         games: 27,
         wins: 11,
         losses: 6,
-        earnedRunAverage: '2.56',
+        earnedRunAverage: '2.55',
         earnedRunAveragePlus: 158,
         whip: 1.01,
         strikeouts: 188,
@@ -311,7 +311,7 @@ const TWO_WAY_CAREER_ARC = {
         games: 23,
         wins: 10,
         losses: 5,
-        earnedRunAverage: '3.14',
+        earnedRunAverage: '2.39',
         earnedRunAveragePlus: 138,
         whip: 0.92,
         strikeouts: 167,
