@@ -586,6 +586,7 @@ export function PlayerDetailModal({
         earnedRuns?: number | null;
         strikeouts?: number | null;
         baseOnBalls?: number | null;
+        earnedRunAverage?: string | null;
       }) => {
         if (!p?.season) return;
         const row: SeasonRow = seasons.get(p.season) || { season: p.season };
@@ -593,7 +594,11 @@ export function PlayerDetailModal({
         const er = p.earnedRuns ?? 0;
         const decimalInnings = ipToDecimalInnings(ip);
         const era =
-          decimalInnings > 0 ? ((er * 9) / decimalInnings).toFixed(2) : '0.00';
+          p.earnedRunAverage != null
+            ? p.earnedRunAverage
+            : decimalInnings > 0
+              ? ((er * 9) / decimalInnings).toFixed(2)
+              : '0.00';
         row.pitching = {
           games: p.games ?? 0,
           wins: p.wins ?? 0,
