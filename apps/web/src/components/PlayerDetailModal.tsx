@@ -1047,9 +1047,13 @@ export function PlayerDetailModal({
 
           {/* ── Hero stats ── */}
           {!!displayData && !error && careerTotals && (
-            <XStack gap={14} flexWrap="wrap" marginTop={20}>
+            <YStack gap={14} marginTop={20} data-testid="hero-stats">
               {careerTotals.hasBatting && (
-                <>
+                <XStack
+                  gap={14}
+                  flexWrap="wrap"
+                  data-testid="hero-stats-batting"
+                >
                   <HeroStat
                     label="Career AVG"
                     value={careerTotals.avg}
@@ -1063,10 +1067,14 @@ export function PlayerDetailModal({
                     label="Runs Batted In"
                     value={careerTotals.rbi.toLocaleString('en-US')}
                   />
-                </>
+                </XStack>
               )}
-              {careerTotals.hasPitching && !careerTotals.hasBatting && (
-                <>
+              {careerTotals.hasPitching && (
+                <XStack
+                  gap={14}
+                  flexWrap="wrap"
+                  data-testid="hero-stats-pitching"
+                >
                   <HeroStat
                     label="Record"
                     value={`${careerTotals.pWins}–${careerTotals.pLosses}`}
@@ -1077,9 +1085,9 @@ export function PlayerDetailModal({
                     value={careerTotals.pSO.toLocaleString('en-US')}
                   />
                   <HeroStat label="Innings Pitched" value={careerTotals.pIP} />
-                </>
+                </XStack>
               )}
-            </XStack>
+            </YStack>
           )}
 
           {/* ── Career batting grid ── */}
