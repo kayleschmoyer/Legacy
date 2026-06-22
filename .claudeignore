@@ -63,3 +63,58 @@ pnpm-lock.yaml
 **/storybook-static/
 **/*.spec.ts-snapshots/
 .screenshots/
+
+# Logs & OS junk
+**/*.log
+.DS_Store
+Thumbs.db
+
+# Terraform plan files (contain credentials)
+tfplan
+*.tfplan
+
+# Large local caches / ephemeral worktrees
+.modules-pool/
+.claude/worktrees/
+
+# Native dependency caches
+**/Pods/
+**/vendor/bundle/
+
+# Mobile binary artifacts
+**/*.apk
+**/*.aab
+**/*.ipa
+**/*.dSYM
+**/*.dSYM.zip
+
+# RN/Hermes bundles
+**/*.jsbundle
+**/*.hbc
+**/*.bundle
+
+# iOS/Android IDE state
+DerivedData/
+xcuserdata/
+*.iml
+.gradle/
+.cxx/
+.idea/
+.vscode/
+
+# Python venv & generic cache
+.venv/
+.cache/
+
+# Remotion render output
+apps/video/out/
+
+# Per-shard Playwright coverage fragments
+coverage-fragments/
+
+# Vite/Vitest temp files
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
+
+# Metro watcher pings
+.metro-health-check*
