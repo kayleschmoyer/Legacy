@@ -1534,6 +1534,96 @@ builder.mutationField('deleteAllLeagues', (t) =>
   }),
 );
 
+// Mutation field to delete only the caller's OWN mock-draft leagues.
+//
+// Scoped reset for the free-tier weekly mock-draft cap (LS-8238). The cap is
+// `countRecentMockDrafts` = `owner = userId AND is_mock_draft = true` within a
+// rolling 7-day window, so deleting the caller's mock leagues resets it.
+//
+// Why this exists instead of reusing `deleteAllLeagues`: integration specs run
+// concurrently across parallel shards against ONE shared dev backend, and they
+// all create their leagues as the SAME shared commissioner test user — which is
+// provisioned `access_level = 'admin'`. For an admin caller, `deleteAllLeagues`
+// deletes every league the admin is a *member of* system-wide (no age guard, no
+// scoping), so the mock-draft spec's reset was deleting the in-flight leagues of
+// every other concurrently-running spec mid-test — the root cause of the
+// persistent nightly integration cluster (LS-8238). This mutation is scoped to
+// the caller AND to mock leagues only, so it can never touch a real league or
+// another user's league regardless of admin status.
+builder.mutationField('deleteMyMockDraftLeagues', (t) =>
+  t.field({
+    type: 'Int',
+    description:
+      'Delete all mock-draft leagues owned by the calling user (owner = caller ' +
+      'AND is_mock_draft = true). Scoped to the caller and to mock leagues only ' +
+      "— never affects real leagues or other users' leagues, even for an admin " +
+      'caller. Returns the number of mock leagues deleted.',
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to reset mock drafts',
+        );
+      }
+
+      const userId = context.user.id;
+
+      try {
+        const mockLeagues = await context.db
+          .select({ id: PublicSchema.leagues.id })
+          .from(PublicSchema.leagues)
+          .where(
+            and(
+              eq(PublicSchema.leagues.owner, userId),
+              eq(PublicSchema.leagues.isMockDraft, true),
+            ),
+          );
+
+        if (mockLeagues.length === 0) {
+          return 0;
+        }
+
+        const leagueIds = mockLeagues.map((l) => l.id);
+
+        // Reuse the deadlock-safe atomic delete (ascending-id order, CASCADE
+        // handles child rows) and the transient-retry wrapper, mirroring
+        // deleteAllLeagues (LS-8099 / LS-8100).
+        await withTransientRetry(
+          () => deleteLeaguesAtomically(context.db, leagueIds),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn(
+                'Retrying deleteMyMockDraftLeagues after transient DB error',
+                { userId, attempt, pgCode: detail.code },
+              ),
+          },
+        );
+
+        return leagueIds.length;
+      } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        const detail = describeDbError(error);
+        LOGGER.error(
+          'Error deleting mock-draft leagues',
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            userId,
+            pgCode: detail.code,
+            constraint: detail.constraint,
+            table: detail.table,
+            detail: detail.detail,
+          },
+        );
+        throw new GraphQLError(
+          'Failed to delete mock-draft leagues: ' + formatDbError(detail),
+          { extensions: { code: 'MOCK_DRAFT_RESET_FAILED' } },
+        );
+      }
+    },
+  }),
+);
+
 // ── Update League Settings ────────────────────────────────────────────────
 
 const UpdateLeagueSettingsInput = builder.inputType(

@@ -2209,6 +2209,11 @@ type Mutation {
     leagueId: Int!
     season: Int!
   ): Boolean
+
+  """
+  Delete all mock-draft leagues owned by the calling user (owner = caller AND is_mock_draft = true). Scoped to the caller and to mock leagues only — never affects real leagues or other users' leagues, even for an admin caller. Returns the number of mock leagues deleted.
+  """
+  deleteMyMockDraftLeagues: Int
   disableDeviceToken(deviceToken: String!): Boolean
 
   """
