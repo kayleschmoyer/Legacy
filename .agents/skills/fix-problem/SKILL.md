@@ -88,7 +88,7 @@ Do not ask for additional approval before switching to the Atlassian plugin in t
 
 #### Step 3b: Create the ticket
 
-Use the structured template from the [define skill](../define/SKILL.md):
+Use the structured template from the [define reference](../plan-ticket/references/define.md):
 
 ```
 jira_create_ticket({

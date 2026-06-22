@@ -40,7 +40,7 @@ Numbers are the canonical step order. "Tool binding" always means: look up the c
 
 0. **Epic check** — if the ticket is an Epic, do not implement it directly; defer to the `work-ticket` skill's Parent Dispatch Mode (enumerate To Do descendants, check blockers, batch-dispatch chips).
 1. **Identify/create the ticket** — complex/ambiguous work runs `/define` first; well-understood work creates directly with `sprint: "current"`. Capture planning output in the `context`/`risk`/`planningNotes` fields.
-   - **1b. Plan** — assess scope, read relevant code, identify constraints, classify risk ([planning skill](../../planning/SKILL.md)). Skip for trivial tasks.
+   - **1b. Plan** — assess scope, read relevant code, identify constraints, classify risk ([planning reference](../../plan-ticket/references/planning.md)). Skip for trivial tasks.
    - **1c. Create the tracking-task graph** — the mandatory enforcement described in [Read first](#read-first-the-enforcement-that-survives-compaction) above. This happens _before_ code.
 2. **Dependency/blocker check** — inspect "blocked-by" links. Blocker not In Review/Done → **STOP**. Blocker In Review → branch off its branch. Blocker Done or none → branch off `origin/main`. Always fetch before branching.
 3. **Transition Jira to In Progress** — only after the blocker check passes. Move the ticket to the current sprint if it isn't already.

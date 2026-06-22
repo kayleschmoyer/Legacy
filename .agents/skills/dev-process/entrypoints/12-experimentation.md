@@ -65,4 +65,4 @@ Experiments are features with extra obligations: a measurement plan, a decision 
 
 - [RFC artifact](../artifacts/rfc.md)
 - [ADR artifact](../artifacts/adr.md)
-- [planning](../../planning/SKILL.md)
+- [planning](../../plan-ticket/references/planning.md)

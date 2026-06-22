@@ -1,9 +1,6 @@
----
-name: planning
-description: 'Structured planning phase for implementation tasks. Read relevant code, understand constraints, identify dependencies, classify risk (Low/Medium/High), and produce a mental model before writing code. Referenced as Phase 0 by workflow skills. Skip for trivial tasks (typo fixes, single-line changes, doc-only edits).'
----
+# Planning — Phase 0 codebase recon + risk (reference)
 
-# Skill: Planning
+> Sub-reference of [`plan-ticket`](../SKILL.md). Used as Phase 0 of any non-trivial implementation: read affected code, classify risk, and build the mental model before writing code.
 
 ## Overview
 
@@ -93,7 +90,7 @@ After reading the code, identify what constrains the implementation:
 
 ### Step 4: Risk Classification
 
-> **Canonical source**: [`.agents/skills/dev-process/gates/risk-tiers.md`](../dev-process/gates/risk-tiers.md) is the authoritative reference for risk tiers, including the **Critical** tier and the full decision tree and per-tier requirements. The table below is a quick reference for the planning phase; consult the canonical doc when the choice is non-obvious or when an entrypoint other than new-feature applies.
+> **Canonical source**: [`.agents/skills/dev-process/gates/risk-tiers.md`](../../dev-process/gates/risk-tiers.md) is the authoritative reference for risk tiers, including the **Critical** tier and the full decision tree and per-tier requirements. The table below is a quick reference for the planning phase; consult the canonical doc when the choice is non-obvious or when an entrypoint other than new-feature applies.
 
 Classify the change using this framework:
 
@@ -102,7 +99,7 @@ Classify the change using this framework:
 | **Low**      | Cosmetic, docs, test-only, single-file, no schema/infra changes                                                         | Fix a typo, add a test, update a doc, rename a variable                                          | Proceed with confidence. Standard `make pc` validation is sufficient.                                                                                               |
 | **Medium**   | Business logic, multiple files, schema changes, new UI components, GraphQL resolver changes                             | New resolver + frontend query, UI feature with state, refactor across files                      | Read all affected files. Identify test coverage gaps. Plan the change sequence (schema first? types first?).                                                        |
 | **High**     | Auth/security, payments/billing, infrastructure (Terraform), data migrations, cross-service changes, WebSocket protocol | OAuth flow change, Stripe webhook handler, DB migration on production data, Lambda configuration | Full dependency analysis. Consider rollback strategy. Identify what could break in production. Plan verification beyond `make pc` (manual testing, staging deploy). |
-| **Critical** | Production incidents, security exploitation, reverts of merged changes affecting prod                                   | Hotfix for live outage, CVE response, rollback of broken deploy                                  | Speed AND rigor maximized. Incident commander, postmortem mandatory. See [dev-process entrypoints 01, 03, 13](../dev-process/entrypoints/).                         |
+| **Critical** | Production incidents, security exploitation, reverts of merged changes affecting prod                                   | Hotfix for live outage, CVE response, rollback of broken deploy                                  | Speed AND rigor maximized. Incident commander, postmortem mandatory. See [dev-process entrypoints 01, 03, 13](../../dev-process/entrypoints/).                      |
 
 **Risk escalation**: if you discover during reconnaissance that the change is higher-risk than the ticket suggests (e.g., a "simple UI fix" requires a schema migration), update your risk classification and adjust your approach accordingly.
 
@@ -170,7 +167,7 @@ jira_create_ticket(
 
 ## Related Skills
 
-- [work-ticket](../work-ticket/SKILL.md) — references this skill as Phase 0
-- [debugging](../debugging/SKILL.md) — planning after reproduction, before fix
-- [mcp-first gaps](../mcp-first/references/gaps.md) — planning before MCP tool implementation
-- [standards](../standards/SKILL.md) — informs risk assessment with review finding patterns
+- [work-ticket](../../work-ticket/SKILL.md) — references this doc as Phase 0
+- [debugging](../../debugging/SKILL.md) — planning after reproduction, before fix
+- [mcp-first gaps](../../mcp-first/references/gaps.md) — planning before MCP tool implementation
+- [standards](../../standards/SKILL.md) — informs risk assessment with review finding patterns

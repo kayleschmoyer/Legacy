@@ -269,7 +269,7 @@ Follow-up tickets to file from this inventory:
   template rather than a hardcoded AMI ID. **Landed in
   [LS-4950](https://bkrupa.atlassian.net/browse/LS-4950)**: see the "Citing
   Infrastructure Version Refs" section in
-  [`.agents/skills/define/SKILL.md`](../../.agents/skills/define/SKILL.md)
+  [`.agents/skills/plan-ticket/references/define.md`](../../.agents/skills/plan-ticket/references/define.md)
   and the "Citing the AMI in Tickets and Docs" section in
   [`.agents/skills/infrastructure/references/ami-build.md`](../../.agents/skills/infrastructure/references/ami-build.md)
   for the canonical guidance and lookup snippet.

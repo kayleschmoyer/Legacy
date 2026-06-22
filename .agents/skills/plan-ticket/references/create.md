@@ -1,21 +1,18 @@
----
-name: create-ticket
-description: 'Catalog of the Jira ticket archetypes this project files (engineering task, bug, user story, QA-coverage page-epic / feature-story, epic, spike, MCP-gap) with the canonical template, summary convention, and parent/label rules for each. Load when: creating any Jira ticket, deciding which type/template to use, bulk-filing tickets, or wiring QA coverage as automated E2E tests.'
----
+# Ticket Archetypes & Templates (reference)
 
-# Skill: Create Ticket
+> Sub-reference of [`plan-ticket`](../SKILL.md). Loaded when you've decided to file a Jira ticket and need to pick the right archetype and shape its description.
 
-The single reference for **what a well-formed ticket of each kind looks like** in this project, and the shared mechanics for writing one to Jira. This skill is the _catalog and templates_; the interactive _workflows_ that produce ticket content live in sibling skills — pick the workflow first, then return here for the archetype template:
+The single reference for **what a well-formed ticket of each kind looks like** in this project, and the shared mechanics for writing one to Jira. This is the _catalog and templates_; the interactive _workflows_ that produce ticket content live in sibling references — pick the workflow first, then return here for the archetype template:
 
-| You have…                                             | Use this workflow skill                | …then file with the template below |
-| ----------------------------------------------------- | -------------------------------------- | ---------------------------------- |
-| A vague idea to talk through into a spec              | [define](../define/SKILL.md)           | Task / Story                       |
-| An idea that needs codebase recon before scoping      | [plan-ticket](../plan-ticket/SKILL.md) | Task / Story                       |
-| A parent ticket too big for one PR                    | [slice](../slice/SKILL.md)             | Task (children)                    |
-| A page that needs QA coverage filed                   | this skill (QA-coverage section)       | Page Epic + Feature Story          |
-| A bug you just found, enough context to write it cold | this skill (Bug section)               | Bug                                |
+| You have…                                             | Use this flow                  | …then file with the template below |
+| ----------------------------------------------------- | ------------------------------ | ---------------------------------- |
+| A vague idea to talk through into a spec              | [define](./define.md)          | Task / Story                       |
+| An idea that needs codebase recon before scoping      | [planning](./planning.md)      | Task / Story                       |
+| A parent ticket too big for one PR                    | [slice](../../slice/SKILL.md)  | Task (children)                    |
+| A page that needs QA coverage filed                   | this doc (QA-coverage section) | Page Epic + Feature Story          |
+| A bug you just found, enough context to write it cold | this doc (Bug section)         | Bug                                |
 
-If the user just says "make a ticket for X" and X is clear, you do not need a workflow skill — pick the archetype here, draft, confirm, write.
+If the user just says "make a ticket for X" and X is clear, you do not need a workflow — pick the archetype here, draft, confirm, write.
 
 ## Critical preconditions
 
@@ -96,15 +93,15 @@ Always include the `LS-####` key in branch names, commit messages, and PR titles
 
 ## Ticket archetype catalog
 
-Full templates (copy-paste ready) live in **[references/ticket-templates.md](references/ticket-templates.md)**. Quick guide to which to use:
+Full templates (copy-paste ready) live in **[ticket-templates.md](./ticket-templates.md)**. Quick guide to which to use:
 
 - **Task** — an engineering change with no standalone user-facing story (refactor, fix, infra, tooling). Default type. → templates §1
 - **Bug** — observed defect. Lead with reproduction + observed vs. expected, then root cause if known. → templates §2
 - **User Story** — a user-facing capability a PM would review, with 3+ acceptance criteria phrased as user outcomes. → templates §3
-- **QA Coverage** — the project's structured QA model. A **Page Epic** (`qa-page-epic`, permanent parent per page) holds **Feature Stories** (`qa-feature-story`, one per user-facing feature) which hold Variant Stories and Bug findings. **Coverage is delivered as hermetic Playwright E2E tests in `apps/web-e2e/src/tests/`, not manual testing** — every Feature Story must be backed by an automated test that proves the user journey end-to-end. → templates §4, and the page-epic/feature-story model in [references/qa-coverage-model.md](references/qa-coverage-model.md)
+- **QA Coverage** — the project's structured QA model. A **Page Epic** (`qa-page-epic`, permanent parent per page) holds **Feature Stories** (`qa-feature-story`, one per user-facing feature) which hold Variant Stories and Bug findings. **Coverage is delivered as hermetic Playwright E2E tests in `apps/web-e2e/src/tests/`, not manual testing** — every Feature Story must be backed by an automated test that proves the user journey end-to-end. → templates §4, and the page-epic/feature-story model in [qa-coverage-model.md](./qa-coverage-model.md)
 - **Epic** — a grouping container for related Stories/Tasks. Use only when the user wants to group work; never auto-pick `Epic` for a single change. → templates §5
 - **Spike / Investigation** — time-boxed research producing a decision or a follow-up ticket, not shippable code. → templates §6
-- **MCP-gap / tooling** — filed when a Bash overflow or missing MCP capability is hit; see the [mcp-first gaps reference](../mcp-first/references/gaps.md) for the bucket-epic wiring. → templates §7
+- **MCP-gap / tooling** — filed when a Bash overflow or missing MCP capability is hit; see the [mcp-first gaps reference](../../mcp-first/references/gaps.md) for the bucket-epic wiring. → templates §7
 
 ## Gotchas
 
@@ -114,11 +111,11 @@ Full templates (copy-paste ready) live in **[references/ticket-templates.md](ref
 - **QA Feature Story ≠ engineering Story** — a `qa-feature-story` documents a feature _to be E2E-tested_ and nests under a `qa-page-epic`; a plain `Story` is product work to be built. Don't conflate the summary formats.
 - **Bulk create is atomic-ish but unlabeled** — `jira_bulk_create_tickets` returns the new keys; immediately record them if you need to parent/link a second wave, because there is no labels/links step inside the bulk call.
 
-## Related skills
+## Related
 
-- [define](../define/SKILL.md) — dialogue-driven spec elicitation (the Problem/Goals/AC template this skill's Task/Story sections build on).
-- [plan-ticket](../plan-ticket/SKILL.md) — codebase recon → implementation-ready ticket with risk + affected files.
-- [slice](../slice/SKILL.md) — decompose an epic/story into child Tasks.
-- [mcp-first](../mcp-first/SKILL.md) — Jira tool routing and auth fallbacks.
-- [mcp-first gaps](../mcp-first/references/gaps.md) — filing tooling-gap tickets against the bucket epic.
-- [testing](../testing/SKILL.md) — how the hermetic Playwright E2E tests that satisfy QA Feature Stories are written (`apps/web-e2e`).
+- [define](./define.md) — dialogue-driven spec elicitation (the Problem/Goals/AC template this doc's Task/Story sections build on).
+- [planning](./planning.md) — codebase recon + risk classification before implementation.
+- [slice](../../slice/SKILL.md) — decompose an epic/story into child Tasks.
+- [mcp-first](../../mcp-first/SKILL.md) — Jira tool routing and auth fallbacks.
+- [mcp-first gaps](../../mcp-first/references/gaps.md) — filing tooling-gap tickets against the bucket epic.
+- [testing](../../testing/SKILL.md) — how the hermetic Playwright E2E tests that satisfy QA Feature Stories are written (`apps/web-e2e`).

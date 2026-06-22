@@ -103,7 +103,7 @@ Templates for each live in [templates/](templates/).
 
 - [workflow-overview](../workflow-overview/SKILL.md) — operational runbook for the new-feature entrypoint (the dominant path). This skill describes _which entrypoint_ you're on; workflow-overview describes _how to execute_ the new-feature entrypoint specifically.
 - [pr-lifecycle](../pr-lifecycle/SKILL.md) — the bot-PR review contract (Cycles 1/2/3, FIX/JUSTIFY/CANNOT-COMPLY). This skill stops at "PR opened"; pr-lifecycle takes over from there.
-- [planning](../planning/SKILL.md) — risk classification details. Used by Phase 1 (Frame).
+- [planning](../plan-ticket/references/planning.md) — risk classification details. Used by Phase 1 (Frame).
 - [standards](../standards/SKILL.md) — coding conventions enforced during Phase 3 (Implement).
 - [testing](../testing/SKILL.md) — test type selection and the determinism reference used by Phase 4 (Verify).
 - [worktree-workflow](../worktree-workflow/SKILL.md) — the substrate for code changes. Every entrypoint that produces code uses this.

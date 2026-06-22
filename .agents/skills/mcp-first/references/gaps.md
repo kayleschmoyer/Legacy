@@ -59,7 +59,7 @@ The script handles Bash classification, noise filtering, and ticket drafting aut
    - `missing-tool` — add a new tool to the appropriate MCP server. **Risk: Medium** (new code in a shared server used by all agents)
    - `missing-feature` — add a parameter/flag to an existing tool. **Risk: Medium** (modifying existing server code)
    - `missing-awareness` / doc gap — update skill docs or AGENTS.md. **Risk: Low** (doc changes only)
-     For `missing-tool` and `missing-feature` gaps, run the [planning skill](../../planning/SKILL.md) before implementation to understand the MCP server's existing patterns, conventions, and tool registration approach. Changes to auth-related tools or tools that make external API calls are **High risk**.
+     For `missing-tool` and `missing-feature` gaps, run the [planning reference](../../plan-ticket/references/planning.md) before implementation to understand the MCP server's existing patterns, conventions, and tool registration approach. Changes to auth-related tools or tools that make external API calls are **High risk**.
 3. **Implement** following the target MCP server's conventions
 4. **Validate** with `make pc`
 5. **Self-review** — run `/review` (or the self-review steps in `skills/pr-lifecycle/references/self-review.md`) and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing. MCP tool code is especially prone to patterns #11 (silent error swallowing), #12 (argument injection), #14 (`shell: true`), and #20 (unbounded output).

@@ -56,4 +56,4 @@ A spike is **timeboxed**. The output is an RFC that recommends what to do next, 
 ## Related skills
 
 - [RFC artifact](../artifacts/rfc.md)
-- [planning](../../planning/SKILL.md)
+- [planning](../../plan-ticket/references/planning.md)

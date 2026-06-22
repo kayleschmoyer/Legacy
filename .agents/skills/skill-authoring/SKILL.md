@@ -30,13 +30,13 @@ A future agent skimming the skill reads positive imperatives as load-bearing ins
 
 ## Reframing patterns
 
-| Prevention phrasing                                         | Precondition phrasing                                                                                                                                                                              |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Never use `gh pr create`"                                  | "Prefer `github_create_pr` — pass `head` set to the local branch name (from `worktree_status().headRefName`) so the PR opens from the correct branch in multi-worktree sessions."                  |
-| "⛔ Never use `Start-Sleep` or polling loops"               | "After pushing, continue to the next workflow step — Claude Code surfaces CI failures and review events as push notifications, so polling never provides earlier signal."                          |
-| "⛔ Never start implementation while any AC is ambiguous"   | "Before writing code, self-quiz on each AC: what must be true when done? If you cannot answer from the ticket alone, run the [define](../define/SKILL.md) skill first to enrich the ticket."       |
-| "Do not apply `merge-when-ready` manually"                  | "When the Reviewer Bot approves, it labels the PR with `merge-when-ready` itself — proceed to the watch step and let the merge queue pick it up."                                                  |
-| "MUST result in a merged PR — never stop after PR creation" | TaskCreate at the start of `/work-ticket`: `[ ] Open draft PR`, `[ ] Mark ready`, `[ ] Reply to all bot threads`, `[ ] PR merged`, `[ ] Jira Done`, `[ ] MCP gap audit`. Each task gates the next. |
+| Prevention phrasing                                         | Precondition phrasing                                                                                                                                                                                        |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "Never use `gh pr create`"                                  | "Prefer `github_create_pr` — pass `head` set to the local branch name (from `worktree_status().headRefName`) so the PR opens from the correct branch in multi-worktree sessions."                            |
+| "⛔ Never use `Start-Sleep` or polling loops"               | "After pushing, continue to the next workflow step — Claude Code surfaces CI failures and review events as push notifications, so polling never provides earlier signal."                                    |
+| "⛔ Never start implementation while any AC is ambiguous"   | "Before writing code, self-quiz on each AC: what must be true when done? If you cannot answer from the ticket alone, run the [define flow](../plan-ticket/references/define.md) first to enrich the ticket." |
+| "Do not apply `merge-when-ready` manually"                  | "When the Reviewer Bot approves, it labels the PR with `merge-when-ready` itself — proceed to the watch step and let the merge queue pick it up."                                                            |
+| "MUST result in a merged PR — never stop after PR creation" | TaskCreate at the start of `/work-ticket`: `[ ] Open draft PR`, `[ ] Mark ready`, `[ ] Reply to all bot threads`, `[ ] PR merged`, `[ ] Jira Done`, `[ ] MCP gap audit`. Each task gates the next.           |
 
 ## When prohibitions are still appropriate
 

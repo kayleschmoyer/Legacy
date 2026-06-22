@@ -146,7 +146,7 @@ jira_list_children(key: "LS-####", limit: 100)
 
 ### Step 1b: Planning phase
 
-After inspecting the ticket, run the [planning skill](../planning/SKILL.md) before implementation.
+After inspecting the ticket, run the [planning reference](../plan-ticket/references/planning.md) before implementation.
 
 **Why**: agents that skip planning produce code that works in isolation but misses constraints, breaks adjacent systems, or solves the wrong problem. A 5-minute planning phase prevents 45-minute rework cycles.
 

@@ -46,7 +46,7 @@ aws ec2 describe-images --owners self \
   --output table
 ```
 
-This is also captured in the `/define` skill — see `.agents/skills/define/SKILL.md` ("Citing Infrastructure Version Refs").
+This is also captured in the `/define` flow — see `.agents/skills/plan-ticket/references/define.md` ("Citing Infrastructure Version Refs").
 
 ## When to Rebuild
 

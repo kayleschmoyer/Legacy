@@ -31,7 +31,7 @@ See `pages/trade-center/features/submit-new-trade/feature.md` for a worked Featu
 
 ## Authoring tickets in this model
 
-Use the **[create-ticket skill](../../../../.agents/skills/create-ticket/SKILL.md)** — it holds the canonical templates, summary conventions, and label rules for Page Epics, Feature Stories, and findings (§4 of its templates reference, plus the full hierarchy in `references/qa-coverage-model.md`). Key rules:
+Use the **[plan-ticket archetype catalog](../../../../.agents/skills/plan-ticket/references/create.md)** — it holds the canonical templates, summary conventions, and label rules for Page Epics, Feature Stories, and findings (§4 of its templates reference, plus the full hierarchy in [`qa-coverage-model.md`](../../../../.agents/skills/plan-ticket/references/qa-coverage-model.md)). Key rules:
 
 - **Page Epic** — type `Epic`, summary `QA — Page: <Name>`, label `qa-page-epic`, no parent.
 - **Feature Story** — type `Story`, summary `Feature: <Name>`, labels `qa-feature-story` + `page-<slug>`, parent = the page epic.

@@ -57,4 +57,4 @@ The risk in a refactor is **silently changing behavior**. The defining test of a
 
 - [standards](../../standards/SKILL.md)
 - [testing](../../testing/SKILL.md)
-- [planning](../../planning/SKILL.md) — risk classification
+- [planning](../../plan-ticket/references/planning.md) — risk classification

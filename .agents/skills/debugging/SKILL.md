@@ -20,7 +20,7 @@ Unified debugging skill for the Legacy Sports monorepo. Covers CI failures, dist
 
 1. **Gather evidence** — read logs, error messages, stack traces. Never guess at the problem.
 2. **Reproduce the bug** — observe the broken behavior before writing any fix. If you can't show it's broken, you can't prove it's fixed. See [Verification by Bug Type](#verification-by-bug-type) for how to reproduce each category.
-3. **Plan the fix** — after reproduction and before writing code, run the [planning skill](../planning/SKILL.md). Risk is especially important for bugs: UI/visual bugs are typically Low risk, resolver/logic bugs are Medium, distributed system bugs are High (cross-service impact), and data/query bugs are Medium-High (data integrity). The planning phase prevents "fix the symptom, miss the cause" patterns.
+3. **Plan the fix** — after reproduction and before writing code, run the [planning reference](../plan-ticket/references/planning.md). Risk is especially important for bugs: UI/visual bugs are typically Low risk, resolver/logic bugs are Medium, distributed system bugs are High (cross-service impact), and data/query bugs are Medium-High (data integrity). The planning phase prevents "fix the symptom, miss the cause" patterns.
 4. **Fix the code** — address the defect that produced the bad state. Data recovery is a separate step, not the fix.
 5. **Verify the fix** — re-run the exact reproduction scenario from step 2 and confirm the broken behavior is gone. This is not optional — `make pc` passing is necessary but not sufficient. You must demonstrate the specific reported behavior is resolved.
 

@@ -1,9 +1,6 @@
----
-name: define
-description: 'Elicit a structured spec for new work through dialogue and write it to a Jira ticket description. Handles both new tickets (creates them) and existing tickets (enriches them). Produces a standard template: Problem, Goals, Acceptance Criteria, Out of Scope, Technical Approach, Open Questions. Load when the user wants to define what to build before implementation starts.'
----
+# Define — dialogue-driven spec elicitation (reference)
 
-# Skill: Define
+> Sub-reference of [`plan-ticket`](../SKILL.md). Used when the right move is to talk through a vague idea into a structured spec (vs. doing codebase recon — see [`planning`](./planning.md)).
 
 ## Overview
 

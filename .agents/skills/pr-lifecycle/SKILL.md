@@ -28,7 +28,7 @@ Run a structured review of all branch changes before pushing. This is a **Tier 2
 
 You must produce a **structured Self-Review Summary** (see the template in the reference doc) listing files reviewed, patterns checked, and issues fixed. This summary is your proof of thoroughness — without it, self-review did not happen.
 
-> Self-review is a verification step, not a planning step. If you find yourself making significant design changes during self-review, you may have skipped the [planning phase](../planning/SKILL.md) — consider stopping and re-planning.
+> Self-review is a verification step, not a planning step. If you find yourself making significant design changes during self-review, you may have skipped the [planning phase](../plan-ticket/references/planning.md) — consider stopping and re-planning.
 
 > **Premium-gating product changes — keep test specs premium-default.** If your PR adds or changes a premium-gated feature (touches `entitlements.ts`, `requireEntitlement`, `PremiumGate`, `useIsPremium`, etc.), the E2E/integration specs covering it must default to the **premium** tier, with `free` used **only** for explicit gate assertions. A gated-feature spec that runs as `free` without asserting the gate silently inverts the feature's tested state — the LS-5030 regression. See the [Tiered Test-User Model](../testing/SKILL.md#tiered-test-user-model-premium-default-free-for-gates) (testing skill) and the [add-entitlement skill](../add-entitlement/SKILL.md).
 
@@ -52,7 +52,7 @@ Verify prerequisites (`make pc`, migrations, branch pushed), create the PR **as 
 
 > **The `<!-- jira-link -->` marker in the PR body is the source of truth for ticket linkage** (RFC: `docs/rfcs/draft-declared-ticket-linkage.md`, LS-7893). Every actor — branch sync, status audit, reviewer bot, sweep agents, humans — reads the marker's `primary` key to answer "which ticket is this PR for"; branch names, titles, and commit messages are secondary signals. `github_create_pr` emits the marker automatically (explicit `jiraPrimary` param → first `LS-####` in the title → `none`); `related` keys are informational only and never auto-transitioned. To correct a PR's linkage, **edit the PR body** — never force-push or rename the branch. See [references/create-pr.md](references/create-pr.md#jira-link-marker-source-of-truth-for-ticket-linkage) for the marker format.
 
-When a planning phase was run (see [planning skill](../planning/SKILL.md)), include its output in the PR body: the **Context** (why) and **Risk Assessment** sections help reviewers focus on the right areas.
+When a planning phase was run (see [planning reference](../plan-ticket/references/planning.md)), include its output in the PR body: the **Context** (why) and **Risk Assessment** sections help reviewers focus on the right areas.
 
 > **A rich PR description is required for Copilot to fix review comments correctly.** When reviewers use "Fix with Copilot" or `@copilot` to address a review thread, Copilot's only context is the PR title, description, and diff. A thin description (e.g., 1-2 summary bullets with no context) causes Copilot to make repeated, incomplete, or misaligned fixes — leading to 3-4 redundant agent runs per review round. Always include a `## Context` section with the Jira link and a clear problem statement. Write the description as a prompt to a capable engineer who has never seen the ticket.
 
@@ -465,7 +465,7 @@ gh pr ready <PR#>
 
 ## Related Skills
 
-- [planning](../planning/SKILL.md) -- Structured planning phase (referenced by self-review and PR body guidance)
+- [planning](../plan-ticket/references/planning.md) -- Structured planning phase (referenced by self-review and PR body guidance)
 - [rebase](../rebase/SKILL.md) -- Rebase branches and resolve merge conflicts
 - [debugging](../debugging/SKILL.md) -- Debug CI failures and code defects
 - [worktree-workflow](../worktree-workflow/SKILL.md) -- Working in isolated worktrees

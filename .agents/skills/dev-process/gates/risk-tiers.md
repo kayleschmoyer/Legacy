@@ -2,7 +2,7 @@
 
 Every task is assigned a risk tier in Phase 1 (Frame). The tier governs which artifacts are required and how strict each phase's exit gate is.
 
-This document supersedes the previous Low/Medium/High classification in [planning](../../planning/SKILL.md) by adding **Critical** and tying tiers explicitly to entrypoints and artifact requirements.
+This document supersedes the previous Low/Medium/High classification in [planning](../../plan-ticket/references/planning.md) by adding **Critical** and tying tiers explicitly to entrypoints and artifact requirements.
 
 ## The four tiers
 
@@ -81,6 +81,6 @@ Lower the tier (with explicit justification in the ticket) when:
 
 ## Related
 
-- [planning](../../planning/SKILL.md) — how to assess risk in practice
+- [planning](../../plan-ticket/references/planning.md) — how to assess risk in practice
 - [pre-PR checklist](pre-pr-checklist.md) — gate that consults the tier
 - [Spine: Phase 1 Frame](../spine.md#phase-1-frame) — where the tier is assigned

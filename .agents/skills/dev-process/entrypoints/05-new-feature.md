@@ -58,7 +58,7 @@ This is the entrypoint that [workflow-overview](../../workflow-overview/SKILL.md
 ## Related skills
 
 - [workflow-overview](../../workflow-overview/SKILL.md) — operational runbook for this entrypoint
-- [planning](../../planning/SKILL.md) — risk classification details
+- [planning](../../plan-ticket/references/planning.md) — risk classification details
 - [pr-lifecycle](../../pr-lifecycle/SKILL.md) — bot-PR contract
 - [worktree-workflow](../../worktree-workflow/SKILL.md) — worktree mechanics
 - [frontend-design](../../frontend-design/SKILL.md) — for UI work

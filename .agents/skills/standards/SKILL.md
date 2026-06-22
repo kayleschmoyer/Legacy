@@ -7,7 +7,7 @@ description: 'Coding standards, config conventions, lint discipline, and codegen
 
 Consolidated reference for coding standards, configuration conventions, lint discipline, and codegen policy. These rules are enforced by CI and code review -- follow them during implementation to avoid review findings.
 
-These standards inform the risk assessment in the [planning skill](../planning/SKILL.md). Changes that touch areas covered by the top review findings (codegen, security, errors) are typically Medium or High risk.
+These standards inform the risk assessment in the [planning reference](../plan-ticket/references/planning.md). Changes that touch areas covered by the top review findings (codegen, security, errors) are typically Medium or High risk.
 
 ## Critical Rules
 
@@ -101,7 +101,7 @@ Run `make pc` before pushing. Skipping saves 5 min but each CI failure costs 40-
 ## Related Skills
 
 - [dev-process](../dev-process/SKILL.md) -- the development process framework these standards apply within
-- [planning](../planning/SKILL.md) -- risk classification informed by these standards
+- [planning](../plan-ticket/references/planning.md) -- risk classification informed by these standards
 - [pr-lifecycle](../pr-lifecycle/SKILL.md) -- self-review checklist and Copilot review fix workflow
 - [testing](../testing/SKILL.md) -- includes the [12-lever E2E determinism checklist](../testing/references/e2e-determinism.md)
 - [create](../create/SKILL.md) -- scaffold new projects (apps, libs, lambdas, MCP servers)
