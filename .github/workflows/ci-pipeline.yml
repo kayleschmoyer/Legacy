@@ -454,7 +454,7 @@ jobs:
           include-optional-deps: false
 
       - name: "Setup uv"
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
 
       # Each custom-checks step tees into one shared log so that, on failure,
       # the capture step can distil whichever check broke.
@@ -856,7 +856,7 @@ jobs:
       - name: "Generate App Token"
         id: app-token
         if: steps.check-reports.outputs.has-reports == 'true'
-        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           client-id: ${{ secrets.PREVIEW_APP_ID }}
           private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}

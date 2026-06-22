@@ -34,13 +34,13 @@ jobs:
           node-version: 22
       - name: Generate reviewer app token
         id: reviewer-token
-        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           client-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
       - name: Configure AWS credentials
         continue-on-error: true # telemetry is best-effort; don't block on auth failure
-        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6
         with:
           role-to-assume: ${{ vars.AWS_CI_ARTIFACTS_ROLE_ARN || 'arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts' }}
           aws-region: us-east-1
