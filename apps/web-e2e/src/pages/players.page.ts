@@ -326,7 +326,10 @@ class PlayerDetailSurface {
 
   /** Wait for navigation back to the stats list. */
   async waitForStatsList(): Promise<void> {
-    await this.#page.waitForURL('**/players/stats');
+    // Regex covers /players/stats with or without query params.
+    // 'commit' is required for bfcache restores (navigate(-1)) which don't
+    // fire a 'load' event that the default waitUntil condition requires.
+    await this.#page.waitForURL(/\/players\/stats/, { waitUntil: 'commit' });
   }
 
   // ── Reads ────────────────────────────────────────────────────────
