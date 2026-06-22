@@ -22,9 +22,9 @@ import {
   useGetPlayerCareerArcQuery,
 } from '@legacy-sports/graphql';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
-import { useHasEntitlement } from '../hooks/useIsPremium';
 import { BaseModal } from './BaseModal';
 import type { CareerArcMode } from './CareerArcChart';
+import { useHasEntitlement } from '../hooks/useIsPremium';
 import {
   ipToDecimalInnings,
   ipToOuts,

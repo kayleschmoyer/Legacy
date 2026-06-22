@@ -335,11 +335,14 @@ export function CareerArcChart({
   }
 
   const metricLabel = mode === 'batting' ? 'OPS' : 'ERA+';
+  const secondaryLabel = mode === 'batting' ? 'HR' : 'SO';
   const gradientId = `careerArcGradient-${mode}`;
   const accentColor = mode === 'batting' ? BRAND_GOLD_LIGHT : BRAND_SEAM_RED;
 
+  const chartAriaLabel = `Career arc: ${mode} performance across ${data.length} season${data.length !== 1 ? 's' : ''}. Peak ${metricLabel}: ${mode === 'batting' ? peakValue.toFixed(3) : peakValue}. Career average ${metricLabel}: ${mode === 'batting' ? avgValue.toFixed(3) : avgValue.toFixed(0)}.`;
+
   return (
-    <YStack gap="$3">
+    <YStack gap="$3" role="region" aria-label={chartAriaLabel}>
       {/* Header stats row */}
       {!compact && (
         <XStack gap="$4" flexWrap="wrap" alignItems="center">
@@ -380,139 +383,141 @@ export function CareerArcChart({
         </XStack>
       )}
 
-      {/* Chart */}
-      <ResponsiveContainer width="100%" height={height}>
-        <AreaChart
-          data={data}
-          margin={{
-            top: 12,
-            right: compact ? 8 : 16,
-            bottom: compact ? 4 : 8,
-            left: compact ? -16 : 0,
-          }}
-        >
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={accentColor} stopOpacity={0.35} />
-              <stop offset="95%" stopColor={accentColor} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke={withAlpha(OUTLINE_SUBTLE, 0.5)}
-            vertical={false}
-          />
-          <XAxis
-            dataKey="season"
-            tick={{ fill: TEXT_MUTED, fontSize: compact ? 10 : 12 }}
-            tickLine={false}
-            axisLine={{ stroke: OUTLINE_SUBTLE }}
-            interval={
-              compact
-                ? 'preserveStartEnd'
-                : Math.max(0, Math.floor(data.length / 8) - 1)
-            }
-          />
-          {!compact && (
-            <YAxis
-              tick={{ fill: TEXT_MUTED, fontSize: 12 }}
-              tickLine={false}
-              axisLine={false}
-              domain={['auto', 'auto']}
-              width={48}
-            />
-          )}
-          <Tooltip
-            content={<CareerArcTooltip mode={mode} />}
-            cursor={{
-              stroke: withAlpha(WHITE, 0.2),
-              strokeDasharray: '4 4',
+      {/* Chart — aria-hidden; the sr-only table below is the accessible equivalent */}
+      <div aria-hidden="true">
+        <ResponsiveContainer width="100%" height={height}>
+          <AreaChart
+            data={data}
+            margin={{
+              top: 12,
+              right: compact ? 8 : 16,
+              bottom: compact ? 4 : 8,
+              left: compact ? -16 : 0,
             }}
-          />
-
-          {/* Career average reference line */}
-          {!compact && avgValue > 0 && (
-            <ReferenceLine
-              y={avgValue}
-              stroke={withAlpha(TEXT_MUTED, 0.4)}
-              strokeDasharray="6 4"
-              label={{
-                value: `Avg ${mode === 'batting' ? avgValue.toFixed(3) : avgValue.toFixed(0)}`,
-                fill: TEXT_MUTED,
-                fontSize: 10,
-                position: 'right',
+          >
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={accentColor} stopOpacity={0.35} />
+                <stop offset="95%" stopColor={accentColor} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke={withAlpha(OUTLINE_SUBTLE, 0.5)}
+              vertical={false}
+            />
+            <XAxis
+              dataKey="season"
+              tick={{ fill: TEXT_MUTED, fontSize: compact ? 10 : 12 }}
+              tickLine={false}
+              axisLine={{ stroke: OUTLINE_SUBTLE }}
+              interval={
+                compact
+                  ? 'preserveStartEnd'
+                  : Math.max(0, Math.floor(data.length / 8) - 1)
+              }
+            />
+            {!compact && (
+              <YAxis
+                tick={{ fill: TEXT_MUTED, fontSize: 12 }}
+                tickLine={false}
+                axisLine={false}
+                domain={['auto', 'auto']}
+                width={48}
+              />
+            )}
+            <Tooltip
+              content={<CareerArcTooltip mode={mode} />}
+              cursor={{
+                stroke: withAlpha(WHITE, 0.2),
+                strokeDasharray: '4 4',
               }}
             />
-          )}
 
-          {/* Team change vertical lines */}
-          {!compact &&
-            teamChanges.map((season) => (
+            {/* Career average reference line */}
+            {!compact && avgValue > 0 && (
               <ReferenceLine
-                key={`team-${season}`}
-                x={season}
-                stroke={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
-                strokeDasharray="4 4"
+                y={avgValue}
+                stroke={withAlpha(TEXT_MUTED, 0.4)}
+                strokeDasharray="6 4"
+                label={{
+                  value: `Avg ${mode === 'batting' ? avgValue.toFixed(3) : avgValue.toFixed(0)}`,
+                  fill: TEXT_MUTED,
+                  fontSize: 10,
+                  position: 'right',
+                }}
               />
-            ))}
+            )}
 
-          {/* Main area */}
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke={accentColor}
-            strokeWidth={compact ? 1.5 : 2.5}
-            fill={`url(#${gradientId})`}
-            dot={
-              compact
-                ? false
-                : {
-                    r: 3,
-                    fill: accentColor,
-                    stroke: SURFACE_CARD,
-                    strokeWidth: 1.5,
-                  }
-            }
-            activeDot={{
-              r: compact ? 4 : 6,
-              fill: accentColor,
-              stroke: WHITE,
-              strokeWidth: 2,
-            }}
-            animationDuration={800}
-          />
-
-          {/* Peak season markers */}
-          {!compact &&
-            data
-              .filter((d) => d.isPeak)
-              .map((d) => (
-                <ReferenceDot
-                  key={`peak-${d.season}`}
-                  x={d.season}
-                  y={d.value}
-                  r={6}
-                  fill={BRAND_GOLD_LIGHT}
-                  stroke={WHITE}
-                  strokeWidth={2}
+            {/* Team change vertical lines */}
+            {!compact &&
+              teamChanges.map((season) => (
+                <ReferenceLine
+                  key={`team-${season}`}
+                  x={season}
+                  stroke={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
+                  strokeDasharray="4 4"
                 />
               ))}
 
-          {/* Award milestone markers */}
-          {!compact &&
-            milestones.map((m, i) => (
-              <ReferenceDot
-                key={`milestone-${m.season}-${i}`}
-                x={m.season}
-                y={m.value}
-                r={5}
-                fill={m.color}
-                stroke={SURFACE_CARD}
-                strokeWidth={2}
-              />
-            ))}
-        </AreaChart>
-      </ResponsiveContainer>
+            {/* Main area */}
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke={accentColor}
+              strokeWidth={compact ? 1.5 : 2.5}
+              fill={`url(#${gradientId})`}
+              dot={
+                compact
+                  ? false
+                  : {
+                      r: 3,
+                      fill: accentColor,
+                      stroke: SURFACE_CARD,
+                      strokeWidth: 1.5,
+                    }
+              }
+              activeDot={{
+                r: compact ? 4 : 6,
+                fill: accentColor,
+                stroke: WHITE,
+                strokeWidth: 2,
+              }}
+              animationDuration={800}
+            />
+
+            {/* Peak season markers */}
+            {!compact &&
+              data
+                .filter((d) => d.isPeak)
+                .map((d) => (
+                  <ReferenceDot
+                    key={`peak-${d.season}`}
+                    x={d.season}
+                    y={d.value}
+                    r={6}
+                    fill={BRAND_GOLD_LIGHT}
+                    stroke={WHITE}
+                    strokeWidth={2}
+                  />
+                ))}
+
+            {/* Award milestone markers */}
+            {!compact &&
+              milestones.map((m, i) => (
+                <ReferenceDot
+                  key={`milestone-${m.season}-${i}`}
+                  x={m.season}
+                  y={m.value}
+                  r={5}
+                  fill={m.color}
+                  stroke={SURFACE_CARD}
+                  strokeWidth={2}
+                />
+              ))}
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
 
       {/* Milestone legend */}
       {!compact && milestones.length > 0 && (
@@ -543,6 +548,51 @@ export function CareerArcChart({
           ))}
         </XStack>
       )}
+
+      {/* Screen-reader-only data table — WCAG 1.1.1 equivalent text alternative */}
+      <table
+        data-testid="career-arc-sr-table"
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: 'hidden',
+          clip: 'rect(0,0,0,0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        <caption>Career {mode} statistics by season</caption>
+        <thead>
+          <tr>
+            <th scope="col">Season</th>
+            <th scope="col">Team</th>
+            <th scope="col">{metricLabel}</th>
+            <th scope="col">{secondaryLabel}</th>
+            <th scope="col">Games</th>
+            <th scope="col">Awards</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((point) => (
+            <tr key={point.season}>
+              <td>
+                {point.season}
+                {point.isPeak ? ' (peak season)' : ''}
+              </td>
+              <td>{point.team}</td>
+              <td>
+                {mode === 'batting' ? point.value.toFixed(3) : point.value}
+              </td>
+              <td>{point.secondary}</td>
+              <td>{point.games}</td>
+              <td>{point.awards ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </YStack>
   );
 }
