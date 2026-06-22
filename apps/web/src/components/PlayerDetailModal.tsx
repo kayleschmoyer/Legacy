@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
+import {
+  Button,
+  ScrollView,
+  Spinner,
+  Text,
+  Tooltip,
+  XStack,
+  YStack,
+} from 'tamagui';
 import { ExternalLink, X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import {
@@ -968,7 +976,7 @@ export function PlayerDetailModal({
           )}
 
           {/* ── Positions band ── */}
-          {!!displayData && !error && eligiblePositions.length > 0 && (
+          {!!displayData && !error && (
             <XStack
               gap={10}
               alignItems="center"
@@ -990,9 +998,50 @@ export function PlayerDetailModal({
               >
                 Eligible
               </Text>
-              {eligiblePositions.map((pos) => (
-                <PositionBadge key={pos} position={pos} />
-              ))}
+              {eligiblePositions.length > 0 ? (
+                eligiblePositions.map((pos) => (
+                  <PositionBadge key={pos} position={pos} />
+                ))
+              ) : (
+                <Tooltip placement="top">
+                  <Tooltip.Trigger>
+                    <Text
+                      color={TEXT_TERTIARY}
+                      style={{
+                        fontFamily: FONT_BODY,
+                        fontStyle: 'italic',
+                        fontSize: 13,
+                        textDecoration: 'underline dotted',
+                        cursor: 'default',
+                      }}
+                      data-testid="eligible-positions-unranked"
+                    >
+                      No fantasy eligibility yet
+                    </Text>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content
+                    enterStyle={{ x: 0, y: -5, opacity: 0, scale: 0.9 }}
+                    exitStyle={{ x: 0, y: -5, opacity: 0, scale: 0.9 }}
+                    scale={1}
+                    x={0}
+                    y={0}
+                    opacity={1}
+                    animation={[
+                      'quick',
+                      { opacity: { overshootClamping: true } },
+                    ]}
+                  >
+                    <Tooltip.Arrow />
+                    <Text
+                      color={TEXT_INTERFACE}
+                      style={{ fontFamily: FONT_BODY, fontSize: 13 }}
+                    >
+                      Rookies and recent call-ups may not yet have fantasy
+                      eligibility assigned for this season.
+                    </Text>
+                  </Tooltip.Content>
+                </Tooltip>
+              )}
             </XStack>
           )}
 
