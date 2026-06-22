@@ -168,7 +168,7 @@ The canonical Secrets Manager value is current; now refresh the pull-based copie
 | **Copilot** | Once AC-A6 lands: update the GitHub **environment secret** on the `copilot` environment (Settings → Environments → `copilot` → Environment secrets) to the new value; the next Copilot task re-runs `copilot-setup-steps.yml` and mints from the new secret. **Until AC-A6, Copilot uses SigV4/OIDC and needs no refresh** (§1.1).              |
 
 > **Why a session restart is required locally.** Per RFC F1 and
-> [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md)
+> [`.agents/skills/mcp-first/references/diagnostics.md`](../../.agents/skills/mcp-first/references/diagnostics.md)
 > ("Mid-Session 401 / Token Expiry"), Claude Code resolves credentials at connection spawn and
 > never re-reads them mid-session. A rotated secret only takes effect on the next session. The
 > `headersHelper` design means the **minted token** refreshes per-connect, but the **secret it
@@ -335,7 +335,7 @@ with `mcp/github`).
   (LS-5092); reads `MCP_MACHINE_CLIENT_ID` / `MCP_MACHINE_CLIENT_SECRET` / `MCP_AUTH_COGNITO_DOMAIN`.
 - [`scripts/mcp-auth.mjs`](../../scripts/mcp-auth.mjs) — current interactive token flow; gains a
   headless machine-provisioning path under RFC **AC-X2** (`--machine`, not yet implemented).
-- [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md) —
+- [`.agents/skills/mcp-first/references/diagnostics.md`](../../.agents/skills/mcp-first/references/diagnostics.md) —
   "Mid-Session 401 / Token Expiry" and why a session restart is required after any credential
   change.
 - [`.agents/skills/secrets-handling/SKILL.md`](../../.agents/skills/secrets-handling/SKILL.md) —

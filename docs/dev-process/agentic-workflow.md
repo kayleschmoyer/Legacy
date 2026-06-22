@@ -38,7 +38,7 @@ Neither gate may be skipped to "save time".
 | 11  | Watch to merge   | [`workflow-overview` Phase 5–6](../../.agents/skills/workflow-overview/SKILL.md#phase-5-jira-branch-sync-jira-branch-syncyml)                                                                   |
 | 12  | Merge queue      | [`workflow-overview` Phase 6](../../.agents/skills/workflow-overview/SKILL.md#phase-6-merge-queue-merge-queueyml)                                                                               |
 | 13  | Post-merge       | [`workflow-overview` Phase 7](../../.agents/skills/workflow-overview/SKILL.md#phase-7-post-merge)                                                                                               |
-| 14  | MCP gap audit    | [`mcp-gaps`](../../.agents/skills/mcp-gaps/SKILL.md)                                                                                                                                            |
+| 14  | MCP gap audit    | [`mcp-first` gaps reference](../../.agents/skills/mcp-first/references/gaps.md)                                                                                                                 |
 | 15  | Cleanup          | [`worktree-workflow`](../../.agents/skills/worktree-workflow/SKILL.md)                                                                                                                          |
 
 ## The bot-PR cycle

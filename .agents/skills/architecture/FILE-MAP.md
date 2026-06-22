@@ -173,6 +173,6 @@ See `.agents/skills/testing/references/db-integration-tests.md` for patterns and
 | PR lifecycle rules     | `.agents/skills/pr-lifecycle/SKILL.md`                             |
 | Common review patterns | `.agents/skills/pr-lifecycle/references/common-review-patterns.md` |
 | Workflow checklist     | `.agents/skills/workflow-overview/SKILL.md`                        |
-| MCP gap audit          | `.agents/skills/mcp-gaps/SKILL.md`                                 |
+| MCP gap audit          | `.agents/skills/mcp-first/references/gaps.md`                      |
 | MCP tool mapping       | `.agents/skills/mcp-first/SKILL.md`                                |
 | Subagent templates     | `.agents/skills/subagent-templates/SKILL.md`                       |

@@ -141,13 +141,13 @@ Grouped and mechanically checkable. **AC-G**, **AC-A**, **AC-B**, **AC-X** = Gen
 
 - **AC-B1** Each Lambda serves OAuth 2.0 Protected Resource Metadata and returns a correct `401 + WWW-Authenticate` challenge when presented no/invalid token (contract test).
 - **AC-B2** A custom connector registered in CC web with the Cognito OAuth client completes the browser consent flow and successfully invokes at least one tool per server from a CC-web session (manual verification, screenshot in the PR).
-- **AC-B3** The CC-web re-consent-on-expiry limitation is documented in `.agents/skills/cloud-agent-mode/SKILL.md` with a link to `claude-code#58607`, and `mcp-diagnostics` is updated to recognize the new posture.
+- **AC-B3** The CC-web re-consent-on-expiry limitation is documented in `.agents/skills/cloud-agent-mode/SKILL.md` with a link to `claude-code#58607`, and the `mcp-first` diagnostics reference is updated to recognize the new posture.
 
 ### Cross-cutting
 
 - **AC-X1** The three duplicated `mcp-bearer-auth.ts` files are collapsed into **one** shared module imported by all three servers (G7); the duplicate copies are deleted.
 - **AC-X2** `scripts/mcp-auth.mjs` is updated (or a new path added) to provision/refresh the machine credential without the interactive hosted-UI flow; the docstring and any setup runbook are updated.
-- **AC-X3** Docs updated: `AGENTS.md` MCP section, `docs/dev-process/session-startup.md`, `.agents/skills/mcp-diagnostics/SKILL.md`, and the memory note "Mid-Session 401 / Token Expiry" reflect the new model.
+- **AC-X3** Docs updated: `AGENTS.md` MCP section, `docs/dev-process/session-startup.md`, `.agents/skills/mcp-first/references/diagnostics.md`, and the memory note "Mid-Session 401 / Token Expiry" reflect the new model.
 - **AC-X4** `make pc` passes; new auth code has unit tests; no `@ts-ignore`/`eslint-disable`; `LOGGER` used (not `console.*`).
 
 ## Implementation Gaps

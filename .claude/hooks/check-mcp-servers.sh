@@ -78,7 +78,7 @@ if [ ${#WARNINGS[@]} -gt 0 ]; then
     echo "  $w"
   done
   echo "└─────────────────────────────────────────────────────────────────────┘"
-  echo "  See .agents/skills/mcp-diagnostics/SKILL.md for the full diagnostic checklist."
+  echo "  See .agents/skills/mcp-first/references/diagnostics.md for the full diagnostic checklist."
   echo ""
 fi
 

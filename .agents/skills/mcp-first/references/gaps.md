@@ -1,9 +1,4 @@
----
-name: mcp-gaps
-description: 'Identify and implement MCP tooling gaps. Phase 1 (Audit): run after merge (workflow step 14) to review Bash and PowerShell commands and MCP overflows from the session, filing tickets under the current MCP gaps bucket epic. Phase 2 (Triage): pick up and implement backlog tickets from the current MCP gaps bucket epic. Load when the PR has merged (audit) or working through the AI Workspace Improvements backlog (triage).'
----
-
-# Skill: MCP Gaps
+# MCP Gaps
 
 ## Overview
 
@@ -12,7 +7,7 @@ Three-phase workflow for closing MCP tooling gaps:
 1. **Audit** — after merge (workflow step 14), review Bash and PowerShell commands, MCP tool overflows, and MCP tool failures to identify gaps, then file tickets under the **current MCP gaps bucket epic** (get key via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })`).
 2. **Triage** — pick up tickets from the current bucket epic backlog, implement the fix, validate, and ship a PR.
 
-This skill enforces the **MCP-first principle** from AGENTS.md: shell commands are fallbacks, not defaults.
+This reference enforces the **MCP-first principle** from AGENTS.md: shell commands are fallbacks, not defaults.
 
 **Why this matters**: every shell command in an agent session represents friction that slows down all future sessions. Filing tickets for gaps is how we systematically eliminate that friction — each ticket closed makes every agent faster.
 
@@ -26,13 +21,13 @@ This skill enforces the **MCP-first principle** from AGENTS.md: shell commands a
 | Processing the current bucket epic backlog      | Triage |
 | After an audit identifies new gaps to implement | Triage |
 
-> **Bucket fan-out command**: `/work-ticket LS-####`. When `/work-ticket` is invoked on the mcp-gaps bucket epic, Parent Dispatch Mode dispatches one chip per To Do child using `/work-ticket` (each child is a standalone leaf ticket — no special per-child command). See [`.agents/skills/work-ticket/references/bucket-epic-routing.md`](../work-ticket/references/bucket-epic-routing.md).
+> **Bucket fan-out command**: `/work-ticket LS-####`. When `/work-ticket` is invoked on the mcp-gaps bucket epic, Parent Dispatch Mode dispatches one chip per To Do child using `/work-ticket` (each child is a standalone leaf ticket — no special per-child command). See [`.agents/skills/work-ticket/references/bucket-epic-routing.md`](../../work-ticket/references/bucket-epic-routing.md).
 
 ---
 
 ## Phase 1: Audit (Quick Reference)
 
-> Full procedure: [`references/audit-workflow.md`](references/audit-workflow.md)
+> Full procedure: [`audit-workflow.md`](audit-workflow.md)
 
 ### Minimum threshold — skip shallow sessions
 
@@ -57,14 +52,14 @@ The script handles Bash classification, noise filtering, and ticket drafting aut
 
 ## Phase 2: Triage (Quick Reference)
 
-> Full procedure: [`references/triage-workflow.md`](references/triage-workflow.md)
+> Full procedure: [`triage-workflow.md`](triage-workflow.md)
 
 1. **Find** the next unblocked To Do ticket: call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` to get the current epic key, then `jira_list_children(key: <currentKey>, status: "To Do")`
 2. **Understand** the gap type — determines implementation approach and risk:
    - `missing-tool` — add a new tool to the appropriate MCP server. **Risk: Medium** (new code in a shared server used by all agents)
    - `missing-feature` — add a parameter/flag to an existing tool. **Risk: Medium** (modifying existing server code)
    - `missing-awareness` / doc gap — update skill docs or AGENTS.md. **Risk: Low** (doc changes only)
-     For `missing-tool` and `missing-feature` gaps, run the [planning skill](../planning/SKILL.md) before implementation to understand the MCP server's existing patterns, conventions, and tool registration approach. Changes to auth-related tools or tools that make external API calls are **High risk**.
+     For `missing-tool` and `missing-feature` gaps, run the [planning skill](../../planning/SKILL.md) before implementation to understand the MCP server's existing patterns, conventions, and tool registration approach. Changes to auth-related tools or tools that make external API calls are **High risk**.
 3. **Implement** following the target MCP server's conventions
 4. **Validate** with `make pc`
 5. **Self-review** — run `/review` (or the self-review steps in `skills/pr-lifecycle/references/self-review.md`) and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing. MCP tool code is especially prone to patterns #11 (silent error swallowing), #12 (argument injection), #14 (`shell: true`), and #20 (unbounded output).
@@ -164,7 +159,7 @@ After a deep audit, summarize:
 
 ## References
 
-- [`references/batch-tool-inventory.md`](references/batch-tool-inventory.md) — full inventory of every tool across the 10 in-repo MCP servers, classified as already-batched / needs-batch / single-use, with a prioritized list of batch-variant candidates (grounds epic LS-8031).
+- [`batch-tool-inventory.md`](batch-tool-inventory.md) — full inventory of every tool across the 10 in-repo MCP servers, classified as already-batched / needs-batch / single-use, with a prioritized list of batch-variant candidates (grounds epic LS-8031).
 
 ---
 

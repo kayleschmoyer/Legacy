@@ -33,7 +33,7 @@ When you recognise the symptom:
 1. Surface the recovery prompt verbatim to the user — run `node scripts/mcp-auth.mjs` to refresh, then **restart the Claude Code session**.
 2. **Precondition for resuming MCP calls: the session has been restarted with a fresh token.** Retrying the failing tool in the current session re-uses the same expired transport headers and fails identically. `gh` / `acli` / `curl` fallbacks bypass the MCP server entirely and so do not exercise the broken auth path the user needs to fix — wait for the restart.
 
-Full diagnosis and the exact prompt to send are in `.agents/skills/mcp-diagnostics/SKILL.md` (Mid-Session 401 / Token Expiry section).
+Full diagnosis and the exact prompt to send are in `.agents/skills/mcp-first/references/diagnostics.md` (Mid-Session 401 / Token Expiry section).
 
 ## Recovery Pattern
 

@@ -259,7 +259,7 @@ After the PR merges:
 
 ### Step 8: MCP gap audit (mandatory)
 
-After merge, run the MCP gap audit per `skills/mcp-gaps/SKILL.md` Phase 1:
+After merge, run the MCP gap audit per `skills/mcp-first/references/gaps.md` Phase 1:
 
 1. Review all Bash commands from this session
 2. Classify gaps: `missing-tool`, `missing-feature`, `missing-awareness`

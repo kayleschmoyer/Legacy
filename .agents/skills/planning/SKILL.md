@@ -172,5 +172,5 @@ jira_create_ticket(
 
 - [work-ticket](../work-ticket/SKILL.md) — references this skill as Phase 0
 - [debugging](../debugging/SKILL.md) — planning after reproduction, before fix
-- [mcp-gaps](../mcp-gaps/SKILL.md) — planning before MCP tool implementation
+- [mcp-first gaps](../mcp-first/references/gaps.md) — planning before MCP tool implementation
 - [standards](../standards/SKILL.md) — informs risk assessment with review finding patterns

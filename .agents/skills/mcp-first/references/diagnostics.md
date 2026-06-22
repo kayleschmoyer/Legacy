@@ -1,9 +1,4 @@
----
-name: mcp-diagnostics
-description: Diagnose and recover from MCP server load failures — when ToolSearch returns empty for known tools (worktree_ping, github_create_pr, make_run, etc.), one or more MCP servers failed to connect silently. Covers node_modules symlink checks, .mcp.json validation, server source verification, and session restart steps.
----
-
-# Skill: MCP Server Diagnostics (LS-3022)
+# MCP Server Diagnostics (LS-3022)
 
 ## Symptom Recognition
 

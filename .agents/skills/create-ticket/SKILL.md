@@ -104,7 +104,7 @@ Full templates (copy-paste ready) live in **[references/ticket-templates.md](ref
 - **QA Coverage** — the project's structured QA model. A **Page Epic** (`qa-page-epic`, permanent parent per page) holds **Feature Stories** (`qa-feature-story`, one per user-facing feature) which hold Variant Stories and Bug findings. **Coverage is delivered as hermetic Playwright E2E tests in `apps/web-e2e/src/tests/`, not manual testing** — every Feature Story must be backed by an automated test that proves the user journey end-to-end. → templates §4, and the page-epic/feature-story model in [references/qa-coverage-model.md](references/qa-coverage-model.md)
 - **Epic** — a grouping container for related Stories/Tasks. Use only when the user wants to group work; never auto-pick `Epic` for a single change. → templates §5
 - **Spike / Investigation** — time-boxed research producing a decision or a follow-up ticket, not shippable code. → templates §6
-- **MCP-gap / tooling** — filed when a Bash overflow or missing MCP capability is hit; see the [mcp-gaps](../mcp-gaps/SKILL.md) skill for the bucket-epic wiring. → templates §7
+- **MCP-gap / tooling** — filed when a Bash overflow or missing MCP capability is hit; see the [mcp-first gaps reference](../mcp-first/references/gaps.md) for the bucket-epic wiring. → templates §7
 
 ## Gotchas
 
@@ -120,5 +120,5 @@ Full templates (copy-paste ready) live in **[references/ticket-templates.md](ref
 - [plan-ticket](../plan-ticket/SKILL.md) — codebase recon → implementation-ready ticket with risk + affected files.
 - [slice](../slice/SKILL.md) — decompose an epic/story into child Tasks.
 - [mcp-first](../mcp-first/SKILL.md) — Jira tool routing and auth fallbacks.
-- [mcp-gaps](../mcp-gaps/SKILL.md) — filing tooling-gap tickets against the bucket epic.
+- [mcp-first gaps](../mcp-first/references/gaps.md) — filing tooling-gap tickets against the bucket epic.
 - [testing](../testing/SKILL.md) — how the hermetic Playwright E2E tests that satisfy QA Feature Stories are written (`apps/web-e2e`).

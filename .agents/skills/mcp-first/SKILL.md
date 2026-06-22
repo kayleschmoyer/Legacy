@@ -1,11 +1,18 @@
 ---
 name: mcp-first
-description: Per-server MCP-first operation mapping — which MCP tools to prefer over shell commands for Nx, Make, Git, GitHub PR, CI, DB, AWS, browser, and Claude built-in integrations. Load when you need to know which MCP tool replaces a specific gh/pnpm/aws/nx CLI command.
+description: MCP tooling — choosing between shell and MCP tools (per-server tool mapping for Nx, Make, Git, GitHub PR, CI, DB, AWS, browser, and Claude built-ins), diagnosing MCP server load failures (ToolSearch returns empty, mid-session 401, missing node_modules/.bin/tsx), and filing/triaging MCP-gap tickets (post-merge audit of Bash overflows, working the MCP backlog). Load when picking an MCP tool over a shell command, when an MCP server fails to connect, or when running the post-merge gap audit or backlog triage.
 ---
 
 # Skill: MCP-First
 
 > **MCP-first principle**: the shell commands shown in AGENTS.md (Workflow, Commands sections) are **fallbacks** for when MCP servers are unavailable. When MCP tools are available, always prefer them.
+
+## Sub-skills (references)
+
+| Topic                                                                       | Load                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MCP server fails to connect (ToolSearch empty, mid-session 401, tsx broken) | [`references/diagnostics.md`](references/diagnostics.md)                                                                                                                                                                   |
+| File MCP-gap tickets / work the MCP backlog                                 | [`references/gaps.md`](references/gaps.md) (+ [`audit-workflow.md`](references/audit-workflow.md), [`triage-workflow.md`](references/triage-workflow.md), [`batch-tool-inventory.md`](references/batch-tool-inventory.md)) |
 
 ## MCP Servers
 
@@ -26,7 +33,7 @@ description: Per-server MCP-first operation mapping — which MCP tools to prefe
 | `claude_ai_Stripe`          | Claude Code built-in Stripe integration                                                                                               |
 | `claude_ai_Atlassian`       | Jira + Confluence via OAuth 2.1. Cloud ID: `fb294606-6c8f-4b52-9a41-11fe45b77528`                                                     |
 
-> **Server load order matters in native-worktree sessions**: Claude Code's worktree-spawned sessions only connect the first few servers from `.mcp.json` at session start (LS-2902). The load order in `.mcp.json` is: `worktree` → `legacy-sports-github` → `legacy-sports-jira` → `legacy-sports-make` → `legacy-sports-nx` → others. Each server is independently available or unavailable — a missing `worktree` server does **not** mean `legacy-sports-jira` is also missing. If a native session is missing a server, check availability with the server's status/ping tool before falling back to shell equivalents; for Jira specifically, always try `jira_auth_status` first (see Jira Operations below). **If all servers are missing** (deferred tools list is empty), the root cause is almost always a missing `node_modules/.bin/tsx` — see `.agents/skills/mcp-diagnostics/SKILL.md` for the full diagnostic checklist and recovery steps.
+> **Server load order matters in native-worktree sessions**: Claude Code's worktree-spawned sessions only connect the first few servers from `.mcp.json` at session start (LS-2902). The load order in `.mcp.json` is: `worktree` → `legacy-sports-github` → `legacy-sports-jira` → `legacy-sports-make` → `legacy-sports-nx` → others. Each server is independently available or unavailable — a missing `worktree` server does **not** mean `legacy-sports-jira` is also missing. If a native session is missing a server, check availability with the server's status/ping tool before falling back to shell equivalents; for Jira specifically, always try `jira_auth_status` first (see Jira Operations below). **If all servers are missing** (deferred tools list is empty), the root cause is almost always a missing `node_modules/.bin/tsx` — see [`references/diagnostics.md`](references/diagnostics.md) for the full diagnostic checklist and recovery steps.
 
 ## Tool-First Concrete Substitutions
 

@@ -130,4 +130,4 @@ The token endpoint is `${MCP_AUTH_COGNITO_DOMAIN}/oauth2/token`. The machine cli
 - [`docs/authentication/mcp-machine-credential-lifecycle.md`](../authentication/mcp-machine-credential-lifecycle.md) — Track A credential rotation and revocation.
 - [`docs/dev-process/session-startup.md`](./session-startup.md) — How the Track A machine credential is minted at session start (Copilot Coding Agent).
 - [`.agents/skills/cloud-agent-mode/SKILL.md`](../../.agents/skills/cloud-agent-mode/SKILL.md) — Full Track B operating guide for Claude Code web sessions.
-- [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md) — Diagnostic checklist for MCP server connection failures.
+- [`.agents/skills/mcp-first/references/diagnostics.md`](../../.agents/skills/mcp-first/references/diagnostics.md) — Diagnostic checklist for MCP server connection failures.

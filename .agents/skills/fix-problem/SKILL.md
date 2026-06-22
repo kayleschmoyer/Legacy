@@ -158,7 +158,7 @@ Follow the [work-ticket](../work-ticket/SKILL.md) leaf mode workflow from Step 2
 
 10. **Watch to merge** — Claude Code surfaces CI failures, review comments, and conflicts natively. Handle each event as it arrives until the PR merges. Use the actual Jira ticket key created earlier in the workflow in place of `LS-####`. Do not stop at PR creation.
 
-11. **MCP gap audit** — after merge, run the [mcp-gaps skill](../mcp-gaps/SKILL.md) Phase 1.
+11. **MCP gap audit** — after merge, run the [mcp-first gaps reference](../mcp-first/references/gaps.md) Phase 1.
 
 12. **Complete tracking** — mark tasks completed only after merge + gap audit.
 

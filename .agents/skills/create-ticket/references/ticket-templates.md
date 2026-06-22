@@ -216,7 +216,7 @@ Out of Scope:
 
 **Type:** `Task` · **Summary:** `missing-feature(<server>): <gap>` or `bug(<server>): <defect>` · **Parent:** the mcp-gaps bucket epic (resolve via `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` — never hardcode the key)
 
-See [mcp-gaps](../../mcp-gaps/SKILL.md) for the full audit-and-file flow.
+See [mcp-first gaps](../../mcp-first/references/gaps.md) for the full audit-and-file flow.
 
 ```
 ## Gap

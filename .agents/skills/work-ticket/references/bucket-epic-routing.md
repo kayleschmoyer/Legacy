@@ -53,4 +53,4 @@ A ticket skipped for any of these reasons remains visible in the user's pre-disp
 
 - [SKILL.md](../SKILL.md) — Step 1 ticket inspection, Parent Dispatch Mode
 - [`.agents/skills/design-sync/SKILL.md`](../../design-sync/SKILL.md) — design-sync bucket consumer flow
-- [`.agents/skills/mcp-gaps/SKILL.md`](../../mcp-gaps/SKILL.md) — mcp-gaps bucket consumer flow
+- [`.agents/skills/mcp-first/references/gaps.md`](../../mcp-first/references/gaps.md) — mcp-gaps bucket consumer flow

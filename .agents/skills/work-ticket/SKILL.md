@@ -48,7 +48,7 @@ The `--batch` flag is also implied when:
 > 3. `Reply to every Reviewer Bot thread` — `FIX: <sha>` / `JUSTIFY:` / `CANNOT-COMPLY:`
 > 4. `PR merged` — `github_view_pr` returns `state: "MERGED"`
 > 5. `Jira Done` — auto-transition fires on merge; verify
-> 6. `MCP gap audit` — run or skip-with-reason per `.agents/skills/mcp-gaps/SKILL.md`
+> 6. `MCP gap audit` — run or skip-with-reason per `.agents/skills/mcp-first/references/gaps.md`
 >
 > Each task is the gate to the next. `make pc` passing closes no tasks. PR open closes only task 1. Stopping before task 4 leaves the ticket unfinished — this is the single most common agent failure mode.
 

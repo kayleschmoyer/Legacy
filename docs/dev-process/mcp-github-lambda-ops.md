@@ -1,6 +1,6 @@
 # Operator Runbook: legacy-sports-github Lambda Authentication
 
-This runbook covers diagnosing and fixing `github_auth_status: configured: false` on the `legacy-sports-github` MCP Lambda. It is the server-side complement to the client-side [MCP diagnostics skill](../../.agents/skills/mcp-diagnostics/SKILL.md).
+This runbook covers diagnosing and fixing `github_auth_status: configured: false` on the `legacy-sports-github` MCP Lambda. It is the server-side complement to the client-side [MCP diagnostics reference](../../.agents/skills/mcp-first/references/diagnostics.md).
 
 ## Symptoms
 

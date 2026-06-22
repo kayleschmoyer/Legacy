@@ -2,7 +2,7 @@
 
 Human-facing reference for what happens between "launcher fires" and "agent's first turn" in a Claude Code session — the hook chain that prepares a worktree for MCP-server connections, the precondition checks that surface failures, and the env-loading ordering that determines whether the 10 MCP servers come up authenticated.
 
-The authoritative ordering for diagnostics lives in [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md); this doc is the orientation. The bug that prompted this doc — false-positive `[MCP WARNING] .env.local not found` output — is fixed in LS-4505 by chaining `check-mcp-servers.sh` sequentially after `setup-worktree-symlink.sh` instead of registering it as a sibling SessionStart entry.
+The authoritative ordering for diagnostics lives in [`.agents/skills/mcp-first/references/diagnostics.md`](../../.agents/skills/mcp-first/references/diagnostics.md); this doc is the orientation. The bug that prompted this doc — false-positive `[MCP WARNING] .env.local not found` output — is fixed in LS-4505 by chaining `check-mcp-servers.sh` sequentially after `setup-worktree-symlink.sh` instead of registering it as a sibling SessionStart entry.
 
 ## At a glance
 
@@ -67,7 +67,7 @@ Real warnings (post-LS-4505) mean what they say. Walk the checklist:
 | `.mcp.json not found`              | `CLAUDE_PROJECT_DIR` not set to the worktree path     | Restart Claude Code from inside the worktree                                |
 | `mcp-bootstrap.mjs missing`        | File deleted from working tree                        | `git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs`              |
 
-The full diagnostic checklist (including pre-flight `auth_check_all` and the report-don't-fall-back protocol) is [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md).
+The full diagnostic checklist (including pre-flight `auth_check_all` and the report-don't-fall-back protocol) is [`.agents/skills/mcp-first/references/diagnostics.md`](../../.agents/skills/mcp-first/references/diagnostics.md).
 
 ## One-time migration for existing developers (LS-5219)
 
@@ -81,7 +81,7 @@ node scripts/mcp-auth.mjs --force
 
 ## See also
 
-- [`.agents/skills/mcp-diagnostics/SKILL.md`](../../.agents/skills/mcp-diagnostics/SKILL.md) — the executable diagnostic checklist this doc orients you to.
+- [`.agents/skills/mcp-first/references/diagnostics.md`](../../.agents/skills/mcp-first/references/diagnostics.md) — the executable diagnostic checklist this doc orients you to.
 - [`.agents/skills/mcp-first/SKILL.md`](../../.agents/skills/mcp-first/SKILL.md) — server load order and per-server tool substitution table.
 - [`AGENTS.md` § MCP Servers](../../AGENTS.md#mcp-servers) — agent-facing rules for MCP-server health.
 - [`scripts/modules-pool/link.mjs`](../../scripts/modules-pool/link.mjs) — the dependency-free Node resolver that owns `node_modules` pool-slot linking and `.env`/`.env.local` symlinking.

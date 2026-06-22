@@ -128,7 +128,7 @@ Full diagram source at [diagrams/spine-detail.mmd](diagrams/spine-detail.mmd).
 - Respond to bot review per the bot-PR contract (Cycles 1/2/3).
 - Merge via `github_merge_pr`.
 - Verify Jira transitioned to Done.
-- Run MCP gap audit if session was above the minimum threshold (see [mcp-gaps](../mcp-gaps/SKILL.md)).
+- Run MCP gap audit if session was above the minimum threshold (see [mcp-first gaps reference](../mcp-first/references/gaps.md)).
 - Close all tracking tasks (`TaskUpdate(taskId, status: "completed")`).
 
 **Exit gate (Task Completion Signal — also defined in AGENTS.md):**
