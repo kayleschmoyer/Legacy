@@ -723,6 +723,8 @@ export function PlayerDetailModal({
           r.batting?.rbi ?? 0,
           r.batting?.sb ?? 0,
           r.batting?.avg ?? '',
+          r.batting?.obp ?? '',
+          r.batting?.slg ?? '',
         ]),
     [seasonRows],
   );
@@ -1213,6 +1215,8 @@ export function PlayerDetailModal({
                       'RBI',
                       'SB',
                       'AVG',
+                      'OBP',
+                      'SLG',
                     ]}
                     rows={battingTableRows}
                   />
