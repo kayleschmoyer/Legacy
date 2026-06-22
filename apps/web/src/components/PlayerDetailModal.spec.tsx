@@ -489,7 +489,7 @@ describe('PlayerDetailModal — premium pitching columns (LS-6991)', () => {
     expect(screen.queryByText('BB/9')).not.toBeInTheDocument();
   });
 
-  it('shows premium pitching columns (FIP, WHIP, K/9, BB/9) for premium users', () => {
+  it('shows premium pitching columns (FIP, WHIP, K/9, BB/9) for premium users', async () => {
     mockHasEntitlement = true;
     mockUseAllPlayerSeasonStats.mockReturnValue({
       ...EMPTY_SEASON,
@@ -515,10 +515,10 @@ describe('PlayerDetailModal — premium pitching columns (LS-6991)', () => {
       />,
     );
 
-    expect(screen.getByText('FIP')).toBeInTheDocument();
-    expect(screen.getByText('WHIP')).toBeInTheDocument();
-    expect(screen.getByText('K/9')).toBeInTheDocument();
-    expect(screen.getByText('BB/9')).toBeInTheDocument();
+    expect(await screen.findByText('FIP')).toBeInTheDocument();
+    expect(await screen.findByText('WHIP')).toBeInTheDocument();
+    expect(await screen.findByText('K/9')).toBeInTheDocument();
+    expect(await screen.findByText('BB/9')).toBeInTheDocument();
   });
 });
 

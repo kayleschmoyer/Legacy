@@ -57,6 +57,7 @@ Legend for **Enforcement**: 🔒 server-enforced (resolver gate) · 🖥️ UI-g
 | Trade analyzer                                     | Premium | `trade_analyzer`            | 🖥️          | _none yet — analyzer is a “coming soon” teaser_                                                     | `TradeCenterPage`                |
 | Fantasy scoring projections (football)             | Premium | `football_projections`      | 🖥️          | _none yet — `ProjectionsTeaser` is an upsell teaser_                                                | `FootballPlayerDetailPage`       |
 | Advanced pitching analytics (FIP, WHIP, K/9, BB/9) | Premium | `advanced_pitching_stats`   | 🖥️          | _none — column display is client-side; `playerSeasonPitching` already gated by `player_comparison`_ | `PlayerDetailModal` pitching tab |
+| Advanced defensive sabermetrics (DRS, UZR, OAA)    | Premium | `defensive_sabermetrics`    | 🔒 🖥️       | `statistics.ts` (`playerSeasonFielding` — nulls non-premium)                                        | `PlayerDetailModal` Fielding tab |
 
 ### Free features (explicit decisions)
 

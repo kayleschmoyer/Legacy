@@ -54,6 +54,9 @@ export const seasonFielding = pgTable(
     wp: integer('wp'),
     team: varchar('team', { length: 50 }).notNull(),
     rowId: varchar('row_id', { length: 50 }).notNull(),
+    drs: doublePrecision('drs'),
+    uzr: doublePrecision('uzr'),
+    oaa: doublePrecision('oaa'),
   },
   (table) => {
     return {

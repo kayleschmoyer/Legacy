@@ -2,7 +2,7 @@ import { createDatabaseService } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { builder } from './builder';
-import { requireEntitlement } from './authorization';
+import { hasEntitlement, requireEntitlement } from './authorization';
 import { ENTITLEMENTS } from './entitlements';
 
 /**
@@ -885,6 +885,9 @@ export const SeasonFieldingRef = builder.objectRef<{
   wp: number | null;
   team: string;
   rowId: string;
+  drs: number | null;
+  uzr: number | null;
+  oaa: number | null;
 }>('SeasonFielding');
 
 SeasonFieldingRef.implement({
@@ -928,6 +931,9 @@ SeasonFieldingRef.implement({
     wildPitches: t.exposeInt('wp', { nullable: true }),
     team: t.exposeString('team'),
     rowId: t.exposeString('rowId'),
+    drs: t.exposeFloat('drs', { nullable: true }),
+    uzr: t.exposeFloat('uzr', { nullable: true }),
+    oaa: t.exposeFloat('oaa', { nullable: true }),
   }),
 });
 
@@ -1338,7 +1344,7 @@ builder.queryField('playerSeasonFielding', (t) =>
       playerId: t.arg.int({ required: true }),
       season: t.arg.int({ required: false }),
     },
-    resolve: async (parent, { playerId, season }) => {
+    resolve: async (parent, { playerId, season }, context) => {
       LOGGER.debug(
         `[playerSeasonFielding] Query for playerId=${playerId}, season=${season}`,
       );
@@ -1351,6 +1357,13 @@ builder.queryField('playerSeasonFielding', (t) =>
       LOGGER.debug(
         `[playerSeasonFielding] Returned ${results.length} records for playerId=${playerId}`,
       );
+      const premium = await hasEntitlement(
+        context,
+        ENTITLEMENTS.defensive_sabermetrics,
+      );
+      if (!premium) {
+        return results.map((r) => ({ ...r, drs: null, uzr: null, oaa: null }));
+      }
       return results;
     },
   }),

@@ -59,5 +59,8 @@ query GetAllPlayerSeasonStats($playerId: Int!) {
     errors
     doublePlays
     fieldingPercentage
+    drs
+    uzr
+    oaa
   }
 }

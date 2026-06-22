@@ -695,6 +695,44 @@ describe('Statistics Resolver', () => {
 
       expect(result).toEqual(seasons);
     });
+
+    it('returns drs/uzr/oaa for premium users', async () => {
+      const seasons = [
+        { playerId: 3, season: 2023, assists: 80, drs: 5, uzr: 3.2, oaa: 7 },
+      ];
+      mockStatistics.getSeasonFieldingStats.mockResolvedValueOnce(seasons);
+
+      const resolver = getQuery('playerSeasonFielding');
+      const result = await resolver(
+        {},
+        { playerId: 3 },
+        makePremiumCtx(),
+        undefined as never,
+      );
+
+      expect(result).toEqual(seasons);
+    });
+
+    it('nulls out drs/uzr/oaa for free-tier users', async () => {
+      const seasons = [
+        { playerId: 3, season: 2023, assists: 80, drs: 5, uzr: 3.2, oaa: 7 },
+      ];
+      mockStatistics.getSeasonFieldingStats.mockResolvedValueOnce(seasons);
+
+      const resolver = getQuery('playerSeasonFielding');
+      const result = (await resolver(
+        {},
+        { playerId: 3 },
+        makeFreeCtx(),
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      expect(result).toHaveLength(1);
+      expect(result[0].drs).toBeNull();
+      expect(result[0].uzr).toBeNull();
+      expect(result[0].oaa).toBeNull();
+      expect(result[0].assists).toBe(80);
+    });
   });
 
   // ── CareerPitching.whip field resolver ────────────────────────────────────

@@ -4026,6 +4026,7 @@ export type SeasonFielding = {
   chances?: Maybe<Scalars['Float']['output']>;
   completeGames?: Maybe<Scalars['Int']['output']>;
   doublePlays?: Maybe<Scalars['Int']['output']>;
+  drs?: Maybe<Scalars['Float']['output']>;
   errors?: Maybe<Scalars['Int']['output']>;
   fieldingPercentage?: Maybe<Scalars['Float']['output']>;
   fieldingPercentageLeague?: Maybe<Scalars['Float']['output']>;
@@ -4034,6 +4035,7 @@ export type SeasonFielding = {
   gamesStarted?: Maybe<Scalars['Int']['output']>;
   inningsDefended?: Maybe<Scalars['Float']['output']>;
   league?: Maybe<Scalars['String']['output']>;
+  oaa?: Maybe<Scalars['Float']['output']>;
   pickoffs?: Maybe<Scalars['Int']['output']>;
   playerId?: Maybe<Scalars['Int']['output']>;
   position?: Maybe<Scalars['String']['output']>;
@@ -4046,6 +4048,7 @@ export type SeasonFielding = {
   season?: Maybe<Scalars['Int']['output']>;
   stolenBases?: Maybe<Scalars['Int']['output']>;
   team?: Maybe<Scalars['String']['output']>;
+  uzr?: Maybe<Scalars['Float']['output']>;
   wildPitches?: Maybe<Scalars['Int']['output']>;
 };
 

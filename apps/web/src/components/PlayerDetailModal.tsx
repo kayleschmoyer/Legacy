@@ -125,6 +125,9 @@ interface SeasonRow {
     a: number;
     e: number;
     position: string;
+    drs: number | null;
+    uzr: number | null;
+    oaa: number | null;
   };
 }
 
@@ -819,6 +822,9 @@ export function PlayerDetailModal({
         assists?: number | null;
         errors?: number | null;
         position?: string | null;
+        drs?: number | null;
+        uzr?: number | null;
+        oaa?: number | null;
       }) => {
         if (!f?.season) return;
         const row: SeasonRow = seasons.get(f.season) || { season: f.season };
@@ -832,6 +838,22 @@ export function PlayerDetailModal({
           if (pos && !row.fielding.position.includes(pos)) {
             row.fielding.position += (row.fielding.position ? ', ' : '') + pos;
           }
+          // Accumulate sabermetrics (null when non-premium or unavailable).
+          // Guard against NaN: if the running total is already NaN (e.g. from a
+          // corrupt upstream value) treat it as 0 so subsequent rows don't
+          // propagate NaN through the rest of the accumulation.
+          if (f.drs != null)
+            row.fielding.drs =
+              (Number.isNaN(row.fielding.drs) ? 0 : (row.fielding.drs ?? 0)) +
+              f.drs;
+          if (f.uzr != null)
+            row.fielding.uzr =
+              (Number.isNaN(row.fielding.uzr) ? 0 : (row.fielding.uzr ?? 0)) +
+              f.uzr;
+          if (f.oaa != null)
+            row.fielding.oaa =
+              (Number.isNaN(row.fielding.oaa) ? 0 : (row.fielding.oaa ?? 0)) +
+              f.oaa;
         } else {
           row.fielding = {
             games: f.games ?? 0,
@@ -840,6 +862,9 @@ export function PlayerDetailModal({
             a: f.assists ?? 0,
             e: f.errors ?? 0,
             position: f.position ?? '',
+            drs: f.drs ?? null,
+            uzr: f.uzr ?? null,
+            oaa: f.oaa ?? null,
           };
         }
         seasons.set(f.season, row);
@@ -946,6 +971,10 @@ export function PlayerDetailModal({
     [seasonRows, hasPremiumPitching],
   );
 
+  const hasPremiumFielding = useHasEntitlement(
+    ENTITLEMENTS.defensive_sabermetrics,
+  );
+
   const fieldingRows = useMemo(() => {
     if (!displayData?.playerSeasonFielding) return [];
     return [...displayData.playerSeasonFielding]
@@ -964,22 +993,41 @@ export function PlayerDetailModal({
         po: f.putouts ?? 0,
         a: f.assists ?? 0,
         e: f.errors ?? 0,
+        drs: f.drs ?? null,
+        uzr: f.uzr ?? null,
+        oaa: f.oaa ?? null,
       }))
       .sort((a, b) => b.season - a.season || b.inn - a.inn);
   }, [displayData]);
 
   const fieldingTableRows = useMemo(
     () =>
-      fieldingRows.map((r) => [
-        r.season,
-        r.position,
-        r.games,
-        r.inn,
-        r.po,
-        r.a,
-        r.e,
-      ]),
-    [fieldingRows],
+      fieldingRows.map((r) => {
+        const base: (string | number)[] = [
+          r.season,
+          r.position,
+          r.games,
+          outsToBaseballIP(ipToOuts(r.inn)),
+          r.po,
+          r.a,
+          r.e,
+        ];
+        if (hasPremiumFielding) {
+          base.push(
+            r.drs != null && !Number.isNaN(r.drs)
+              ? Number(r.drs.toFixed(1))
+              : '—',
+            r.uzr != null && !Number.isNaN(r.uzr)
+              ? Number(r.uzr.toFixed(1))
+              : '—',
+            r.oaa != null && !Number.isNaN(r.oaa)
+              ? Number(r.oaa.toFixed(1))
+              : '—',
+          );
+        }
+        return base;
+      }),
+    [fieldingRows, hasPremiumFielding],
   );
 
   // ------ Available tabs ------
@@ -1510,7 +1558,22 @@ export function PlayerDetailModal({
                     <SectionHead title="Season by Season · Fielding" />
                     <EditorialTable
                       caption="Season fielding statistics"
-                      headers={['Year', 'POS', 'G', 'INN', 'PO', 'A', 'E']}
+                      headers={
+                        hasPremiumFielding
+                          ? [
+                              'Year',
+                              'POS',
+                              'G',
+                              'INN',
+                              'PO',
+                              'A',
+                              'E',
+                              'DRS',
+                              'UZR',
+                              'OAA',
+                            ]
+                          : ['Year', 'POS', 'G', 'INN', 'PO', 'A', 'E']
+                      }
                       rows={fieldingTableRows}
                     />
                   </>

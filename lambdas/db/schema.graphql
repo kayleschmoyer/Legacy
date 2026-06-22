@@ -4028,6 +4028,7 @@ type SeasonFielding {
   chances: Float
   completeGames: Int
   doublePlays: Int
+  drs: Float
   errors: Int
   fieldingPercentage: Float
   fieldingPercentageLeague: Float
@@ -4036,6 +4037,7 @@ type SeasonFielding {
   gamesStarted: Int
   inningsDefended: Float
   league: String
+  oaa: Float
   pickoffs: Int
   playerId: Int
   position: String
@@ -4048,6 +4050,7 @@ type SeasonFielding {
   season: Int
   stolenBases: Int
   team: String
+  uzr: Float
   wildPitches: Int
 }
 
