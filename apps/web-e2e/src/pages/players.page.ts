@@ -435,6 +435,32 @@ class PlayerDetailSurface {
     ).not.toBeVisible();
   }
 
+  /** Assert the stat tab with the given label is present in the tab bar. */
+  async expectTabVisible(
+    name: 'Career Arc' | 'Batting' | 'Pitching' | 'Fielding',
+  ): Promise<void> {
+    const testIdMap = {
+      'Career Arc': 'tab-career-arc',
+      Batting: 'tab-batting',
+      Pitching: 'tab-pitching',
+      Fielding: 'tab-fielding',
+    } as const;
+    await expect(this.#dialog.getByTestId(testIdMap[name])).toBeVisible();
+  }
+
+  /** Assert the stat tab with the given label is absent from the tab bar. */
+  async expectTabHidden(
+    name: 'Career Arc' | 'Batting' | 'Pitching' | 'Fielding',
+  ): Promise<void> {
+    const testIdMap = {
+      'Career Arc': 'tab-career-arc',
+      Batting: 'tab-batting',
+      Pitching: 'tab-pitching',
+      Fielding: 'tab-fielding',
+    } as const;
+    await expect(this.#dialog.getByTestId(testIdMap[name])).toHaveCount(0);
+  }
+
   /**
    * Assert text is visible within the modal. `exact` matches the whole node;
    * `first` (default true) resolves strict-mode collisions on repeated labels.

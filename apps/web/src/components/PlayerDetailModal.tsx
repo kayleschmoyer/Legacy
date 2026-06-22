@@ -396,10 +396,10 @@ function EditorialTab({
       pressStyle={{ scale: 0.97 }}
       hoverStyle={{ backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.08) }}
       onPress={onPress}
-      data-testid={`tab-${tabKey}`}
       style={{ scrollSnapAlign: 'start' }}
     >
       <Text
+        testID={`tab-${tabKey}`}
         color={active ? TEXT_INTERFACE : TEXT_SECONDARY}
         style={{
           fontFamily: FONT_DISPLAY,
@@ -703,6 +703,10 @@ export function PlayerDetailModal({
     useGetPlayerCareerArcQuery({
       variables: { playerId: playerId ?? 0 },
       skip: !playerId || !open,
+      // no-cache prevents playerSeasonBatting/playerSeasonPitching arc responses
+      // from overwriting the season stats entries at the same Apollo cache key,
+      // which would incorrectly hide stat tabs.
+      fetchPolicy: 'no-cache',
     });
 
   const displayArcData = arcData ?? previousArcData;
