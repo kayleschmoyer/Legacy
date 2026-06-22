@@ -134,15 +134,38 @@ test.describe
     });
 
     await test.step('Set Min Home Runs filter using the slider', async () => {
-      // The Advanced panel renders a <input type="range" aria-label="Min Home Runs">
+      // The Advanced panel renders <input type="range" aria-label="Min Home Runs">.
+      //
+      // LS-8248: this step used to press End and assert toHaveValue('75'),
+      // which worked while the slider was capped at max=75/step=1. LS-7135
+      // (PR #5537) widened the control to the CAREER HR domain (max=800,
+      // step=5) because the grid surfaces career totals — the all-time leader,
+      // Barry Bonds, sits at 762. Pressing End now drives the slider to 800, so
+      // the old assertion failed (actual value '800') AND no player meets a
+      // 800-HR minimum, which would empty the grid and break the next step too.
+      //
+      // Instead, step the slider up to a fixed in-domain threshold (75 career
+      // HR) that genuinely narrows the result set while keeping ~1.4k matching
+      // players, so the grid still renders rows. The press count is derived
+      // from the live `step` attribute so this stays correct if the cap/step
+      // change again. Home zeroes the control; each ArrowUp advances one step
+      // and fires onKeyUp → the debounced onCommit → applyFilters refetch.
       const minHRSlider = page.getByLabel('Min Home Runs');
       await expect(minHRSlider).toBeVisible({ timeout: 10_000 });
-      // Press End to move slider to max (75 career HR minimum).
-      // onKeyUp triggers onCommit → applyFilters.
-      await minHRSlider.press('End');
-      // Confirm the filter value actually changed — guards against the keypress
-      // not taking effect on the controlled <input type="range">.
-      await expect(minHRSlider).toHaveValue('75');
+
+      const MIN_HR_TARGET = 75;
+      const step = Number(await minHRSlider.getAttribute('step')) || 1;
+      const presses = Math.round(MIN_HR_TARGET / step);
+
+      await minHRSlider.press('Home');
+      await expect(minHRSlider).toHaveValue('0');
+      for (let i = 0; i < presses; i++) {
+        await minHRSlider.press('ArrowUp');
+      }
+      // Assert against the value the keypresses actually reach (presses × step)
+      // rather than a hardcoded literal, so a future step change can't silently
+      // re-break this guard.
+      await expect(minHRSlider).toHaveValue(String(presses * step));
     });
 
     await test.step('Grid re-loads with filtered data', async () => {
