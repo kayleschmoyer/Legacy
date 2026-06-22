@@ -734,10 +734,14 @@ export function PlayerDetailModal({
         plateAppearances?: number | null;
         atBats?: number | null;
         hits?: number | null;
+        doubles?: number | null;
+        triples?: number | null;
         homeRuns?: number | null;
         rbi?: number | null;
         stolenBases?: number | null;
         baseOnBalls?: number | null;
+        onBasePercentage?: number | null;
+        sluggingPercentage?: number | null;
       }) => {
         if (!b?.season) return;
         const row: SeasonRow = seasons.get(b.season) || { season: b.season };
@@ -745,16 +749,28 @@ export function PlayerDetailModal({
         const h = b.hits ?? 0;
         const pa = b.plateAppearances ?? 0;
         const bb = b.baseOnBalls ?? 0;
+        const doubles = b.doubles ?? 0;
+        const triples = b.triples ?? 0;
+        const hr = b.homeRuns ?? 0;
         const avg = ab > 0 ? (h / ab).toFixed(3) : '.000';
-        const obp = pa > 0 ? ((h + bb) / pa).toFixed(3) : '.000';
+        const obp =
+          b.onBasePercentage != null
+            ? b.onBasePercentage.toFixed(3)
+            : pa > 0
+              ? ((h + bb) / pa).toFixed(3)
+              : '.000';
         const slg =
-          ab > 0 ? (((b.homeRuns ?? 0) * 4 + h) / ab).toFixed(3) : '.000';
+          b.sluggingPercentage != null
+            ? b.sluggingPercentage.toFixed(3)
+            : ab > 0
+              ? ((h + doubles + 2 * triples + 3 * hr) / ab).toFixed(3)
+              : '.000';
         row.batting = {
           games: b.games ?? 0,
           pa,
           ab,
           h,
-          hr: b.homeRuns ?? 0,
+          hr,
           rbi: b.rbi ?? 0,
           sb: b.stolenBases ?? 0,
           avg,

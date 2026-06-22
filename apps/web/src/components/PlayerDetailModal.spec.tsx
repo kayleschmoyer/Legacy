@@ -522,6 +522,111 @@ describe('PlayerDetailModal — premium pitching columns (LS-6991)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// OBP / SLG calculation (LS-6970)
+// ---------------------------------------------------------------------------
+
+describe('PlayerDetailModal — OBP/SLG calculation (LS-6970)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockHasEntitlement = false;
+    mockUsePlayerCareerArc.mockReturnValue(makeArcData(false, false));
+  });
+
+  it('uses server-provided onBasePercentage and sluggingPercentage when available', () => {
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: {
+        ...EMPTY_SEASON.data,
+        playerSeasonBatting: [
+          {
+            season: 2023,
+            games: 157,
+            plateAppearances: 600,
+            atBats: 530,
+            hits: 159,
+            doubles: 30,
+            triples: 5,
+            homeRuns: 44,
+            rbi: 95,
+            stolenBases: 20,
+            baseOnBalls: 70,
+            onBasePercentage: 0.35,
+            sluggingPercentage: 0.55,
+          },
+        ],
+      },
+    });
+
+    renderModal();
+
+    // Server-provided values: 0.35 → "0.350", 0.55 → "0.550"
+    expect(screen.getByText('0.350')).toBeInTheDocument();
+    expect(screen.getByText('0.550')).toBeInTheDocument();
+  });
+
+  it('computes correct SLG using doubles and triples when server value is absent', () => {
+    // H=150, 2B=30, 3B=5, HR=20, AB=500
+    // Correct: (150 + 30 + 2*5 + 3*20) / 500 = 250/500 = 0.500
+    // Old broken: (20*4 + 150) / 500 = 230/500 = 0.460
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: {
+        ...EMPTY_SEASON.data,
+        playerSeasonBatting: [
+          {
+            season: 2023,
+            games: 150,
+            plateAppearances: 550,
+            atBats: 500,
+            hits: 150,
+            doubles: 30,
+            triples: 5,
+            homeRuns: 20,
+            rbi: 80,
+            stolenBases: 10,
+            baseOnBalls: 50,
+          },
+        ],
+      },
+    });
+
+    renderModal();
+
+    expect(screen.getByText('0.500')).toBeInTheDocument();
+    expect(screen.queryByText('0.460')).not.toBeInTheDocument();
+  });
+
+  it('computes correct OBP fallback as (H+BB)/PA when server value is absent', () => {
+    // H=150, BB=50, PA=550 → (150+50)/550 = 200/550 ≈ 0.364
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: {
+        ...EMPTY_SEASON.data,
+        playerSeasonBatting: [
+          {
+            season: 2023,
+            games: 150,
+            plateAppearances: 550,
+            atBats: 500,
+            hits: 150,
+            doubles: 30,
+            triples: 5,
+            homeRuns: 20,
+            rbi: 80,
+            stolenBases: 10,
+            baseOnBalls: 50,
+          },
+        ],
+      },
+    });
+
+    renderModal();
+
+    expect(screen.getByText('0.364')).toBeInTheDocument();
+  });
+});
+
 // ── Position badge interactivity (LS-6978) ────────────────────────────────────
 
 function renderModalWithPositions(onPositionClick?: (pos: string) => void) {
