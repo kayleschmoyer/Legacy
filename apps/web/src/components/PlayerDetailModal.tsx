@@ -76,6 +76,12 @@ export interface PlayerDetailModalProps {
    * (PlayerDetailPage), where the affordance would be redundant.
    */
   onViewFullPage?: () => void;
+  /**
+   * Called when the user clicks a position badge in the eligible-positions row
+   * (LS-6978). Consumers can use this to filter or highlight matching roster
+   * slots. When omitted the badges remain non-interactive.
+   */
+  onPositionClick?: (position: string) => void;
 }
 
 interface SeasonRow {
@@ -165,7 +171,13 @@ function PortraitAvatar({
   );
 }
 
-function PositionBadge({ position }: { position: string }) {
+function PositionBadge({
+  position,
+  onPress,
+}: {
+  position: string;
+  onPress?: () => void;
+}) {
   return (
     <Text
       data-testid="player-position"
@@ -182,6 +194,12 @@ function PositionBadge({ position }: { position: string }) {
         fontSize: 11,
         letterSpacing: '0.1em',
       }}
+      cursor={onPress != null ? 'pointer' : undefined}
+      onPress={onPress}
+      pressStyle={onPress != null ? { opacity: 0.7 } : undefined}
+      hoverStyle={onPress != null ? { opacity: 0.85 } : undefined}
+      role={onPress != null ? 'button' : undefined}
+      aria-label={onPress != null ? `Filter roster by ${position}` : undefined}
     >
       {position}
     </Text>
@@ -518,6 +536,7 @@ export function PlayerDetailModal({
   open,
   onOpenChange,
   onViewFullPage,
+  onPositionClick,
 }: PlayerDetailModalProps) {
   LOGGER.debug('[PlayerDetailModal] render', { playerId, playerName, open });
 
@@ -1058,7 +1077,13 @@ export function PlayerDetailModal({
               </Text>
               {eligiblePositions.length > 0 ? (
                 eligiblePositions.map((pos) => (
-                  <PositionBadge key={pos} position={pos} />
+                  <PositionBadge
+                    key={pos}
+                    position={pos}
+                    onPress={
+                      onPositionClick ? () => onPositionClick(pos) : undefined
+                    }
+                  />
                 ))
               ) : (
                 <Tooltip placement="top">

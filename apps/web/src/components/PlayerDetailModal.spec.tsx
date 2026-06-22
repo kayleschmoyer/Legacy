@@ -90,8 +90,14 @@ jest.mock('tamagui', () => {
     ),
     ScrollView: Pass,
     Spinner: () => <div data-testid="spinner" />,
-    Text: ({ children, ...rest }: Children) => (
-      <span {...rest}>{children}</span>
+    Text: ({
+      children,
+      onPress,
+      ...rest
+    }: Children & { onPress?: () => void }) => (
+      <span onClick={onPress} {...rest}>
+        {children}
+      </span>
     ),
     Tooltip: TooltipRoot,
     XStack: Pass,
@@ -334,5 +340,69 @@ describe('PlayerDetailModal — premium pitching columns (LS-6991)', () => {
     expect(screen.getByText('WHIP')).toBeInTheDocument();
     expect(screen.getByText('K/9')).toBeInTheDocument();
     expect(screen.getByText('BB/9')).toBeInTheDocument();
+  });
+});
+
+// ── Position badge interactivity (LS-6978) ────────────────────────────────────
+
+function renderModalWithPositions(onPositionClick?: (pos: string) => void) {
+  mockUseAllPlayerSeasonStats.mockReturnValue({
+    ...EMPTY_SEASON,
+    data: {
+      ...EMPTY_SEASON.data,
+      player: {
+        ...EMPTY_SEASON.data.player,
+        eligiblePositions: ['DH', '1B'],
+      },
+      playerSeasonBatting: [battingSeason()],
+    },
+  });
+  return render(
+    <PlayerDetailModal
+      playerId={660271}
+      playerName="Shohei Ohtani"
+      position="DH"
+      open
+      onOpenChange={jest.fn()}
+      onPositionClick={onPositionClick}
+    />,
+  );
+}
+
+describe('PlayerDetailModal — position badge interactivity (LS-6978)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUsePlayerCareerArc.mockReturnValue(makeArcData(false, false));
+  });
+
+  it('renders position badges without interactive attributes when onPositionClick is not provided', () => {
+    renderModalWithPositions(undefined);
+
+    const badges = screen.getAllByTestId('player-position');
+    for (const badge of badges) {
+      expect(badge).not.toHaveAttribute('role', 'button');
+      expect(badge).not.toHaveAttribute('aria-label');
+    }
+  });
+
+  it('renders position badges with role=button and aria-label when onPositionClick is provided', () => {
+    renderModalWithPositions(jest.fn());
+
+    expect(
+      screen.getByRole('button', { name: 'Filter roster by DH' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Filter roster by 1B' }),
+    ).toBeInTheDocument();
+  });
+
+  it('calls onPositionClick with the position when a badge is clicked', () => {
+    const onPositionClick = jest.fn();
+    renderModalWithPositions(onPositionClick);
+
+    screen.getByRole('button', { name: 'Filter roster by DH' }).click();
+
+    expect(onPositionClick).toHaveBeenCalledTimes(1);
+    expect(onPositionClick).toHaveBeenCalledWith('DH');
   });
 });

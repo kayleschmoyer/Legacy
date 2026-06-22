@@ -338,6 +338,7 @@ interface RosterRowProps {
   minCareerSeasons?: number;
   onViewDetails?: (player: TeamMemberFragment) => void;
   onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
+  isPositionHighlighted?: boolean;
 }
 
 function RosterRow({
@@ -354,6 +355,7 @@ function RosterRow({
   minCareerSeasons,
   onViewDetails,
   onSetNickname,
+  isPositionHighlighted,
 }: RosterRowProps): React.JSX.Element {
   const isLocked = Boolean(matchupData?.isLocked);
   const posType = position.positionType ?? '';
@@ -480,8 +482,10 @@ function RosterRow({
       opacity={isLocked ? 0.7 : 1}
       style={{
         boxShadow: rowGlow,
-        transition: 'box-shadow 0.3s ease, background 0.3s ease',
+        transition:
+          'box-shadow 0.3s ease, background 0.3s ease, border-left 0.2s ease',
         ...(rowGradient ? { background: rowGradient } : {}),
+        ...(isPositionHighlighted ? { borderLeft: `3px solid ${AMBER}` } : {}),
       }}
       className={recentlyMoved ? 'roster-flash' : undefined}
       role="button"
@@ -745,6 +749,7 @@ interface RosterSectionProps {
   minCareerSeasons?: number;
   onViewDetails?: (player: TeamMemberFragment) => void;
   onSetNickname?: (teamMemberId: number, nickname: string | null) => void;
+  positionFilter?: string | null;
 }
 
 function RosterSection({
@@ -761,6 +766,7 @@ function RosterSection({
   minCareerSeasons,
   onViewDetails,
   onSetNickname,
+  positionFilter,
 }: RosterSectionProps): React.JSX.Element | null {
   if (positions.length === 0) return null;
 
@@ -846,6 +852,9 @@ function RosterSection({
             minCareerSeasons={minCareerSeasons}
             onViewDetails={onViewDetails}
             onSetNickname={onSetNickname}
+            isPositionHighlighted={
+              positionFilter != null && position.positionType === positionFilter
+            }
           />
         );
       })}
@@ -1350,6 +1359,60 @@ function SelectedBanner({
   );
 }
 
+// ── Position Filter Banner ────────────────────────────────────────────────
+
+function PositionFilterBanner({
+  position,
+  onClear,
+}: {
+  position: string;
+  onClear: () => void;
+}): React.JSX.Element {
+  return (
+    <XStack
+      backgroundColor={withAlpha(AMBER, 0.1)}
+      borderColor={withAlpha(AMBER, 0.4)}
+      borderWidth={1}
+      borderRadius="$4"
+      paddingVertical="$2"
+      paddingHorizontal="$3"
+      alignItems="center"
+      justifyContent="space-between"
+      gap="$3"
+      animation="bouncy"
+      enterStyle={{ opacity: 0, y: -10, scale: 0.98 }}
+      style={{ boxShadow: `0 0 20px ${withAlpha(AMBER, 0.12)}` }}
+    >
+      <XStack alignItems="center" gap="$2">
+        <YStack
+          width={8}
+          height={8}
+          borderRadius={4}
+          backgroundColor={AMBER}
+          animation="bouncy"
+          enterStyle={{ scale: 0 }}
+        />
+        <Text fontSize="$3" fontWeight="700" color={AMBER}>
+          Showing slots for {position}
+        </Text>
+      </XStack>
+      <Button
+        size="$2"
+        variant="outlined"
+        backgroundColor="transparent"
+        borderColor={withAlpha(AMBER, 0.5)}
+        color={AMBER}
+        pressStyle={{ backgroundColor: withAlpha(AMBER, 0.1) }}
+        hoverStyle={{ backgroundColor: withAlpha(AMBER, 0.08) }}
+        onPress={onClear}
+        aria-label="Clear position filter"
+      >
+        Clear
+      </Button>
+    </XStack>
+  );
+}
+
 // ── Lineup Locked Banner ──────────────────────────────────────────────────
 
 function LockedBanner(): React.JSX.Element {
@@ -1434,6 +1497,8 @@ export function LeagueRosterManagement({
     name: string;
     position?: string;
   } | null>(null);
+
+  const [positionFilter, setPositionFilter] = useState<string | null>(null);
 
   const handleViewDetails = useCallback((player: TeamMemberFragment) => {
     const id = player.player?.id ?? null;
@@ -1725,6 +1790,16 @@ export function LeagueRosterManagement({
           </YStack>
         )}
 
+        {/* ── Position filter banner (LS-6978) ─────────────────────── */}
+        {positionFilter != null && !selectedPlayer && (
+          <YStack paddingHorizontal="$3">
+            <PositionFilterBanner
+              position={positionFilter}
+              onClear={() => setPositionFilter(null)}
+            />
+          </YStack>
+        )}
+
         {/* ── Lineup locked banner ─────────────────────────────────── */}
         {showLockedBanner && !readOnly && (
           <YStack paddingHorizontal="$3">
@@ -1826,6 +1901,7 @@ export function LeagueRosterManagement({
               minCareerSeasons={minCareerSeasons}
               onViewDetails={handleViewDetails}
               onSetNickname={readOnly ? undefined : onSetNickname}
+              positionFilter={positionFilter}
             />
 
             <RosterSection
@@ -1842,6 +1918,7 @@ export function LeagueRosterManagement({
               minCareerSeasons={minCareerSeasons}
               onViewDetails={handleViewDetails}
               onSetNickname={readOnly ? undefined : onSetNickname}
+              positionFilter={positionFilter}
             />
           </YStack>
 
@@ -1896,6 +1973,10 @@ export function LeagueRosterManagement({
         open={detailPlayer != null}
         onOpenChange={(open) => {
           if (!open) setDetailPlayer(null);
+        }}
+        onPositionClick={(pos) => {
+          setDetailPlayer(null);
+          setPositionFilter(pos);
         }}
       />
     </YStack>
