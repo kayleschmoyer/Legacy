@@ -12,7 +12,13 @@ export const Button = ({ children, onPress, onClick, ...props }) =>
     { ...props, onClick: onClick || onPress },
     children,
   );
-export const Input = ({ ...props }) => React.createElement('input', props);
+export const Input = ({ onChangeText, onChange, ...props }) =>
+  React.createElement('input', {
+    ...props,
+    onChange:
+      onChange ||
+      (onChangeText ? (e) => onChangeText(e.target.value) : undefined),
+  });
 export const XStack = ({ children, ...props }) =>
   React.createElement(
     'div',
