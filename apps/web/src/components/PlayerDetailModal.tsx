@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Button,
   ScrollView,
@@ -409,7 +416,34 @@ function EditorialTab({
   );
 }
 
-function EditorialTable({
+// Rows beyond this threshold are rendered in a fixed-height virtual window.
+const EDITORIAL_VIRTUALIZE_THRESHOLD = 25;
+const EDITORIAL_ROW_HEIGHT_PX = 46;
+const EDITORIAL_VIRTUAL_HEIGHT = 400;
+
+type EditorialSortDir = 'asc' | 'desc';
+type EditorialCellVal = string | number;
+
+export function compareEditorialCells(
+  a: EditorialCellVal,
+  b: EditorialCellVal,
+  dir: EditorialSortDir,
+): number {
+  const aMissing = a === '' || a == null;
+  const bMissing = b === '' || b == null;
+  if (aMissing && bMissing) return 0;
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+  const aNum = typeof a === 'number' ? a : Number(a);
+  const bNum = typeof b === 'number' ? b : Number(b);
+  const bothNum = Number.isFinite(aNum) && Number.isFinite(bNum);
+  const cmp = bothNum
+    ? aNum - bNum
+    : String(a).localeCompare(String(b), undefined, { numeric: true });
+  return dir === 'asc' ? cmp : -cmp;
+}
+
+export function EditorialTable({
   caption,
   headers,
   rows,
@@ -418,6 +452,62 @@ function EditorialTable({
   headers: string[];
   rows: (string | number)[][];
 }) {
+  const [sortCol, setSortCol] = useState<number | null>(null);
+  const [sortDir, setSortDir] = useState<EditorialSortDir>('asc');
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const handleSort = useCallback(
+    (colIdx: number) => {
+      if (sortCol !== colIdx) {
+        setSortCol(colIdx);
+        setSortDir('asc');
+      } else if (sortDir === 'asc') {
+        setSortDir('desc');
+      } else {
+        setSortCol(null);
+        setSortDir('asc');
+      }
+    },
+    [sortCol, sortDir],
+  );
+
+  const sortedRows = useMemo(() => {
+    if (sortCol === null) return rows;
+    return [...rows].sort((a, b) =>
+      compareEditorialCells(a[sortCol], b[sortCol], sortDir),
+    );
+  }, [rows, sortCol, sortDir]);
+
+  const shouldVirtualize = sortedRows.length > EDITORIAL_VIRTUALIZE_THRESHOLD;
+
+  const virtualizer = useVirtualizer({
+    count: shouldVirtualize ? sortedRows.length : 0,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => EDITORIAL_ROW_HEIGHT_PX,
+    overscan: 5,
+  });
+
+  const rowContent = (cells: EditorialCellVal[]) =>
+    cells.map((cell, ci) => (
+      <Text
+        key={`${cells[0]}-${headers[ci]}`}
+        flex={ci === 0 ? 1.2 : 1}
+        minWidth={0}
+        numberOfLines={1}
+        color={ci === 0 ? BRAND_GOLD_LIGHT : TEXT_INTERFACE}
+        textAlign={ci === 0 ? 'left' : 'right'}
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: ci === 0 ? 800 : 600,
+          fontSize: 15,
+          letterSpacing: ci === 0 ? '0.04em' : 0,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {cell}
+      </Text>
+    ));
+
   return (
     <YStack
       marginTop={14}
@@ -429,6 +519,7 @@ function EditorialTable({
     >
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <YStack minWidth={700}>
+          {/* Sortable header row */}
           <XStack
             backgroundColor={SURFACE_PANEL}
             borderBottomWidth={1}
@@ -437,57 +528,109 @@ function EditorialTable({
             paddingHorizontal={12}
           >
             {headers.map((h, i) => (
-              <Text
+              <YStack
                 key={h}
                 flex={i === 0 ? 1.2 : 1}
                 minWidth={0}
-                numberOfLines={1}
-                color={TEXT_SECONDARY}
-                textAlign={i === 0 ? 'left' : 'right'}
-                style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: 700,
-                  fontSize: 11,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                }}
+                role="columnheader"
+                aria-sort={
+                  sortCol === i
+                    ? sortDir === 'asc'
+                      ? 'ascending'
+                      : 'descending'
+                    : 'none'
+                }
               >
-                {h}
-              </Text>
-            ))}
-          </XStack>
-          {rows.map((cells, ri) => (
-            <XStack
-              key={`${cells[0]}-${cells[1]}`}
-              paddingVertical={12}
-              paddingHorizontal={12}
-              borderBottomWidth={ri < rows.length - 1 ? 1 : 0}
-              borderBottomColor={STATS_BORDER}
-              hoverStyle={{
-                backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.1),
-              }}
-            >
-              {cells.map((cell, ci) => (
-                <Text
-                  key={`${cells[0]}-${cells[1]}-${headers[ci]}`}
-                  flex={ci === 0 ? 1.2 : 1}
-                  minWidth={0}
-                  numberOfLines={1}
-                  color={ci === 0 ? BRAND_GOLD_LIGHT : TEXT_INTERFACE}
-                  textAlign={ci === 0 ? 'left' : 'right'}
+                <button
+                  type="button"
+                  onClick={() => handleSort(i)}
+                  aria-label={`Sort by ${h}`}
                   style={{
+                    display: 'block',
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textAlign: i === 0 ? 'left' : 'right',
                     fontFamily: FONT_DISPLAY,
-                    fontWeight: ci === 0 ? 800 : 600,
-                    fontSize: 15,
-                    letterSpacing: ci === 0 ? '0.04em' : 0,
-                    fontVariantNumeric: 'tabular-nums',
+                    fontWeight: 700,
+                    fontSize: 11,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: sortCol === i ? TEXT_INTERFACE : TEXT_SECONDARY,
+                    userSelect: 'none',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                 >
-                  {cell}
-                </Text>
-              ))}
-            </XStack>
-          ))}
+                  {h}
+                  {sortCol === i ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                </button>
+              </YStack>
+            ))}
+          </XStack>
+
+          {/* Rows — virtualized when count > threshold */}
+          {shouldVirtualize ? (
+            <div
+              ref={parentRef}
+              style={{ height: EDITORIAL_VIRTUAL_HEIGHT, overflowY: 'auto' }}
+            >
+              <div
+                style={{
+                  height: virtualizer.getTotalSize(),
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((vi) => {
+                  const cells = sortedRows[vi.index];
+                  const isLast = vi.index === sortedRows.length - 1;
+                  return (
+                    <div
+                      key={vi.key}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${vi.start}px)`,
+                      }}
+                    >
+                      <XStack
+                        paddingVertical={12}
+                        paddingHorizontal={12}
+                        borderBottomWidth={isLast ? 0 : 1}
+                        borderBottomColor={STATS_BORDER}
+                        hoverStyle={{
+                          backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.1),
+                        }}
+                      >
+                        {rowContent(cells)}
+                      </XStack>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            sortedRows.map((cells, ri) => (
+              <XStack
+                key={String(cells[0])}
+                paddingVertical={12}
+                paddingHorizontal={12}
+                borderBottomWidth={ri < sortedRows.length - 1 ? 1 : 0}
+                borderBottomColor={STATS_BORDER}
+                hoverStyle={{
+                  backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.1),
+                }}
+              >
+                {rowContent(cells)}
+              </XStack>
+            ))
+          )}
         </YStack>
       </ScrollView>
       <Text
@@ -1304,10 +1447,7 @@ export function PlayerDetailModal({
 
               {activeTab === 'batting' && battingTableRows.length > 0 && (
                 <>
-                  <SectionHead
-                    title="Season by Season · Batting"
-                    meta="Newest first"
-                  />
+                  <SectionHead title="Season by Season · Batting" />
                   <EditorialTable
                     caption="Season batting statistics"
                     headers={[
@@ -1330,10 +1470,7 @@ export function PlayerDetailModal({
 
               {activeTab === 'pitching' && pitchingTableRows.length > 0 && (
                 <>
-                  <SectionHead
-                    title="Season by Season · Pitching"
-                    meta="Newest first"
-                  />
+                  <SectionHead title="Season by Season · Pitching" />
                   <EditorialTable
                     caption="Season pitching statistics"
                     headers={[
@@ -1355,10 +1492,7 @@ export function PlayerDetailModal({
 
               {activeTab === 'fielding' && fieldingTableRows.length > 0 && (
                 <>
-                  <SectionHead
-                    title="Season by Season · Fielding"
-                    meta="Newest first"
-                  />
+                  <SectionHead title="Season by Season · Fielding" />
                   <EditorialTable
                     caption="Season fielding statistics"
                     headers={['Year', 'POS', 'G', 'INN', 'PO', 'A', 'E']}

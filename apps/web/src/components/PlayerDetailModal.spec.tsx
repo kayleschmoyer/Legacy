@@ -1,9 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
+/* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factories need runtime require */
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
-import { PlayerDetailModal } from './PlayerDetailModal';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  compareEditorialCells,
+  EditorialTable,
+  PlayerDetailModal,
+} from './PlayerDetailModal';
 
-// ── Mocks ────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Module mocks — heavy deps not under test
+// ---------------------------------------------------------------------------
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -31,13 +38,17 @@ jest.mock('@tamagui/lucide-icons', () => ({
 }));
 
 jest.mock('./BaseModal', () => ({
-  BaseModal: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  BaseModal: ({ children }: { children: React.ReactNode }) => {
+    const R = require('react') as typeof import('react');
+    return R.createElement('div', { 'data-testid': 'base-modal' }, children);
+  },
 }));
 
 jest.mock('./CareerArcChart', () => ({
-  CareerArcChart: () => null,
+  CareerArcChart: () => {
+    const R = require('react') as typeof import('react');
+    return R.createElement('div', null, 'CareerArcChart');
+  },
 }));
 
 jest.mock('../lib/scoring/ipUtils', () => ({
@@ -65,7 +76,26 @@ jest.mock('../constants/colors', () => ({
   withAlpha: (color: string, _alpha: number) => color,
 }));
 
-type Children = { children?: React.ReactNode; [key: string]: unknown };
+jest.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: jest.fn(
+    ({
+      count,
+      estimateSize,
+    }: {
+      count: number;
+      estimateSize: () => number;
+    }) => ({
+      getVirtualItems: () =>
+        Array.from({ length: count }, (_, i) => ({
+          key: i,
+          index: i,
+          start: i * estimateSize(),
+          size: estimateSize(),
+        })),
+      getTotalSize: () => count * estimateSize(),
+    }),
+  ),
+}));
 
 jest.mock('tamagui', () => {
   const Pass = ({ children, ...rest }: Children) => (
@@ -83,7 +113,13 @@ jest.mock('tamagui', () => {
     },
   );
   return {
-    Button: ({ children, onPress }: Children & { onPress?: () => void }) => (
+    Button: ({
+      children,
+      onPress,
+    }: {
+      children?: React.ReactNode;
+      onPress?: () => void;
+    }) => (
       <button type="button" onClick={onPress}>
         {children}
       </button>
@@ -105,7 +141,9 @@ jest.mock('tamagui', () => {
   };
 });
 
-// ── GraphQL hook factory helpers ─────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// GraphQL hook helpers
+// ---------------------------------------------------------------------------
 
 const EMPTY_SEASON = {
   loading: false,
@@ -138,7 +176,9 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUsePlayerCareerArc(...args),
 }));
 
-// ── Season data builders ─────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Season data builders
+// ---------------------------------------------------------------------------
 
 function battingSeason() {
   return {
@@ -204,7 +244,9 @@ function renderModal() {
   );
 }
 
-// ── Tests ────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Tests — hero stats two-way player fix (LS-6979)
+// ---------------------------------------------------------------------------
 
 describe('PlayerDetailModal — hero stats two-way player fix (LS-6979)', () => {
   beforeEach(() => {
@@ -265,6 +307,140 @@ describe('PlayerDetailModal — hero stats two-way player fix (LS-6979)', () => 
     expect(within(battingHero).getByText('Career AVG')).toBeInTheDocument();
     expect(within(pitchingHero).getByText('Record')).toBeInTheDocument();
     expect(within(pitchingHero).getByText('Strikeouts')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// compareEditorialCells unit tests (LS-6983)
+// ---------------------------------------------------------------------------
+
+describe('compareEditorialCells (LS-6983)', () => {
+  it('orders numbers ascending and descending', () => {
+    expect(compareEditorialCells(1, 2, 'asc')).toBeLessThan(0);
+    expect(compareEditorialCells(1, 2, 'desc')).toBeGreaterThan(0);
+    expect(compareEditorialCells(2, 1, 'asc')).toBeGreaterThan(0);
+    expect(compareEditorialCells(2, 1, 'desc')).toBeLessThan(0);
+  });
+
+  it('preserves 0 as a sortable value — not treated as missing', () => {
+    expect(compareEditorialCells(0, 1, 'asc')).toBeLessThan(0);
+    expect(compareEditorialCells(0, 1, 'desc')).toBeGreaterThan(0);
+  });
+
+  it('sorts missing values (null, "") last in both directions', () => {
+    const missing: (string | number)[] = [null as unknown as string, ''];
+    for (const m of missing) {
+      expect(compareEditorialCells(m, 5, 'asc')).toBeGreaterThan(0);
+      expect(compareEditorialCells(m, 5, 'desc')).toBeGreaterThan(0);
+      expect(compareEditorialCells(5, m, 'asc')).toBeLessThan(0);
+      expect(compareEditorialCells(5, m, 'desc')).toBeLessThan(0);
+    }
+  });
+
+  it('returns 0 when both values are missing', () => {
+    expect(compareEditorialCells('', '', 'asc')).toBe(0);
+    expect(compareEditorialCells(null as unknown as string, '', 'desc')).toBe(
+      0,
+    );
+  });
+
+  it('falls back to numeric-aware locale compare for non-numeric strings', () => {
+    expect(
+      compareEditorialCells('2026-04-01', '2026-05-01', 'asc'),
+    ).toBeLessThan(0);
+    expect(
+      compareEditorialCells('2026-04-01', '2026-05-01', 'desc'),
+    ).toBeGreaterThan(0);
+  });
+
+  it('sorts numeric strings as numbers, not lexicographically', () => {
+    // '9' vs '10': lexicographic order gives '9' > '10', numeric order gives 9 < 10
+    expect(compareEditorialCells('9', '10', 'asc')).toBeLessThan(0);
+    expect(compareEditorialCells('9', '10', 'desc')).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EditorialTable component tests (LS-6983)
+// ---------------------------------------------------------------------------
+
+const HEADERS = ['Name', 'AB', 'HR'];
+const FEW_ROWS: (string | number)[][] = [
+  ['Adams', 400, 15],
+  ['Brown', 350, 8],
+  ['Clark', 420, 22],
+];
+
+function make26Rows(): (string | number)[][] {
+  return Array.from({ length: 26 }, (_, i) => [`Player${i}`, 100 + i, i]);
+}
+
+describe('EditorialTable (LS-6983)', () => {
+  it('renders all rows when count is ≤ 25', () => {
+    const { getAllByText } = render(
+      <EditorialTable caption="Batting" headers={HEADERS} rows={FEW_ROWS} />,
+    );
+    expect(getAllByText('Adams').length).toBeGreaterThan(0);
+    expect(getAllByText('Brown').length).toBeGreaterThan(0);
+    expect(getAllByText('Clark').length).toBeGreaterThan(0);
+  });
+
+  it('renders virtual rows when count exceeds 25', () => {
+    const rows = make26Rows();
+    const { getAllByText } = render(
+      <EditorialTable caption="Batting" headers={HEADERS} rows={rows} />,
+    );
+    expect(getAllByText('Player0').length).toBeGreaterThan(0);
+    expect(getAllByText('Player25').length).toBeGreaterThan(0);
+  });
+
+  it('headers start with aria-sort="none"', () => {
+    const { getAllByRole } = render(
+      <EditorialTable caption="Batting" headers={HEADERS} rows={FEW_ROWS} />,
+    );
+    for (const ch of getAllByRole('columnheader')) {
+      expect(ch.getAttribute('aria-sort')).toBe('none');
+    }
+  });
+
+  it('cycles aria-sort: none → ascending → descending → none on header clicks', () => {
+    const { getAllByRole } = render(
+      <EditorialTable caption="Batting" headers={HEADERS} rows={FEW_ROWS} />,
+    );
+    const abButton = getAllByRole('button', { name: /Sort by AB/i })[0];
+    const abHeader = getAllByRole('columnheader')[1];
+
+    expect(abHeader.getAttribute('aria-sort')).toBe('none');
+    fireEvent.click(abButton);
+    expect(abHeader.getAttribute('aria-sort')).toBe('ascending');
+    fireEvent.click(abButton);
+    expect(abHeader.getAttribute('aria-sort')).toBe('descending');
+    fireEvent.click(abButton);
+    expect(abHeader.getAttribute('aria-sort')).toBe('none');
+  });
+
+  it('resets sort to ascending when switching to a different column', () => {
+    const { getAllByRole } = render(
+      <EditorialTable caption="Batting" headers={HEADERS} rows={FEW_ROWS} />,
+    );
+    const buttons = getAllByRole('button');
+    const abButton = buttons.find(
+      (b) => b.getAttribute('aria-label') === 'Sort by AB',
+    )!;
+    const hrButton = buttons.find(
+      (b) => b.getAttribute('aria-label') === 'Sort by HR',
+    )!;
+    const colHeaders = getAllByRole('columnheader');
+    const abHeader = colHeaders[1];
+    const hrHeader = colHeaders[2];
+
+    fireEvent.click(abButton);
+    fireEvent.click(abButton); // descending
+    expect(abHeader.getAttribute('aria-sort')).toBe('descending');
+
+    fireEvent.click(hrButton); // switch column → ascending
+    expect(hrHeader.getAttribute('aria-sort')).toBe('ascending');
+    expect(abHeader.getAttribute('aria-sort')).toBe('none');
   });
 });
 

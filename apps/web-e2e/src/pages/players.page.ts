@@ -451,6 +451,51 @@ class PlayerDetailSurface {
     await expect(first ? locator.first() : locator).toBeVisible();
   }
 
+  // ── Season-table sorting ─────────────────────────────────────────
+
+  /** The sort button for `column` (e.g. 'ERA', 'Year') inside the modal. */
+  sortButton(column: string): Locator {
+    return this.#dialog.getByRole('button', { name: `Sort by ${column}` });
+  }
+
+  /** The `columnheader` cell that wraps the sort button for `column`. */
+  columnHeader(column: string): Locator {
+    return this.#dialog.getByRole('columnheader').filter({
+      has: this.#page.getByRole('button', { name: `Sort by ${column}` }),
+    });
+  }
+
+  /** The full text content of the modal dialog. */
+  async dialogTextContent(): Promise<string> {
+    return (await this.#dialog.textContent()) ?? '';
+  }
+
+  /** Assert the sort button for `column` is visible. */
+  async expectSortButtonVisible(column: string): Promise<void> {
+    await expect(this.sortButton(column)).toBeVisible();
+  }
+
+  /** Click the sort button for `column`. */
+  async clickSortButton(column: string): Promise<void> {
+    await this.sortButton(column).click();
+  }
+
+  /** Focus the sort button for `column`. */
+  async focusSortButton(column: string): Promise<void> {
+    await this.sortButton(column).focus();
+  }
+
+  /** Assert the `aria-sort` value on the columnheader for `column`. */
+  async expectSortDirection(
+    column: string,
+    direction: 'none' | 'ascending' | 'descending',
+  ): Promise<void> {
+    await expect(this.columnHeader(column)).toHaveAttribute(
+      'aria-sort',
+      direction,
+    );
+  }
+
   // ── brefId route ─────────────────────────────────────────────────
 
   /** Assert the brefId loading `status` indicator is visible. */

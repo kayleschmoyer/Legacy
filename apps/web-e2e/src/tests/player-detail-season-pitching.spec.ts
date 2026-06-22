@@ -13,7 +13,7 @@
  * (ADR-0015); GraphQL mocks stay inline (ADR-0015 §6).
  */
 
-import { test } from '../fixtures/pages';
+import { expect, test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
 // ── Mock Data ──────────────────────────────────────────────────────────────────
@@ -677,6 +677,118 @@ test.describe('Season Pitching Stats Table – two-way player @regression', () =
     // Batting table headers should reappear
     await playersPage.detail.expectText('AVG', { exact: true });
     await playersPage.detail.expectText('HR', { exact: true });
+  });
+});
+
+// ── Tests: sorting ────────────────────────────────────────────────────────────
+
+test.describe('Season Pitching Stats Table – sorting @regression', () => {
+  test('sort buttons exist for all pitching column headers', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, {
+      seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
+      careerArcBody: MULTI_SEASON_CAREER_ARC,
+    });
+    await playersPage.gotoDetail(3, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Pitching');
+
+    for (const col of ['Year', 'G', 'W-L', 'ERA', 'IP', 'SO', 'BB']) {
+      await playersPage.detail.expectSortButtonVisible(col);
+    }
+  });
+
+  test('clicking Sort by ERA sets aria-sort to ascending then descending', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, {
+      seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
+      careerArcBody: MULTI_SEASON_CAREER_ARC,
+    });
+    await playersPage.gotoDetail(3, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Pitching');
+
+    await playersPage.detail.expectSortDirection('ERA', 'none');
+    await playersPage.detail.clickSortButton('ERA');
+    await playersPage.detail.expectSortDirection('ERA', 'ascending');
+    await playersPage.detail.clickSortButton('ERA');
+    await playersPage.detail.expectSortDirection('ERA', 'descending');
+    await playersPage.detail.clickSortButton('ERA');
+    await playersPage.detail.expectSortDirection('ERA', 'none');
+  });
+
+  test('ERA ascending sort displays lower ERA value first', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, {
+      seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
+      careerArcBody: MULTI_SEASON_CAREER_ARC,
+    });
+    await playersPage.gotoDetail(3, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Pitching');
+    await playersPage.detail.clickSortButton('ERA');
+
+    // After ascending ERA sort: 2.55 (2023) appears before 3.69 (2024)
+    const dialogText = await playersPage.detail.dialogTextContent();
+    expect(dialogText.indexOf('2.55')).toBeLessThan(dialogText.indexOf('3.69'));
+  });
+
+  test('ERA descending sort displays higher ERA value first', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, {
+      seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
+      careerArcBody: MULTI_SEASON_CAREER_ARC,
+    });
+    await playersPage.gotoDetail(3, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Pitching');
+    // Click twice: asc → desc
+    await playersPage.detail.clickSortButton('ERA');
+    await playersPage.detail.clickSortButton('ERA');
+
+    // After descending ERA sort: 3.69 (2024) appears before 2.55 (2023)
+    const dialogText = await playersPage.detail.dialogTextContent();
+    expect(dialogText.indexOf('3.69')).toBeLessThan(dialogText.indexOf('2.55'));
+  });
+
+  test('sort button is keyboard accessible via Enter key', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, {
+      seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
+      careerArcBody: MULTI_SEASON_CAREER_ARC,
+    });
+    await playersPage.gotoDetail(3, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Pitching');
+
+    await playersPage.detail.focusSortButton('ERA');
+    await page.keyboard.press('Enter');
+    await playersPage.detail.expectSortDirection('ERA', 'ascending');
   });
 });
 

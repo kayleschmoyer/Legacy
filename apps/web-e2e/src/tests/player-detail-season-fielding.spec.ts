@@ -8,7 +8,7 @@
  *   - Multiple fielding seasons render as multiple rows
  *   - Fielding tab absent when player has no fielding data (pitcher)
  *   - Multi-position aggregation within the same season
- *   - "Newest first" ordering metadata
+ *   - Sortable column headers (sort by Year, POS, etc.)
  *
  * Element access goes through the injected `playersPage` semantic object
  * (ADR-0015); GraphQL mocks stay inline (ADR-0015 §6).
@@ -563,10 +563,7 @@ test.describe('Season Fielding Stats Table — column headers @regression', () =
     await playersPage.detail.expectText('Season by Season · Fielding');
   });
 
-  test('"Newest first" ordering metadata is visible', async ({
-    page,
-    playersPage,
-  }) => {
+  test('column headers are sortable buttons', async ({ page, playersPage }) => {
     await setupMocks(page);
     await playersPage.gotoDetail(1, 'networkidle');
 
@@ -574,7 +571,9 @@ test.describe('Season Fielding Stats Table — column headers @regression', () =
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Fielding');
-    await playersPage.detail.expectText('Newest first');
+    await expect(
+      page.getByRole('button', { name: 'Sort by Year' }),
+    ).toBeVisible();
   });
 });
 
