@@ -29,7 +29,10 @@
         "--import",
         "tsx",
         "tools/mcp/nx-server/src/index.ts"
-      ]
+      ],
+      "env": {
+        "TSX_TSCONFIG_PATH": "tools/mcp/nx-server/tsconfig.json"
+      }
     },
     "legacy-sports-ci-local": {
       "command": "node",

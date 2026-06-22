@@ -1,3 +1,4 @@
+import { projectListText } from '../format.js';
 import { getRepoRoot, runNx } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -8,10 +9,28 @@ interface ShowProjectsParams {
   worktreePath?: string;
 }
 
+const NX_ARG_REGEX = /^[a-z0-9-._/:@]+$/i;
+
 export async function showProjects(
   params: ShowProjectsParams,
 ): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
+
+  if (params.withTarget != null && !NX_ARG_REGEX.test(params.withTarget)) {
+    return {
+      content: [
+        { type: 'text', text: `Invalid withTarget: "${params.withTarget}".` },
+      ],
+      isError: true,
+    };
+  }
+  if (params.tag != null && !NX_ARG_REGEX.test(params.tag)) {
+    return {
+      content: [{ type: 'text', text: `Invalid tag: "${params.tag}".` }],
+      isError: true,
+    };
+  }
+
   const args: string[] = ['show', 'projects'];
 
   if (params.affected) {
@@ -37,17 +56,13 @@ export async function showProjects(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
+          text: projectListText(
             {
-              success: true,
-              count: filtered.length,
-              projects: filtered,
               ...(params.affected && { mode: 'affected' }),
               ...(params.withTarget && { filteredByTarget: params.withTarget }),
               ...(params.tag && { filteredByTag: params.tag }),
             },
-            null,
-            2,
+            filtered,
           ),
         },
       ],

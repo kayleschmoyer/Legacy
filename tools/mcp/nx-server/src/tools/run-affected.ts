@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runNx } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -47,16 +48,11 @@ export async function runAffected(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              target: params.target,
-              base,
-              output: truncateOutput(output, MAX_OUTPUT_CHARS),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            target: params.target,
+            base,
+            output: truncateOutput(output, MAX_OUTPUT_CHARS),
+          }),
         },
       ],
     };

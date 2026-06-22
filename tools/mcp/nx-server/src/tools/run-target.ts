@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runNx } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -95,8 +96,36 @@ export function coalesceWindowsTestPathPatterns(tokens: string[]): string[] {
   return result;
 }
 
+const NX_NAME_REGEX = /^[a-z0-9-._]+$/i;
+
 export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
+
+  if (!NX_NAME_REGEX.test(params.project)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Invalid project name: "${params.project}". Only alphanumeric characters, hyphens, underscores, and dots are allowed.`,
+        },
+      ],
+      isError: true,
+    };
+  }
+  if (
+    params.configuration != null &&
+    !NX_NAME_REGEX.test(params.configuration)
+  ) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Invalid configuration name: "${params.configuration}". Only alphanumeric characters, hyphens, underscores, and dots are allowed.`,
+        },
+      ],
+      isError: true,
+    };
+  }
 
   if (!ALLOWED_TARGETS.has(params.target)) {
     return {
@@ -186,16 +215,11 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              project: params.project,
-              target: params.target,
-              output: truncateOutput(output, MAX_OUTPUT_CHARS),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            project: params.project,
+            target: params.target,
+            output: truncateOutput(output, MAX_OUTPUT_CHARS),
+          }),
         },
       ],
     };

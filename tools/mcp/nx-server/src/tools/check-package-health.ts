@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { readFile, readdir, access, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getRepoRoot, runPnpm } from '../run-command.js';
@@ -276,22 +277,17 @@ export async function checkPackageHealth(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              healthy: errorCount === 0 && warningCount === 0,
-              summary: {
-                errors: errorCount,
-                warnings: warningCount,
-                info: infoCount,
-                linked,
-                libPackagesWithDeps: libPkgs.length,
-              },
-              issues,
+          text: minifiedJson({
+            healthy: errorCount === 0 && warningCount === 0,
+            summary: {
+              errors: errorCount,
+              warnings: warningCount,
+              info: infoCount,
+              linked,
+              libPackagesWithDeps: libPkgs.length,
             },
-            null,
-            2,
-          ),
+            issues,
+          }),
         },
       ],
     };
@@ -300,15 +296,10 @@ export async function checkPackageHealth(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              error: 'HEALTH_CHECK_FAILED',
-              message: error instanceof Error ? error.message : String(error),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            error: 'HEALTH_CHECK_FAILED',
+            message: error instanceof Error ? error.message : String(error),
+          }),
         },
       ],
       isError: true,

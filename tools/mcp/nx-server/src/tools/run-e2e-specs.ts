@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
@@ -218,16 +219,10 @@ export async function runE2ESpecs(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              error:
-                'dist/apps/web not found — the web app must be built first',
-              hint: 'Run: nx_run({ project: "web", target: "build" })',
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            error: 'dist/apps/web not found — the web app must be built first',
+            hint: 'Run: nx_run({ project: "web", target: "build" })',
+          }),
         },
       ],
       isError: true,
@@ -255,10 +250,27 @@ export async function runE2ESpecs(
   // failed to start (no new file written) vs. tests ran and failed.
   await rm(resultsFile, { force: true });
 
-  // Resolve spec paths relative to apps/web-e2e when not absolute
-  const resolvedSpecs = params.specs.map((spec) =>
-    path.isAbsolute(spec) ? spec : path.join(e2eAppDir, spec),
-  );
+  // Resolve spec paths relative to apps/web-e2e and guard against path traversal.
+  const resolvedSpecs: string[] = [];
+  for (const spec of params.specs) {
+    const fullPath = path.isAbsolute(spec) ? spec : path.join(e2eAppDir, spec);
+    const normalized = path.normalize(fullPath);
+    if (
+      !normalized.startsWith(e2eAppDir + path.sep) &&
+      normalized !== e2eAppDir
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Spec path "${spec}" must be within the e2e directory.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    resolvedSpecs.push(normalized);
+  }
 
   const args = [
     'exec',
@@ -365,24 +377,20 @@ export async function runE2ESpecs(
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            success: failed === 0 && flaky === 0,
-            port,
-            stats: {
-              total: passed + failed + flaky + skipped,
-              passed,
-              failed,
-              flaky,
-              skipped,
-              durationMs: stats.duration ?? null,
-            },
-            failingTests: extractFailingTests(report),
-            output: combinedOutput,
+        text: minifiedJson({
+          success: failed === 0 && flaky === 0,
+          port,
+          stats: {
+            total: passed + failed + flaky + skipped,
+            passed,
+            failed,
+            flaky,
+            skipped,
+            durationMs: stats.duration ?? null,
           },
-          null,
-          2,
-        ),
+          failingTests: extractFailingTests(report),
+          output: combinedOutput,
+        }),
       },
     ],
   };

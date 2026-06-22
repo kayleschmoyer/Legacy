@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { readFile, readdir, access } from 'node:fs/promises';
 import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -85,10 +86,34 @@ async function findNestedNodeModules(cwd: string): Promise<string[]> {
   return nested;
 }
 
+const PACKAGE_NAME_REGEX = /^(?:@[a-z0-9-._]+\/)?[a-z0-9-._]+$/i;
+const PACKAGE_VERSION_REGEX = /^[0-9a-z.*+_~^-]+$/i;
+
 export async function installPackage(
   params: InstallPackageParams,
 ): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
+
+  if (!PACKAGE_NAME_REGEX.test(params.name)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Invalid package name: "${params.name}". Only scoped or unscoped npm package names are allowed.`,
+        },
+      ],
+      isError: true,
+    };
+  }
+  if (params.version != null && !PACKAGE_VERSION_REGEX.test(params.version)) {
+    return {
+      content: [
+        { type: 'text', text: `Invalid version string: "${params.version}".` },
+      ],
+      isError: true,
+    };
+  }
+
   const spec = params.version
     ? `${params.name}@${params.version}`
     : params.name;
@@ -100,18 +125,13 @@ export async function installPackage(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              error: 'SYMLINK_DETECTED',
-              message:
-                'node_modules is a symlink into a shared, immutable content-addressable pool slot. Running pnpm add here would mutate a slot other worktrees may be running. ' +
-                'To add a package: remove the symlink first (rm -rf node_modules in Git Bash), run `pnpm add -w <pkg>` (this rewrites the lockfile), then `make install` (or `node scripts/modules-pool/link.mjs`) to materialise and link the new slot.',
-              cwd,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            error: 'SYMLINK_DETECTED',
+            message:
+              'node_modules is a symlink into a shared, immutable content-addressable pool slot. Running pnpm add here would mutate a slot other worktrees may be running. ' +
+              'To add a package: remove the symlink first (rm -rf node_modules in Git Bash), run `pnpm add -w <pkg>` (this rewrites the lockfile), then `make install` (or `node scripts/modules-pool/link.mjs`) to materialise and link the new slot.',
+            cwd,
+          }),
         },
       ],
       isError: true,
@@ -169,19 +189,14 @@ export async function installPackage(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              package: params.name,
-              installedVersion,
-              dev: params.dev ?? false,
-              typesStatus,
-              ...(warnings.length > 0 && { warnings }),
-              output,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            package: params.name,
+            installedVersion,
+            dev: params.dev ?? false,
+            typesStatus,
+            ...(warnings.length > 0 && { warnings }),
+            output,
+          }),
         },
       ],
     };
@@ -190,16 +205,11 @@ export async function installPackage(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              error: 'INSTALL_FAILED',
-              package: params.name,
-              message: error instanceof Error ? error.message : String(error),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            error: 'INSTALL_FAILED',
+            package: params.name,
+            message: error instanceof Error ? error.message : String(error),
+          }),
         },
       ],
       isError: true,

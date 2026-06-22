@@ -1,5 +1,6 @@
 import { readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { projectListText } from '../format.js';
 import { getRepoRoot, runNx } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -9,9 +10,23 @@ interface DepGraphParams {
   worktreePath?: string;
 }
 
+const NX_NAME_REGEX = /^[a-z0-9-._]+$/i;
+
 export async function depGraph(params: DepGraphParams): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
   const direction = params.direction || 'dependencies';
+
+  if (!NX_NAME_REGEX.test(params.project)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Invalid project name: "${params.project}". Only alphanumeric characters, hyphens, underscores, and dots are allowed.`,
+        },
+      ],
+      isError: true,
+    };
+  }
 
   const tmpFile = join(cwd, 'scratch', `dep-graph-${Date.now()}.json`);
   try {
@@ -64,16 +79,9 @@ export async function depGraph(params: DepGraphParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              direction,
-              project: result.project,
-              count: result.related.length,
-              [direction]: result.related,
-            },
-            null,
-            2,
+          text: projectListText(
+            { direction, project: result.project },
+            result.related,
           ),
         },
       ],

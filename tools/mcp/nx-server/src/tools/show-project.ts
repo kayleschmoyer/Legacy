@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runNx } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -6,10 +7,24 @@ interface ShowProjectParams {
   worktreePath?: string;
 }
 
+const NX_NAME_REGEX = /^[a-z0-9-._]+$/i;
+
 export async function showProject(
   params: ShowProjectParams,
 ): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
+
+  if (!NX_NAME_REGEX.test(params.project)) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Invalid project name: "${params.project}". Only alphanumeric characters, hyphens, underscores, and dots are allowed.`,
+        },
+      ],
+      isError: true,
+    };
+  }
 
   try {
     const output = await runNx(
@@ -20,7 +35,6 @@ export async function showProject(
     const projectConfig = JSON.parse(output);
 
     // Extract key info for a concise summary
-    const targets = Object.keys(projectConfig.targets || {});
     const tags = projectConfig.tags || [];
     const root = projectConfig.root;
     const sourceRoot = projectConfig.sourceRoot;
@@ -42,24 +56,21 @@ export async function showProject(
       };
     }
 
+    // `targets` (the bare name array) is dropped — its names are the keys of
+    // `targetDetails`, so keeping both repeats every target name. Agents read
+    // the per-target executor/dependsOn from `targetDetails`.
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              project: params.project,
-              root,
-              sourceRoot,
-              projectType,
-              tags,
-              targets,
-              targetDetails,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            project: params.project,
+            root,
+            sourceRoot,
+            projectType,
+            tags,
+            targetDetails,
+          }),
         },
       ],
     };

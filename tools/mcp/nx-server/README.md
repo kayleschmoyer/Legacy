@@ -15,7 +15,7 @@ Nx build system intelligence for AI agents — project discovery, affected analy
 
 ## How It Works
 
-Wraps Nx CLI commands (`nx show projects`, `nx show project`, `nx affected`, `nx run`, `nx graph`) with structured JSON output and safety guardrails. Target execution is limited to an allowlist of safe targets (build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, storybook) to prevent unintended side effects.
+Wraps Nx CLI commands (`nx show projects`, `nx show project`, `nx affected`, `nx run`, `nx graph`) with token-efficient structured output (see [Response format](#response-format)) and safety guardrails. Target execution is limited to an allowlist of safe targets (build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, storybook) to prevent unintended side effects.
 
 ### Package Installation Safety
 
@@ -26,3 +26,7 @@ Wraps Nx CLI commands (`nx show projects`, `nx show project`, `nx affected`, `nx
 3. **Workspace root** — always installs with `-w` flag (all deps are hoisted to the root)
 4. **Post-install scanning** — checks for nested `node_modules` in `lib/` that signal version duplication
 5. **Types detection** — reports whether the package bundles types or needs an `@types/` companion
+
+## Response format
+
+Responses use `@legacy-sports/mcp-format` for token efficiency (epic LS-8018). Format is chosen per response shape: flat project-name lists (`nx_show_projects`, `nx_affected`, `nx_dep_graph`) render as a compact list — a one-line minified-JSON summary (counts + active filters) followed by the bare names, one per line — while single objects and nested project detail (`nx_show_project`, run/health results) render as minified JSON. Fields agents don't consume (e.g. the redundant `success` flag, and `nx_show_project`'s `targets` array, whose names are the keys of `targetDetails`) are pruned. Runtime alias resolution is wired via `TSX_TSCONFIG_PATH` on the server's `.mcp.json` entry.

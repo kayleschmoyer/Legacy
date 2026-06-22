@@ -1,3 +1,4 @@
+import { projectListText } from '../format.js';
 import { getRepoRoot, runNx } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -7,9 +8,24 @@ interface AffectedParams {
   worktreePath?: string;
 }
 
+const NX_ARG_REGEX = /^[a-z0-9-._/:@]+$/i;
+
 export async function affected(params: AffectedParams): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
   const base = params.base || 'origin/main';
+
+  if (params.base != null && !NX_ARG_REGEX.test(params.base)) {
+    return {
+      content: [{ type: 'text', text: `Invalid base ref: "${params.base}".` }],
+      isError: true,
+    };
+  }
+  if (params.target != null && !NX_ARG_REGEX.test(params.target)) {
+    return {
+      content: [{ type: 'text', text: `Invalid target: "${params.target}".` }],
+      isError: true,
+    };
+  }
 
   try {
     // Get the list of affected projects
@@ -28,16 +44,12 @@ export async function affected(params: AffectedParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
+          text: projectListText(
             {
-              success: true,
               base,
-              count: projects.length,
-              projects,
               ...(params.target && { filteredByTarget: params.target }),
             },
-            null,
-            2,
+            projects,
           ),
         },
       ],
