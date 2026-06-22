@@ -406,6 +406,28 @@ class PlayerDetailSurface {
     ).not.toBeVisible();
   }
 
+  /** All position badge elements in the eligible-positions band. */
+  getPlayerPositionBadges(): Locator {
+    return this.#dialog.getByTestId('player-position');
+  }
+
+  /** A single position badge filtered by its abbreviation text. */
+  getPlayerPositionBadge(abbr: string): Locator {
+    return this.getPlayerPositionBadges().filter({ hasText: abbr });
+  }
+
+  /** Assert exactly `n` position badges are rendered. */
+  async expectPlayerPositionCount(n: number): Promise<void> {
+    await expect(this.getPlayerPositionBadges()).toHaveCount(n);
+  }
+
+  /** Assert the "No fantasy eligibility yet" placeholder is visible. */
+  async expectEligiblePositionsUnranked(): Promise<void> {
+    await expect(
+      this.#dialog.getByTestId('eligible-positions-unranked'),
+    ).toBeVisible();
+  }
+
   /** Assert the career-batting summary card is NOT visible. */
   async expectCareerBattingCardNotVisible(): Promise<void> {
     await expect(
