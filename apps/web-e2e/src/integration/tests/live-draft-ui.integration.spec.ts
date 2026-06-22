@@ -1168,7 +1168,10 @@ test.describe
   // PHASE 7 — MANAGER VERIFIES THEIR ROSTER
   // -----------------------------------------------------------------
 
-  test('Phase 7: Manager verifies their roster', async ({ managerPage1 }) => {
+  test('Phase 7: Manager verifies their roster', async ({
+    managerPage1,
+    managerJwt1,
+  }) => {
     // The manager verifies their own roster after the draft. Navigate to
     // /overview first, then click the My Roster tab (client-side nav) to avoid
     // the LeagueDetailPageV2 membership-gate redirect race: a direct /roster hit
@@ -1180,7 +1183,71 @@ test.describe
     // RosterBoard never renders (LS-7878 — same root cause as Phase 6).
     test.setTimeout(240_000);
 
-    const LINEUP_BUDGET_MS = 120_000;
+    // LS-8211 budget composition: the backend read-path gate, the navigation,
+    // and the closing UI assertion all share this single 240s test ceiling.
+    // Sizing each independently (a 180s gate + ~45s nav + a 120s assert = 345s)
+    // overran it, so under sustained throttling the UI assertion was killed
+    // mid-flight by the test timeout (a generic, uninformative failure) instead
+    // of failing with a meaningful message. Derive every sub-budget from the
+    // wall-time remaining against a hard ceiling kept a margin under
+    // `setTimeout`, so the three phases provably compose within 240s.
+    const testStart = Date.now();
+    const TEST_BUDGET_MS = 230_000;
+    const remainingBudgetMs = () => TEST_BUDGET_MS - (Date.now() - testStart);
+
+    await test.step('Wait for manager roster to populate in backend (read-path gate)', async () => {
+      // LS-8211: Phase 7 was the weakest spec in the 429-throttled timing tail —
+      // a single-shot 120s toBeVisible with NO reload and NO backend gate. A
+      // naive reload loop is deliberately avoided here (LS-4320: reloading the
+      // roster route cancelled the in-flight positions + teamMembers queries
+      // before they resolved, and a direct /roster hit races the membership
+      // gate). The correct fix is a backend-authoritative read-path gate:
+      // confirm the manager's roster is actually filled in the DB before the
+      // browser even navigates, so the UI assertion below is never racing
+      // autoPopulateFirstMatchupLineup or read-replica lag. Same pattern Phase 6
+      // and roster-management-ui use (LS-4520 / LS-5053).
+      const teamId = await gqlFetch<{ userTeamId: number | null }>(
+        managerJwt1,
+        `query GetManager1TeamId($leagueId: Int!) {
+           userTeamId(leagueId: $leagueId)
+         }`,
+        { leagueId: state.leagueId },
+      ).then((d) => d.userTeamId);
+      expect(teamId).not.toBeNull();
+
+      await expect
+        .poll(
+          async () => {
+            const data = await gqlFetch<{
+              teamMembers: Array<{ positionId: number | null }>;
+            }>(
+              managerJwt1,
+              `query GetManager1LineupFilled($teamId: Int!) {
+                 teamMembers(teamId: $teamId) { positionId }
+               }`,
+              { teamId },
+            );
+            return data.teamMembers.filter((m) => m.positionId != null).length;
+          },
+          {
+            // autoPopulateFirstMatchupLineup runs outside the final-pick
+            // transaction and can take well over a minute under live-backend
+            // load — same generous budget Phase 6 uses (180s) so the gate is
+            // resilient to throttling without masking a real failure. Capped
+            // against the shared test budget, reserving ~60s for the subsequent
+            // navigation + roster render so the gate can never consume the
+            // whole budget and starve the UI assertion below (LS-8211).
+            timeout: Math.min(
+              180_000,
+              Math.max(30_000, remainingBudgetMs() - 60_000),
+            ),
+            intervals: [2_000, 5_000, 10_000],
+            message:
+              'autoPopulateFirstMatchupLineup never populated any positionId for manager 1 within 180s after draft completion',
+          },
+        )
+        .toBeGreaterThan(0);
+    });
 
     await test.step('Navigate to Manager 1 roster', async () => {
       // Navigate to the league overview first.  Going directly to /roster
@@ -1227,8 +1294,14 @@ test.describe
       const filledSlot = managerPage1.getByRole('button', {
         name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
       });
+      // Budget-aware (LS-8211): the read-path gate above already confirmed the
+      // roster is filled in the DB, so this assertion only needs render time —
+      // not the old 120s, which double-counted the backend populate wait the
+      // gate now owns. Spend whatever of the test budget remains (>=15s) so the
+      // gate + nav + assertion always compose within the 240s ceiling and a
+      // throttled render fails cleanly rather than walking the test timeout.
       await expect(filledSlot.first()).toBeVisible({
-        timeout: LINEUP_BUDGET_MS,
+        timeout: Math.max(15_000, remainingBudgetMs() - 5_000),
       });
     });
 

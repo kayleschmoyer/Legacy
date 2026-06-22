@@ -166,10 +166,13 @@ test.describe
       // backend-authoritative determinism gate Phase 3 already uses for its
       // BATTERS assertion (line ~225) and that LS-8138 applied to the sibling
       // matchup specs (LS-8206 confirmed this content does eventually render).
+      // Budget-aware gate (LS-8211): keep re-firing the throttled query across
+      // most of this 60s phase budget instead of exhausting a fixed 3 reloads
+      // early and then walking the residual one-shot timeout.
       await reloadUntilVisible(
         page,
         page.getByRole('heading', { name: /Player Matchups/i }),
-        { finalTimeoutMs: 20_000 },
+        { finalTimeoutMs: 20_000, budgetMs: 45_000 },
       );
     });
 
@@ -231,8 +234,12 @@ test.describe
       // browser-side matchup query resolves; reload to re-fire it if the first
       // request was throttled under load, so the "Show Bench" assertion below
       // isn't racing an unmounted comparison (LS-8138).
+      // Budget-aware gate (LS-8211): the concrete 429-exhaustion instance this
+      // ticket targets — Phase 2 BATTERS exhausted 3 reloads + a 20s assert
+      // under nightly load. Keep re-firing across most of the 60s phase budget.
       await reloadUntilVisible(page, page.getByText('BATTERS').first(), {
         finalTimeoutMs: 20_000,
+        budgetMs: 45_000,
       });
     });
 

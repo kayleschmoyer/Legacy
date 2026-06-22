@@ -344,8 +344,11 @@ test.describe
       // which previously hung the whole test on the later "Save Name" click
       // (120s timeout). Reload to re-fire the query before asserting, then the
       // strict visibility check (LS-8138).
+      // Budget-aware gate (LS-8211): keep re-firing the throttled getUserTeamId
+      // query across the budget instead of exhausting a fixed 3 reloads early.
       await reloadUntilVisible(page, page.getByText('Team Identity').first(), {
         finalTimeoutMs: 30_000,
+        budgetMs: 60_000,
       });
       // Team.tsx V2 renders the name inside an <input> — use toHaveValue
       // instead of getByText, which only matches text nodes, not input values.

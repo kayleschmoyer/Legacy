@@ -541,10 +541,12 @@ test.describe
       // The offer is confirmed on the backend read path above; reload to
       // re-fire the TradingCenter query so the incoming-offer row renders from
       // fresh data even if the first mount was throttled (LS-8138).
+      // Budget-aware gate (LS-8211): keep re-firing the throttled TradingCenter
+      // query across the budget instead of exhausting a fixed 3 reloads early.
       await reloadUntilVisible(
         managerPage1,
         managerPage1.getByText(/from:/i).first(),
-        { finalTimeoutMs: 15_000 },
+        { finalTimeoutMs: 15_000, budgetMs: 60_000 },
       );
     });
 

@@ -459,8 +459,11 @@ test.describe
       const acceptBtn = managerPage2
         .getByRole('button', { name: /Accept/i })
         .first();
+      // Budget-aware gate (LS-8211): keep re-firing the throttled TradingCenter
+      // query across the budget instead of exhausting a fixed 3 reloads early.
       await reloadUntilVisible(managerPage2, acceptBtn, {
         finalTimeoutMs: 15_000,
+        budgetMs: 60_000,
       });
       await acceptBtn.click();
 

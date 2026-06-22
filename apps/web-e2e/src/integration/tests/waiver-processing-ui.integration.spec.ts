@@ -110,8 +110,20 @@ async function submitWaiverClaimViaUI(
   // a genuinely-absent player still fails with the clear message below
   // (LS-8138; backend 429s now retry in apollo-client, this is the UI-side
   // belt-and-suspenders).
+  //
+  // Budget-aware loop (LS-8211): bound by wall-time rather than a fixed 3
+  // attempts so that under sustained throttling the gate keeps re-firing the
+  // free-agents query across most of the phase budget instead of exhausting
+  // early and walking the residual timeout. Strictly more lenient — it still
+  // exits the moment the Add button attaches.
+  const RELOAD_BUDGET_MS = 60_000;
+  const reloadStart = Date.now();
   let isInDom = false;
-  for (let attempt = 0; attempt < 3 && !isInDom; attempt++) {
+  for (
+    let attempt = 0;
+    !isInDom && Date.now() - reloadStart < RELOAD_BUDGET_MS;
+    attempt++
+  ) {
     if (attempt === 0) {
       await page.goto(`/baseball/league/${leagueId}/free-agents`);
     } else {
