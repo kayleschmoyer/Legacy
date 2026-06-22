@@ -2154,6 +2154,10 @@ export type MutationDeleteAchievementRestrictionArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type MutationDeleteAllLeaguesArgs = {
+  systemWide?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 export type MutationDeleteLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -5730,7 +5734,9 @@ export type GetUserLeaguesQuery = {
   }>;
 };
 
-export type DeleteAllLeaguesMutationVariables = Exact<{ [key: string]: never }>;
+export type DeleteAllLeaguesMutationVariables = Exact<{
+  systemWide?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
 
 export type DeleteAllLeaguesMutation = {
   __typename?: 'Mutation';
@@ -16757,8 +16763,8 @@ export type GetUserLeaguesQueryResult = Apollo.QueryResult<
   GetUserLeaguesQueryVariables
 >;
 export const DeleteAllLeagues = gql`
-  mutation DeleteAllLeagues {
-    deleteAllLeagues
+  mutation DeleteAllLeagues($systemWide: Boolean) {
+    deleteAllLeagues(systemWide: $systemWide)
   }
 `;
 export type DeleteAllLeaguesMutationFn = MutationFunction<
@@ -16779,6 +16785,7 @@ export type DeleteAllLeaguesMutationFn = MutationFunction<
  * @example
  * const [deleteAllLeaguesMutation, { data, loading, error }] = useDeleteAllLeaguesMutation({
  *   variables: {
+ *      systemWide: // value for 'systemWide'
  *   },
  * });
  */

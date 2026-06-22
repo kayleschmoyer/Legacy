@@ -69,6 +69,11 @@ describe('League Mutations', () => {
           id: 'id',
           leagueId: 'leagueId',
         },
+        // Needed by checkAdminInDb (admin systemWide path, LS-8240).
+        users: {
+          id: 'id',
+          accessLevel: 'accessLevel',
+        },
       },
       InternalSchema: {
         usersInAppInternal: {
@@ -376,11 +381,25 @@ describe('League Mutations', () => {
       ).rejects.toThrow('Authentication required to delete leagues');
     });
 
+    // deleteLeaguesAtomically wraps the deletes in `db.transaction(cb)`; give the
+    // shared mock a transaction that just runs the callback against the same
+    // mockDb so the resolver's delete loop resolves (LS-8099 introduced the
+    // transaction; the mock predates it).
+    const getResolver = () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().deleteAllLeagues;
+      if (!field?.resolve) {
+        throw new Error('deleteAllLeagues resolver not found');
+      }
+      return field.resolve;
+    };
+
     it('should delete only own leagues for a non-admin user', async () => {
       // Non-admin users can delete their own leagues (where they are the owner)
       const mockLeagues = [{ id: 1 }, { id: 2 }];
 
-      // Non-admin path: .select().from().where() — no innerJoin (owner is always a member)
+      // Owner-only path: .select().from().where() — no innerJoin (owner is always a member)
+      mockDb.transaction = jest.fn(async (cb: any) => cb(mockDb));
       mockDb.select.mockReturnValueOnce(mockDb);
       mockDb.from.mockReturnValueOnce(mockDb);
       mockDb.where.mockResolvedValueOnce(mockLeagues);
@@ -389,13 +408,7 @@ describe('League Mutations', () => {
       mockDb.delete.mockReturnValue(mockDb);
       mockDb.where.mockResolvedValue(undefined);
 
-      const mutationType = schema.getMutationType();
-      const deleteAllLeaguesField = mutationType?.getFields().deleteAllLeagues;
-      if (!deleteAllLeaguesField?.resolve) {
-        throw new Error('deleteAllLeagues resolver not found');
-      }
-
-      const result = await deleteAllLeaguesField.resolve(
+      const result = await getResolver()(
         {},
         {},
         mockContext,
@@ -408,34 +421,24 @@ describe('League Mutations', () => {
       expect(mockDb.innerJoin).not.toHaveBeenCalled();
     });
 
-    it('should successfully delete all leagues when user is admin', async () => {
+    // LS-8240: an admin caller with NO systemWide flag must get owner-only
+    // behavior — the broad member-of purge is now opt-in, so the default can
+    // never wipe leagues the admin merely joined.
+    it('should delete only own leagues for an admin when systemWide is omitted', async () => {
       const adminContext = {
-        user: {
-          id: 1,
-          isAdmin: true,
-        },
+        user: { id: 1, isAdmin: true },
         db: mockDb,
       };
+      const mockLeagues = [{ id: 1 }, { id: 2 }];
 
-      // Admins get all leagues without a WHERE filter on owner — the select chain
-      // resolves at .innerJoin() (there is no trailing .where() on the admin path).
-      const mockLeagues = [{ id: 1 }, { id: 2 }, { id: 3 }];
-
+      mockDb.transaction = jest.fn(async (cb: any) => cb(mockDb));
       mockDb.select.mockReturnValueOnce(mockDb);
       mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.innerJoin.mockResolvedValueOnce(mockLeagues);
-
-      // Mock delete operations (these return mockDb for chaining)
+      mockDb.where.mockResolvedValueOnce(mockLeagues);
       mockDb.delete.mockReturnValue(mockDb);
       mockDb.where.mockResolvedValue(undefined);
 
-      const mutationType = schema.getMutationType();
-      const deleteAllLeaguesField = mutationType?.getFields().deleteAllLeagues;
-      if (!deleteAllLeaguesField?.resolve) {
-        throw new Error('deleteAllLeagues resolver not found');
-      }
-
-      const result = await deleteAllLeaguesField.resolve(
+      const result = await getResolver()(
         {},
         {},
         adminContext,
@@ -443,8 +446,67 @@ describe('League Mutations', () => {
       );
 
       expect(result).toContain(
+        'Successfully deleted 2 league(s) and all associated data',
+      );
+      // Owner-only path takes no member join, and checkAdminInDb is short-
+      // circuited by the falsy systemWide flag (no admin DB lookup).
+      expect(mockDb.innerJoin).not.toHaveBeenCalled();
+    });
+
+    // LS-8240: with explicit systemWide: true, an admin opts into the member-of
+    // purge (every league the admin is a member of, via the member join).
+    it('should delete all member-of leagues for an admin when systemWide is true', async () => {
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+      const mockLeagues = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+      mockDb.transaction = jest.fn(async (cb: any) => cb(mockDb));
+      // checkAdminInDb: .select().from().where().limit(1) resolves to an admin
+      // row. `where` stays chainable (default mockReturnThis) so `.limit()`
+      // resolves; the delete loop's `tx.delete().where()` return is unused.
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
+      // League query (system-wide): .select().from().innerJoin() resolves the set.
+      mockDb.innerJoin.mockResolvedValueOnce(mockLeagues);
+      mockDb.delete.mockReturnValue(mockDb);
+
+      const result = await getResolver()(
+        {},
+        { systemWide: true },
+        adminContext,
+        undefined as never,
+      );
+
+      expect(result).toContain(
         'Successfully deleted 3 league(s) and all associated data',
       );
+      expect(mockDb.innerJoin).toHaveBeenCalled();
+    });
+
+    // LS-8240: a non-admin cannot escalate to the system-wide purge even by
+    // passing systemWide: true — checkAdminInDb gates it, so they get owner-only.
+    it('should ignore systemWide for a non-admin caller', async () => {
+      const mockLeagues = [{ id: 1 }];
+
+      mockDb.transaction = jest.fn(async (cb: any) => cb(mockDb));
+      mockDb.select.mockReturnValueOnce(mockDb);
+      mockDb.from.mockReturnValueOnce(mockDb);
+      mockDb.where.mockResolvedValueOnce(mockLeagues);
+      mockDb.delete.mockReturnValue(mockDb);
+      mockDb.where.mockResolvedValue(undefined);
+
+      const result = await getResolver()(
+        {},
+        { systemWide: true },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toContain(
+        'Successfully deleted 1 league(s) and all associated data',
+      );
+      expect(mockDb.innerJoin).not.toHaveBeenCalled();
     });
   });
 

@@ -71,6 +71,12 @@ export const LeagueManagement: React.FC = () => {
 
     void Promise.race([
       deleteAllLeagues({
+        // Admins are shown the explicit member-of warning and pass through the
+        // two-step confirmation, so opt them into the system-wide purge here.
+        // Non-admins delete owner-only. The mutation defaults to owner-only when
+        // the flag is omitted, so this is the only place the broad variant is
+        // ever requested (LS-8240).
+        variables: { systemWide: isAdmin },
         refetchQueries: ['GetUserLeagues'],
         awaitRefetchQueries: true,
       }),

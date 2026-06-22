@@ -2148,6 +2148,10 @@ export type MutationDeleteAchievementRestrictionArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type MutationDeleteAllLeaguesArgs = {
+  systemWide?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 export type MutationDeleteLeagueArgs = {
   leagueId: Scalars['Int']['input'];
 };

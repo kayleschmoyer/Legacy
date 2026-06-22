@@ -1439,12 +1439,31 @@ export async function deleteLeaguesAtomically(
   });
 }
 
-// Mutation field to delete all leagues owned by the current user.
-// Admins can delete all leagues system-wide; regular users only delete the
-// leagues where they are the owner.
+// Mutation field to delete the caller's leagues.
+//
+// Default (and every caller that omits `systemWide`): owner-only — deletes only
+// the leagues where the caller is the owner.
+//
+// `systemWide: true` opts an *admin* caller into the destructive variant that
+// also deletes every league the admin is merely a *member of* (including
+// leagues owned by other users). This is an explicit, opt-in capability: it was
+// previously the implicit default for any admin caller and silently wiped
+// leagues the admin had only joined — the footgun behind the LS-8238
+// integration cluster (LS-8240). Non-admin callers always get owner-only,
+// regardless of the flag.
 builder.mutationField('deleteAllLeagues', (t) =>
   t.field({
     type: 'String',
+    args: {
+      systemWide: t.arg.boolean({
+        required: false,
+        description:
+          'Admin-only opt-in. When true and the caller is an admin, also ' +
+          'deletes every league the caller is a member of (including leagues ' +
+          'owned by other users), system-wide. Defaults to false (owner-only). ' +
+          'Non-admin callers always delete owner-only regardless of this flag.',
+      }),
+    },
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
@@ -1452,11 +1471,16 @@ builder.mutationField('deleteAllLeagues', (t) =>
       }
 
       try {
-        // Admins delete all leagues they are a member of (requires join).
-        // Regular users own their leagues — owner is always a member — so
-        // query directly on leagues.owner without the redundant member join.
-        const isAdmin = await checkAdminInDb(context);
-        const allLeagues = isAdmin
+        // System-wide deletion (every league the caller is a member of, via the
+        // member join) is gated behind an explicit `systemWide: true` AND an
+        // admin caller. Everyone else — and every caller that omits the flag —
+        // gets owner-only: query directly on leagues.owner (owner is always a
+        // member) without the member join. This makes the broad member-of purge
+        // opt-in so a stray call can never wipe leagues the caller merely
+        // joined (LS-8240).
+        const useSystemWide =
+          (args.systemWide ?? false) && (await checkAdminInDb(context));
+        const allLeagues = useSystemWide
           ? await context.db
               .select({ id: PublicSchema.leagues.id })
               .from(PublicSchema.leagues)

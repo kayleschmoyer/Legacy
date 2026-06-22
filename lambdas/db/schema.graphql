@@ -2197,7 +2197,12 @@ type Mutation {
     achievementType: String!
     leagueId: Int!
   ): Boolean
-  deleteAllLeagues: String
+  deleteAllLeagues(
+    """
+    Admin-only opt-in. When true and the caller is an admin, also deletes every league the caller is a member of (including leagues owned by other users), system-wide. Defaults to false (owner-only). Non-admin callers always delete owner-only regardless of this flag.
+    """
+    systemWide: Boolean
+  ): String
   deleteLeague(leagueId: Int!): String
   deleteLeagueAnnouncement(id: Int!, leagueId: Int!): Boolean
 

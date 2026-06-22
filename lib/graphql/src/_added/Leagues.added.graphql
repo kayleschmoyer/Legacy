@@ -19,8 +19,8 @@ query GetUserLeagues {
   }
 }
 
-mutation DeleteAllLeagues {
-  deleteAllLeagues
+mutation DeleteAllLeagues($systemWide: Boolean) {
+  deleteAllLeagues(systemWide: $systemWide)
 }
 
 mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
