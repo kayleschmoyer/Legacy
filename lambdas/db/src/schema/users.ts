@@ -224,6 +224,14 @@ builder.queryField('user', (t) =>
         username: user.username,
         accessLevel: user.accessLevel,
         avatarUrl: user.avatarUrl ?? null,
+        // `subscriptionTier` is exposed on `UserRef` (LS-822) and requested by
+        // the `GetUserById` document, but was never included in this hand-built
+        // return object — so the field always resolved to `null`. Harmless until
+        // LS-5030 wrapped the whole league-detail page in a `PremiumGate` keyed
+        // on `useIsPremium()` → `GetUserById.subscriptionTier`: every non-admin
+        // premium user was then mis-read as free and blocked by the gate
+        // (the `accessLevel === 'admin'` shortcut masked it for admins). LS-8247.
+        subscriptionTier: user.subscriptionTier ?? null,
         themePreference: user.themePreference ?? null,
       };
     },

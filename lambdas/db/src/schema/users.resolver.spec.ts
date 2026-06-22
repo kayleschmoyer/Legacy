@@ -311,6 +311,63 @@ describe('impersonateUser mutation', () => {
     expect(auditPayload.target).not.toHaveProperty('email');
     expect(auditPayload.target).not.toHaveProperty('username');
   });
+
+  // LS-8247: the `user(id)` query resolver builds its return object by hand and
+  // historically omitted `subscriptionTier`, so `GetUserById.subscriptionTier`
+  // always resolved to null. That silently disabled the non-admin premium path
+  // in `useIsPremium()` once LS-5030 gated the whole league-detail page on it.
+  function getUserQueryResolver() {
+    const queryType = schema.getQueryType();
+    const field = queryType?.getFields().user;
+    if (!field?.resolve) {
+      throw new Error('user query resolver not found');
+    }
+    return field.resolve;
+  }
+
+  it('user(id) query exposes the premium subscriptionTier from the DB record', async () => {
+    mockGetUserById.mockResolvedValue({
+      id: 7,
+      canonicalEmail: 'premium@example.com',
+      username: 'premiumuser',
+      accessLevel: 'none',
+      avatarUrl: null,
+      themePreference: null,
+      subscriptionTier: 'premium',
+    });
+
+    const resolve = getUserQueryResolver();
+    const result = await resolve(
+      {},
+      { id: 7 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toMatchObject({ id: 7, subscriptionTier: 'premium' });
+  });
+
+  it('user(id) query passes through a null subscriptionTier', async () => {
+    mockGetUserById.mockResolvedValue({
+      id: 8,
+      canonicalEmail: 'free@example.com',
+      username: 'freeuser',
+      accessLevel: 'none',
+      avatarUrl: null,
+      themePreference: null,
+      subscriptionTier: null,
+    });
+
+    const resolve = getUserQueryResolver();
+    const result = await resolve(
+      {},
+      { id: 8 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toMatchObject({ id: 8, subscriptionTier: null });
+  });
 });
 
 describe('cleanupLeakedTestUsers mutation', () => {
