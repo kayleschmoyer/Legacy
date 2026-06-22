@@ -202,6 +202,7 @@ module.exports = {
         'player-comparison.spec.ts',
         'player-detail-bio-career-arc.spec.ts',
         'player-detail-modal.spec.ts',
+        'player-detail-season-pitching.spec.ts',
         'player-stats-mocked.spec.ts',
         'player-stats.spec.ts',
       ],

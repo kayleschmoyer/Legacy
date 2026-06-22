@@ -375,6 +375,13 @@ class PlayerDetailSurface {
     await expect(this.#dialog.getByTestId('career-batting-card')).toBeVisible();
   }
 
+  /** Assert the career-batting summary card is absent (detached or never mounted). */
+  async expectNoCareerBattingCard(timeout = 3000): Promise<void> {
+    await expect(
+      this.#dialog.getByTestId('career-batting-card'),
+    ).not.toBeAttached({ timeout });
+  }
+
   /** Assert the career-pitching summary card is visible. */
   async expectCareerPitchingCard(): Promise<void> {
     await expect(
