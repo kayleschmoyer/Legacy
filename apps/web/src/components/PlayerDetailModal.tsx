@@ -440,7 +440,7 @@ function EditorialTable({
           </XStack>
           {rows.map((cells, ri) => (
             <XStack
-              key={String(cells[0])}
+              key={`${cells[0]}-${cells[1]}`}
               paddingVertical={12}
               paddingHorizontal={12}
               borderBottomWidth={ri < rows.length - 1 ? 1 : 0}
@@ -451,7 +451,7 @@ function EditorialTable({
             >
               {cells.map((cell, ci) => (
                 <Text
-                  key={`${cells[0]}-${headers[ci]}`}
+                  key={`${cells[0]}-${cells[1]}-${headers[ci]}`}
                   flex={ci === 0 ? 1.2 : 1}
                   minWidth={0}
                   numberOfLines={1}
@@ -780,20 +780,40 @@ export function PlayerDetailModal({
     [seasonRows, hasPremiumPitching],
   );
 
+  const fieldingRows = useMemo(() => {
+    if (!displayData?.playerSeasonFielding) return [];
+    return [...displayData.playerSeasonFielding]
+      .filter(
+        (
+          f,
+        ): f is NonNullable<typeof f> & {
+          season: number;
+        } => f != null && f.season != null,
+      )
+      .map((f) => ({
+        season: f.season,
+        position: f.position ?? '',
+        games: f.games ?? 0,
+        inn: f.inningsDefended ?? 0,
+        po: f.putouts ?? 0,
+        a: f.assists ?? 0,
+        e: f.errors ?? 0,
+      }))
+      .sort((a, b) => b.season - a.season || b.inn - a.inn);
+  }, [displayData]);
+
   const fieldingTableRows = useMemo(
     () =>
-      seasonRows
-        .filter((r) => r.fielding != null)
-        .map((r) => [
-          r.season,
-          r.fielding?.position ?? '',
-          r.fielding?.games ?? 0,
-          outsToBaseballIP(ipToOuts(r.fielding?.inn ?? 0)),
-          r.fielding?.po ?? 0,
-          r.fielding?.a ?? 0,
-          r.fielding?.e ?? 0,
-        ]),
-    [seasonRows],
+      fieldingRows.map((r) => [
+        r.season,
+        r.position,
+        r.games,
+        r.inn,
+        r.po,
+        r.a,
+        r.e,
+      ]),
+    [fieldingRows],
   );
 
   // ------ Available tabs ------

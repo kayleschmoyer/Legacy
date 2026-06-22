@@ -159,10 +159,9 @@ const BATTER_TWO_FIELDING_SEASONS = {
 };
 
 /**
- * Player who played two positions in one season (CF and LF). The modal
- * aggregates both rows into one combined entry when season matches.
- * Combined 2024: games 100+40=140, inn 900+355=1255, po 260+85=345,
- * a 5+2=7, e 1+1=2, position "CF, LF".
+ * Player who played two positions in one season (CF and LF). Each fielding
+ * record is rendered as its own row: CF (100g, 900inn, 260po, 5a, 1e) and
+ * LF (40g, 355inn, 85po, 2a, 1e), sorted by innings DESC within the season.
  */
 const MULTI_POSITION_SAME_SEASON = {
   data: {
@@ -748,10 +747,10 @@ test.describe('Season Fielding Stats Table — multiple seasons @regression', ()
   });
 });
 
-// ── Tests: Multi-position same season aggregation ─────────────────────────────
+// ── Tests: Multi-position same season per-row breakdown ──────────────────────
 
-test.describe('Season Fielding Stats Table — multi-position aggregation @regression', () => {
-  test('aggregates G, INN, PO, A, E when player has two positions in one season', async ({
+test.describe('Season Fielding Stats Table — multi-position per-row breakdown @regression', () => {
+  test('renders two separate rows when player has two positions in one season', async ({
     page,
     playersPage,
   }) => {
@@ -764,60 +763,55 @@ test.describe('Season Fielding Stats Table — multi-position aggregation @regre
     await playersPage.detail.switchTab('Fielding');
     await playersPage.detail.expectText('POS');
 
-    // CF(100g) + LF(40g) = 140 total games
-    await playersPage.detail.expectText('140');
-    // CF(900) + LF(355) = 1255 total innings
-    await playersPage.detail.expectText('1255');
-    // CF(260) + LF(85) = 345 total putouts
-    await playersPage.detail.expectText('345');
-    // CF(5) + LF(2) = 7 total assists
-    await playersPage.detail.expectText('7');
-    // CF(1) + LF(1) = 2 total errors
-    await playersPage.detail.expectText('2');
-  });
-
-  test('combined POS cell lists all positions played in the season', async ({
-    page,
-    playersPage,
-  }) => {
-    await setupMocks(page, { seasonStatsBody: MULTI_POSITION_SAME_SEASON });
-    await playersPage.gotoDetail(1, 'networkidle');
-
-    await playersPage.detail.expectOpen();
-    await playersPage.detail.expectNotLoading();
-
-    await playersPage.detail.switchTab('Fielding');
-    await playersPage.detail.expectText('POS');
-
-    // The modal appends positions in encounter order: "CF, LF"
-    await playersPage.detail.expectText(/CF.*LF/);
-  });
-
-  test('two-position season collapses into one row (not two separate rows)', async ({
-    page,
-    playersPage,
-  }) => {
-    await setupMocks(page, { seasonStatsBody: MULTI_POSITION_SAME_SEASON });
-    await playersPage.gotoDetail(1, 'networkidle');
-
-    await playersPage.detail.expectOpen();
-    await playersPage.detail.expectNotLoading();
-
-    await playersPage.detail.switchTab('Fielding');
-    await playersPage.detail.expectText('POS');
-
-    // Only one season year should appear (one combined row, not two)
+    // 2024 must appear once per position row (CF + LF = 2 rows)
     const yearLocator = page
       .locator('div[role="dialog"]')
       .getByText('2024', { exact: true });
-    await expect(yearLocator).toHaveCount(1);
+    await expect(yearLocator).toHaveCount(2);
+  });
+
+  test('each position row shows its own position label', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: MULTI_POSITION_SAME_SEASON });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Fielding');
+    await playersPage.detail.expectText('POS');
+
+    // Both positions must appear as separate entries (not merged into one cell)
+    await playersPage.detail.expectText('CF', { exact: true });
+    await playersPage.detail.expectText('LF', { exact: true });
+  });
+
+  test('per-position stats are preserved (not aggregated across positions)', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: MULTI_POSITION_SAME_SEASON });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Fielding');
+    await playersPage.detail.expectText('POS');
+
+    // CF row: putouts=260 (not the merged 345)
+    await playersPage.detail.expectText('260');
+    // LF row: putouts=85 (not the merged 345)
+    await playersPage.detail.expectText('85');
   });
 });
 
 // ── Tests: Baseball-notation INN formatting (LS-6987) ─────────────────────────
 
 test.describe('Season Fielding Stats Table — INN baseball notation @regression', () => {
-  test('INN accumulates fractional outs correctly across positions (5.1 + 5.2 = 11.0, not 10.3)', async ({
+  test('INN column displays per-row baseball notation correctly (5.1 and 5.2 each row)', async ({
     page,
     playersPage,
   }) => {
@@ -830,9 +824,11 @@ test.describe('Season Fielding Stats Table — INN baseball notation @regression
     await playersPage.detail.switchTab('Fielding');
     await playersPage.detail.expectText('INN');
 
-    // CF(5.1 = 16 outs) + LF(5.2 = 17 outs) = 33 outs = 11.0 innings.
-    // Raw decimal addition (5.1 + 5.2 = 10.3) would wrongly display "10.3".
-    await playersPage.detail.expectText('11.0');
+    // Each position row shows its own correctly converted INN value.
+    // CF: inningsDefended=5.1 (baseball IP) → 16 outs → "5.1"
+    // LF: inningsDefended=5.2 (baseball IP) → 17 outs → "5.2"
+    await playersPage.detail.expectText('5.1');
+    await playersPage.detail.expectText('5.2');
   });
 });
 
