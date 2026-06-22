@@ -237,15 +237,14 @@ function HeroStat({
 }) {
   return (
     <YStack
-      flex={1}
-      minWidth={120}
+      minWidth={90}
       padding={20}
       gap={6}
       backgroundColor={SURFACE_CARD}
       borderWidth={1}
       borderColor={STATS_BORDER}
       borderRadius={16}
-      $sm={{ minWidth: 96, padding: 14 }}
+      $sm={{ padding: 14 }}
     >
       <Text
         color={TEXT_TERTIARY}
@@ -264,12 +263,11 @@ function HeroStat({
         style={{
           fontFamily: FONT_DISPLAY,
           fontWeight: 800,
-          fontSize: 54,
+          fontSize: 'clamp(30px, 8vw, 54px)',
           lineHeight: 1,
           letterSpacing: '-0.01em',
           fontVariantNumeric: 'tabular-nums',
         }}
-        $sm={{ style: { fontSize: 30 } }}
       >
         {value}
       </Text>
@@ -1052,9 +1050,12 @@ export function PlayerDetailModal({
             <YStack gap={14} marginTop={20} data-testid="hero-stats">
               {careerTotals.hasBatting && (
                 <XStack
-                  gap={14}
-                  flexWrap="wrap"
                   data-testid="hero-stats-batting"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
+                    gap: 14,
+                  }}
                 >
                   <HeroStat
                     label="Career AVG"
@@ -1073,9 +1074,12 @@ export function PlayerDetailModal({
               )}
               {careerTotals.hasPitching && (
                 <XStack
-                  gap={14}
-                  flexWrap="wrap"
                   data-testid="hero-stats-pitching"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
+                    gap: 14,
+                  }}
                 >
                   <HeroStat
                     label="Record"
