@@ -1,3 +1,4 @@
+import { buildStructuredDescription } from '../adf.js';
 import { jiraRequest } from '../jira-api.js';
 import { getActiveSprintId } from './get-active-sprint.js';
 import type { ToolResult } from '../types.js';
@@ -27,16 +28,7 @@ export async function editTicket(
   }
   if (description !== undefined) {
     fields.description = description
-      ? {
-          type: 'doc',
-          version: 1,
-          content: [
-            {
-              type: 'paragraph',
-              content: [{ type: 'text', text: description }],
-            },
-          ],
-        }
+      ? (buildStructuredDescription({ description }) ?? null)
       : null;
     updatedFields.push('description');
   }
