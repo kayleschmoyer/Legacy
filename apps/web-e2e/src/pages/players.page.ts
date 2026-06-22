@@ -461,6 +461,14 @@ class PlayerDetailSurface {
     await expect(this.#dialog.getByTestId(testIdMap[name])).toHaveCount(0);
   }
 
+  /** Wait until the player name is visible in the modal header. */
+  async waitForPlayerName(name: string, timeout = 5000): Promise<void> {
+    await this.#dialog
+      .getByText(name)
+      .first()
+      .waitFor({ state: 'visible', timeout });
+  }
+
   /**
    * Assert text is visible within the modal. `exact` matches the whole node;
    * `first` (default true) resolves strict-mode collisions on repeated labels.

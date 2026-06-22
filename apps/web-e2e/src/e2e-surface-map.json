@@ -2915,6 +2915,22 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/player-switch-performance.spec.ts": [
+      "apps/web/src/pages/players/**",
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/components/PlayerDetailModal.tsx",
+      "apps/web/src/components/CareerArcChart.tsx",
+      "apps/web/src/components/CareerArcSparkline.tsx",
+      "lambdas/stats/**",
+      "apps/web/src/components/**",
+      "apps/web/src/config/**",
+      "apps/web/src/constants/**",
+      "apps/web/src/hooks/**",
+      "apps/web/src/store/**",
+      "apps/web/src/utils/**",
+      "lib/graphql/src/**",
+      "lib/shared-components/src/**"
+    ],
     "apps/web-e2e/src/tests/player-stats-mocked.spec.ts": [
       "apps/web/src/pages/players/**",
       "apps/web/src/components/baseball/**",
