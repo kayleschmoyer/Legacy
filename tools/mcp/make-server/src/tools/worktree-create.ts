@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { runMake, getRepoRoot } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -72,21 +73,17 @@ export async function worktreeCreate(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              ticket: `LS-${ticketNum}`,
-              description,
-              parent: parent ?? 'main',
-              output,
-              nextSteps: [
-                `Run make_wt_setup with the worktree path to install dependencies`,
-                `Use worktree_set("LS-${ticketNum}") to set as active worktree`,
-              ],
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            ticket: `LS-${ticketNum}`,
+            description,
+            parent: parent ?? 'main',
+            output,
+            nextSteps: [
+              `Run make_wt_setup with the worktree path to install dependencies`,
+              `Use worktree_set("LS-${ticketNum}") to set as active worktree`,
+            ],
+          }),
         },
       ],
     };
@@ -95,15 +92,11 @@ export async function worktreeCreate(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              ticket: `LS-${ticketNum}`,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: false,
+            ticket: `LS-${ticketNum}`,
+            error: error instanceof Error ? error.message : String(error),
+          }),
         },
       ],
       isError: true,

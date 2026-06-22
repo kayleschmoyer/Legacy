@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { runMake, getRepoRoot, TimeoutError } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 import {
@@ -216,22 +217,18 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              status: 'running',
-              jobId,
-              target,
-              worktreePath: workDir,
-              timeoutMs,
-              logPath,
-              message:
-                'Process started in background. ' +
-                'Use make_run_wait({ jobId }) to wait for completion (re-call if still running), ' +
-                'or make_run_status({ jobId }) for a non-blocking snapshot.',
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            status: 'running',
+            jobId,
+            target,
+            worktreePath: workDir,
+            timeoutMs,
+            logPath,
+            message:
+              'Process started in background. ' +
+              'Use make_run_wait({ jobId }) to wait for completion (re-call if still running), ' +
+              'or make_run_status({ jobId }) for a non-blocking snapshot.',
+          }),
         },
       ],
     };
@@ -262,7 +259,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       if (steps.length > 0) result.steps = steps;
       result.output = truncateOutput(output, MAX_OUTPUT_CHARS);
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson(result) }],
       };
     }
 
@@ -270,16 +267,12 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              target,
-              worktreePath: workDir,
-              output: truncateOutput(output, MAX_OUTPUT_CHARS),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            target,
+            worktreePath: workDir,
+            output: truncateOutput(output, MAX_OUTPUT_CHARS),
+          }),
         },
       ],
     };
@@ -299,7 +292,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
         partialOutput,
       };
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson(result) }],
         isError: true,
       };
     }
@@ -329,19 +322,15 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(
-                    {
-                      success: false,
-                      target,
-                      worktreePath: workDir,
-                      autoFormatterCommit: false,
-                      error:
-                        'Auto-recovery aborted: the git index has staged changes that would be swept into the formatter commit. ' +
-                        'Please commit or unstage your staged changes, then re-run make pc.',
-                    },
-                    null,
-                    2,
-                  ),
+                  text: minifiedJson({
+                    success: false,
+                    target,
+                    worktreePath: workDir,
+                    autoFormatterCommit: false,
+                    error:
+                      'Auto-recovery aborted: the git index has staged changes that would be swept into the formatter commit. ' +
+                      'Please commit or unstage your staged changes, then re-run make pc.',
+                  }),
                 },
               ],
               isError: true,
@@ -386,9 +375,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             if (retrySteps.length > 0) retryResult.steps = retrySteps;
             retryResult.output = truncateOutput(retryOutput, MAX_OUTPUT_CHARS);
             return {
-              content: [
-                { type: 'text', text: JSON.stringify(retryResult, null, 2) },
-              ],
+              content: [{ type: 'text', text: minifiedJson(retryResult) }],
               isError: !allPassed,
             };
           } catch (retryError) {
@@ -410,9 +397,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             if (retryErrors.length > 0) retryResult.errors = retryErrors;
             retryResult.output = truncateOutput(retryMsg, MAX_OUTPUT_CHARS);
             return {
-              content: [
-                { type: 'text', text: JSON.stringify(retryResult, null, 2) },
-              ],
+              content: [{ type: 'text', text: minifiedJson(retryResult) }],
               isError: true,
             };
           }
@@ -447,9 +432,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
           if (gitErrors.length > 0) gitResult.errors = gitErrors;
           gitResult.output = truncateOutput(errorMsg, MAX_OUTPUT_CHARS);
           return {
-            content: [
-              { type: 'text', text: JSON.stringify(gitResult, null, 2) },
-            ],
+            content: [{ type: 'text', text: minifiedJson(gitResult) }],
             isError: true,
           };
         }
@@ -467,7 +450,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       if (errors.length > 0) result.errors = errors;
       result.output = truncateOutput(errorMsg, MAX_OUTPUT_CHARS);
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson(result) }],
         isError: true,
       };
     }
@@ -476,16 +459,12 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              target,
-              worktreePath: workDir,
-              error: truncateOutput(errorMsg, MAX_OUTPUT_CHARS),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: false,
+            target,
+            worktreePath: workDir,
+            error: truncateOutput(errorMsg, MAX_OUTPUT_CHARS),
+          }),
         },
       ],
       isError: true,

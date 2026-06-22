@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { runCommand, runMake, getRepoRoot } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -163,16 +164,12 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              worktreePath,
-              symlinkRemoved: symlinkActuallyRemoved,
-              log: log.join('\n'),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            worktreePath,
+            symlinkRemoved: symlinkActuallyRemoved,
+            log: log.join('\n'),
+          }),
         },
       ],
     };
@@ -185,15 +182,11 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              worktreePath,
-              log: log.join('\n'),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: false,
+            worktreePath,
+            log: log.join('\n'),
+          }),
         },
       ],
       isError: true,

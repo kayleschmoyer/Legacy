@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createWriteStream, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import type { ToolResult } from '../types.js';
 import {
   MAX_OUTPUT_CHARS,
@@ -116,16 +117,12 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              status: 'running',
-              target: record.target,
-              elapsedSec,
-              logTail,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            status: 'running',
+            target: record.target,
+            elapsedSec,
+            logTail,
+          }),
         },
       ],
     };
@@ -162,7 +159,7 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
     result.output = truncateOutput(output, MAX_OUTPUT_CHARS);
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(result) }],
       isError: !success,
     };
   }
@@ -172,19 +169,15 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            status: record.done ? (success ? 'done' : 'failed') : 'running',
-            success,
-            target: record.target,
-            worktreePath: record.workDir,
-            elapsedSec,
-            ...(record.error ? { error: record.error } : {}),
-            output: truncateOutput(output, MAX_OUTPUT_CHARS),
-          },
-          null,
-          2,
-        ),
+        text: minifiedJson({
+          status: record.done ? (success ? 'done' : 'failed') : 'running',
+          success,
+          target: record.target,
+          worktreePath: record.workDir,
+          elapsedSec,
+          ...(record.error ? { error: record.error } : {}),
+          output: truncateOutput(output, MAX_OUTPUT_CHARS),
+        }),
       },
     ],
     isError: !success,
@@ -204,7 +197,7 @@ export function makeRunStatus(params: MakeRunStatusParams): ToolResult {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: minifiedJson({
             ok: false,
             error: `Job "${params.jobId}" not found. Job records exist only for the lifetime of this MCP server process.`,
           }),
@@ -246,7 +239,7 @@ export async function makeRunWait(
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: minifiedJson({
             ok: false,
             error: `Job "${params.jobId}" not found. Job records exist only for the lifetime of this MCP server process.`,
           }),

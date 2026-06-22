@@ -3,7 +3,10 @@ import { existsSync, statSync, unlinkSync } from 'node:fs';
 import { writeFile as writeFileAsync } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { runCommand } from '../run-command.js';
+import { formatResourceList } from '../format.js';
+import { containsUnsafePathChars } from '../path-safety.js';
 
 // Absolute path: Windows (C:\... or C:/...) or Unix (/...)
 const ABSOLUTE_PATH_REGEX = /^([A-Za-z]:[/\\]|\/)/;
@@ -18,6 +21,11 @@ function resolveDir(dir: string, repoRoot: string): string {
     throw new Error(
       'dir must be a non-empty path to a Terraform working directory',
     );
+  }
+  // Defense-in-depth: reject shell metacharacters and control characters in the
+  // `dir` value before it ever reaches the terraform CLI (see path-safety.ts).
+  if (containsUnsafePathChars(trimmed)) {
+    throw new Error(`dir contains disallowed characters: "${dir}"`);
   }
   // If it's an absolute path, use it directly; otherwise resolve relative to repo root.
   // Use path.resolve (not path.join) so that traversal sequences like "../.." are
@@ -87,7 +95,7 @@ export async function terraformStatePull(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: errorMsg }),
+          text: minifiedJson({ success: false, error: errorMsg }),
         },
       ],
       isError: true,
@@ -158,7 +166,7 @@ export async function terraformStatePush(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: errorMsg }),
+          text: minifiedJson({ success: false, error: errorMsg }),
         },
       ],
       isError: true,
@@ -227,17 +235,13 @@ export async function terraformStatePush(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              output: output || '(no output)',
-              ...(cleanupWarning !== undefined && {
-                cleanupWarning,
-              }),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            output: output || '(no output)',
+            ...(cleanupWarning !== undefined && {
+              cleanupWarning,
+            }),
+          }),
         },
       ],
     };
@@ -294,7 +298,7 @@ export async function terraformStateMv(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: errorMsg }),
+          text: minifiedJson({ success: false, error: errorMsg }),
         },
       ],
       isError: true,
@@ -307,7 +311,7 @@ export async function terraformStateMv(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: sourceErr }),
+          text: minifiedJson({ success: false, error: sourceErr }),
         },
       ],
       isError: true,
@@ -320,7 +324,7 @@ export async function terraformStateMv(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: destErr }),
+          text: minifiedJson({ success: false, error: destErr }),
         },
       ],
       isError: true,
@@ -345,16 +349,12 @@ export async function terraformStateMv(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              source: params.source,
-              destination: params.destination,
-              output: output || '(no output)',
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            source: params.source,
+            destination: params.destination,
+            output: output || '(no output)',
+          }),
         },
       ],
     };
@@ -384,7 +384,7 @@ export async function terraformStateList(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: errorMsg }),
+          text: minifiedJson({ success: false, error: errorMsg }),
         },
       ],
       isError: true,
@@ -398,7 +398,7 @@ export async function terraformStateList(params: {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ success: false, error: addrErr }),
+            text: minifiedJson({ success: false, error: addrErr }),
           },
         ],
         isError: true,
@@ -419,16 +419,7 @@ export async function terraformStateList(params: {
     );
     const resources = output.trim().split(/\r?\n/).filter(Boolean);
     return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            { success: true, count: resources.length, resources },
-            null,
-            2,
-          ),
-        },
-      ],
+      content: [{ type: 'text', text: formatResourceList(resources) }],
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -457,7 +448,7 @@ export async function terraformStateRm(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: errorMsg }),
+          text: minifiedJson({ success: false, error: errorMsg }),
         },
       ],
       isError: true,
@@ -470,7 +461,7 @@ export async function terraformStateRm(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: addrErr }),
+          text: minifiedJson({ success: false, error: addrErr }),
         },
       ],
       isError: true,
@@ -493,16 +484,12 @@ export async function terraformStateRm(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              address: params.address,
-              dryRun: params.dryRun ?? false,
-              output: output || '(no output)',
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: true,
+            address: params.address,
+            dryRun: params.dryRun ?? false,
+            output: output || '(no output)',
+          }),
         },
       ],
     };
@@ -549,7 +536,7 @@ export async function terraformStateMvBatch(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ success: false, error: errorMsg }),
+          text: minifiedJson({ success: false, error: errorMsg }),
         },
       ],
       isError: true,
@@ -561,7 +548,7 @@ export async function terraformStateMvBatch(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: minifiedJson({
             success: false,
             error: 'moves array must not be empty',
           }),
@@ -576,7 +563,7 @@ export async function terraformStateMvBatch(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: minifiedJson({
             success: false,
             error: `Too many moves: ${params.moves.length} (max 200)`,
           }),
@@ -595,7 +582,7 @@ export async function terraformStateMvBatch(params: {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
+            text: minifiedJson({
               success: false,
               error: `moves[${i}].from: ${fromErr}`,
             }),
@@ -610,7 +597,7 @@ export async function terraformStateMvBatch(params: {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
+            text: minifiedJson({
               success: false,
               error: `moves[${i}].to: ${toErr}`,
             }),
@@ -666,15 +653,11 @@ export async function terraformStateMvBatch(params: {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              summary: { total: results.length, succeeded, failed },
-              results,
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            success: false,
+            summary: { total: results.length, succeeded, failed },
+            results,
+          }),
         },
       ],
       isError: true,
@@ -685,15 +668,11 @@ export async function terraformStateMvBatch(params: {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            success: true,
-            summary: { total: results.length, succeeded, failed },
-            results,
-          },
-          null,
-          2,
-        ),
+        text: minifiedJson({
+          success: true,
+          summary: { total: results.length, succeeded, failed },
+          results,
+        }),
       },
     ],
   };

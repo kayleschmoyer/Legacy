@@ -1,7 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { z } from 'zod';
-import { join, resolve } from 'node:path';
+import { join, resolve, relative, isAbsolute } from 'node:path';
 import { existsSync } from 'node:fs';
 import { runCommand, getRepoRoot } from './run-command.js';
 import { runTarget } from './tools/run-target.js';
@@ -181,8 +182,32 @@ server.tool(
       .describe('Report missing vars without writing the file'),
   },
   async (params) => {
-    const baseDir = params.worktreePath || getRepoRoot();
-    const scriptPath = join(baseDir, 'scripts', 'gen-tfvars.js');
+    const repoRoot = resolve(getRepoRoot());
+    const baseDir = resolve(params.worktreePath || repoRoot);
+    const scriptPath = resolve(baseDir, 'scripts', 'gen-tfvars.js');
+
+    // Containment: the script we execute with `node` must live inside the repo
+    // root and be exactly scripts/gen-tfvars.js — never an arbitrary file
+    // reached via a crafted worktreePath (e.g. an absolute path or `..`
+    // traversal pointing at attacker-controlled code). path.resolve has already
+    // collapsed any `..`, so a relative() that escapes the repo root means the
+    // worktreePath pointed outside it.
+    const relToRoot = relative(repoRoot, scriptPath);
+    if (
+      relToRoot.startsWith('..') ||
+      isAbsolute(relToRoot) ||
+      scriptPath !== join(baseDir, 'scripts', 'gen-tfvars.js')
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Refused: worktreePath must resolve within the repository root; "${scriptPath}" is outside ${repoRoot}.`,
+          },
+        ],
+        isError: true,
+      };
+    }
 
     if (!existsSync(scriptPath)) {
       return {
@@ -207,7 +232,7 @@ server.tool(
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ success: true, output }, null, 2),
+            text: minifiedJson({ success: true, output }),
           },
         ],
       };
@@ -324,7 +349,7 @@ server.tool(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(result, null, 2),
+            text: minifiedJson(result),
           },
         ],
       };
@@ -353,18 +378,14 @@ server.tool(
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  success: false,
-                  mode: 'check',
-                  cwd: terraformDir,
-                  filesNeedFormatting: tfFiles.map((f) => f.trim()),
-                  needsFormatting: true,
-                  message: `${tfFiles.length} file(s) need formatting.`,
-                },
-                null,
-                2,
-              ),
+              text: minifiedJson({
+                success: false,
+                mode: 'check',
+                cwd: terraformDir,
+                filesNeedFormatting: tfFiles.map((f) => f.trim()),
+                needsFormatting: true,
+                message: `${tfFiles.length} file(s) need formatting.`,
+              }),
             },
           ],
           isError: true,
@@ -609,17 +630,13 @@ server.tool(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              ready,
-              repoRoot,
-              makefileExists,
-              makeVersion,
-              ...(makeError ? { makeError } : {}),
-            },
-            null,
-            2,
-          ),
+          text: minifiedJson({
+            ready,
+            repoRoot,
+            makefileExists,
+            makeVersion,
+            ...(makeError ? { makeError } : {}),
+          }),
         },
       ],
     };
