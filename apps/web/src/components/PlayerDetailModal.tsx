@@ -763,7 +763,7 @@ export function PlayerDetailModal({
             r.pitching?.games ?? 0,
             `${r.pitching?.wins ?? 0}-${r.pitching?.losses ?? 0}`,
             r.pitching?.era ?? 0,
-            r.pitching?.ip ?? 0,
+            outsToBaseballIP(ipToOuts(r.pitching?.ip ?? 0)),
             r.pitching?.so ?? 0,
             r.pitching?.bb ?? 0,
           ];

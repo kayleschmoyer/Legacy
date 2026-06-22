@@ -1823,8 +1823,6 @@ export type Mutation = {
   deleteLeagueAnnouncement?: Maybe<Scalars['Boolean']['output']>;
   /** Remove a season award from a league. Commissioner / General Manager access required. */
   deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
-  /** Delete all mock-draft leagues owned by the calling user (owner = caller AND is_mock_draft = true). Scoped to the caller and to mock leagues only — never affects real leagues or other users' leagues, even for an admin caller. Returns the number of mock leagues deleted. */
-  deleteMyMockDraftLeagues?: Maybe<Scalars['Int']['output']>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: edit the scores of a past or current matchup. All edits are audit-logged. */
   editMatchupScore?: Maybe<CommissionerActionResult>;
