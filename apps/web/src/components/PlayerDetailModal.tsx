@@ -527,8 +527,8 @@ export function PlayerDetailModal({
 
   const eligiblePositions = displayData?.player?.eligiblePositions ?? [];
 
-  const firstName = data?.player?.firstName;
-  const lastName = data?.player?.lastName;
+  const firstName = displayData?.player?.firstName;
+  const lastName = displayData?.player?.lastName;
   const resolvedPlayerName =
     firstName && lastName ? `${firstName} ${lastName}` : playerName;
   const initials = deriveInitials(resolvedPlayerName);
