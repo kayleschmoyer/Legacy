@@ -9033,6 +9033,9 @@ export type GetAllPlayerSeasonStatsQuery = {
     strikeouts?: number | null;
     earnedRunAverage?: string | null;
     whip?: number | null;
+    fip?: number | null;
+    strikeoutsPerNine?: number | null;
+    basesOnBallsPerNine?: number | null;
   }> | null;
   playerSeasonFielding?: Array<{
     __typename?: 'SeasonFielding';
@@ -22535,6 +22538,9 @@ export const GetAllPlayerSeasonStats = gql`
       strikeouts
       earnedRunAverage
       whip
+      fip
+      strikeoutsPerNine
+      basesOnBallsPerNine
     }
     playerSeasonFielding(playerId: $playerId) {
       season

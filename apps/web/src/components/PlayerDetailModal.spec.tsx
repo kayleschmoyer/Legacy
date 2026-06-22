@@ -14,9 +14,20 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+let mockHasEntitlement = false;
+jest.mock('../hooks/useIsPremium', () => ({
+  useIsPremium: () => mockHasEntitlement,
+  useHasEntitlement: () => mockHasEntitlement,
+  useIsPremiumStatus: () => ({
+    isPremium: mockHasEntitlement,
+    isLoading: false,
+  }),
+}));
+
 jest.mock('@tamagui/lucide-icons', () => ({
   ExternalLink: () => null,
   X: () => null,
+  Lock: () => null,
 }));
 
 jest.mock('./BaseModal', () => ({
@@ -143,6 +154,31 @@ function pitchingSeason() {
   };
 }
 
+function premiumPitchingSeason() {
+  return {
+    season: 2023,
+    games: 30,
+    wins: 12,
+    losses: 8,
+    gamesStarted: 28,
+    completeGames: 2,
+    shutouts: 1,
+    saves: 0,
+    inningsPitched: 180,
+    hits: 160,
+    runs: 65,
+    earnedRuns: 60,
+    homeRuns: 15,
+    baseOnBalls: 45,
+    strikeouts: 180,
+    earnedRunAverage: '3.00',
+    whip: 1.139,
+    fip: 3.15,
+    strikeoutsPerNine: 9.0,
+    basesOnBallsPerNine: 2.25,
+  };
+}
+
 function renderModal() {
   return render(
     <PlayerDetailModal
@@ -160,6 +196,7 @@ function renderModal() {
 describe('PlayerDetailModal — hero stats two-way player fix (LS-6979)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHasEntitlement = false;
     mockUsePlayerCareerArc.mockReturnValue(makeArcData(false, false));
   });
 
@@ -215,5 +252,80 @@ describe('PlayerDetailModal — hero stats two-way player fix (LS-6979)', () => 
     expect(within(battingHero).getByText('Career AVG')).toBeInTheDocument();
     expect(within(pitchingHero).getByText('Record')).toBeInTheDocument();
     expect(within(pitchingHero).getByText('Strikeouts')).toBeInTheDocument();
+  });
+});
+
+describe('PlayerDetailModal — premium pitching columns (LS-6991)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockHasEntitlement = false;
+    mockUsePlayerCareerArc.mockReturnValue(makeArcData(false, false));
+  });
+
+  it('shows only base pitching columns for free users', () => {
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: {
+        player: {
+          eligiblePositions: ['P'],
+          firstName: 'Test',
+          lastName: 'Pitcher',
+        },
+        playerSeasonBatting: [],
+        playerSeasonPitching: [premiumPitchingSeason()],
+        playerSeasonFielding: [],
+      },
+    });
+
+    render(
+      <PlayerDetailModal
+        playerId={1}
+        playerName="Test Pitcher"
+        position="P"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('ERA')).toBeInTheDocument();
+    expect(screen.getByText('SO')).toBeInTheDocument();
+    expect(screen.getByText('BB')).toBeInTheDocument();
+
+    expect(screen.queryByText('FIP')).not.toBeInTheDocument();
+    expect(screen.queryByText('WHIP')).not.toBeInTheDocument();
+    expect(screen.queryByText('K/9')).not.toBeInTheDocument();
+    expect(screen.queryByText('BB/9')).not.toBeInTheDocument();
+  });
+
+  it('shows premium pitching columns (FIP, WHIP, K/9, BB/9) for premium users', () => {
+    mockHasEntitlement = true;
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: {
+        player: {
+          eligiblePositions: ['P'],
+          firstName: 'Test',
+          lastName: 'Pitcher',
+        },
+        playerSeasonBatting: [],
+        playerSeasonPitching: [premiumPitchingSeason()],
+        playerSeasonFielding: [],
+      },
+    });
+
+    render(
+      <PlayerDetailModal
+        playerId={1}
+        playerName="Test Pitcher"
+        position="P"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('FIP')).toBeInTheDocument();
+    expect(screen.getByText('WHIP')).toBeInTheDocument();
+    expect(screen.getByText('K/9')).toBeInTheDocument();
+    expect(screen.getByText('BB/9')).toBeInTheDocument();
   });
 });

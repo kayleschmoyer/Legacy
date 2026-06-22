@@ -43,6 +43,9 @@ query GetAllPlayerSeasonStats($playerId: Int!) {
     strikeouts
     earnedRunAverage
     whip
+    fip
+    strikeoutsPerNine
+    basesOnBallsPerNine
   }
   playerSeasonFielding(playerId: $playerId) {
     season

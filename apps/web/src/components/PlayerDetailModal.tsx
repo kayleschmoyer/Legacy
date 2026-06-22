@@ -14,6 +14,8 @@ import {
   useGetAllPlayerSeasonStatsQuery,
   useGetPlayerCareerArcQuery,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { useHasEntitlement } from '../hooks/useIsPremium';
 import { BaseModal } from './BaseModal';
 import type { CareerArcMode } from './CareerArcChart';
 import {
@@ -98,6 +100,10 @@ interface SeasonRow {
     ip: number;
     so: number;
     bb: number;
+    fip: string | null;
+    whip: string | null;
+    k9: string | null;
+    bb9: string | null;
   };
   fielding?: {
     games: number;
@@ -518,6 +524,10 @@ export function PlayerDetailModal({
   const [activeTab, setActiveTab] = useState<StatsTab>('career-arc');
   const [arcMode, setArcMode] = useState<CareerArcMode>('batting');
 
+  const hasPremiumPitching = useHasEntitlement(
+    ENTITLEMENTS.advanced_pitching_stats,
+  );
+
   // ------ Data fetching ------
   const { data, previousData, loading, error } =
     useGetAllPlayerSeasonStatsQuery({
@@ -597,6 +607,10 @@ export function PlayerDetailModal({
         strikeouts?: number | null;
         baseOnBalls?: number | null;
         earnedRunAverage?: string | null;
+        fip?: number | null;
+        whip?: number | null;
+        strikeoutsPerNine?: number | null;
+        basesOnBallsPerNine?: number | null;
       }) => {
         if (!p?.season) return;
         const row: SeasonRow = seasons.get(p.season) || { season: p.season };
@@ -617,6 +631,14 @@ export function PlayerDetailModal({
           ip,
           so: p.strikeouts ?? 0,
           bb: p.baseOnBalls ?? 0,
+          fip: p.fip != null ? p.fip.toFixed(2) : null,
+          whip: p.whip != null ? p.whip.toFixed(3) : null,
+          k9:
+            p.strikeoutsPerNine != null ? p.strikeoutsPerNine.toFixed(1) : null,
+          bb9:
+            p.basesOnBallsPerNine != null
+              ? p.basesOnBallsPerNine.toFixed(1)
+              : null,
         };
         seasons.set(p.season, row);
       },
@@ -735,16 +757,27 @@ export function PlayerDetailModal({
     () =>
       seasonRows
         .filter((r) => r.pitching != null)
-        .map((r) => [
-          r.season,
-          r.pitching?.games ?? 0,
-          `${r.pitching?.wins ?? 0}-${r.pitching?.losses ?? 0}`,
-          r.pitching?.era ?? 0,
-          r.pitching?.ip ?? 0,
-          r.pitching?.so ?? 0,
-          r.pitching?.bb ?? 0,
-        ]),
-    [seasonRows],
+        .map((r) => {
+          const base: (string | number)[] = [
+            r.season,
+            r.pitching?.games ?? 0,
+            `${r.pitching?.wins ?? 0}-${r.pitching?.losses ?? 0}`,
+            r.pitching?.era ?? 0,
+            r.pitching?.ip ?? 0,
+            r.pitching?.so ?? 0,
+            r.pitching?.bb ?? 0,
+          ];
+          if (hasPremiumPitching) {
+            base.push(
+              r.pitching?.fip ?? '—',
+              r.pitching?.whip ?? '—',
+              r.pitching?.k9 ?? '—',
+              r.pitching?.bb9 ?? '—',
+            );
+          }
+          return base;
+        }),
+    [seasonRows, hasPremiumPitching],
   );
 
   const fieldingTableRows = useMemo(
@@ -1258,7 +1291,18 @@ export function PlayerDetailModal({
                   />
                   <EditorialTable
                     caption="Season pitching statistics"
-                    headers={['Year', 'G', 'W-L', 'ERA', 'IP', 'SO', 'BB']}
+                    headers={[
+                      'Year',
+                      'G',
+                      'W-L',
+                      'ERA',
+                      'IP',
+                      'SO',
+                      'BB',
+                      ...(hasPremiumPitching
+                        ? ['FIP', 'WHIP', 'K/9', 'BB/9']
+                        : []),
+                    ]}
                     rows={pitchingTableRows}
                   />
                 </>
