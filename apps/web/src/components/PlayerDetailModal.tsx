@@ -527,10 +527,13 @@ export function PlayerDetailModal({
 
   const displayData = data ?? previousData;
 
-  const { data: arcData } = useGetPlayerCareerArcQuery({
-    variables: { playerId: playerId ?? 0 },
-    skip: !playerId || !open,
-  });
+  const { data: arcData, previousData: previousArcData } =
+    useGetPlayerCareerArcQuery({
+      variables: { playerId: playerId ?? 0 },
+      skip: !playerId || !open,
+    });
+
+  const displayArcData = arcData ?? previousArcData;
 
   const eligiblePositions = displayData?.player?.eligiblePositions ?? [];
 
@@ -761,8 +764,9 @@ export function PlayerDetailModal({
   );
 
   // ------ Available tabs ------
-  const hasBattingArc = (arcData?.playerSeasonBatting?.length ?? 0) > 0;
-  const hasPitchingArc = (arcData?.playerSeasonPitching?.length ?? 0) > 0;
+  const hasBattingArc = (displayArcData?.playerSeasonBatting?.length ?? 0) > 0;
+  const hasPitchingArc =
+    (displayArcData?.playerSeasonPitching?.length ?? 0) > 0;
 
   const availableTabs = useMemo(() => {
     const tabs: { key: StatsTab; label: string }[] = [];
@@ -1210,8 +1214,9 @@ export function PlayerDetailModal({
                   >
                     <React.Suspense fallback={<Spinner color={BRAND_GOLD} />}>
                       <CareerArcChart
-                        battingSeasons={arcData?.playerSeasonBatting}
-                        pitchingSeasons={arcData?.playerSeasonPitching}
+                        key={playerId ?? 0}
+                        battingSeasons={displayArcData?.playerSeasonBatting}
+                        pitchingSeasons={displayArcData?.playerSeasonPitching}
                         mode={hasBattingArc ? arcMode : 'pitching'}
                       />
                     </React.Suspense>
