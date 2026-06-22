@@ -78,11 +78,11 @@ Until that lint lands, the table is maintained manually. Adding a skill requires
 
 Flagged during LS-7921 bucketing pass. Do not delete until a separate pruning ticket investigates usage:
 
-| Skill            | Reason flagged                                                                                                              |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `cloud-teleport` | Protocol described in skill body but not referenced by any other skill or workflow step; unclear if any agent implements it |
-| `jira-rollover`  | Operational-only (sprint boundaries); no code path; may be superseded by manual or automated sprint tooling                 |
-| `open-prs`       | Appears to overlap with `sweep-prs` (slash command) and `unblock-prs`; routing table keeps the row to avoid silent deletion |
+| Skill                                               | Reason flagged                                                                                                                                                                 |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cloud-teleport`                                    | Protocol described in skill body but not referenced by any other skill or workflow step; unclear if any agent implements it                                                    |
+| `jira-rollover`                                     | Operational-only (sprint boundaries); no code path; may be superseded by manual or automated sprint tooling                                                                    |
+| `pr-lifecycle` (sweep/sweep-prs/unblock references) | Consolidated under `pr-lifecycle` per LS-8231 — the former `open-prs`/`sweep-prs`/`unblock-prs` skills now live as references under `.agents/skills/pr-lifecycle/references/`. |
 
 ---
 

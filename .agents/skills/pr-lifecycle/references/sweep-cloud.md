@@ -1,8 +1,8 @@
 # Cloud Agent Sweep
 
 > This file contains the full cloud agent workflow for PR sweeps.
-> For the overview, decision table, critical rules, and environment compatibility, see [SKILL.md](SKILL.md).
-> For local agent pass playbooks, see [PASSES.md](PASSES.md).
+> For the overview, decision table, critical rules, and environment compatibility, see [sweep.md](./sweep.md) and the parent [pr-lifecycle SKILL.md](../SKILL.md).
+> For local agent pass playbooks, see [sweep-passes.md](./sweep-passes.md).
 
 Cloud agents (Copilot Coding Agent) cannot commit or push code. This workflow covers: scan, triage, all API-only actions, and producing an actionable report for items that need a local agent.
 
@@ -28,7 +28,7 @@ For detailed inspection of specific PRs, use `github_pr_batch_status` with an ar
 
 ## Cloud Step 2: Verify Reviewer Bot Labeling
 
-The **Reviewer Bot** applies `merge-when-ready` itself on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`). Do **not** apply this label manually — see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership). Manual application bypasses the gate that holds back PRs the Reviewer Bot has rejected.
+The **Reviewer Bot** applies `merge-when-ready` itself on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`). Do **not** apply this label manually — see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership). Manual application bypasses the gate that holds back PRs the Reviewer Bot has rejected.
 
 For PRs where Reviewer Bot has not yet labeled despite a clean state, the upstream cause is one of:
 

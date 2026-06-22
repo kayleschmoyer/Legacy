@@ -1,8 +1,8 @@
 # Local Agent Pass Playbooks
 
 > This file contains the detailed step-by-step playbooks for each pass in the local agent sweep.
-> For the overview, decision table, critical rules, and environment compatibility, see [SKILL.md](SKILL.md).
-> For cloud agent mode, see [CLOUD-SWEEP.md](CLOUD-SWEEP.md).
+> For the overview, decision table, critical rules, and environment compatibility, see [sweep.md](./sweep.md) and the parent [pr-lifecycle SKILL.md](../SKILL.md).
+> For cloud agent mode, see [sweep-cloud.md](./sweep-cloud.md).
 
 ---
 
@@ -158,7 +158,7 @@ After posting a rebase command, the PR enters a "commanded" state. Dependabot ha
 
 ### 0c. Verify Reviewer Bot Labeling on Already-Clean PRs
 
-For PRs that are already mergeable, CI passing, and have no unresolved threads, the **Reviewer Bot** should have applied `merge-when-ready` itself on its APPROVED verdict — do **not** apply this label manually (see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership)).
+For PRs that are already mergeable, CI passing, and have no unresolved threads, the **Reviewer Bot** should have applied `merge-when-ready` itself on its APPROVED verdict — do **not** apply this label manually (see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership)).
 
 If a clean PR is missing the label, the upstream cause is one of:
 
@@ -218,7 +218,7 @@ For each PR (sequentially within a dependency chain, or in parallel for disjoint
 
 1. Enter the worktree (Step 2)
 2. **Rebase via MCP**: `worktree_rebase(worktree: "LS-####")` — this fetches the latest remote state and rebases onto the parent branch in one operation. Worktrees have their own fetch state and may be stale even if the main repo fetched recently.
-3. If conflicts arise → load `skills/rebase/SKILL.md` and `skills/resolve-merge-conflicts/SKILL.md`
+3. If conflicts arise → load `../../rebase/SKILL.md` and `../../resolve-merge-conflicts/SKILL.md`
 4. **Post-rebase stabilization**: `worktree_stabilize(worktree: "LS-####")` — reinstalls deps, regenerates schema, and runs affected codegen so `make pc` does not fail on stale artifacts.
 
 ### Lightweight vs. Full Validation
@@ -250,18 +250,18 @@ After validation:
 
 If a rebase fails irrecoverably: `git rebase --abort`, comment on the PR with the failure reason, and move on. Only label `requires-human-review` if the conflict requires human judgment (e.g., schema design decisions) — routine merge conflicts should be retried in a future sweep. The PR is now **settled**.
 
-> **Full step-by-step rebase instructions** are in `skills/rebase/SKILL.md`. Do not duplicate them here — load the skill.
+> **Full step-by-step rebase instructions** are in `../../rebase/SKILL.md`. Do not duplicate them here — load the skill.
 
 ---
 
 ## Pass 2: Fix Unresolved Review Comments
 
-**Parallel by default** — PRs with review comments are independent and can be fixed concurrently. Spawn up to 3 sub-agents, each working in its own worktree. See [sweep-and-parallelization.md](../pr-lifecycle/references/sweep-and-parallelization.md) for the agent prompt template and failure handling.
+**Parallel by default** — PRs with review comments are independent and can be fixed concurrently. Spawn up to 3 sub-agents, each working in its own worktree. See [sweep-and-parallelization.md](./sweep-and-parallelization.md) for the agent prompt template and failure handling.
 
 For each PR in the review-comments bucket from Step 1's `github_pr_dashboard` result (in parallel batches of 3):
 
 1. Enter the worktree (Step 2)
-2. **Load `skills/pr-lifecycle/SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
+2. **Load `../SKILL.md`** — it contains the full workflow: reading comments, applying fixes, validating, committing, resolving threads, and the common-patterns reference table
 3. After pushing, re-check for new threads (Copilot re-reviews on push)
 4. If a review fix sub-agent **cannot complete the task but runs successfully**, analyze why, and optionally do **one** orchestrator-driven retry with a different approach (e.g., read the module source, check related files for patterns, try an alternative implementation). If it still cannot resolve the comments, comment on the PR with the diagnosed blocker. Only label `requires-human-review` if the blocker is outside agent reach (needs credentials, product decisions, or external dependencies) — otherwise leave it unlabeled for a future sweep attempt. If the sub-agent **execution itself fails** (crash, timeout, or tool error), do not retry — comment on the PR with the failure details and continue to the next PR (do not label, as the failure may be transient).
 
@@ -275,7 +275,7 @@ For each PR in the review-comments bucket from Step 1's `github_pr_dashboard` re
 
 ## Pass 3: Fix Failing CI
 
-**Parallel by default** — CI fixes for different PRs are independent. After the orchestrator classifies each failure (3a), spawn up to 3 sub-agents for PRs that need code fixes. PRs needing only a CI re-run (`flaky`, `infrastructure`) are handled inline by the orchestrator — no sub-agent needed. See [sweep-and-parallelization.md](../pr-lifecycle/references/sweep-and-parallelization.md) for details.
+**Parallel by default** — CI fixes for different PRs are independent. After the orchestrator classifies each failure (3a), spawn up to 3 sub-agents for PRs that need code fixes. PRs needing only a CI re-run (`flaky`, `infrastructure`) are handled inline by the orchestrator — no sub-agent needed. See [sweep-and-parallelization.md](./sweep-and-parallelization.md) for details.
 
 For each PR in the derived `ciFailing` bucket (from `github_pr_dashboard` in the preferred path, or `$scan.ciFailing` only in the shell fallback path), process in parallel batches of 3 for code fixes:
 
@@ -293,11 +293,11 @@ Before diving into manual debugging, use existing CI MCP tools to diagnose the f
 | `stale_branch`   | Rebase onto main via `worktree_rebase`, then re-run CI                    |
 | `codegen`        | Run `make codegen` in the worktree, commit and push                       |
 | `type_error`     | Check if error exists on main — if not, rebase (stale); if so, manual fix |
-| `test_failure`   | Load `skills/debugging/SKILL.md` for investigation                        |
+| `test_failure`   | Load `../../debugging/SKILL.md` for investigation                         |
 | `lint`           | Run `pnpm exec nx affected -t lint --fix`, commit and push                |
 | `flaky`          | Re-run CI: `ci_rerun(runId: <id>, failedOnly: true)` — no code change     |
 | `infrastructure` | Re-run CI — timeout or GitHub Actions infra issue                         |
-| `unknown`        | Load `skills/debugging/SKILL.md` for manual investigation                 |
+| `unknown`        | Load `../../debugging/SKILL.md` for manual investigation                  |
 
 ### 3b. Stale Branch Detection
 
@@ -326,7 +326,7 @@ The `github_pr_scan` tool syncs these labels automatically (`applyLabels: true`)
 If automated classification returns `unknown` or the auto-fix doesn't resolve the issue:
 
 1. Enter the worktree (Step 2)
-2. **Load `skills/debugging/SKILL.md`** — it contains the full diagnostic playbook
+2. **Load `../../debugging/SKILL.md`** — it contains the full diagnostic playbook
 3. Apply the fix based on error category
 4. Validate: `make pc`
 5. Commit and push
@@ -376,7 +376,7 @@ This decouples Copilot review from the critical path — the sweep continues wor
 
 ## Verify Reviewer Bot Labeling
 
-After each pass, the **Reviewer Bot** is responsible for adding `merge-when-ready` to PRs it has APPROVED (`.github/scripts/reviewer/index.mjs:914`). The Author/Sweep Agent does **not** apply this label manually — see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership).
+After each pass, the **Reviewer Bot** is responsible for adding `merge-when-ready` to PRs it has APPROVED (`.github/scripts/reviewer/index.mjs:914`). The Author/Sweep Agent does **not** apply this label manually — see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership).
 
 For each PR that is clean (no unresolved review threads, CI clean) but missing `merge-when-ready`:
 
@@ -392,7 +392,7 @@ For each PR that is clean (no unresolved review threads, CI clean) but missing `
 
 ## Full Sweep: Outer Loop
 
-> **Cloud-mode short-circuit**: this outer loop is **local-only**. Passes 1–3 all require `git commit` / `git push` and will never settle any PR when run from a cloud agent, so the 10-pass `REPEAT` will spin until the session times out (the #1 cause of "sweep-prs hangs in cloud"). If you cannot commit and push code in your current environment, **stop here and jump to [CLOUD-SWEEP.md](CLOUD-SWEEP.md)** — run its steps 1–8 exactly once, then produce the report. Do not sleep or poll.
+> **Cloud-mode short-circuit**: this outer loop is **local-only**. Passes 1–3 all require `git commit` / `git push` and will never settle any PR when run from a cloud agent, so the 10-pass `REPEAT` will spin until the session times out (the #1 cause of "sweep-prs hangs in cloud"). If you cannot commit and push code in your current environment, **stop here and jump to [sweep-cloud.md](./sweep-cloud.md)** — run its steps 1–8 exactly once, then produce the report. Do not sleep or poll.
 
 For full sweeps, run passes 0–3 in a loop until every PR is **settled** — either clean, CI-pending, or labeled `requires-human-review` for a blocker outside agent reach. Fixing one category often creates issues in another (rebase → CI fail, fix → new review), so multiple passes are expected.
 
@@ -515,8 +515,8 @@ REPEAT (max 10 passes):
 - The max 10 pass cap is a safety net, not the expected exit condition
 - If the cap is hit with unsettled PRs remaining, comment the blocker on each and report them in the summary — but do **not** auto-label them `requires-human-review` just because the cap was hit (the blocker may still be agent-fixable in a future sweep)
 
-> 📎 **Claim/release protocol, stale detection, race mitigation, and sub-agent prompt templates**: see [multi-agent-sweep-coordination.md](../pr-lifecycle/references/multi-agent-sweep-coordination.md)
-> 📎 **Parallelization details**: see [sweep-and-parallelization.md](../pr-lifecycle/references/sweep-and-parallelization.md)
+> 📎 **Claim/release protocol, stale detection, race mitigation, and sub-agent prompt templates**: see [multi-agent-sweep-coordination.md](./multi-agent-sweep-coordination.md)
+> 📎 **Parallelization details**: see [sweep-and-parallelization.md](./sweep-and-parallelization.md)
 
 ---
 

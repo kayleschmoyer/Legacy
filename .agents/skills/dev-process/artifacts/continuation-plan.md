@@ -97,7 +97,7 @@ Requires `GITHUB_TOKEN` for posting/fetching comments; returns formatted body fo
 ## Related
 
 - [Entrypoint 10: inherited-pr](../entrypoints/10-inherited-pr.md).
-- [drive-pr skill](../../drive-pr/SKILL.md) — the operational driver-agent flow.
+- [pr-lifecycle (drive reference)](../../pr-lifecycle/references/drive.md) — the operational driver-agent flow.
 - [cloud-agent-mode → Container timeout resilience](../../cloud-agent-mode/SKILL.md#container-timeout-resilience) — the timeout-resilience checkpoint flow.
 - [ticket-to-merge-spine — draft-PR-before-validation gate](../../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions) — draft-PR-first ordering in the canonical spine.
 - [Template](../templates/continuation-plan-template.md).

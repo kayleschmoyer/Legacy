@@ -16,7 +16,7 @@ Each tool is classified into one of three buckets:
 | ⚪ **single-use**  | Genuinely one-shot per workflow (reads, status checks, one-per-session setup). Leave as-is.                               |
 
 **Loop frequency** estimates how often the tool is called repeatedly within one session, grounded by cross-referencing the
-sweep/fan-out skills under `.agents/skills/` (`sweep-prs`, `sweep-dependabot`, `unblock-prs`, `open-prs`, `work-bugs`,
+sweep/fan-out skills under `.agents/skills/` (`pr-lifecycle` references: sweep / sweep-prs / unblock, plus `sweep-dependabot`, `work-bugs`,
 `work-mcp-gaps`, `slice`, `jira-rollover`) plus the ticket-to-merge spine.
 
 **Priority** (for the per-server tickets): **P0** high-frequency + multi-target sweeps are the norm · **P1** looped in
@@ -44,7 +44,7 @@ specific skills · **P2** occasional batching benefit.
 | jira     | `jira_view`                          | `jira_view_batch` (array of keys)                                   | Med — triage reads N tickets per sweep                               | **P2**   | LS-8034           |
 | jira     | `jira_add_comment`                   | `jira_comment_batch` (array of `{ key, body }`)                     | Low–Med — status-stamping N tickets                                  | **P2**   | LS-8034           |
 | github   | `github_merge_pr`                    | `github_merge_batch` (array of PR numbers)                          | High — sweep-prs / sweep-dependabot merge N PRs                      | **P0**   | LS-8035           |
-| github   | `github_rebase_pr`                   | `github_rebase_batch` (array of PR numbers)                         | High — open-prs/sweep rebase the whole board                         | **P0**   | LS-8035           |
+| github   | `github_rebase_pr`                   | `github_rebase_batch` (array of PR numbers)                         | High — pr-lifecycle sweep rebases the whole board                    | **P0**   | LS-8035           |
 | github   | `github_edit_pr`                     | `github_edit_batch` (array of `{ number, ...edits }`)               | Med — relabel/retitle across a sweep                                 | **P1**   | LS-8035           |
 | github   | `github_comment_pr`                  | `github_comment_batch` (array of `{ number, body }`)                | Med — post status notes across PRs                                   | **P1**   | LS-8035           |
 | github   | `github_reply_to_review` / `_thread` | `github_reply_to_review_batch` (array of `{ threadId, body }`)      | High — bot-review cycle replies to N threads                         | **P0**   | LS-8035           |

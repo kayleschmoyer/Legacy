@@ -42,7 +42,7 @@ Build a triage list:
 | CI checks failing             | Fix CI (Step 3)      |
 | All green                     | Skip to Step 4       |
 
-**Jira-link marker check (do this during assessment)**: the PR body must carry the structured `<!-- jira-link -->` marker — the source of truth for ticket linkage (see [create-pr reference](../pr-lifecycle/references/create-pr.md#jira-link-marker-source-of-truth-for-ticket-linkage)). If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number: <PR#>, body: "<marker block>\n\n<existing body>" })` with `primary:` set to the PR's ticket key (from title/branch), or `primary: none` for ticket-less bot PRs. Editing the body is the supported correction path — never force-push or rename the branch to fix linkage.
+**Jira-link marker check (do this during assessment)**: the PR body must carry the structured `<!-- jira-link -->` marker — the source of truth for ticket linkage (see [create-pr reference](./create-pr.md#jira-link-marker-source-of-truth-for-ticket-linkage)). If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number: <PR#>, body: "<marker block>\n\n<existing body>" })` with `primary:` set to the PR's ticket key (from title/branch), or `primary: none` for ticket-less bot PRs. Editing the body is the supported correction path — never force-push or rename the branch to fix linkage.
 
 **Order matters**: always rebase first (Step 1), then fix reviews (Step 2), then fix CI (Step 3). Rebasing can resolve outdated review comments and change CI results.
 
@@ -50,7 +50,7 @@ Build a triage list:
 
 ### Step 1: Rebase (if conflicting)
 
-> Reference: load [rebase skill](../rebase/SKILL.md) for the full decision framework and conflict resolution patterns.
+> Reference: load [rebase skill](../../rebase/SKILL.md) for the full decision framework and conflict resolution patterns.
 
 1. `git fetch origin` in the worktree
 2. `worktree_rebase()` — fetches origin and rebases onto parent
@@ -62,13 +62,13 @@ Build a triage list:
 
 ### Step 2: Fix Review Comments (if any unresolved threads)
 
-> Reference: load [fix-reviews reference](../pr-lifecycle/references/fix-reviews.md) for the full workflow, cloud tool substitutions, and two-round cap.
+> Reference: load [fix-reviews reference](./fix-reviews.md) for the full workflow, cloud tool substitutions, and two-round cap.
 
 1. **Fetch ticket context first**: extract `LS-####` from PR title or branch name. If found and Jira is configured, call `jira_view(key: "LS-####")` to get acceptance criteria — use as a guardrail against contradictory suggestions.
 2. **Read ALL unresolved threads** before making any changes — collect every `path`, `line`, `body`, and `id`.
 3. **Apply all fixes in one pass** — do not commit between individual fixes. If a comment is unclear or contradicts ticket AC, reply explaining the conflict but still queue the thread for resolution.
 4. **Validate**: `make pc` (minimum: `make format && make lint-fix && make typecheck`)
-5. **Self-review fix code**: re-read every file you changed in full. Check fixes against `skills/pr-lifecycle/references/common-review-patterns.md` — fix code often introduces the same anti-patterns that triggered the original review. This prevents another review cycle.
+5. **Self-review fix code**: re-read every file you changed in full. Check fixes against `./common-review-patterns.md` — fix code often introduces the same anti-patterns that triggered the original review. This prevents another review cycle.
 6. **Commit + push once**: single commit covering all review fixes and any already-identified CI/root-cause fixes you intentionally batched into the same round.
 7. **Resolve threads immediately after push**: call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` — include all addressed threads. GitHub does not auto-resolve threads. **Precondition for any GraphQL / `Invoke-RestMethod` / `curl` fallback**: first call `github_resolve_threads` and receive a connection error or explicit tool-not-found response. The MCP tool handles thread-ID batching and worktree-path resolution; shell fallbacks bypass both.
 8. **Apply `bot:ready-for-review` label**: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })` — fires the next Reviewer (W1) cycle. Copilot review triggers automatically; no explicit `github_request_review` call needed.
@@ -77,7 +77,7 @@ Build a triage list:
 
 ### Step 3: Fix CI Failures (if checks failing)
 
-> Reference: load [debugging skill](../debugging/SKILL.md) and its [CI failure reference](../debugging/references/ci-failure.md) for evidence-first methodology and pipeline architecture.
+> Reference: load [debugging skill](../../debugging/SKILL.md) and its [CI failure reference](../../debugging/references/ci-failure.md) for evidence-first methodology and pipeline architecture.
 
 1. **Route `bot-review` correctly before reading logs**: if the failing check is `bot-review`, or otherwise looks review-related by name/context, this is **not** a CI-logs-first problem. First inspect the status/check details — for example via `github_list_commit_statuses({ number: <PR#> })` or by opening the failed check URL — to confirm it is actually reporting unresolved comments, review threads, or `Copilot review blocked`. Once confirmed, re-evaluate unresolved review threads now — whether Step 2 was skipped earlier because none existed yet, or new threads appeared after a prior push — and fold any current review fixes into this remediation round before reading Actions logs for the remaining non-review failures.
 2. **Get the PR branch**: `github_view_pr({ number: <PR#> })` and capture `headRefName`.
@@ -86,9 +86,9 @@ Build a triage list:
 5. **Read logs**: `ci_get_logs({ runId, failedOnly: true })` to pull failing-job logs, or after `ci_view_run({ runId })` identify a failing `jobId` and use `ci_get_logs({ jobId })` — find the actual error, not just the job name.
 6. **Fix the code** based on the error evidence. If you already collected unresolved review threads in the current round, batch those fixes into the same working pass rather than pushing twice.
 7. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
-8. **Self-review fix code**: re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing.
+8. **Self-review fix code**: re-read changed files in full and check against `./common-review-patterns.md` before pushing.
 9. **Commit + push once for the round**.
-10. **Wait for CI**: continue to the next workflow step after pushing — Claude Code surfaces CI pass/fail as push notifications, so `github_view_pr` / `ci_view_run` are one-shot lookups (e.g. after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal. See [mcp-first CI Operations](../mcp-first/SKILL.md#ci-operations).
+10. **Wait for CI**: continue to the next workflow step after pushing — Claude Code surfaces CI pass/fail as push notifications, so `github_view_pr` / `ci_view_run` are one-shot lookups (e.g. after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal. See [mcp-first CI Operations](../../mcp-first/SKILL.md#ci-operations).
 
 ### Step 4: Final Verification
 
@@ -97,7 +97,7 @@ After all fixes are applied and pushed:
 1. Re-check PR status: `github_pr_batch_status({ numbers: [<PR#>] })`
 2. Confirm: `mergeable != CONFLICTING`, no unresolved threads, CI green
 3. If new issues appeared (Copilot re-review found new problems, CI regressed), loop back to the relevant step — but cap total iterations at 3.
-4. (Re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership)).
+4. (Re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership)).
 
 ## Iteration Cap
 
@@ -110,16 +110,16 @@ After all fixes are applied and pushed:
 
 - **Rebase before reviews**: outdated review threads may auto-resolve after rebase — always rebase first to avoid fixing stale comments.
 - **`mergeable: UNKNOWN`** does not mean blocked — GitHub may still be computing. Call `github_view_pr` and check `state` + `mergedAt` to confirm actual status.
-- **Check Runs vs Commit Statuses**: `github_retrigger_check` only works on Check Runs. `bot-review` uses the Statuses API — push a new commit or dispatch the workflow to clear it. See [pr-lifecycle skill](../pr-lifecycle/SKILL.md) rule 8.
+- **Check Runs vs Commit Statuses**: `github_retrigger_check` only works on Check Runs. `bot-review` uses the Statuses API — push a new commit or dispatch the workflow to clear it. See [pr-lifecycle skill](../SKILL.md) rule 8.
 - **Route `bot-review` to reviews, not CI debugging** — if the failure text is about unresolved comments or blocked Copilot review, fetch unresolved threads first instead of digging through Actions logs.
 - **Always `make pc` before pushing** — every push that fails CI costs 40-60 min of pipeline time.
 - **Batch review fixes** — push once per round, not once per comment. Each push triggers Copilot re-review.
 
 ## Related Skills
 
-- [rebase](../rebase/SKILL.md) — conflict resolution decision tree and post-rebase stabilization
-- [pr-lifecycle](../pr-lifecycle/SKILL.md) — PR creation, self-review, thread resolution workflow
-- [fix-reviews reference](../pr-lifecycle/references/fix-reviews.md) — detailed review fixing, cloud workflow, two-round cap
-- [debugging](../debugging/SKILL.md) — CI failure debugging, evidence-first methodology
-- [debugging/ci-failure](../debugging/references/ci-failure.md) — CI pipeline architecture and failure patterns
-- [open-prs](../open-prs/SKILL.md) — sweep orchestrator (multi-PR, not single-PR)
+- [rebase](../../rebase/SKILL.md) — conflict resolution decision tree and post-rebase stabilization
+- [pr-lifecycle](../SKILL.md) — PR creation, self-review, thread resolution workflow
+- [fix-reviews reference](./fix-reviews.md) — detailed review fixing, cloud workflow, two-round cap
+- [debugging](../../debugging/SKILL.md) — CI failure debugging, evidence-first methodology
+- [debugging/ci-failure](../../debugging/references/ci-failure.md) — CI pipeline architecture and failure patterns
+- [open-prs](./sweep.md) — sweep orchestrator (multi-PR, not single-PR)

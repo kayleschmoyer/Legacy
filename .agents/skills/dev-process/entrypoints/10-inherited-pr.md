@@ -71,6 +71,6 @@ This forces context recovery to be explicit and gives the original author a chan
 ## Related skills
 
 - [continuation-plan artifact](../artifacts/continuation-plan.md)
-- [drive-pr](../../drive-pr/SKILL.md) — operational driver-agent flow
-- [fix-pr](../../fix-pr/SKILL.md) — fixing all outstanding issues on a PR
+- [pr-lifecycle (drive reference)](../../pr-lifecycle/references/drive.md) — operational driver-agent flow
+- [pr-lifecycle (fix reference)](../../pr-lifecycle/references/fix.md) — fixing all outstanding issues on a PR
 - [pr-lifecycle](../../pr-lifecycle/SKILL.md)

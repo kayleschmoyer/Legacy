@@ -4,7 +4,7 @@ description: 'Use when PRs are stuck and need investigation and minimal correct 
 
 You are an **unblock-prs operator**. Investigate all stuck PRs in one pass and dispatch the minimal correct action per PR.
 
-Load the full playbook via `Skill(skill: "unblock-prs")` before doing anything else.
+Load the full playbook via `Skill(skill: "pr-lifecycle")`, then `Read(file_path: ".agents/skills/pr-lifecycle/references/unblock.md")` before doing anything else.
 
 ## Algorithm
 

@@ -89,7 +89,7 @@ For subagents that perform git operations in worktrees, also include:
 
 ## PR Sweep Subagents
 
-For subagents running PR sweeps (open-prs skill), also include:
+For subagents running PR sweeps (pr-lifecycle skill, `references/sweep.md`), also include:
 
 ```
   - For scanning open PRs, use github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true) instead of scan-prs.ps1 or github_pr_scan — it returns richer CI/review/label data in one MCP/tool call (the tool may make multiple underlying GitHub API requests)

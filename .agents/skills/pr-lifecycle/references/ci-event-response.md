@@ -13,7 +13,7 @@ Before responding to any event:
 
 1. **Identify the event type** — the incoming notification tells you whether this is a check failure, a review comment, a PR comment update, or a status change. Start there, not with logs.
 2. **Identify the check or actor** — the check name or comment author determines which triage branch to follow.
-3. **Read state once, act once** — use `github_view_pr` and `github_get_review_threads` as one-shot lookups. Do not call them in a loop. See Critical Rule #11 in [pr-lifecycle](../pr-lifecycle/SKILL.md).
+3. **Read state once, act once** — use `github_view_pr` and `github_get_review_threads` as one-shot lookups. Do not call them in a loop. See Critical Rule #11 in [pr-lifecycle](../SKILL.md).
 4. **Batch all known fixes into one push** — if a failing check AND unresolved review threads are both present, fix both before pushing. Separate pushes trigger separate CI and review cycles.
 
 ---
@@ -50,7 +50,7 @@ The `check-conflicts.yml` workflow is dispatched from the PR's head branch (not 
 
 **Response**:
 
-1. Load and run the [`/rebase` skill](../rebase/SKILL.md).
+1. Load and run the [`/rebase` skill](../../rebase/SKILL.md).
 2. Resolve any conflicts that arise during rebase.
 3. Push the rebased branch.
 4. Apply `bot:ready-for-review` if CI was previously passing and the PR was already in review.
@@ -75,20 +75,20 @@ The `check-conflicts.yml` workflow is dispatched from the PR's head branch (not 
 
 ### Failure Classification
 
-| Category                   | Symptoms                                                | Fix                                                                                                                                                                                                                                                                                 |
-| -------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Format**                 | `Prettier`, `exit 123`, "No files matching the pattern" | Run `make format` locally, commit. If "No files matching" — stale diff phantom: rebase on main and re-push                                                                                                                                                                          |
-| **Lint**                   | ESLint rule violations                                  | Fix the flagged lines; `make lint-fix` handles auto-fixable rules                                                                                                                                                                                                                   |
-| **Typecheck**              | `tsc` type errors                                       | Fix types; check for missing imports or wrong generic params                                                                                                                                                                                                                        |
-| **Test**                   | Jest/Vitest failures                                    | Fix the failing test or the code it covers; run `make test` to verify                                                                                                                                                                                                               |
-| **Build**                  | Webpack/Vite/tsc compile errors                         | Fix the build error; common causes: missing export, wrong import path                                                                                                                                                                                                               |
-| **Codegen**                | "Generated file out of date", graphql-codegen diff      | Run `make codegen`, commit the diff                                                                                                                                                                                                                                                 |
-| **Lockfile**               | `pnpm-lock.yaml` out of sync                            | Run `make install`, commit the lockfile update                                                                                                                                                                                                                                      |
-| **E2E**                    | Playwright test failures                                | See [e2e-determinism](../testing/references/e2e-determinism.md); fix flake or update selectors                                                                                                                                                                                      |
-| **Migrations**             | "Verify Migrations Applied" failure                     | Run `pnpm --prefix lib/db-client run db:up` (or hosted `db_migrate` MCP for dev RDS), re-push; if journal mismatch after editing a committed migration, soft-reset to branch base so the migration re-stages as "added", then re-apply — see [database skill](../database/SKILL.md) |
-| **Infrastructure / flake** | Timeout, network error, runner OOM                      | Re-run via `ci_rerun_failed_jobs(runId: <id>)` once; if it fails again, investigate root cause                                                                                                                                                                                      |
+| Category                   | Symptoms                                                | Fix                                                                                                                                                                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Format**                 | `Prettier`, `exit 123`, "No files matching the pattern" | Run `make format` locally, commit. If "No files matching" — stale diff phantom: rebase on main and re-push                                                                                                                                                                             |
+| **Lint**                   | ESLint rule violations                                  | Fix the flagged lines; `make lint-fix` handles auto-fixable rules                                                                                                                                                                                                                      |
+| **Typecheck**              | `tsc` type errors                                       | Fix types; check for missing imports or wrong generic params                                                                                                                                                                                                                           |
+| **Test**                   | Jest/Vitest failures                                    | Fix the failing test or the code it covers; run `make test` to verify                                                                                                                                                                                                                  |
+| **Build**                  | Webpack/Vite/tsc compile errors                         | Fix the build error; common causes: missing export, wrong import path                                                                                                                                                                                                                  |
+| **Codegen**                | "Generated file out of date", graphql-codegen diff      | Run `make codegen`, commit the diff                                                                                                                                                                                                                                                    |
+| **Lockfile**               | `pnpm-lock.yaml` out of sync                            | Run `make install`, commit the lockfile update                                                                                                                                                                                                                                         |
+| **E2E**                    | Playwright test failures                                | See [e2e-determinism](../../testing/references/e2e-determinism.md); fix flake or update selectors                                                                                                                                                                                      |
+| **Migrations**             | "Verify Migrations Applied" failure                     | Run `pnpm --prefix lib/db-client run db:up` (or hosted `db_migrate` MCP for dev RDS), re-push; if journal mismatch after editing a committed migration, soft-reset to branch base so the migration re-stages as "added", then re-apply — see [database skill](../../database/SKILL.md) |
+| **Infrastructure / flake** | Timeout, network error, runner OOM                      | Re-run via `ci_rerun_failed_jobs(runId: <id>)` once; if it fails again, investigate root cause                                                                                                                                                                                         |
 
-After fixing, validate before pushing. In **cloud** sessions run the seven `pc-*` chunks in order (never a single `make pc`) — see [cloud-agent-mode](../cloud-agent-mode/SKILL.md); locally `make pc` is fine. See [workflow-overview](../workflow-overview/SKILL.md) Step 11.
+After fixing, validate before pushing. In **cloud** sessions run the seven `pc-*` chunks in order (never a single `make pc`) — see [cloud-agent-mode](../../cloud-agent-mode/SKILL.md); locally `make pc` is fine. See [workflow-overview](../../workflow-overview/SKILL.md) Step 11.
 
 ---
 
@@ -112,7 +112,7 @@ After fixing, validate before pushing. In **cloud** sessions run the seven `pc-*
 
 ### From `legacy-sports-review-bot`
 
-This is the Reviewer Bot (W1). Its reviews are the primary gate before merge. Follow the **Author Agent Contract** in [pr-lifecycle](../pr-lifecycle/SKILL.md) exactly.
+This is the Reviewer Bot (W1). Its reviews are the primary gate before merge. Follow the **Author Agent Contract** in [pr-lifecycle](../SKILL.md) exactly.
 
 Quick reference:
 
@@ -120,7 +120,7 @@ Quick reference:
 - **Cycle 3+**: `FIX: <sha>` or `CANNOT-COMPLY: <issue-id>` with reason on the next line.
 - **LGTM / APPROVED with no findings**: stop — no reply needed.
 
-The full protocol, cycle rules, and format requirements live in [pr-lifecycle](../pr-lifecycle/SKILL.md#author-agent-contract-bot-pr-flow). Load it now if responding to a bot review cycle.
+The full protocol, cycle rules, and format requirements live in [pr-lifecycle](../SKILL.md#author-agent-contract-bot-pr-flow). Load it now if responding to a bot review cycle.
 
 ### From `copilot-pull-request-reviewer`
 
@@ -148,7 +148,7 @@ Read carefully. If the comment contains instructions or a question directed at t
 
 **Response**:
 
-1. Read the check name carefully — match it against [ci-checks-reference.md](../pr-lifecycle/references/ci-checks-reference.md) for a known fix.
+1. Read the check name carefully — match it against [ci-checks-reference.md](./ci-checks-reference.md) for a known fix.
 2. If not listed there: `ci_get_logs(runId: <id>)` and read the failure output.
 3. Classify using the [Failure Classification](#failure-classification) table above.
 4. If the root cause is unclear after reading logs, check whether the check name appears in `ruleset.json` as a required check. Non-required checks that fail do not block merge — confirm before spending time debugging them.
@@ -179,7 +179,7 @@ After pushing any fix (conflict resolution, CI fix, or review fix):
 
 ## Related Skills
 
-- [pr-lifecycle](../pr-lifecycle/SKILL.md) — Author Agent Contract, label ownership, thread resolution
-- [rebase](../rebase/SKILL.md) — Rebase branch and resolve merge conflicts
-- [drive-pr](../drive-pr/SKILL.md) — Full PR shepherding loop from push to merge
-- [debugging](../debugging/SKILL.md) — Deep-dive CI and runtime debugging
+- [pr-lifecycle](../SKILL.md) — Author Agent Contract, label ownership, thread resolution
+- [rebase](../../rebase/SKILL.md) — Rebase branch and resolve merge conflicts
+- [drive-pr](./drive.md) — Full PR shepherding loop from push to merge
+- [debugging](../../debugging/SKILL.md) — Deep-dive CI and runtime debugging

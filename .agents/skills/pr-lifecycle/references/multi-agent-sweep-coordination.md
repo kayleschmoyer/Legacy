@@ -7,7 +7,7 @@ description: 'Claim/release protocol used by every sweep-prs run to coordinate a
 
 Every `sweep-prs` run uses `sweep-claimed` GitHub labels to coordinate across agents. When running solo the labels simply never contend. When multiple agents run simultaneously, each claims PRs before working on them and releases when done, so agents naturally work on disjoint sets.
 
-The outer loop is in `open-prs/SKILL.md`. This document covers the low-level claim mechanics referenced there.
+The outer loop is in `pr-lifecycle/references/sweep.md`. This document covers the low-level claim mechanics referenced there.
 
 ## Coordination Labels
 

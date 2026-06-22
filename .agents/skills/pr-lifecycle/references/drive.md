@@ -39,12 +39,12 @@ The core loop is: **inspect → fix → wait → repeat** until the PR is merged
 
 This skill is a **coordinator** — it delegates to specialized sub-skills for actual fixes:
 
-| Problem                    | Sub-Skill                                             |
-| -------------------------- | ----------------------------------------------------- |
-| Merge conflicts            | `skills/rebase/SKILL.md`                              |
-| Copilot review comments    | `skills/pr-lifecycle/SKILL.md` (Phase 3: Fix Reviews) |
-| CI failures (code changes) | `skills/debugging/SKILL.md`                           |
-| Worktree setup             | `skills/worktree-workflow/SKILL.md`                   |
+| Problem                    | Sub-Skill                            |
+| -------------------------- | ------------------------------------ |
+| Merge conflicts            | `../../rebase/SKILL.md`              |
+| Copilot review comments    | `../SKILL.md` (Phase 3: Fix Reviews) |
+| CI failures (code changes) | `../../debugging/SKILL.md`           |
+| Worktree setup             | `../../worktree-workflow/SKILL.md`   |
 
 ## Steps
 
@@ -163,7 +163,7 @@ Work through blockers in priority order. Treat each pass through Step 5 as a **r
 
 If `mergeable: "CONFLICTING"`:
 
-1. Load the rebase skill: read `skills/rebase/SKILL.md`
+1. Load the rebase skill: read `../../rebase/SKILL.md`
 2. Rebase onto the base branch (usually `origin/main`)
 3. Resolve conflicts
 4. Run post-rebase stabilization: `worktree_stabilize()`
@@ -177,8 +177,8 @@ If CI is failing:
 1. Get the run ID: `ci_list_runs(branch: "<headRefName>", limit: 1)`
 2. Check if it's a flaky test — `ci_rerun(runId: <id>, failedOnly: true)` if it looks transient
 3. If persistent, get logs: `ci_get_logs(runId: <id>, errorSummary: true)`
-4. Load debugging skill if code changes are needed: read `skills/debugging/SKILL.md`
-5. Fix, validate with `make pc`, self-review fix code against `skills/pr-lifecycle/references/common-review-patterns.md`, then commit and push
+4. Load debugging skill if code changes are needed: read `../../debugging/SKILL.md`
+5. Fix, validate with `make pc`, self-review fix code against `./common-review-patterns.md`, then commit and push
 
 #### Priority 3: Review comments
 
@@ -187,7 +187,7 @@ If there are unresolved review threads:
 1. Fetch threads: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
 2. For each thread, read the comment's path/line/body
 3. Cross-reference with Jira ticket context (don't apply suggestions that contradict AC)
-4. Fix the code, validate with `make pc`, self-review fix code against `skills/pr-lifecycle/references/common-review-patterns.md`, then commit and push
+4. Fix the code, validate with `make pc`, self-review fix code against `./common-review-patterns.md`, then commit and push
 5. Resolve threads: `github_resolve_threads(threadIds: [...], prNumber: <PR#>)`
 6. Apply `bot:ready-for-review` label: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])` — fires the next review cycle; Copilot triggers automatically.
 
@@ -210,7 +210,7 @@ worktree_push()
 
 After fixing all known issues, Claude Code will surface PR events natively — no wait tool needed.
 
-> **Precondition for waiting on PR events**: continue to the next workflow step after pushing — Claude Code surfaces CI fail/pass, review threads, conflicts, and merge events as push notifications. Treat `github_view_pr` and `ci_view_run` as one-shot lookups (e.g. to fetch a `runId` after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal than the native notification. See the [mcp-first CI Operations section](../mcp-first/SKILL.md#ci-operations).
+> **Precondition for waiting on PR events**: continue to the next workflow step after pushing — Claude Code surfaces CI fail/pass, review threads, conflicts, and merge events as push notifications. Treat `github_view_pr` and `ci_view_run` as one-shot lookups (e.g. to fetch a `runId` after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal than the native notification. See the [mcp-first CI Operations section](../../mcp-first/SKILL.md#ci-operations).
 
 React to each event as it arrives. Handle each event:
 
@@ -231,7 +231,7 @@ React to each event as it arrives. Handle each event:
 - No unresolved review threads
 - `bot:ready-for-review` has been (re-)applied since the last fix-push so the Reviewer Bot fires
 
-When the Reviewer Bot APPROVEs, it labels the PR with `merge-when-ready` itself and the merge queue (`.github/workflows/merge-queue.yml`) picks it up automatically. **Precondition for the merge step**: wait for the Bot's label rather than applying `merge-when-ready` yourself; manual application bypasses the gate that holds back PRs the Bot has rejected. Use `github_merge_pr` only when the workflow explicitly calls for an admin merge (`strategy: "direct"`) — the default path is the merge queue. See [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership).
+When the Reviewer Bot APPROVEs, it labels the PR with `merge-when-ready` itself and the merge queue (`.github/workflows/merge-queue.yml`) picks it up automatically. **Precondition for the merge step**: wait for the Bot's label rather than applying `merge-when-ready` yourself; manual application bypasses the gate that holds back PRs the Bot has rejected. Use `github_merge_pr` only when the workflow explicitly calls for an admin merge (`strategy: "direct"`) — the default path is the merge queue. See [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership).
 
 If a clean PR sits without `merge-when-ready` for more than one Reviewer Bot cycle, the upstream cause is either (a) `bot:ready-for-review` was not (re-)applied after the last push, (b) the Reviewer Bot is rate-limited (`review-bot-degraded` label present), or (c) the Reviewer Bot's verdict is still CHANGES_REQUESTED. Fix the upstream cause — do not paper over with the label.
 
@@ -259,7 +259,7 @@ After the PR merges:
 
 ### Step 8: MCP gap audit (mandatory)
 
-After merge, run the MCP gap audit per `skills/mcp-first/references/gaps.md` Phase 1:
+After merge, run the MCP gap audit per [`../../mcp-first/references/gaps.md`](../../mcp-first/references/gaps.md) Phase 1:
 
 1. Review all Bash commands from this session
 2. Classify gaps: `missing-tool`, `missing-feature`, `missing-awareness`

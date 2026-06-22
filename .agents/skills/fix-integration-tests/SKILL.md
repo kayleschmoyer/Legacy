@@ -348,5 +348,5 @@ make_run({ target: "pc" })
 - `/e2e` (`.claude/commands/e2e.md`) — use for hermetic mocked E2E failures under `apps/web-e2e/src/tests/`
 - [read-playwright-report](./../read-playwright-report/SKILL.md) — parse Playwright HTML reports linked in the ticket
 - [debugging](./../debugging/SKILL.md) — general debugging approach for non-obvious failures
-- [fix-pr](./../fix-pr/SKILL.md) — if the PR is already open and CI is failing
+- [pr-lifecycle (fix reference)](./../pr-lifecycle/references/fix.md) — if the PR is already open and CI is failing
 - [pr-lifecycle](./../pr-lifecycle/SKILL.md) — PR creation, thread resolution, and merge protocol

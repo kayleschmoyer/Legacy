@@ -64,14 +64,14 @@ Supports three modes:
 
 This skill delegates to specialized sub-skills for each operation category. Load them when you encounter that problem type:
 
-| Operation               | Sub-Skill                                 | When to Load                                 | Cloud? |
-| ----------------------- | ----------------------------------------- | -------------------------------------------- | :----: |
-| Rebase conflicting PRs  | `skills/rebase/SKILL.md`                  | PR has merge conflicts                       |   ❌   |
-| Resolve merge conflicts | `skills/resolve-merge-conflicts/SKILL.md` | Rebase produces conflicts needing manual fix |   ❌   |
-| Fix review comments     | `skills/pr-lifecycle/SKILL.md`            | PR has unresolved Copilot review threads     |   ❌   |
-| Debug CI failures       | `skills/debugging/SKILL.md`               | PR has failing CI checks                     |   ❌   |
-| Enter a worktree        | `skills/worktree-workflow/SKILL.md`       | Need to create or access a PR's worktree     |   ❌   |
-| Create a PR             | `skills/pr-lifecycle/SKILL.md`            | Need to open a new PR after fixes            |   ❌   |
+| Operation               | Sub-Skill                                | When to Load                                 | Cloud? |
+| ----------------------- | ---------------------------------------- | -------------------------------------------- | :----: |
+| Rebase conflicting PRs  | `../../rebase/SKILL.md`                  | PR has merge conflicts                       |   ❌   |
+| Resolve merge conflicts | `../../resolve-merge-conflicts/SKILL.md` | Rebase produces conflicts needing manual fix |   ❌   |
+| Fix review comments     | `../SKILL.md`                            | PR has unresolved Copilot review threads     |   ❌   |
+| Debug CI failures       | `../../debugging/SKILL.md`               | PR has failing CI checks                     |   ❌   |
+| Enter a worktree        | `../../worktree-workflow/SKILL.md`       | Need to create or access a PR's worktree     |   ❌   |
+| Create a PR             | `../SKILL.md`                            | Need to open a new PR after fixes            |   ❌   |
 
 ## Prerequisites
 
@@ -106,7 +106,7 @@ If either returns `configured: false`, **stop and prompt the user** before proce
 - **Precondition for any action on a Dependabot PR: route to the Dependabot pass in `PASSES.md`, comment-only.** Identify by author (`dependabot[bot]`) or branch prefix (`dependabot/`). Excluded from passes 0, 1, 2, 3. Interactions use Dependabot comment commands (`@dependabot rebase` for conflicts/stale CI, `merge-when-ready` label for clean PRs); local rebases, lockfile regeneration, and code edits race against Dependabot's branch ownership and produce force-push conflicts.
 - **Scan all open PRs, not just your own** — prefer `github_pr_dashboard(limit: 100, excludeDrafts: true)` for the main sweep. The dashboard has a hard cap of 100 PRs, so if the repo has more than 100 open PRs, cover the remainder with additional filtered dashboard runs (for example by label/queue slices) or use the local `scan-prs.ps1 -Limit <n>` fallback when a larger one-shot listing is required.
 - **Resolve review threads after fixing** — leaving threads unresolved is incomplete work
-- **Precondition for applying `merge-when-ready`: the Reviewer Bot has APPROVED.** The Bot labels the PR itself on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`); manual application bypasses the review gate and can push un-reviewed or CHANGES_REQUESTED PRs into the merge queue. If a clean PR is missing the label after the Bot ran, the upstream cause is one of: (a) `bot:ready-for-review` not (re-)applied after the last push, (b) Bot rate-limited (`review-bot-degraded` label present), or (c) Bot verdict is still CHANGES_REQUESTED. Fix the upstream cause; do not paper over with the label. See [Label Ownership in AGENTS.md](../../../AGENTS.md#label-ownership). (**Dependabot exception**: Dependabot PRs have no Reviewer Bot involvement; applying `merge-when-ready` directly is the documented comment-command flow below.)
+- **Precondition for applying `merge-when-ready`: the Reviewer Bot has APPROVED.** The Bot labels the PR itself on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`); manual application bypasses the review gate and can push un-reviewed or CHANGES_REQUESTED PRs into the merge queue. If a clean PR is missing the label after the Bot ran, the upstream cause is one of: (a) `bot:ready-for-review` not (re-)applied after the last push, (b) Bot rate-limited (`review-bot-degraded` label present), or (c) Bot verdict is still CHANGES_REQUESTED. Fix the upstream cause; do not paper over with the label. See [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership). (**Dependabot exception**: Dependabot PRs have no Reviewer Bot involvement; applying `merge-when-ready` directly is the documented comment-command flow below.)
 - **Dashboard CI summary can be stale** — the dashboard reports `ciStatus` as `none`, `pass`, `fail`, or `pending`. Stale checks (e.g., Enhanced Merge Queue on an old SHA) can cause a PR to show `fail` or `pending` even when current-SHA checks all pass. Use `github_pr_batch_status` to inspect actual job-level results: if all CI Pipeline and Security Scanning jobs are SUCCESS/SKIPPED, the PR is clean regardless of dashboard `ciStatus`.
 - **Burn through until settled** — every PR must reach a terminal state. A PR is settled when it is clean, has CI pending after the final pass, or labeled `requires-human-review` with a comment explaining the blocker. Do not stop the sweep while actionable PRs remain (subject to the max-passes safety cap).
 - **Precondition for `requires-human-review`: at least one fix attempt has failed AND the blocker is outside agent reach.** Valid reasons: missing credentials/secrets the agent cannot access, product or design decisions requiring human judgment, blocked on an external team or system, manual infrastructure access required. Invalid reasons that fail this precondition: CI failures (rebase, fix the code, or re-run), review comments (read the code and fix them), Dependabot PRs with conflicts or stale CI (use `@dependabot rebase`), complexity or multiple failed attempts (try a different approach). When the precondition is met, add via `github_manage_labels(prs: [<PR#>], add: ["requires-human-review"])` with a PR comment explaining the specific blocker.
@@ -116,7 +116,7 @@ If either returns `configured: false`, **stop and prompt the user** before proce
 - **One worktree per PR** — never mix fixes for different PRs in the same worktree
 - **All file edits happen in the worktree**, never in `D:\code\legacy-sports`
 - **Always `make pc` before pushing** — do not push broken code. **Every agent that modifies code must validate before pushing. Skipping saves 5 min but each CI failure costs 40-60 min in re-dispatch + CI queue time.**
-- **Always self-review before pushing** — after `make pc` passes, re-read changed files in full and check against `skills/pr-lifecycle/references/common-review-patterns.md`. Fix code is new code that Copilot will review — skipping self-review here is the #1 cause of review round-trip cycles in sweeps.
+- **Always self-review before pushing** — after `make pc` passes, re-read changed files in full and check against `./common-review-patterns.md`. Fix code is new code that Copilot will review — skipping self-review here is the #1 cause of review round-trip cycles in sweeps.
 - **Dirty-tree guard before push** — after `make pc` passes, check `worktree_status(worktree: "LS-####")`. If the working tree is dirty (formatting auto-amend may leave changes on Windows), commit with `worktree_commit(message: "style: apply formatting", worktree: "LS-####")` and re-run `make pc` before pushing.
 - **Always `--force-with-lease`** when pushing rebased branches — `worktree_push` uses this by default
 
@@ -148,9 +148,9 @@ When an MCP tool fails, **do not assume the entire server is down**. Different t
 
 # Workflow
 
-> For detailed step-by-step playbooks for the local agent sweep (Steps 0–2, Passes 0–3, outer loop, final summary, final validation), see [PASSES.md](PASSES.md).
+> For detailed step-by-step playbooks for the local agent sweep (Steps 0–2, Passes 0–3, outer loop, final summary, final validation), see [sweep-passes.md](./sweep-passes.md).
 >
-> For the cloud agent workflow (Cloud Steps 1–6, Cloud Full Sweep Algorithm), see [CLOUD-SWEEP.md](CLOUD-SWEEP.md).
+> For the cloud agent workflow (Cloud Steps 1–6, Cloud Full Sweep Algorithm), see [sweep-cloud.md](./sweep-cloud.md).
 
 > **⚠️ ORCHESTRATOR FOOTPRINT PRINCIPLE — read before proceeding.**
 > The sweep orchestrator must maintain a **minimal context footprint**. It scans, claims, dispatches, and tracks state — it does **NOT** do per-PR deep work inline. Every operation that involves reading CI logs, loading skill files, reading review threads, editing code, running `make pc`, committing, or pushing **must be delegated to a sub-agent** via `Agent(subagent_type: "general-purpose", ...)` with a fully self-contained prompt.
@@ -159,7 +159,7 @@ When an MCP tool fails, **do not assume the entire server is down**. Different t
 >
 > **Violations to avoid** — the orchestrator must NOT:
 >
-> - Load per-PR skill files (`skills/pr-lifecycle/SKILL.md`, `skills/debugging/SKILL.md`) and execute their steps inline
+> - Load per-PR skill files (`../SKILL.md`, `../../debugging/SKILL.md`) and execute their steps inline
 > - Call `Read` / `Edit` / `Grep` on PR branch files directly in the orchestrator
 > - Run `make_run({ target: "pc" })` in a PR's worktree from the orchestrator context
 > - Call `ci_get_logs` / `ci_search_logs` to diagnose CI failures inline in the orchestrator
@@ -172,7 +172,7 @@ The sweep's **read-only front half — scan every open PR, classify each into a 
 
 **Why a Workflow here**: scanning is one `github_pr_dashboard` call, but turning ambiguous PRs into settled buckets needs per-PR deep inspection — review-thread counts, stale `COMMENTED`-review detection, and classifying CI failures as flaky-vs-code from logs. Doing that inline blows the orchestrator's context (see the Orchestrator Footprint Principle above); fanning it out one agent per PR keeps orchestrator cost `O(PRs × dispatch)` and makes the classification deterministic and schema-validated. The `pipeline()` has no barrier — each PR classifies as soon as the scan returns.
 
-**When to invoke**: invoking `/open-prs` (or `/sweep-prs`) authorizes this scoped Workflow call — pass the read-only triage script below. For a trivial scan (few PRs, dashboard data already unambiguous) the single `github_pr_dashboard` call in [PASSES.md Step 1](PASSES.md) is sufficient and the Workflow adds no value; reach for the Workflow when the PR set is large or per-PR classification is ambiguous.
+**When to invoke**: invoking `/open-prs` (or `/sweep-prs`) authorizes this scoped Workflow call — pass the read-only triage script below. For a trivial scan (few PRs, dashboard data already unambiguous) the single `github_pr_dashboard` call in [sweep-passes.md Step 1](./sweep-passes.md) is sufficient and the Workflow adds no value; reach for the Workflow when the PR set is large or per-PR classification is ambiguous.
 
 **Read-only contract**: the Workflow uses **read-only tools only** — `github_pr_dashboard`, `github_pr_batch_status`, `github_get_review_threads`, and `ci_get_logs` / `ci_search_logs` for log inspection. It **never** labels, comments, re-runs CI, rebases, or pushes. All of those write actions stay in Pass 0 (API writes) and Passes 1–3 (git fixes), exactly as today — so behavior and the read/execute split are preserved.
 
@@ -263,10 +263,10 @@ The returned `verdicts` array **is** the triage report. The orchestrator then ru
 
 ## Troubleshooting
 
-| Problem                                      | Fix                                                                          |
-| -------------------------------------------- | ---------------------------------------------------------------------------- |
-| Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `skills/rebase/SKILL.md` |
-| Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                    |
-| CI failure is flaky (passes on re-run)       | Re-trigger: `ci_rerun(runId: <id>, failedOnly: true)` — do not change code   |
-| Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                         |
-| `make pc` fails after rebase stabilization   | Load `skills/rebase/SKILL.md` for post-rebase steps                          |
+| Problem                                      | Fix                                                                         |
+| -------------------------------------------- | --------------------------------------------------------------------------- |
+| Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `../../rebase/SKILL.md` |
+| Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                   |
+| CI failure is flaky (passes on re-run)       | Re-trigger: `ci_rerun(runId: <id>, failedOnly: true)` — do not change code  |
+| Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                        |
+| `make pc` fails after rebase stabilization   | Load `../../rebase/SKILL.md` for post-rebase steps                          |

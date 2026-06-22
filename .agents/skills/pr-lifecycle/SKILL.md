@@ -1,6 +1,6 @@
 ---
 name: pr-lifecycle
-description: 'PR lifecycle: create PRs with Jira linkage, self-review code before push, fix Copilot review comments, and orchestrate PR maintenance sweeps. Load when creating PRs, reviewing changes, fixing review comments, or managing open PRs.'
+description: 'PR lifecycle (end-to-end): create PRs with Jira linkage, self-review before push, drive a single PR to merge, fix conflicts/CI/reviews, respond to bot review threads, unblock stuck PRs, sweep all open PRs, and react to CI/review events on a watched PR. Load when creating PRs, reviewing changes, fixing review comments, driving/shipping/landing a PR, unblocking stuck PRs, sweeping open PRs, reacting to CI failures, or responding to bot review threads.'
 ---
 
 # Skill: PR Lifecycle
@@ -68,7 +68,7 @@ Claude Code surfaces CI results and review events **as push notifications**. Aft
 
 > **Precondition for any CI status read**: a push event has arrived (CI failure/pass, review, merge). Treat `ci_view_run`, `github_view_pr`, and `gh pr view --json statusCheckRollup` as one-shot lookups triggered by an event — not as poll targets. Repeated calls in a `sleep` loop have been observed burning 1–2M tokens per session for zero earlier signal than the native push notification.
 
-See [drive-pr](../drive-pr/SKILL.md) Step 6 for the full event-handling table.
+See [references/drive.md](references/drive.md) Step 6 for the full event-handling table.
 
 > **`run:integration` runs can be orphaned by merge — accepted by design.** A PR-branch integration run still in flight when the PR merges (merge-queue squash + branch deletion) is cancelled or its result never consumed; the nightly full Playwright run on `main` is the backstop ([ADR 0014](../../../docs/decisions/0014-integration-nightly-bisect.md)). When a `run:integration` result matters to the merge decision, **confirm the run completed before merging**, or re-validate on `main` afterward. Do not treat an in-flight run as a green signal (this bit LS-7876 / #5023).
 
@@ -85,6 +85,23 @@ Fetch unresolved threads, apply fixes, validate, commit, push, and resolve threa
 Orchestrate maintenance across all open PRs: scan, rebase conflicts, fix reviews, fix CI failures. Supports both local (full sweep) and cloud (API-only) modes.
 
 > Details: [references/pr-maintenance.md](references/pr-maintenance.md)
+
+## Sub-skills
+
+This skill consolidates the full PR-lifecycle cluster. Load the matching reference for your specific trigger:
+
+| Reference                                                          | Trigger                                                                                 |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [references/drive.md](references/drive.md)                         | Drive/land/ship a specific PR to merge (single PR, by number/URL)                       |
+| [references/fix.md](references/fix.md)                             | Fix all outstanding issues on one PR (conflicts + reviews + CI)                         |
+| [references/unblock.md](references/unblock.md)                     | Investigate and unblock stuck PRs; detect Expected CI / false positives                 |
+| [references/sweep.md](references/sweep.md)                         | Orchestrate maintenance across all open PRs (full sweep coordinator)                    |
+| [references/sweep-passes.md](references/sweep-passes.md)           | Detailed Pass 0–3 playbook for the local agent sweep                                    |
+| [references/sweep-cloud.md](references/sweep-cloud.md)             | Cloud-mode sweep algorithm (API-only actions + report)                                  |
+| [references/sweep-prs.md](references/sweep-prs.md)                 | Local chip-dispatch sweep entrypoint (`/sweep-prs`)                                     |
+| [references/respond-to-review.md](references/respond-to-review.md) | Scaffold FIX/JUSTIFY/CANNOT-COMPLY replies to bot review threads (`/respond-to-review`) |
+| [references/fix-reviews.md](references/fix-reviews.md)             | Fix Copilot review comments on a PR (single-PR review workflow)                         |
+| [references/ci-event-response.md](references/ci-event-response.md) | Triage and respond to CI/GitHub events on a watched PR (event-driven cloud agent)       |
 
 ## Who's Who in the PR Flow
 

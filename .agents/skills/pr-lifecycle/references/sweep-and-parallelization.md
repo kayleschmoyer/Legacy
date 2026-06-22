@@ -140,7 +140,7 @@ Review fixes (Pass 2) and CI code fixes (Pass 3) operate on independent PRs in s
 
        Steps:
        1. Fetch full logs: ci_get_logs(jobId: <failing-job-id>)
-       2. Classify root cause and apply fix (see Pass 3 triage table in skills/open-prs/SKILL.md):
+       2. Classify root cause and apply fix (see Pass 3 triage table in `pr-lifecycle/references/sweep.md`):
           - stale_branch: worktree_rebase, re-run CI — no code change
           - formatting: pnpm exec nx format:write, commit, push
           - codegen: make codegen, commit, push

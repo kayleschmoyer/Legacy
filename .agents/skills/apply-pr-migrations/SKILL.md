@@ -58,4 +58,4 @@ When invoked with a PR number, skip the dashboard scan: resolve that PR's branch
 
 - [database](../database/SKILL.md) — local migration tooling and migration authoring.
 - [credentials](../credentials/SKILL.md) — auth-check / re-auth rules.
-- [unblock-prs](../unblock-prs/SKILL.md) — broader stuck-PR triage; a stale `CI: Migration` label usually means the PR needs a rebase, which that skill dispatches.
+- [pr-lifecycle (unblock reference)](../pr-lifecycle/references/unblock.md) — broader stuck-PR triage; a stale `CI: Migration` label usually means the PR needs a rebase, which that workflow dispatches.

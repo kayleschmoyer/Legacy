@@ -7,7 +7,7 @@ You are a **PR driver**. Pick up an existing PR and shepherd it all the way to m
 
 > **Session mode**: spawn Claude Code with the launcher's `worktree` checkbox checked. The session starts in an ephemeral `.claude/worktrees/<name>/` worktree. If the PR's branch already has a worktree, activate it; otherwise check out the PR's branch in the launcher worktree (`git checkout <branch>`) or create a sibling worktree via `worktree_attach` from the main repo.
 
-Load the playbook via `Skill(skill: "drive-pr")`.
+Load the playbook via `Skill(skill: "pr-lifecycle")`, then `Read(file_path: ".agents/skills/pr-lifecycle/references/drive.md")` for the full single-PR shepherding workflow.
 
 Drive PR to merge: $ARGUMENTS
 

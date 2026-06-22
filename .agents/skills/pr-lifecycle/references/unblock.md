@@ -96,7 +96,7 @@ mcp__ccd_session__spawn_task({
   tldr: "Fix <bot-review threads / CI failures> on PR #<N>.",
   prompt: `PR #<N> on branch <branch> has <unresolved bot-review threads / failing CI checks: <list check names>>.
 
-Load Skill(skill: "fix-pr") and follow it: enter the PR's worktree, address the issues, make pc, push, resolve threads, re-apply bot:ready-for-review.
+Load Skill(skill: "pr-lifecycle") and follow it: enter the PR's worktree, address the issues, make pc, push, resolve threads, re-apply bot:ready-for-review.
 
 Failing checks (snapshot): <check names + runId from github_pr_why_blocked>. Fetch logs via ci_get_logs(runId, errorSummary: true) — do not paste raw logs.`
 })
@@ -131,7 +131,7 @@ Print a summary table:
 
 ## Related Skills
 
-- [sweep-prs](../open-prs/SKILL.md) — full overnight sweep with chip dispatch for all PR issues
-- [rebase](../rebase/SKILL.md) — rebase workflow for conflict resolution chips
-- [fix-pr](../fix-pr/SKILL.md) — PR fix workflow for review/CI fix chips
-- [ci-event-response](../ci-event-response/SKILL.md) — triage individual CI check failures on a watched PR
+- [sweep-prs](./sweep.md) — full overnight sweep with chip dispatch for all PR issues
+- [rebase](../../rebase/SKILL.md) — rebase workflow for conflict resolution chips
+- [fix-pr](./fix.md) — PR fix workflow for review/CI fix chips
+- [ci-event-response](./ci-event-response.md) — triage individual CI check failures on a watched PR
