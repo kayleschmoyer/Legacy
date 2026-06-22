@@ -1087,6 +1087,23 @@ export function PlayerDetailModal({
     }
   }, [effectiveActiveTab, activeTab]);
 
+  // ------ Focus restoration (LS-6966) ------
+  // BaseModal uses hideHeader so the X button calls onOpenChange(false) directly
+  // rather than going through Dialog.Close. Radix therefore doesn't automatically
+  // return focus to the triggering element; we save it on open and restore it on
+  // close so keyboard users land back where they started. ESC is handled by the
+  // underlying Radix Dialog primitive and also triggers this path.
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+    } else {
+      const el = previousFocusRef.current;
+      previousFocusRef.current = null;
+      el?.focus();
+    }
+  }, [open]);
+
   // ------ Career stat tile rows ------
   const battingTiles: CareerTile[] = useMemo(() => {
     if (!careerTotals?.hasBatting) return [];

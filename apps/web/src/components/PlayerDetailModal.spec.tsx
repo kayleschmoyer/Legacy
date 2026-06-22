@@ -692,6 +692,72 @@ describe('PlayerDetailModal — position badge interactivity (LS-6978)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Focus restoration (LS-6966)
+// ---------------------------------------------------------------------------
+
+describe('PlayerDetailModal — focus restoration (LS-6966)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockHasEntitlement = false;
+    mockUsePlayerCareerArc.mockReturnValue(makeArcData(false, false));
+    mockUseAllPlayerSeasonStats.mockReturnValue(EMPTY_SEASON);
+  });
+
+  it('restores focus to the previously focused element when the modal closes', () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Open player';
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const { rerender } = render(
+      <PlayerDetailModal
+        playerId={1}
+        playerName="Test Player"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+
+    rerender(
+      <PlayerDetailModal
+        playerId={1}
+        playerName="Test Player"
+        open={false}
+        onOpenChange={jest.fn()}
+      />,
+    );
+
+    expect(document.activeElement).toBe(trigger);
+    document.body.removeChild(trigger);
+  });
+
+  it('does not throw when no element was focused before the modal opened', () => {
+    // Blur everything so activeElement is body
+    (document.activeElement as HTMLElement | null)?.blur?.();
+
+    expect(() => {
+      const { rerender } = render(
+        <PlayerDetailModal
+          playerId={1}
+          playerName="Test Player"
+          open
+          onOpenChange={jest.fn()}
+        />,
+      );
+      rerender(
+        <PlayerDetailModal
+          playerId={1}
+          playerName="Test Player"
+          open={false}
+          onOpenChange={jest.fn()}
+        />,
+      );
+    }).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Active tab reset (LS-6992)
 // ---------------------------------------------------------------------------
 
