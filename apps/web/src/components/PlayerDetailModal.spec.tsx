@@ -60,6 +60,10 @@ jest.mock('tamagui', () => {
   const Pass = ({ children, ...rest }: Children) => (
     <div {...rest}>{children}</div>
   );
+  const TooltipRoot = ({ children }: Children) => <div>{children}</div>;
+  TooltipRoot.Trigger = ({ children }: Children) => <>{children}</>;
+  TooltipRoot.Content = ({ children }: Children) => <div>{children}</div>;
+  TooltipRoot.Arrow = () => null;
   return {
     Button: ({ children, onPress }: Children & { onPress?: () => void }) => (
       <button type="button" onClick={onPress}>
@@ -71,6 +75,7 @@ jest.mock('tamagui', () => {
     Text: ({ children, ...rest }: Children) => (
       <span {...rest}>{children}</span>
     ),
+    Tooltip: TooltipRoot,
     XStack: Pass,
     YStack: Pass,
   };

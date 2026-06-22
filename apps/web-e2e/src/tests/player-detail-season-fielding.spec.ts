@@ -229,6 +229,78 @@ const MULTI_POSITION_SAME_SEASON = {
   },
 };
 
+/**
+ * Two positions in one season where the raw sum of baseball-notation innings
+ * overflows an out boundary: CF(5.1) + LF(5.2) = 10.3 as a raw number, but
+ * ipToOuts(5.1)+ipToOuts(5.2) = 16+17 = 33 outs = 11.0 innings.
+ * This fixture verifies LS-6987: the INN column must use baseball notation
+ * conversion, not raw decimal display.
+ */
+const MULTI_POSITION_FRACTIONAL_INN = {
+  data: {
+    player: {
+      __typename: 'Player',
+      eligiblePositions: ['CF', 'OF'],
+      firstName: 'Mike',
+      lastName: 'Trout',
+    },
+    playerSeasonBatting: [
+      {
+        __typename: 'SeasonBatting',
+        season: 2024,
+        team: 'LAA',
+        games: 100,
+        plateAppearances: 410,
+        atBats: 360,
+        runs: 60,
+        hits: 105,
+        doubles: 18,
+        triples: 1,
+        homeRuns: 15,
+        rbi: 55,
+        stolenBases: 5,
+        caughtStealing: 1,
+        baseOnBalls: 40,
+        strikeouts: 75,
+        battingAverage: 0.292,
+        onBasePercentage: 0.36,
+        sluggingPercentage: 0.47,
+      },
+    ],
+    playerSeasonPitching: [],
+    playerSeasonFielding: [
+      {
+        __typename: 'SeasonFielding',
+        season: 2024,
+        team: 'LAA',
+        position: 'CF',
+        games: 60,
+        gamesStarted: 60,
+        inningsDefended: 5.1,
+        putouts: 120,
+        assists: 2,
+        errors: 1,
+        doublePlays: 1,
+        fieldingPercentage: 0.992,
+      },
+      {
+        __typename: 'SeasonFielding',
+        season: 2024,
+        team: 'LAA',
+        position: 'LF',
+        games: 40,
+        gamesStarted: 38,
+        inningsDefended: 5.2,
+        putouts: 80,
+        assists: 1,
+        errors: 0,
+        doublePlays: 0,
+        fieldingPercentage: 1.0,
+      },
+    ],
+  },
+};
+
 /** Pitcher with no fielding data — the Fielding tab must not appear. */
 const PITCHER_NO_FIELDING = {
   data: {
@@ -739,6 +811,28 @@ test.describe('Season Fielding Stats Table — multi-position aggregation @regre
       .locator('div[role="dialog"]')
       .getByText('2024', { exact: true });
     await expect(yearLocator).toHaveCount(1);
+  });
+});
+
+// ── Tests: Baseball-notation INN formatting (LS-6987) ─────────────────────────
+
+test.describe('Season Fielding Stats Table — INN baseball notation @regression', () => {
+  test('INN accumulates fractional outs correctly across positions (5.1 + 5.2 = 11.0, not 10.3)', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: MULTI_POSITION_FRACTIONAL_INN });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Fielding');
+    await playersPage.detail.expectText('INN');
+
+    // CF(5.1 = 16 outs) + LF(5.2 = 17 outs) = 33 outs = 11.0 innings.
+    // Raw decimal addition (5.1 + 5.2 = 10.3) would wrongly display "10.3".
+    await playersPage.detail.expectText('11.0');
   });
 });
 

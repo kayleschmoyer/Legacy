@@ -753,7 +753,7 @@ export function PlayerDetailModal({
           r.season,
           r.fielding?.position ?? '',
           r.fielding?.games ?? 0,
-          r.fielding?.inn ?? 0,
+          outsToBaseballIP(ipToOuts(r.fielding?.inn ?? 0)),
           r.fielding?.po ?? 0,
           r.fielding?.a ?? 0,
           r.fielding?.e ?? 0,
