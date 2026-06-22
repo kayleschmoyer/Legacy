@@ -1002,14 +1002,22 @@ export function PlayerDetailModal({
     fieldingTableRows,
   ]);
 
-  useEffect(() => {
-    if (
-      availableTabs.length > 0 &&
-      !availableTabs.some((t) => t.key === activeTab)
-    ) {
-      setActiveTab(availableTabs[0].key);
-    }
+  // Derive the displayed tab synchronously (LS-6992): useMemo prevents the
+  // one-frame flash of empty content that occurred with a post-render useEffect.
+  const effectiveActiveTab = useMemo((): StatsTab => {
+    if (availableTabs.length === 0) return activeTab;
+    return availableTabs.some((t) => t.key === activeTab)
+      ? activeTab
+      : availableTabs[0].key;
   }, [availableTabs, activeTab]);
+
+  // Sync state after fallback so stale activeTab doesn't cause later renders to
+  // jump back to an unexpected tab when availableTabs grows (e.g. arc data loads).
+  useEffect(() => {
+    if (effectiveActiveTab !== activeTab) {
+      setActiveTab(effectiveActiveTab);
+    }
+  }, [effectiveActiveTab, activeTab]);
 
   // ------ Career stat tile rows ------
   const battingTiles: CareerTile[] = useMemo(() => {
@@ -1389,7 +1397,7 @@ export function PlayerDetailModal({
                       key={tab.key}
                       label={tab.label}
                       tabKey={tab.key}
-                      active={activeTab === tab.key}
+                      active={effectiveActiveTab === tab.key}
                       onPress={() => setActiveTab(tab.key)}
                     />
                   ))}
@@ -1408,7 +1416,7 @@ export function PlayerDetailModal({
               </YStack>
 
               {/* Career Arc */}
-              {activeTab === 'career-arc' && (
+              {effectiveActiveTab === 'career-arc' && (
                 <YStack gap={12} marginTop={22}>
                   {hasBattingArc && hasPitchingArc && (
                     <XStack gap={4}>
@@ -1445,61 +1453,64 @@ export function PlayerDetailModal({
                 </YStack>
               )}
 
-              {activeTab === 'batting' && battingTableRows.length > 0 && (
-                <>
-                  <SectionHead title="Season by Season · Batting" />
-                  <EditorialTable
-                    caption="Season batting statistics"
-                    headers={[
-                      'Year',
-                      'G',
-                      'PA',
-                      'AB',
-                      'H',
-                      'HR',
-                      'RBI',
-                      'SB',
-                      'AVG',
-                      'OBP',
-                      'SLG',
-                    ]}
-                    rows={battingTableRows}
-                  />
-                </>
-              )}
+              {effectiveActiveTab === 'batting' &&
+                battingTableRows.length > 0 && (
+                  <>
+                    <SectionHead title="Season by Season · Batting" />
+                    <EditorialTable
+                      caption="Season batting statistics"
+                      headers={[
+                        'Year',
+                        'G',
+                        'PA',
+                        'AB',
+                        'H',
+                        'HR',
+                        'RBI',
+                        'SB',
+                        'AVG',
+                        'OBP',
+                        'SLG',
+                      ]}
+                      rows={battingTableRows}
+                    />
+                  </>
+                )}
 
-              {activeTab === 'pitching' && pitchingTableRows.length > 0 && (
-                <>
-                  <SectionHead title="Season by Season · Pitching" />
-                  <EditorialTable
-                    caption="Season pitching statistics"
-                    headers={[
-                      'Year',
-                      'G',
-                      'W-L',
-                      'ERA',
-                      'IP',
-                      'SO',
-                      'BB',
-                      ...(hasPremiumPitching
-                        ? ['FIP', 'WHIP', 'K/9', 'BB/9']
-                        : []),
-                    ]}
-                    rows={pitchingTableRows}
-                  />
-                </>
-              )}
+              {effectiveActiveTab === 'pitching' &&
+                pitchingTableRows.length > 0 && (
+                  <>
+                    <SectionHead title="Season by Season · Pitching" />
+                    <EditorialTable
+                      caption="Season pitching statistics"
+                      headers={[
+                        'Year',
+                        'G',
+                        'W-L',
+                        'ERA',
+                        'IP',
+                        'SO',
+                        'BB',
+                        ...(hasPremiumPitching
+                          ? ['FIP', 'WHIP', 'K/9', 'BB/9']
+                          : []),
+                      ]}
+                      rows={pitchingTableRows}
+                    />
+                  </>
+                )}
 
-              {activeTab === 'fielding' && fieldingTableRows.length > 0 && (
-                <>
-                  <SectionHead title="Season by Season · Fielding" />
-                  <EditorialTable
-                    caption="Season fielding statistics"
-                    headers={['Year', 'POS', 'G', 'INN', 'PO', 'A', 'E']}
-                    rows={fieldingTableRows}
-                  />
-                </>
-              )}
+              {effectiveActiveTab === 'fielding' &&
+                fieldingTableRows.length > 0 && (
+                  <>
+                    <SectionHead title="Season by Season · Fielding" />
+                    <EditorialTable
+                      caption="Season fielding statistics"
+                      headers={['Year', 'POS', 'G', 'INN', 'PO', 'A', 'E']}
+                      rows={fieldingTableRows}
+                    />
+                  </>
+                )}
             </>
           )}
         </YStack>

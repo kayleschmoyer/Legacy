@@ -455,13 +455,19 @@ class PlayerDetailSurface {
 
   /** The sort button for `column` (e.g. 'ERA', 'Year') inside the modal. */
   sortButton(column: string): Locator {
-    return this.#dialog.getByRole('button', { name: `Sort by ${column}` });
+    return this.#dialog.getByRole('button', {
+      name: `Sort by ${column}`,
+      exact: true,
+    });
   }
 
   /** The `columnheader` cell that wraps the sort button for `column`. */
   columnHeader(column: string): Locator {
     return this.#dialog.getByRole('columnheader').filter({
-      has: this.#page.getByRole('button', { name: `Sort by ${column}` }),
+      has: this.#page.getByRole('button', {
+        name: `Sort by ${column}`,
+        exact: true,
+      }),
     });
   }
 

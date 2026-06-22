@@ -130,7 +130,11 @@ jest.mock('tamagui', () => {
       children,
       onPress,
       ...rest
-    }: Children & { onPress?: () => void }) => (
+    }: {
+      children?: React.ReactNode;
+      onPress?: () => void;
+      [key: string]: unknown;
+    }) => (
       <span onClick={onPress} {...rest}>
         {children}
       </span>
@@ -580,5 +584,139 @@ describe('PlayerDetailModal — position badge interactivity (LS-6978)', () => {
 
     expect(onPositionClick).toHaveBeenCalledTimes(1);
     expect(onPositionClick).toHaveBeenCalledWith('DH');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Active tab reset (LS-6992)
+// ---------------------------------------------------------------------------
+
+describe('PlayerDetailModal — active tab reset (LS-6992)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockHasEntitlement = false;
+    mockUsePlayerCareerArc.mockReturnValue(makeArcData(false, false));
+  });
+
+  it('immediately shows batting content when switching from a pitcher to a batter', () => {
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: { ...EMPTY_SEASON.data, playerSeasonPitching: [pitchingSeason()] },
+    });
+    const { rerender } = render(
+      <PlayerDetailModal
+        playerId={1}
+        playerName="Pitcher One"
+        position="P"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Season by Season · Batting'),
+    ).not.toBeInTheDocument();
+
+    // Switch to a batting-only player
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: { ...EMPTY_SEASON.data, playerSeasonBatting: [battingSeason()] },
+    });
+    rerender(
+      <PlayerDetailModal
+        playerId={2}
+        playerName="Batter Two"
+        position="DH"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Season by Season · Batting')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Season by Season · Pitching'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('preserves the active tab when switching to a player who also has that tab', () => {
+    // Render a pitching-only player so activeTab syncs to 'pitching'
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: { ...EMPTY_SEASON.data, playerSeasonPitching: [pitchingSeason()] },
+    });
+    const { rerender } = render(
+      <PlayerDetailModal
+        playerId={1}
+        playerName="Pitcher One"
+        position="P"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
+
+    // Switch to a two-way player — pitching tab is still available
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: {
+        ...EMPTY_SEASON.data,
+        playerSeasonBatting: [battingSeason()],
+        playerSeasonPitching: [pitchingSeason()],
+      },
+    });
+    rerender(
+      <PlayerDetailModal
+        playerId={2}
+        playerName="Two-Way Two"
+        position="SP"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+
+    // Pitching was the synced activeTab and is still available — it should persist
+    expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Season by Season · Batting'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('resets to the first available tab when the previously active tab is not available for the new player', () => {
+    // Render a pitching-only player so activeTab syncs to 'pitching'
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: { ...EMPTY_SEASON.data, playerSeasonPitching: [pitchingSeason()] },
+    });
+    const { rerender } = render(
+      <PlayerDetailModal
+        playerId={1}
+        playerName="Pitcher One"
+        position="P"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
+
+    // Switch to a batting-only player — pitching tab is gone
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: { ...EMPTY_SEASON.data, playerSeasonBatting: [battingSeason()] },
+    });
+    rerender(
+      <PlayerDetailModal
+        playerId={2}
+        playerName="Pure Batter"
+        position="DH"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+
+    // 'pitching' is no longer available — must fall back to batting
+    expect(screen.getByText('Season by Season · Batting')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Season by Season · Pitching'),
+    ).not.toBeInTheDocument();
   });
 });
