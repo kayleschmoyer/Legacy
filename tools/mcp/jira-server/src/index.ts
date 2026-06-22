@@ -18,7 +18,6 @@ import { bulkCreate } from './tools/bulk-create.js';
 import { bulkEdit } from './tools/bulk-edit.js';
 import { bulkLinkIssues } from './tools/bulk-link-issues.js';
 import { bulkListChildren } from './tools/bulk-list-children.js';
-import { bulkView } from './tools/bulk-view.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { rolloverSync } from './tools/rollover-sync.js';
 import { claimTicket } from './tools/claim-ticket.js';
@@ -340,33 +339,6 @@ server.tool(
   async (params) => bulkListChildren(params),
 );
 
-// --- jira_bulk_view ---
-server.tool(
-  'jira_bulk_view',
-  'View up to 50 Jira tickets in one call. Default format is "json" for programmatic consumption — pass format: "markdown" to embed compact markdown cards instead. Returns { total, succeeded: [{key, format, ticket}], failed }.',
-  {
-    keys: z
-      .array(
-        z
-          .string()
-          .regex(
-            /^[A-Z][A-Z0-9_]+-\d+$/,
-            'Must be a valid Jira issue key (e.g., LS-123)',
-          ),
-      )
-      .min(1)
-      .max(50)
-      .describe('Ticket keys to view (1-50).'),
-    format: z
-      .enum(['markdown', 'json'])
-      .default('json')
-      .describe(
-        'Output format per ticket. Default "json" for bulk programmatic use; "markdown" embeds the same compact card jira_view returns.',
-      ),
-  },
-  async (params) => bulkView(params),
-);
-
 // --- jira_get_comments ---
 server.tool(
   'jira_get_comments',
@@ -681,17 +653,59 @@ server.tool(
 // --- jira_view ---
 server.tool(
   'jira_view',
-  'View ticket details including linked blockers. Returns a compact markdown card by default; pass format: "json" for the structured shape.',
+  'View ticket details including linked blockers. ' +
+    'Single-key mode: pass `key` (and optionally `format`) to get a compact markdown card by default, or the legacy JSON shape with `format: "json"`. ' +
+    'Batch mode: pass `keys` (1-50 ticket keys) to fetch all in one call. ' +
+    'Batch responses have shape `{ tickets: { [key]: <ticket-json> }, missing: [key, ...] }`; ' +
+    'any key that 404s or otherwise fails is isolated to `missing[]` so partial results are not lost. ' +
+    'Batch always returns the JSON shape per ticket — markdown is reserved for single-ticket reads. ' +
+    'Exactly one of `key` or `keys` must be provided.',
   {
-    key: z.string().describe('Ticket key'),
+    key: z
+      .string()
+      .optional()
+      .describe(
+        'Single ticket key (legacy path; mutually exclusive with `keys`)',
+      ),
+    keys: z
+      .array(z.string())
+      .min(1)
+      .max(50)
+      .optional()
+      .describe(
+        'Batch: 1-50 ticket keys. Returns { tickets: {[key]: <ticket>}, missing: [key,...] }. Mutually exclusive with `key`.',
+      ),
     format: z
       .enum(['markdown', 'json'])
       .optional()
       .describe(
-        'Output format. "markdown" (default) returns a compact card optimized for agent reading; "json" returns the legacy structured shape for programmatic consumers.',
+        'Output format for single-key mode. "markdown" (default) returns a compact card optimized for agent reading; "json" returns the legacy structured shape. Ignored in batch mode (batch always returns JSON).',
       ),
   },
-  async (params) => view(params),
+  async (params) => {
+    if (params.keys && params.key) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'jira_view: provide exactly one of `key` or `keys`, not both.',
+          },
+        ],
+      };
+    }
+    if (params.keys) return view({ keys: params.keys });
+    if (params.key) return view({ key: params.key, format: params.format });
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'jira_view: must provide either `key` (single) or `keys` (batch, 1-50).',
+        },
+      ],
+    };
+  },
 );
 
 // --- jira_delete_ticket ---
