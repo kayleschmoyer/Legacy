@@ -83,7 +83,7 @@ The canonical reference for who's who in the PR flow, the Label Ownership table,
 
 **Process framework**: every task funnels through one of 13 entrypoints into a 6-phase shared spine. See `.agents/skills/dev-process/SKILL.md` for the design layer — pick the entrypoint at the start of any task using `.agents/skills/dev-process/entrypoints/README.md`.
 
-**Operational runbook**: the canonical, environment-neutral **Steps 0–16** live in `.agents/skills/workflow-overview/references/ticket-to-merge-spine.md` (with the four critical gates and the mandatory Step 1c tracking-task graph). `.agents/skills/workflow-overview/SKILL.md` is the **local** tool binding for that spine; `.agents/skills/cloud-agent-mode/SKILL.md` is the **cloud** binding. Summary:
+**Operational runbook**: the canonical, environment-neutral **Steps 0–16** live in `.agents/skills/workflow-overview/references/ticket-to-merge-spine.md` (with the five critical gates and the mandatory Step 1c tracking-task graph). `.agents/skills/workflow-overview/SKILL.md` is the **local** tool binding for that spine; `.agents/skills/cloud-agent-mode/SKILL.md` is the **cloud** binding. Summary:
 
 0. Epic check → 1. Create/identify ticket → **1b. Planning** → 2. Dependency check → 3. Jira "In Progress" → 4. Worktree setup → 5. node_modules symlink → 6. Work → 7. Code & test → 8. Commit → 9. Rebase → 10. Migrations → 11. seven `pc-*` chunks + self-review → 12. Ship (draft PR → mark ready → bot review → reply threads → Jira "In Review") → 13. Watch PR to merge → 14. MCP gap audit → 15. Complete tracking tasks → 16. Cleanup
 

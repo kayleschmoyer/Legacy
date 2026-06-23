@@ -11,7 +11,7 @@ This is the **local implementation** of the ticket-to-merge workflow. The orderi
 
 ## Start here
 
-1. Read **[references/ticket-to-merge-spine.md](references/ticket-to-merge-spine.md)** for the canonical Steps 0–16, the four critical gates (draft-PR-before-validate, `make pc`-before-mark-ready, migrations-before-`make pc`, self-review-before-push), and the **mandatory tracking-task graph** (Step 1c) that makes the ordering survive context compaction.
+1. Read **[references/ticket-to-merge-spine.md](references/ticket-to-merge-spine.md)** for the canonical Steps 0–16, the five critical gates (draft-PR-before-validate, `make pc`-before-mark-ready, migrations-before-`make pc`, self-review-before-push, PR-Ready-before-watch-to-merge), and the **mandatory tracking-task graph** (Step 1c) that makes the ordering survive context compaction.
 2. Use the **[Local tool binding](#local-tool-binding)** below for the concrete call behind each spine step.
 3. Use **[Local worktree setup](#local-worktree-setup)** and **[Local validation gates](#local-validation-gates)** for the local-only mechanics.
 4. For everything after mark-ready, see the machinery references: [ci-and-merge-pipeline.md](references/ci-and-merge-pipeline.md), [post-merge-and-deploy.md](references/post-merge-and-deploy.md), [roles-checks-secrets.md](references/roles-and-required-checks.md).
