@@ -146,6 +146,13 @@ class PlayerStatsSurface {
     await this.#page.getByText(name).first().click();
   }
 
+  /** Click the "Share player statistics link" button. */
+  async clickShare(): Promise<void> {
+    await this.#page
+      .getByRole('button', { name: 'Share player statistics link' })
+      .click();
+  }
+
   // ── Reads ────────────────────────────────────────────────────────
 
   /** A player row by id (`data-testid="player-row-<id>"`). */
@@ -263,6 +270,28 @@ class PlayerStatsSurface {
     await expect(
       this.#page.getByText(/dominate your league/i),
     ).not.toBeVisible();
+  }
+
+  /** Assert the share button is visible. */
+  async expectShareButtonVisible(): Promise<void> {
+    await expect(
+      this.#page.getByRole('button', { name: 'Share player statistics link' }),
+    ).toBeVisible();
+  }
+
+  /** Assert the share confirmation toast is visible and contains text. */
+  async expectShareToast(text: string): Promise<void> {
+    await expect(this.#page.locator('.ls-stats-toast')).toContainText(text);
+  }
+
+  /** Assert no share toast is mounted (liveMsg is empty). */
+  async expectShareToastHidden(): Promise<void> {
+    await expect(this.#page.locator('.ls-stats-toast')).not.toBeAttached();
+  }
+
+  /** Assert the fallback URL input ("Shareable link to copy") is visible. */
+  async expectShareFallbackInput(): Promise<void> {
+    await expect(this.#page.getByLabel('Shareable link to copy')).toBeVisible();
   }
 
   /** Assert an arbitrary value/label is visible on the stats page. */
