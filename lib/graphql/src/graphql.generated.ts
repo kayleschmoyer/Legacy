@@ -9021,6 +9021,8 @@ export type GetAllPlayerSeasonStatsQuery = {
     battingAverage?: number | null;
     onBasePercentage?: number | null;
     sluggingPercentage?: number | null;
+    onBasePlusSlugging?: number | null;
+    onBasePlusSluggingPlus?: number | null;
   }> | null;
   playerSeasonPitching?: Array<{
     __typename?: 'SeasonPitching';
@@ -22531,6 +22533,8 @@ export const GetAllPlayerSeasonStats = gql`
       battingAverage
       onBasePercentage
       sluggingPercentage
+      onBasePlusSlugging
+      onBasePlusSluggingPlus
     }
     playerSeasonPitching(playerId: $playerId) {
       season

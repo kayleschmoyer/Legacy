@@ -23,6 +23,8 @@ query GetAllPlayerSeasonStats($playerId: Int!) {
     battingAverage
     onBasePercentage
     sluggingPercentage
+    onBasePlusSlugging
+    onBasePlusSluggingPlus
   }
   playerSeasonPitching(playerId: $playerId) {
     season

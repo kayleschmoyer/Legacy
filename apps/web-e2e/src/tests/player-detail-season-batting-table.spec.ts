@@ -17,6 +17,7 @@ import { expect, test } from '../fixtures/pages';
 import {
   BASELINE_GRAPHQL_RESPONSES,
   extractOperationName,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -595,6 +596,76 @@ test.describe('Season Batting Table — calculated stats @regression', () => {
   });
 });
 
+// ── Advanced Batting Columns Mock ─────────────────────────────────────────────
+
+/**
+ * Two-season batter with server-provided OPS/OPS+ for premium column tests.
+ *
+ * Computed expectations:
+ *   2024: OPS = 0.895 (server), BABIP = (165-28)/(550-110-28) = 137/412 ≈ .333, OPS+ = 142
+ *   2023: OPS = OBP+SLG fallback = 0.373+0.490 = .863, OPS+ = '—' (null)
+ */
+const ADVANCED_BATTER = {
+  data: {
+    player: {
+      __typename: 'Player',
+      eligiblePositions: ['CF', 'OF'],
+      firstName: 'Mike',
+      lastName: 'Trout',
+    },
+    playerSeasonBatting: [
+      {
+        __typename: 'SeasonBatting',
+        season: 2024,
+        team: 'LAA',
+        games: 145,
+        plateAppearances: 620,
+        atBats: 550,
+        runs: 95,
+        hits: 165,
+        doubles: 30,
+        triples: 2,
+        homeRuns: 28,
+        rbi: 85,
+        stolenBases: 12,
+        caughtStealing: 3,
+        baseOnBalls: 60,
+        strikeouts: 110,
+        battingAverage: 0.3,
+        onBasePercentage: 0.363,
+        sluggingPercentage: 0.504,
+        onBasePlusSlugging: 0.895,
+        onBasePlusSluggingPlus: 142,
+      },
+      {
+        __typename: 'SeasonBatting',
+        season: 2023,
+        team: 'LAA',
+        games: 140,
+        plateAppearances: 590,
+        atBats: 520,
+        runs: 88,
+        hits: 155,
+        doubles: 28,
+        triples: 1,
+        homeRuns: 25,
+        rbi: 80,
+        stolenBases: 10,
+        caughtStealing: 2,
+        baseOnBalls: 65,
+        strikeouts: 105,
+        battingAverage: 0.298,
+        onBasePercentage: 0.373,
+        sluggingPercentage: 0.49,
+        onBasePlusSlugging: null,
+        onBasePlusSluggingPlus: null,
+      },
+    ],
+    playerSeasonPitching: [],
+    playerSeasonFielding: [],
+  },
+};
+
 test.describe('Season Batting Table — multiple seasons @regression', () => {
   test('season count subtitle reflects the correct number of seasons', async ({
     page,
@@ -630,5 +701,119 @@ test.describe('Season Batting Table — multiple seasons @regression', () => {
     // Both seasons visible
     await playersPage.detail.expectText('2024', { exact: true });
     await playersPage.detail.expectText('2023', { exact: true });
+  });
+});
+
+// ── Advanced batting columns (LS-6985) ────────────────────────────────────────
+
+test.describe('Season Batting Table — advanced batting columns (premium) @regression', () => {
+  test('premium user sees OPS, BABIP, and OPS+ column headers', async ({
+    page,
+    playersPage,
+  }) => {
+    // Premium is the default tier — no useTier() call needed.
+    await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.switchTab('Batting');
+
+    await playersPage.detail.expectText('OPS', { exact: true });
+    await playersPage.detail.expectText('BABIP', { exact: true });
+    await playersPage.detail.expectText('OPS+', { exact: true });
+  });
+
+  test('free user does not see OPS, BABIP, or OPS+ column headers', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
+    // useTier registered after setupMocks so it runs first in Playwright LIFO chain
+    // and intercepts GetUserById before the baseline fallback can return premium.
+    await useTier(page, 'free');
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    // Free users at /players/:id see a PremiumGate panel instead of the
+    // PlayerDetailModal dialog — the advanced columns live inside the modal,
+    // so they are never rendered for a free-tier visitor.
+    await expect(page.getByText('OPS', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('BABIP', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('OPS+', { exact: true })).toHaveCount(0);
+  });
+
+  test('premium user sees server-provided OPS value', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.switchTab('Batting');
+
+    // 2024: onBasePlusSlugging=0.895 → renders "0.895"
+    await playersPage.detail.expectText('.895');
+  });
+
+  test('premium user sees computed BABIP when server provides raw stats', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.switchTab('Batting');
+
+    // 2024: BABIP = (H-HR) / (AB-SO-HR) = (165-28) / (550-110-28) = 137/412 ≈ .333
+    await playersPage.detail.expectText('.333');
+  });
+
+  test('premium user sees OPS+ when server provides it', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.switchTab('Batting');
+
+    // 2024: onBasePlusSluggingPlus=142
+    await playersPage.detail.expectText('142', { exact: true });
+  });
+
+  test('premium user sees em-dash for OPS+ when server returns null', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.switchTab('Batting');
+
+    // 2023: onBasePlusSluggingPlus=null → displayed as '—'
+    await playersPage.detail.expectText('—', { exact: true });
+  });
+
+  test('premium user sees OBP+SLG fallback OPS when server returns null', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.switchTab('Batting');
+
+    // 2023: onBasePlusSlugging=null → OBP+SLG = 0.373+0.490 = 0.863
+    await playersPage.detail.expectText('.863');
   });
 });

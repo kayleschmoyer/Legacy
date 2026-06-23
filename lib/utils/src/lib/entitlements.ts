@@ -49,6 +49,7 @@ export const ENTITLEMENTS = {
   advanced_football_stats: 'advanced_football_stats',
   advanced_pitching_stats: 'advanced_pitching_stats',
   defensive_sabermetrics: 'defensive_sabermetrics',
+  advanced_batting_stats: 'advanced_batting_stats',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -88,6 +89,7 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.advanced_football_stats,
     ENTITLEMENTS.advanced_pitching_stats,
     ENTITLEMENTS.defensive_sabermetrics,
+    ENTITLEMENTS.advanced_batting_stats,
   ],
 };
 
@@ -112,6 +114,7 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   advanced_football_stats: 'Advanced football stats',
   advanced_pitching_stats: 'Advanced pitching analytics (FIP, WHIP, K/9, BB/9)',
   defensive_sabermetrics: 'Advanced defensive sabermetrics (DRS, UZR, OAA)',
+  advanced_batting_stats: 'Advanced batting stats (OPS, BABIP, OPS+)',
 };
 
 export function tierHasEntitlement(

@@ -17,14 +17,14 @@ import {
 } from 'tamagui';
 import { ExternalLink, X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import { ENTITLEMENTS, tierHasEntitlement } from '@legacy-sports/utils';
 import {
   useGetAllPlayerSeasonStatsQuery,
   useGetPlayerCareerArcQuery,
 } from '@legacy-sports/graphql';
-import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { BaseModal } from './BaseModal';
 import type { CareerArcMode } from './CareerArcChart';
-import { useHasEntitlement } from '../hooks/useIsPremium';
+import { useIsPremiumStatus } from '../hooks/useIsPremium';
 import {
   ipToDecimalInnings,
   ipToOuts,
@@ -179,6 +179,9 @@ interface SeasonRow {
     avg: string;
     obp: string;
     slg: string;
+    ops: string;
+    babip: string;
+    opsPlus: number | null;
   };
   pitching?: {
     games: number;
@@ -764,9 +767,18 @@ export function PlayerDetailModal({
 
   const [activeTab, setActiveTab] = useState<StatsTab>('career-arc');
   const [arcMode, setArcMode] = useState<CareerArcMode>('batting');
-
-  const hasPremiumPitching = useHasEntitlement(
+  const { isPremium } = useIsPremiumStatus();
+  const hasAdvancedBatting = tierHasEntitlement(
+    isPremium ? 'premium' : 'free',
+    ENTITLEMENTS.advanced_batting_stats,
+  );
+  const hasPremiumPitching = tierHasEntitlement(
+    isPremium ? 'premium' : 'free',
     ENTITLEMENTS.advanced_pitching_stats,
+  );
+  const hasPremiumFielding = tierHasEntitlement(
+    isPremium ? 'premium' : 'free',
+    ENTITLEMENTS.defensive_sabermetrics,
   );
 
   // ------ Data fetching ------
@@ -815,16 +827,20 @@ export function PlayerDetailModal({
         baseOnBalls?: number | null;
         onBasePercentage?: number | null;
         sluggingPercentage?: number | null;
+        strikeouts?: number | null;
+        onBasePlusSlugging?: number | null;
+        onBasePlusSluggingPlus?: number | null;
       }) => {
         if (!b?.season) return;
         const row: SeasonRow = seasons.get(b.season) || { season: b.season };
         const ab = b.atBats ?? 0;
         const h = b.hits ?? 0;
+        const hr = b.homeRuns ?? 0;
         const pa = b.plateAppearances ?? 0;
         const bb = b.baseOnBalls ?? 0;
         const doubles = b.doubles ?? 0;
         const triples = b.triples ?? 0;
-        const hr = b.homeRuns ?? 0;
+        const so = b.strikeouts ?? 0;
         const avg = ab > 0 ? (h / ab).toFixed(3) : '.000';
         const obp =
           b.onBasePercentage != null
@@ -838,6 +854,16 @@ export function PlayerDetailModal({
             : ab > 0
               ? ((h + doubles + 2 * triples + 3 * hr) / ab).toFixed(3)
               : '.000';
+        const ops =
+          b.onBasePlusSlugging != null
+            ? b.onBasePlusSlugging.toFixed(3)
+            : (parseFloat(obp) + parseFloat(slg)).toFixed(3);
+        // BABIP = (H - HR) / (AB - SO - HR); SF omitted — not in schema
+        const babipDenominator = ab - so - hr;
+        const babip =
+          babipDenominator > 0
+            ? ((h - hr) / babipDenominator).toFixed(3)
+            : '.000';
         row.batting = {
           games: b.games ?? 0,
           pa,
@@ -849,6 +875,9 @@ export function PlayerDetailModal({
           avg,
           obp,
           slg,
+          ops,
+          babip,
+          opsPlus: b.onBasePlusSluggingPlus ?? null,
         };
         seasons.set(b.season, row);
       },
@@ -1013,11 +1042,11 @@ export function PlayerDetailModal({
   }, [seasonRows]);
 
   // ------ Table data ------
-  const battingTableRows = useMemo(
-    () =>
-      seasonRows
-        .filter((r) => r.batting != null)
-        .map((r) => [
+  const battingTableRows = useMemo(() => {
+    const base = seasonRows
+      .filter((r) => r.batting != null)
+      .map((r) => {
+        const row: (string | number)[] = [
           r.season,
           r.batting?.games ?? 0,
           r.batting?.pa ?? 0,
@@ -1029,9 +1058,18 @@ export function PlayerDetailModal({
           r.batting?.avg ?? '',
           r.batting?.obp ?? '',
           r.batting?.slg ?? '',
-        ]),
-    [seasonRows],
-  );
+        ];
+        if (hasAdvancedBatting) {
+          row.push(
+            r.batting?.ops ?? '',
+            r.batting?.babip ?? '',
+            r.batting?.opsPlus ?? '—',
+          );
+        }
+        return row;
+      });
+    return base;
+  }, [seasonRows, hasAdvancedBatting]);
 
   const pitchingTableRows = useMemo(
     () =>
@@ -1058,10 +1096,6 @@ export function PlayerDetailModal({
           return base;
         }),
     [seasonRows, hasPremiumPitching],
-  );
-
-  const hasPremiumFielding = useHasEntitlement(
-    ENTITLEMENTS.defensive_sabermetrics,
   );
 
   const fieldingRows = useMemo(() => {
@@ -1640,19 +1674,38 @@ export function PlayerDetailModal({
                     <SectionHead title="Season by Season · Batting" />
                     <EditorialTable
                       caption="Season batting statistics"
-                      headers={[
-                        'Year',
-                        'G',
-                        'PA',
-                        'AB',
-                        'H',
-                        'HR',
-                        'RBI',
-                        'SB',
-                        'AVG',
-                        'OBP',
-                        'SLG',
-                      ]}
+                      headers={
+                        hasAdvancedBatting
+                          ? [
+                              'Year',
+                              'G',
+                              'PA',
+                              'AB',
+                              'H',
+                              'HR',
+                              'RBI',
+                              'SB',
+                              'AVG',
+                              'OBP',
+                              'SLG',
+                              'OPS',
+                              'BABIP',
+                              'OPS+',
+                            ]
+                          : [
+                              'Year',
+                              'G',
+                              'PA',
+                              'AB',
+                              'H',
+                              'HR',
+                              'RBI',
+                              'SB',
+                              'AVG',
+                              'OBP',
+                              'SLG',
+                            ]
+                      }
                       rows={battingTableRows}
                     />
                   </>
