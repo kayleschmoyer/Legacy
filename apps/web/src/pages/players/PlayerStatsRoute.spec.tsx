@@ -46,11 +46,14 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
   // trigger is always rendered (it ignores `canExport`) so the host's own
   // handleExport premium guard can be exercised directly — proving export never
   // runs for a free viewer even if the handler is reached.
+  // `canCustomizeColumns` is surfaced (data-testid="can-customize-columns") so
+  // the host's premium-gating wiring (PST-003 / LS-7107) can be asserted.
   PlayerStatsPage: (props: {
     onShare?: (relativeUrl: string) => void;
     onPlayerDetails?: (player: { id: string | number }) => void;
     onExport?: (filters: unknown, viewMode: string) => void;
     canExport?: boolean;
+    canCustomizeColumns?: boolean;
     [key: string]: unknown;
   }) => {
     mockStatsPageProps = props;
@@ -65,6 +68,9 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
           Share
         </button>
         <div data-testid="can-export">{String(props.canExport)}</div>
+        <div data-testid="can-customize-columns">
+          {String(props.canCustomizeColumns)}
+        </div>
         <button
           type="button"
           data-testid="export-button"
@@ -754,6 +760,22 @@ describe('PlayerStatsRoute export entitlement (LS-5591)', () => {
     mockHasEntitlement = false;
     render(<PlayerStatsRoute />);
     expect(screen.getByTestId('can-export')).toHaveTextContent('true');
+  });
+
+  it('grants the column-customization capability (canCustomizeColumns=true) to premium viewers (PST-003 / LS-7107)', () => {
+    mockHasEntitlement = true;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('can-customize-columns')).toHaveTextContent(
+      'true',
+    );
+  });
+
+  it('withholds the column-customization capability (canCustomizeColumns=false) from non-premium viewers (PST-003 / LS-7107)', () => {
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('can-customize-columns')).toHaveTextContent(
+      'false',
+    );
   });
 
   it('runs the client-side export for premium viewers', () => {

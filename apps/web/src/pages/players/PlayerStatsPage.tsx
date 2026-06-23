@@ -1471,6 +1471,7 @@ export function PlayerStatsRoute() {
           showHeader={true}
           showActions={true}
           canExport={true}
+          canCustomizeColumns={isPremium}
           statsFormat={statsFormat}
           initialVisibleColumns={visibleColumns}
           onVisibleColumnsChange={handleVisibleColumnsChange}

@@ -410,6 +410,14 @@ export interface PlayerStatsPageProps {
    * `showActions`.
    */
   canExport?: boolean;
+  /**
+   * Whether the column-visibility picker is available to the current viewer.
+   * Column customization is a premium capability (PST-003 / LS-7107): when the
+   * host marks the viewer as not entitled (`false`), the Columns button and
+   * picker panel are hidden. Defaults to `true` so callers that do not gate
+   * column control are unaffected.
+   */
+  canCustomizeColumns?: boolean;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
   /**
@@ -693,6 +701,7 @@ export function PlayerStatsPage({
   showHeader = true,
   showActions = true,
   canExport = true,
+  canCustomizeColumns = true,
   statsFormat = 'expanded',
   initialVisibleColumns = null,
   onVisibleColumnsChange,
@@ -1921,72 +1930,74 @@ export function PlayerStatsPage({
               </Text>
             </Pressable>
 
-            {/* Columns toggle — opens the per-column visibility picker (LS-7105) */}
-            <Pressable
-              onPress={() => setColumnsOpen((v) => !v)}
-              accessibilityRole="button"
-              accessibilityLabel="Toggle column visibility"
-              accessibilityState={{ expanded: columnsOpen }}
-              testID="column-picker-toggle"
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 16,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderStyle: 'solid',
-                borderColor: columnsOpen
-                  ? BRAND_NAVY_LIGHT
-                  : isColumnCustomized
-                    ? withAlpha(BRAND_GOLD, 0.5)
-                    : OUTLINE_DEFAULT,
-                backgroundColor: columnsOpen
-                  ? 'rgba(27,58,92,0.35)'
-                  : isColumnCustomized
-                    ? withAlpha(BRAND_GOLD, 0.08)
-                    : 'transparent',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                minHeight: 44,
-              }}
-            >
-              {Platform.OS === 'web' && (
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={columnsOpen ? TEXT_PRIMARY : FG3}
-                  strokeWidth="2"
-                >
-                  <line x1="3" y1="3" x2="3" y2="21" />
-                  <line x1="9" y1="3" x2="9" y2="21" />
-                  <line x1="15" y1="3" x2="15" y2="21" />
-                  <line x1="21" y1="3" x2="21" y2="21" />
-                </svg>
-              )}
-              <Text
+            {/* Columns toggle — premium-gated (PST-003 / LS-7107); hidden for free users */}
+            {canCustomizeColumns && (
+              <Pressable
+                onPress={() => setColumnsOpen((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel="Toggle column visibility"
+                accessibilityState={{ expanded: columnsOpen }}
+                testID="column-picker-toggle"
                 style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontWeight: '700',
-                  fontSize: 12,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: columnsOpen ? TEXT_PRIMARY : FG3,
-                  whiteSpace: 'nowrap',
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderStyle: 'solid',
+                  borderColor: columnsOpen
+                    ? BRAND_NAVY_LIGHT
+                    : isColumnCustomized
+                      ? withAlpha(BRAND_GOLD, 0.5)
+                      : OUTLINE_DEFAULT,
+                  backgroundColor: columnsOpen
+                    ? 'rgba(27,58,92,0.35)'
+                    : isColumnCustomized
+                      ? withAlpha(BRAND_GOLD, 0.08)
+                      : 'transparent',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  minHeight: 44,
                 }}
               >
-                Columns
-              </Text>
-              <Text style={{ fontSize: 10, color: FG3 }}>
-                {columnsOpen ? '▴' : '▾'}
-              </Text>
-            </Pressable>
+                {Platform.OS === 'web' && (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={columnsOpen ? TEXT_PRIMARY : FG3}
+                    strokeWidth="2"
+                  >
+                    <line x1="3" y1="3" x2="3" y2="21" />
+                    <line x1="9" y1="3" x2="9" y2="21" />
+                    <line x1="15" y1="3" x2="15" y2="21" />
+                    <line x1="21" y1="3" x2="21" y2="21" />
+                  </svg>
+                )}
+                <Text
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: '700',
+                    fontSize: 12,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: columnsOpen ? TEXT_PRIMARY : FG3,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Columns
+                </Text>
+                <Text style={{ fontSize: 10, color: FG3 }}>
+                  {columnsOpen ? '▴' : '▾'}
+                </Text>
+              </Pressable>
+            )}
           </XStack>
         </XStack>
 
-        {/* ── Column visibility picker ───────────────────────────────── */}
-        {columnsOpen && (
+        {/* ── Column visibility picker (premium-only, PST-003 / LS-7107) ─ */}
+        {canCustomizeColumns && columnsOpen && (
           <ColumnPickerPanel
             columns={toggleableColumns}
             visibleKeys={effectiveVisibleKeys}
