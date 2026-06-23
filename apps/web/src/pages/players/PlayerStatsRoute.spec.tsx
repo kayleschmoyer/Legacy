@@ -674,7 +674,9 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
     // Premium viewer (default) so the export actually runs.
     mockHasEntitlement = true;
     const onExport = getOnExport();
-    onExport({}, 'combined');
+    act(() => {
+      onExport({}, 'combined');
+    });
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledTimes(1);
@@ -707,7 +709,9 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
     const onExport = getOnExport();
 
     for (let i = 0; i < 50; i++) {
-      onExport({}, 'combined');
+      act(() => {
+        onExport({}, 'combined');
+      });
     }
 
     expect(createObjectURL).toHaveBeenCalledTimes(50);

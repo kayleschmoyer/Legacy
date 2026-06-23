@@ -85,7 +85,7 @@ jobs:
   detect-changes:
     name: "Detect Project Changes"
     # LS-3884: change detection is pure git + paths-filter — no build tooling needed
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
     outputs:
@@ -578,7 +578,7 @@ jobs:
   lockfile-check:
     name: "lockfile-check"
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: "Checkout Repository"
@@ -751,7 +751,7 @@ jobs:
     name: "e2e-affected"
     needs: [detect-changes, e2e]
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: "Evaluate e2e result"
@@ -951,7 +951,7 @@ jobs:
     name: "Summarize & Report"
     needs: [detect-changes, e2e, lint, format, test, build, custom-checks, lockfile-check]
     if: "always() && !cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     outputs:
       overall-status: ${{ steps.collect-results.outputs.overall-status }}

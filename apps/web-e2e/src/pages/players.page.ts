@@ -539,6 +539,11 @@ class PlayerDetailSurface {
     );
   }
 
+  /** Assert the given text is NOT visible anywhere inside the modal dialog. */
+  async expectTextAbsent(text: string | RegExp): Promise<void> {
+    await expect(this.#dialog.getByText(text)).not.toBeVisible();
+  }
+
   // ── brefId route ─────────────────────────────────────────────────
 
   /** Assert the brefId loading `status` indicator is visible. */

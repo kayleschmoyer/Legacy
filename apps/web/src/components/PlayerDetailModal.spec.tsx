@@ -98,18 +98,19 @@ jest.mock('@tanstack/react-virtual', () => ({
   ),
 }));
 
-type Children = { children?: React.ReactNode };
-type PassProps = React.HTMLAttributes<HTMLElement>;
-
 jest.mock('tamagui', () => {
-  const Pass = ({ children, ...rest }: PassProps) => (
+  const Pass = ({ children, ...rest }: React.HTMLAttributes<HTMLElement>) => (
     <div {...rest}>{children}</div>
   );
-  const TooltipTrigger = ({ children }: Children) => <div>{children}</div>;
-  const TooltipContent = ({ children }: Children) => <div>{children}</div>;
+  const TooltipTrigger = ({ children }: React.HTMLAttributes<HTMLElement>) => (
+    <div>{children}</div>
+  );
+  const TooltipContent = ({ children }: React.HTMLAttributes<HTMLElement>) => (
+    <div>{children}</div>
+  );
   const TooltipArrow = () => null;
   const TooltipRoot = Object.assign(
-    ({ children }: Children) => <div>{children}</div>,
+    ({ children }: React.HTMLAttributes<HTMLElement>) => <div>{children}</div>,
     {
       Trigger: TooltipTrigger,
       Content: TooltipContent,
@@ -134,7 +135,11 @@ jest.mock('tamagui', () => {
       children,
       onPress,
       ...rest
-    }: PassProps & { onPress?: () => void }) => (
+    }: {
+      children?: React.ReactNode;
+      onPress?: () => void;
+      [key: string]: unknown;
+    }) => (
       <span onClick={onPress} {...rest}>
         {children}
       </span>
