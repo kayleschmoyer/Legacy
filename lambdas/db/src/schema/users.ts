@@ -161,6 +161,7 @@ builder.queryField('users', (t) =>
         username: u.username,
         accessLevel: u.accessLevel,
         avatarUrl: u.avatarUrl ?? null,
+        subscriptionTier: u.subscriptionTier ?? null,
         themePreference: u.themePreference ?? null,
       }));
     },
@@ -230,7 +231,9 @@ builder.queryField('user', (t) =>
         // LS-5030 wrapped the whole league-detail page in a `PremiumGate` keyed
         // on `useIsPremium()` → `GetUserById.subscriptionTier`: every non-admin
         // premium user was then mis-read as free and blocked by the gate
-        // (the `accessLevel === 'admin'` shortcut masked it for admins). LS-8247.
+        // (the `accessLevel === 'admin'` shortcut masked it for admins). LS-8247
+        // fixed this `user(id)` path; LS-8249 extends the same fix to every
+        // other resolver that builds the `User` shape (below).
         subscriptionTier: user.subscriptionTier ?? null,
         themePreference: user.themePreference ?? null,
       };
@@ -264,6 +267,7 @@ builder.queryField('userByEmail', (t) =>
         username: foundUser.username,
         accessLevel: foundUser.accessLevel,
         avatarUrl: foundUser.avatarUrl ?? null,
+        subscriptionTier: foundUser.subscriptionTier ?? null,
         themePreference: foundUser.themePreference ?? null,
       };
     },
@@ -294,6 +298,7 @@ builder.queryField('searchUsers', (t) =>
         username: user.username,
         accessLevel: user.accessLevel,
         avatarUrl: user.avatarUrl ?? null,
+        subscriptionTier: user.subscriptionTier ?? null,
         themePreference: user.themePreference ?? null,
       }));
     },
@@ -329,6 +334,7 @@ builder.mutationField('updateUserRole', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
+        subscriptionTier: updated.subscriptionTier ?? null,
         themePreference: updated.themePreference ?? null,
       };
     },
@@ -372,6 +378,7 @@ builder.mutationField('updateUsername', (t) =>
           username: updated.username,
           accessLevel: updated.accessLevel,
           avatarUrl: updated.avatarUrl ?? null,
+          subscriptionTier: updated.subscriptionTier ?? null,
           themePreference: updated.themePreference ?? null,
         };
       } catch (error: unknown) {
@@ -420,6 +427,7 @@ builder.mutationField('updateUserAvatar', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
+        subscriptionTier: updated.subscriptionTier ?? null,
         themePreference: updated.themePreference ?? null,
       };
     },
@@ -465,6 +473,7 @@ builder.mutationField('updateUserTheme', (t) =>
         username: updated.username,
         accessLevel: updated.accessLevel,
         avatarUrl: updated.avatarUrl ?? null,
+        subscriptionTier: updated.subscriptionTier ?? null,
         themePreference: updated.themePreference ?? null,
       };
     },
@@ -722,6 +731,7 @@ builder.mutationField('setCanonicalEmail', (t) =>
           username: result.user.username,
           accessLevel: result.user.accessLevel,
           avatarUrl: result.user.avatarUrl ?? null,
+          subscriptionTier: result.user.subscriptionTier ?? null,
           themePreference: result.user.themePreference ?? null,
         },
         changed: result.changed,

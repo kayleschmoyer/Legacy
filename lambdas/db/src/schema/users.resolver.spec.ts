@@ -41,7 +41,9 @@ describe('impersonateUser mutation', () => {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
+      // requireAdmin's DB admin-check terminates the chain at .limit(1) and
+      // expects a row array; return an admin row so the admin-path tests pass.
+      limit: jest.fn().mockResolvedValue([{ accessLevel: 'admin' }]),
     };
 
     mockGetUserById = jest.fn();
@@ -159,6 +161,9 @@ describe('impersonateUser mutation', () => {
           occurredAt: 'occurredAt',
         },
         leagueActivityEventType: { enumValues: [] },
+        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+        users: { id: 'id', accessLevel: 'accessLevel' },
       },
       InternalSchema: {
         usersInAppInternal: {
@@ -220,7 +225,7 @@ describe('impersonateUser mutation', () => {
 
     await expect(
       resolve({}, { userId: 10 }, nonAdminContext, undefined as never),
-    ).rejects.toThrow('Forbidden');
+    ).rejects.toThrow('Admin access required');
   });
 
   it('should reject unauthenticated requests', async () => {
@@ -379,6 +384,8 @@ describe('cleanupLeakedTestUsers mutation', () => {
       username: string;
       isAdmin: boolean;
     } | null;
+    // requireAdmin (#4781) re-verifies admin access against the DB via context.db.
+    db?: unknown;
   };
   let mockDeleteLeakedTestUsers: jest.Mock;
   let mockLogger: {
@@ -501,6 +508,9 @@ describe('cleanupLeakedTestUsers mutation', () => {
           occurredAt: 'o',
         },
         leagueActivityEventType: { enumValues: [] },
+        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+        users: { id: 'id', accessLevel: 'accessLevel' },
       },
       InternalSchema: {
         usersInAppInternal: { id: 'id', subscriptionTier: 's' },
@@ -527,6 +537,12 @@ describe('cleanupLeakedTestUsers mutation', () => {
         email: 'admin@example.com',
         username: 'admin',
         isAdmin: true,
+      },
+      db: {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ accessLevel: 'admin' }]),
       },
     };
   });
@@ -813,6 +829,9 @@ describe('updateUserTheme mutation', () => {
           occurredAt: 'o',
         },
         leagueActivityEventType: { enumValues: [] },
+        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+        users: { id: 'id', accessLevel: 'accessLevel' },
       },
       InternalSchema: {
         usersInAppInternal: { id: 'id', subscriptionTier: 's' },
@@ -1046,6 +1065,9 @@ describe('myIdentities query', () => {
           occurredAt: 'o',
         },
         leagueActivityEventType: { enumValues: [] },
+        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+        users: { id: 'id', accessLevel: 'accessLevel' },
       },
       InternalSchema: {
         usersInAppInternal: { id: 'id', subscriptionTier: 's' },
@@ -1278,6 +1300,9 @@ describe('setCanonicalEmail mutation', () => {
           occurredAt: 'o',
         },
         leagueActivityEventType: { enumValues: [] },
+        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+        users: { id: 'id', accessLevel: 'accessLevel' },
       },
       InternalSchema: {
         usersInAppInternal: { id: 'id', subscriptionTier: 's' },
