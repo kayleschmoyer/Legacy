@@ -169,6 +169,10 @@ function computePitchingFantasyPoints(
 // Column Configuration
 // =============================================================================
 
+// Column order mirrors docs/agents/pages/players/stats.md (Pitcher Columns section):
+// Name · Position · [Team omitted — not available on CareerPitching data model] ·
+// G · GS · W · L · IP · ERA · SO · BB · WHIP · SHO · SV · K/9
+// Additional non-spec columns (CG, H, ER, WAR, FPTS) follow at the end.
 export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
   {
     key: 'playerName' as unknown as string,
@@ -199,6 +203,15 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     description: 'Games pitched',
   },
   {
+    key: 'gamesStarted',
+    label: 'GS',
+    sortable: true,
+    width: '60px',
+    align: 'center',
+    priority: 'medium',
+    description: 'Games started',
+  },
+  {
     key: 'wins',
     label: 'W',
     sortable: true,
@@ -217,6 +230,16 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     description: 'Losses',
   },
   {
+    // Derived from outsRecorded / 3; displayed in baseball IP notation (e.g. 12.2 = 12⅔ innings).
+    key: 'inningsPitched',
+    label: 'IP',
+    sortable: true,
+    width: '70px',
+    align: 'center',
+    priority: 'high',
+    description: 'Innings pitched',
+  },
+  {
     key: 'era',
     label: 'ERA',
     sortable: true,
@@ -232,22 +255,33 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
         : '-',
   },
   {
-    key: 'gamesStarted',
-    label: 'GS',
+    key: 'strikeouts',
+    label: 'SO',
+    sortable: true,
+    width: '70px',
+    align: 'center',
+    priority: 'high',
+    description: 'Strikeouts',
+  },
+  {
+    key: 'baseOnBalls',
+    label: 'BB',
     sortable: true,
     width: '60px',
     align: 'center',
     priority: 'medium',
-    description: 'Games started',
+    description: 'Base on balls (walks)',
   },
   {
-    key: 'completeGames',
-    label: 'CG',
+    key: 'whip',
+    label: 'WHIP',
     sortable: true,
-    width: '60px',
+    width: '70px',
     align: 'center',
-    priority: 'low',
-    description: 'Complete games',
+    priority: 'high',
+    description: 'Walks plus hits per inning pitched',
+    formatter: (v: unknown) =>
+      v != null && typeof v === 'number' ? v.toFixed(2) : '-',
   },
   {
     key: 'shutouts',
@@ -268,22 +302,24 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     description: 'Saves',
   },
   {
-    key: 'strikeouts',
-    label: 'SO',
+    key: 'strikeoutsPerNine',
+    label: 'K/9',
     sortable: true,
     width: '70px',
     align: 'center',
     priority: 'high',
-    description: 'Strikeouts',
+    description: 'Strikeouts per nine innings',
+    formatter: (v: unknown) =>
+      v != null && typeof v === 'number' ? v.toFixed(2) : '-',
   },
   {
-    key: 'baseOnBalls',
-    label: 'BB',
+    key: 'completeGames',
+    label: 'CG',
     sortable: true,
     width: '60px',
     align: 'center',
-    priority: 'medium',
-    description: 'Base on balls (walks)',
+    priority: 'low',
+    description: 'Complete games',
   },
   {
     key: 'hits',
@@ -337,15 +373,18 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
 const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   playerName: 'lastName',
   games: 'games',
+  gamesStarted: 'gamesStarted',
   wins: 'wins',
   losses: 'losses',
+  inningsPitched: 'outsRecorded',
   era: 'era',
-  gamesStarted: 'gamesStarted',
-  completeGames: 'completeGames',
-  shutouts: 'shutouts',
-  saves: 'saves',
   strikeouts: 'strikeouts',
   baseOnBalls: 'baseOnBalls',
+  whip: 'whip',
+  shutouts: 'shutouts',
+  saves: 'saves',
+  strikeoutsPerNine: 'strikeoutsPerNine',
+  completeGames: 'completeGames',
   hits: 'hits',
   earnedRuns: 'earnedRuns',
   pitchingWAR: 'pitchingWAR',
@@ -945,32 +984,42 @@ export function PitchingStatsDataGrid({
                           ? formatPositionsPlayed(player?.positionsPlayed) ||
                             player?.primaryPosition ||
                             '-'
-                          : column.key === 'fantasyPoints'
-                            ? Math.round(
-                                computePitchingFantasyPoints(player),
-                              ).toString()
-                            : column.key === 'fantasyPointsPerGame'
-                              ? (() => {
-                                  const games = player?.games ?? 0;
-                                  const fpts =
-                                    computePitchingFantasyPoints(player);
-                                  return games > 0
-                                    ? (fpts / games).toFixed(1)
-                                    : '0.0';
-                                })()
-                              : column.formatter
-                                ? column.formatter(
-                                    player?.[column.key as keyof typeof player],
-                                  )
-                                : (() => {
-                                    const rawVal =
+                          : column.key === 'inningsPitched'
+                            ? (() => {
+                                const outs = player?.outsRecorded;
+                                if (outs == null || outs === 0) return '-';
+                                const wholeInnings = Math.floor(outs / 3);
+                                const extraOuts = outs % 3;
+                                return `${wholeInnings}.${extraOuts}`;
+                              })()
+                            : column.key === 'fantasyPoints'
+                              ? Math.round(
+                                  computePitchingFantasyPoints(player),
+                                ).toString()
+                              : column.key === 'fantasyPointsPerGame'
+                                ? (() => {
+                                    const games = player?.games ?? 0;
+                                    const fpts =
+                                      computePitchingFantasyPoints(player);
+                                    return games > 0
+                                      ? (fpts / games).toFixed(1)
+                                      : '0.0';
+                                  })()
+                                : column.formatter
+                                  ? column.formatter(
                                       player?.[
                                         column.key as keyof typeof player
-                                      ];
-                                    return typeof rawVal === 'object'
-                                      ? '—'
-                                      : String(rawVal ?? '—');
-                                  })();
+                                      ],
+                                    )
+                                  : (() => {
+                                      const rawVal =
+                                        player?.[
+                                          column.key as keyof typeof player
+                                        ];
+                                      return typeof rawVal === 'object'
+                                        ? '—'
+                                        : String(rawVal ?? '—');
+                                    })();
                     return (
                       <XStack
                         key={column.key}

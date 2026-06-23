@@ -8202,6 +8202,7 @@ export type CareerPitchingFragment = {
   outRate?: number | null;
   era?: string | null;
   whip?: number | null;
+  strikeoutsPerNine?: number | null;
   winPercentage?: number | null;
   pitchingWAR?: number | null;
   player?: {
@@ -9207,6 +9208,7 @@ export type GetCareerPitchingStatsQuery = {
     outRate?: number | null;
     era?: string | null;
     whip?: number | null;
+    strikeoutsPerNine?: number | null;
     winPercentage?: number | null;
     pitchingWAR?: number | null;
     player?: {
@@ -13705,6 +13707,7 @@ export const CareerPitchingFragmentDoc = gql`
     outRate
     era
     whip
+    strikeoutsPerNine
     winPercentage
     pitchingWAR
     player {
