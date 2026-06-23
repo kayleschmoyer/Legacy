@@ -624,10 +624,9 @@ test.describe('Player Detail Modal – two-way player Career Arc @regression', (
 
     // Switch to Pitching tab
     await playersPage.detail.switchTab('Pitching');
-    await playersPage.detail.expectText('2023', { exact: true });
 
-    // 2023 pitching season row should be visible
-    await playersPage.detail.expectText('2023', { exact: true });
+    // 2023 pitching season row should be visible (team abbreviation follows year)
+    await playersPage.detail.expectText('2023 LAA');
 
     // ERA column header
     await playersPage.detail.expectText('ERA');
@@ -691,10 +690,10 @@ test.describe('Player Detail Modal – stat data values @regression', () => {
 
     // Switch to Batting tab to see the season table
     await playersPage.detail.switchTab('Batting');
-    await playersPage.detail.expectText('2024', { exact: true });
 
+    // 2024 season row: team abbreviation follows year
+    await playersPage.detail.expectText('2024 LAA');
     // 2024 season: 145 G, 28 HR, 85 RBI
-    await playersPage.detail.expectText('2024', { exact: true });
     await playersPage.detail.expectText('145');
   });
 });

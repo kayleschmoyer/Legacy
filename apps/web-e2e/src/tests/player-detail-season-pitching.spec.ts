@@ -417,8 +417,8 @@ test.describe('Season Pitching Stats Table – data values @regression', () => {
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Pitching');
-    // The 2024 season row must appear
-    await playersPage.detail.expectText('2024', { exact: true });
+    // The 2024 season row must appear (team abbreviation follows the year)
+    await playersPage.detail.expectText('2024 LAD');
   });
 
   test('shows ERA computed from earnedRuns and inningsPitched (50 ER / 210 IP = 2.14)', async ({
@@ -518,8 +518,9 @@ test.describe('Season Pitching Stats Table – multi-season @regression', () => 
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Pitching');
-    await playersPage.detail.expectText('2024', { exact: true });
-    await playersPage.detail.expectText('2023', { exact: true });
+    // Team abbreviation follows the year: TEX for 2024, NYM for 2023
+    await playersPage.detail.expectText('2024 TEX');
+    await playersPage.detail.expectText('2023 NYM');
   });
 
   test('shows distinct computed ERA for each season', async ({
@@ -536,7 +537,7 @@ test.describe('Season Pitching Stats Table – multi-season @regression', () => 
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Pitching');
-    // 2024: (48 × 9) / 117 = 3.69  |  2023: (44 × 9) / 155 = 2.55
+    // 2024: earnedRunAverage = '3.69'  |  2023: earnedRunAverage = '2.55'
     await playersPage.detail.expectText('3.69');
     await playersPage.detail.expectText('2.55');
   });
@@ -613,7 +614,8 @@ test.describe('Season Pitching Stats Table – two-way player @regression', () =
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Pitching');
-    await playersPage.detail.expectText('2023', { exact: true });
+    // Team abbreviation follows the year: LAA for the 2023 pitching season
+    await playersPage.detail.expectText('2023 LAA');
   });
 
   test('shows computed ERA for two-way player pitching season (35 ER / 132 IP = 2.39)', async ({
@@ -630,7 +632,7 @@ test.describe('Season Pitching Stats Table – two-way player @regression', () =
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Pitching');
-    // ERA = (35 × 9) / ipToDecimalInnings(132) = 315/132 = 2.386… → "2.39"
+    // earnedRunAverage from mock = '2.39'
     await playersPage.detail.expectText('2.39');
   });
 

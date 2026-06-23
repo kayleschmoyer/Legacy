@@ -593,8 +593,8 @@ test.describe('Season Fielding Stats Table — data values @regression', () => {
     await playersPage.detail.switchTab('Fielding');
     await playersPage.detail.expectText('POS');
 
-    // Season year from mock data
-    await playersPage.detail.expectText('2024', { exact: true });
+    // Season year + team from mock data
+    await playersPage.detail.expectText('2024 LAA');
   });
 
   test('POS column shows the fielding position (CF)', async ({
@@ -704,9 +704,9 @@ test.describe('Season Fielding Stats Table — multiple seasons @regression', ()
     await playersPage.detail.switchTab('Fielding');
     await playersPage.detail.expectText('POS');
 
-    // Both season years must appear in the table
-    await playersPage.detail.expectText('2024', { exact: true });
-    await playersPage.detail.expectText('2023', { exact: true });
+    // Both season rows must appear in the table
+    await playersPage.detail.expectText('2024 LAA');
+    await playersPage.detail.expectText('2023 LAA');
   });
 
   test('2023 fielding row shows correct PO, A, E values', async ({
@@ -762,10 +762,10 @@ test.describe('Season Fielding Stats Table — multi-position per-row breakdown 
     await playersPage.detail.switchTab('Fielding');
     await playersPage.detail.expectText('POS');
 
-    // 2024 must appear once per position row (CF + LF = 2 rows)
+    // 2024 LAA must appear once per position row (CF + LF = 2 rows)
     const yearLocator = page
       .locator('div[role="dialog"]')
-      .getByText('2024', { exact: true });
+      .getByText('2024 LAA', { exact: true });
     await expect(yearLocator).toHaveCount(2);
   });
 

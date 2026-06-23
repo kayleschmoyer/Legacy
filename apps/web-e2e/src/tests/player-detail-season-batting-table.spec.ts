@@ -400,8 +400,8 @@ test.describe('Season Batting Table — row data @regression', () => {
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Batting');
-    await playersPage.detail.expectText('2024', { exact: true });
-    await playersPage.detail.expectText('2023', { exact: true });
+    await playersPage.detail.expectText('2024 LAA', { exact: true });
+    await playersPage.detail.expectText('2023 LAA', { exact: true });
   });
 
   test('2024 season row shows correct games, HR, and RBI', async ({
@@ -416,7 +416,7 @@ test.describe('Season Batting Table — row data @regression', () => {
 
     // Switch to Batting tab to reveal season table
     await playersPage.detail.switchTab('Batting');
-    await playersPage.detail.expectText('2024', { exact: true });
+    await playersPage.detail.expectText('2024 LAA', { exact: true });
 
     // 2024 mock: games=145, HR=28, RBI=85
     await playersPage.detail.expectText('145');
@@ -435,7 +435,7 @@ test.describe('Season Batting Table — row data @regression', () => {
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Batting');
-    await playersPage.detail.expectText('2023', { exact: true });
+    await playersPage.detail.expectText('2023 LAA', { exact: true });
 
     // 2023 mock: games=140, SB=10
     await playersPage.detail.expectText('140');
@@ -456,7 +456,7 @@ test.describe('Season Batting Table — row data @regression', () => {
     await playersPage.detail.expectNotLoading();
 
     await playersPage.detail.switchTab('Batting');
-    await playersPage.detail.expectText('2022', { exact: true });
+    await playersPage.detail.expectText('2022 LAD', { exact: true });
 
     // Only the 2022 row — neither 2024 nor 2023 should appear in the dialog
     const dialog = playersPage.detail.dialog;
@@ -481,11 +481,11 @@ test.describe('Season Batting Table — sort order @regression', () => {
     const dialog = playersPage.detail.dialog;
 
     const box2024 = await dialog
-      .getByText('2024', { exact: true })
+      .getByText('2024 LAA', { exact: true })
       .first()
       .boundingBox();
     const box2023 = await dialog
-      .getByText('2023', { exact: true })
+      .getByText('2023 LAA', { exact: true })
       .first()
       .boundingBox();
 
@@ -699,8 +699,8 @@ test.describe('Season Batting Table — multiple seasons @regression', () => {
     await playersPage.detail.expectText('AVG', { exact: true });
 
     // Both seasons visible
-    await playersPage.detail.expectText('2024', { exact: true });
-    await playersPage.detail.expectText('2023', { exact: true });
+    await playersPage.detail.expectText('2024 LAA', { exact: true });
+    await playersPage.detail.expectText('2023 LAA', { exact: true });
   });
 });
 

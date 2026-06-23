@@ -424,3 +424,164 @@ test.describe('Player Detail Modal — Error State @regression', () => {
     await playersPage.detail.expectCareerBattingCardNotVisible();
   });
 });
+
+// ── Tests: Mid-year trade (duplicate season) ──────────────────────────────────
+
+/** Player traded mid-season: two batting rows for the same year, different teams. */
+const TRADE_SEASON_STATS = {
+  data: {
+    player: {
+      __typename: 'Player',
+      eligiblePositions: ['1B'],
+      firstName: 'Traded',
+      lastName: 'Player',
+    },
+    playerSeasonBatting: [
+      {
+        __typename: 'SeasonBatting',
+        season: 2023,
+        team: 'NYY',
+        games: 80,
+        plateAppearances: 330,
+        atBats: 290,
+        runs: 45,
+        hits: 80,
+        doubles: 15,
+        triples: 1,
+        homeRuns: 12,
+        rbi: 38,
+        stolenBases: 2,
+        caughtStealing: 1,
+        baseOnBalls: 38,
+        strikeouts: 70,
+        battingAverage: 0.276,
+        onBasePercentage: 0.36,
+        sluggingPercentage: 0.455,
+      },
+      {
+        __typename: 'SeasonBatting',
+        season: 2023,
+        team: 'LAD',
+        games: 60,
+        plateAppearances: 240,
+        atBats: 210,
+        runs: 32,
+        hits: 55,
+        doubles: 10,
+        triples: 0,
+        homeRuns: 8,
+        rbi: 25,
+        stolenBases: 1,
+        caughtStealing: 0,
+        baseOnBalls: 28,
+        strikeouts: 50,
+        battingAverage: 0.262,
+        onBasePercentage: 0.345,
+        sluggingPercentage: 0.41,
+      },
+      {
+        __typename: 'SeasonBatting',
+        season: 2024,
+        team: 'LAD',
+        games: 150,
+        plateAppearances: 620,
+        atBats: 545,
+        runs: 88,
+        hits: 158,
+        doubles: 30,
+        triples: 2,
+        homeRuns: 25,
+        rbi: 80,
+        stolenBases: 5,
+        caughtStealing: 2,
+        baseOnBalls: 68,
+        strikeouts: 120,
+        battingAverage: 0.29,
+        onBasePercentage: 0.37,
+        sluggingPercentage: 0.48,
+      },
+    ],
+    playerSeasonPitching: [],
+    playerSeasonFielding: [],
+  },
+};
+
+const TRADE_CAREER_ARC = {
+  data: {
+    player: {
+      __typename: 'Player',
+      firstName: 'Traded',
+      lastName: 'Player',
+      eligiblePositions: ['1B'],
+      careerAchievements: {
+        allStarSelections: 0,
+        goldGloves: 0,
+        silverSluggers: 0,
+        mvpAwards: 0,
+        cyYoungAwards: 0,
+        hallOfFame: false,
+        rookieOfTheYear: false,
+      },
+    },
+    playerSeasonBatting: [
+      {
+        season: 2023,
+        team: 'NYY',
+        games: 80,
+        hits: 80,
+        atBats: 290,
+        homeRuns: 12,
+        rbi: 38,
+        stolenBases: 2,
+        battingAverage: 0.276,
+        onBasePercentage: 0.36,
+        sluggingPercentage: 0.455,
+        onBasePlusSlugging: 0.815,
+        onBasePlusSluggingPlus: 115,
+        awardSummary: null,
+      },
+    ],
+    playerSeasonPitching: [],
+  },
+};
+
+test.describe('Player Detail Modal — Mid-year trade (LS-6984) @regression', () => {
+  test('two batting rows for the same season with different teams are shown as separate rows', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, {
+      seasonStatsBody: TRADE_SEASON_STATS,
+      careerArcBody: TRADE_CAREER_ARC,
+    });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    await playersPage.detail.switchTab('Batting');
+
+    // Both trade legs must appear as distinct rows
+    await playersPage.detail.expectText('2023 NYY');
+    await playersPage.detail.expectText('2023 LAD');
+    // The other season is also present
+    await playersPage.detail.expectText('2024 LAD');
+  });
+
+  test('seasons count in eyebrow text counts unique years, not team-rows', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page, {
+      seasonStatsBody: TRADE_SEASON_STATS,
+      careerArcBody: TRADE_CAREER_ARC,
+    });
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+
+    // Three batting rows (NYY-2023, LAD-2023, LAD-2024) but only 2 unique seasons
+    await playersPage.detail.expectText('2 Season');
+  });
+});

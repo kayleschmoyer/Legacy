@@ -168,6 +168,7 @@ export interface PlayerDetailModalProps {
 
 interface SeasonRow {
   season: number;
+  team?: string;
   batting?: {
     games: number;
     pa: number;
@@ -763,9 +764,9 @@ export function PlayerDetailModal({
   position,
   open,
   onOpenChange,
+  onBack,
   onViewFullPage,
   onPositionClick,
-  onBack,
 }: PlayerDetailModalProps) {
   LOGGER.debug('[PlayerDetailModal] render', { playerId, playerName, open });
 
@@ -819,11 +820,12 @@ export function PlayerDetailModal({
   // ------ Transform to season rows ------
   const seasonRows = useMemo((): SeasonRow[] => {
     if (!displayData) return [];
-    const seasons = new Map<number, SeasonRow>();
+    const seasons = new Map<string, SeasonRow>();
 
     displayData.playerSeasonBatting?.forEach(
       (b: {
         season?: number | null;
+        team?: string | null;
         games?: number | null;
         plateAppearances?: number | null;
         atBats?: number | null;
@@ -841,7 +843,11 @@ export function PlayerDetailModal({
         onBasePlusSluggingPlus?: number | null;
       }) => {
         if (!b?.season) return;
-        const row: SeasonRow = seasons.get(b.season) || { season: b.season };
+        const key = `${b.season}-${b.team ?? ''}`;
+        const row: SeasonRow = seasons.get(key) || {
+          season: b.season,
+          team: b.team ?? undefined,
+        };
         const ab = b.atBats ?? 0;
         const h = b.hits ?? 0;
         const hr = b.homeRuns ?? 0;
@@ -892,13 +898,14 @@ export function PlayerDetailModal({
           babip,
           opsPlus: b.onBasePlusSluggingPlus ?? null,
         };
-        seasons.set(b.season, row);
+        seasons.set(key, row);
       },
     );
 
     displayData.playerSeasonPitching?.forEach(
       (p: {
         season?: number | null;
+        team?: string | null;
         games?: number | null;
         wins?: number | null;
         losses?: number | null;
@@ -913,7 +920,11 @@ export function PlayerDetailModal({
         basesOnBallsPerNine?: number | null;
       }) => {
         if (!p?.season) return;
-        const row: SeasonRow = seasons.get(p.season) || { season: p.season };
+        const key = `${p.season}-${p.team ?? ''}`;
+        const row: SeasonRow = seasons.get(key) || {
+          season: p.season,
+          team: p.team ?? undefined,
+        };
         const ip = p.inningsPitched ?? 0;
         const er = p.earnedRuns ?? 0;
         const decimalInnings = ipToDecimalInnings(ip);
@@ -940,13 +951,14 @@ export function PlayerDetailModal({
               ? p.basesOnBallsPerNine.toFixed(1)
               : null,
         };
-        seasons.set(p.season, row);
+        seasons.set(key, row);
       },
     );
 
     displayData.playerSeasonFielding?.forEach(
       (f: {
         season?: number | null;
+        team?: string | null;
         games?: number | null;
         inningsDefended?: number | null;
         putouts?: number | null;
@@ -958,7 +970,11 @@ export function PlayerDetailModal({
         oaa?: number | null;
       }) => {
         if (!f?.season) return;
-        const row: SeasonRow = seasons.get(f.season) || { season: f.season };
+        const key = `${f.season}-${f.team ?? ''}`;
+        const row: SeasonRow = seasons.get(key) || {
+          season: f.season,
+          team: f.team ?? undefined,
+        };
         if (row.fielding) {
           row.fielding.games += f.games ?? 0;
           row.fielding.inn += f.inningsDefended ?? 0;
@@ -998,7 +1014,7 @@ export function PlayerDetailModal({
             oaa: f.oaa ?? null,
           };
         }
-        seasons.set(f.season, row);
+        seasons.set(key, row);
       },
     );
 
@@ -1042,6 +1058,7 @@ export function PlayerDetailModal({
     const years = seasonRows.map((r) => r.season);
     const minYear = Math.min(...years);
     const maxYear = Math.max(...years);
+    const uniqueSeasons = new Set(years).size;
 
     const careerOBP = totAB + totBB > 0 ? (totH + totBB) / (totAB + totBB) : 0;
     const careerSLG =
@@ -1068,7 +1085,7 @@ export function PlayerDetailModal({
       hasBatting: batting.length > 0,
       hasPitching: pitching.length > 0,
       hasFielding: seasonRows.some((r) => r.fielding),
-      seasons: seasonRows.length,
+      seasons: uniqueSeasons,
       minYear,
       maxYear,
       games: totGames,
@@ -1097,7 +1114,7 @@ export function PlayerDetailModal({
       .filter((r) => r.batting != null)
       .map((r) => {
         const row: (string | number)[] = [
-          r.season,
+          r.team ? `${r.season} ${r.team}` : r.season,
           r.batting?.games ?? 0,
           r.batting?.pa ?? 0,
           r.batting?.ab ?? 0,
@@ -1127,7 +1144,7 @@ export function PlayerDetailModal({
         .filter((r) => r.pitching != null)
         .map((r) => {
           const base: (string | number)[] = [
-            r.season,
+            r.team ? `${r.season} ${r.team}` : r.season,
             r.pitching?.games ?? 0,
             `${r.pitching?.wins ?? 0}-${r.pitching?.losses ?? 0}`,
             r.pitching?.era ?? 0,
@@ -1160,6 +1177,7 @@ export function PlayerDetailModal({
       )
       .map((f) => ({
         season: f.season,
+        team: f.team ?? undefined,
         position: f.position ?? '',
         games: f.games ?? 0,
         inn: f.inningsDefended ?? 0,
@@ -1177,7 +1195,7 @@ export function PlayerDetailModal({
     () =>
       fieldingRows.map((r) => {
         const base: (string | number)[] = [
-          r.season,
+          r.team ? `${r.season} ${r.team}` : r.season,
           r.position,
           r.games,
           outsToBaseballIP(ipToOuts(r.inn)),

@@ -484,9 +484,9 @@ test.describe('Player Detail Modal @regression', () => {
     await playersPage.detail.expectText('SB');
     await playersPage.detail.expectText('AVG', { exact: true });
 
-    // Both season rows should appear
-    await playersPage.detail.expectText('2024', { exact: true });
-    await playersPage.detail.expectText('2023', { exact: true });
+    // Both season rows should appear (team abbreviation follows the year)
+    await playersPage.detail.expectText('2024 LAA');
+    await playersPage.detail.expectText('2023 LAA');
   });
 
   test('switching to Fielding tab shows fielding table', async ({
@@ -681,10 +681,9 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
 
     // Switch to Batting tab to verify season rows
     await playersPage.detail.switchTab('Batting');
-    await playersPage.detail.expectText('2024', { exact: true });
 
-    // Both season years are in the batting table
-    await playersPage.detail.expectText('2024', { exact: true });
-    await playersPage.detail.expectText('2023', { exact: true });
+    // Both season rows appear with team abbreviation
+    await playersPage.detail.expectText('2024 LAA');
+    await playersPage.detail.expectText('2023 LAA');
   });
 });
