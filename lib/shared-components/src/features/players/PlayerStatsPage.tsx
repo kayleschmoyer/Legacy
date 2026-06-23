@@ -184,8 +184,17 @@ export interface ClearFiltersSetters {
   setPosition: (v: string) => void;
   setTeam: (v: string) => void;
   setMinHR: (v: number) => void;
+  setMaxHR: (v: number) => void;
+  setMinRBI: (v: number) => void;
+  setMaxRBI: (v: number) => void;
   setMinAVG: (v: number) => void;
+  setMaxAVG: (v: number) => void;
+  setMinERA: (v: number) => void;
   setMaxERA: (v: number) => void;
+  setMinWins: (v: number) => void;
+  setMaxWins: (v: number) => void;
+  setMinSO: (v: number) => void;
+  setMaxSO: (v: number) => void;
 }
 
 /**
@@ -205,8 +214,17 @@ export function createClearFiltersHandler(
     setters.setPosition('All Positions');
     setters.setTeam('All Teams');
     setters.setMinHR(0);
+    setters.setMaxHR(HR_MAX);
+    setters.setMinRBI(0);
+    setters.setMaxRBI(RBI_MAX);
     setters.setMinAVG(0);
+    setters.setMaxAVG(AVG_MAX);
+    setters.setMinERA(0);
     setters.setMaxERA(ERA_MAX_OFF);
+    setters.setMinWins(0);
+    setters.setMaxWins(WINS_MAX);
+    setters.setMinSO(0);
+    setters.setMaxSO(SO_MAX);
     applyFilters();
     onClearFilters?.();
   };
@@ -459,6 +477,25 @@ const HR_MAX = 800;
 // off-grid values remain reachable via a hand-typed URL.
 const HR_STEP = 5;
 
+// Batting average upper bound and step. The all-time single-season record is .440
+// (Hugh Duffy, 1894); 0.43 is a practical cap for the career-avg domain. Step matches
+// the three-decimal display precision used in the format function.
+const AVG_MAX = 0.43;
+const AVG_STEP = 0.005;
+
+// RBI career upper bound. Hank Aaron's career total of 2297 is the all-time record;
+// 2500 gives headroom for future records and round thresholds like "2000+".
+const RBI_MAX = 2500;
+const RBI_STEP = 5;
+
+// Wins career upper bound. Cy Young holds the all-time record at 511; 550 gives headroom.
+const WINS_MAX = 550;
+const WINS_STEP = 5;
+
+// Strikeouts career upper bound. Nolan Ryan's record is 5714; 6000 gives headroom.
+const SO_MAX = 6000;
+const SO_STEP = 10;
+
 // Rows-per-page choices for the toolbar selector.
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 // In 'combined' view both the batting and pitching grids render simultaneously, so a
@@ -473,8 +510,17 @@ export interface AppliedFilters {
   team: string;
   pageSize: number;
   minHR: number;
+  maxHR: number;
+  minRBI: number;
+  maxRBI: number;
   minAVG: number;
+  maxAVG: number;
+  minERA: number;
   maxERA: number;
+  minWins: number;
+  maxWins: number;
+  minSO: number;
+  maxSO: number;
 }
 
 /**
@@ -500,8 +546,17 @@ export function hasPendingFilterChanges(
     draft.team !== applied.team ||
     draft.pageSize !== applied.pageSize ||
     draft.minHR !== applied.minHR ||
+    draft.maxHR !== applied.maxHR ||
+    draft.minRBI !== applied.minRBI ||
+    draft.maxRBI !== applied.maxRBI ||
     draft.minAVG !== applied.minAVG ||
-    draft.maxERA !== applied.maxERA
+    draft.maxAVG !== applied.maxAVG ||
+    draft.minERA !== applied.minERA ||
+    draft.maxERA !== applied.maxERA ||
+    draft.minWins !== applied.minWins ||
+    draft.maxWins !== applied.maxWins ||
+    draft.minSO !== applied.minSO ||
+    draft.maxSO !== applied.maxSO
   );
 }
 
@@ -563,12 +618,25 @@ export function buildShareUrl(
   }
   if (filters.team !== 'All Teams') params.set('team', filters.team);
   if (filters.minHR > 0) params.set('minHomeRuns', String(filters.minHR));
+  if (filters.maxHR < HR_MAX) params.set('maxHomeRuns', String(filters.maxHR));
+  if (filters.minRBI > 0) params.set('minRBI', String(filters.minRBI));
+  if (filters.maxRBI < RBI_MAX) params.set('maxRBI', String(filters.maxRBI));
   if (filters.minAVG > 0) {
     params.set('minBattingAvg', filters.minAVG.toFixed(3));
   }
+  if (filters.maxAVG < AVG_MAX) {
+    params.set('maxBattingAvg', filters.maxAVG.toFixed(3));
+  }
+  if (filters.minERA > 0) params.set('minERA', filters.minERA.toFixed(2));
   if (filters.maxERA < ERA_MAX_OFF) {
     params.set('maxERA', filters.maxERA.toFixed(2));
   }
+  if (filters.minWins > 0) params.set('minWins', String(filters.minWins));
+  if (filters.maxWins < WINS_MAX)
+    params.set('maxWins', String(filters.maxWins));
+  if (filters.minSO > 0) params.set('minStrikeouts', String(filters.minSO));
+  if (filters.maxSO < SO_MAX)
+    params.set('maxStrikeouts', String(filters.maxSO));
   // Persist the active batting sort so the shared link restores it (LS-7115);
   // the default sort is omitted to keep the URL clean.
   const sortFilter = battingSortFilter(sortBy, sortDir);
@@ -687,8 +755,17 @@ export function PlayerStatsPage({
 
   // ── Advanced filter draft state ────────────────────────────────
   const [minHR, setMinHR] = useState(initialFilters.minHomeRuns ?? 0);
+  const [maxHR, setMaxHR] = useState(initialFilters.maxHomeRuns ?? HR_MAX);
+  const [minRBI, setMinRBI] = useState(initialFilters.minRBI ?? 0);
+  const [maxRBI, setMaxRBI] = useState(initialFilters.maxRBI ?? RBI_MAX);
   const [minAVG, setMinAVG] = useState(initialFilters.minBattingAvg ?? 0);
+  const [maxAVG, setMaxAVG] = useState(initialFilters.maxBattingAvg ?? AVG_MAX);
+  const [minERA, setMinERA] = useState(initialFilters.minERA ?? 0);
   const [maxERA, setMaxERA] = useState(initialFilters.maxERA ?? ERA_MAX_OFF);
+  const [minWins, setMinWins] = useState(initialFilters.minWins ?? 0);
+  const [maxWins, setMaxWins] = useState(initialFilters.maxWins ?? WINS_MAX);
+  const [minSO, setMinSO] = useState(initialFilters.minStrikeouts ?? 0);
+  const [maxSO, setMaxSO] = useState(initialFilters.maxStrikeouts ?? SO_MAX);
 
   // ── Applied filters — committed snapshot that drives grid queries ─
   // Separate draft vs. applied state avoids mid-input query flicker and
@@ -702,16 +779,59 @@ export function PlayerStatsPage({
       normalizeViewMode(initialViewMode),
     ),
     minHR: initialFilters.minHomeRuns ?? 0,
+    maxHR: initialFilters.maxHomeRuns ?? HR_MAX,
+    minRBI: initialFilters.minRBI ?? 0,
+    maxRBI: initialFilters.maxRBI ?? RBI_MAX,
     minAVG: initialFilters.minBattingAvg ?? 0,
+    maxAVG: initialFilters.maxBattingAvg ?? AVG_MAX,
+    minERA: initialFilters.minERA ?? 0,
     maxERA: initialFilters.maxERA ?? ERA_MAX_OFF,
+    minWins: initialFilters.minWins ?? 0,
+    maxWins: initialFilters.maxWins ?? WINS_MAX,
+    minSO: initialFilters.minStrikeouts ?? 0,
+    maxSO: initialFilters.maxStrikeouts ?? SO_MAX,
   }));
 
   // Single draft snapshot, mirroring the committed AppliedFilters shape. Every
   // toolbar control writes only to draft state; applyFilters() commits the whole
   // snapshot at once so all controls share one apply model (LS-7126).
   const draftFilters = useMemo<AppliedFilters>(
-    () => ({ search, position, team, pageSize, minHR, minAVG, maxERA }),
-    [search, position, team, pageSize, minHR, minAVG, maxERA],
+    () => ({
+      search,
+      position,
+      team,
+      pageSize,
+      minHR,
+      maxHR,
+      minRBI,
+      maxRBI,
+      minAVG,
+      maxAVG,
+      minERA,
+      maxERA,
+      minWins,
+      maxWins,
+      minSO,
+      maxSO,
+    }),
+    [
+      search,
+      position,
+      team,
+      pageSize,
+      minHR,
+      maxHR,
+      minRBI,
+      maxRBI,
+      minAVG,
+      maxAVG,
+      minERA,
+      maxERA,
+      minWins,
+      maxWins,
+      minSO,
+      maxSO,
+    ],
   );
 
   // The snapshot that Apply actually commits. Enforces the documented minimum
@@ -777,6 +897,7 @@ export function PlayerStatsPage({
       team:
         appliedFilters.team !== 'All Teams' ? appliedFilters.team : undefined,
       minHomeRuns: appliedFilters.minHR > 0 ? appliedFilters.minHR : undefined,
+      minRBI: appliedFilters.minRBI > 0 ? appliedFilters.minRBI : undefined,
       minBattingAvg:
         appliedFilters.minAVG > 0 ? appliedFilters.minAVG : undefined,
       // The Hitters tab must exclude pure pitchers from the batting grid; the
@@ -813,6 +934,9 @@ export function PlayerStatsPage({
           : undefined,
       team:
         appliedFilters.team !== 'All Teams' ? appliedFilters.team : undefined,
+      minWins: appliedFilters.minWins > 0 ? appliedFilters.minWins : undefined,
+      minStrikeouts:
+        appliedFilters.minSO > 0 ? appliedFilters.minSO : undefined,
     }),
     [appliedFilters],
   );
@@ -829,12 +953,26 @@ export function PlayerStatsPage({
       filters.team = appliedFilters.team;
     }
     if (appliedFilters.minHR > 0) filters.minHomeRuns = appliedFilters.minHR;
+    if (appliedFilters.maxHR < HR_MAX)
+      filters.maxHomeRuns = appliedFilters.maxHR;
+    if (appliedFilters.minRBI > 0) filters.minRBI = appliedFilters.minRBI;
+    if (appliedFilters.maxRBI < RBI_MAX) filters.maxRBI = appliedFilters.maxRBI;
     if (appliedFilters.minAVG > 0) {
       filters.minBattingAvg = appliedFilters.minAVG;
     }
+    if (appliedFilters.maxAVG < AVG_MAX) {
+      filters.maxBattingAvg = appliedFilters.maxAVG;
+    }
+    if (appliedFilters.minERA > 0) filters.minERA = appliedFilters.minERA;
     if (appliedFilters.maxERA < ERA_MAX_OFF) {
       filters.maxERA = appliedFilters.maxERA;
     }
+    if (appliedFilters.minWins > 0) filters.minWins = appliedFilters.minWins;
+    if (appliedFilters.maxWins < WINS_MAX)
+      filters.maxWins = appliedFilters.maxWins;
+    if (appliedFilters.minSO > 0) filters.minStrikeouts = appliedFilters.minSO;
+    if (appliedFilters.maxSO < SO_MAX)
+      filters.maxStrikeouts = appliedFilters.maxSO;
     // Persist the batting sort when it differs from the default so a shared link
     // restores the chosen sort (LS-7115). Default sort is omitted to keep URLs
     // clean.
@@ -929,8 +1067,17 @@ export function PlayerStatsPage({
       position: position !== 'All Positions' ? position : undefined,
       team: team !== 'All Teams' ? team : undefined,
       minHomeRuns: minHR > 0 ? minHR : undefined,
+      maxHomeRuns: maxHR < HR_MAX ? maxHR : undefined,
+      minRBI: minRBI > 0 ? minRBI : undefined,
+      maxRBI: maxRBI < RBI_MAX ? maxRBI : undefined,
       minBattingAvg: minAVG > 0 ? minAVG : undefined,
+      maxBattingAvg: maxAVG < AVG_MAX ? maxAVG : undefined,
+      minERA: minERA > 0 ? minERA : undefined,
       maxERA: maxERA < ERA_MAX_OFF ? maxERA : undefined,
+      minWins: minWins > 0 ? minWins : undefined,
+      maxWins: maxWins < WINS_MAX ? maxWins : undefined,
+      minStrikeouts: minSO > 0 ? minSO : undefined,
+      maxStrikeouts: maxSO < SO_MAX ? maxSO : undefined,
     };
     onExport(filters, viewMode);
   }, [
@@ -940,8 +1087,17 @@ export function PlayerStatsPage({
     position,
     team,
     minHR,
+    maxHR,
+    minRBI,
+    maxRBI,
     minAVG,
+    maxAVG,
+    minERA,
     maxERA,
+    minWins,
+    maxWins,
+    minSO,
+    maxSO,
     viewMode,
   ]);
 
@@ -1049,8 +1205,17 @@ export function PlayerStatsPage({
       params.push(`position=${encodeURIComponent(position)}`);
     if (team !== 'All Teams') params.push(`team=${encodeURIComponent(team)}`);
     if (minHR > 0) params.push(`minHomeRuns=${minHR}`);
+    if (maxHR < HR_MAX) params.push(`maxHomeRuns=${maxHR}`);
+    if (minRBI > 0) params.push(`minRBI=${minRBI}`);
+    if (maxRBI < RBI_MAX) params.push(`maxRBI=${maxRBI}`);
     if (minAVG > 0) params.push(`minBattingAvg=${minAVG.toFixed(3)}`);
+    if (maxAVG < AVG_MAX) params.push(`maxBattingAvg=${maxAVG.toFixed(3)}`);
+    if (minERA > 0) params.push(`minERA=${minERA.toFixed(2)}`);
     if (maxERA < ERA_MAX_OFF) params.push(`maxERA=${maxERA.toFixed(2)}`);
+    if (minWins > 0) params.push(`minWins=${minWins}`);
+    if (maxWins < WINS_MAX) params.push(`maxWins=${maxWins}`);
+    if (minSO > 0) params.push(`minStrikeouts=${minSO}`);
+    if (maxSO < SO_MAX) params.push(`maxStrikeouts=${maxSO}`);
     const sortFilter = battingSortFilter(sortBy, sortDir);
     if (sortFilter.sortBy) {
       params.push(`sortBy=${sortFilter.sortBy}`);
@@ -1064,8 +1229,17 @@ export function PlayerStatsPage({
     position,
     team,
     minHR,
+    maxHR,
+    minRBI,
+    maxRBI,
     minAVG,
+    maxAVG,
+    minERA,
     maxERA,
+    minWins,
+    maxWins,
+    minSO,
+    maxSO,
     sortBy,
     sortDir,
   ]);
@@ -1915,8 +2089,17 @@ export function PlayerStatsPage({
               <Pressable
                 onPress={() => {
                   setMinHR(0);
+                  setMaxHR(HR_MAX);
+                  setMinRBI(0);
+                  setMaxRBI(RBI_MAX);
                   setMinAVG(0);
+                  setMaxAVG(AVG_MAX);
+                  setMinERA(0);
                   setMaxERA(ERA_MAX_OFF);
+                  setMinWins(0);
+                  setMaxWins(WINS_MAX);
+                  setMinSO(0);
+                  setMaxSO(SO_MAX);
                   applyFilters();
                 }}
                 accessibilityRole="button"
@@ -1958,13 +2141,65 @@ export function PlayerStatsPage({
                 onCommit={applyFilters}
               />
               <StatSlider
+                label="Max Home Runs"
+                value={maxHR}
+                min={0}
+                max={HR_MAX}
+                step={HR_STEP}
+                format={(v) => (v >= HR_MAX ? '—' : String(v))}
+                onChange={setMaxHR}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Min RBI"
+                value={minRBI}
+                min={0}
+                max={RBI_MAX}
+                step={RBI_STEP}
+                format={(v) => String(v)}
+                onChange={setMinRBI}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Max RBI"
+                value={maxRBI}
+                min={0}
+                max={RBI_MAX}
+                step={RBI_STEP}
+                format={(v) => (v >= RBI_MAX ? '—' : String(v))}
+                onChange={setMaxRBI}
+                onCommit={applyFilters}
+              />
+              <StatSlider
                 label="Min Batting Average"
                 value={minAVG}
                 min={0}
-                max={0.43}
-                step={0.005}
+                max={AVG_MAX}
+                step={AVG_STEP}
                 format={(v) => v.toFixed(3).replace(/^0/, '')}
                 onChange={setMinAVG}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Max Batting Average"
+                value={maxAVG}
+                min={0}
+                max={AVG_MAX}
+                step={AVG_STEP}
+                format={(v) =>
+                  v >= AVG_MAX ? '—' : v.toFixed(3).replace(/^0/, '')
+                }
+                onChange={setMaxAVG}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Min ERA"
+                value={minERA}
+                min={0}
+                max={ERA_MAX_OFF}
+                step={0.05}
+                format={(v) => v.toFixed(2)}
+                onChange={setMinERA}
                 onCommit={applyFilters}
               />
               <StatSlider
@@ -1973,8 +2208,48 @@ export function PlayerStatsPage({
                 min={0}
                 max={ERA_MAX_OFF}
                 step={0.05}
-                format={(v) => v.toFixed(2)}
+                format={(v) => (v >= ERA_MAX_OFF ? '—' : v.toFixed(2))}
                 onChange={setMaxERA}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Min Wins"
+                value={minWins}
+                min={0}
+                max={WINS_MAX}
+                step={WINS_STEP}
+                format={(v) => String(v)}
+                onChange={setMinWins}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Max Wins"
+                value={maxWins}
+                min={0}
+                max={WINS_MAX}
+                step={WINS_STEP}
+                format={(v) => (v >= WINS_MAX ? '—' : String(v))}
+                onChange={setMaxWins}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Min Strikeouts"
+                value={minSO}
+                min={0}
+                max={SO_MAX}
+                step={SO_STEP}
+                format={(v) => String(v)}
+                onChange={setMinSO}
+                onCommit={applyFilters}
+              />
+              <StatSlider
+                label="Max Strikeouts"
+                value={maxSO}
+                min={0}
+                max={SO_MAX}
+                step={SO_STEP}
+                format={(v) => (v >= SO_MAX ? '—' : String(v))}
+                onChange={setMaxSO}
                 onCommit={applyFilters}
               />
             </XStack>
@@ -2015,8 +2290,17 @@ export function PlayerStatsPage({
                 setPosition,
                 setTeam,
                 setMinHR,
+                setMaxHR,
+                setMinRBI,
+                setMaxRBI,
                 setMinAVG,
+                setMaxAVG,
+                setMinERA,
                 setMaxERA,
+                setMinWins,
+                setMaxWins,
+                setMinSO,
+                setMaxSO,
               },
               applyFilters,
               onClearFilters,

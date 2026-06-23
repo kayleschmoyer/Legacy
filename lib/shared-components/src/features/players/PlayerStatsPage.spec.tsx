@@ -23,6 +23,11 @@ import {
 // can be verified without mounting the full Tamagui shell.
 
 const ERA_MAX_OFF = 5;
+const HR_MAX = 800;
+const RBI_MAX = 2500;
+const AVG_MAX = 0.43;
+const WINS_MAX = 550;
+const SO_MAX = 6000;
 
 function makeSetters(): {
   setters: ClearFiltersSetters;
@@ -33,16 +38,34 @@ function makeSetters(): {
     setPosition: [],
     setTeam: [],
     setMinHR: [],
+    setMaxHR: [],
+    setMinRBI: [],
+    setMaxRBI: [],
     setMinAVG: [],
+    setMaxAVG: [],
+    setMinERA: [],
     setMaxERA: [],
+    setMinWins: [],
+    setMaxWins: [],
+    setMinSO: [],
+    setMaxSO: [],
   };
   const setters: ClearFiltersSetters = {
     setSearch: (v) => calls.setSearch.push(v),
     setPosition: (v) => calls.setPosition.push(v),
     setTeam: (v) => calls.setTeam.push(v),
     setMinHR: (v) => calls.setMinHR.push(v),
+    setMaxHR: (v) => calls.setMaxHR.push(v),
+    setMinRBI: (v) => calls.setMinRBI.push(v),
+    setMaxRBI: (v) => calls.setMaxRBI.push(v),
     setMinAVG: (v) => calls.setMinAVG.push(v),
+    setMaxAVG: (v) => calls.setMaxAVG.push(v),
+    setMinERA: (v) => calls.setMinERA.push(v),
     setMaxERA: (v) => calls.setMaxERA.push(v),
+    setMinWins: (v) => calls.setMinWins.push(v),
+    setMaxWins: (v) => calls.setMaxWins.push(v),
+    setMinSO: (v) => calls.setMinSO.push(v),
+    setMaxSO: (v) => calls.setMaxSO.push(v),
   };
   return { setters, calls };
 }
@@ -64,8 +87,17 @@ describe('createClearFiltersHandler (LS-4613)', () => {
     expect(calls.setPosition).toEqual(['All Positions']);
     expect(calls.setTeam).toEqual(['All Teams']);
     expect(calls.setMinHR).toEqual([0]);
+    expect(calls.setMaxHR).toEqual([HR_MAX]);
+    expect(calls.setMinRBI).toEqual([0]);
+    expect(calls.setMaxRBI).toEqual([RBI_MAX]);
     expect(calls.setMinAVG).toEqual([0]);
+    expect(calls.setMaxAVG).toEqual([AVG_MAX]);
+    expect(calls.setMinERA).toEqual([0]);
     expect(calls.setMaxERA).toEqual([ERA_MAX_OFF]);
+    expect(calls.setMinWins).toEqual([0]);
+    expect(calls.setMaxWins).toEqual([WINS_MAX]);
+    expect(calls.setMinSO).toEqual([0]);
+    expect(calls.setMaxSO).toEqual([SO_MAX]);
     expect(applyFilters).toHaveBeenCalledTimes(1);
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });
@@ -77,8 +109,17 @@ describe('createClearFiltersHandler (LS-4613)', () => {
       setPosition: () => order.push('setPosition'),
       setTeam: () => order.push('setTeam'),
       setMinHR: () => order.push('setMinHR'),
+      setMaxHR: () => order.push('setMaxHR'),
+      setMinRBI: () => order.push('setMinRBI'),
+      setMaxRBI: () => order.push('setMaxRBI'),
       setMinAVG: () => order.push('setMinAVG'),
+      setMaxAVG: () => order.push('setMaxAVG'),
+      setMinERA: () => order.push('setMinERA'),
       setMaxERA: () => order.push('setMaxERA'),
+      setMinWins: () => order.push('setMinWins'),
+      setMaxWins: () => order.push('setMaxWins'),
+      setMinSO: () => order.push('setMinSO'),
+      setMaxSO: () => order.push('setMaxSO'),
     };
     const applyFilters = jest.fn(() => order.push('applyFilters'));
     const onClearFilters = jest.fn(() => order.push('onClearFilters'));
@@ -90,8 +131,17 @@ describe('createClearFiltersHandler (LS-4613)', () => {
       'setPosition',
       'setTeam',
       'setMinHR',
+      'setMaxHR',
+      'setMinRBI',
+      'setMaxRBI',
       'setMinAVG',
+      'setMaxAVG',
+      'setMinERA',
       'setMaxERA',
+      'setMinWins',
+      'setMaxWins',
+      'setMinSO',
+      'setMaxSO',
       'applyFilters',
       'onClearFilters',
     ]);
@@ -310,8 +360,17 @@ describe('hasPendingFilterChanges (LS-7126)', () => {
     team: 'All Teams',
     pageSize: 25,
     minHR: 0,
+    maxHR: HR_MAX,
+    minRBI: 0,
+    maxRBI: RBI_MAX,
     minAVG: 0,
-    maxERA: 5,
+    maxAVG: AVG_MAX,
+    minERA: 0,
+    maxERA: ERA_MAX_OFF,
+    minWins: 0,
+    maxWins: WINS_MAX,
+    minSO: 0,
+    maxSO: SO_MAX,
   };
 
   it('returns false when the draft equals the applied snapshot', () => {
@@ -342,6 +401,18 @@ describe('hasPendingFilterChanges (LS-7126)', () => {
     expect(hasPendingFilterChanges({ ...base, minHR: 500 }, base)).toBe(true);
     expect(hasPendingFilterChanges({ ...base, minAVG: 0.3 }, base)).toBe(true);
     expect(hasPendingFilterChanges({ ...base, maxERA: 3 }, base)).toBe(true);
+  });
+
+  it('detects pending new range slider edits (LS-5598)', () => {
+    expect(hasPendingFilterChanges({ ...base, maxHR: 600 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minRBI: 500 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxRBI: 1000 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxAVG: 0.35 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minERA: 1.5 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minWins: 100 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxWins: 300 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minSO: 1000 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxSO: 4000 }, base)).toBe(true);
   });
 
   it('returns true when several controls have pending edits at once', () => {
@@ -398,14 +469,23 @@ describe('parseSliderValue (LS-7137)', () => {
 // previous implementation read the uncommitted toolbar draft, leaking
 // typed-but-not-entered edits into the recipient's view.
 describe('buildShareUrl (LS-7131)', () => {
-  const APPLIED_DEFAULTS = {
+  const APPLIED_DEFAULTS: AppliedFilters = {
     search: '',
     position: 'All Positions',
     team: 'All Teams',
     pageSize: 25,
     minHR: 0,
+    maxHR: HR_MAX,
+    minRBI: 0,
+    maxRBI: RBI_MAX,
     minAVG: 0,
-    maxERA: 5, // ERA_MAX_OFF — no upper bound applied
+    maxAVG: AVG_MAX,
+    minERA: 0,
+    maxERA: ERA_MAX_OFF,
+    minWins: 0,
+    maxWins: WINS_MAX,
+    minSO: 0,
+    maxSO: SO_MAX,
   };
 
   it('serializes only view + pageSize when no filters are applied', () => {
@@ -456,6 +536,44 @@ describe('buildShareUrl (LS-7131)', () => {
   it('omits maxERA when it sits at the off-sentinel', () => {
     const applied = { ...APPLIED_DEFAULTS, maxERA: 5 };
     expect(buildShareUrl('combined', applied)).not.toContain('maxERA');
+  });
+
+  it('serializes new range params when active (LS-5598)', () => {
+    const applied = {
+      ...APPLIED_DEFAULTS,
+      maxHR: 600,
+      minRBI: 500,
+      maxRBI: 2000,
+      maxAVG: 0.35,
+      minERA: 1.5,
+      minWins: 100,
+      maxWins: 400,
+      minSO: 1000,
+      maxSO: 5000,
+    };
+    const url = buildShareUrl('combined', applied);
+    expect(url).toContain('maxHomeRuns=600');
+    expect(url).toContain('minRBI=500');
+    expect(url).toContain('maxRBI=2000');
+    expect(url).toContain('maxBattingAvg=0.350');
+    expect(url).toContain('minERA=1.50');
+    expect(url).toContain('minWins=100');
+    expect(url).toContain('maxWins=400');
+    expect(url).toContain('minStrikeouts=1000');
+    expect(url).toContain('maxStrikeouts=5000');
+  });
+
+  it('omits new range params when at their off-sentinels (LS-5598)', () => {
+    const url = buildShareUrl('combined', APPLIED_DEFAULTS);
+    expect(url).not.toContain('maxHomeRuns');
+    expect(url).not.toContain('minRBI');
+    expect(url).not.toContain('maxRBI');
+    expect(url).not.toContain('maxBattingAvg');
+    expect(url).not.toContain('minERA');
+    expect(url).not.toContain('minWins');
+    expect(url).not.toContain('maxWins');
+    expect(url).not.toContain('minStrikeouts');
+    expect(url).not.toContain('maxStrikeouts');
   });
 });
 
