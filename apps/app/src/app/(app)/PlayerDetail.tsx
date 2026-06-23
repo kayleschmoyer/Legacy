@@ -1,8 +1,12 @@
 import React from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Pressable } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { ChevronLeft } from '@tamagui/lucide-icons';
 import { PlayerDetailById } from '@legacy-sports/shared-components';
 import { Button, Text, YStack } from 'tamagui';
 import { toIntId } from '../../common/utilities/RouteUtils';
+
+const PLAYERS_FALLBACK = '/(tabs)/players' as const;
 
 export default function PlayerDetailScreen() {
   const { playerId } = useLocalSearchParams<{
@@ -31,7 +35,11 @@ export default function PlayerDetailScreen() {
         </Text>
         <Button
           testID="player-detail-invalid-back"
-          onPress={() => router.back()}
+          onPress={() =>
+            router.canGoBack()
+              ? router.back()
+              : router.replace(PLAYERS_FALLBACK)
+          }
           borderRadius="$3"
           paddingHorizontal="$5"
         >
@@ -43,6 +51,25 @@ export default function PlayerDetailScreen() {
     );
   }
 
-  return <PlayerDetailById playerId={id} />;
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          headerLeft: ({ canGoBack }) => (
+            <Pressable
+              testID="player-detail-header-back"
+              onPress={() =>
+                canGoBack ? router.back() : router.replace(PLAYERS_FALLBACK)
+              }
+              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+            >
+              <ChevronLeft size={24} color="#1B3A5C" />
+            </Pressable>
+          ),
+        }}
+      />
+      <PlayerDetailById playerId={id} />
+    </>
+  );
 }
 export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

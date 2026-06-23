@@ -16,14 +16,42 @@ import { ScreenErrorBoundary } from './_screenErrorBoundary';
 
 const mockUseLocalSearchParams = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+let mockCanGoBack = true;
 
-jest.mock('expo-router', () => ({
-  useLocalSearchParams: (
-    ...args: unknown[]
-  ): Record<string, string | undefined> =>
-    mockUseLocalSearchParams(...args) as Record<string, string | undefined>,
-  useRouter: () => ({ back: mockBack }),
-}));
+jest.mock('expo-router', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+
+  return {
+    useLocalSearchParams: (
+      ...args: unknown[]
+    ): Record<string, string | undefined> =>
+      mockUseLocalSearchParams(...args) as Record<string, string | undefined>,
+    useRouter: () => ({
+      back: mockBack,
+      replace: mockReplace,
+      canGoBack: () => mockCanGoBack,
+    }),
+    Stack: {
+      Screen: ({
+        options,
+      }: {
+        options?: {
+          headerLeft?: (props: { canGoBack?: boolean }) => React.ReactNode;
+        };
+      }) => {
+        if (!options?.headerLeft) return ReactActual.createElement(View, null);
+        return ReactActual.createElement(
+          View,
+          { testID: 'stack-screen-header' },
+          options.headerLeft({ canGoBack: mockCanGoBack }),
+        );
+      },
+    },
+  };
+});
 
 // Param-parsing tests use a stub so they can assert the parsed numeric ID
 // without exercising Tamagui or the network. Integration tests below bypass
@@ -96,11 +124,22 @@ jest.mock('tamagui', () => {
   };
 });
 
+jest.mock('@tamagui/lucide-icons', () => {
+  const { View } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    ChevronLeft: ({ testID }: { testID?: string; [key: string]: unknown }) =>
+      ReactActual.createElement(View, { testID: testID ?? 'chevron-left' }),
+  };
+});
+
 // ── Tests: route param parsing ────────────────────────────────────────────────
 
 describe('PlayerDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack = true;
   });
 
   it('renders without crashing', () => {
@@ -136,11 +175,46 @@ describe('PlayerDetailScreen', () => {
     expect(screen.getByTestId('player-detail-invalid-back')).toBeTruthy();
   });
 
-  it('calls router.back when the Go Back button is pressed on the fallback screen', () => {
+  it('calls router.back when the Go Back button is pressed on the fallback screen and canGoBack is true', () => {
+    mockCanGoBack = true;
     mockUseLocalSearchParams.mockReturnValue({ playerId: undefined });
     render(<PlayerDetailScreen />);
     fireEvent.press(screen.getByTestId('player-detail-invalid-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('calls router.replace to players hub when Go Back is pressed on the fallback screen and canGoBack is false', () => {
+    mockCanGoBack = false;
+    mockUseLocalSearchParams.mockReturnValue({ playerId: undefined });
+    render(<PlayerDetailScreen />);
+    fireEvent.press(screen.getByTestId('player-detail-invalid-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/players');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('renders a header back button when a valid playerId is provided', () => {
+    mockUseLocalSearchParams.mockReturnValue({ playerId: '42' });
+    render(<PlayerDetailScreen />);
+    expect(screen.getByTestId('player-detail-header-back')).toBeTruthy();
+  });
+
+  it('calls router.back from the header back button when canGoBack is true', () => {
+    mockCanGoBack = true;
+    mockUseLocalSearchParams.mockReturnValue({ playerId: '42' });
+    render(<PlayerDetailScreen />);
+    fireEvent.press(screen.getByTestId('player-detail-header-back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('calls router.replace to players hub from the header back button when canGoBack is false', () => {
+    mockCanGoBack = false;
+    mockUseLocalSearchParams.mockReturnValue({ playerId: '42' });
+    render(<PlayerDetailScreen />);
+    fireEvent.press(screen.getByTestId('player-detail-header-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/players');
+    expect(mockBack).not.toHaveBeenCalled();
   });
 });
 
