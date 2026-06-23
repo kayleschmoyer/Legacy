@@ -173,9 +173,13 @@ interface SeasonRow {
     pa: number;
     ab: number;
     h: number;
+    doubles: number;
+    triples: number;
     hr: number;
     rbi: number;
     sb: number;
+    bb: number;
+    so: number;
     avg: string;
     obp: string;
     slg: string;
@@ -781,6 +785,11 @@ export function PlayerDetailModal({
     ENTITLEMENTS.defensive_sabermetrics,
   );
 
+  const hasPremiumBatting = tierHasEntitlement(
+    isPremium ? 'premium' : 'free',
+    ENTITLEMENTS.advanced_batting_stats,
+  );
+
   // ------ Data fetching ------
   const { data, previousData, loading, error } =
     useGetAllPlayerSeasonStatsQuery({
@@ -869,9 +878,13 @@ export function PlayerDetailModal({
           pa,
           ab,
           h,
+          doubles,
+          triples,
           hr,
           rbi: b.rbi ?? 0,
           sb: b.stolenBases ?? 0,
+          bb,
+          so: b.strikeouts ?? 0,
           avg,
           obp,
           slg,
@@ -1004,6 +1017,17 @@ export function PlayerDetailModal({
     const totHR = batting.reduce((s, r) => s + (r.batting?.hr ?? 0), 0);
     const totRBI = batting.reduce((s, r) => s + (r.batting?.rbi ?? 0), 0);
     const totSB = batting.reduce((s, r) => s + (r.batting?.sb ?? 0), 0);
+    const totBB = batting.reduce((s, r) => s + (r.batting?.bb ?? 0), 0);
+    const totSO = batting.reduce((s, r) => s + (r.batting?.so ?? 0), 0);
+    const totPA = batting.reduce((s, r) => s + (r.batting?.pa ?? 0), 0);
+    const totDoubles = batting.reduce(
+      (s, r) => s + (r.batting?.doubles ?? 0),
+      0,
+    );
+    const totTriples = batting.reduce(
+      (s, r) => s + (r.batting?.triples ?? 0),
+      0,
+    );
 
     const pGames = pitching.reduce((s, r) => s + (r.pitching?.games ?? 0), 0);
     const pWins = pitching.reduce((s, r) => s + (r.pitching?.wins ?? 0), 0);
@@ -1019,6 +1043,27 @@ export function PlayerDetailModal({
     const minYear = Math.min(...years);
     const maxYear = Math.max(...years);
 
+    const careerOBP = totAB + totBB > 0 ? (totH + totBB) / (totAB + totBB) : 0;
+    const careerSLG =
+      totAB > 0 ? (totH + totDoubles + 2 * totTriples + 3 * totHR) / totAB : 0;
+    const careerOPS = careerOBP + careerSLG;
+
+    const opsPlusSamples = batting.filter((r) => r.batting?.opsPlus != null);
+    const opsPlusTotalPA = opsPlusSamples.reduce(
+      (s, r) => s + (r.batting?.pa ?? 0),
+      0,
+    );
+    const careerOPSPlus =
+      opsPlusTotalPA > 0
+        ? opsPlusSamples.reduce(
+            (s, r) => s + (r.batting?.opsPlus ?? 0) * (r.batting?.pa ?? 0),
+            0,
+          ) / opsPlusTotalPA
+        : null;
+
+    const babipDenom = totAB - totSO - totHR;
+    const careerBABIP = babipDenom > 0 ? (totH - totHR) / babipDenom : null;
+
     return {
       hasBatting: batting.length > 0,
       hasPitching: pitching.length > 0,
@@ -1033,11 +1078,16 @@ export function PlayerDetailModal({
       rbi: totRBI,
       sb: totSB,
       avg: totAB > 0 ? (totH / totAB).toFixed(3) : '.000',
+      ops: careerOPS.toFixed(3),
+      opsPlus:
+        careerOPSPlus != null ? Math.round(careerOPSPlus).toString() : null,
+      babip: careerBABIP != null ? careerBABIP.toFixed(3) : null,
       pGames,
       pWins,
       pLosses,
       pIP,
       pSO,
+      totPA,
     };
   }, [seasonRows]);
 
@@ -1226,7 +1276,7 @@ export function PlayerDetailModal({
   // ------ Career stat tile rows ------
   const battingTiles: CareerTile[] = useMemo(() => {
     if (!careerTotals?.hasBatting) return [];
-    return [
+    const tiles: CareerTile[] = [
       { label: 'Games', value: careerTotals.games.toLocaleString('en-US') },
       { label: 'AVG', value: careerTotals.avg, accent: true },
       { label: 'Home Runs', value: careerTotals.hr.toLocaleString('en-US') },
@@ -1237,7 +1287,17 @@ export function PlayerDetailModal({
         value: careerTotals.sb.toLocaleString('en-US'),
       },
     ];
-  }, [careerTotals]);
+    if (hasPremiumBatting) {
+      tiles.push({ label: 'OPS', value: careerTotals.ops, accent: true });
+      if (careerTotals.opsPlus != null) {
+        tiles.push({ label: 'OPS+', value: careerTotals.opsPlus });
+      }
+      if (careerTotals.babip != null) {
+        tiles.push({ label: 'BABIP', value: careerTotals.babip });
+      }
+    }
+    return tiles;
+  }, [careerTotals, hasPremiumBatting]);
 
   const pitchingTiles: CareerTile[] = useMemo(() => {
     if (!careerTotals?.hasPitching) return [];

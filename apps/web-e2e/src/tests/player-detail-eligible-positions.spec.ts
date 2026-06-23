@@ -48,6 +48,7 @@ const BATTER_RESPONSE = {
         battingAverage: 0.3,
         onBasePercentage: 0.37,
         sluggingPercentage: 0.52,
+        onBasePlusSluggingPlus: 142,
       },
     ],
     playerSeasonPitching: [],

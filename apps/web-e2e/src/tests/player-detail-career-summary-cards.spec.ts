@@ -13,10 +13,11 @@
  * (ADR-0015); GraphQL mocks stay inline (ADR-0015 §6).
  */
 
-import { test } from '../fixtures/pages';
+import { expect, test } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -54,6 +55,7 @@ const BATTER_SEASON_STATS = {
         battingAverage: 0.3,
         onBasePercentage: 0.37,
         sluggingPercentage: 0.52,
+        onBasePlusSluggingPlus: 142,
       },
       {
         __typename: 'SeasonBatting',
@@ -75,6 +77,7 @@ const BATTER_SEASON_STATS = {
         battingAverage: 0.298,
         onBasePercentage: 0.365,
         sluggingPercentage: 0.495,
+        onBasePlusSluggingPlus: 135,
       },
     ],
     playerSeasonPitching: [],
@@ -868,5 +871,69 @@ test.describe('Career Summary Cards — hidden when no stats @regression', () =>
       'career-pitching-card',
     );
     await pitchingCard.waitFor({ state: 'hidden' });
+  });
+});
+
+// ── Tests: Advanced batting tile entitlement gating ───────────────────────────
+
+test.describe('Career Summary Cards — advanced batting entitlement @regression', () => {
+  test('premium user sees OPS, OPS+, and BABIP tiles', async ({
+    page,
+    playersPage,
+  }) => {
+    // Default tier is premium — no useTier() call needed
+    await setupMocks(page);
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.expectCareerBattingCard();
+
+    await playersPage.detail.expectText('OPS');
+    await playersPage.detail.expectText('OPS+');
+    await playersPage.detail.expectText('BABIP');
+  });
+
+  test('premium user sees correct OPS, OPS+, and BABIP values', async ({
+    page,
+    playersPage,
+  }) => {
+    // Expected from BATTER_SEASON_STATS (two seasons: 2024 + 2023):
+    //   totH=320 totBB=125 totAB=1070 tot2B=58 tot3B=3 totHR=53 totSO=215
+    //   OPS   = (320+125)/(1070+125) + (320+58+6+159)/1070 = 0.880
+    //   OPS+  = (142×620 + 135×590) / 1210 = 138.6 → 139
+    //   BABIP = (320−53) / (1070−215−53) = 267/802 = 0.333
+    await setupMocks(page);
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.expectCareerBattingCard();
+
+    const battingCard = playersPage.detail.dialog.getByTestId(
+      'career-batting-card',
+    );
+    await expect(battingCard.getByText('0.880')).toBeVisible();
+    await expect(battingCard.getByText('139')).toBeVisible();
+    await expect(battingCard.getByText('0.333')).toBeVisible();
+  });
+
+  test('free user does not see OPS, OPS+, or BABIP tiles', async ({
+    page,
+    playersPage,
+  }) => {
+    await setupMocks(page);
+    await useTier(page, 'free');
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    // PlayerDetailPage gates the entire PlayerDetailModal behind
+    // advanced_search_filters (premium). Free users see a PremiumGate
+    // upgrade CTA instead; the dialog — and therefore CareerArcChart with
+    // its SR-only <th>OPS</th> — is never mounted. not.toBeVisible() passes
+    // for absent elements, covering both the no-dialog case and any
+    // defense-in-depth gating within the modal itself.
+    await expect(page.getByText('OPS', { exact: true })).not.toBeVisible();
+    await expect(page.getByText('OPS+', { exact: true })).not.toBeVisible();
+    await expect(page.getByText('BABIP', { exact: true })).not.toBeVisible();
   });
 });

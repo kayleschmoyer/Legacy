@@ -174,6 +174,7 @@ export interface MockSeasonBatting {
   battingAverage: number;
   onBasePercentage: number;
   sluggingPercentage: number;
+  onBasePlusSluggingPlus: number | null;
 }
 
 export function mockSeasonBatting(
@@ -199,6 +200,7 @@ export function mockSeasonBatting(
     battingAverage: 0.3,
     onBasePercentage: 0.37,
     sluggingPercentage: 0.52,
+    onBasePlusSluggingPlus: 142,
     ...overrides,
   };
 }

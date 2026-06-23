@@ -1306,6 +1306,13 @@ builder.queryField('playerSeasonBatting', (t) =>
       LOGGER.debug(
         `[playerSeasonBatting] Returned ${results.length} records for playerId=${playerId}`,
       );
+      const premium = await hasEntitlement(
+        context,
+        ENTITLEMENTS.advanced_batting_stats,
+      );
+      if (!premium) {
+        return results.map((r) => ({ ...r, onbasePlusSluggingPlus: null }));
+      }
       return results;
     },
   }),

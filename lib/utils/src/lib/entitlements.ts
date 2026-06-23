@@ -114,7 +114,7 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   advanced_football_stats: 'Advanced football stats',
   advanced_pitching_stats: 'Advanced pitching analytics (FIP, WHIP, K/9, BB/9)',
   defensive_sabermetrics: 'Advanced defensive sabermetrics (DRS, UZR, OAA)',
-  advanced_batting_stats: 'Advanced batting stats (OPS, BABIP, OPS+)',
+  advanced_batting_stats: 'Advanced batting sabermetrics (OPS, OPS+, BABIP)',
 };
 
 export function tierHasEntitlement(
