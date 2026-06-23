@@ -13,7 +13,7 @@
  * (ADR-0015); GraphQL mocks stay inline (ADR-0015 §6).
  */
 
-import { test } from '../fixtures/pages';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -747,13 +747,25 @@ test.describe('Player Detail Modal – open from stats table @regression', () =>
     await setupMocks(page);
     await playersPage.gotoStats();
 
-    // The stats table should have loaded with Mike Trout row
-    await playersPage.stats.expectPlayerVisible('Trout');
+    // Gate on the actual clickable row element (data-testid="player-row-1"),
+    // not the player-name text. The row XStack owns the onPress handler that
+    // opens the modal; the inner name Text node both couples the assertion to
+    // copy and can re-render as the grid hydrates, so clicking it raced the
+    // row's handler being wired (LS-8258). The row only mounts once the grid
+    // has data (loading → rows), so its visibility is a single, stable "ready"
+    // signal — mirroring the @critical deep-link sibling.
+    await expect(playersPage.stats.row(1)).toBeVisible({ timeout: 15_000 });
 
-    // Click the player row to open the detail modal
-    await playersPage.stats.openPlayerByName('Trout');
+    // Click the row to open the detail modal.
+    await playersPage.stats.row(1).click();
 
-    // The modal dialog should appear
+    // A numeric player id opens the modal in place via ?playerId=1 (PST-051 /
+    // LS-7124). Wait for that URL transition — the single source of truth that
+    // the modal is about to render — before asserting visibility, instead of
+    // racing the dialog mount.
+    await page.waitForURL(/\/players\/stats.*playerId=1/);
+
+    // The modal dialog should appear.
     await playersPage.detail.expectOpen();
   });
 });
