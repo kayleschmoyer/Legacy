@@ -52,8 +52,9 @@ pending migration `.ts` to CommonJS with esbuild and POSTs
 `{ migrations: [{ name, hash, jsSource }] }` (ordered by timestamp). The server
 evaluates each `jsSource` in a constrained `vm` sandbox — a `require` shim
 resolving **only** `postgres` and `drizzle-orm[/*]` to the Lambda's bundled
-instances — and applies it transactionally via `applyMigrationModule`
-(`lib/db-client`, the same atomic code path as the local runner). Already-applied
+instances — and applies it via `applyMigrationModule`
+(`lib/db-client`, the same code path as the local runner; migrations run with
+autocommit semantics since LS-8254). Already-applied
 migrations are skipped; the run stops on the first failure.
 
 It is defended in depth: the **`mcp/db`** scope, a **dev-only** `NODE_ENV` guard,

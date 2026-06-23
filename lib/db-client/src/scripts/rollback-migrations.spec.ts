@@ -27,20 +27,16 @@ beforeEach(() => {
 });
 
 /**
- * Build a fake `postgres` client whose `begin` runs the callback with a
- * tagged-template transaction stub. The stub records every templated query so
- * tests can assert whether (and with what values) the bookkeeping INSERT ran.
+ * Build a fake `postgres` client: a callable tagged template that records every
+ * templated query so tests can assert whether (and with what values) the
+ * bookkeeping INSERT ran. Migrations run with autocommit semantics (no
+ * `begin` transaction — LS-8254), so the client is invoked directly.
  */
 function makeSqlClient() {
-  const tx = jest.fn().mockResolvedValue(undefined);
-  const begin = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn(tx),
-  );
-  // The real client is callable + has .begin; tests only use .begin here.
-  const sqlClient = Object.assign(jest.fn(), {
-    begin,
-  }) as unknown as SqlClientArg;
-  return { sqlClient, begin, tx };
+  const sqlClient = jest
+    .fn()
+    .mockResolvedValue(undefined) as unknown as SqlClientArg;
+  return { sqlClient, calls: sqlClient as unknown as jest.Mock };
 }
 
 /** Fake drizzle db backed by a jest.Mock `execute`. */
@@ -49,22 +45,19 @@ function makeDb(execute: jest.Mock): DrizzleDbArg {
 }
 
 describe('applyMigrationModule', () => {
-  it('runs up() and records the hash inside one transaction', async () => {
-    const { sqlClient, begin, tx } = makeSqlClient();
+  it('runs up() then records the hash (autocommit, no transaction)', async () => {
+    const { sqlClient, calls } = makeSqlClient();
     const up = jest.fn().mockResolvedValue(undefined);
 
     await applyMigrationModule(sqlClient, '20260101_000000_test.ts', { up });
 
-    // Wrapped in exactly one transaction.
-    expect(begin).toHaveBeenCalledTimes(1);
-
-    // up() received the transaction-scoped db and sql.
+    // up() received the connection-bound db and the raw sql client.
     expect(up).toHaveBeenCalledTimes(1);
-    expect(up).toHaveBeenCalledWith({ db: mockTxDb, sql: tx });
+    expect(up).toHaveBeenCalledWith({ db: mockTxDb, sql: sqlClient });
 
-    // The bookkeeping INSERT ran with the hash, on the same transaction.
-    expect(tx).toHaveBeenCalledTimes(1);
-    const [queryStrings, hashArg] = tx.mock.calls[0] as [string[], string];
+    // The bookkeeping INSERT ran with the hash, directly on the connection.
+    expect(calls).toHaveBeenCalledTimes(1);
+    const [queryStrings, hashArg] = calls.mock.calls[0] as [string[], string];
     expect(queryStrings.join('')).toContain(
       'INSERT INTO drizzle.__drizzle_migrations',
     );
@@ -72,22 +65,22 @@ describe('applyMigrationModule', () => {
 
     // up() must run before the hash is recorded.
     expect(up.mock.invocationCallOrder[0]).toBeLessThan(
-      tx.mock.invocationCallOrder[0],
+      calls.mock.invocationCallOrder[0],
     );
   });
 
-  it('rolls back and does NOT record the hash when up() throws', async () => {
-    const { sqlClient, begin, tx } = makeSqlClient();
+  it('does NOT record the hash when up() throws', async () => {
+    const { sqlClient, calls } = makeSqlClient();
     const up = jest.fn().mockRejectedValue(new Error('migration boom'));
 
     await expect(
       applyMigrationModule(sqlClient, '20260101_000000_test.ts', { up }),
     ).rejects.toThrow('migration boom');
 
-    expect(begin).toHaveBeenCalledTimes(1);
     expect(up).toHaveBeenCalledTimes(1);
-    // The transaction aborts before the INSERT, so the hash is never recorded.
-    expect(tx).not.toHaveBeenCalled();
+    // up() failed before the INSERT, so the hash is never recorded — the
+    // migration will be retried (migrations are idempotent).
+    expect(calls).not.toHaveBeenCalled();
   });
 });
 
@@ -124,11 +117,12 @@ describe('runMigrationsUp', () => {
 
     // db.execute backs getAppliedMigrations — report the file as already applied.
     const db = makeDb(jest.fn().mockResolvedValue([{ hash: filename }]));
-    const { sqlClient, begin } = makeSqlClient();
+    const { sqlClient, calls } = makeSqlClient();
 
     await runMigrationsUp(db, sqlClient);
 
-    // Already applied → no transaction is opened to re-apply it.
-    expect(begin).not.toHaveBeenCalled();
+    // Already applied → applyMigrationModule is never invoked, so nothing runs
+    // on the connection to re-apply it.
+    expect(calls).not.toHaveBeenCalled();
   });
 });

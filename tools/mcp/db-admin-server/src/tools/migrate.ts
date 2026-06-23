@@ -20,8 +20,8 @@ import type { McpCaller } from '../audit.js';
  * client transpiles each pending migration `.ts` to CJS JavaScript (see
  * `src/client/transpile.ts`) and POSTs `{ migrations: [{ name, hash, jsSource }] }`.
  * This tool evaluates each `jsSource` in a constrained sandbox and applies it
- * through the exact same atomic code path as the local runner
- * (`applyMigrationModule`, extracted in LS-8118).
+ * through the exact same code path as the local runner (`applyMigrationModule`,
+ * extracted in LS-8118; migrations run with autocommit semantics since LS-8254).
  *
  * Security posture — this is effectively a remote DDL endpoint. It is defended
  * in depth: the `mcp/db` Cognito scope (enforced in `lambda.ts`), a dev-only
@@ -222,8 +222,9 @@ async function getAppliedHashes(sqlClient: postgres.Sql): Promise<Set<string>> {
 
 /**
  * Apply the provided migrations, skipping any already recorded as applied, and
- * stopping on the first failure. Each migration is applied atomically (up() +
- * the bookkeeping insert in one transaction) by `applyMigrationModule`.
+ * stopping on the first failure. Each migration's `up()` runs with autocommit
+ * semantics and its hash is recorded only on success, by `applyMigrationModule`
+ * (LS-8254).
  */
 export async function migrate(
   params: MigrateParams,

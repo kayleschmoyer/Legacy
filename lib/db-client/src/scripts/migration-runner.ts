@@ -1,12 +1,12 @@
 /**
- * Transactional migration-application primitives.
+ * Migration-application primitives.
  *
  * Extracted from `rollback-migrations.ts` so they can be imported by callers
  * that must NOT drag in that script's heavier dependency graph (dotenv +
  * `config/database` → AWS credential resolution). In particular the hosted
  * db-admin Lambda (LS-8119) imports `applyMigrationModule` from here to apply a
- * client-transpiled migration through the exact same atomic code path as the
- * local runner, without pulling local-only credential code into its bundle.
+ * client-transpiled migration through the exact same code path as the local
+ * runner, without pulling local-only credential code into its bundle.
  *
  * This module deliberately depends ONLY on `drizzle-orm` and `postgres`.
  */
@@ -17,8 +17,8 @@ import type postgres from 'postgres';
 /**
  * Context handed to a migration's `up`/`down` function. Migrations receive a
  * Drizzle instance (`db`) and, optionally, the raw `postgres` client (`sql`).
- * When a migration is applied transactionally, both point at the same
- * transaction so the migration body and the bookkeeping insert commit together.
+ * Both point at the same connection, so a migration body can mix `db.execute`
+ * and raw `sql` calls freely.
  */
 export interface MigrationContext {
   db: ReturnType<typeof drizzle>;
@@ -35,10 +35,32 @@ export interface MigrationModule {
 }
 
 /**
- * Apply a single migration module's `up()` and record its hash inside ONE
- * transaction. If `up()` throws (or the bookkeeping insert fails), the whole
- * transaction rolls back and the hash is NOT recorded — so a partially-applied
- * migration can never be marked as applied.
+ * Apply a single migration module's `up()`, then record its hash.
+ *
+ * The migration body runs with autocommit semantics — each `db.execute()` /
+ * `sql` statement commits on its own, NOT inside one enclosing transaction.
+ *
+ * LS-8254: LS-8118 (PR #5454) wrapped every migration in a single
+ * `sqlClient.begin(...)` transaction to make `up()` + the bookkeeping insert
+ * atomic. But every landed migration was authored for the pre-LS-8118 runner,
+ * which auto-committed each statement, and several REQUIRE that — a single
+ * transaction breaks them on a fresh DB, leaving "DB Integration Tests" red:
+ *
+ *   - `20260215_..._add_missing_foreign_key_indexes.ts` swallows a best-effort
+ *     `ALTER TABLE ... RENAME COLUMN` in a JS `try/catch`. Inside a transaction
+ *     the failed statement aborts the WHOLE transaction, so the swallowed error
+ *     poisons the following `CREATE INDEX` ("current transaction is aborted").
+ *   - `20260219_..._update_draft_type_enum.ts` runs `ALTER TYPE ... ADD VALUE`
+ *     and then uses the new value in the very next statement. Postgres forbids
+ *     using a freshly-added enum value in the same transaction that added it.
+ *   - `CREATE INDEX CONCURRENTLY` migrations cannot run in a transaction at all.
+ *
+ * None of these can opt out per-migration: they are landed and immutable
+ * (`scripts/check-migration-immutability.js`). Running the body with autocommit
+ * — exactly as authored — fixes all three classes. We still record the hash
+ * only AFTER `up()` fully resolves, so a migration that fails partway is never
+ * marked applied; migrations are idempotent (IF [NOT] EXISTS / best-effort
+ * guards), so re-running after a partial failure is safe.
  *
  * Connection-agnostic by design: callers pass an already-opened `postgres`
  * client and an already-imported migration module. This lets a hosted Lambda
@@ -53,39 +75,15 @@ export async function applyMigrationModule(
   hash: string,
   module: MigrationModule,
 ): Promise<void> {
-  await sqlClient.begin(async (tx) => {
-    // `tx` is a TransactionSql, which is NOT assignable to postgres.Sql — it
-    // lacks the connection-management methods (CLOSE/END/PostgresError/...).
-    // A direct `tx as postgres.Sql` fails to compile (TS2352: "neither type
-    // sufficiently overlaps... convert to 'unknown' first"), so the `unknown`
-    // hop is required. Migrations only run queries on it, never lifecycle
-    // methods. The raw INSERT below still uses `tx` directly as a tagged
-    // template.
-    const txSql = tx as unknown as postgres.Sql;
-    // postgres.js transaction clients (created by `Sql(handler)`) do not carry
-    // the `.options` bag that the top-level connection holds — `.options` is
-    // attached only to the parent connection instance. drizzle-orm's
-    // `construct()` reads `client.options.parsers`/`.serializers` to install
-    // its transparent date/timestamp parsers (drizzle-orm/postgres-js/
-    // driver.js), so building a Drizzle instance from the bare transaction
-    // client throws "Cannot read properties of undefined (reading 'parsers')"
-    // (LS-8141, a regression from LS-8118 routing every migration through this
-    // transactional path). Borrow the parent connection's options onto the tx
-    // so the per-tx Drizzle can construct; the parsers it installs are
-    // idempotent and identical to what a Drizzle instance built on the parent
-    // connection would set.
-    const txWithOptions = txSql as unknown as { options?: unknown };
-    if (txWithOptions.options === undefined) {
-      txWithOptions.options = (
-        sqlClient as unknown as { options?: unknown }
-      ).options;
-    }
-    const txDb = drizzle(txSql);
-    await module.up({ db: txDb, sql: txSql });
-    await tx`
-      INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-      VALUES (${hash}, ${Date.now()})
-      ON CONFLICT (hash) DO NOTHING
-    `;
-  });
+  // The top-level connection carries the `.options` bag drizzle-orm's
+  // `construct()` reads (`client.options.parsers`/`.serializers`), so building
+  // the Drizzle instance directly on it is safe — no options-borrow needed
+  // (that was only required for the transaction client; see LS-8141).
+  const db = drizzle(sqlClient);
+  await module.up({ db, sql: sqlClient });
+  await sqlClient`
+    INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+    VALUES (${hash}, ${Date.now()})
+    ON CONFLICT (hash) DO NOTHING
+  `;
 }
