@@ -403,12 +403,11 @@ export interface PlayerStatsPageProps {
   showHeader?: boolean;
   showActions?: boolean;
   /**
-   * Whether the Export action is available to the current viewer. Export of
-   * player statistics is a premium capability (PST-010 / LS-7108): when the host
-   * marks the viewer as not entitled (`false`), the Export button is hidden and
-   * {@link PlayerStatsPageProps.onExport} is never invoked. Defaults to `true` so
-   * callers that do not gate export are unaffected. The Share button is
-   * independent and remains governed solely by `showActions`.
+   * Whether the Export action is available to the current viewer. When `false`
+   * the Export button is hidden and {@link PlayerStatsPageProps.onExport} is
+   * never invoked. Defaults to `true` so callers that do not gate export are
+   * unaffected. The Share button is independent and remains governed solely by
+   * `showActions`.
    */
   canExport?: boolean;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */

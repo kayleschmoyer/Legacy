@@ -724,13 +724,10 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
   });
 });
 
-// PST-010 / LS-7108: the Export JSON action previously ran unconditionally for
-// any viewer — handleExport had no premium check, no PremiumGate awareness, and
-// the page-level gate only blurs/blocks pointer events (a keyboard user could
-// still trigger it). The host now hides the Export button for non-premium
-// viewers (canExport) and guards handleExport so the client-side download never
-// runs without entitlement.
-describe('PlayerStatsRoute export premium gating (PST-010 / LS-7108)', () => {
+// LS-5591: Export JSON is available to all viewers (entitlement `all`). The
+// host passes canExport={true} unconditionally so every signed-in or anonymous
+// user can download the filtered stats.
+describe('PlayerStatsRoute export entitlement (LS-5591)', () => {
   let createObjectURL: jest.Mock;
 
   beforeEach(() => {
@@ -747,16 +744,16 @@ describe('PlayerStatsRoute export premium gating (PST-010 / LS-7108)', () => {
     URL.revokeObjectURL = jest.fn();
   });
 
-  it('grants the export capability (canExport=true) to premium viewers', () => {
+  it('grants the export capability (canExport=true) to all viewers', () => {
     mockHasEntitlement = true;
     render(<PlayerStatsRoute />);
     expect(screen.getByTestId('can-export')).toHaveTextContent('true');
   });
 
-  it('withholds the export capability (canExport=false) from non-premium viewers', () => {
+  it('grants the export capability (canExport=true) to non-premium viewers', () => {
     mockHasEntitlement = false;
     render(<PlayerStatsRoute />);
-    expect(screen.getByTestId('can-export')).toHaveTextContent('false');
+    expect(screen.getByTestId('can-export')).toHaveTextContent('true');
   });
 
   it('runs the client-side export for premium viewers', () => {
@@ -766,10 +763,10 @@ describe('PlayerStatsRoute export premium gating (PST-010 / LS-7108)', () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
   });
 
-  it('does not run the client-side export for non-premium viewers, even if the handler is reached', () => {
+  it('runs the client-side export for non-premium viewers', () => {
     mockHasEntitlement = false;
     render(<PlayerStatsRoute />);
     fireEvent.click(screen.getByTestId('export-button'));
-    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
   });
 });

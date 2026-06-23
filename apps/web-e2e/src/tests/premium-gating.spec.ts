@@ -29,13 +29,6 @@ test.describe('Premium gating — free user @critical', () => {
     await expect(
       page.getByRole('button', { name: UPGRADE_CTA }).first(),
     ).toBeVisible();
-
-    // PST-010 / LS-7108: Export is a premium action. The page-level gate only
-    // blurs/blocks pointer events (leaving a keyboard path), so the Export
-    // button must not be rendered at all for a free viewer.
-    await expect(page.getByRole('button', { name: EXPORT_BUTTON })).toHaveCount(
-      0,
-    );
   });
 
   test('View Game Logs page is gated for free users', async ({ page }) => {
@@ -91,8 +84,8 @@ test.describe('Premium gating — premium user @critical', () => {
     await useTier(page, 'premium');
     await page.goto('/players/stats');
 
-    // No lock overlay, and the premium Export action is rendered (PST-010 /
-    // LS-7108 — premium viewers keep full export).
+    // No lock overlay, and the Export action is rendered (LS-5591 — export is
+    // available to all entitlements, not premium-only).
     await expect(page.getByTestId(GATE)).toHaveCount(0);
     await expect(
       page.getByRole('button', { name: EXPORT_BUTTON }),
