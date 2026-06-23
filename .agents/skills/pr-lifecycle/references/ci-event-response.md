@@ -15,6 +15,7 @@ Before responding to any event:
 2. **Identify the check or actor** — the check name or comment author determines which triage branch to follow.
 3. **Read state once, act once** — use `github_view_pr` and `github_get_review_threads` as one-shot lookups. Do not call them in a loop. See Critical Rule #11 in [pr-lifecycle](../SKILL.md).
 4. **Batch all known fixes into one push** — if a failing check AND unresolved review threads are both present, fix both before pushing. Separate pushes trigger separate CI and review cycles.
+5. **Handling (or skipping) an event is not a stopping point.** Acting on one event, replying to a review, or deciding an event is a no-op does **not** end your responsibility for the PR. Keep watching until the PR reaches a [terminal state](drive.md#terminal-states-the-only-places-this-loop-may-stop): `MERGED`, `CLOSED`, or a human-only blocker you have surfaced with a label **and** an explicit message. A session that processes one event and exits while the PR is still `CHANGES_REQUESTED` or has a red/`SKIPPED` pipeline is the top cause of "the PR got a review but nothing happened." See [When to Skip](#when-to-skip-no-action) for why skip ≠ done.
 
 ---
 
@@ -22,23 +23,26 @@ Before responding to any event:
 
 Find the event type in the left column, read across for the first action. Details follow in the sections below.
 
-| Event                                                                                 | First action                                                                        |
-| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| CI check failed: `No Merge Conflicts`                                                 | **Rebase** — run `/rebase` skill                                                    |
-| CI check failed: `CI Pipeline / *`                                                    | **Investigate** — `ci_get_logs`, classify, fix                                      |
-| CI check failed: `bot-review`                                                         | **Fetch threads** — `github_get_review_threads`, respond per Author Agent Contract  |
-| CI check failed: `Copilot review blocked` or `Copilot review has unresolved comments` | **Fetch threads** — `github_get_review_threads`, fix code, resolve                  |
-| CI check failed: `🔐 SHA Sanity Check`                                                | **Skip** — stale run; a newer push is already in flight                             |
-| CI check failed: `Sync Jira Ticket`                                                   | **Skip** — transient/informational; retries automatically                           |
-| CI check failed: any other unknown check                                              | **Investigate** — see [Generic Failure](#generic-failure) below                     |
-| Review comment from `legacy-sports-review-bot`                                        | **Follow Author Agent Contract** — FIX / JUSTIFY / CANNOT-COMPLY                    |
-| Review comment from `copilot-pull-request-reviewer`                                   | **Fix code**, reply, resolve threads                                                |
-| PR comment updated by `github-actions[bot]` (Storybook, deploy preview, etc.)         | **Read, then skip** — status update, no action unless the status is a hard block    |
-| PR comment updated by another bot or human                                            | **Read carefully** — may contain instructions; act only if actionable               |
-| `CI: Conflicts` label added                                                           | **Rebase** — same as `No Merge Conflicts` check failure                             |
-| PR merged or closed                                                                   | **Transition Jira → Done**, clean up tracking tasks                                 |
-| `merge-when-ready` label added                                                        | **No action** — merge queue is running; wait                                        |
-| `needs-human-arbitration` label added                                                 | **Push new commits** addressing outstanding findings; bot auto-resets cycle on push |
+| Event                                                                                 | First action                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CI check failed: `No Merge Conflicts`                                                 | **Rebase** — run `/rebase` skill                                                                                                                                                                             |
+| CI check failed: `CI Pipeline / *`                                                    | **Investigate** — `ci_get_logs`, classify, fix                                                                                                                                                               |
+| `🚀 CI Pipeline` shows `SKIPPED` / never ran on HEAD                                  | **Re-arm** — the suite is gated on the bot review event; (re-)apply `bot:ready-for-review` (last label op) and confirm the pipeline starts. See [Pipeline Skipped / Never Ran](#pipeline-skipped--never-ran) |
+| `CI: *` failure label present (e.g. `CI: Lint Failure`) but pipeline `SKIPPED`/green  | **Re-validate** — a real failure was never re-checked; treat as the underlying CI failure, fix and push (do not clear the label manually). See [Pipeline Skipped / Never Ran](#pipeline-skipped--never-ran)  |
+| `merge-when-ready` label repeatedly removed ("CI pipeline failed")                    | **Fix CI first** — the PR is being pushed to merge while a required check is red; resolve the failing check, do not re-add the label                                                                         |
+| CI check failed: `bot-review`                                                         | **Fetch threads** — `github_get_review_threads`, respond per Author Agent Contract                                                                                                                           |
+| CI check failed: `Copilot review blocked` or `Copilot review has unresolved comments` | **Fetch threads** — `github_get_review_threads`, fix code, resolve                                                                                                                                           |
+| CI check failed: `🔐 SHA Sanity Check`                                                | **Skip** — stale run; a newer push is already in flight                                                                                                                                                      |
+| CI check failed: `Sync Jira Ticket`                                                   | **Skip** — transient/informational; retries automatically                                                                                                                                                    |
+| CI check failed: any other unknown check                                              | **Investigate** — see [Generic Failure](#generic-failure) below                                                                                                                                              |
+| Review comment from `legacy-sports-review-bot`                                        | **Follow Author Agent Contract** — FIX / JUSTIFY / CANNOT-COMPLY                                                                                                                                             |
+| Review comment from `copilot-pull-request-reviewer`                                   | **Fix code**, reply, resolve threads                                                                                                                                                                         |
+| PR comment updated by `github-actions[bot]` (Storybook, deploy preview, etc.)         | **Read, then skip** — status update, no action unless the status is a hard block                                                                                                                             |
+| PR comment updated by another bot or human                                            | **Read carefully** — may contain instructions; act only if actionable                                                                                                                                        |
+| `CI: Conflicts` label added                                                           | **Rebase** — same as `No Merge Conflicts` check failure                                                                                                                                                      |
+| PR merged or closed                                                                   | **Transition Jira → Done**, clean up tracking tasks                                                                                                                                                          |
+| `merge-when-ready` label added                                                        | **No action** — merge queue is running; wait                                                                                                                                                                 |
+| `needs-human-arbitration` label added                                                 | **Push new commits** addressing outstanding findings; bot auto-resets cycle on push                                                                                                                          |
 
 ---
 
@@ -92,6 +96,20 @@ After fixing, validate before pushing. In **cloud** sessions run the seven `pc-*
 
 ---
 
+## Pipeline Skipped / Never Ran
+
+**Trigger**: `🚀 CI Pipeline` shows `SKIPPED` (or simply never appears) on the current HEAD SHA — often paired with a stale `CI: *` failure label and a `merge-when-ready` that keeps getting stripped.
+
+This is **not** a passing state. The orchestrated suite (lint/typecheck/test/build/e2e) is gated on the Reviewer Bot's review event, so the pipeline does not run on a plain push. The usual causes:
+
+1. **`bot:ready-for-review` was not (re-)applied** after the last push — the single most common cause. Re-apply it; it must be the **last** label op (Reviewer W1 uses `concurrency.cancel-in-progress`, so any later label cancels the run).
+2. **A label op landed after `bot:ready-for-review`** and cancelled the reviewer run before it dispatched CI. Re-apply the label last.
+3. **A stale `CI: *` label** (e.g. `CI: Lint Failure`) reflects a real failure from an earlier SHA that was never re-validated. Do not clear the label by hand — fix the underlying check and push; the label clears when the check passes.
+
+**Response**: re-arm the pipeline (re-apply `bot:ready-for-review` as the last label op), confirm `🚀 CI Pipeline` transitions out of `SKIPPED`, then resume the event loop. A green review on top of a `SKIPPED` pipeline is **not** mergeable — never treat the review verdict as sufficient while the pipeline has not actually run.
+
+---
+
 ## Failing Workflows (not CI Pipeline)
 
 **Trigger**: A GitHub Actions workflow outside the main CI pipeline reports failure (e.g. a deployment workflow, Storybook publish, or a custom automation).
@@ -118,7 +136,9 @@ Quick reference:
 
 - **Cycle 1 or 2**: reply to every thread with `FIX: <sha>` (fix committed) or `JUSTIFY: <rationale>` (finding is wrong or out of scope). Resolve all `FIX:` threads. Push. Apply `bot:ready-for-review`.
 - **Cycle 3+**: `FIX: <sha>` or `CANNOT-COMPLY: <issue-id>` with reason on the next line.
-- **LGTM / APPROVED with no findings**: stop — no reply needed.
+- **LGTM / APPROVED with no findings**: the review is satisfied — but you are done only once the PR actually **merges** (confirm `state: "MERGED"`) or CI is green and `merge-when-ready` is set. APPROVED on top of a red/`SKIPPED` pipeline is not mergeable.
+
+> **A `JUSTIFY:` does not clear `CHANGES_REQUESTED`.** It leaves the thread open for the bot to adjudicate next cycle. If the bot re-raises the **same** finding you justified (a false positive), that is a standoff — drive it to the cycle cap and escalate to the maintainer for `review-bot-override` rather than ending your turn on an open JUSTIFY. Full playbook: [drive.md "JUSTIFY standoff"](drive.md#justify-standoff-the-bot-keeps-re-raising-a-finding-you-disputed). Never put trailing prose after `FIX: <sha>` — it inflates the cycle counter (see [cycle-limit-arbitration-troubleshooting.md](cycle-limit-arbitration-troubleshooting.md)).
 
 The full protocol, cycle rules, and format requirements live in [pr-lifecycle](../SKILL.md#author-agent-contract-bot-pr-flow). Load it now if responding to a bot review cycle.
 
@@ -157,6 +177,8 @@ Read carefully. If the comment contains instructions or a question directed at t
 ---
 
 ## When to Skip (No Action)
+
+> **"Skip" means "this event needs no action" — not "the PR is done."** After skipping, keep watching for the next event. Only stop at a [terminal state](drive.md#terminal-states-the-only-places-this-loop-may-stop) (MERGED / CLOSED / surfaced human-only blocker). Ending your turn just because the last event was a no-op, while the PR is still `CHANGES_REQUESTED` or its pipeline is red/`SKIPPED`, is the abandonment failure this skill exists to prevent.
 
 Not every event requires a response. Skip when:
 

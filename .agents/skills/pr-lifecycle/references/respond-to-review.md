@@ -132,6 +132,17 @@ Summarize:
 - Whether `bot:ready-for-review` label was applied
 - Any threads that could not be replied to (escalate these to the user)
 
+### Step 8 — Do NOT stop here: return to the drive loop
+
+**Posting replies is a sub-step, not a terminal state.** This is the single most common stall: a session answers every thread, writes its Step 7 report, and ends its turn while the PR is still `CHANGES_REQUESTED`. To a human watching the PR, that looks like "no activity despite the review" — because the bot is waiting on the author and the author session has exited.
+
+After Step 7, **re-enter the [drive.md](drive.md) event loop (Step 6)** and continue until the PR reaches a [terminal state](drive.md#terminal-states-the-only-places-this-loop-may-stop). Specifically:
+
+- **A `JUSTIFY:` does not clear `CHANGES_REQUESTED`.** It leaves the thread open for bot adjudication. You must re-fire the cycle (`bot:ready-for-review`) and handle the bot's next verdict — not stop. If the bot re-raises a finding you have already justified (a false positive that keeps coming back), that is a **standoff**, not a resolution: drive it to the cycle cap and then escalate per [drive.md "JUSTIFY standoff"](drive.md#justify-standoff-the-bot-keeps-re-raising-a-finding-you-disputed). Do not park the PR on an open JUSTIFY.
+- **A green review is moot while CI is red.** Before treating any review round as done, confirm the `🚀 CI Pipeline` actually **ran and passed** on the current HEAD SHA. A `SKIPPED` pipeline or a lingering `CI: *` failure label means the real merge gate has not been satisfied — fix it (drive.md Step 5, Priority 2) rather than declaring victory on the review alone.
+
+Only stop when `github_view_pr` reports `MERGED`/`CLOSED`, or you have hit a genuine human-only blocker and **surfaced it explicitly** (label + message), per drive.md's terminal-states list.
+
 ## Guardrails
 
 - **Never use `JUSTIFY:` in Cycle 2+** — the bot rejects it.
@@ -139,4 +150,6 @@ Summarize:
 - **Always push fixes before posting `FIX:` replies** — never use placeholder SHAs or edit posted replies.
 - **Never apply `bot:ready-for-review` if any thread is still unanswered** — the bot will mandate all skipped threads.
 - **Never edit the bot's review threads** — this breaks cycle-state tracking.
+- **Never put trailing prose after `FIX: <sha>`** — the reply body must be _exactly_ `FIX: <sha>`, nothing after the sha. Trailing text (`FIX: abc123 — replaced all foo()`) trips the bot's format-error path, which posts a corrective reply that GitHub records as an empty-body `COMMENTED` bot review. Those artifacts **inflate the cycle counter** toward `MAX_CYCLE` and accelerate false `needs-human-arbitration` (see [cycle-limit-arbitration-troubleshooting.md](cycle-limit-arbitration-troubleshooting.md)). Prefer `github_finish_fix_round`, which emits the exact format for you.
 - **Cap at Cycle 3** — if after three cycles threads remain unresolved, escalate to a human reviewer rather than applying the label again.
+- **Posting replies is not "done"** — after replying you MUST continue driving the PR to a terminal state (Step 8). A session that stops on an open `JUSTIFY:` or a red CI pipeline is the root cause of "the PR got a review but nothing happened."

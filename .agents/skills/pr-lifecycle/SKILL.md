@@ -66,6 +66,8 @@ After creating the PR and transitioning Jira, shepherd the PR through CI and rev
 
 Claude Code surfaces CI results and review events **as push notifications**. After marking the PR ready, Claude Code will automatically receive and surface CI failures, new review threads, and other agent-actionable events. Handle each event as it arrives (fixing code, resolving threads, re-running CI) and continue until merged or closed.
 
+> **Responding to a review is NOT a terminal state.** The single most common stall is a session that replies to every thread (or runs `/respond-to-review`), writes a summary, and ends its turn while the PR is still `CHANGES_REQUESTED` — which reads, from the outside, as "the PR got a review but nothing happened." A `JUSTIFY:` does not clear `CHANGES_REQUESTED`, and a passing review is moot while CI is red or `SKIPPED`. The loop may only stop at a true terminal state: `MERGED`, `CLOSED`, or a genuine human-only blocker that you have **surfaced with a label and an explicit message** (e.g. asking the maintainer to apply `review-bot-override` on a persistent bot false positive). See [drive.md "Terminal states"](references/drive.md#terminal-states-the-only-places-this-loop-may-stop) and ["JUSTIFY standoff"](references/drive.md#justify-standoff-the-bot-keeps-re-raising-a-finding-you-disputed).
+
 > **Precondition for any CI status read**: a push event has arrived (CI failure/pass, review, merge). Treat `ci_view_run`, `github_view_pr`, and `gh pr view --json statusCheckRollup` as one-shot lookups triggered by an event — not as poll targets. Repeated calls in a `sleep` loop have been observed burning 1–2M tokens per session for zero earlier signal than the native push notification.
 
 See [references/drive.md](references/drive.md) Step 6 for the full event-handling table.
@@ -230,6 +232,7 @@ This triggers W6 (`.github/workflows/security-review-override.yml`), which submi
 
 ### Format Rules
 
+- **A `FIX:` reply must be exactly `FIX: <sha>` — no trailing prose.** Text after the sha (`FIX: abc123 — fixed the thing`) trips the bot's format-error path. The corrective reply GitHub records is an empty-body `COMMENTED` bot review that **inflates the cycle counter** toward `MAX_CYCLE`, accelerating false `needs-human-arbitration`. Prefer `github_finish_fix_round` (emits the exact format) over hand-writing replies. See [cycle-limit-arbitration-troubleshooting.md](references/cycle-limit-arbitration-troubleshooting.md).
 - **Format errors get corrective replies** — the bot will reply in-thread when a response is malformed; re-post correctly.
 - **Never edit the bot's review comments or threads** — the bot reads its own thread state to determine cycle progression; mutation breaks this.
 - **No free-form text outside structured replies** — the bot ignores unstructured content and will not count it as a thread response.

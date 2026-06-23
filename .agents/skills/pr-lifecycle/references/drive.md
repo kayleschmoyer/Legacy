@@ -220,7 +220,7 @@ React to each event as it arrives. Handle each event:
 | `checks_passed`            | CI is green — if the Reviewer Bot has APPROVED, it will add `merge-when-ready` itself. Author Agent does nothing here.                                                                                                                                                                                                                                                                                                    |
 | `new_review_thread`        | Fix the review comment (return to Step 5, Priority 3)                                                                                                                                                                                                                                                                                                                                                                     |
 | `review_approved`          | The Reviewer Bot adds `merge-when-ready` itself on APPROVED. Author Agent does **not** apply this label manually — doing so bypasses the review gate.                                                                                                                                                                                                                                                                     |
-| `review_changes_requested` | Inspect the review, fix issues (return to Step 5, Priority 3)                                                                                                                                                                                                                                                                                                                                                             |
+| `review_changes_requested` | Inspect the review, fix issues (return to Step 5, Priority 3). If you `JUSTIFY:` a finding and the bot re-raises it, follow [JUSTIFY standoff](#justify-standoff-the-bot-keeps-re-raising-a-finding-you-disputed) — do not stop on an open JUSTIFY.                                                                                                                                                                       |
 | `conflicts`                | Rebase (return to Step 5, Priority 1)                                                                                                                                                                                                                                                                                                                                                                                     |
 | `merged`                   | Success — proceed to Step 7                                                                                                                                                                                                                                                                                                                                                                                               |
 | `closed`                   | PR was closed externally — report and stop                                                                                                                                                                                                                                                                                                                                                                                |
@@ -236,6 +236,34 @@ When the Reviewer Bot APPROVEs, it labels the PR with `merge-when-ready` itself 
 If a clean PR sits without `merge-when-ready` for more than one Reviewer Bot cycle, the upstream cause is either (a) `bot:ready-for-review` was not (re-)applied after the last push, (b) the Reviewer Bot is rate-limited (`review-bot-degraded` label present), or (c) the Reviewer Bot's verdict is still CHANGES_REQUESTED. Fix the upstream cause — do not paper over with the label.
 
 After handling an event, continue until `merged` or `closed`.
+
+#### Terminal states (the ONLY places this loop may stop)
+
+Do not end your turn until one of these is true. "I posted my replies" and "I pushed my fix" are **not** terminal — they are mid-loop events. Stopping anywhere else is the defect that makes a PR look reviewed-but-abandoned.
+
+| Terminal state                 | How you confirm it                                                                                                                                                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Merged**                     | `github_view_pr({ number: <PR#> })` returns `state: "MERGED"` (or `mergedAt` populated)                                                                                                                                           |
+| **Closed without merge**       | `state: "CLOSED"` with no `mergedAt` — report and stop                                                                                                                                                                            |
+| **Genuine human-only blocker** | You have applied the right label (e.g. `requires-human-review`) **and** posted a message naming the exact blocker and what the human must do. A blocker is not terminal until it is surfaced — silently parking is never allowed. |
+
+If none of these holds, you are still mid-loop — keep going.
+
+#### JUSTIFY standoff: the bot keeps re-raising a finding you disputed
+
+A `JUSTIFY:` reply does **not** clear `CHANGES_REQUESTED` — it leaves the thread open for the bot to adjudicate on the next cycle. If the Reviewer Bot re-raises the **same finding** you already justified (i.e. it is a false positive that won't die), you are in a standoff. Resolve it deterministically — never park on it:
+
+1. **Confirm it's a true false positive**, not a real issue you mislabeled — re-read the flagged code and the bot's claim. If the bot is right, switch to `FIX:`.
+2. **Leave a durable in-code/doc note** at the flagged line (or nearest `SKILL.md`/`references/` doc) explaining why the pattern is intentional, and push it — so the finding stops recurring and a maintainer can see the rationale at a glance. (Author Agent Contract §2.)
+3. **Drive to the cycle cap.** Re-apply `bot:ready-for-review` and let the cycle counter advance. At Cycle 3+, reply `CANNOT-COMPLY: <issue-id>` (reason on the next line) on the disputed thread instead of another `JUSTIFY:`.
+4. **Escalate to the maintainer for the override.** A persistent false-positive `CHANGES_REQUESTED` can only be cleared by a human applying `review-bot-override` (you must never apply it yourself — Author Agent Contract §5). Post a comment that quotes the finding, your evidence that it's wrong, and explicitly asks the maintainer to apply `review-bot-override`. **This ask — with the label named — is itself a terminal state** (genuine human-only blocker). Parking on an open JUSTIFY with no such ask is not.
+
+#### The CI pipeline must actually have run (not SKIPPED)
+
+A review verdict is meaningless while the merge gate is red. Before you treat a review round as resolved, confirm the real CI ran:
+
+- If `🚀 CI Pipeline` shows `SKIPPED` on the current HEAD SHA, the orchestrated suite (lint/typecheck/test/build/E2E) **did not run** — most often because `bot:ready-for-review` was not (re-)applied after the last push (CI orchestration is gated on the bot review event), or a prior label op cancelled the reviewer run. Re-apply `bot:ready-for-review` (it must be the last label op) and confirm the pipeline starts.
+- A lingering `CI: *` failure label (e.g. `CI: Lint Failure`) with a `SKIPPED` pipeline means a real failure was never re-validated. Treat it as Priority 2 (CI failure), not as noise — fix the underlying check and push, do not just clear the label (you never clear `CI: *` labels manually anyway; they clear when the check passes).
 
 ### Step 7: Post-merge
 
@@ -279,7 +307,7 @@ Summarize:
 ## Gotchas
 
 - **`worktree_set` is required for native CI event routing** — Claude Code Desktop routes CI/PR push notifications to the session whose active worktree matches the branch. Without calling `worktree_set` after any checkout or attach, the session enters the Step 6 event loop but never receives events and spins indefinitely. Note: `worktree_set` requires a local worktree entry to exist; for sessions that cannot create a local checkout, native events are unavailable — `worktree_watch_pr` (LS-7904) will close this gap when shipped.
-- **Don't stop after the first fix** — the event loop is the core of this skill. A PR often needs multiple rounds (fix CI → new review → fix review → CI again → merge).
+- **Don't stop after the first fix** — the event loop is the core of this skill. A PR often needs multiple rounds (fix CI → new review → fix review → CI again → merge). Replying to a review or pushing a fix is a mid-loop event, never a stopping point — see [Terminal states](#terminal-states-the-only-places-this-loop-may-stop). The most common abandonment is exiting on an open `JUSTIFY:` or a `SKIPPED`/red CI pipeline.
 - **`mergeable: UNKNOWN` is not a blocker** — GitHub may still be computing. Wait for the next event rather than treating it as an error.
 - **Check Runs vs. Commit Statuses** — `github_retrigger_check` only works on Check Runs. `bot-review` uses the Statuses API. If "check not found", use `github_list_commit_statuses({ number: <PR#> })` instead. See pr-lifecycle SKILL.md Critical Rule 8.
 - **Cap review fix rounds at 2** — after 2 rounds, resolve remaining threads and proceed. Infinite review loops are a common agent failure mode.
