@@ -147,6 +147,11 @@ jest.mock('tamagui', () => {
     Tooltip: TooltipRoot,
     XStack: Pass,
     YStack: Pass,
+    Tooltip: Object.assign(Pass, {
+      Trigger: Pass,
+      Content: Pass,
+      Arrow: () => null,
+    }),
   };
 });
 

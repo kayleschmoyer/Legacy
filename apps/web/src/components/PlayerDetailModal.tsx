@@ -1352,7 +1352,10 @@ export function PlayerDetailModal({
       maxWidth={1200}
       hideHeader
     >
-      <ScrollView maxHeight="calc(88vh)" backgroundColor={BG_DARK}>
+      <ScrollView
+        maxHeight="min(88dvh, calc(100dvh - 32px))"
+        backgroundColor={BG_DARK}
+      >
         <YStack
           padding={24}
           $sm={{ padding: 16 }}

@@ -35,7 +35,7 @@ export interface BaseModalProps {
   headerAccentColor?: string;
   /** Optional max width override (default: 960) */
   maxWidth?: number;
-  /** Optional max height override (default: 88vh) */
+  /** Optional max height override (default: min(88dvh, calc(100dvh - 32px))) */
   maxHeight?: string;
   /**
    * When true, suppress the default gradient header. The consumer is then
@@ -77,7 +77,7 @@ export function BaseModal({
   titleBadge,
   headerAccentColor,
   maxWidth = 960,
-  maxHeight = '88vh',
+  maxHeight = 'min(88dvh, calc(100dvh - 32px))',
   hideHeader = false,
   children,
 }: BaseModalProps) {
