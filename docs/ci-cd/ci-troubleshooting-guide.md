@@ -188,7 +188,7 @@ The hosted `legacy-sports-db-admin` MCP server's `db_migrate` tool applies UNMER
 
 ### `Naming Lint` (W3)
 
-PR title must start with `LS-XXXX` or contain a valid conventional commit type. See `.agents/skills/branch-naming/SKILL.md`.
+PR title must start with `LS-XXXX` or contain a valid conventional commit type. See `.agents/skills/worktree-workflow/references/branch-naming.md`.
 
 ## Debug Mode
 

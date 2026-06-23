@@ -1,9 +1,6 @@
----
-name: rebase
-description: 'Rebase branches onto main (or another base) and resolve merge conflicts. Covers simple rebases, bulk PR rebases, stacked branch trees, conflict resolution strategies, post-rebase stabilization, and recovery. Load when rebasing, resolving conflicts, or updating a branch.'
----
+# Rebase
 
-# Skill: Rebase
+> Sub-reference of [`worktree-workflow`](../SKILL.md). Load when rebasing branches onto main, resolving merge conflicts, or updating a stale branch.
 
 ## When to Use
 
@@ -15,7 +12,7 @@ description: 'Rebase branches onto main (or another base) and resolve merge conf
 
 ## Risk Level
 
-Rebasing is inherently a **Medium-risk** operation — it modifies git history and can introduce conflicts in areas you didn't originally change. For branches with High-risk changes (auth, payments, infrastructure), take extra care during conflict resolution. If the rebase introduces conflicts in unfamiliar code areas, re-run the [planning reference](../plan-ticket/references/planning.md) on the conflicting files before resolving.
+Rebasing is inherently a **Medium-risk** operation — it modifies git history and can introduce conflicts in areas you didn't originally change. For branches with High-risk changes (auth, payments, infrastructure), take extra care during conflict resolution. If the rebase introduces conflicts in unfamiliar code areas, re-run the [planning reference](../../plan-ticket/references/planning.md) on the conflicting files before resolving.
 
 ## Quick Start: Simple Rebase
 
@@ -44,10 +41,10 @@ git push --force-with-lease origin HEAD
 | Generated files (`*.generated.ts`) conflict | Regenerate -- never manually merge. `.\scripts\resolve-generated-conflicts.ps1`                              |
 | Lock file (`pnpm-lock.yaml`) conflicts      | Now handled by `.\scripts\resolve-generated-conflicts.ps1` (accepts theirs, regenerates via `make install`)  |
 | Migration files conflict (duplicate)        | Handled by `.\scripts\resolve-generated-conflicts.ps1` (accepts theirs; skip dupes with `git rebase --skip`) |
-| Source/config files conflict                | Read both sides, synthesize. See [conflict-resolution-guide.md](references/conflict-resolution-guide.md)     |
-| Many files conflict across many commits     | See [rebase-conflict-strategies.md](references/rebase-conflict-strategies.md)                                |
+| Source/config files conflict                | Read both sides, synthesize. See [conflict-resolution-guide.md](rebase/conflict-resolution-guide.md)         |
+| Many files conflict across many commits     | See [rebase-conflict-strategies.md](rebase/rebase-conflict-strategies.md)                                    |
 | Stacked/dependent branches need rebasing    | `make rebase-tree` or `make rebase-tree-auto`                                                                |
-| Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](references/rebase-interactive-and-recovery.md)                      |
+| Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](rebase/rebase-interactive-and-recovery.md)                          |
 
 ## Check for Conflicts After Rebase
 
@@ -131,20 +128,18 @@ $conflicting | Select-Object number, headRefName
 | Unresolved conflicts mid-rebase    | `worktree_conflict_info()` (MCP-first) — lists all unresolved entries including binary conflicts (which have no textual markers). Shell fallback (text conflicts only): `grep -rn -E '^<<<<<<<\|^=======\|^>>>>>>>'` — note: misses binary conflicts |
 | Leftover markers in resolved files | `grep -rn -E '^<<<<<<<\|^=======\|^>>>>>>>'` — `worktree_conflict_info` only sees index-unmerged files, not stray markers accidentally left in resolved files                                                                                        |
 
-## References
+## Sub-references
 
-- [Conflict Resolution Guide](references/conflict-resolution-guide.md) -- full decision framework, resolution rules, bulk operations, and when to escalate
-- [Conflict Resolution Framework](references/conflict-resolution-framework.md) -- 5-step reasoning process with rules for synthesizing both sides
-- [Pitfalls and Escalation](references/pitfalls-and-escalation.md) -- common mistakes, decision checklist, when and how to ask the developer
-- [Rebase Conflict Strategies](references/rebase-conflict-strategies.md) -- large rebases, generated files, migrations, lockfiles, schema conflicts
-- [Interactive Rebase and Recovery](references/rebase-interactive-and-recovery.md) -- squash/fixup/reword, stuck mid-rebase diagnosis
-- [Worked Examples](references/worked-examples.md) -- three annotated conflict resolution examples
+- [Conflict Resolution Guide](rebase/conflict-resolution-guide.md) -- full decision framework, resolution rules, bulk operations, and when to escalate
+- [Conflict Resolution Framework](rebase/conflict-resolution-framework.md) -- 5-step reasoning process with rules for synthesizing both sides
+- [Pitfalls and Escalation](rebase/pitfalls-and-escalation.md) -- common mistakes, decision checklist, when and how to ask the developer
+- [Rebase Conflict Strategies](rebase/rebase-conflict-strategies.md) -- large rebases, generated files, migrations, lockfiles, schema conflicts
+- [Interactive Rebase and Recovery](rebase/rebase-interactive-and-recovery.md) -- squash/fixup/reword, stuck mid-rebase diagnosis
+- [Worked Examples](rebase/worked-examples.md) -- three annotated conflict resolution examples
 
-## Related Skills
+## Related
 
-- [planning](../plan-ticket/references/planning.md) -- re-plan when rebase introduces conflicts in unfamiliar code
-- [branch-tree](../branch-tree/SKILL.md) -- view and manage dependent branch trees
-- [worktree-workflow](../worktree-workflow/SKILL.md) -- working in isolated worktrees
-- [repo-tooling](../repo-tooling/SKILL.md) -- fix TypeScript and lint errors after rebase
-- [codegen](../codegen/SKILL.md) -- regenerate GraphQL types
-- [standards](../standards/SKILL.md) -- coding standards including codegen policy
+- [planning](../../plan-ticket/references/planning.md) -- re-plan when rebase introduces conflicts in unfamiliar code
+- [worktree-workflow](../SKILL.md) -- parent skill for working in isolated worktrees
+- [repo-tooling](../../repo-tooling/SKILL.md) -- fix TypeScript and lint errors after rebase
+- [standards](../../standards/SKILL.md) -- coding standards including codegen policy

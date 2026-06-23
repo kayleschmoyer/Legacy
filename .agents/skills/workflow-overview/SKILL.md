@@ -32,7 +32,7 @@ Concrete local calls for each spine action. Always prefer the MCP tool over raw 
 | Label / checkpoint     | `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })`; `continuation_post({ pr: <PR#>, ... })`              | Apply `agent-in-progress` while still draft. Remove it when you exit without completing.                                                                          |
 | Migrations             | `pnpm --prefix lib/db-client run db:status` then `db:up`                                                                   | Confirm `Applied N new migrations` or `No new migrations to apply`. Hosted `db_migrate` MCP tool applies to dev RDS over HTTPS.                                   |
 | Validate               | `make_run({ target: "pc" })` — run in the foreground; do not background validation                                         | On formatter auto-commit (`autoFormatterCommit: true`), amend with `worktree_commit({ amend: true, message: "type(scope): msg" })` — never `git commit --amend`.  |
-| Rebase / stabilize     | `git fetch origin ; twig rebase`, then `make stabilize-after-rebase`                                                       | Do **not** push until stabilize passes. See [rebase/SKILL.md](../rebase/SKILL.md).                                                                                |
+| Rebase / stabilize     | `git fetch origin ; twig rebase`, then `make stabilize-after-rebase`                                                       | Do **not** push until stabilize passes. See [rebase sub-reference](../worktree-workflow/references/rebase.md).                                                    |
 | Mark ready             | `github_mark_pr_ready({ number: <PR#> })`                                                                                  | Applies `bot:ready-for-review`. Then `jira_transition({ key, status: "In Review" })`.                                                                             |
 | Watch to merge         | `github_merge_pr({ number })` (merge queue); `strategy: "direct"` for admin bypass                                         | PR events surface natively — never `sleep`-poll. Snapshot reads (`ci_list_runs`, `github_view_pr`) only in response to an event.                                  |
 
@@ -135,7 +135,7 @@ Everything downstream of the ready PR is environment-neutral — see the machine
 - [ticket-to-merge-spine](references/ticket-to-merge-spine.md) -- the canonical environment-neutral ordering + enforcement (read first).
 - [cloud-agent-mode](../cloud-agent-mode/SKILL.md) -- the cloud implementation of the same spine.
 - [pr-lifecycle](../pr-lifecycle/SKILL.md) -- PR creation, self-review, Copilot fix workflow.
-- [rebase](../rebase/SKILL.md) -- rebase branches and resolve conflicts.
+- [rebase](../worktree-workflow/references/rebase.md) -- rebase branches and resolve conflicts.
 - [debugging](../debugging/SKILL.md) -- investigate and fix CI failures and code defects.
 - [worktree-workflow](../worktree-workflow/SKILL.md) -- worktree creation and management.
 - [repo-tooling](../repo-tooling/SKILL.md) -- Make targets, Nx commands, migration scripts.

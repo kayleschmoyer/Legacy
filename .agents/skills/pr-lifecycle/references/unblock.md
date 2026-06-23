@@ -132,6 +132,6 @@ Print a summary table:
 ## Related Skills
 
 - [sweep-prs](./sweep.md) — full overnight sweep with chip dispatch for all PR issues
-- [rebase](../../rebase/SKILL.md) — rebase workflow for conflict resolution chips
+- [rebase](../../worktree-workflow/references/rebase.md) — rebase workflow for conflict resolution chips
 - [fix-pr](./fix.md) — PR fix workflow for review/CI fix chips
 - [ci-event-response](./ci-event-response.md) — triage individual CI check failures on a watched PR

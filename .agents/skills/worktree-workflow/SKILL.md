@@ -1,6 +1,6 @@
 ---
 name: worktree-workflow
-description: 'Route agents to the correct worktree flow for Jira ticket work. Two flows exist: (1) native ephemeral worktree via Claude Code launcher `worktree` checkbox (primary, single-ticket, native branch detection); (2) sibling worktree under D:\code\legacy-sports-worktrees\ (legacy fallback for chained branch stacks, parent-ticket dispatch when chips/Agent isolation unavailable). Multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`) dispatch chips via `mcp__ccd_session__spawn_task` — each chip is its own session and uses the native flow. Load when starting ticket work; routes to the right flow guide.'
+description: 'Route agents to the correct worktree flow for Jira ticket work, plus branch naming and rebase conventions as sub-references. Two flows: (1) native ephemeral worktree via Claude Code launcher `worktree` checkbox (primary, single-ticket); (2) sibling worktree under D:\code\legacy-sports-worktrees\ (legacy fallback for chained stacks). Multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`) dispatch chips via `mcp__ccd_session__spawn_task` — each chip uses the native flow. Sub-references cover branch naming (human/launcher/agent drivers, Jira linking via PR title and commits) and rebase (rebasing onto main, resolving merge conflicts, updating stale branches, post-rebase stabilization, recovery). Load when starting ticket work, creating or naming a branch, first push to remote, rebasing onto main, or resolving a merge conflict.'
 ---
 
 # Skill: Worktree Workflow
@@ -16,6 +16,13 @@ This skill is a **router**. It describes the two worktree flows, when to use eac
 | **Subagent dispatch (legacy)**   | Fallback when chips (`mcp__ccd_session__spawn_task`) are unavailable. All current multi-ticket orchestrators (including `/work-ticket` Parent Mode) use chip dispatch instead.                                                     | See "Subagent Dispatch" below + orchestrator command files                                                                  |
 | **Sibling worktree (legacy)**    | Fallback when `Agent(isolation: "worktree")` is unavailable, or chained branch stacks requiring twig.                                                                                                                              | See [references/sibling/sibling-worktree-flow.md](references/sibling/sibling-worktree-flow.md)                              |
 
+## Sub-skills
+
+These references cover topics that always travel with worktree work:
+
+- [branch-naming.md](references/branch-naming.md) — branch naming conventions by driver (human, Claude Code launcher checkbox, cloud/bot agents). Load when creating branches, first pushing to remote, or naming remote branches.
+- [rebase.md](references/rebase.md) — rebasing branches onto main (or another base), resolving merge conflicts, post-rebase stabilization, recovery. Load when rebasing, resolving merge conflicts, or updating a stale branch.
+
 > **Both flows keep `D:\code\legacy-sports` on `main`.** Working in the main repo directory with HEAD on a feature branch is forbidden. The native flow puts the branch in `.claude/worktrees/<name>/`; the sibling flow puts it in `D:\code\legacy-sports-worktrees\<ticket>\`.
 
 ## Native Flow (primary)
@@ -28,7 +35,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 2. **Inspect ticket** — `jira_view(key: "LS-####")` / `jira_list_children(key: "LS-####")` for parents.
 3. **Blocker check** — `jira_check_blockers(key: "LS-####")`. Stop if blockers are not In Review/Done.
 4. **Jira → In Progress** — `jira_transition(key: "LS-####", status: "In Progress")`.
-5. **Precondition for any branch operation: leave the auto-generated branch name (`claude/<random>`) as-is.** Claude Code caches the branch name at session start and never refreshes it, so a rename permanently disables PR detection and "Create PR" (anthropics/claude-code#18690). Jira linking flows through PR title and commit messages containing `LS-####`, not the branch name. See `.agents/skills/branch-naming/SKILL.md`.
+5. **Precondition for any branch operation: leave the auto-generated branch name (`claude/<random>`) as-is.** Claude Code caches the branch name at session start and never refreshes it, so a rename permanently disables PR detection and "Create PR" (anthropics/claude-code#18690). Jira linking flows through PR title and commit messages containing `LS-####`, not the branch name. See [references/branch-naming.md](references/branch-naming.md).
 6. **Register the active worktree** — so MCP tools target the right tree:
    ```
    worktree_set(key: "<absolute .claude/worktrees/... path from pwd>")

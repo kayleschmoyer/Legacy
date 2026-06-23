@@ -218,7 +218,7 @@ For each PR (sequentially within a dependency chain, or in parallel for disjoint
 
 1. Enter the worktree (Step 2)
 2. **Rebase via MCP**: `worktree_rebase(worktree: "LS-####")` — this fetches the latest remote state and rebases onto the parent branch in one operation. Worktrees have their own fetch state and may be stale even if the main repo fetched recently.
-3. If conflicts arise → load `../../rebase/SKILL.md` and `../../resolve-merge-conflicts/SKILL.md`
+3. If conflicts arise → load `../../worktree-workflow/references/rebase.md` and `../../resolve-merge-conflicts/SKILL.md`
 4. **Post-rebase stabilization**: `worktree_stabilize(worktree: "LS-####")` — reinstalls deps, regenerates schema, and runs affected codegen so `make pc` does not fail on stale artifacts.
 
 ### Lightweight vs. Full Validation
@@ -250,7 +250,7 @@ After validation:
 
 If a rebase fails irrecoverably: `git rebase --abort`, comment on the PR with the failure reason, and move on. Only label `requires-human-review` if the conflict requires human judgment (e.g., schema design decisions) — routine merge conflicts should be retried in a future sweep. The PR is now **settled**.
 
-> **Full step-by-step rebase instructions** are in `../../rebase/SKILL.md`. Do not duplicate them here — load the skill.
+> **Full step-by-step rebase instructions** are in `../../worktree-workflow/references/rebase.md`. Do not duplicate them here — load the skill.
 
 ---
 

@@ -1,9 +1,6 @@
----
-name: branch-naming
-description: Branch naming conventions by driver type (human, Claude Code launcher, cloud/bot agents). Load when creating branches, pushing for the first time, or naming remote branches.
----
+# Branch Naming
 
-# Skill: Branch Naming
+> Sub-reference of [`worktree-workflow`](../SKILL.md). Load when creating branches, pushing for the first time, or naming remote branches.
 
 Jira's GitHub integration links development info to tickets by scanning **PR titles**, **commit messages**, and **branch names** for `LS-####` keys. All three are independent — branch name is NOT required if PR title and commits contain the key.
 

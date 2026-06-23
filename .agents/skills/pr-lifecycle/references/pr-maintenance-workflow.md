@@ -92,7 +92,7 @@ For each PR in `$scan.conflicting` (parallel for disjoint, sequential for overla
 
 1. Enter the worktree (Step 2)
 2. Rebase: `.\scripts\rebase-pr.ps1 -Branch $branch` (or `worktree_rebase` via MCP)
-3. If conflicts arise — load `skills/rebase/SKILL.md`
+3. If conflicts arise — load `skills/worktree-workflow/references/rebase.md`
 4. **Lightweight vs. full validation**: if rebase had zero conflicts and last CI passed, use lightweight validation (`codegen` → `typecheck` → `format`); otherwise full `make pc`. See [sweep-and-parallelization.md](sweep-and-parallelization.md) for the decision tree.
 5. After validating, batch-push passing PRs: `git push --force-with-lease origin HEAD`
 
@@ -305,10 +305,10 @@ Produce a summary report with:
 
 ## Troubleshooting
 
-| Problem                                      | Fix                                                                          |
-| -------------------------------------------- | ---------------------------------------------------------------------------- |
-| Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `skills/rebase/SKILL.md` |
-| Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                    |
-| CI failure is flaky (passes on re-run)       | Re-trigger: `ci_rerun(runId: <id>, failedOnly: true)` — do not change code   |
-| Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                         |
-| `make pc` fails after rebase stabilization   | Load `skills/rebase/SKILL.md` for post-rebase steps                          |
+| Problem                                      | Fix                                                                                                 |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `skills/worktree-workflow/references/rebase.md` |
+| Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                                           |
+| CI failure is flaky (passes on re-run)       | Re-trigger: `ci_rerun(runId: <id>, failedOnly: true)` — do not change code                          |
+| Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                                                |
+| `make pc` fails after rebase stabilization   | Load `skills/worktree-workflow/references/rebase.md` for post-rebase steps                          |

@@ -1258,7 +1258,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           remoteBranch: {
             type: 'string',
             description:
-              'Push to this remote branch name instead of the local branch name. Must contain an LS-#### Jira key; pushes are refused otherwise. Providing remoteBranch also implies upstream is set (-u). ⚠️ Do NOT use this in native ephemeral (launcher-checkbox) sessions — local/remote name mismatch confuses PR association in the Claude Code UI (anthropics/claude-code#18690). Jira linking for native ephemeral sessions is done via PR title and commit messages containing LS-####, not the branch name. See .agents/skills/branch-naming/SKILL.md.',
+              'Push to this remote branch name instead of the local branch name. Must contain an LS-#### Jira key; pushes are refused otherwise. Providing remoteBranch also implies upstream is set (-u). ⚠️ Do NOT use this in native ephemeral (launcher-checkbox) sessions — local/remote name mismatch confuses PR association in the Claude Code UI (anthropics/claude-code#18690). Jira linking for native ephemeral sessions is done via PR title and commit messages containing LS-####, not the branch name. See .agents/skills/worktree-workflow/references/branch-naming.md.',
           },
           timeoutMs: {
             type: 'number',

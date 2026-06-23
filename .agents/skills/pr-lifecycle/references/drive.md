@@ -39,12 +39,12 @@ The core loop is: **inspect → fix → wait → repeat** until the PR is merged
 
 This skill is a **coordinator** — it delegates to specialized sub-skills for actual fixes:
 
-| Problem                    | Sub-Skill                            |
-| -------------------------- | ------------------------------------ |
-| Merge conflicts            | `../../rebase/SKILL.md`              |
-| Copilot review comments    | `../SKILL.md` (Phase 3: Fix Reviews) |
-| CI failures (code changes) | `../../debugging/SKILL.md`           |
-| Worktree setup             | `../../worktree-workflow/SKILL.md`   |
+| Problem                    | Sub-Skill                                      |
+| -------------------------- | ---------------------------------------------- |
+| Merge conflicts            | `../../worktree-workflow/references/rebase.md` |
+| Copilot review comments    | `../SKILL.md` (Phase 3: Fix Reviews)           |
+| CI failures (code changes) | `../../debugging/SKILL.md`                     |
+| Worktree setup             | `../../worktree-workflow/SKILL.md`             |
 
 ## Steps
 
@@ -163,7 +163,7 @@ Work through blockers in priority order. Treat each pass through Step 5 as a **r
 
 If `mergeable: "CONFLICTING"`:
 
-1. Load the rebase skill: read `../../rebase/SKILL.md`
+1. Load the rebase skill: read `../../worktree-workflow/references/rebase.md`
 2. Rebase onto the base branch (usually `origin/main`)
 3. Resolve conflicts
 4. Run post-rebase stabilization: `worktree_stabilize()`

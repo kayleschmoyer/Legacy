@@ -54,7 +54,7 @@ The Legacy Sports CI system accumulated several critical gaps that required a gr
 
 **Impact:** Jira branch sync failed silently. Branch lists were cluttered with inconsistently named branches.
 
-**Resolution (W3):** `required-checks-lint.yml` enforces naming conventions as a required check. See `.agents/skills/branch-naming/SKILL.md` for the full naming rules.
+**Resolution (W3):** `required-checks-lint.yml` enforces naming conventions as a required check. See `.agents/skills/worktree-workflow/references/branch-naming.md` for the full naming rules.
 
 ## Implementation Phases (LS-3857 Epic)
 

@@ -64,14 +64,14 @@ Supports three modes:
 
 This skill delegates to specialized sub-skills for each operation category. Load them when you encounter that problem type:
 
-| Operation               | Sub-Skill                                | When to Load                                 | Cloud? |
-| ----------------------- | ---------------------------------------- | -------------------------------------------- | :----: |
-| Rebase conflicting PRs  | `../../rebase/SKILL.md`                  | PR has merge conflicts                       |   ❌   |
-| Resolve merge conflicts | `../../resolve-merge-conflicts/SKILL.md` | Rebase produces conflicts needing manual fix |   ❌   |
-| Fix review comments     | `../SKILL.md`                            | PR has unresolved Copilot review threads     |   ❌   |
-| Debug CI failures       | `../../debugging/SKILL.md`               | PR has failing CI checks                     |   ❌   |
-| Enter a worktree        | `../../worktree-workflow/SKILL.md`       | Need to create or access a PR's worktree     |   ❌   |
-| Create a PR             | `../SKILL.md`                            | Need to open a new PR after fixes            |   ❌   |
+| Operation               | Sub-Skill                                      | When to Load                                 | Cloud? |
+| ----------------------- | ---------------------------------------------- | -------------------------------------------- | :----: |
+| Rebase conflicting PRs  | `../../worktree-workflow/references/rebase.md` | PR has merge conflicts                       |   ❌   |
+| Resolve merge conflicts | `../../resolve-merge-conflicts/SKILL.md`       | Rebase produces conflicts needing manual fix |   ❌   |
+| Fix review comments     | `../SKILL.md`                                  | PR has unresolved Copilot review threads     |   ❌   |
+| Debug CI failures       | `../../debugging/SKILL.md`                     | PR has failing CI checks                     |   ❌   |
+| Enter a worktree        | `../../worktree-workflow/SKILL.md`             | Need to create or access a PR's worktree     |   ❌   |
+| Create a PR             | `../SKILL.md`                                  | Need to open a new PR after fixes            |   ❌   |
 
 ## Prerequisites
 
@@ -263,10 +263,10 @@ The returned `verdicts` array **is** the triage report. The orchestrator then ru
 
 ## Troubleshooting
 
-| Problem                                      | Fix                                                                         |
-| -------------------------------------------- | --------------------------------------------------------------------------- |
-| Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `../../rebase/SKILL.md` |
-| Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                   |
-| CI failure is flaky (passes on re-run)       | Re-trigger: `ci_rerun(runId: <id>, failedOnly: true)` — do not change code  |
-| Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                        |
-| `make pc` fails after rebase stabilization   | Load `../../rebase/SKILL.md` for post-rebase steps                          |
+| Problem                                      | Fix                                                                                                |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Rebase aborts repeatedly on same commit      | `git rebase --skip` if commit already applied; load `../../worktree-workflow/references/rebase.md` |
+| Copilot keeps re-reviewing with same comment | After 2 cycles on the same thread, resolve it and move on                                          |
+| CI failure is flaky (passes on re-run)       | Re-trigger: `ci_rerun(runId: <id>, failedOnly: true)` — do not change code                         |
+| Too many PRs to process in one session       | Prioritize: conflicts → CI → reviews                                                               |
+| `make pc` fails after rebase stabilization   | Load `../../worktree-workflow/references/rebase.md` for post-rebase steps                          |

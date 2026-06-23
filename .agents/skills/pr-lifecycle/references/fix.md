@@ -50,7 +50,7 @@ Build a triage list:
 
 ### Step 1: Rebase (if conflicting)
 
-> Reference: load [rebase skill](../../rebase/SKILL.md) for the full decision framework and conflict resolution patterns.
+> Reference: load [rebase skill](../../worktree-workflow/references/rebase.md) for the full decision framework and conflict resolution patterns.
 
 1. `git fetch origin` in the worktree
 2. `worktree_rebase()` — fetches origin and rebases onto parent
@@ -117,7 +117,7 @@ After all fixes are applied and pushed:
 
 ## Related Skills
 
-- [rebase](../../rebase/SKILL.md) — conflict resolution decision tree and post-rebase stabilization
+- [rebase](../../worktree-workflow/references/rebase.md) — conflict resolution decision tree and post-rebase stabilization
 - [pr-lifecycle](../SKILL.md) — PR creation, self-review, thread resolution workflow
 - [fix-reviews reference](./fix-reviews.md) — detailed review fixing, cloud workflow, two-round cap
 - [debugging](../../debugging/SKILL.md) — CI failure debugging, evidence-first methodology

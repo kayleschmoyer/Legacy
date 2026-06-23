@@ -50,7 +50,7 @@ The `check-conflicts.yml` workflow is dispatched from the PR's head branch (not 
 
 **Response**:
 
-1. Load and run the [`/rebase` skill](../../rebase/SKILL.md).
+1. Load and run the [`/rebase` skill](../../worktree-workflow/references/rebase.md).
 2. Resolve any conflicts that arise during rebase.
 3. Push the rebased branch.
 4. Apply `bot:ready-for-review` if CI was previously passing and the PR was already in review.
@@ -180,6 +180,6 @@ After pushing any fix (conflict resolution, CI fix, or review fix):
 ## Related Skills
 
 - [pr-lifecycle](../SKILL.md) — Author Agent Contract, label ownership, thread resolution
-- [rebase](../../rebase/SKILL.md) — Rebase branch and resolve merge conflicts
+- [rebase](../../worktree-workflow/references/rebase.md) — Rebase branch and resolve merge conflicts
 - [drive-pr](./drive.md) — Full PR shepherding loop from push to merge
 - [debugging](../../debugging/SKILL.md) — Deep-dive CI and runtime debugging

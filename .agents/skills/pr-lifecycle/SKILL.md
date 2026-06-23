@@ -466,6 +466,6 @@ gh pr ready <PR#>
 ## Related Skills
 
 - [planning](../plan-ticket/references/planning.md) -- Structured planning phase (referenced by self-review and PR body guidance)
-- [rebase](../rebase/SKILL.md) -- Rebase branches and resolve merge conflicts
+- [rebase](../worktree-workflow/references/rebase.md) -- Rebase branches and resolve merge conflicts
 - [debugging](../debugging/SKILL.md) -- Debug CI failures and code defects
 - [worktree-workflow](../worktree-workflow/SKILL.md) -- Working in isolated worktrees

@@ -156,7 +156,7 @@ Write-Host "Total conflicting: $($conflicting.Count) of $(($raw | ConvertFrom-Js
 
 ## Rebase in Worktrees
 
-When working in a worktree (see [worktree-workflow skill](../../worktree-workflow/SKILL.md)):
+When working in a worktree (see [worktree-workflow skill](../../SKILL.md)):
 
 **Preferred (MCP):** Use `worktree_rebase` -- it targets the active worktree, fetches, rebases, and injects a cross-platform no-op Git editor automatically.
 
