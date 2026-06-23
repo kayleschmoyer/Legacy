@@ -235,16 +235,19 @@ test.describe('Player Detail – back navigation: in-app path @regression', () =
 
     // Wait for the PremiumGate overlay to clear before clicking. The gate
     // renders pointerEvents="none" on the table while getuserbyid is still
-    // in-flight; clicking before isPremium=true opens UpgradeModal instead.
+    // in-flight; clicking before isPremium=true lands on the upgrade-CTA
+    // overlay instead of the row handler.
     await playersPage.premiumGate.expectAbsent();
 
-    // Clicking a numeric player id sets ?playerId=1 via setSearchParams, which
-    // opens the in-place detail modal on the stats page (PST-051 / LS-7124).
+    // LS-7124: row clicks open an inline modal (?playerId=X) rather than
+    // navigating to /players/:id directly. The in-app path to the standalone
+    // player detail page goes through the modal's "Open full page" button,
+    // which calls navigate('/players/1') and sets location.key !== 'default'.
     await playersPage.stats.openPlayerByName('Trout');
+    await page.waitForURL(/playerId=/, { timeout: 5000 });
     await playersPage.detail.expectOpen();
 
-    // The "Open full page" button navigates to /players/1 (pushes a history
-    // entry), so location.key !== 'default' inside PlayerDetailPage.handleBack.
+    // Click "Open full page" → navigate('/players/1') → location.key !== 'default'
     await playersPage.detail.openFullPage();
 
     await playersPage.detail.expectBackButton();
@@ -262,12 +265,11 @@ test.describe('Player Detail – back navigation: in-app path @regression', () =
     // Wait for PremiumGate to clear (same race condition as the test above).
     await playersPage.premiumGate.expectAbsent();
 
-    // Clicking a numeric player id opens the in-place modal (PST-051 / LS-7124).
+    // LS-7124: open inline modal first, then navigate to /players/1 via
+    // "Open full page" (pushes a history entry, sets location.key !== 'default').
     await playersPage.stats.openPlayerByName('Trout');
+    await page.waitForURL(/playerId=/, { timeout: 5000 });
     await playersPage.detail.expectOpen();
-
-    // Navigate to the full-page /players/1 route (pushes a history entry so
-    // location.key !== 'default') via the "Open full page" affordance.
     await playersPage.detail.openFullPage();
 
     await playersPage.detail.expectBackButton();

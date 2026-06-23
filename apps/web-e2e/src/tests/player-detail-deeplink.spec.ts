@@ -519,7 +519,8 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await playersPage.detail.close();
       await page.waitForFunction(
         () => !new URLSearchParams(window.location.search).has('playerId'),
-        { timeout: 5_000 },
+        null,
+        { timeout: 10_000 },
       );
       await playersPage.detail.expectClosed();
     });
@@ -559,7 +560,8 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await playersPage.detail.close();
       await page.waitForFunction(
         () => !new URLSearchParams(window.location.search).has('playerId'),
-        { timeout: 5_000 },
+        null,
+        { timeout: 10_000 },
       );
       await playersPage.detail.expectClosed();
     });

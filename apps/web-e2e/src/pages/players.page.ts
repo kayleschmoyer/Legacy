@@ -307,9 +307,9 @@ class PlayerDetailSurface {
 
   /** Click the modal's Close (X) button. */
   async close(): Promise<void> {
-    await this.#dialog
-      .getByRole('button', { name: 'Close' })
-      .click({ force: true });
+    const btn = this.#dialog.getByRole('button', { name: 'Close' });
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click({ force: true });
   }
 
   /** Press Escape to close the modal. */
@@ -320,7 +320,7 @@ class PlayerDetailSurface {
   /** Click the "Open full page" external-link button to navigate to /players/:id. */
   async openFullPage(): Promise<void> {
     await this.#dialog
-      .getByRole('button', { name: 'Open full page' })
+      .getByRole('button', { name: /open full page/i })
       .click({ force: true });
   }
 

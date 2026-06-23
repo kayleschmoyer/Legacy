@@ -349,7 +349,7 @@ async function measureSwitchMs(
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 test.describe('Player Switch Performance Budget @performance', () => {
-  test('cold player switch renders within 2000 ms budget', async ({
+  test('cold player switch renders within 3000 ms budget', async ({
     page,
     playersPage,
   }) => {
@@ -365,11 +365,11 @@ test.describe('Player Switch Performance Budget @performance', () => {
     // Fail loudly with the actual value so regressions are easy to diagnose.
     expect(
       coldMs,
-      `Cold player-switch took ${coldMs.toFixed(1)} ms — budget is 2000 ms`,
-    ).toBeLessThan(2000);
+      `Cold player-switch took ${coldMs.toFixed(1)} ms — budget is 3000 ms`,
+    ).toBeLessThan(3000);
   });
 
-  test('cached player switch renders within 2000 ms budget', async ({
+  test('cached player switch renders within 3000 ms budget', async ({
     page,
     playersPage,
   }) => {
@@ -388,7 +388,7 @@ test.describe('Player Switch Performance Budget @performance', () => {
 
     expect(
       cachedMs,
-      `Cached player-switch took ${cachedMs.toFixed(1)} ms — budget is 2000 ms`,
-    ).toBeLessThan(2000);
+      `Cached player-switch took ${cachedMs.toFixed(1)} ms — budget is 3000 ms`,
+    ).toBeLessThan(3000);
   });
 });

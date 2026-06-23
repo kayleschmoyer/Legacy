@@ -9,7 +9,7 @@ import { toIntId } from '../../common/utilities/RouteUtils';
 const PLAYERS_FALLBACK = '/(tabs)/players' as const;
 
 export default function PlayerDetailScreen() {
-  const { playerId } = useLocalSearchParams<{
+  const { playerId, playerName } = useLocalSearchParams<{
     playerId: string;
     playerName: string;
   }>();
@@ -68,7 +68,7 @@ export default function PlayerDetailScreen() {
           ),
         }}
       />
-      <PlayerDetailById playerId={id} />
+      <PlayerDetailById playerId={id} initialName={playerName} />
     </>
   );
 }

@@ -452,6 +452,7 @@ test.describe('Player Detail – zero-flicker player switching @regression', () 
     // loaded before close() is called — this primes the Apollo in-memory cache.
     await playersPage.gotoStats();
     await playersPage.stats.openPlayerByName('Trout');
+    await page.waitForURL(/playerId=/, { timeout: 5000 });
     await playersPage.detail.expectNotLoading();
     await playersPage.detail.expectText('Mike Trout');
 
@@ -461,6 +462,7 @@ test.describe('Player Detail – zero-flicker player switching @regression', () 
     await playersPage.detail.close();
     await playersPage.detail.expectClosed();
     await playersPage.stats.openPlayerByName('Trout');
+    await page.waitForURL(/playerId=/, { timeout: 5000 });
 
     // Second visit: cache hit — loading indicator must never appear
     await playersPage.detail.expectNotLoading();
@@ -479,6 +481,7 @@ test.describe('Player Detail – zero-flicker player switching @regression', () 
     // Navigate to player 1 (batter)
     await playersPage.gotoStats();
     await playersPage.stats.openPlayerByName('Trout');
+    await page.waitForURL(/playerId=/, { timeout: 5000 });
     await playersPage.detail.expectNotLoading();
     await playersPage.detail.expectText('Mike Trout');
     await playersPage.detail.expectText('AVG');
@@ -490,6 +493,7 @@ test.describe('Player Detail – zero-flicker player switching @regression', () 
     await playersPage.detail.close();
     await playersPage.detail.expectClosed();
     await playersPage.stats.openPlayerByName('Buehler');
+    await page.waitForURL(/playerId=/, { timeout: 5000 });
     await playersPage.detail.expectNotLoading();
 
     // Pitcher data must be shown

@@ -60,8 +60,17 @@ jest.mock('@legacy-sports/shared-components', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    PlayerDetailById: ({ playerId }: { playerId: number }) => (
-      <View testID={`player-detail-${playerId}`} />
+    PlayerDetailById: ({
+      playerId,
+      initialName,
+    }: {
+      playerId: number;
+      initialName?: string;
+    }) => (
+      <View
+        testID={`player-detail-${playerId}`}
+        accessibilityLabel={initialName}
+      />
     ),
   };
 });
@@ -215,6 +224,25 @@ describe('PlayerDetailScreen', () => {
     fireEvent.press(screen.getByTestId('player-detail-header-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(tabs)/players');
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('passes playerName param to PlayerDetailById as initialName', () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      playerId: '7',
+      playerName: 'Jose Ramirez',
+    });
+    render(<PlayerDetailScreen />);
+    expect(screen.getByTestId('player-detail-7').props.accessibilityLabel).toBe(
+      'Jose Ramirez',
+    );
+  });
+
+  it('passes undefined initialName to PlayerDetailById when playerName is absent', () => {
+    mockUseLocalSearchParams.mockReturnValue({ playerId: '7' });
+    render(<PlayerDetailScreen />);
+    expect(
+      screen.getByTestId('player-detail-7').props.accessibilityLabel,
+    ).toBeUndefined();
   });
 });
 

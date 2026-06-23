@@ -31,6 +31,7 @@ export interface PlayerDetailProps {
   loading?: boolean;
   error?: string;
   onPlayerSelect?: (playerId: number) => void;
+  initialName?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,25 +123,45 @@ function SectionHeader({ title }: { title: string }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-function PlayerDetail({ player, loading, error }: PlayerDetailProps) {
+function PlayerDetail({
+  player,
+  loading,
+  error,
+  initialName,
+}: PlayerDetailProps) {
   if (loading) {
     return (
-      <YStack
-        flex={1}
-        backgroundColor="$background"
-        padding="$5"
-        alignItems="center"
-        justifyContent="center"
-      >
-        <Spinner size="large" color="$color10" />
-        <Text
-          color="$textMuted"
-          fontSize="$4"
-          marginTop="$3"
-          textAlign="center"
+      <YStack flex={1} backgroundColor="$background">
+        {initialName ? (
+          <YStack
+            alignItems="center"
+            paddingTop="$5"
+            paddingBottom="$4"
+            borderBottomWidth={1}
+            borderBottomColor="$borderColor"
+            gap="$1"
+          >
+            <Text fontSize="$8" fontWeight="bold" color="$color12">
+              {initialName}
+            </Text>
+          </YStack>
+        ) : null}
+        <YStack
+          flex={1}
+          padding="$5"
+          alignItems="center"
+          justifyContent="center"
         >
-          Loading player details…
-        </Text>
+          <Spinner size="large" color="$color10" />
+          <Text
+            color="$textMuted"
+            fontSize="$4"
+            marginTop="$3"
+            textAlign="center"
+          >
+            Loading player details…
+          </Text>
+        </YStack>
       </YStack>
     );
   }
@@ -289,12 +310,13 @@ function PlayerDetail({ player, loading, error }: PlayerDetailProps) {
 
 export interface PlayerDetailByIdProps {
   playerId: number;
+  initialName?: string;
 }
 
-function PlayerDetailById({ playerId }: PlayerDetailByIdProps) {
+function PlayerDetailById({ playerId, initialName }: PlayerDetailByIdProps) {
   const player = getPlayerDetails(playerId);
 
-  return <PlayerDetail player={player} />;
+  return <PlayerDetail player={player} initialName={initialName} />;
 }
 
 export { PlayerDetail };
