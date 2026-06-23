@@ -15,11 +15,12 @@
  *      - At least one pitcher row visible
  *   3. Player comparison tool  (/players/compare)
  *      - Page loads with the player search control
- *      - Live player search round-trips to the real backend
- *      - The comparison tool is premium-gated for free-tier users (the live
- *        integration identity), so the interactive add/compare/remove flow is
- *        covered hermetically against a mocked premium user in
- *        apps/web-e2e/src/tests/player-comparison.spec.ts
+ *      - Live player search round-trips to the real backend on a PREMIUM user
+ *        (player-name search is gated behind the `player_comparison` entitlement
+ *        server-side — LS-7019/LS-8257 — so only premium identities get results)
+ *      - The comparison tool is premium-gated for free-tier users, so the
+ *        interactive add/compare/remove flow is covered hermetically against a
+ *        mocked premium user in apps/web-e2e/src/tests/player-comparison.spec.ts
  *
  * Run:
  *   cd D:\code\legacy-sports-worktrees\LS-754-integration-test-player-search-stats
@@ -227,10 +228,10 @@ test.describe
   });
 
   // -------------------------------------------------------------------------
-  // PHASE 4 — PLAYER COMPARISON: PAGE LOADS WITH SEARCH CONTROL
+  // PHASE 4 — PLAYER COMPARISON: PAGE LOADS + LIVE SEARCH (PREMIUM USER)
   // -------------------------------------------------------------------------
 
-  test('Phase 4: /players/compare loads with player search input', async ({
+  test('Phase 4: /players/compare loads and live search returns results (premium)', async ({
     commissionerPage: page,
   }) => {
     await page.goto('/players/compare');
@@ -265,59 +266,30 @@ test.describe
         timeout: 10_000,
       });
     });
-  });
 
-  // -------------------------------------------------------------------------
-  // PHASE 5 — COMPARISON: LIVE SEARCH + PREMIUM GATE (FREE-TIER USER)
-  // -------------------------------------------------------------------------
-
-  test('Phase 5: Player search returns live results; comparison is premium-gated', async ({
-    freePage: page,
-  }) => {
-    await page.goto('/players/compare');
-    await page.waitForLoadState('domcontentloaded');
-
-    // Wait for search input to be ready
-    await expect(page.getByLabel('Search players to compare')).toBeVisible({
-      timeout: 20_000,
-    });
-
-    // The /players/compare comparison tool is wrapped in <PremiumGate>
-    // (apps/web/src/pages/players/PlayerComparisonPage.tsx). This phase asserts
-    // the gate, so it runs on the dedicated FREE-tier identity (fixtures/ui.ts
-    // → loginAs('free', 1), LS-8057) rather than the now-premium commissioner
-    // fixture. A free user has no premium subscription, so useIsPremium()
-    // resolves false and the gate renders a full-bleed `premium-feature-gate`
-    // overlay with
-    // pointer-events disabled on the comparison children. A free user
-    // therefore CANNOT click a search result to add a chip, build a 2-player
-    // comparison, or remove a chip — the click is intercepted by the overlay
-    // and hangs until the test times out (LS-7878; the prior assertion clicked
-    // the dropdown option and blocked for the full 120s test timeout because
-    // the premium-feature-gate subtree intercepted the pointer event).
-    //
-    // The full interactive comparison flow (add / compare table / remove) is
-    // covered hermetically against a mocked premium user in
-    // apps/web-e2e/src/tests/player-comparison.spec.ts, and the live GraphQL
-    // premium gating is covered in subscription-gating.integration.spec.ts. So
-    // the live UI suite asserts the two things that ARE true for a free user:
-    // live search still round-trips to the real backend, and the premium gate
-    // is shown.
     await test.step(`Live search for "${PLAYER_SEARCH_1}" returns results from the real backend`, async () => {
+      // Player-name search is a PREMIUM feature: the `players(search:)` resolver
+      // gates ANY search term behind the `player_comparison` entitlement
+      // server-side (LS-7019, lambdas/db/src/schema/players.ts → requireEntitlement).
+      // The free tier holds NO entitlements (TIER_ENTITLEMENTS.free = [],
+      // lib/utils/src/lib/entitlements.ts), so a free user's search ALWAYS throws
+      // PremiumRequiredError and the dropdown can never render a result. The live
+      // round-trip is therefore only meaningful on a PREMIUM identity — this phase
+      // runs on the premium+admin commissioner fixture, which holds
+      // player_comparison and is NOT premium-gated, so the result option renders
+      // fully interactive (LS-8257).
+      //
       // The dropdown renders each result as a `role="option"` Pressable whose
       // accessible name is the player's full name (PlayerComparison.tsx). The
       // browser-side `useGetPlayersWithStatsQuery` does NOT go through the
-      // integration suite's fetchWithBackoff, and the production Apollo
-      // RetryLink retries only network-level failures — NOT HTTP 429
-      // (apps/web/src/lib/apollo-client.ts). So a transient throttle on the
-      // shared live backend can leave the dropdown empty with no client retry.
-      // Re-issue the search (clear + re-type flips the `search` variable from
-      // skip→active, firing a fresh request) until a real result renders. The
-      // option renders behind the gate (blurred, pointer-events: none) but is
-      // still DOM-visible, so `fill()` (no pointer hit-test) and `toBeVisible`
-      // both work. Backend-authoritative — only passes once the live search
-      // actually returns PLAYER_SEARCH_1 — and bounded, so a genuinely empty
-      // result still fails.
+      // integration suite's fetchWithBackoff, and the production Apollo RetryLink
+      // retries only network-level failures — NOT HTTP 429
+      // (apps/web/src/lib/apollo-client.ts). So a transient throttle on the shared
+      // live backend can leave the dropdown empty with no client retry. Re-issue
+      // the search (clear + re-type flips the `search` variable from skip→active,
+      // firing a fresh request) until a real result renders. Backend-authoritative
+      // — only passes once the live search actually returns PLAYER_SEARCH_1 — and
+      // bounded, so a genuinely empty result still fails.
       const input = page.getByLabel('Search players to compare');
       const firstResult = page
         .getByRole('option', { name: new RegExp(PLAYER_SEARCH_1, 'i') })
@@ -328,17 +300,67 @@ test.describe
         await expect(firstResult).toBeVisible({ timeout: 10_000 });
       }).toPass({ timeout: 60_000, intervals: [1_000, 2_000, 5_000] });
     });
+  });
 
-    await test.step('Premium gate overlay blocks the comparison tool for a free-tier user', async () => {
-      const gate = page.getByTestId('premium-feature-gate');
-      await expect(gate).toBeVisible({ timeout: 15_000 });
-      // Lock card copy + upgrade CTA confirm it is the real gate, not a
-      // transient loading shell (PremiumGate.tsx).
-      await expect(gate.getByText('Premium Feature').first()).toBeVisible({
-        timeout: 10_000,
-      });
+  // -------------------------------------------------------------------------
+  // PHASE 5 — COMPARISON: PREMIUM GATE (FREE-TIER USER)
+  // -------------------------------------------------------------------------
+
+  test('Phase 5: Comparison tool is premium-gated for a free-tier user', async ({
+    freePage: page,
+  }) => {
+    await page.goto('/players/compare');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for search input to be ready
+    await expect(page.getByLabel('Search players to compare')).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // The /players/compare page does NOT use a full-bleed `premium-feature-gate`
+    // blur overlay. LS-7012 deliberately keeps the page fully legible for free
+    // users: PlayerComparisonPage renders <PlayerComparison isPremium={false}>
+    // (apps/web/src/pages/players/PlayerComparisonPage.tsx), which shows an inline
+    // gold PremiumBanner — a "Premium · Player Comparison" label plus an "Upgrade"
+    // pill (lib/shared-components/.../PlayerComparison.tsx → PremiumBanner) — while
+    // the comparison UI stays interactive. This phase therefore runs on the
+    // dedicated FREE-tier identity (fixtures/ui.ts → loginAs('free', 1), LS-8057)
+    // and asserts that inline banner. useHasEntitlement(player_comparison) is
+    // false for the free tier (TIER_ENTITLEMENTS.free = []) and stays false while
+    // loading (useIsPremium.ts), so the banner renders deterministically for a
+    // free user with no backend round-trip needed to gate it.
+    //
+    // The earlier version of this phase asserted a `getByTestId('premium-feature-
+    // gate')` overlay (the PremiumGate component used on OTHER pages, never on
+    // /players/compare since LS-7012) AND, before that, a live "Bonds" search
+    // result. Both were impossible for a free user: the page renders no gate
+    // overlay, and player-name search is premium-only server-side — the
+    // `players(search:)` resolver gates every search term behind the
+    // `player_comparison` entitlement (LS-7019, lambdas/db/src/schema/players.ts →
+    // requireEntitlement), which the free tier lacks, so the dropdown never
+    // renders a result (LS-8257). The stale gate assertion was never actually
+    // reached on the live backend until the search step was removed, which is how
+    // it surfaced.
+    //
+    // The LIVE search round-trip is verified on the PREMIUM commissioner in
+    // Phase 4 (the only tier the backend serves search results to). The full
+    // interactive comparison flow (add / compare table / remove) is covered
+    // hermetically against a mocked premium user in
+    // apps/web-e2e/src/tests/player-comparison.spec.ts, and the live GraphQL
+    // premium gating is covered in subscription-gating.integration.spec.ts. So
+    // this phase asserts the one thing that is true for a free user: the inline
+    // premium upgrade banner is shown.
+    await test.step('Free-tier user sees the inline premium upgrade banner', async () => {
+      // The PremiumBanner is a role="note" container holding the gold
+      // "Premium · Player Comparison" label and a role="button" Upgrade pill
+      // (aria-label="Upgrade"). Scope the CTA to the banner so it can't match a
+      // stray Upgrade control elsewhere on the page.
+      const banner = page
+        .getByRole('note')
+        .filter({ hasText: /Player Comparison/i });
+      await expect(banner).toBeVisible({ timeout: 15_000 });
       await expect(
-        gate.getByRole('button', { name: /upgrade to premium/i }),
+        banner.getByRole('button', { name: /upgrade/i }),
       ).toBeVisible({ timeout: 10_000 });
     });
   });
