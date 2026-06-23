@@ -54,6 +54,75 @@ const CareerArcChart = React.lazy(() =>
 );
 
 // ---------------------------------------------------------------------------
+// ChartErrorBoundary — catches lazy-chunk failures for CareerArcChart
+// and renders a retry CTA rather than crashing the modal (LS-6967).
+// ---------------------------------------------------------------------------
+
+interface ChartErrorBoundaryState {
+  hasError: boolean;
+}
+
+export class ChartErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  ChartErrorBoundaryState
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): ChartErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error): void {
+    LOGGER.error('[PlayerDetailModal] CareerArcChart chunk load failed', error);
+  }
+
+  render(): React.ReactNode {
+    if (this.state.hasError) {
+      return (
+        <YStack
+          alignItems="center"
+          gap={12}
+          paddingVertical={24}
+          data-testid="career-arc-chart-error"
+        >
+          <Text
+            color={TEXT_SECONDARY}
+            style={{ fontFamily: FONT_BODY, fontStyle: 'italic', fontSize: 14 }}
+          >
+            Chart unavailable — the visualisation failed to load.
+          </Text>
+          <Button
+            size="$3"
+            onPress={() => this.setState({ hasError: false })}
+            backgroundColor={withAlpha(BRAND_GOLD, 0.15)}
+            borderColor={withAlpha(BRAND_GOLD, 0.4)}
+            borderWidth={1}
+            color={BRAND_GOLD_LIGHT}
+            hoverStyle={{ backgroundColor: withAlpha(BRAND_GOLD, 0.25) }}
+            pressStyle={{ backgroundColor: withAlpha(BRAND_GOLD, 0.3) }}
+          >
+            <Text
+              color={BRAND_GOLD_LIGHT}
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              Retry
+            </Text>
+          </Button>
+        </YStack>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Editorial type tokens — match the Player Details design bundle
 // (docs/design/kXxk3B29-DRvoJthw6UifA, slice 2 / LS-4622).
 // ---------------------------------------------------------------------------
@@ -1526,14 +1595,16 @@ export function PlayerDetailModal({
                     borderColor={STATS_BORDER}
                     borderRadius={16}
                   >
-                    <React.Suspense fallback={<Spinner color={BRAND_GOLD} />}>
-                      <CareerArcChart
-                        key={playerId ?? 0}
-                        battingSeasons={displayArcData?.playerSeasonBatting}
-                        pitchingSeasons={displayArcData?.playerSeasonPitching}
-                        mode={hasBattingArc ? arcMode : 'pitching'}
-                      />
-                    </React.Suspense>
+                    <ChartErrorBoundary>
+                      <React.Suspense fallback={<Spinner color={BRAND_GOLD} />}>
+                        <CareerArcChart
+                          key={playerId ?? 0}
+                          battingSeasons={displayArcData?.playerSeasonBatting}
+                          pitchingSeasons={displayArcData?.playerSeasonPitching}
+                          mode={hasBattingArc ? arcMode : 'pitching'}
+                        />
+                      </React.Suspense>
+                    </ChartErrorBoundary>
                   </YStack>
                 </YStack>
               )}

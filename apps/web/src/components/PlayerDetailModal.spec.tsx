@@ -3,6 +3,7 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import {
+  ChartErrorBoundary,
   compareEditorialCells,
   EditorialTable,
   PlayerDetailModal,
@@ -45,10 +46,10 @@ jest.mock('./BaseModal', () => ({
 }));
 
 jest.mock('./CareerArcChart', () => ({
-  CareerArcChart: () => {
+  CareerArcChart: jest.fn(() => {
     const R = require('react') as typeof import('react');
     return R.createElement('div', null, 'CareerArcChart');
-  },
+  }),
 }));
 
 jest.mock('../lib/scoring/ipUtils', () => ({
@@ -888,5 +889,69 @@ describe('PlayerDetailModal — active tab reset (LS-6992)', () => {
     expect(
       screen.queryByText('Season by Season · Pitching'),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ChartErrorBoundary — lazy chunk failure handling (LS-6967)
+// Tested in isolation (no React.lazy) for determinism.
+// ---------------------------------------------------------------------------
+
+function Bomb(): React.ReactElement {
+  throw new Error('ChunkLoadError: Loading chunk 42 failed.');
+}
+
+describe('ChartErrorBoundary (LS-6967)', () => {
+  let consoleErrorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    // Suppress React's error boundary noise so test output stays clean.
+    consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(jest.fn());
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('renders the error fallback when a child throws', () => {
+    render(
+      <ChartErrorBoundary>
+        <Bomb />
+      </ChartErrorBoundary>,
+    );
+
+    expect(screen.getByTestId('career-arc-chart-error')).toBeInTheDocument();
+    expect(screen.getByText(/Chart unavailable/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument();
+  });
+
+  it('clears the error state and re-renders children when Retry is clicked', () => {
+    function MaybeThrow({ shouldThrow }: { shouldThrow: boolean }) {
+      if (shouldThrow) throw new Error('ChunkLoadError');
+      return <div data-testid="chart-ok">chart</div>;
+    }
+
+    const { rerender } = render(
+      <ChartErrorBoundary>
+        <MaybeThrow shouldThrow />
+      </ChartErrorBoundary>,
+    );
+
+    expect(screen.getByTestId('career-arc-chart-error')).toBeInTheDocument();
+
+    // After Retry the boundary resets; pass a non-throwing child on next render.
+    rerender(
+      <ChartErrorBoundary>
+        <MaybeThrow shouldThrow={false} />
+      </ChartErrorBoundary>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
+
+    expect(
+      screen.queryByTestId('career-arc-chart-error'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('chart-ok')).toBeInTheDocument();
   });
 });
