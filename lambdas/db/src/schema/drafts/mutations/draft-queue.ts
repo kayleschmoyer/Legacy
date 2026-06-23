@@ -19,7 +19,11 @@ import { and, asc, eq } from 'drizzle-orm';
 
 import { DraftQueueEntry } from '../types';
 import { builder } from '../../builder';
-import { AuthenticationError, UserInputError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,7 +51,7 @@ async function resolveTeamIdForDraft(
     .limit(1);
 
   if (!membership?.teamId)
-    throw new Error('You are not a member of this league');
+    throw ForbiddenError('You are not a member of this league');
 
   return { teamId: membership.teamId, leagueId: draft.leagueId };
 }
@@ -98,6 +102,15 @@ builder.mutationField('setDraftQueue', (t) =>
       }
 
       const rows = await context.db.transaction(async (tx) => {
+        // Re-validate draft exists inside the transaction to close the race window
+        // between the auth check above and the FK-constrained insert below (LS-8215).
+        const [draftRow] = await tx
+          .select({ id: PublicSchema.drafts.id })
+          .from(PublicSchema.drafts)
+          .where(eq(PublicSchema.drafts.id, draftId))
+          .limit(1);
+        if (!draftRow) throw UserInputError('Draft not found');
+
         // Delete existing queue entries for this team in this draft
         await tx
           .delete(PublicSchema.draftQueue)
@@ -167,6 +180,15 @@ builder.mutationField('addToDraftQueue', (t) =>
       );
 
       const rows = await context.db.transaction(async (tx) => {
+        // Re-validate draft exists inside the transaction to close the race window
+        // between the auth check above and the FK-constrained insert below (LS-8215).
+        const [draftRow] = await tx
+          .select({ id: PublicSchema.drafts.id })
+          .from(PublicSchema.drafts)
+          .where(eq(PublicSchema.drafts.id, draftId))
+          .limit(1);
+        if (!draftRow) throw UserInputError('Draft not found');
+
         // Check if already queued
         const [existing] = await tx
           .select({ id: PublicSchema.draftQueue.id })
