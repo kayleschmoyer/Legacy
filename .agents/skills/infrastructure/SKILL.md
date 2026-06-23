@@ -18,7 +18,7 @@ Covers all infrastructure operations: AWS authentication, Terraform changes, Lam
 | AWS credentials expired                                                                   | [references/aws-sso-login.md](references/aws-sso-login.md)                             |
 | Deploy Lambda code                                                                        | [references/deploy-lambda.md](references/deploy-lambda.md)                             |
 | Terraform infrastructure changes                                                          | [references/terraform-apply.md](references/terraform-apply.md)                         |
-| **Plan IAM perms BEFORE editing terraform (predict → diff → patch → local-plan-as-role)** | [terraform-permission-planning](../terraform-permission-planning/SKILL.md)             |
+| **Plan IAM perms BEFORE editing terraform (predict → diff → patch → local-plan-as-role)** | [terraform → permission-planning](../terraform/references/permission-planning.md)      |
 | Add IAM permissions to the github-actions deploy role (size limits, gotchas)              | [references/iam-policies.md](references/iam-policies.md)                               |
 | Clean up orphaned AWS resources                                                           | [references/aws-orphan-cleanup.md](references/aws-orphan-cleanup.md)                   |
 | Configure Sentry sourcemaps                                                               | [references/configure-sentry-sourcemaps.md](references/configure-sentry-sourcemaps.md) |

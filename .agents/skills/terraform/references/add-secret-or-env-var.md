@@ -1,9 +1,6 @@
----
-name: add-secret-or-env-var
-description: 'Add a new secret or environment variable to the project. Load before adding any secret or env var — ensures all required locations are updated: Terraform, AWS Secrets Manager, local .env sync, Lambda config, GitHub Actions, and CI wiring.'
----
+# Add a Secret or Environment Variable
 
-# Skill: Add a Secret or Environment Variable
+> Reference for the [`terraform`](../SKILL.md) skill. Load before adding any new secret or env var — ensures all required locations are updated: Terraform variables, AWS Secrets Manager, local `.env` sync, Lambda config, GitHub Actions, and CI wiring. For safe handling of the VALUE itself in tool calls, see [`secrets-handling`](../../secrets-handling/SKILL.md).
 
 ## Overview
 
@@ -27,7 +24,7 @@ make scan-secret VAR=MY_SECRET_NAME
 # or: node scripts/secret-location-scanner.js --json MY_SECRET_NAME
 ```
 
-Then work through all steps in order. Detailed code examples for each step: [references/step-by-step-guide.md](references/step-by-step-guide.md)
+Then work through all steps in order. Detailed code examples for each step: [add-secret-or-env-var-step-by-step.md](add-secret-or-env-var-step-by-step.md)
 
 | #   | Location                                        | Plain Env Var |         Secret         |
 | --- | ----------------------------------------------- | :-----------: | :--------------------: |
@@ -56,7 +53,7 @@ Then work through all steps in order. Detailed code examples for each step: [ref
 > secret_sync_to_github(secretId: "prod/my-api-key", repoSecret: "MY_API_KEY", scope: "environment", env: "production")
 > ```
 >
-> See [`secrets-handling`](../secrets-handling/SKILL.md) Pattern 2 for full details.
+> See [`secrets-handling`](../../secrets-handling/SKILL.md) Pattern 2 for full details.
 
 ---
 
@@ -91,9 +88,11 @@ The GitHub Actions repository secret hasn't been created yet. Follow Step 8.
 
 ---
 
-## Related Skills
+## Related references
 
-- [sync-env](../sync-env/SKILL.md) — Pull AWS Parameter Store variables into `.env.local`
-- [terraform-apply](../terraform-apply/SKILL.md) — Apply Terraform infrastructure changes
-- [deploy-lambda](../deploy-lambda/SKILL.md) — Deploy Lambda code after infrastructure changes
-- [standards](../standards/SKILL.md) — Coding standards and config conventions
+- [`local-apply.md`](local-apply.md) — Apply Terraform infrastructure changes locally
+- [`permission-planning.md`](permission-planning.md) — IAM perms for the CI roles when adding Secrets Manager resources
+- [`infrastructure/references/sync-env.md`](../../infrastructure/references/sync-env.md) — Pull AWS Parameter Store / Terraform outputs into `.env.local`
+- [`infrastructure/references/deploy-lambda.md`](../../infrastructure/references/deploy-lambda.md) — Deploy Lambda code after infrastructure changes
+- [`secrets-handling`](../../secrets-handling/SKILL.md) — Safely transit the VALUE through tool calls (file-copy patterns, `secret_sync_to_github`, `valueFile`)
+- [`standards`](../../standards/SKILL.md) — Coding standards and config conventions

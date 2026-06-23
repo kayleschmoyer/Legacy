@@ -1,9 +1,6 @@
----
-name: terraform-local-apply
-description: 'Run terraform plan/apply locally against the AWS dev environment. Load before any terraform operation — plan, apply, destroy, import, state. Covers the LS-2425 two-state architecture (terraform/main/ for Lambda app infra and terraform/runners/ for self-hosted runners), AWS SSO credential checks, state lock clearance, and the correct command sequence for local applies.'
----
+# Terraform Local Apply
 
-# Skill: Terraform Local Apply
+> Reference for the [`terraform`](../SKILL.md) skill. Load before any terraform operation — plan, apply, destroy, import, state. Covers the LS-2425 two-state architecture, AWS SSO credential checks, state lock clearance, and the correct command sequence for local applies.
 
 ## Overview
 
@@ -37,7 +34,7 @@ aws sso login --profile <your-profile>
 aws sts get-caller-identity
 ```
 
-> 📎 See [references/aws-sso-login.md](../infrastructure/references/aws-sso-login.md) for the full SSO login flow.
+> 📎 See [references/aws-sso-login.md](../../infrastructure/references/aws-sso-login.md) for the full SSO login flow.
 
 ### 2. Clear any state locks
 
@@ -145,7 +142,7 @@ make wt-setup WT=<path-to-worktree>
 | "Required version constraint"                          | Check `terraform/main/main.tf` (or `terraform/runners/backend.tf`) and install matching `terraform` binary                                                                                           |
 | `runners/` plan shows VPC/SG creates                   | Cross-state outputs missing in `terraform/main/outputs.tf` — re-run `terraform -chdir=terraform/main apply` to publish them, then re-init `terraform/runners/`                                       |
 
-> 📎 Full issue catalogue: see [references/terraform-common-issues.md](../infrastructure/references/terraform-common-issues.md)
+> 📎 Full issue catalogue: see [references/terraform-common-issues.md](../../infrastructure/references/terraform-common-issues.md)
 
 ## MCP State Management Tools
 

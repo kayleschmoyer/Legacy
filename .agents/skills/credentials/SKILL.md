@@ -81,5 +81,5 @@ When a service is not authenticated, `ok: false` and a `hint` field with login i
 ## Related Skills
 
 - [secrets-handling](../secrets-handling/SKILL.md) — Never embed raw secret values in tool calls
-- [add-secret-or-env-var](../add-secret-or-env-var/SKILL.md) — Adding a new secret to the infrastructure
+- [terraform](../terraform/SKILL.md) — Adding a new secret to the infrastructure (see `references/add-secret-or-env-var.md`)
 - [cloud-agent-mode](../cloud-agent-mode/SKILL.md) — Auth configuration for cloud coding agents

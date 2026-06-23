@@ -1,9 +1,6 @@
----
-name: local-plan-as-ci-role
-description: 'Validate Terraform IAM permission changes against the CI roles BEFORE merging to main, using a draft PR to exercise the github_actions_plan_policy and a targeted post-merge watch to catch any apply-only perm gaps. Use during step 4 of the terraform-permission-planning loop.'
----
-
 # Validate IAM perms against the CI roles
+
+> Reference for the [`terraform`](../SKILL.md) skill. Use during step 4 of the [permission-planning](permission-planning.md) loop.
 
 ## Why
 
@@ -28,7 +25,7 @@ This catches missing `Get*` / `List*` / `Describe*` actions in `github_actions_p
 2. Push the branch and open a **draft PR**.
 3. The `Plan` job runs on every push. Wait for it (Claude Code surfaces CI completion as a push notification — no polling).
 4. If the job fails on `AccessDenied`, the GHA log shows exactly which action is missing on which resource ARN.
-5. Add the missing action to `github_actions_plan_policy` (and mirror to `github_actions_supplemental` if the resource will also be applied — see [SKILL.md step 3](../SKILL.md#3-patch--minimal-scope-right-policy)).
+5. Add the missing action to `github_actions_plan_policy` (and mirror to `github_actions_supplemental` if the resource will also be applied — see [permission-planning.md step 3](permission-planning.md#3-patch--minimal-scope-right-policy)).
 6. Force-push and repeat until the `Plan` job succeeds.
 
 > Reading the failure from the CI log: see [github-actions-logs.md](../../infrastructure/references/github-actions-logs.md).
@@ -37,7 +34,7 @@ This catches missing `Get*` / `List*` / `Describe*` actions in `github_actions_p
 
 The apply role only assumes on `refs/heads/main` — there is no way to exercise it pre-merge without widening the trust policy, which this skill explicitly forbids. Instead:
 
-1. **Pre-merge:** make the permission patch as complete as possible using the [predict step](../SKILL.md#1-predict) + [action-mapping.md](action-mapping.md). The cheatsheet exists specifically so apply-time perms can be patched without ever running an apply locally.
+1. **Pre-merge:** make the permission patch as complete as possible using the [predict step](permission-planning.md#1-predict) + [action-mapping.md](action-mapping.md). The cheatsheet exists specifically so apply-time perms can be patched without ever running an apply locally.
 2. **At merge time:** mark the PR ready and merge. The `Apply Lambda Infrastructure` workflow runs immediately.
 3. **Watch the apply job.** If it fails with `AccessDenied`:
    - Read the action + ARN from the log

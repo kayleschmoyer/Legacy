@@ -1,11 +1,6 @@
----
-name: action-mapping
-description: 'Terraform resource → required AWS IAM actions cheatsheet. Use during the predict step to enumerate the permission delta for new or modified resources before patching github_actions_supplemental and github_actions_plan_policy.'
----
-
 # Terraform Resource → AWS Action Mapping
 
-Use this cheatsheet during step 1 (predict) of the [terraform-permission-planning](../SKILL.md) loop. Each row lists the actions Terraform invokes for that resource type, grouped by the lifecycle bucket (create / read / tag / delete). **Read actions go in both the apply role AND the plan role**; everything else goes in apply only.
+> Reference for the [`terraform`](../SKILL.md) skill. Use during step 1 (predict) of the [permission-planning](permission-planning.md) loop. Each row lists the actions Terraform invokes for that resource type, grouped by the lifecycle bucket (create / read / tag / delete). **Read actions go in both the apply role AND the plan role**; everything else goes in apply only.
 
 This is intentionally not exhaustive — it covers the resource types this repo uses today plus the historical gotchas. When you add a resource type not on this list, check the AWS [Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html) and add a row here in the same PR.
 

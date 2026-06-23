@@ -90,11 +90,11 @@ Flagged during LS-7921 bucketing pass. Do not delete until a separate pruning ti
 
 These hooks are registered in the `PreToolUse → ^(Edit|Write)$` entry in [`.claude/settings.json`](../../.claude/settings.json). The hook script is [`.claude/hooks/inject-skill-reminder.js`](../../.claude/hooks/inject-skill-reminder.js).
 
-| Path glob                        | Skill to load                                             | Why it matters                                                                                                                                                     |
-| -------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `terraform/**/*.tf`              | `.agents/skills/terraform-permission-planning/SKILL.md`   | A missed load costs CI AccessDenied cycles — `terraform plan` doesn't validate IAM; the skill enforces predict → diff → patch → local-plan-as-CI-role before push. |
-| `lib/db-client/**/migrations/**` | `.agents/skills/database/SKILL.md` (or `/database` skill) | Migration immutability rules apply — applied migrations must never be edited; missed load leads to schema drift that blocks other developers.                      |
-| `apps/web-e2e/**`                | `.agents/skills/testing/references/e2e-determinism.md`    | E2E flake is a P1 bug; the 12-lever determinism checklist gates every PR touching E2E or integration tests.                                                        |
+| Path glob                        | Skill to load                                                                 | Why it matters                                                                                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `terraform/**/*.tf`              | `.agents/skills/terraform/SKILL.md` (and `references/permission-planning.md`) | A missed load costs CI AccessDenied cycles — `terraform plan` doesn't validate IAM; the skill enforces predict → diff → patch → local-plan-as-CI-role before push. |
+| `lib/db-client/**/migrations/**` | `.agents/skills/database/SKILL.md` (or `/database` skill)                     | Migration immutability rules apply — applied migrations must never be edited; missed load leads to schema drift that blocks other developers.                      |
+| `apps/web-e2e/**`                | `.agents/skills/testing/references/e2e-determinism.md`                        | E2E flake is a P1 bug; the 12-lever determinism checklist gates every PR touching E2E or integration tests.                                                        |
 
 ### Behaviour
 
@@ -114,6 +114,6 @@ These hooks are registered in the `PreToolUse → ^(Edit|Write)$` entry in [`.cl
 - [AGENTS.md § Skills](../../AGENTS.md#skills) — the instruction-routing table agents read at session start.
 - [`.claude/settings.json`](../../.claude/settings.json) — full hook configuration.
 - [LS-7922](https://bkrupa.atlassian.net/browse/LS-7922) — epic; full design and rejected alternatives.
-- [`.agents/skills/terraform-permission-planning/SKILL.md`](../../.agents/skills/terraform-permission-planning/SKILL.md)
+- [`.agents/skills/terraform/SKILL.md`](../../.agents/skills/terraform/SKILL.md) (and [`references/permission-planning.md`](../../.agents/skills/terraform/references/permission-planning.md))
 - [`.agents/skills/database/SKILL.md`](../../.agents/skills/database/SKILL.md)
 - [`.agents/skills/testing/references/e2e-determinism.md`](../../.agents/skills/testing/references/e2e-determinism.md)

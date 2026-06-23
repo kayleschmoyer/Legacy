@@ -128,4 +128,4 @@ Never commit `secrets.auto.tfvars` (it's in `.gitignore`). Never display its con
 
 ## Related Skills
 
-- [add-secret-or-env-var](../add-secret-or-env-var/SKILL.md) — Full checklist for adding a new secret to the infrastructure (Terraform, AWS Secrets Manager, GitHub Actions, Lambda)
+- [terraform](../terraform/SKILL.md) — Full checklist for adding a new secret to the infrastructure (Terraform, AWS Secrets Manager, GitHub Actions, Lambda) lives in `references/add-secret-or-env-var.md`

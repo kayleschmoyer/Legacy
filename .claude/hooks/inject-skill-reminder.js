@@ -24,7 +24,7 @@ const RULES = [
     pattern: /(?:^|[/\\])terraform[/\\].*\.tf$/,
     marker: 'terraform',
     message:
-      '[SKILL REMINDER] Terraform file detected — load .agents/skills/terraform-permission-planning/SKILL.md before pushing. A missed load costs CI AccessDenied cycles (IAM plan → diff → patch → local-plan-as-CI-role loop).',
+      '[SKILL REMINDER] Terraform file detected — load .agents/skills/terraform/SKILL.md (and references/permission-planning.md) before pushing. A missed load costs CI AccessDenied cycles (IAM plan → diff → patch → local-plan-as-CI-role loop).',
   },
   {
     // lib/db-client/**/migrations/**

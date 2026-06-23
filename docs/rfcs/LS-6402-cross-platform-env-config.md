@@ -47,7 +47,7 @@ The net effect: adding or reading a config value requires platform-specific know
 
 ## Non-goals
 
-- **Secret provisioning / rotation / storage.** This RFC is about _reading_ config in app code. How secrets get into `.env` / EAS / Lambda env / Secrets Manager is unchanged (see `add-secret-or-env-var` skill and the MCP machine-credential runbook).
+- **Secret provisioning / rotation / storage.** This RFC is about _reading_ config in app code. How secrets get into `.env` / EAS / Lambda env / Secrets Manager is unchanged (see the `terraform` skill's `references/add-secret-or-env-var.md` and the MCP machine-credential runbook).
 - **Server-side runtime config that legitimately must stay dynamic** (e.g. Lambda values resolved from Secrets Manager at cold start). The layer must _accommodate_ runtime resolution in Node, not force inlining there.
 - **Changing the underlying `.env` files or variable values.** Only the read path and naming registry change.
 - **A new config delivery mechanism** (remote config service, etc.). Out of scope.

@@ -7,7 +7,7 @@ name: "Terraform Plan (PR)"
 # Real breakage — missing IAM permissions, plan-time errors, resources that
 # would be destroyed — currently only surfaces in `Apply Lambda Infrastructure`
 # AFTER merge, which blocks ALL backend deploys until a follow-up PR lands. The
-# terraform-permission-planning skill already documents a "Plan job assumes the
+# terraform skill (references/permission-planning.md) already documents a "Plan job assumes the
 # github_actions_plan role" — this workflow is that job. It moves terraform
 # breakage detection from post-merge (everyone blocked) to pre-merge (one PR
 # blocked).
@@ -219,7 +219,7 @@ jobs:
               '',
               ok
                 ? ''
-                : 'If this is a missing IAM permission, see `.agents/skills/terraform-permission-planning/SKILL.md` (mirror new `Get*`/`List*`/`Describe*` actions into `github_actions_plan_policy`).',
+                : 'If this is a missing IAM permission, see `.agents/skills/terraform/references/permission-planning.md` (mirror new `Get*`/`List*`/`Describe*` actions into `github_actions_plan_policy`).',
             ].join('\n');
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;

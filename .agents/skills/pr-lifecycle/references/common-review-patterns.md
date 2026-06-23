@@ -642,7 +642,7 @@ moved {
 resource "aws_sqs_queue" "new_name" { ... }
 ```
 
-**When to check**: any rename of a Terraform resource or module block address. See `.agents/skills/terraform-permission-planning/SKILL.md`.
+**When to check**: any rename of a Terraform resource or module block address. See `.agents/skills/terraform/references/permission-planning.md`.
 
 ### #43 — Shell variable left empty on command failure (GHA scripts)
 

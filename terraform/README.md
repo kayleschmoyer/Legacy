@@ -2,7 +2,7 @@
 
 AWS infrastructure for the legacy-sports platform, managed with Terraform across **two separate state files** (LS-2425).
 
-> **Working locally?** See the [terraform-local-apply skill](../.agents/skills/terraform-local-apply/SKILL.md) for the full workflow, safety model, and troubleshooting guide.
+> **Working locally?** See the [terraform skill](../.agents/skills/terraform/SKILL.md) (`references/local-apply.md`) for the full workflow, safety model, and troubleshooting guide.
 
 ---
 
@@ -192,4 +192,4 @@ make terraform-apply        # Lambda app
 make runner-apply           # Runner fleet (with confirmation)
 ```
 
-Full workflow, targeting guide, and troubleshooting: [terraform-local-apply skill](../.agents/skills/terraform-local-apply/SKILL.md).
+Full workflow, targeting guide, and troubleshooting: [terraform skill](../.agents/skills/terraform/SKILL.md) — see `references/local-apply.md`.

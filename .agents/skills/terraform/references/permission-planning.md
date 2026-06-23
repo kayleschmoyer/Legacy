@@ -1,9 +1,6 @@
----
-name: terraform-permission-planning
-description: 'Plan IAM permissions BEFORE pushing a Terraform change so the CI apply does not fail on AccessDenied. Load before editing any file under terraform/ — especially when adding new AWS resource types, data sources, or providers. Walks through the predict → diff → patch → local-plan-as-role → push loop and the minimal-permission convention. Pairs with the reactive iam-policies.md (size limits) and terraform-local-apply.md (state mechanics).'
----
+# Terraform Permission Planning
 
-# Skill: Terraform Permission Planning
+> Reference for the [`terraform`](../SKILL.md) skill. Load when adding or modifying a Terraform resource or data source — before push. Walks through the predict → diff → patch → local-plan-as-role → push loop and the minimal-permission convention. Pairs with the reactive [`iam-policies.md`](../../infrastructure/references/iam-policies.md) (size limits) and [`local-apply.md`](local-apply.md) (state mechanics).
 
 ## Why this exists
 
@@ -36,7 +33,7 @@ Both roles have a permission boundary (`aws_iam_policy.github_actions_boundary`)
 | `aws_iam_policy.github_actions_supplemental`     | Managed | 6,144 bytes / version | **Default home for all new apply-time perms**                  |
 | `aws_iam_role_policy.github_actions_plan_policy` | Inline  | 10,240 bytes          | Read-only equivalents needed by `terraform plan` (PR workflow) |
 
-See [iam-policies.md](../infrastructure/references/iam-policies.md) for the full size-budget rationale (LS-3839).
+See [iam-policies.md](../../infrastructure/references/iam-policies.md) for the full size-budget rationale (LS-3839).
 
 ## The five-step loop
 
@@ -49,7 +46,7 @@ For every resource and data source you are adding or modifying, enumerate the AW
 - **Tag** — many provider-v5+ resources call dedicated tag actions even when tags are inherited from `default_tags` (e.g. `apigateway:TagResource`, `lambda:TagResource`, `sso:TagResource`). Forgetting these is the #1 cause of LS-4466-style cycles.
 - **Replace / delete** — if a `terraform plan` shows `must be replaced`, you also need the delete-side actions (`iam:DeleteRole`, `lambda:DeleteFunctionUrlConfig`).
 
-Use the [action-mapping cheatsheet](references/action-mapping.md) as the starting point. When a resource type isn't listed, check the AWS [Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html).
+Use the [action-mapping cheatsheet](action-mapping.md) as the starting point. When a resource type isn't listed, check the AWS [Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html).
 
 ### 2. Diff against current policies
 
@@ -72,7 +69,7 @@ Scope every action to the narrowest resource ARN it supports:
 
 - For account-scoped resources Terraform will create: use the predictable ARN pattern (`arn:aws:lambda:${region}:${account_id}:function:legacy-sports-dev-*`).
 - For service instance IDs (SSO, EventBridge bus): extract from a `data` source into `locals` and template into the ARN. See `terraform/main/lambda-mcp-api-gateway.tf` for the `local.sso_instance_id` extraction pattern (LS-4466).
-- For actions that **do not support resource-level permissions** (`sqs:ListQueues`, `logs:DescribeLogGroups`, `cloudtrail:DescribeTrails`, `iam:ListPolicies`, `iam:ListRoles`, most `*List*` actions), split into a separate statement with `Resource = "*"`. Mixing them into a resource-scoped statement causes silent `AccessDenied` at runtime — see [iam-policies.md gotcha #1](../infrastructure/references/iam-policies.md#1-some-actions-dont-support-resource-level-permissions).
+- For actions that **do not support resource-level permissions** (`sqs:ListQueues`, `logs:DescribeLogGroups`, `cloudtrail:DescribeTrails`, `iam:ListPolicies`, `iam:ListRoles`, most `*List*` actions), split into a separate statement with `Resource = "*"`. Mixing them into a resource-scoped statement causes silent `AccessDenied` at runtime — see [iam-policies.md gotcha #1](../../infrastructure/references/iam-policies.md#1-some-actions-dont-support-resource-level-permissions).
 
 Group new statements with existing ones for the same service when possible to conserve policy bytes.
 
@@ -80,7 +77,7 @@ Group new statements with existing ones for the same service when possible to co
 
 Don't rely on your laptop's SSO admin credentials — they'll happily run any plan. Push the change as a **draft PR**: the `Plan` job assumes the same `github_actions_plan_policy` CI uses and surfaces any missing `Get*` / `List*` / `Describe*` action as `AccessDenied` before merge.
 
-Apply-only perms (`Create*`, `Update*`, `Delete*`, `Tag*`) cannot be validated pre-merge — the apply role's trust policy is OIDC-locked to `refs/heads/main` and **must not** be widened for local development. The pre-merge mitigation is a thorough [predict step](#1-predict) using the [action-mapping cheatsheet](references/action-mapping.md); the post-merge mitigation is watching the apply job and shipping a permission-only follow-up if anything was missed. See [local-plan-as-ci-role.md](references/local-plan-as-ci-role.md) for the full procedure and the rationale for not assuming the apply role locally.
+Apply-only perms (`Create*`, `Update*`, `Delete*`, `Tag*`) cannot be validated pre-merge — the apply role's trust policy is OIDC-locked to `refs/heads/main` and **must not** be widened for local development. The pre-merge mitigation is a thorough [predict step](#1-predict) using the [action-mapping cheatsheet](action-mapping.md); the post-merge mitigation is watching the apply job and shipping a permission-only follow-up if anything was missed. See [local-plan-as-ci-role.md](local-plan-as-ci-role.md) for the full procedure and the rationale for not assuming the apply role locally.
 
 ### 5. Size-budget gate before push
 
@@ -137,13 +134,13 @@ Resource ARN for the scoped statement: `arn:aws:sqs:${local.region}:${local.acco
 
 ## Diagrams
 
-- [Permission planning flow](diagrams/permission-flow.svg) — agent's step-by-step loop
-- [Policy decision tree](diagrams/decision-tree.svg) — which policy to edit, when to use `Resource = "*"`
+- [Permission planning flow](../diagrams/permission-flow.svg) — agent's step-by-step loop
+- [Policy decision tree](../diagrams/decision-tree.svg) — which policy to edit, when to use `Resource = "*"`
 
 ## Related references
 
-- [iam-policies.md](../infrastructure/references/iam-policies.md) — Size limits, the three historical gotchas, what to do after CI fails
-- [action-mapping.md](references/action-mapping.md) — Terraform resource → required AWS actions cheatsheet
-- [local-plan-as-ci-role.md](references/local-plan-as-ci-role.md) — Assume the CI role locally to catch AccessDenied before push
-- [terraform-local-apply](../terraform-local-apply/SKILL.md) — Two-state architecture, state locks, secrets.auto.tfvars
-- [github-actions-logs.md](../infrastructure/references/github-actions-logs.md) — Read apply failures from CI logs
+- [iam-policies.md](../../infrastructure/references/iam-policies.md) — Size limits, the three historical gotchas, what to do after CI fails
+- [action-mapping.md](action-mapping.md) — Terraform resource → required AWS actions cheatsheet
+- [local-plan-as-ci-role.md](local-plan-as-ci-role.md) — Assume the CI role locally to catch AccessDenied before push
+- [local-apply.md](local-apply.md) — Two-state architecture, state locks, secrets.auto.tfvars
+- [github-actions-logs.md](../../infrastructure/references/github-actions-logs.md) — Read apply failures from CI logs

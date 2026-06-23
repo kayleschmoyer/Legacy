@@ -110,7 +110,7 @@ The surface maps are only as good as their globs. A stale or missing glob silent
 - **fmt + tflint** (`.tflint.hcl`) — static, no AWS.
 - **Speculative `terraform plan`** assuming the read-only `legacy-sports-dev-github-actions-plan` role (OIDC trust already allows `pull_request`), with `-lock=false` so it never contends with the post-merge apply. Plan errors / `AccessDenied` block the PR and post a comment pointing at the missing permission.
 
-This implements the "Plan job" that `.agents/skills/terraform-permission-planning/SKILL.md` already references but that was never built — moving terraform breakage from post-merge (everyone blocked) to pre-merge (one PR blocked).
+This implements the "Plan job" that `.agents/skills/terraform/references/permission-planning.md` already references but that was never built — moving terraform breakage from post-merge (everyone blocked) to pre-merge (one PR blocked).
 
 **Scope:** `terraform/main` only — the Lambda/API/RDS infra whose apply gates backend deploys. `terraform/runners` (separate state, separate TF_VARs, does not block deploys) is a follow-up.
 
