@@ -17,6 +17,7 @@ import {
   GraphQLError,
   Kind,
   type OperationDefinitionNode,
+  type SelectionNode,
   type SelectionSetNode,
   ValidationContext,
 } from 'graphql';
@@ -122,6 +123,27 @@ export function queryDepthLimitRule(maxDepth: number) {
 // Field-count (complexity proxy) limiting
 // ---------------------------------------------------------------------------
 
+/**
+ * Count the fields in `selectionSet` the way GraphQL execution does: sibling
+ * selections that share a response key (alias, else field name) are **merged**
+ * into a single field whose sub-selections are likewise merged. A field selected
+ * via several overlapping fragments is therefore counted once — matching the
+ * single resolver call execution makes for it.
+ *
+ * Fragment spreads and inline fragments are flattened into the current level
+ * before grouping, exactly as execution's field-collection step does.
+ *
+ * Why merge: the earlier implementation summed every fragment's fields
+ * independently, which over-counted operations that spread multiple overlapping
+ * fragments on the same type. The shared cross-platform `getMatchupPlayers`
+ * query spreads both `...MatchupPlayer` and `...AppMatchupPlayer` (GraphQL
+ * consolidation, LS-8009); summed that is ~284 fields and falsely trips the 200
+ * limit, even though the merged query resolves ~150 distinct fields and the
+ * whole matchup detail page silently failed to render (LS-8246). Merging removes
+ * those false positives without weakening DoS protection: duplicate selections
+ * never amplify real resolver cost, so collapsing them cannot let a genuinely
+ * wide query through.
+ */
 function countFields(
   selectionSet: SelectionSetNode | undefined,
   getFragment: (name: string) => FragmentDefinitionNode | undefined,
@@ -129,38 +151,67 @@ function countFields(
 ): number {
   if (!selectionSet) return 0;
 
-  return selectionSet.selections.reduce<number>((total, selection) => {
-    if (selection.kind === Kind.FRAGMENT_SPREAD) {
-      const fragName = selection.name.value;
-      if (visitedFragments.has(fragName)) {
-        // Cycle detected — skip to avoid infinite recursion.
-        return total;
+  // Group sibling field selections by response key, accumulating each field's
+  // child selections so same-keyed fields merge into one (with merged children).
+  const childrenByKey = new Map<string, SelectionNode[]>();
+  let unknownFragmentCount = 0;
+
+  const flatten = (
+    selections: readonly SelectionNode[],
+    visited: Set<string>,
+  ): void => {
+    for (const selection of selections) {
+      if (selection.kind === Kind.FRAGMENT_SPREAD) {
+        const fragName = selection.name.value;
+        if (visited.has(fragName)) {
+          // Cycle detected — skip to avoid infinite recursion.
+          continue;
+        }
+        const fragment = getFragment(fragName);
+        if (!fragment) {
+          // Unknown fragment — count conservatively as 1 field.
+          unknownFragmentCount += 1;
+          continue;
+        }
+        const newVisited = new Set(visited);
+        newVisited.add(fragName);
+        flatten(fragment.selectionSet.selections, newVisited);
+        continue;
       }
-      const fragment = getFragment(fragName);
-      if (!fragment) {
-        // Unknown fragment — count conservatively as 1 field.
-        return total + 1;
+
+      if (selection.kind === Kind.INLINE_FRAGMENT) {
+        // Inline fragments are type refinements — flatten their fields into
+        // this level without an extra +1 for the wrapper itself.
+        flatten(selection.selectionSet.selections, visited);
+        continue;
       }
-      const newVisited = new Set(visitedFragments);
-      newVisited.add(fragName);
-      return (
-        total + countFields(fragment.selectionSet, getFragment, newVisited)
+
+      // Kind.FIELD — merge by response key (alias wins over the field name).
+      const key = selection.alias?.value ?? selection.name.value;
+      const merged = childrenByKey.get(key);
+      const childSelections = selection.selectionSet?.selections ?? [];
+      if (merged) {
+        merged.push(...childSelections);
+      } else {
+        childrenByKey.set(key, [...childSelections]);
+      }
+    }
+  };
+
+  flatten(selectionSet.selections, visitedFragments);
+
+  let total = unknownFragmentCount;
+  for (const childSelections of childrenByKey.values()) {
+    total += 1; // the field itself
+    if (childSelections.length > 0) {
+      total += countFields(
+        { kind: Kind.SELECTION_SET, selections: childSelections },
+        getFragment,
+        visitedFragments,
       );
     }
-
-    if (selection.kind === Kind.INLINE_FRAGMENT) {
-      // Inline fragments are type refinements — count their fields but
-      // don't add an extra +1 for the fragment wrapper itself.
-      return (
-        total +
-        countFields(selection.selectionSet, getFragment, visitedFragments)
-      );
-    }
-
-    // Kind.FIELD — count the field itself plus any nested selections.
-    const nested = selection.selectionSet;
-    return total + 1 + countFields(nested, getFragment, visitedFragments);
-  }, 0);
+  }
+  return total;
 }
 
 /**
