@@ -216,6 +216,14 @@ class PlayerStatsSurface {
     ).toBeVisible();
   }
 
+  /** Assert a data-grid column header is present in the DOM (attached). Use
+   * for columns in a horizontally-scrollable grid that may be off-screen. */
+  async expectColumnHeaderAttached(label: string): Promise<void> {
+    await expect(
+      this.#page.getByText(label, { exact: true }).first(),
+    ).toBeAttached();
+  }
+
   /** Assert the filter-controls toolbar is visible. */
   async expectFilterControls(): Promise<void> {
     await expect(this.#filterControls).toBeVisible();

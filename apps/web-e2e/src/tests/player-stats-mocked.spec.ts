@@ -483,3 +483,108 @@ unauthTest.describe(
     );
   },
 );
+
+// ---------------------------------------------------------------------------
+// LS-5592: Hitter Stats Columns — QA coverage
+// Asserts every implemented hitter stat column header is visible and that the
+// getValue() pipeline returns real data (not null / em-dash). A regression
+// like LS-7113 — where all getValue() functions returned null causing every
+// cell to render an em-dash — would be caught by these tests.
+//
+// Team column is absent: career stats aggregate across all teams; no per-player
+// team data exists in the PlayerCareerStats data model.
+//
+// Column visibility depends on statsFormat (read from localStorage key
+// "ls_user_preferences"):
+//   standard (default, empty localStorage) → high-priority columns only
+//   expanded                               → all columns
+// ---------------------------------------------------------------------------
+
+test.describe('Player Stats Page (mocked) — hitter columns standard mode @regression', () => {
+  test.beforeEach(async ({ page, playersPage }) => {
+    await mockPlayerStatsGraphQL(page);
+    await playersPage.gotoStats();
+    await playersPage.stats.switchView('Hitters');
+  });
+
+  test('shows all high-priority hitter column headers', async ({
+    playersPage,
+  }) => {
+    // High-priority columns are shown when statsFormat='standard' (the default
+    // when localStorage is empty). expectColumnHeader uses exact text match.
+    const headers = ['Player', 'H', 'HR', 'RBI', 'AVG', 'OBP', 'SLG', 'oWAR'];
+    for (const header of headers) {
+      await playersPage.stats.expectColumnHeader(header);
+    }
+  });
+
+  test('shows HR stat value from mock data', async ({ playersPage }) => {
+    // Barry Bonds playerId=101, homeRuns=762 → String(762) = "762"
+    await playersPage.stats.expectRowValue(101, '762');
+  });
+
+  test('shows RBI stat value from mock data', async ({ playersPage }) => {
+    // Barry Bonds rbi=1996 → String(1996) = "1996"
+    await playersPage.stats.expectRowValue(101, '1996');
+  });
+
+  test('shows oWAR stat value from mock data', async ({ playersPage }) => {
+    // Barry Bonds offensiveWAR=162.8 → column formatter: (162.8).toFixed(1) = "162.8"
+    await playersPage.stats.expectRowValue(101, '162.8');
+  });
+
+  test('shows AVG stat value from mock data', async ({ playersPage }) => {
+    // Barry Bonds battingAverage=0.298 → formatStatistic(0.298, 3) = "0.298"
+    await playersPage.stats.expectRowValue(101, '0.298');
+  });
+
+  test('shows position chip in hitter row', async ({ playersPage }) => {
+    // Barry Bonds primaryPosition="LF" — rendered as a badge inside the Player cell
+    await playersPage.stats.expectRowValue(101, 'LF');
+  });
+});
+
+test.describe('Player Stats Page (mocked) — hitter columns expanded mode @regression', () => {
+  test.beforeEach(async ({ page, playersPage }) => {
+    // Seed localStorage before any page script runs so readStatsFormat()
+    // returns 'expanded', making medium- and low-priority columns visible.
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'ls_user_preferences',
+        JSON.stringify({ statsFormat: 'expanded' }),
+      );
+    });
+    await mockPlayerStatsGraphQL(page);
+    await playersPage.gotoStats();
+    await playersPage.stats.switchView('Hitters');
+  });
+
+  test('shows medium-priority hitter column headers in expanded mode', async ({
+    playersPage,
+  }) => {
+    // Medium-priority columns hidden in standard mode, visible in expanded mode
+    const headers = ['G', 'PA', 'AB', 'SB', 'R'];
+    for (const header of headers) {
+      await playersPage.stats.expectColumnHeader(header);
+    }
+  });
+
+  test('shows low-priority hitter column headers in expanded mode', async ({
+    playersPage,
+  }) => {
+    // Low-priority columns hidden in standard mode, included in expanded mode.
+    // The grid is horizontally scrollable; toBeAttached() confirms the columns
+    // are rendered in the DOM rather than requiring them to be in the viewport.
+    const headers = ['2B', '3B', 'BB', 'SO'];
+    for (const header of headers) {
+      await playersPage.stats.expectColumnHeaderAttached(header);
+    }
+  });
+
+  test('shows G stat value from mock data in expanded mode', async ({
+    playersPage,
+  }) => {
+    // Barry Bonds games=2986 → String(2986) = "2986"
+    await playersPage.stats.expectRowValue(101, '2986');
+  });
+});
