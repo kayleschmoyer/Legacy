@@ -1509,6 +1509,7 @@ export function PlayerStatsRoute() {
           playerId={selectedPlayerId}
           playerName="Player details"
           onViewFullPage={handleViewFullPage}
+          onBack={handleClosePlayerDetails}
         />
       )}
     </div>

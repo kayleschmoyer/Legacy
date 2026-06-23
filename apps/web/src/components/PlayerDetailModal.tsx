@@ -158,6 +158,12 @@ export interface PlayerDetailModalProps {
    * slots. When omitted the badges remain non-interactive.
    */
   onPositionClick?: (position: string) => void;
+  /**
+   * Optional back-navigation callback (LS-5578). When provided, a "← Back"
+   * button is rendered above the masthead so users can return to the calling
+   * context (e.g. the stats list) without relying on the browser's back button.
+   */
+  onBack?: () => void;
 }
 
 interface SeasonRow {
@@ -752,6 +758,7 @@ export function PlayerDetailModal({
   onOpenChange,
   onViewFullPage,
   onPositionClick,
+  onBack,
 }: PlayerDetailModalProps) {
   LOGGER.debug('[PlayerDetailModal] render', { playerId, playerName, open });
 
@@ -1230,6 +1237,28 @@ export function PlayerDetailModal({
           $sm={{ padding: 16 }}
           style={{ background: mastheadBackground }}
         >
+          {/* ── Back button for in-app context (LS-5578) ── */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              style={{
+                alignSelf: 'flex-start',
+                marginBottom: '1rem',
+                padding: '0.4rem 0.8rem',
+                backgroundColor: 'transparent',
+                color: WHITE,
+                border: `1px solid rgba(197,165,90,0.2)`,
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontFamily: "'Big Shoulders Display', sans-serif",
+                letterSpacing: '0.3px',
+                fontSize: 14,
+              }}
+            >
+              ← Back
+            </button>
+          )}
           {/* ── Editorial masthead ── */}
           <XStack
             gap={16}
