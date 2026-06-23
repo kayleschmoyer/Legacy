@@ -8,6 +8,7 @@ import { createTicket } from './tools/create-ticket.js';
 import { editTicket } from './tools/edit-ticket.js';
 import { getComments } from './tools/get-comments.js';
 import { linkIssues } from './tools/link-issues.js';
+import { getAllDescendants } from './tools/get-all-descendants.js';
 import { listChildren } from './tools/list-children.js';
 import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
@@ -438,6 +439,52 @@ server.tool(
       .describe('Cursor token from a previous response to fetch the next page'),
   },
   async (params) => listChildren(params),
+);
+
+// --- jira_get_all_descendants ---
+server.tool(
+  'jira_get_all_descendants',
+  'Recursively traverse the ticket tree rooted at `key` and return all leaf-typed descendants ' +
+    '(Task / Bug / Sub-task) in a single call. Container-typed tickets (Epic / Story) are used ' +
+    'as traversal nodes only and are not included in the result. Blocker status is annotated ' +
+    'inline on every result (blocked / blockers[]) — no separate jira_check_blockers calls needed. ' +
+    'Use `status: "To Do"` to limit results to workable tickets. Use `unblockedOnly: true` to ' +
+    'automatically exclude tickets with active (non-Done, non-In-Review) blockers. ' +
+    'This replaces the manual two-level enumeration pattern: ' +
+    'jira_list_children → per-container jira_list_children → parallel jira_check_blockers. ' +
+    'Returns { root, total, descendants: [{key, summary, status, type, priority, blocked, blockers}], ' +
+    'skipped: {byStatus, byBlockers}, errors?: [{key, error}] }.',
+  {
+    key: z
+      .string()
+      .regex(
+        /^[A-Z][A-Z0-9_]+-\d+$/,
+        'Must be a valid Jira issue key (e.g., LS-123)',
+      )
+      .describe('Root ticket key (Epic, Story, or any parent)'),
+    status: z
+      .string()
+      .optional()
+      .describe(
+        'Filter leaf descendants by status (e.g. "To Do"). Omit to return all statuses.',
+      ),
+    unblockedOnly: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When true, exclude leaf tickets that have active (non-Done, non-In-Review) blockers.',
+      ),
+    maxDepth: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(20)
+      .default(10)
+      .describe(
+        'Maximum tree depth to traverse (default: 10, max: 20). Safety cap to prevent runaway traversal.',
+      ),
+  },
+  async (params) => getAllDescendants(params),
 );
 
 // --- jira_search ---

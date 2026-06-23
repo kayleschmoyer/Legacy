@@ -125,22 +125,24 @@ worktree_rename_session(title: "LS-#### <summary, truncated to 80 chars>")
 
 > **Precondition for implementation**: every AC must be readable, unambiguous, and answerable from the ticket body alone. If you cannot answer every self-quiz question above, the ticket is underspecified — go to Step 1c for enrichment **before planning begins**. Reading the ticket carefully now costs less than a rejected PR later.
 
-Determine the ticket type and whether it has children:
+Determine the ticket type and whether it has leaf descendants by fetching the full subtree in one call:
 
 ```
-jira_list_children(key: "LS-####", limit: 100)
+jira_get_all_descendants(key: "LS-####", status: "To Do")
 ```
 
-> **Pagination required**: if the response contains `nextPageToken`, you must paginate (pass `pageToken` to subsequent calls) until `nextPageToken` is absent. Never assume the first page is complete — default limits (10-25) will silently truncate large epics.
+This call traverses the full tree (not just two levels) and returns all leaf-typed To Do descendants
+annotated with inline blocker status. No separate `jira_check_blockers` calls are needed — each
+descendant already carries `blocked` and `blockers[]`.
 
-| Condition                                                                               | Mode                                                                                                                                                      |
-| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No children (or `jira_list_children` returns empty)                                     | **Leaf mode** — implement this ticket directly                                                                                                            |
-| `type == "Epic"` (any epic, with or without children)                                   | **Parent Mode (batch chip dispatch)** — auto-dispatch chips for all unblocked To Do descendants; **no user prompt**. **Never implement the epic itself.** |
-| Has children, `type` in `{Story, Task}`, `--batch` flag absent                          | **Parent Dispatch Mode** — gather To Do descendants two levels deep, ask the user (chips for all / pick one / subset)                                     |
-| Has children, `--batch` flag present (or implied by user text or bucket-epic detection) | **Parent Mode (batch chip dispatch)** — spawn one chip per unblocked To Do child (chips claim their own tickets), stop                                    |
+| Condition                                                                              | Mode                                                                                                                                                      |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `total == 0` (no To Do leaf descendants)                                               | **Leaf mode** — implement this ticket directly                                                                                                            |
+| `type == "Epic"` (any epic, with or without descendants)                               | **Parent Mode (batch chip dispatch)** — auto-dispatch chips for all unblocked To Do descendants; **no user prompt**. **Never implement the epic itself.** |
+| `total > 0`, `type` in `{Story, Task}`, `--batch` flag absent                          | **Parent Dispatch Mode** — use the `descendants` result from this call, ask the user (chips for all / pick one / subset)                                  |
+| `total > 0`, `--batch` flag present (or implied by user text or bucket-epic detection) | **Parent Mode (batch chip dispatch)** — spawn one chip per unblocked To Do descendant (chips claim their own tickets), stop                               |
 
-> **Why all Epics auto-batch-dispatch**: every Epic's children are independent units of work ready to be driven in parallel — the user's intent when targeting an epic key is always "work down this backlog", not "implement just the first available child". The two-level enumeration ensures epics containing child epics (each containing the actual story/task children) resolve correctly without further clarification rounds.
+> **Why all Epics auto-batch-dispatch**: every Epic's children are independent units of work ready to be driven in parallel — the user's intent when targeting an epic key is always "work down this backlog", not "implement just the first available child". `jira_get_all_descendants` resolves the full tree (epics containing child epics containing stories/tasks) in one call, regardless of depth.
 
 > **Bucket epic handling — per-child slash command varies by bucket.** Identify the bucket by calling `jira_get_bucket_epic` once per known bucket name (`design-sync`, `mcp-gaps`, `client-bugs`) and matching the input epic key against each returned key. Different buckets have different per-child workflows — the chip prompt must select the right slash command (`/implement-design` for design-sync children; `/work-ticket` for mcp-gaps, client-bugs, and generic). The full decision table lives in [`references/bucket-epic-routing.md`](references/bucket-epic-routing.md); Parent Dispatch Mode step 5 below selects the chip template accordingly. Never hardcode bucket-epic keys — they rotate. If `jira_get_bucket_epic` does not resolve any known bucket to the input epic, treat it as a generic bucket epic and use `/work-ticket` for its children; do not guess routing from labels or summary prefixes.
 
@@ -367,34 +369,20 @@ This mode runs whenever the user invokes `/work-ticket` on an **Epic** (always),
 
 1. **Do not transition the epic itself.** An Epic's status is mirrored from its children (see Status Transition Rules) — never move an Epic to `In Progress` manually here.
 
-2. **Gather all To Do descendants, two levels deep**:
+2. **Use the To Do descendants already fetched in Step 1.**
 
-   a. List direct children (paginate until `nextPageToken` is absent). Do **not** pass `status: "To Do"` on this call — a container-shaped child (Epic/Story) in any status may still hold To Do grandchildren, and filtering here would drop those containers and hide their work:
+   `jira_get_all_descendants` (called in Step 1) traverses the full tree at any depth and returns
+   every leaf-typed To Do descendant with inline blocker annotation — no additional API calls needed.
+   Each entry in `descendants[]` already carries:
+   - `blocked: boolean` — true if the ticket has active (non-Done, non-In-Review) blockers
+   - `blockers: [{key, status}]` — the specific blocking tickets and their current statuses
 
-   ```
-   jira_list_children(key: "LS-<epic>", limit: 100)
-   ```
+   > **Why blocker annotation matters**: chips dispatched to a ticket with an unresolved blocker fail
+   > their first `jira_claim_ticket` call and exit — wasting a chip session and leaving the user without
+   > visibility into _why_ a "To Do" ticket is not ready to work. Having blocker state inline lets the
+   > user defer blocked tickets in Parent Dispatch Mode and lets batch mode filter them out cleanly.
 
-   b. Split the result into two groups:
-   - **Leaf-shaped children**: `type` in `{Task, Bug, Sub-task}` — these are terminal. Keep only those with `status == "To Do"`.
-   - **Container-shaped children**: `type` in `{Epic, Story}` — these may themselves have children. Keep all of them regardless of status so we can recurse one level.
-
-   c. For each container-shaped child, fetch its **To Do** grandchildren via `jira_list_children` with the `status` filter and pagination — never raw JQL:
-
-   ```
-   jira_list_children(key: "LS-<container>", status: "To Do", limit: 100)
-   // paginate via pageToken until nextPageToken is absent
-   ```
-
-   Issue these calls in parallel (one per container child) by batching them into a single tool-call message. Combine the resulting grandchildren with the To Do leaf-shaped children from step (b) to form the final To Do descendant set.
-
-   d. **Stop at two levels.** Do not recurse further; the design assumption is that bucket-epic → child-epic → story/task is the deepest realistic shape and deeper trees should be flattened in Jira, not papered over by the skill.
-
-   e. **Check blockers on every To Do descendant.** Before presenting the list (Step 4) or dispatching chips (Step 5 / batch Step 3), call `jira_check_blockers(key: "LS-####")` on each candidate **in parallel** — batch all calls into a single tool-call message rather than awaiting them sequentially. For each ticket, record whether blockers are clear or capture the blocking keys.
-
-   > **Why this matters**: chips dispatched to a ticket with an unresolved blocker fail their first `jira_claim_ticket` call (which atomically re-checks blockers) and exit — wasting a chip session and leaving the user without visibility into _why_ a "To Do" ticket is not actually ready to work. Surfacing blocker state up front lets the user defer blocked tickets in Parent Dispatch Mode, and lets batch mode filter them out cleanly. This was noticed during LS-4568 dispatch when the user had to ask "Are any of these tickets blocked?" — the orchestrator should answer that question without prompting.
-
-3. **Zero-To-Do branch**: if the To Do descendant set is empty, surface the breakdown by status so the user can decide whether to fall back to In Progress work:
+3. **Zero-To-Do branch**: if `jira_get_all_descendants` returned `total: 0`, fetch a status breakdown with `jira_get_all_descendants(key: "LS-<epic>")` (no status filter) to show what exists, then surface it:
 
    ```
    No To Do descendants under LS-<epic>. Breakdown:
@@ -405,7 +393,7 @@ This mode runs whenever the user invokes `/work-ticket` on an **Epic** (always),
 
    Then **stop**. Do not auto-claim an In Progress ticket — ask the user what to do.
 
-4. **Present the To Do descendants to the user** with a single `AskUserQuestion` call. Include each To Do descendant's key + summary in the prompt body (above the question), **annotated with its blocker status from Step 2e** — `✓ clear` if blockers are all Done (or none exist), or `⚠ blocked by LS-####[, LS-####]` if any blocker is still open. The user must see blocker status before choosing dispatch so they can defer or deselect blocked tickets via the `subset` option.
+4. **Present the To Do descendants to the user** with a single `AskUserQuestion` call. Include each To Do descendant's key + summary in the prompt body (above the question), **annotated with its blocker status from the `jira_get_all_descendants` result** — `✓ clear` if `blocked: false`, or `⚠ blocked by LS-####[, LS-####]` for each key in `blockers[]`. The user must see blocker status before choosing dispatch so they can defer or deselect blocked tickets via the `subset` option.
 
    > **Precondition for `AskUserQuestion` in this step**: the input ticket is **not** an Epic (`type == "Epic"`). All epics proceed directly to Step 5 and auto-dispatch chips for all unblocked To Do descendants — no user confirmation is needed for any epic.
 
@@ -525,13 +513,15 @@ Used **only** when `--batch` is passed (or implied by user phrasing like "work a
    jira_transition(key: "LS-####", status: "In Progress")
    ```
 
-2. **Enumerate ALL To Do descendants two levels deep** using the same gathering procedure as Parent Dispatch Mode step 2 (direct children via `jira_list_children`, then per-container `jira_list_children(status: "To Do")` for grandchildren — no raw JQL — then the parallel `jira_check_blockers` pass in step 2e). Paginate.
+2. **Use the To Do descendants already fetched in Step 1.** `jira_get_all_descendants` (called in
+   Step 1) already traversed the full tree and returned all leaf-typed To Do descendants with inline
+   blocker annotation. Re-use that result directly — no additional API calls are needed.
 
 3. **Dispatch every unblocked To Do descendant** (do **not** claim upfront — chips claim themselves):
 
    For each ticket:
    - Re-verify via `jira_view` — if no longer "To Do" (race with another agent), skip and record in the `skipped (status changed)` set.
-   - **Check the blocker status captured in step 2e — if blockers are not all Done, skip the ticket and record it in the `skipped (blocked)` set along with the blocking keys.** Re-check via `jira_check_blockers` only if step 2e ran more than a minute ago (otherwise trust the cached result). Skipping blocked tickets prevents the chip from immediately failing inside its first `jira_claim_ticket` call.
+   - **Check the `blocked` field from `jira_get_all_descendants` — if `blocked: true`, skip the ticket and record it in the `skipped (blocked)` set along with its `blockers[]`.** If the descendants result is more than a minute old, re-fetch with `jira_get_all_descendants(key: "LS-####", status: "To Do")` to get fresh blocker state before dispatching. Skipping blocked tickets prevents the chip from immediately failing inside its first `jira_claim_ticket` call.
    - Spawn a chip via `mcp__ccd_session__spawn_task` using the Parent Dispatch Mode chip template (step 5). Inject parent-derived context where applicable (design bundle path, etc.).
 
    **Do NOT transition the child to "In Progress" yourself** — each chip calls `jira_claim_ticket` as its first action and claims atomically. Claiming upfront here would strand the ticket "In Progress" with no active worker if the chip fails to start, and the ticket would silently fall off the "To Do" queue for the next batch run. Spawn all chips in a single pass. Do **not** wait between them.
