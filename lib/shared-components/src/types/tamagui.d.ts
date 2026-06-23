@@ -145,4 +145,25 @@ declare module '@tamagui/web' {
   }
 }
 
+// Extend React Native's AccessibilityProps with WAI-ARIA 1.2 combobox attrs
+// not yet included in the react-native core types. Required for the
+// aria-activedescendant pattern on web-rendered TextInput components.
+declare module 'react-native' {
+  interface AccessibilityProps {
+    'aria-activedescendant'?: string | undefined;
+    'aria-controls'?: string | undefined;
+    'aria-haspopup'?:
+      | boolean
+      | 'false'
+      | 'true'
+      | 'menu'
+      | 'listbox'
+      | 'tree'
+      | 'grid'
+      | 'dialog'
+      | undefined;
+    'aria-autocomplete'?: 'none' | 'inline' | 'list' | 'both' | undefined;
+  }
+}
+
 export {};

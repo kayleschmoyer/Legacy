@@ -625,6 +625,82 @@ adminTest.describe(
 );
 
 // ---------------------------------------------------------------------------
+// Tests: Keyboard navigation @regression (LS-7022)
+// ---------------------------------------------------------------------------
+
+adminTest.describe(
+  'Player Comparison – keyboard navigation @regression',
+  () => {
+    adminTest.beforeEach(async ({ page }) => {
+      await mockPlayerComparisonGraphQL(page);
+      await page.goto('/players/compare');
+      await page.waitForLoadState('load');
+      await expect(page.getByLabel('Search players to compare')).toBeVisible();
+    });
+
+    adminTest(
+      'ArrowDown moves active descendant to first suggestion',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('Aa');
+        await expect(page.getByText('Aaron Judge')).toBeVisible();
+
+        await input.press('ArrowDown');
+
+        await expect(
+          page.getByRole('option', { name: 'Aaron Judge' }),
+        ).toHaveAttribute('aria-selected', 'true');
+      },
+    );
+
+    adminTest(
+      'ArrowDown then ArrowUp restores no selection',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('Aa');
+        await expect(page.getByText('Aaron Judge')).toBeVisible();
+
+        await input.press('ArrowDown');
+        await input.press('ArrowUp');
+
+        await expect(
+          page.getByRole('option', { name: 'Aaron Judge' }),
+        ).toHaveAttribute('aria-selected', 'false');
+      },
+    );
+
+    adminTest(
+      'Enter selects the focused suggestion and clears input',
+      async ({ page }) => {
+        const input = page.getByLabel('Search players to compare');
+        await input.fill('Aa');
+        await expect(page.getByText('Aaron Judge')).toBeVisible();
+
+        await input.press('ArrowDown');
+        await input.press('Enter');
+
+        await expect(
+          page.getByRole('button', { name: /remove aaron judge/i }),
+        ).toBeVisible();
+        await expect(input).toHaveValue('');
+      },
+    );
+
+    adminTest('Escape closes the suggestion list', async ({ page }) => {
+      const input = page.getByLabel('Search players to compare');
+      await input.fill('Aa');
+      await expect(page.getByLabel('Player suggestions')).toBeVisible();
+
+      await input.press('Escape');
+
+      await expect(page.getByLabel('Player suggestions')).not.toBeVisible({
+        timeout: 2000,
+      });
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Tests: Unauthenticated visitor – Get Started Free CTA @regression
 // ---------------------------------------------------------------------------
 

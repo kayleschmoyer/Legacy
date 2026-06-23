@@ -7,11 +7,13 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   type StyleProp,
   Text,
   TextInput,
+  type TextInputKeyPressEventData,
   type TextStyle,
   useWindowDimensions,
   View,
@@ -458,6 +460,7 @@ function PlayerSearchInput({
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const searchInputRef = React.useRef<TextInput>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   React.useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), 300);
@@ -475,6 +478,10 @@ function PlayerSearchInput({
     }
   }, [error, debouncedQuery]);
 
+  React.useEffect(() => {
+    setActiveIndex(-1);
+  }, [query]);
+
   const results = useMemo(
     () =>
       (data?.players ?? []).filter(
@@ -490,6 +497,44 @@ function PlayerSearchInput({
       : `${usedCount} of 4 selected · ${slotsOpen} slot${slotsOpen === 1 ? '' : 's'} open`;
 
   const showDropdown = open && debouncedQuery.trim().length >= 2;
+
+  const LISTBOX_ID = 'player-search-suggestions';
+  const getOptionId = (i: number) => `player-search-opt-${i}`;
+
+  // Keyboard navigation for the combobox. react-native-web's TextInput calls
+  // e.stopPropagation() on keydown (so a wrapper onKeyDown never fires) but
+  // forwards the raw event to onKeyPress — so the handler lives on the input
+  // itself. The event is a DOM KeyboardEvent: nativeEvent.key carries the key
+  // and preventDefault() suppresses caret movement / form submit (LS-7022).
+  const handleKeyPress = useCallback(
+    (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+      const { key } = e.nativeEvent;
+      if (key === 'Escape') {
+        e.preventDefault();
+        setOpen(false);
+        setActiveIndex(-1);
+        return;
+      }
+      if (!showDropdown) return;
+      if (key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIndex((prev) => Math.min(prev + 1, results.length - 1));
+      } else if (key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIndex((prev) => Math.max(prev - 1, -1));
+      } else if (key === 'Enter') {
+        const player = activeIndex >= 0 ? results[activeIndex] : undefined;
+        if (player) {
+          e.preventDefault();
+          onSelect(player);
+          setQuery('');
+          setOpen(false);
+          setActiveIndex(-1);
+        }
+      }
+    },
+    [showDropdown, results, activeIndex, onSelect],
+  );
 
   return (
     <View
@@ -538,14 +583,20 @@ function PlayerSearchInput({
             aria-label="Search players to compare"
             accessibilityLabel="Search players to compare"
             role="combobox"
+            aria-haspopup="listbox"
             aria-expanded={showDropdown}
-            aria-controls="player-search-listbox"
+            aria-controls={LISTBOX_ID}
+            aria-autocomplete="list"
+            aria-activedescendant={
+              activeIndex >= 0 ? getOptionId(activeIndex) : undefined
+            }
             editable={!disabled}
             // RN's `editable={false}` renders as `readonly`, not `disabled`, so
             // expose the disabled state to assistive tech (and Playwright's
             // toBeDisabled) explicitly when at max capacity (LS-7843).
             aria-disabled={disabled || undefined}
             value={query}
+            onKeyPress={handleKeyPress}
             onChangeText={(text) => {
               setQuery(text);
               setOpen(true);
@@ -579,7 +630,7 @@ function PlayerSearchInput({
         {showDropdown ? (
           <ListboxView
             role="listbox"
-            nativeID="player-search-listbox"
+            nativeID={LISTBOX_ID}
             aria-label="Player suggestions"
             style={{
               position: 'absolute',
@@ -614,23 +665,33 @@ function PlayerSearchInput({
                     : 'No players match that search.'}
               </Text>
             ) : null}
-            {results.map((p) => {
+            {results.map((p, idx) => {
               const name = `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
               const pos = formatEligiblePositions(p.eligiblePositions);
+              const isActive = activeIndex === idx;
               return (
                 <Pressable
                   key={p.id}
+                  nativeID={getOptionId(idx)}
                   role="option"
                   aria-label={name}
+                  aria-selected={isActive}
+                  // Both handlers fire selection: onPressIn covers the
+                  // blur-before-click race (PCM-030), onPress covers the normal
+                  // pointer/click path. Keep both — relying on onPressIn alone
+                  // drops click selection because the dropdown unmounts on
+                  // press-in before the click resolves (LS-7022).
                   onPressIn={() => {
                     onSelect(p);
                     setQuery('');
                     setOpen(false);
+                    setActiveIndex(-1);
                   }}
                   onPress={() => {
                     onSelect(p);
                     setQuery('');
                     setOpen(false);
+                    setActiveIndex(-1);
                   }}
                   style={{
                     flexDirection: 'row',
@@ -641,6 +702,9 @@ function PlayerSearchInput({
                     paddingHorizontal: 14,
                     borderBottomWidth: 1,
                     borderBottomColor: 'rgba(255,255,255,0.04)',
+                    ...(isActive && {
+                      backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.15),
+                    }),
                   }}
                 >
                   <View style={{ gap: 2 }}>
