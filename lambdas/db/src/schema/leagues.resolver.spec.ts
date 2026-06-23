@@ -64,6 +64,15 @@ describe('League Mutations', () => {
         leagueMembers: {
           leagueId: 'leagueId',
           userId: 'userId',
+          permissionLevel: 'permissionLevel',
+        },
+        drafts: {
+          id: 'id',
+          leagueId: 'leagueId',
+          draftMode: 'draftMode',
+          selectionMethod: 'selectionMethod',
+          draftOrder: 'draftOrder',
+          createdAt: 'createdAt',
         },
         leaguePosition: {
           id: 'id',
@@ -1109,13 +1118,15 @@ describe('League Mutations', () => {
 
     it('should not throw ForbiddenError when user is a commissioner (LS-2496)', async () => {
       // First select: leagueMembers returns commissioner.
-      // Second select: drafts table (savedDraft) returns empty.
+      // Second select: leagues existence check returns the league.
+      // Third select: drafts table (savedDraft) returns empty.
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
       mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
       mockDb.limit
         .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ id: 1 }])
         .mockResolvedValueOnce([]);
 
       const mutationType = schema.getMutationType();
@@ -1133,15 +1144,37 @@ describe('League Mutations', () => {
       ).rejects.not.toThrow('Only the league Commissioner can start the draft');
     });
 
+    it('should throw UserInputError when the league does not exist (LS-8223)', async () => {
+      // Commissioner check passes (orphaned leagueMembers row), but leagues
+      // table has no matching row — should return BAD_USER_INPUT, not a Rollbar error.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([]); // league not found
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      await expect(
+        field.resolve({}, { leagueId: 6170 }, mockContext, undefined as never),
+      ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    });
+
     it('should preserve a GraphQLError code thrown inside the try block instead of rewrapping it (LS-5156)', async () => {
-      // Commissioner passes the access gate; savedDraft empty so the resolver
-      // calls createDraftForLeague, which we make throw a GraphQLError.
+      // Commissioner passes the access gate; league exists; savedDraft empty so
+      // the resolver calls createDraftForLeague, which we make throw a GraphQLError.
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
       mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
       mockDb.limit
         .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ id: 1 }])
         .mockResolvedValueOnce([]);
 
       // Resolve graphql + the mocked db-client AFTER the post-resetModules

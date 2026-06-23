@@ -696,6 +696,19 @@ builder.mutationField('startDraft', (t) =>
         );
       }
 
+      // Guard against orphaned leagueMembers rows for deleted leagues.
+      // leagueMembers FK may not cascade-delete, so the commissioner check
+      // above can pass even when the leagues row is gone.
+      const [leagueExists] = await context.db
+        .select({ id: PublicSchema.leagues.id })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (!leagueExists) {
+        throw UserInputError(`League ${leagueId} not found`);
+      }
+
       try {
         // Read saved draft settings from the database
         const [savedDraft] = await context.db
