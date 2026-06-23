@@ -1210,6 +1210,19 @@ export function PlayerDetailModal({
     }
   }, [open]);
 
+  // Reset arcMode to a sane default whenever the viewed player changes so
+  // state from a previous player is never carried over (LS-6975).
+  useEffect(() => {
+    setArcMode('batting');
+  }, [playerId]);
+
+  // Once arc data resolves, correct pitcher-only players to 'pitching'.
+  useEffect(() => {
+    if (!hasBattingArc && hasPitchingArc) {
+      setArcMode('pitching');
+    }
+  }, [hasBattingArc, hasPitchingArc]);
+
   // ------ Career stat tile rows ------
   const battingTiles: CareerTile[] = useMemo(() => {
     if (!careerTotals?.hasBatting) return [];
