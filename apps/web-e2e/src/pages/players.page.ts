@@ -317,6 +317,13 @@ class PlayerDetailSurface {
     await this.#page.keyboard.press('Escape');
   }
 
+  /** Click the "Open full page" external-link button to navigate to /players/:id. */
+  async openFullPage(): Promise<void> {
+    await this.#dialog
+      .getByRole('button', { name: 'Open full page' })
+      .click({ force: true });
+  }
+
   /** Click the "← Back" button (dispatchEvent bypasses overlay interception). */
   async back(): Promise<void> {
     await this.#page

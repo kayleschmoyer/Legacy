@@ -86,7 +86,7 @@ const CAREER_ARC_RESPONSE = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAA',
@@ -104,7 +104,7 @@ const CAREER_ARC_RESPONSE = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 

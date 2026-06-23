@@ -39,8 +39,8 @@ const PITCHER_CAREER_ARC = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [
+    arcBatting: [],
+    arcPitching: [
       {
         season: 1999,
         team: 'BOS',
@@ -147,7 +147,7 @@ const TWO_WAY_CAREER_ARC = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2023,
         team: 'LAA',
@@ -181,7 +181,7 @@ const TWO_WAY_CAREER_ARC = {
         awardSummary: 'AS,MVP',
       },
     ],
-    playerSeasonPitching: [
+    arcPitching: [
       {
         season: 2022,
         team: 'LAA',
@@ -279,8 +279,8 @@ const MULTI_TEAM_CAREER_ARC = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [
+    arcBatting: [],
+    arcPitching: [
       {
         season: 1992,
         team: 'CHC',
@@ -815,7 +815,7 @@ test.describe('Career Arc Chart — empty/no-data state @regression', () => {
           },
         },
         // Batting seasons present but missing onBasePlusSlugging → filtered out
-        playerSeasonBatting: [
+        arcBatting: [
           {
             season: 2024,
             team: 'LAD',
@@ -834,7 +834,7 @@ test.describe('Career Arc Chart — empty/no-data state @regression', () => {
           },
         ],
         // Pitching season present so Career Arc tab appears and toggle renders
-        playerSeasonPitching: [
+        arcPitching: [
           {
             season: 2022,
             team: 'LAA',

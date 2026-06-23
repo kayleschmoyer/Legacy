@@ -29,11 +29,9 @@ import {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type BattingSeason = NonNullable<
-  GetPlayerCareerArcQuery['playerSeasonBatting']
->[number];
+type BattingSeason = NonNullable<GetPlayerCareerArcQuery['arcBatting']>[number];
 type PitchingSeason = NonNullable<
-  GetPlayerCareerArcQuery['playerSeasonPitching']
+  GetPlayerCareerArcQuery['arcPitching']
 >[number];
 
 export type CareerArcMode = 'batting' | 'pitching';

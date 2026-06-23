@@ -782,10 +782,7 @@ export function PlayerDetailModal({
     useGetPlayerCareerArcQuery({
       variables: { playerId: playerId ?? 0 },
       skip: !playerId || !open,
-      // no-cache prevents playerSeasonBatting/playerSeasonPitching arc responses
-      // from overwriting the season stats entries at the same Apollo cache key,
-      // which would incorrectly hide stat tabs.
-      fetchPolicy: 'no-cache',
+      fetchPolicy: 'cache-first',
     });
 
   const displayArcData = arcData ?? previousArcData;
@@ -1123,9 +1120,8 @@ export function PlayerDetailModal({
   );
 
   // ------ Available tabs ------
-  const hasBattingArc = (displayArcData?.playerSeasonBatting?.length ?? 0) > 0;
-  const hasPitchingArc =
-    (displayArcData?.playerSeasonPitching?.length ?? 0) > 0;
+  const hasBattingArc = (displayArcData?.arcBatting?.length ?? 0) > 0;
+  const hasPitchingArc = (displayArcData?.arcPitching?.length ?? 0) > 0;
 
   const availableTabs = useMemo(() => {
     const tabs: { key: StatsTab; label: string }[] = [];
@@ -1628,8 +1624,8 @@ export function PlayerDetailModal({
                       <React.Suspense fallback={<Spinner color={BRAND_GOLD} />}>
                         <CareerArcChart
                           key={playerId ?? 0}
-                          battingSeasons={displayArcData?.playerSeasonBatting}
-                          pitchingSeasons={displayArcData?.playerSeasonPitching}
+                          battingSeasons={displayArcData?.arcBatting}
+                          pitchingSeasons={displayArcData?.arcPitching}
                           mode={hasBattingArc ? arcMode : 'pitching'}
                         />
                       </React.Suspense>

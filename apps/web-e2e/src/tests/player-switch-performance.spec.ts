@@ -111,7 +111,7 @@ const TROUT_CAREER_ARC = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAA',
@@ -129,7 +129,7 @@ const TROUT_CAREER_ARC = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 
@@ -150,7 +150,7 @@ const JUDGE_CAREER_ARC = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'NYY',
@@ -168,7 +168,7 @@ const JUDGE_CAREER_ARC = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 

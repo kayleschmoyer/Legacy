@@ -7040,7 +7040,7 @@ export type GetPlayerCareerArcQuery = {
       rookieOfTheYear?: boolean | null;
     } | null;
   } | null;
-  playerSeasonBatting?: Array<{
+  arcBatting?: Array<{
     __typename?: 'SeasonBatting';
     season?: number | null;
     team?: string | null;
@@ -7057,7 +7057,7 @@ export type GetPlayerCareerArcQuery = {
     onBasePlusSluggingPlus?: number | null;
     awardSummary?: string | null;
   }> | null;
-  playerSeasonPitching?: Array<{
+  arcPitching?: Array<{
     __typename?: 'SeasonPitching';
     season?: number | null;
     team?: string | null;
@@ -18295,7 +18295,7 @@ export const GetPlayerCareerArc = gql`
         rookieOfTheYear
       }
     }
-    playerSeasonBatting(playerId: $playerId) {
+    arcBatting: playerSeasonBatting(playerId: $playerId) {
       season
       team
       games
@@ -18311,7 +18311,7 @@ export const GetPlayerCareerArc = gql`
       onBasePlusSluggingPlus
       awardSummary
     }
-    playerSeasonPitching(playerId: $playerId) {
+    arcPitching: playerSeasonPitching(playerId: $playerId) {
       season
       team
       games

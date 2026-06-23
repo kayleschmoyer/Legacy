@@ -74,7 +74,7 @@ const CAREER_ARC_RESPONSE = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAA',
@@ -92,7 +92,7 @@ const CAREER_ARC_RESPONSE = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 
@@ -235,16 +235,17 @@ test.describe('Player Detail – back navigation: in-app path @regression', () =
 
     // Wait for the PremiumGate overlay to clear before clicking. The gate
     // renders pointerEvents="none" on the table while getuserbyid is still
-    // in-flight; clicking before isPremium=true lands on the upgrade-CTA
-    // overlay instead of the row handler, opening UpgradeModal rather than
-    // navigating to /players/:id.
+    // in-flight; clicking before isPremium=true opens UpgradeModal instead.
     await playersPage.premiumGate.expectAbsent();
 
-    // In-app click: openPlayerByName clicks the player name text inside the row,
-    // which bubbles to the Tamagui XStack onPress handler → navigate('/players/1')
-    // → location.key !== 'default'
+    // Clicking a numeric player id sets ?playerId=1 via setSearchParams, which
+    // opens the in-place detail modal on the stats page (PST-051 / LS-7124).
     await playersPage.stats.openPlayerByName('Trout');
     await playersPage.detail.expectOpen();
+
+    // The "Open full page" button navigates to /players/1 (pushes a history
+    // entry), so location.key !== 'default' inside PlayerDetailPage.handleBack.
+    await playersPage.detail.openFullPage();
 
     await playersPage.detail.expectBackButton();
   });
@@ -261,15 +262,19 @@ test.describe('Player Detail – back navigation: in-app path @regression', () =
     // Wait for PremiumGate to clear (same race condition as the test above).
     await playersPage.premiumGate.expectAbsent();
 
-    // In-app click sets location.key !== 'default', so back uses navigate(-1)
+    // Clicking a numeric player id opens the in-place modal (PST-051 / LS-7124).
     await playersPage.stats.openPlayerByName('Trout');
     await playersPage.detail.expectOpen();
+
+    // Navigate to the full-page /players/1 route (pushes a history entry so
+    // location.key !== 'default') via the "Open full page" affordance.
+    await playersPage.detail.openFullPage();
 
     await playersPage.detail.expectBackButton();
 
     await playersPage.detail.back();
 
-    // navigate(-1) returns to the previous history entry (/players/stats)
+    // navigate(-1) returns to the previous history entry (/players/stats?playerId=1)
     await playersPage.detail.waitForStatsList();
     await playersPage.stats.expectText(/MLB Player Statistics/i);
   });

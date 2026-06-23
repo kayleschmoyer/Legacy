@@ -94,7 +94,7 @@ const BATTER_CAREER_ARC = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAA',
@@ -128,7 +128,7 @@ const BATTER_CAREER_ARC = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 
@@ -191,8 +191,8 @@ const PITCHER_CAREER_ARC = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [
+    arcBatting: [],
+    arcPitching: [
       {
         season: 2024,
         team: 'LAD',
@@ -229,8 +229,8 @@ const EMPTY_STATS = {
 const EMPTY_CAREER_ARC = {
   data: {
     player: null,
-    playerSeasonBatting: [],
-    playerSeasonPitching: [],
+    arcBatting: [],
+    arcPitching: [],
   },
 };
 
@@ -522,8 +522,6 @@ test.describe('Hero Stats Chips — batter values @regression', () => {
       },
     };
 
-    // Provide a career arc whose playerSeasonBatting mirrors the season stats so
-    // Apollo's cache doesn't overwrite the displayData entry with an empty array.
     const twoSeasonCareerArc = {
       data: {
         player: {
@@ -541,7 +539,7 @@ test.describe('Hero Stats Chips — batter values @regression', () => {
             rookieOfTheYear: false,
           },
         },
-        playerSeasonBatting: [
+        arcBatting: [
           {
             season: 2022,
             team: 'NYY',
@@ -575,7 +573,7 @@ test.describe('Hero Stats Chips — batter values @regression', () => {
             awardSummary: null,
           },
         ],
-        playerSeasonPitching: [],
+        arcPitching: [],
       },
     };
 
@@ -854,7 +852,7 @@ test.describe('Hero Stats Chips — two-way player @regression', () => {
             rookieOfTheYear: true,
           },
         },
-        playerSeasonBatting: [
+        arcBatting: [
           {
             season: 2024,
             team: 'LAD',
@@ -872,7 +870,7 @@ test.describe('Hero Stats Chips — two-way player @regression', () => {
             awardSummary: 'AS,MVP',
           },
         ],
-        playerSeasonPitching: [
+        arcPitching: [
           {
             season: 2023,
             team: 'LAA',
@@ -967,8 +965,6 @@ test.describe('Hero Stats Chips — two-way player @regression', () => {
       },
     };
 
-    // Mirror the 2024 batting season in the career arc so Apollo's cache doesn't
-    // overwrite playerSeasonBatting with an empty array from the arc response.
     const twoWayCareerArcValue = {
       data: {
         player: {
@@ -986,7 +982,7 @@ test.describe('Hero Stats Chips — two-way player @regression', () => {
             rookieOfTheYear: true,
           },
         },
-        playerSeasonBatting: [
+        arcBatting: [
           {
             season: 2024,
             team: 'LAD',
@@ -1004,7 +1000,7 @@ test.describe('Hero Stats Chips — two-way player @regression', () => {
             awardSummary: 'AS,MVP',
           },
         ],
-        playerSeasonPitching: [],
+        arcPitching: [],
       },
     };
 

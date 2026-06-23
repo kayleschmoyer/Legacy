@@ -201,8 +201,8 @@ const BATTER_CAREER_ARC_RESPONSE = {
       lastName: 'Trout',
       eligiblePositions: ['CF', 'OF'],
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [],
+    arcBatting: [],
+    arcPitching: [],
   },
 };
 
@@ -214,8 +214,8 @@ const PITCHER_CAREER_ARC_RESPONSE = {
       lastName: 'Buehler',
       eligiblePositions: ['SP', 'RP'],
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [],
+    arcBatting: [],
+    arcPitching: [],
   },
 };
 
@@ -227,16 +227,16 @@ const TWO_WAY_CAREER_ARC_RESPONSE = {
       lastName: 'Ohtani',
       eligiblePositions: ['SP', 'DH'],
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [],
+    arcBatting: [],
+    arcPitching: [],
   },
 };
 
 const EMPTY_CAREER_ARC_RESPONSE = {
   data: {
     player: null,
-    playerSeasonBatting: [],
-    playerSeasonPitching: [],
+    arcBatting: [],
+    arcPitching: [],
   },
 };
 

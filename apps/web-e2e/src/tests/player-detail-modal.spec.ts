@@ -146,7 +146,7 @@ const BATTER_CAREER_ARC_RESPONSE = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAA',
@@ -180,7 +180,7 @@ const BATTER_CAREER_ARC_RESPONSE = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 
@@ -202,8 +202,8 @@ const PITCHER_CAREER_ARC_RESPONSE = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [
+    arcBatting: [],
+    arcPitching: [
       {
         season: 2024,
         team: 'LAD',
@@ -225,8 +225,8 @@ const PITCHER_CAREER_ARC_RESPONSE = {
 const EMPTY_CAREER_ARC_RESPONSE = {
   data: {
     player: null,
-    playerSeasonBatting: [],
-    playerSeasonPitching: [],
+    arcBatting: [],
+    arcPitching: [],
   },
 };
 

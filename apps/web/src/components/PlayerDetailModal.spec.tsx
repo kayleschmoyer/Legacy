@@ -169,8 +169,8 @@ const EMPTY_SEASON = {
 function makeArcData(hasBatting: boolean, hasPitching: boolean) {
   return {
     data: {
-      playerSeasonBatting: hasBatting ? [{ season: 2023, avg: 0.3 }] : [],
-      playerSeasonPitching: hasPitching ? [{ season: 2023, era: 3.0 }] : [],
+      arcBatting: hasBatting ? [{ season: 2023, avg: 0.3 }] : [],
+      arcPitching: hasPitching ? [{ season: 2023, era: 3.0 }] : [],
     },
   };
 }

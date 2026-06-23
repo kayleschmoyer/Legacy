@@ -188,7 +188,7 @@ const BATTER_CAREER_ARC = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAA',
@@ -206,7 +206,7 @@ const BATTER_CAREER_ARC = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 
@@ -228,8 +228,8 @@ const PITCHER_CAREER_ARC = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [
+    arcBatting: [],
+    arcPitching: [
       {
         season: 2024,
         team: 'LAD',
@@ -265,7 +265,7 @@ const TWO_WAY_CAREER_ARC = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAD',
@@ -283,7 +283,7 @@ const TWO_WAY_CAREER_ARC = {
         awardSummary: 'AS,MVP',
       },
     ],
-    playerSeasonPitching: [
+    arcPitching: [
       {
         season: 2023,
         team: 'LAA',
@@ -319,8 +319,8 @@ const NO_CAREER_ARC = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [],
+    arcBatting: [],
+    arcPitching: [],
   },
 };
 

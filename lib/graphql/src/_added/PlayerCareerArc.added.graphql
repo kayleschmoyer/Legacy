@@ -13,7 +13,7 @@ query GetPlayerCareerArc($playerId: Int!) {
       rookieOfTheYear
     }
   }
-  playerSeasonBatting(playerId: $playerId) {
+  arcBatting: playerSeasonBatting(playerId: $playerId) {
     season
     team
     games
@@ -29,7 +29,7 @@ query GetPlayerCareerArc($playerId: Int!) {
     onBasePlusSluggingPlus
     awardSummary
   }
-  playerSeasonPitching(playerId: $playerId) {
+  arcPitching: playerSeasonPitching(playerId: $playerId) {
     season
     team
     games

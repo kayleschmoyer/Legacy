@@ -355,7 +355,7 @@ const BATTER_CAREER_ARC = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAA',
@@ -373,7 +373,7 @@ const BATTER_CAREER_ARC = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 
@@ -395,8 +395,8 @@ const PITCHER_CAREER_ARC = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [],
-    playerSeasonPitching: [
+    arcBatting: [],
+    arcPitching: [
       {
         season: 2024,
         team: 'LAD',

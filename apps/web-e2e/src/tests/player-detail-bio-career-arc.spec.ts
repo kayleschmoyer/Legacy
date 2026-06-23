@@ -111,7 +111,7 @@ const BATTER_CAREER_ARC = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2023,
         team: 'LAA',
@@ -145,7 +145,7 @@ const BATTER_CAREER_ARC = {
         awardSummary: 'AS,MVP',
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 
@@ -225,7 +225,7 @@ const TWO_WAY_CAREER_ARC = {
         rookieOfTheYear: true,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         season: 2024,
         team: 'LAD',
@@ -243,7 +243,7 @@ const TWO_WAY_CAREER_ARC = {
         awardSummary: 'AS,MVP',
       },
     ],
-    playerSeasonPitching: [
+    arcPitching: [
       {
         season: 2023,
         team: 'LAA',
@@ -283,7 +283,7 @@ const DUPLICATE_SEASON_CAREER_ARC = {
         rookieOfTheYear: false,
       },
     },
-    playerSeasonBatting: [
+    arcBatting: [
       {
         // First team in 1939 (fewer games — should be dropped by deduplication)
         season: 1939,
@@ -335,7 +335,7 @@ const DUPLICATE_SEASON_CAREER_ARC = {
         awardSummary: null,
       },
     ],
-    playerSeasonPitching: [],
+    arcPitching: [],
   },
 };
 
