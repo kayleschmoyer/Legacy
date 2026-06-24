@@ -14,7 +14,11 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import { Draft } from '../types';
 import { enableAutoPickForUnmanagedTeams } from '../helpers';
 import { builder } from '../../builder';
-import { AuthenticationError, ForbiddenError } from '../../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from '../../graphql-errors';
 
 /**
  * Mutation: Initialize a draft (live or automated)
@@ -87,11 +91,11 @@ builder.mutationField('initializeDraft', (t) =>
           .limit(1);
 
         if (!league) {
-          throw new Error('League not found');
+          throw UserInputError('League not found');
         }
 
         if (league.draftStatus !== 'not-started') {
-          throw new Error(
+          throw UserInputError(
             `Cannot initialize draft: current status is '${league.draftStatus}'`,
           );
         }

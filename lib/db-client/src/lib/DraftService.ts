@@ -1,6 +1,7 @@
 import { DraftSqsService, StartDraftMessage } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  DraftUserInputError,
   fetchLeagueDetails,
   updateLeagueDraftStatus,
   validateDraftRequest,
@@ -8,6 +9,8 @@ import {
 
 export interface DraftTriggerResult {
   success: boolean;
+  /** Populated on failure: 'user_input' for bad caller input, 'server' for unexpected faults. */
+  errorType?: 'user_input' | 'server';
   league: {
     id: number;
     name: string;
@@ -185,7 +188,16 @@ export class DraftService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      LOGGER.error('❌ Failed to start draft:', errorMessage);
+      const isUserFacing = error instanceof DraftUserInputError;
+
+      if (isUserFacing) {
+        LOGGER.warn('Draft start rejected (user input):', {
+          errorMessage,
+          leagueId,
+        });
+      } else {
+        LOGGER.error('❌ Failed to start draft:', errorMessage);
+      }
 
       // Try to get league details even in error case (if league exists)
       let league: DraftTriggerResult['league'];
@@ -209,6 +221,7 @@ export class DraftService {
 
       return {
         success: false,
+        errorType: isUserFacing ? 'user_input' : 'server',
         league,
         message: 'Failed to start draft',
         error: errorMessage,

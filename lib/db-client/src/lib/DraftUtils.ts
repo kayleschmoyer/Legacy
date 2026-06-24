@@ -8,6 +8,21 @@ import { PublicDb, PublicSchema, runWithPublicClient } from '../index';
  * Used by both DraftService (coordinator) and draft-processor lambda (worker)
  */
 
+/**
+ * Thrown when a draft operation fails because of invalid caller input
+ * (bad leagueId, wrong status, missing access). Callers can inspect
+ * `instanceof DraftUserInputError` to log at warn level and surface a
+ * BAD_USER_INPUT GraphQL error rather than treating the condition as an
+ * unexpected server fault.
+ */
+export class DraftUserInputError extends Error {
+  readonly isUserFacing = true as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'DraftUserInputError';
+  }
+}
+
 export const VALID_DRAFT_MODES = ['live', 'automated'] as const;
 export type DraftMode = (typeof VALID_DRAFT_MODES)[number];
 
@@ -37,7 +52,7 @@ export function validateDraftMode(
   draftMode: string,
 ): asserts draftMode is DraftMode {
   if (!VALID_DRAFT_MODES.includes(draftMode as DraftMode)) {
-    throw new Error(
+    throw new DraftUserInputError(
       `Invalid draft mode: ${draftMode}. Valid modes are: ${VALID_DRAFT_MODES.join(', ')}`,
     );
   }
@@ -50,7 +65,7 @@ export function validateSelectionMethod(
   selectionMethod: string,
 ): asserts selectionMethod is SelectionMethod {
   if (!VALID_SELECTION_METHODS.includes(selectionMethod as SelectionMethod)) {
-    throw new Error(
+    throw new DraftUserInputError(
       `Invalid selection method: ${selectionMethod}. Valid methods are: ${VALID_SELECTION_METHODS.join(', ')}`,
     );
   }
@@ -63,7 +78,7 @@ export function validateDraftOrder(
   draftOrder: string,
 ): asserts draftOrder is DraftOrder {
   if (!VALID_DRAFT_ORDERS.includes(draftOrder as DraftOrder)) {
-    throw new Error(
+    throw new DraftUserInputError(
       `Invalid draft order: ${draftOrder}. Valid orders are: ${VALID_DRAFT_ORDERS.join(', ')}`,
     );
   }
@@ -92,7 +107,7 @@ export async function validateUserAccess(
   });
 
   if (!hasAccess) {
-    throw new Error(
+    throw new DraftUserInputError(
       `User ${userId} does not have access to league ${leagueId}`,
     );
   }
@@ -167,7 +182,7 @@ export async function fetchLeagueDetails(leagueId: number) {
       .limit(1);
 
     if (result.length === 0) {
-      throw new Error(`League ${leagueId} not found`);
+      throw new DraftUserInputError(`League ${leagueId} not found`);
     }
 
     return result[0];

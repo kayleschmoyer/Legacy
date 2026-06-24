@@ -59,7 +59,7 @@ builder.mutationField('pauseDraft', (t) =>
         .limit(1);
 
       if (!league) {
-        throw new Error('League not found');
+        throw UserInputError('League not found');
       }
 
       if (league.draftStatus !== 'in-progress') {
@@ -142,7 +142,7 @@ builder.mutationField('resumeDraft', (t) =>
         .limit(1);
 
       if (!league) {
-        throw new Error('League not found');
+        throw UserInputError('League not found');
       }
 
       if (league.draftStatus !== 'paused') {

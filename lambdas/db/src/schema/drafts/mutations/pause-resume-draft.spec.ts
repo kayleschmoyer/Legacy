@@ -10,6 +10,8 @@
  *   2. resumeDraft FORBIDDEN guard — caller is not a commissioner
  *   3. resumeDraft BAD_USER_INPUT guard — draftStatus !== 'paused' (the reported bug)
  *   4. pauseDraft BAD_USER_INPUT guard — draftStatus !== 'in-progress'
+ *   5. resumeDraft BAD_USER_INPUT guard — league not found
+ *   6. pauseDraft BAD_USER_INPUT guard — league not found
  */
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -118,6 +120,21 @@ describe('resumeDraft resolver', () => {
       extensions: { code: 'BAD_USER_INPUT' },
     });
   });
+
+  it('throws BAD_USER_INPUT (not a raw server error) when the league does not exist', async () => {
+    const { resumeDraft } = capturePauseResumeResolvers();
+    const { db } = makeDb([
+      [{ permissionLevel: 'commissioner' }], // membership lookup
+      [], // league lookup — empty = not found
+    ]);
+    const ctx = { user: { id: 99 }, db };
+    await expect(
+      resumeDraft({}, { leagueId: 999 }, ctx, undefined),
+    ).rejects.toMatchObject({
+      message: 'League not found',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  });
 });
 
 describe('pauseDraft resolver', () => {
@@ -132,6 +149,21 @@ describe('pauseDraft resolver', () => {
       pauseDraft({}, { leagueId: 1 }, ctx, undefined),
     ).rejects.toMatchObject({
       message: "Cannot pause draft: current status is 'not-started'",
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  });
+
+  it('throws BAD_USER_INPUT (not a raw server error) when the league does not exist', async () => {
+    const { pauseDraft } = capturePauseResumeResolvers();
+    const { db } = makeDb([
+      [{ permissionLevel: 'commissioner' }], // membership lookup
+      [], // league lookup — empty = not found
+    ]);
+    const ctx = { user: { id: 99 }, db };
+    await expect(
+      pauseDraft({}, { leagueId: 999 }, ctx, undefined),
+    ).rejects.toMatchObject({
+      message: 'League not found',
       extensions: { code: 'BAD_USER_INPUT' },
     });
   });

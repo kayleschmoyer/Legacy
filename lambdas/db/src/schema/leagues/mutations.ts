@@ -757,6 +757,9 @@ builder.mutationField('startDraft', (t) =>
         });
 
         if (!result.success) {
+          if (result.errorType === 'user_input') {
+            throw UserInputError(result.error || 'Failed to start draft');
+          }
           throw new Error(result.error || 'Failed to start draft');
         }
 
