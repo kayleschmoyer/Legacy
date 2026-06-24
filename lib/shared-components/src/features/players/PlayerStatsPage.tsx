@@ -376,6 +376,9 @@ export interface PlayerStatsExportData {
   pitching: readonly CareerPitchingFragment[];
 }
 
+/** Export file format options for the player-stats download (PST-014 / LS-7112). */
+export type ExportFormat = 'json' | 'csv' | 'xlsx';
+
 /**
  * Computes a slider's fill percentage (0–100) for `value` within `[min, max]`.
  * Guards the denominator: when `max <= min` the range is degenerate (a future
@@ -439,9 +442,16 @@ export interface PlayerStatsPageProps {
   /** Clear-filters handler used by the empty state. Defaults to resetting local filter draft. */
   onClearFilters?: () => void;
   onPlayerDetails?: (player: PlayerWithStats) => void;
+  /**
+   * Export formats available to the current viewer. Defaults to `['json']` so
+   * existing callers are unaffected. Pass `['json', 'csv', 'xlsx']` to render
+   * three export buttons for premium viewers (PST-014 / LS-7112).
+   */
+  exportFormats?: readonly ExportFormat[];
   onExport?: (
     filters: PlayerStatsFilters,
     viewMode: PlayerStatsViewMode,
+    format?: ExportFormat,
   ) => void;
   /**
    * Fired with the rows currently visible in the grid(s) whenever they change
@@ -704,6 +714,7 @@ export function PlayerStatsPage({
   showActions = true,
   canExport = true,
   canCustomizeColumns = true,
+  exportFormats = ['json'],
   statsFormat = 'expanded',
   initialVisibleColumns = null,
   onVisibleColumnsChange,
@@ -1078,51 +1089,54 @@ export function PlayerStatsPage({
     emitVisibleRows();
   }, [emitVisibleRows]);
 
-  const handleExport = useCallback(() => {
-    // Export is a premium capability (PST-010 / LS-7108). Bail out when the host
-    // has not granted it: the page-level PremiumGate only blurs content and
-    // disables pointer events, which still leaves a keyboard-activation path to
-    // this handler. Guarding here ensures the export never runs for a non-entitled
-    // viewer regardless of how the (now hidden) button was reached.
-    if (!onExport || !canExport) return;
-    const filters: PlayerStatsFilters = {
-      searchTerm: search || undefined,
-      position: position !== 'All Positions' ? position : undefined,
-      team: team !== 'All Teams' ? team : undefined,
-      minHomeRuns: minHR > 0 ? minHR : undefined,
-      maxHomeRuns: maxHR < HR_MAX ? maxHR : undefined,
-      minRBI: minRBI > 0 ? minRBI : undefined,
-      maxRBI: maxRBI < RBI_MAX ? maxRBI : undefined,
-      minBattingAvg: minAVG > 0 ? minAVG : undefined,
-      maxBattingAvg: maxAVG < AVG_MAX ? maxAVG : undefined,
-      minERA: minERA > 0 ? minERA : undefined,
-      maxERA: maxERA < ERA_MAX_OFF ? maxERA : undefined,
-      minWins: minWins > 0 ? minWins : undefined,
-      maxWins: maxWins < WINS_MAX ? maxWins : undefined,
-      minStrikeouts: minSO > 0 ? minSO : undefined,
-      maxStrikeouts: maxSO < SO_MAX ? maxSO : undefined,
-    };
-    onExport(filters, viewMode);
-  }, [
-    onExport,
-    canExport,
-    search,
-    position,
-    team,
-    minHR,
-    maxHR,
-    minRBI,
-    maxRBI,
-    minAVG,
-    maxAVG,
-    minERA,
-    maxERA,
-    minWins,
-    maxWins,
-    minSO,
-    maxSO,
-    viewMode,
-  ]);
+  const handleExportFormat = useCallback(
+    (format: ExportFormat) => {
+      // Export is a premium capability (PST-010 / LS-7108). Bail out when the host
+      // has not granted it: the page-level PremiumGate only blurs content and
+      // disables pointer events, which still leaves a keyboard-activation path to
+      // this handler. Guarding here ensures the export never runs for a non-entitled
+      // viewer regardless of how the (now hidden) button was reached.
+      if (!onExport || !canExport) return;
+      const filters: PlayerStatsFilters = {
+        searchTerm: search || undefined,
+        position: position !== 'All Positions' ? position : undefined,
+        team: team !== 'All Teams' ? team : undefined,
+        minHomeRuns: minHR > 0 ? minHR : undefined,
+        maxHomeRuns: maxHR < HR_MAX ? maxHR : undefined,
+        minRBI: minRBI > 0 ? minRBI : undefined,
+        maxRBI: maxRBI < RBI_MAX ? maxRBI : undefined,
+        minBattingAvg: minAVG > 0 ? minAVG : undefined,
+        maxBattingAvg: maxAVG < AVG_MAX ? maxAVG : undefined,
+        minERA: minERA > 0 ? minERA : undefined,
+        maxERA: maxERA < ERA_MAX_OFF ? maxERA : undefined,
+        minWins: minWins > 0 ? minWins : undefined,
+        maxWins: maxWins < WINS_MAX ? maxWins : undefined,
+        minStrikeouts: minSO > 0 ? minSO : undefined,
+        maxStrikeouts: maxSO < SO_MAX ? maxSO : undefined,
+      };
+      onExport(filters, viewMode, format);
+    },
+    [
+      onExport,
+      canExport,
+      search,
+      position,
+      team,
+      minHR,
+      maxHR,
+      minRBI,
+      maxRBI,
+      minAVG,
+      maxAVG,
+      minERA,
+      maxERA,
+      minWins,
+      maxWins,
+      minSO,
+      maxSO,
+      viewMode,
+    ],
+  );
 
   const handleShare = useCallback(() => {
     if (!onShare) return;
@@ -1456,33 +1470,36 @@ export function PlayerStatsPage({
                   <Text style={GOLD_ACCENT_BUTTON_LABEL_STYLE}>Share</Text>
                 </Pressable>
                 {/* Export is premium-gated (PST-010 / LS-7108): only rendered when
-                    the host grants the export capability. */}
-                {canExport && (
-                  <Pressable
-                    onPress={handleExport}
-                    accessibilityRole="button"
-                    accessibilityLabel="Export player statistics as JSON"
-                    style={GOLD_ACCENT_BUTTON_STYLE}
-                  >
-                    {Platform.OS === 'web' && (
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={BRAND_GOLD_LIGHT}
-                        strokeWidth="2"
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                      </svg>
-                    )}
-                    <Text style={GOLD_ACCENT_BUTTON_LABEL_STYLE}>
-                      Export JSON
-                    </Text>
-                  </Pressable>
-                )}
+                    the host grants the export capability. One button per format
+                    in exportFormats (PST-014 / LS-7112). */}
+                {canExport &&
+                  exportFormats.map((fmt) => (
+                    <Pressable
+                      key={fmt}
+                      onPress={() => handleExportFormat(fmt)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Export player statistics as ${fmt.toUpperCase()}`}
+                      style={GOLD_ACCENT_BUTTON_STYLE}
+                    >
+                      {Platform.OS === 'web' && (
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={BRAND_GOLD_LIGHT}
+                          strokeWidth="2"
+                        >
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="7 10 12 15 17 10" />
+                          <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                      )}
+                      <Text style={GOLD_ACCENT_BUTTON_LABEL_STYLE}>
+                        Export {fmt.toUpperCase()}
+                      </Text>
+                    </Pressable>
+                  ))}
               </XStack>
             )}
           </XStack>

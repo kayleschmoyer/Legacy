@@ -1,18 +1,4 @@
-/* eslint-disab  return {
-    ...RN,
-    Platform: {
-      OS: 'web',
-      select: (options: any) => options.web || options.default,
-    },
-    StyleSheet: {
-      ...RN.StyleSheet,
-      hairlineWidth: 1,
-    },
-    Dimensions: {
-      get: (size?: any) => ({ width: 1024, height: 768 }),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-    },eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access -- test setup mocks use any throughout */
 /* eslint-disable @typescript-eslint/no-unsafe-return -- test setup mocks use any throughout */
 /* eslint-disable @typescript-eslint/no-unsafe-call -- test setup mocks use any throughout */
@@ -22,6 +8,21 @@ import '@testing-library/jest-dom';
 
 // Set global test timeout to 30 seconds to prevent interruptions on slower CI runners
 jest.setTimeout(30000);
+
+// jsdom does not expose TextEncoder/TextDecoder — polyfill from Node's util module
+// so that code using `new TextEncoder().encode()` works in unit tests.
+const {
+  TextEncoder: NodeTextEncoder,
+  TextDecoder: NodeTextDecoder,
+} = require('util');
+Object.defineProperty(globalThis, 'TextEncoder', {
+  value: NodeTextEncoder,
+  writable: true,
+});
+Object.defineProperty(globalThis, 'TextDecoder', {
+  value: NodeTextDecoder,
+  writable: true,
+});
 
 // Suppress expected Tamagui React DOM prop warnings in test output
 const originalError = console.error;

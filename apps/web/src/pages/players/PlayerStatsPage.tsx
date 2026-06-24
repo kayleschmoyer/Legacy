@@ -21,6 +21,7 @@ import {
   STATS_TOGGLEABLE_COLUMN_KEYS,
 } from '@legacy-sports/shared-components/players';
 import type {
+  ExportFormat,
   PlayerStatsExportData,
   PlayerStatsFilters,
   PlayerWithStats,
@@ -549,6 +550,344 @@ export function buildExportPayload(
   const json = JSON.stringify(payload, null, 2);
   const bytes = utf8ByteLength(json);
   return { ok: bytes <= MAX_EXPORT_BYTES, json, bytes };
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+const BATTING_CSV_HEADERS = [
+  'Name',
+  'Position',
+  'Games',
+  'PA',
+  'AB',
+  'Hits',
+  'HR',
+  'RBI',
+  'SB',
+  'Runs',
+  '2B',
+  '3B',
+  'BB',
+  'SO',
+  'AVG',
+  'OBP',
+  'SLG',
+  'OPS',
+] as const;
+
+const PITCHING_CSV_HEADERS = [
+  'Name',
+  'Position',
+  'W',
+  'L',
+  'Games',
+  'GS',
+  'SV',
+  'IP (outs)',
+  'ERA',
+  'WHIP',
+  'SO',
+  'BB',
+  'HR',
+  'K/9',
+] as const;
+
+function csvCell(value: string | number | null | undefined): string {
+  const s = value === null || value === undefined ? '' : String(value);
+  return s.includes(',') || s.includes('"') || s.includes('\n')
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+}
+
+/**
+ * Convert player-stats export data to CSV. Batting and pitching rows are
+ * separated by a blank line and their own header row so a single file is
+ * self-contained. Exported for unit testing.
+ */
+export function buildCsvExport(data: PlayerStatsExportData): string {
+  const batting = data.batting ?? [];
+  const pitching = data.pitching ?? [];
+
+  const battingRows = [
+    BATTING_CSV_HEADERS.join(','),
+    ...batting.map((r) =>
+      [
+        r.displayName,
+        r.primaryPosition ?? '',
+        r.games,
+        r.plateAppearances,
+        r.atBats,
+        r.hits,
+        r.homeRuns,
+        r.rbi,
+        r.stolenBases,
+        r.runs,
+        r.doubles,
+        r.triples,
+        r.baseOnBalls,
+        r.strikeouts,
+        r.formattedBattingAverage,
+        r.formattedOnBasePercentage,
+        r.formattedSluggingPercentage,
+        r.formattedOPS,
+      ]
+        .map(csvCell)
+        .join(','),
+    ),
+  ];
+
+  const pitchingRows = [
+    PITCHING_CSV_HEADERS.join(','),
+    ...pitching.map((r) => {
+      const firstName = r.player?.firstName ?? '';
+      const lastName = r.player?.lastName ?? '';
+      const name =
+        firstName && lastName
+          ? `${firstName} ${lastName}`
+          : lastName || firstName;
+      return [
+        name,
+        r.primaryPosition ?? '',
+        r.wins,
+        r.losses,
+        r.games,
+        r.gamesStarted,
+        r.saves,
+        r.outsRecorded,
+        r.era,
+        r.whip,
+        r.strikeouts,
+        r.baseOnBalls,
+        r.homeRuns,
+        r.outRate,
+      ]
+        .map(csvCell)
+        .join(',');
+    }),
+  ];
+
+  const sections: string[] = [];
+  if (batting.length > 0) sections.push(battingRows.join('\r\n'));
+  if (pitching.length > 0) sections.push(pitchingRows.join('\r\n'));
+  return sections.join('\r\n\r\n');
+}
+
+// ── XLSX export (pure-JS ZIP + OOXML) ────────────────────────────────────────
+
+function strToBytes(s: string): Uint8Array {
+  return new TextEncoder().encode(s);
+}
+
+function crc32(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+interface ZipEntry {
+  name: string;
+  data: Uint8Array;
+}
+
+function buildZip(entries: ZipEntry[]): Uint8Array {
+  const localBlocks: Uint8Array[] = [];
+  const centralBlocks: Uint8Array[] = [];
+  let localOffset = 0;
+
+  for (const entry of entries) {
+    const nameBytes = strToBytes(entry.name);
+    const crc = crc32(entry.data);
+    const size = entry.data.length;
+
+    const local = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(6, 0, true);
+    lv.setUint16(8, 0, true);
+    lv.setUint16(10, 0, true);
+    lv.setUint16(12, 0, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, size, true);
+    lv.setUint32(22, size, true);
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, 0, true);
+    local.set(nameBytes, 30);
+
+    const central = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(central.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, 0, true);
+    cv.setUint16(14, 0, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, size, true);
+    cv.setUint32(24, size, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true);
+    cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true);
+    cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0, true);
+    cv.setUint32(42, localOffset, true);
+    central.set(nameBytes, 46);
+
+    localBlocks.push(local, entry.data);
+    centralBlocks.push(central);
+    localOffset += 30 + nameBytes.length + size;
+  }
+
+  const centralSize = centralBlocks.reduce((s, b) => s + b.length, 0);
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, localOffset, true);
+  ev.setUint16(20, 0, true);
+
+  const all = [...localBlocks, ...centralBlocks, eocd];
+  const total = all.reduce((s, b) => s + b.length, 0);
+  const out = new Uint8Array(total);
+  let pos = 0;
+  for (const b of all) {
+    out.set(b, pos);
+    pos += b.length;
+  }
+  return out;
+}
+
+function xmlEscape(val: string | number | null | undefined): string {
+  const s = val === null || val === undefined ? '' : String(val);
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function toColLetter(index: number): string {
+  let col = '';
+  let n = index + 1;
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    col = String.fromCharCode(65 + rem) + col;
+    n = Math.floor((n - 1) / 26);
+  }
+  return col;
+}
+
+function buildSheetXml(headers: string[], rows: (string | number)[][]): string {
+  const rowXml = (cells: (string | number)[], rowIdx: number) =>
+    `<row r="${rowIdx}">${cells
+      .map((cell, ci) => {
+        const ref = `${toColLetter(ci)}${rowIdx}`;
+        return typeof cell === 'number'
+          ? `<c r="${ref}"><v>${cell}</v></c>`
+          : `<c r="${ref}" t="inlineStr"><is><t>${xmlEscape(cell)}</t></is></c>`;
+      })
+      .join('')}</row>`;
+
+  const sheetRows = [
+    rowXml(headers, 1),
+    ...rows.map((r, i) => rowXml(r, i + 2)),
+  ].join('');
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows}</sheetData></worksheet>`;
+}
+
+/**
+ * Build a minimal valid `.xlsx` file (OOXML) from player-stats export data.
+ * Uses a pure-JS ZIP writer (no external library) so no additional bundle dep
+ * is required. Batting stats land on Sheet1, pitching on Sheet2.
+ * Exported for unit testing.
+ */
+export function buildXlsxExport(data: PlayerStatsExportData): Uint8Array {
+  const batting = data.batting ?? [];
+  const pitching = data.pitching ?? [];
+
+  const battingRows = batting.map(
+    (r) =>
+      [
+        r.displayName,
+        r.primaryPosition ?? '',
+        r.games,
+        r.plateAppearances,
+        r.atBats,
+        r.hits,
+        r.homeRuns,
+        r.rbi,
+        r.stolenBases,
+        r.runs,
+        r.doubles,
+        r.triples,
+        r.baseOnBalls,
+        r.strikeouts,
+        r.formattedBattingAverage,
+        r.formattedOnBasePercentage,
+        r.formattedSluggingPercentage,
+        r.formattedOPS,
+      ] as (string | number)[],
+  );
+
+  const pitchingRows = pitching.map((r) => {
+    const firstName = r.player?.firstName ?? '';
+    const lastName = r.player?.lastName ?? '';
+    const name =
+      firstName && lastName
+        ? `${firstName} ${lastName}`
+        : lastName || firstName;
+    return [
+      name,
+      r.primaryPosition ?? '',
+      r.wins,
+      r.losses,
+      r.games,
+      r.gamesStarted,
+      r.saves,
+      r.outsRecorded,
+      r.era,
+      r.whip,
+      r.strikeouts,
+      r.baseOnBalls,
+      r.homeRuns,
+      r.outRate,
+    ] as (string | number)[];
+  });
+
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`;
+
+  const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+
+  const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Batting" sheetId="1" r:id="rId1"/><sheet name="Pitching" sheetId="2" r:id="rId2"/></sheets></workbook>`;
+
+  const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>`;
+
+  return buildZip([
+    { name: '[Content_Types].xml', data: strToBytes(contentTypes) },
+    { name: '_rels/.rels', data: strToBytes(rels) },
+    { name: 'xl/workbook.xml', data: strToBytes(workbook) },
+    { name: 'xl/_rels/workbook.xml.rels', data: strToBytes(workbookRels) },
+    {
+      name: 'xl/worksheets/sheet1.xml',
+      data: strToBytes(buildSheetXml([...BATTING_CSV_HEADERS], battingRows)),
+    },
+    {
+      name: 'xl/worksheets/sheet2.xml',
+      data: strToBytes(buildSheetXml([...PITCHING_CSV_HEADERS], pitchingRows)),
+    },
+  ]);
 }
 
 const PREFS_STORAGE_KEY = 'ls_user_preferences';
@@ -1111,31 +1450,77 @@ export function PlayerStatsRoute() {
     exportDataRef.current = data;
   }, []);
 
+  // Handle export functionality (PST-014 / LS-7112: CSV and XLSX added for premium)
   const handleExport = useCallback(
-    (filters: PlayerStatsFilters, viewMode: PlayerStatsViewMode) => {
-      // Serialize the visible rows (PST-011 / LS-7109) with an upper size bound.
-      // The download path is a synchronous stringify + Blob that blocks the main
-      // thread; refusing an oversized payload here prevents a large export from
-      // freezing the tab or exhausting memory (PST-012 / LS-7110). The rows are
-      // captured from the grids via onVisibleRowsChange (see exportDataRef).
-      const { ok, json, bytes } = buildExportPayload(
-        filters,
-        viewMode,
-        exportDataRef.current,
-      );
-      if (!ok) {
-        LOGGER.warn(
-          'Player statistics export exceeded size cap; refusing download',
-          { bytes, cap: MAX_EXPORT_BYTES },
+    (
+      filters: PlayerStatsFilters,
+      viewMode: PlayerStatsViewMode,
+      format: ExportFormat = 'json',
+    ) => {
+      // CSV and XLSX are premium-only (PST-014 / LS-7112). JSON export remains
+      // available to all users. Guard the handler so the premium formats can
+      // never run for a free user even if triggered programmatically.
+      if (format !== 'json' && !isPremium) return;
+
+      let dataBlob: Blob;
+      let filename: string;
+      const dateSuffix = new Date().toISOString().split('T')[0];
+      const viewSegment = sanitizeFilenameSegment(viewMode);
+
+      if (format === 'csv') {
+        const csv = buildCsvExport(exportDataRef.current);
+        const csvBytes = utf8ByteLength(csv);
+        if (csvBytes > MAX_EXPORT_BYTES) {
+          LOGGER.warn(
+            'Player statistics CSV export exceeded size cap; refusing download',
+            { bytes: csvBytes, cap: MAX_EXPORT_BYTES },
+          );
+          setLiveMsg(
+            'Export is too large to download here. Narrow your filters and try again.',
+          );
+          return;
+        }
+        dataBlob = new Blob([csv], { type: 'text/csv' });
+        filename = `player-stats-${viewSegment}-${dateSuffix}.csv`;
+      } else if (format === 'xlsx') {
+        const xlsxBytes = buildXlsxExport(exportDataRef.current);
+        if (xlsxBytes.byteLength > MAX_EXPORT_BYTES) {
+          LOGGER.warn(
+            'Player statistics XLSX export exceeded size cap; refusing download',
+            { bytes: xlsxBytes.byteLength, cap: MAX_EXPORT_BYTES },
+          );
+          setLiveMsg(
+            'Export is too large to download here. Narrow your filters and try again.',
+          );
+          return;
+        }
+        dataBlob = new Blob([xlsxBytes.buffer as ArrayBuffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        filename = `player-stats-${viewSegment}-${dateSuffix}.xlsx`;
+      } else {
+        // JSON (default) — enforce size cap to avoid blocking the main thread
+        // (PST-012 / LS-7110).
+        const { ok, json, bytes } = buildExportPayload(
+          filters,
+          viewMode,
+          exportDataRef.current,
         );
-        setLiveMsg(
-          'Export is too large to download here. Narrow your filters and try again.',
-        );
-        return;
+        if (!ok) {
+          LOGGER.warn(
+            'Player statistics export exceeded size cap; refusing download',
+            { bytes, cap: MAX_EXPORT_BYTES },
+          );
+          setLiveMsg(
+            'Export is too large to download here. Narrow your filters and try again.',
+          );
+          return;
+        }
+        dataBlob = new Blob([json], { type: 'application/json' });
+        filename = `player-stats-${viewSegment}-${dateSuffix}.json`;
+        LOGGER.info('Exported player statistics', { bytes });
       }
 
-      // Create downloadable file
-      const dataBlob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
 
       // Create download link. The object URL is revoked in a `finally` so the
@@ -1146,7 +1531,7 @@ export function PlayerStatsRoute() {
       const link = document.createElement('a');
       try {
         link.href = url;
-        link.download = `player-stats-${sanitizeFilenameSegment(viewMode)}-${new Date().toISOString().split('T')[0]}.json`;
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
       } finally {
@@ -1154,9 +1539,9 @@ export function PlayerStatsRoute() {
         URL.revokeObjectURL(url);
       }
 
-      // Log a compact summary (byte size), not the full row set — the payload
-      // now carries the entire visible result set and would flood the logs.
-      LOGGER.info('Exported player statistics', { bytes });
+      if (format !== 'json') {
+        LOGGER.info('Exported player statistics', { format });
+      }
       setLiveMsg('Player statistics exported. Download started.');
     },
     [],
@@ -1488,6 +1873,7 @@ export function PlayerStatsRoute() {
           showHeader={true}
           showActions={true}
           canExport={true}
+          exportFormats={isPremium ? ['json', 'csv', 'xlsx'] : ['json']}
           canCustomizeColumns={isPremium}
           statsFormat={statsFormat}
           initialVisibleColumns={visibleColumns}

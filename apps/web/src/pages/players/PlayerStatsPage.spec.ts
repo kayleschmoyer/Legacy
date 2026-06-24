@@ -2,8 +2,10 @@ import { LOGGER } from '@legacy-sports/logging';
 import type { PlayerStatsExportData } from '@legacy-sports/shared-components/players';
 import {
   applyParamRenames,
+  buildCsvExport,
   buildExportPayload,
   buildStatsSearchParams,
+  buildXlsxExport,
   MAX_EXPORT_BYTES,
   migrateStatsSearchParams,
   parseClampedInt,
@@ -1030,5 +1032,223 @@ describe('buildExportPayload (PST-011 / LS-7109)', () => {
     expect(parsed.players.batting).toHaveLength(2);
     expect(parsed.players.batting[0].displayName).toBe('Gerrit Cole');
     expect(parsed.rowCount).toBe(2);
+  });
+});
+
+// PST-014 / LS-7112: CSV and XLSX export formats for premium viewers.
+
+const BATTING_ROW = {
+  playerId: 1,
+  id: 'b-1',
+  displayName: 'Aaron Judge',
+  firstName: 'Aaron',
+  lastName: 'Judge',
+  primaryPosition: 'RF',
+  games: 150,
+  plateAppearances: 600,
+  atBats: 520,
+  runs: 90,
+  hits: 150,
+  doubles: 25,
+  triples: 2,
+  homeRuns: 40,
+  rbi: 95,
+  stolenBases: 5,
+  caughtStealing: 2,
+  baseOnBalls: 70,
+  strikeouts: 120,
+  totalBases: 280,
+  groundedIntoDoublePlays: 10,
+  hitByPitch: 3,
+  sacrificeHits: 1,
+  intentionalBaseOnBalls: 8,
+  battingAverage: 0.288,
+  onBasePercentage: 0.378,
+  sluggingPercentage: 0.538,
+  ops: 0.916,
+  formattedBattingAverage: '.288',
+  formattedOnBasePercentage: '.378',
+  formattedSluggingPercentage: '.538',
+  formattedOPS: '.916',
+  offensiveWAR: 6.2,
+  fantasyPoints: 320,
+  fantasyPointsPerGame: 2.13,
+} as const;
+
+const PITCHING_ROW = {
+  playerId: 2,
+  primaryPosition: 'SP',
+  positionsPlayed: null,
+  wins: 15,
+  losses: 8,
+  games: 30,
+  gamesStarted: 30,
+  gamesFinished: 0,
+  completeGames: 2,
+  shutouts: 1,
+  saves: 0,
+  hits: 180,
+  runs: 70,
+  earnedRuns: 65,
+  homeRuns: 20,
+  baseOnBalls: 45,
+  intentionalBaseOnBalls: 3,
+  strikeouts: 220,
+  hitByPitch: 5,
+  balks: 1,
+  wildPitches: 3,
+  battersFaced: 800,
+  outsRecorded: 567,
+  outRate: 9.2,
+  era: 3.25,
+  whip: 1.12,
+  winPercentage: 0.652,
+  pitchingWAR: 5.1,
+  player: { id: 2, firstName: 'Gerrit', lastName: 'Cole' },
+} as const;
+
+describe('buildCsvExport (PST-014 / LS-7112)', () => {
+  const DATA: PlayerStatsExportData = {
+    batting: [BATTING_ROW as unknown as PlayerStatsExportData['batting'][0]],
+    pitching: [PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0]],
+  };
+
+  it('includes batting header row', () => {
+    const csv = buildCsvExport(DATA);
+    expect(csv).toContain('Name,Position,Games');
+  });
+
+  it('includes pitching header row', () => {
+    const csv = buildCsvExport(DATA);
+    expect(csv).toContain('W,L,Games');
+  });
+
+  it('includes player name in batting section', () => {
+    const csv = buildCsvExport({
+      batting: [BATTING_ROW as unknown as PlayerStatsExportData['batting'][0]],
+      pitching: [],
+    });
+    expect(csv).toContain('Aaron Judge');
+  });
+
+  it('includes pitcher name in pitching section', () => {
+    const csv = buildCsvExport({
+      batting: [],
+      pitching: [
+        PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0],
+      ],
+    });
+    expect(csv).toContain('Gerrit Cole');
+  });
+
+  it('returns empty string for empty data', () => {
+    const csv = buildCsvExport({ batting: [], pitching: [] });
+    expect(csv).toBe('');
+  });
+
+  it('escapes values containing commas with double quotes', () => {
+    const rowWithComma = {
+      ...BATTING_ROW,
+      displayName: 'Judge, Aaron',
+    };
+    const csv = buildCsvExport({
+      batting: [rowWithComma as unknown as PlayerStatsExportData['batting'][0]],
+      pitching: [],
+    });
+    expect(csv).toContain('"Judge, Aaron"');
+  });
+});
+
+/** Parse stored (uncompressed) ZIP local file entries into a filename→content map. */
+function parseZipEntries(bytes: Uint8Array): Map<string, string> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const entries = new Map<string, string>();
+  let pos = 0;
+  while (pos + 30 <= bytes.length) {
+    const sig = view.getUint32(pos, true);
+    if (sig !== 0x04034b50) break; // not a local file header — hit central dir
+    const nameLen = view.getUint16(pos + 26, true);
+    const extraLen = view.getUint16(pos + 28, true);
+    const dataSize = view.getUint32(pos + 22, true); // compressed == uncompressed (stored)
+    const name = new TextDecoder().decode(
+      bytes.slice(pos + 30, pos + 30 + nameLen),
+    );
+    const dataStart = pos + 30 + nameLen + extraLen;
+    const content = new TextDecoder().decode(
+      bytes.slice(dataStart, dataStart + dataSize),
+    );
+    entries.set(name, content);
+    pos = dataStart + dataSize;
+  }
+  return entries;
+}
+
+describe('buildXlsxExport (PST-014 / LS-7112)', () => {
+  const DATA: PlayerStatsExportData = {
+    batting: [BATTING_ROW as unknown as PlayerStatsExportData['batting'][0]],
+    pitching: [PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0]],
+  };
+
+  it('returns a non-empty Uint8Array', () => {
+    const result = buildXlsxExport(DATA);
+    expect(result).toBeInstanceOf(Uint8Array);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it('starts with ZIP local file header signature (PK\\x03\\x04)', () => {
+    const result = buildXlsxExport(DATA);
+    // ZIP magic bytes: 0x50 0x4B 0x03 0x04
+    expect(result[0]).toBe(0x50);
+    expect(result[1]).toBe(0x4b);
+    expect(result[2]).toBe(0x03);
+    expect(result[3]).toBe(0x04);
+  });
+
+  it('returns a non-empty result for empty data', () => {
+    const result = buildXlsxExport({ batting: [], pitching: [] });
+    expect(result).toBeInstanceOf(Uint8Array);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it('ZIP contains all required OOXML entries', () => {
+    const result = buildXlsxExport(DATA);
+    const entries = parseZipEntries(result);
+    const names = [...entries.keys()];
+    expect(names).toEqual(
+      expect.arrayContaining([
+        '[Content_Types].xml',
+        '_rels/.rels',
+        'xl/workbook.xml',
+        'xl/_rels/workbook.xml.rels',
+        'xl/worksheets/sheet1.xml',
+        'xl/worksheets/sheet2.xml',
+      ]),
+    );
+  });
+
+  it('workbook.xml references Batting and Pitching sheets', () => {
+    const result = buildXlsxExport(DATA);
+    const entries = parseZipEntries(result);
+    const workbook = entries.get('xl/workbook.xml') ?? '';
+    expect(workbook).toContain('name="Batting"');
+    expect(workbook).toContain('name="Pitching"');
+  });
+
+  it('sheet1.xml (Batting) contains player data row', () => {
+    const result = buildXlsxExport(DATA);
+    const entries = parseZipEntries(result);
+    const sheet1 = entries.get('xl/worksheets/sheet1.xml') ?? '';
+    // header row should contain Name column (first header)
+    expect(sheet1).toContain('Name');
+    // data row should reference the batting row's displayName
+    expect(sheet1).toContain(BATTING_ROW.displayName as string);
+  });
+
+  it('sheet2.xml (Pitching) contains pitcher data row', () => {
+    const result = buildXlsxExport(DATA);
+    const entries = parseZipEntries(result);
+    const sheet2 = entries.get('xl/worksheets/sheet2.xml') ?? '';
+    expect(sheet2).toContain('W');
+    expect(sheet2).toContain('ERA');
   });
 });

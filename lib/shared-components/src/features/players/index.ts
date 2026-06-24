@@ -36,7 +36,7 @@ export {
   DEFAULT_BATTING_SORT_BY,
   DEFAULT_BATTING_SORT_DIR,
 } from './PlayerStatsPage';
-export type { PlayerStatsExportData } from './PlayerStatsPage';
+export type { ExportFormat, PlayerStatsExportData } from './PlayerStatsPage';
 
 // Column-visibility helpers + serialization (LS-7105 / PST-001)
 export {

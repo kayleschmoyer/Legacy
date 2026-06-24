@@ -51,9 +51,10 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
   PlayerStatsPage: (props: {
     onShare?: (relativeUrl: string) => void;
     onPlayerDetails?: (player: { id: string | number }) => void;
-    onExport?: (filters: unknown, viewMode: string) => void;
+    onExport?: (filters: unknown, viewMode: string, format?: string) => void;
     canExport?: boolean;
     canCustomizeColumns?: boolean;
+    exportFormats?: readonly string[];
     [key: string]: unknown;
   }) => {
     mockStatsPageProps = props;
@@ -71,12 +72,29 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
         <div data-testid="can-customize-columns">
           {String(props.canCustomizeColumns)}
         </div>
+        <div data-testid="export-formats">
+          {(props.exportFormats ?? []).join(',')}
+        </div>
         <button
           type="button"
           data-testid="export-button"
           onClick={() => props.onExport?.({}, 'combined')}
         >
-          Export
+          Export JSON
+        </button>
+        <button
+          type="button"
+          data-testid="export-csv-button"
+          onClick={() => props.onExport?.({}, 'combined', 'csv')}
+        >
+          Export CSV
+        </button>
+        <button
+          type="button"
+          data-testid="export-xlsx-button"
+          onClick={() => props.onExport?.({}, 'combined', 'xlsx')}
+        >
+          Export XLSX
         </button>
       </>
     );
@@ -806,5 +824,71 @@ describe('PlayerStatsRoute export entitlement (LS-5591)', () => {
     render(<PlayerStatsRoute />);
     fireEvent.click(screen.getByTestId('export-button'));
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+  });
+});
+
+// PST-014 / LS-7112: Premium viewers get CSV and XLSX export format options.
+describe('PlayerStatsRoute export formats (PST-014 / LS-7112)', () => {
+  let createObjectURL: jest.Mock;
+
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+    mockIsAuthenticated = true;
+    mockAuthLoading = false;
+    mockStatsPageProps = {};
+    createObjectURL = jest.fn(() => 'blob:mock');
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = jest.fn();
+  });
+
+  it('passes exportFormats ["json","csv","xlsx"] to premium viewers', () => {
+    mockHasEntitlement = true;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('export-formats')).toHaveTextContent(
+      'json,csv,xlsx',
+    );
+  });
+
+  it('passes exportFormats ["json"] to non-premium viewers', () => {
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('export-formats')).toHaveTextContent('json');
+  });
+
+  it('triggers a CSV download when format is csv', () => {
+    mockHasEntitlement = true;
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('export-csv-button'));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe('text/csv');
+  });
+
+  it('triggers an XLSX download when format is xlsx', () => {
+    mockHasEntitlement = true;
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('export-xlsx-button'));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+  });
+
+  it('does not run CSV export for non-premium viewers', () => {
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('export-csv-button'));
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('does not run XLSX export for non-premium viewers', () => {
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('export-xlsx-button'));
+    expect(createObjectURL).not.toHaveBeenCalled();
   });
 });
