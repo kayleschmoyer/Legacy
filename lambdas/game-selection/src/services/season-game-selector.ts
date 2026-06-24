@@ -787,47 +787,10 @@ export async function selectGamesForMatchup(
   }> = [];
 
   for (const matchupPlayer of matchupPlayers) {
-    // Check if games have already been selected for this player and game number
-    const existingGames = await db
-      .select()
-      .from(PublicSchema.matchupPlayerGames)
-      .where(
-        and(
-          eq(PublicSchema.matchupPlayerGames.matchupPlayerId, matchupPlayer.id),
-          eq(PublicSchema.matchupPlayerGames.gameNum, gameNumber),
-        ),
-      );
-
-    if (existingGames.length > 0) {
-      LOGGER.debug(
-        `Games already selected for matchup player ${matchupPlayer.id}, game ${gameNumber}. Skipping.`,
-      );
-      continue;
-    }
-
-    // Get this player's assigned season from league_week_player_seasons
-    const playerSeason = seasonMap.get(matchupPlayer.playerId);
-
-    if (!playerSeason) {
-      // A player can legitimately have no season when they were added via
-      // waivers mid-week but have insufficient historical game data to assign
-      // a season. Skip game selection for them rather than crashing the entire
-      // matchup — they will simply contribute no stats for this matchup.
-      LOGGER.warn(
-        `No season assigned for player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber} — skipping game selection`,
-      );
-      continue;
-    }
-
-    // Determine the player's pitcher role from the pre-loaded map (batched query above)
-    const pitcherRole =
-      pitcherRoleMap.get(matchupPlayer.playerId) ?? 'non-pitcher';
-
-    // For SPs: apply probabilistic start selection
-    if (pitcherRole === 'SP') {
-      // Count how many starts this SP already has in this matchup
-      const existingStarts = await db
-        .select({ count: sql<number>`count(*)` })
+    try {
+      // Check if games have already been selected for this player and game number
+      const existingGames = await db
+        .select()
         .from(PublicSchema.matchupPlayerGames)
         .where(
           and(
@@ -835,75 +798,152 @@ export async function selectGamesForMatchup(
               PublicSchema.matchupPlayerGames.matchupPlayerId,
               matchupPlayer.id,
             ),
-            isNotNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+            eq(PublicSchema.matchupPlayerGames.gameNum, gameNumber),
           ),
         );
 
-      const startsAlreadySelected = Number(existingStarts[0]?.count ?? 0);
-
-      if (
-        !shouldSelectSpGame(
-          pitcherStartsPerMatchup,
-          startsAlreadySelected,
-          gamesRemainingInMatchup,
-        )
-      ) {
+      if (existingGames.length > 0) {
         LOGGER.debug(
-          `SP player ${matchupPlayer.playerId} skipped for game ${gameNumber} ` +
-            `(starts=${startsAlreadySelected}/${pitcherStartsPerMatchup}, ` +
-            `remaining=${gamesRemainingInMatchup})`,
+          `Games already selected for matchup player ${matchupPlayer.id}, game ${gameNumber}. Skipping.`,
         );
-
-        // Insert a record with null gameIdentifier and pitcherStartSkipped=true to indicate intentional skip
-        await db.insert(PublicSchema.matchupPlayerGames).values({
-          gameNum: gameNumber,
-          matchupPlayerId: matchupPlayer.id,
-          gameIdentifier: null,
-          gamePosition: null,
-          statsLoadingStatus: 'completed',
-          pitcherStartSkipped: true,
-        });
         continue;
       }
-    }
 
-    LOGGER.debug(
-      `Selecting game for player ${matchupPlayer.playerId} ` +
-        `(role=${pitcherRole}) using season ${playerSeason}`,
-    );
+      // Get this player's assigned season from league_week_player_seasons
+      const playerSeason = seasonMap.get(matchupPlayer.playerId);
 
-    // Select a real game for this player using game_identifier
-    const result = await selectGamesForMatchupPlayer(
-      db,
-      matchupPlayer.id,
-      matchupPlayer.playerId,
-      playerSeason,
-      pitcherRole,
-    );
+      if (!playerSeason) {
+        // A player can legitimately have no season when they were added via
+        // waivers mid-week but have insufficient historical game data to assign
+        // a season. Skip game selection for them rather than crashing the entire
+        // matchup — they will simply contribute no stats for this matchup.
+        LOGGER.warn(
+          `No season assigned for player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber} — skipping game selection`,
+        );
+        continue;
+      }
 
-    // Insert the selected game into the database
-    await db.insert(PublicSchema.matchupPlayerGames).values({
-      gameNum: gameNumber,
-      matchupPlayerId: matchupPlayer.id,
-      gameIdentifier: result.gameIdentifier,
-      gamePosition: result.gamePosition,
-      // Set status based on whether stats are cached
-      statsLoadingStatus: result.statsAreCached ? 'completed' : 'pending',
-    });
+      // Determine the player's pitcher role from the pre-loaded map (batched query above)
+      const pitcherRole =
+        pitcherRoleMap.get(matchupPlayer.playerId) ?? 'non-pitcher';
 
-    LOGGER.debug(
-      `Inserted game selection for matchup player ${matchupPlayer.id}, game ${gameNumber} ` +
-        `(gameIdentifier=${result.gameIdentifier}, cached=${result.statsAreCached}, role=${pitcherRole})`,
-    );
+      // For SPs: apply probabilistic start selection
+      if (pitcherRole === 'SP') {
+        // Count how many starts this SP already has in this matchup
+        const existingStarts = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(PublicSchema.matchupPlayerGames)
+          .where(
+            and(
+              eq(
+                PublicSchema.matchupPlayerGames.matchupPlayerId,
+                matchupPlayer.id,
+              ),
+              isNotNull(PublicSchema.matchupPlayerGames.gameIdentifier),
+            ),
+          );
 
-    // Track players that need stats loading
-    if (!result.statsAreCached) {
-      playersNeedingStatsLoading.push({
+        const startsAlreadySelected = Number(existingStarts[0]?.count ?? 0);
+
+        if (
+          !shouldSelectSpGame(
+            pitcherStartsPerMatchup,
+            startsAlreadySelected,
+            gamesRemainingInMatchup,
+          )
+        ) {
+          LOGGER.debug(
+            `SP player ${matchupPlayer.playerId} skipped for game ${gameNumber} ` +
+              `(starts=${startsAlreadySelected}/${pitcherStartsPerMatchup}, ` +
+              `remaining=${gamesRemainingInMatchup})`,
+          );
+
+          // Insert a record with null gameIdentifier and pitcherStartSkipped=true to indicate intentional skip
+          await db.insert(PublicSchema.matchupPlayerGames).values({
+            gameNum: gameNumber,
+            matchupPlayerId: matchupPlayer.id,
+            gameIdentifier: null,
+            gamePosition: null,
+            statsLoadingStatus: 'completed',
+            pitcherStartSkipped: true,
+          });
+          continue;
+        }
+      }
+
+      LOGGER.debug(
+        `Selecting game for player ${matchupPlayer.playerId} ` +
+          `(role=${pitcherRole}) using season ${playerSeason}`,
+      );
+
+      // Select a real game for this player using game_identifier
+      const result = await selectGamesForMatchupPlayer(
+        db,
+        matchupPlayer.id,
+        matchupPlayer.playerId,
+        playerSeason,
+        pitcherRole,
+      );
+
+      // Insert the selected game into the database
+      await db.insert(PublicSchema.matchupPlayerGames).values({
+        gameNum: gameNumber,
         matchupPlayerId: matchupPlayer.id,
-        playerId: matchupPlayer.playerId,
-        season: playerSeason,
+        gameIdentifier: result.gameIdentifier,
         gamePosition: result.gamePosition,
+        // Set status based on whether stats are cached
+        statsLoadingStatus: result.statsAreCached ? 'completed' : 'pending',
       });
+
+      LOGGER.debug(
+        `Inserted game selection for matchup player ${matchupPlayer.id}, game ${gameNumber} ` +
+          `(gameIdentifier=${result.gameIdentifier}, cached=${result.statsAreCached}, role=${pitcherRole})`,
+      );
+
+      // Track players that need stats loading
+      if (!result.statsAreCached) {
+        playersNeedingStatsLoading.push({
+          matchupPlayerId: matchupPlayer.id,
+          playerId: matchupPlayer.playerId,
+          season: playerSeason,
+          gamePosition: result.gamePosition,
+        });
+      }
+    } catch (err) {
+      // A matchup_player row can be concurrently deleted (waiver/trade) between
+      // the initial SELECT and the INSERT. Postgres raises 23503 (FK violation)
+      // on the matchup_player_games_matchup_player_fk constraint. Treat this as
+      // a non-retriable skip — the player is gone, skip gracefully rather than
+      // failing the entire matchup (LS-8244).
+      const source =
+        (err as { cause?: Record<string, unknown> }).cause ??
+        (err as Record<string, unknown>);
+      const pgCode =
+        typeof source === 'object' &&
+        source !== null &&
+        typeof source.code === 'string'
+          ? source.code
+          : '';
+      const pgConstraint =
+        typeof source === 'object' && source !== null
+          ? typeof source.constraint_name === 'string'
+            ? source.constraint_name
+            : typeof source.constraint === 'string'
+              ? source.constraint
+              : ''
+          : '';
+
+      if (
+        pgCode === '23503' &&
+        pgConstraint === 'matchup_player_games_matchup_player_fk'
+      ) {
+        LOGGER.warn(
+          `Matchup player ${matchupPlayer.id} was deleted before game selection insert — skipping (LS-8244)`,
+        );
+        continue;
+      }
+
+      throw err;
     }
   }
 

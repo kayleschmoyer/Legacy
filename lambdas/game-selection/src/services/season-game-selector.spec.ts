@@ -729,5 +729,145 @@ describe('season-game-selector', () => {
         expect.objectContaining({ statsLoadingStatus: 'completed' }),
       );
     });
+
+    it('skips a player when the insert fails with matchup_player FK violation (LS-8244)', async () => {
+      // Reproduces the race condition where a matchup_player row is deleted
+      // (via waiver/trade) between the initial SELECT and the INSERT into
+      // matchup_player_games. Postgres raises 23503 on the
+      // matchup_player_games_matchup_player_fk constraint; the function must
+      // skip the player with a warn rather than throwing and failing the whole
+      // matchup.
+
+      jest.clearAllMocks();
+      mockGetMatchupPlayerGameStats.mockResolvedValue([]);
+      mockGetScoringMultipliersForLeague.mockResolvedValue({
+        batting: {},
+        pitching: {},
+        fielding: {},
+      });
+
+      let selectIndex = 0;
+      const fkError = Object.assign(
+        new Error('Failed query: insert into ...'),
+        {
+          cause: {
+            code: '23503',
+            constraint_name: 'matchup_player_games_matchup_player_fk',
+          },
+        },
+      );
+
+      const selectResults = [
+        // 1. get matchup
+        [
+          {
+            id: 1,
+            leagueId: 10,
+            weekNumber: 1,
+            pitcherStartsPerMatchup: 1,
+            gamesPerMatchup: 5,
+          },
+        ],
+        // 2. get league sport
+        [{ sport: 'baseball' }],
+        // 3. get matchup players — one player
+        [{ id: 2666405, playerId: 7, matchupId: 1 }],
+        // 4. get player seasons
+        [{ playerId: 7, season: 1990 }],
+        // 5. batch pitcher roles
+        [],
+        // 6. existingGames check — no existing games
+        [],
+      ];
+
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue(result),
+                then: (cb: (rows: unknown[]) => unknown) =>
+                  Promise.resolve(cb(result)),
+                ...result,
+              }),
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue(result),
+              }),
+            }),
+          };
+        }),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockRejectedValue(fkError),
+        }),
+      } as unknown as PublicDb;
+
+      const { playersNeedingStatsLoading } = await selectGamesForMatchup(
+        mockDb,
+        1,
+        1,
+      );
+
+      // Player was skipped — no stats to load, no throw
+      expect(playersNeedingStatsLoading).toHaveLength(0);
+    });
+
+    it('re-throws non-FK errors from insert (LS-8244)', async () => {
+      let selectIndex = 0;
+      const otherError = new Error('unexpected DB failure');
+
+      const selectResults = [
+        [
+          {
+            id: 1,
+            leagueId: 10,
+            weekNumber: 1,
+            pitcherStartsPerMatchup: 1,
+            gamesPerMatchup: 5,
+          },
+        ],
+        [{ sport: 'baseball' }],
+        [{ id: 300, playerId: 8, matchupId: 1 }],
+        [{ playerId: 8, season: 2000 }],
+        [],
+        [],
+      ];
+
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue(result),
+                then: (cb: (rows: unknown[]) => unknown) =>
+                  Promise.resolve(cb(result)),
+                ...result,
+              }),
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue(result),
+              }),
+            }),
+          };
+        }),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockRejectedValue(otherError),
+        }),
+      } as unknown as PublicDb;
+
+      await expect(selectGamesForMatchup(mockDb, 1, 1)).rejects.toThrow(
+        'unexpected DB failure',
+      );
+    });
   });
 });
