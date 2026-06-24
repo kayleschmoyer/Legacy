@@ -282,6 +282,17 @@ export class BadgeService {
     return runWithPublicClient(this.options, async (db) => {
       const { leagueId = null, teamId = null, metadata = {} } = opts;
 
+      if (leagueId != null) {
+        const [league] = await db
+          .select({ id: PublicSchema.leagues.id })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+        if (!league) {
+          throw new Error(`League not found: ${leagueId}`);
+        }
+      }
+
       // Deduplication check for non-repeatable badges
       const existing = await db
         .select({ id: PublicSchema.userBadges.id })
