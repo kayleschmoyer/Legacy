@@ -405,6 +405,18 @@ class PlayerDetailSurface {
     await expect(this.#loading).not.toBeVisible();
   }
 
+  /**
+   * Assert the loading spinner never mounted. The spinner renders only while
+   * `loading && !displayData`; on a cache hit `displayData` is present on the
+   * first render, so the spinner element is absent from the settled DOM. This
+   * is a deterministic check on the final state — not a race against a timing
+   * window — so pair it with a positive ready signal (e.g.
+   * {@link expectCareerBattingCard}) that proves the data has already rendered.
+   */
+  async expectNeverLoaded(): Promise<void> {
+    await expect(this.#loading).toHaveCount(0);
+  }
+
   /** Assert the "← Back" button is visible. */
   async expectBackButton(): Promise<void> {
     await expect(

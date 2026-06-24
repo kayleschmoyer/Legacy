@@ -1081,10 +1081,15 @@ export function PlayerStatsRoute() {
   // Close the in-place modal by stripping only the playerId param; filters are
   // untouched. Replaces history so re-opening doesn't stack duplicate entries.
   const handleClosePlayerDetails = useCallback(() => {
-    const params = new URLSearchParams(searchParams);
+    // Read the LIVE URL (history is updated synchronously by React Router),
+    // not the `searchParams` render snapshot or a functional updater's `prev` —
+    // both lag the URL within a tick, so a concurrent filter-commit write could
+    // otherwise win with a stale `playerId` and resurrect the just-closed modal
+    // (LS-8260).
+    const params = new URLSearchParams(window.location.search);
     params.delete('playerId');
     setSearchParams(params, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [setSearchParams]);
 
   // "Ability to navigate externally": open the standalone, full-page
   // `/players/:id` route for the player shown in the modal. The modal surfaces
@@ -1169,19 +1174,31 @@ export function PlayerStatsRoute() {
       // link through so a filter change (which rebuilds the whole param set, and
       // fires on mount too) never drops the `cols` key or the `playerId` modal
       // selection (PST-051 / LS-7124).
+      //
+      // The `playerId` MUST be read from the LIVE URL (`window.location.search`,
+      // which React Router updates synchronously via history), not from the
+      // `searchParams` render snapshot or a functional updater's `prev` — both
+      // lag the URL within a tick. The shared PlayerStatsPage re-fires
+      // onFiltersChange around the modal lifecycle; if this commit lands right
+      // after the close with a stale `playerId`, it re-adds the just-removed
+      // param and resurrects the closed modal (a ~16% flake; LS-8260). Reading
+      // the live URL means a filter commit preserves the modal only while it is
+      // genuinely still open. Dropping `searchParams` from the deps also keeps
+      // the callback identity stable so the shared effect stops re-firing on
+      // every URL write.
       setSearchParams(
         buildStatsSearchParams({
           ...state,
           sport,
           visibleColumns,
-          playerId: searchParams.get('playerId'),
+          playerId: new URLSearchParams(window.location.search).get('playerId'),
         }),
         {
           replace: true,
         },
       );
     },
-    [searchParams, setSearchParams, sport, visibleColumns],
+    [setSearchParams, sport, visibleColumns],
   );
 
   // Handle share functionality — shared component passes a relative URL; prepend origin here.

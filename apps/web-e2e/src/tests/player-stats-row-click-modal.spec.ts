@@ -270,6 +270,10 @@ test.describe('Player Stats — Row Click Opens Modal (LS-5595) @regression', ()
 
     await playersPage.detail.pressEscape();
 
+    // Awaits the dialog's removal (deterministic web-first assertion), not a
+    // fixed delay. The close itself is made reliable by the functional
+    // setSearchParams fix in PlayerStatsRoute (LS-8260) — previously a stale
+    // filter-commit closure could re-add ?playerId and resurrect the modal.
     await playersPage.detail.expectClosed();
     await expect(page).not.toHaveURL(/playerId/);
   });

@@ -448,12 +448,16 @@ test.describe('Player Detail – zero-flicker player switching @regression', () 
     await setupSwitchingMocks(page);
 
     // First visit: full data load via SPA navigation from the stats table.
-    // expectNotLoading() + expectText() confirm the dialog is open and data is
-    // loaded before close() is called — this primes the Apollo in-memory cache.
+    // The career-batting card mounts only once GetAllPlayerSeasonStats has
+    // resolved (it derives from `displayData`), so gating on it proves the
+    // query response is in the Apollo cache before close() is called. Gating
+    // on the header name alone would not: the masthead renders the prop-sourced
+    // name immediately, so it can pass before the query resolves — leaving the
+    // cache cold and re-introducing the spinner on re-open.
     await playersPage.gotoStats();
     await playersPage.stats.openPlayerByName('Trout');
     await page.waitForURL(/playerId=/, { timeout: 5000 });
-    await playersPage.detail.expectNotLoading();
+    await playersPage.detail.expectCareerBattingCard();
     await playersPage.detail.expectText('Mike Trout');
 
     // Close modal to return to stats, then re-open the same player.
@@ -464,9 +468,16 @@ test.describe('Player Detail – zero-flicker player switching @regression', () 
     await playersPage.stats.openPlayerByName('Trout');
     await page.waitForURL(/playerId=/, { timeout: 5000 });
 
-    // Second visit: cache hit — loading indicator must never appear
-    await playersPage.detail.expectNotLoading();
+    // Second visit is a cache hit: `displayData` is defined on the first render,
+    // so the career-batting card renders synchronously. Gate on that positive
+    // ready signal first…
+    await playersPage.detail.expectCareerBattingCard();
     await playersPage.detail.expectText('Mike Trout');
+    // …then assert the loading spinner never mounted. The spinner renders only
+    // while `loading && !displayData`, so its absence from the settled DOM is a
+    // deterministic proof of the cache hit — not a race against the
+    // (non-)render window.
+    await playersPage.detail.expectNeverLoaded();
   });
 
   test('shows correct player data after switching from batter to pitcher', async ({

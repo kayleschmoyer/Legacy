@@ -561,6 +561,9 @@ describe('PlayerStatsRoute player deep link (PST-051)', () => {
     mockHasEntitlement = true;
     mockStatsPageProps = {};
     mockOnPlayerDetailsRef.current = undefined;
+    // The close / filter-commit handlers read the LIVE URL (window.location)
+    // rather than the React-state snapshot, so reset jsdom's history per test.
+    window.history.replaceState(null, '', '/players/stats');
   });
 
   it('auto-opens the detail modal for the player in ?playerId on mount (AC3)', () => {
@@ -601,6 +604,13 @@ describe('PlayerStatsRoute player deep link (PST-051)', () => {
 
   it('strips ?playerId when the modal closes, keeping filters (AC2, AC4)', () => {
     mockSearchParams = new URLSearchParams('sport=mlb&playerId=42&position=OF');
+    // Close strips playerId from the live URL, so mirror the snapshot into
+    // jsdom history (LS-8260).
+    window.history.replaceState(
+      null,
+      '',
+      `/players/stats?${mockSearchParams.toString()}`,
+    );
     render(<PlayerStatsRoute />);
     fireEvent.click(screen.getByTestId('close-modal'));
     const [params, opts] = mockSetSearchParams.mock.calls[0] as [
@@ -616,6 +626,12 @@ describe('PlayerStatsRoute player deep link (PST-051)', () => {
     // The shared list fires onFiltersChange from a mount effect; if the rebuild
     // dropped playerId it would close the deep-linked modal on reload.
     mockSearchParams = new URLSearchParams('sport=mlb&playerId=42');
+    // The commit handler reads playerId from the live URL (LS-8260).
+    window.history.replaceState(
+      null,
+      '',
+      `/players/stats?${mockSearchParams.toString()}`,
+    );
     render(<PlayerStatsRoute />);
     act(() => {
       (mockStatsPageProps.onFiltersChange as (state: unknown) => void)?.({
