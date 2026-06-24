@@ -51,10 +51,17 @@ export interface StatisticsFilters {
   playerId?: number;
   minGames?: number;
   minHomeRuns?: number;
+  maxHomeRuns?: number;
   minRBI?: number;
+  maxRBI?: number;
   minWins?: number;
+  maxWins?: number;
   minStrikeouts?: number;
+  maxStrikeouts?: number;
   minBattingAvg?: number;
+  maxBattingAvg?: number;
+  minERA?: number;
+  maxERA?: number;
   searchTerm?: string;
   position?: string;
   team?: string;
@@ -1173,9 +1180,21 @@ export class StatisticsService {
       );
     }
 
+    if (filters.maxHomeRuns !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerBatting.hr} <= ${filters.maxHomeRuns}`,
+      );
+    }
+
     if (filters.minRBI !== undefined) {
       conditions.push(
         sql`${PublicSchema.careerBatting.rbi} >= ${filters.minRBI}`,
+      );
+    }
+
+    if (filters.maxRBI !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerBatting.rbi} <= ${filters.maxRBI}`,
       );
     }
 
@@ -1184,6 +1203,12 @@ export class StatisticsService {
       // Only include players with at least 1 at-bat to avoid division by zero
       conditions.push(
         sql`${PublicSchema.careerBatting.ab} > 0 AND (CAST(${PublicSchema.careerBatting.h} AS DECIMAL) / CAST(${PublicSchema.careerBatting.ab} AS DECIMAL)) >= ${filters.minBattingAvg}`,
+      );
+    }
+
+    if (filters.maxBattingAvg !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerBatting.ab} > 0 AND (CAST(${PublicSchema.careerBatting.h} AS DECIMAL) / CAST(${PublicSchema.careerBatting.ab} AS DECIMAL)) <= ${filters.maxBattingAvg}`,
       );
     }
 
@@ -1220,9 +1245,33 @@ export class StatisticsService {
       );
     }
 
+    if (filters.maxWins !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerPitching.w} <= ${filters.maxWins}`,
+      );
+    }
+
     if (filters.minStrikeouts !== undefined) {
       conditions.push(
         sql`${PublicSchema.careerPitching.so} >= ${filters.minStrikeouts}`,
+      );
+    }
+
+    if (filters.maxStrikeouts !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerPitching.so} <= ${filters.maxStrikeouts}`,
+      );
+    }
+
+    if (filters.minERA !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerPitching.era}::float >= ${filters.minERA}`,
+      );
+    }
+
+    if (filters.maxERA !== undefined) {
+      conditions.push(
+        sql`${PublicSchema.careerPitching.era}::float <= ${filters.maxERA}`,
       );
     }
 

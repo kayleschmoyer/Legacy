@@ -397,10 +397,19 @@ describe('hasPendingFilterChanges (LS-7126)', () => {
     expect(hasPendingFilterChanges({ ...base, pageSize: 50 }, base)).toBe(true);
   });
 
-  it('detects pending advanced slider edits (minHR / minAVG / maxERA)', () => {
+  it('detects pending advanced slider edits (all stat range fields)', () => {
     expect(hasPendingFilterChanges({ ...base, minHR: 500 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxHR: 400 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minRBI: 100 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxRBI: 1000 }, base)).toBe(true);
     expect(hasPendingFilterChanges({ ...base, minAVG: 0.3 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxAVG: 0.3 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minERA: 1.5 }, base)).toBe(true);
     expect(hasPendingFilterChanges({ ...base, maxERA: 3 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minWins: 100 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxWins: 300 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, minSO: 1000 }, base)).toBe(true);
+    expect(hasPendingFilterChanges({ ...base, maxSO: 3000 }, base)).toBe(true);
   });
 
   it('detects pending new range slider edits (LS-5598)', () => {
@@ -534,7 +543,7 @@ describe('buildShareUrl (LS-7131)', () => {
   });
 
   it('omits maxERA when it sits at the off-sentinel', () => {
-    const applied = { ...APPLIED_DEFAULTS, maxERA: 5 };
+    const applied = { ...APPLIED_DEFAULTS, maxERA: ERA_MAX_OFF };
     expect(buildShareUrl('combined', applied)).not.toContain('maxERA');
   });
 

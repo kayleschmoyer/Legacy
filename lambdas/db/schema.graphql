@@ -3103,6 +3103,9 @@ type Query {
   careerBattingStats(
     after: String
     first: Int
+    maxBattingAvg: Float
+    maxHomeRuns: Int
+    maxRBI: Int
     minBattingAvg: Float
     minGames: Int
     minHomeRuns: Int
@@ -3123,6 +3126,10 @@ type Query {
   ): [CareerFielding!]
   careerPitchingStats(
     limit: Int
+    maxERA: Float
+    maxStrikeouts: Int
+    maxWins: Int
+    minERA: Float
     minGames: Int
     minStrikeouts: Int
     minWins: Int
@@ -3134,6 +3141,10 @@ type Query {
     team: String
   ): [CareerPitching!]
   careerPitchingStatsCount(
+    maxERA: Float
+    maxStrikeouts: Int
+    maxWins: Int
+    minERA: Float
     minGames: Int
     minStrikeouts: Int
     minWins: Int

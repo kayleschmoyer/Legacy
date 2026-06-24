@@ -480,7 +480,11 @@ export function PitchingStatsDataGrid({
     variables: {
       minGames: queryParams.minGames,
       minWins: queryParams.minWins,
+      maxWins: queryParams.maxWins,
       minStrikeouts: queryParams.minStrikeouts,
+      maxStrikeouts: queryParams.maxStrikeouts,
+      minERA: queryParams.minERA,
+      maxERA: queryParams.maxERA,
       searchTerm: queryParams.searchTerm,
       position: queryParams.position,
       team: queryParams.team,

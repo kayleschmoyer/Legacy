@@ -10,8 +10,11 @@ query GetCareerBattingStats(
   $orderDirection: String
   $minGames: Int
   $minHomeRuns: Int
+  $maxHomeRuns: Int
   $minRBI: Int
+  $maxRBI: Int
   $minBattingAvg: Float
+  $maxBattingAvg: Float
   $searchTerm: String
   $position: String
   $team: String
@@ -24,8 +27,11 @@ query GetCareerBattingStats(
     orderDirection: $orderDirection
     minGames: $minGames
     minHomeRuns: $minHomeRuns
+    maxHomeRuns: $maxHomeRuns
     minRBI: $minRBI
+    maxRBI: $maxRBI
     minBattingAvg: $minBattingAvg
+    maxBattingAvg: $maxBattingAvg
     searchTerm: $searchTerm
     position: $position
     team: $team

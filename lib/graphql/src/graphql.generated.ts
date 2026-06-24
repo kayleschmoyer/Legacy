@@ -3137,6 +3137,9 @@ export type QueryAwardVotingPeriodArgs = {
 export type QueryCareerBattingStatsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
+  maxBattingAvg?: InputMaybe<Scalars['Float']['input']>;
+  maxHomeRuns?: InputMaybe<Scalars['Int']['input']>;
+  maxRBI?: InputMaybe<Scalars['Int']['input']>;
   minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minHomeRuns?: InputMaybe<Scalars['Int']['input']>;
@@ -3159,6 +3162,10 @@ export type QueryCareerFieldingStatsArgs = {
 
 export type QueryCareerPitchingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
+  maxERA?: InputMaybe<Scalars['Float']['input']>;
+  maxStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  maxWins?: InputMaybe<Scalars['Int']['input']>;
+  minERA?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   minWins?: InputMaybe<Scalars['Int']['input']>;
@@ -3171,6 +3178,10 @@ export type QueryCareerPitchingStatsArgs = {
 };
 
 export type QueryCareerPitchingStatsCountArgs = {
+  maxERA?: InputMaybe<Scalars['Float']['input']>;
+  maxStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  maxWins?: InputMaybe<Scalars['Int']['input']>;
+  minERA?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   minWins?: InputMaybe<Scalars['Int']['input']>;
@@ -9102,8 +9113,11 @@ export type GetCareerBattingStatsQueryVariables = Exact<{
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minHomeRuns?: InputMaybe<Scalars['Int']['input']>;
+  maxHomeRuns?: InputMaybe<Scalars['Int']['input']>;
   minRBI?: InputMaybe<Scalars['Int']['input']>;
+  maxRBI?: InputMaybe<Scalars['Int']['input']>;
   minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
+  maxBattingAvg?: InputMaybe<Scalars['Float']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
@@ -9172,7 +9186,11 @@ export type GetCareerPitchingStatsQueryVariables = Exact<{
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minWins?: InputMaybe<Scalars['Int']['input']>;
+  maxWins?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  maxStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  minERA?: InputMaybe<Scalars['Float']['input']>;
+  maxERA?: InputMaybe<Scalars['Float']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
@@ -9223,7 +9241,11 @@ export type GetCareerPitchingStatsQuery = {
 export type GetCareerPitchingStatsCountQueryVariables = Exact<{
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minWins?: InputMaybe<Scalars['Int']['input']>;
+  maxWins?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  maxStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  minERA?: InputMaybe<Scalars['Float']['input']>;
+  maxERA?: InputMaybe<Scalars['Float']['input']>;
   searchTerm?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['String']['input']>;
   team?: InputMaybe<Scalars['String']['input']>;
@@ -22771,8 +22793,11 @@ export const GetCareerBattingStats = gql`
     $orderDirection: String
     $minGames: Int
     $minHomeRuns: Int
+    $maxHomeRuns: Int
     $minRBI: Int
+    $maxRBI: Int
     $minBattingAvg: Float
+    $maxBattingAvg: Float
     $searchTerm: String
     $position: String
     $team: String
@@ -22785,8 +22810,11 @@ export const GetCareerBattingStats = gql`
       orderDirection: $orderDirection
       minGames: $minGames
       minHomeRuns: $minHomeRuns
+      maxHomeRuns: $maxHomeRuns
       minRBI: $minRBI
+      maxRBI: $maxRBI
       minBattingAvg: $minBattingAvg
+      maxBattingAvg: $maxBattingAvg
       searchTerm: $searchTerm
       position: $position
       team: $team
@@ -22829,8 +22857,11 @@ export const GetCareerBattingStats = gql`
  *      orderDirection: // value for 'orderDirection'
  *      minGames: // value for 'minGames'
  *      minHomeRuns: // value for 'minHomeRuns'
+ *      maxHomeRuns: // value for 'maxHomeRuns'
  *      minRBI: // value for 'minRBI'
+ *      maxRBI: // value for 'maxRBI'
  *      minBattingAvg: // value for 'minBattingAvg'
+ *      maxBattingAvg: // value for 'maxBattingAvg'
  *      searchTerm: // value for 'searchTerm'
  *      position: // value for 'position'
  *      team: // value for 'team'
@@ -22908,7 +22939,11 @@ export const GetCareerPitchingStats = gql`
     $orderDirection: String
     $minGames: Int
     $minWins: Int
+    $maxWins: Int
     $minStrikeouts: Int
+    $maxStrikeouts: Int
+    $minERA: Float
+    $maxERA: Float
     $searchTerm: String
     $position: String
     $team: String
@@ -22920,7 +22955,11 @@ export const GetCareerPitchingStats = gql`
       orderDirection: $orderDirection
       minGames: $minGames
       minWins: $minWins
+      maxWins: $maxWins
       minStrikeouts: $minStrikeouts
+      maxStrikeouts: $maxStrikeouts
+      minERA: $minERA
+      maxERA: $maxERA
       searchTerm: $searchTerm
       position: $position
       team: $team
@@ -22951,7 +22990,11 @@ export const GetCareerPitchingStats = gql`
  *      orderDirection: // value for 'orderDirection'
  *      minGames: // value for 'minGames'
  *      minWins: // value for 'minWins'
+ *      maxWins: // value for 'maxWins'
  *      minStrikeouts: // value for 'minStrikeouts'
+ *      maxStrikeouts: // value for 'maxStrikeouts'
+ *      minERA: // value for 'minERA'
+ *      maxERA: // value for 'maxERA'
  *      searchTerm: // value for 'searchTerm'
  *      position: // value for 'position'
  *      team: // value for 'team'
@@ -23024,7 +23067,11 @@ export const GetCareerPitchingStatsCount = gql`
   query GetCareerPitchingStatsCount(
     $minGames: Int
     $minWins: Int
+    $maxWins: Int
     $minStrikeouts: Int
+    $maxStrikeouts: Int
+    $minERA: Float
+    $maxERA: Float
     $searchTerm: String
     $position: String
     $team: String
@@ -23032,7 +23079,11 @@ export const GetCareerPitchingStatsCount = gql`
     careerPitchingStatsCount(
       minGames: $minGames
       minWins: $minWins
+      maxWins: $maxWins
       minStrikeouts: $minStrikeouts
+      maxStrikeouts: $maxStrikeouts
+      minERA: $minERA
+      maxERA: $maxERA
       searchTerm: $searchTerm
       position: $position
       team: $team
@@ -23054,7 +23105,11 @@ export const GetCareerPitchingStatsCount = gql`
  *   variables: {
  *      minGames: // value for 'minGames'
  *      minWins: // value for 'minWins'
+ *      maxWins: // value for 'maxWins'
  *      minStrikeouts: // value for 'minStrikeouts'
+ *      maxStrikeouts: // value for 'maxStrikeouts'
+ *      minERA: // value for 'minERA'
+ *      maxERA: // value for 'maxERA'
  *      searchTerm: // value for 'searchTerm'
  *      position: // value for 'position'
  *      team: // value for 'team'

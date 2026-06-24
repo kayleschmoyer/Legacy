@@ -8,7 +8,11 @@ query GetCareerPitchingStats(
   $orderDirection: String
   $minGames: Int
   $minWins: Int
+  $maxWins: Int
   $minStrikeouts: Int
+  $maxStrikeouts: Int
+  $minERA: Float
+  $maxERA: Float
   $searchTerm: String
   $position: String
   $team: String
@@ -20,7 +24,11 @@ query GetCareerPitchingStats(
     orderDirection: $orderDirection
     minGames: $minGames
     minWins: $minWins
+    maxWins: $maxWins
     minStrikeouts: $minStrikeouts
+    maxStrikeouts: $maxStrikeouts
+    minERA: $minERA
+    maxERA: $maxERA
     searchTerm: $searchTerm
     position: $position
     team: $team

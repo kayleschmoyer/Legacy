@@ -3131,6 +3131,9 @@ export type QueryAwardVotingPeriodArgs = {
 export type QueryCareerBattingStatsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
+  maxBattingAvg?: InputMaybe<Scalars['Float']['input']>;
+  maxHomeRuns?: InputMaybe<Scalars['Int']['input']>;
+  maxRBI?: InputMaybe<Scalars['Int']['input']>;
   minBattingAvg?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minHomeRuns?: InputMaybe<Scalars['Int']['input']>;
@@ -3153,6 +3156,10 @@ export type QueryCareerFieldingStatsArgs = {
 
 export type QueryCareerPitchingStatsArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
+  maxERA?: InputMaybe<Scalars['Float']['input']>;
+  maxStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  maxWins?: InputMaybe<Scalars['Int']['input']>;
+  minERA?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   minWins?: InputMaybe<Scalars['Int']['input']>;
@@ -3165,6 +3172,10 @@ export type QueryCareerPitchingStatsArgs = {
 };
 
 export type QueryCareerPitchingStatsCountArgs = {
+  maxERA?: InputMaybe<Scalars['Float']['input']>;
+  maxStrikeouts?: InputMaybe<Scalars['Int']['input']>;
+  maxWins?: InputMaybe<Scalars['Int']['input']>;
+  minERA?: InputMaybe<Scalars['Float']['input']>;
   minGames?: InputMaybe<Scalars['Int']['input']>;
   minStrikeouts?: InputMaybe<Scalars['Int']['input']>;
   minWins?: InputMaybe<Scalars['Int']['input']>;

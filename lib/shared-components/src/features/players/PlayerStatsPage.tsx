@@ -516,12 +516,14 @@ export interface AppliedFilters {
   position: string;
   team: string;
   pageSize: number;
+  // Batting stat ranges
   minHR: number;
   maxHR: number;
   minRBI: number;
   maxRBI: number;
   minAVG: number;
   maxAVG: number;
+  // Pitching stat ranges
   minERA: number;
   maxERA: number;
   minWins: number;
@@ -905,9 +907,15 @@ export function PlayerStatsPage({
       team:
         appliedFilters.team !== 'All Teams' ? appliedFilters.team : undefined,
       minHomeRuns: appliedFilters.minHR > 0 ? appliedFilters.minHR : undefined,
+      maxHomeRuns:
+        appliedFilters.maxHR < HR_MAX ? appliedFilters.maxHR : undefined,
       minRBI: appliedFilters.minRBI > 0 ? appliedFilters.minRBI : undefined,
+      maxRBI:
+        appliedFilters.maxRBI < RBI_MAX ? appliedFilters.maxRBI : undefined,
       minBattingAvg:
         appliedFilters.minAVG > 0 ? appliedFilters.minAVG : undefined,
+      maxBattingAvg:
+        appliedFilters.maxAVG < AVG_MAX ? appliedFilters.maxAVG : undefined,
       // The Hitters tab must exclude pure pitchers from the batting grid; the
       // tab flags alone only toggle grid visibility (LS-7145). Two-way players
       // (e.g. Ohtani) retain a non-pitching eligible position and so remain
@@ -943,8 +951,15 @@ export function PlayerStatsPage({
       team:
         appliedFilters.team !== 'All Teams' ? appliedFilters.team : undefined,
       minWins: appliedFilters.minWins > 0 ? appliedFilters.minWins : undefined,
+      maxWins:
+        appliedFilters.maxWins < WINS_MAX ? appliedFilters.maxWins : undefined,
       minStrikeouts:
         appliedFilters.minSO > 0 ? appliedFilters.minSO : undefined,
+      maxStrikeouts:
+        appliedFilters.maxSO < SO_MAX ? appliedFilters.maxSO : undefined,
+      minERA: appliedFilters.minERA > 0 ? appliedFilters.minERA : undefined,
+      maxERA:
+        appliedFilters.maxERA < ERA_MAX_OFF ? appliedFilters.maxERA : undefined,
     }),
     [appliedFilters],
   );
