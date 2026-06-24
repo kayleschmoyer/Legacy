@@ -1,4 +1,4 @@
-import { and, eq, inArray, not, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, not, sql } from 'drizzle-orm';
 import { conflictUpdateAllExcept } from './utils/ConflictUpdateAllExcept';
 import { TakeUniqueOrNull } from './utils/TakeUniqueOrThrow';
 import { GenericDatabase } from './abstract/BaseDbClient';
@@ -738,7 +738,7 @@ export async function getMatchupPlayerGameStats(
   for (const [playerId, { season, gameIdentifiers }] of playerGamesMap) {
     const uniqueGameIds = [...new Set(gameIdentifiers)];
     for (const gameIdentifier of uniqueGameIds) {
-      const batting = await db
+      const battingRows = await db
         .select()
         .from(Schema.gameBatting)
         .where(
@@ -748,9 +748,11 @@ export async function getMatchupPlayerGameStats(
             eq(Schema.gameBatting.gameIdentifier, gameIdentifier),
           ),
         )
-        .then(TakeUniqueOrNull);
+        .orderBy(asc(Schema.gameBatting.gameNum))
+        .limit(1);
+      const batting = battingRows[0] ?? null;
 
-      const pitching = await db
+      const pitchingRows = await db
         .select()
         .from(Schema.gamePitching)
         .where(
@@ -760,9 +762,11 @@ export async function getMatchupPlayerGameStats(
             eq(Schema.gamePitching.gameIdentifier, gameIdentifier),
           ),
         )
-        .then(TakeUniqueOrNull);
+        .orderBy(asc(Schema.gamePitching.gameNum))
+        .limit(1);
+      const pitching = pitchingRows[0] ?? null;
 
-      const fielding = await db
+      const fieldingRows = await db
         .select()
         .from(Schema.gameFielding)
         .where(
@@ -772,7 +776,9 @@ export async function getMatchupPlayerGameStats(
             eq(Schema.gameFielding.gameIdentifier, gameIdentifier),
           ),
         )
-        .then(TakeUniqueOrNull);
+        .orderBy(asc(Schema.gameFielding.gameNum))
+        .limit(1);
+      const fielding = fieldingRows[0] ?? null;
 
       results.push({
         playerId,

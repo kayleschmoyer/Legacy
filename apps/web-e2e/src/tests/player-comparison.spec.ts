@@ -640,49 +640,40 @@ adminTest.describe(
 
     adminTest(
       'ArrowDown moves active descendant to first suggestion',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('Aa');
-        await expect(page.getByText('Aaron Judge')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.typeSearch('Aa');
+        await playersPage.compare.expectSuggestionVisible('Aaron Judge');
 
-        await input.press('ArrowDown');
+        await playersPage.compare.pressSearchKey('ArrowDown');
 
-        await expect(
-          page.getByRole('option', { name: 'Aaron Judge' }),
-        ).toHaveAttribute('aria-selected', 'true');
+        await playersPage.compare.expectSuggestionSelected('Aaron Judge');
       },
     );
 
     adminTest(
       'ArrowDown then ArrowUp restores no selection',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('Aa');
-        await expect(page.getByText('Aaron Judge')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.typeSearch('Aa');
+        await playersPage.compare.expectSuggestionVisible('Aaron Judge');
 
-        await input.press('ArrowDown');
-        await input.press('ArrowUp');
+        await playersPage.compare.pressSearchKey('ArrowDown');
+        await playersPage.compare.pressSearchKey('ArrowUp');
 
-        await expect(
-          page.getByRole('option', { name: 'Aaron Judge' }),
-        ).toHaveAttribute('aria-selected', 'false');
+        await playersPage.compare.expectSuggestionDeselected('Aaron Judge');
       },
     );
 
     adminTest(
       'Enter selects the focused suggestion and clears input',
-      async ({ page }) => {
-        const input = page.getByLabel('Search players to compare');
-        await input.fill('Aa');
-        await expect(page.getByText('Aaron Judge')).toBeVisible();
+      async ({ playersPage }) => {
+        await playersPage.compare.typeSearch('Aa');
+        await playersPage.compare.expectSuggestionVisible('Aaron Judge');
 
-        await input.press('ArrowDown');
-        await input.press('Enter');
+        await playersPage.compare.pressSearchKey('ArrowDown');
+        await playersPage.compare.pressSearchKey('Enter');
 
-        await expect(
-          page.getByRole('button', { name: /remove aaron judge/i }),
-        ).toBeVisible();
-        await expect(input).toHaveValue('');
+        await playersPage.compare.expectRemoveButton('Aaron Judge');
+        await playersPage.compare.expectSearchValue('');
       },
     );
 

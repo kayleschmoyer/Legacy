@@ -1300,4 +1300,27 @@ class PlayerCompareSurface {
     await expect(cta).toBeVisible({ timeout: 15000 });
     await expect(cta).toBeEnabled();
   }
+
+  // ── Actions: keyboard ────────────────────────────────────────────
+
+  /** Press `key` on the search input. */
+  async pressSearchKey(key: string): Promise<void> {
+    await this.#search.press(key);
+  }
+
+  // ── Assertions: keyboard / aria ──────────────────────────────────
+
+  /** Assert the named option in the suggestions list has aria-selected="true". */
+  async expectSuggestionSelected(name: string): Promise<void> {
+    await expect(
+      this.#suggestions.getByRole('option', { name }),
+    ).toHaveAttribute('aria-selected', 'true');
+  }
+
+  /** Assert the named option in the suggestions list has aria-selected="false". */
+  async expectSuggestionDeselected(name: string): Promise<void> {
+    await expect(
+      this.#suggestions.getByRole('option', { name }),
+    ).toHaveAttribute('aria-selected', 'false');
+  }
 }
