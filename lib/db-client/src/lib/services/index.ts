@@ -15,6 +15,10 @@ import {
   createNotificationService,
   NotificationService,
 } from './NotificationService';
+import {
+  createUserPreferencesService,
+  UserPreferencesService,
+} from './UserPreferencesService';
 import { createLeagueService, LeagueService } from './LeagueService';
 import { createGdprService, GdprService } from './GdprService';
 import { BadgeService, createBadgeService } from './BadgeService';
@@ -80,6 +84,7 @@ export class DatabaseService {
   public readonly statistics: StatisticsService;
   public readonly scoring: ScoringService;
   public readonly notifications: NotificationService;
+  public readonly userPreferences: UserPreferencesService;
   public readonly leagues: LeagueService;
   public readonly gdpr: GdprService;
   public readonly badges: BadgeService;
@@ -96,6 +101,7 @@ export class DatabaseService {
     this.statistics = createStatisticsService(options);
     this.scoring = createScoringService(options);
     this.notifications = createNotificationService(options);
+    this.userPreferences = createUserPreferencesService(options);
     this.leagues = createLeagueService(options);
     this.gdpr = createGdprService(options);
     this.badges = createBadgeService(options);
@@ -151,6 +157,10 @@ export {
   NotificationService,
   createNotificationService,
 } from './NotificationService';
+export {
+  UserPreferencesService,
+  createUserPreferencesService,
+} from './UserPreferencesService';
 export { LeagueService, createLeagueService } from './LeagueService';
 export { GdprService, createGdprService } from './GdprService';
 export {
@@ -187,6 +197,11 @@ export type {
   NotificationHistoryItem,
   NotificationPreferenceUpdate,
 } from './NotificationService';
+export type {
+  UserPreferences,
+  UserPreferencesUpdate,
+  StatsFormat,
+} from './UserPreferencesService';
 export type { CreateLeagueOptions, CreateLeagueResult } from './LeagueService';
 export type {
   UserConsent,

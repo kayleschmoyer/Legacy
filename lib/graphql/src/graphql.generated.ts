@@ -1977,6 +1977,7 @@ export type Mutation = {
   updateTeamMemberPosition?: Maybe<TeamMember>;
   /** Update the avatar URL for the currently authenticated user. */
   updateUserAvatar?: Maybe<User>;
+  updateUserPreferences?: Maybe<UserPreference>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
   /** Update the theme preference ("system" | "light" | "dark") for the currently authenticated user. Syncs the choice across devices (LS-4913). */
@@ -2598,6 +2599,10 @@ export type MutationUpdateUserAvatarArgs = {
   avatarUrl?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationUpdateUserPreferencesArgs = {
+  input: UserPreferenceInput;
+};
+
 export type MutationUpdateUserRoleArgs = {
   accessLevel: Scalars['String']['input'];
   userId: Scalars['Int']['input'];
@@ -3005,6 +3010,7 @@ export type Query = {
   getUserDeviceTokens?: Maybe<Array<DeviceToken>>;
   getUserLeagueSummaries: Array<UserLeagueSummary>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
+  getUserPreferences?: Maybe<UserPreference>;
   /** Returns true when the authenticated user holds the given entitlement. Admin users always return true. */
   hasEntitlement: Scalars['Boolean']['output'];
   hello?: Maybe<Scalars['String']['output']>;
@@ -4659,6 +4665,19 @@ export type UserLeagueSummary = {
   totalTeams?: Maybe<Scalars['Int']['output']>;
   userScore?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
+};
+
+export type UserPreference = {
+  __typename?: 'UserPreference';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  statsFormat?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type UserPreferenceInput = {
+  statsFormat?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** Version and deployment information for the GraphQL API */
@@ -13002,6 +13021,45 @@ export type TwentyQuestionsStartMutation = {
   } | null;
 };
 
+export type UserPreferenceFragment = {
+  __typename?: 'UserPreference';
+  id?: number | null;
+  userId?: number | null;
+  statsFormat?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type GetUserPreferencesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetUserPreferencesQuery = {
+  __typename?: 'Query';
+  getUserPreferences?: {
+    __typename?: 'UserPreference';
+    id?: number | null;
+    userId?: number | null;
+    statsFormat?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type UpdateUserPreferencesMutationVariables = Exact<{
+  input: UserPreferenceInput;
+}>;
+
+export type UpdateUserPreferencesMutation = {
+  __typename?: 'Mutation';
+  updateUserPreferences?: {
+    __typename?: 'UserPreference';
+    id?: number | null;
+    userId?: number | null;
+    statsFormat?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
 export type GetTeamWaiverClaimsQueryVariables = Exact<{
   teamId: Scalars['Int']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
@@ -14537,6 +14595,15 @@ export const TradeOfferFragmentDoc = gql`
     }
   }
   ${TradeOfferPlayerFragmentDoc}
+`;
+export const UserPreferenceFragmentDoc = gql`
+  fragment UserPreference on UserPreference {
+    id
+    userId
+    statsFormat
+    createdAt
+    updatedAt
+  }
 `;
 export const AdminRevenueStats = gql`
   query AdminRevenueStats {
@@ -32289,6 +32356,143 @@ export type TwentyQuestionsStartMutationResult =
 export type TwentyQuestionsStartMutationOptions = BaseMutationOptions<
   TwentyQuestionsStartMutation,
   TwentyQuestionsStartMutationVariables
+>;
+export const GetUserPreferences = gql`
+  query GetUserPreferences {
+    getUserPreferences {
+      ...UserPreference
+    }
+  }
+  ${UserPreferenceFragmentDoc}
+`;
+
+/**
+ * __useGetUserPreferencesQuery__
+ *
+ * To run a query within a React component, call `useGetUserPreferencesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetUserPreferencesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetUserPreferencesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetUserPreferencesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetUserPreferencesQuery,
+    GetUserPreferencesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetUserPreferencesQuery,
+    GetUserPreferencesQueryVariables
+  >(GetUserPreferences, options);
+}
+export function useGetUserPreferencesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetUserPreferencesQuery,
+    GetUserPreferencesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetUserPreferencesQuery,
+    GetUserPreferencesQueryVariables
+  >(GetUserPreferences, options);
+}
+export function useGetUserPreferencesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserPreferencesQuery,
+        GetUserPreferencesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetUserPreferencesQuery,
+    GetUserPreferencesQueryVariables
+  >(
+    GetUserPreferences,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetUserPreferencesQuery,
+          GetUserPreferencesQueryVariables
+        >,
+  );
+}
+export type GetUserPreferencesQueryHookResult = ReturnType<
+  typeof useGetUserPreferencesQuery
+>;
+export type GetUserPreferencesLazyQueryHookResult = ReturnType<
+  typeof useGetUserPreferencesLazyQuery
+>;
+export type GetUserPreferencesSuspenseQueryHookResult = ReturnType<
+  typeof useGetUserPreferencesSuspenseQuery
+>;
+export type GetUserPreferencesQueryResult = Apollo.QueryResult<
+  GetUserPreferencesQuery,
+  GetUserPreferencesQueryVariables
+>;
+export const UpdateUserPreferences = gql`
+  mutation UpdateUserPreferences($input: UserPreferenceInput!) {
+    updateUserPreferences(input: $input) {
+      ...UserPreference
+    }
+  }
+  ${UserPreferenceFragmentDoc}
+`;
+export type UpdateUserPreferencesMutationFn = MutationFunction<
+  UpdateUserPreferencesMutation,
+  UpdateUserPreferencesMutationVariables
+>;
+
+/**
+ * __useUpdateUserPreferencesMutation__
+ *
+ * To run a mutation, you first call `useUpdateUserPreferencesMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateUserPreferencesMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateUserPreferencesMutation, { data, loading, error }] = useUpdateUserPreferencesMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateUserPreferencesMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateUserPreferencesMutation,
+    UpdateUserPreferencesMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateUserPreferencesMutation,
+    UpdateUserPreferencesMutationVariables
+  >(UpdateUserPreferences, options);
+}
+export type UpdateUserPreferencesMutationHookResult = ReturnType<
+  typeof useUpdateUserPreferencesMutation
+>;
+export type UpdateUserPreferencesMutationResult =
+  Apollo.MutationResult<UpdateUserPreferencesMutation>;
+export type UpdateUserPreferencesMutationOptions = BaseMutationOptions<
+  UpdateUserPreferencesMutation,
+  UpdateUserPreferencesMutationVariables
 >;
 export const GetTeamWaiverClaims = gql`
   query GetTeamWaiverClaims($teamId: Int!, $status: String) {

@@ -1971,6 +1971,7 @@ export type Mutation = {
   updateTeamMemberPosition?: Maybe<TeamMember>;
   /** Update the avatar URL for the currently authenticated user. */
   updateUserAvatar?: Maybe<User>;
+  updateUserPreferences?: Maybe<UserPreference>;
   /** Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them. */
   updateUserRole?: Maybe<User>;
   /** Update the theme preference ("system" | "light" | "dark") for the currently authenticated user. Syncs the choice across devices (LS-4913). */
@@ -2592,6 +2593,10 @@ export type MutationUpdateUserAvatarArgs = {
   avatarUrl?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type MutationUpdateUserPreferencesArgs = {
+  input: UserPreferenceInput;
+};
+
 export type MutationUpdateUserRoleArgs = {
   accessLevel: Scalars['String']['input'];
   userId: Scalars['Int']['input'];
@@ -2999,6 +3004,7 @@ export type Query = {
   getUserDeviceTokens?: Maybe<Array<DeviceToken>>;
   getUserLeagueSummaries: Array<UserLeagueSummary>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
+  getUserPreferences?: Maybe<UserPreference>;
   /** Returns true when the authenticated user holds the given entitlement. Admin users always return true. */
   hasEntitlement: Scalars['Boolean']['output'];
   hello?: Maybe<Scalars['String']['output']>;
@@ -4653,6 +4659,19 @@ export type UserLeagueSummary = {
   totalTeams?: Maybe<Scalars['Int']['output']>;
   userScore?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
+};
+
+export type UserPreference = {
+  __typename?: 'UserPreference';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  statsFormat?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+};
+
+export type UserPreferenceInput = {
+  statsFormat?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** Version and deployment information for the GraphQL API */

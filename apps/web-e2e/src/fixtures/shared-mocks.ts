@@ -224,6 +224,22 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   getusernotificationpreferences: {
     data: { getUserNotificationPreferences: null },
   },
+  // User display preferences (stats format, LS-7138). Default to no
+  // server-stored prefs so the client falls back to localStorage — preserving
+  // the existing localStorage-driven test expectations.
+  getuserpreferences: { data: { getUserPreferences: null } },
+  updateuserpreferences: {
+    data: {
+      updateUserPreferences: {
+        __typename: 'UserPreference',
+        id: 1,
+        userId: 1,
+        statsFormat: 'standard',
+        createdAt: FIXED_NOW_ISO,
+        updatedAt: FIXED_NOW_ISO,
+      },
+    },
+  },
 
   // ── Scoreboard ticker (fires on every page load via app shell) ──
   getscoreboard: {

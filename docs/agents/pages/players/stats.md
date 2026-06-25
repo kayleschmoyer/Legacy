@@ -108,7 +108,7 @@ Opened when player row is clicked. See [player-detail.md](./player-detail.md) fo
 
 ## Stats Format
 
-User preference (`standard` / `expanded`) persisted in localStorage as `ls_user_preferences.statsFormat`. Re-read on page focus (user may change on `/preferences`).
+User preference (`standard` / `expanded`). Persisted server-side per user via the `getUserPreferences` / `updateUserPreferences` GraphQL operations (`user_preferences` table) and hydrated into the Apollo cache on load, so it syncs across devices (LS-7138). localStorage (`ls_user_preferences.statsFormat`) is kept only as a synchronous cold-load fallback. Also re-read on page focus (user may change on `/preferences`).
 
 ---
 

@@ -2674,6 +2674,7 @@ type Mutation {
   Update the avatar URL for the currently authenticated user.
   """
   updateUserAvatar(avatarUrl: String): User
+  updateUserPreferences(input: UserPreferenceInput!): UserPreference
 
   """
   Update a user's access level. Requires admin access. Use "admin" to grant admin privileges or "none" to revoke them.
@@ -3323,6 +3324,7 @@ type Query {
   getUserDeviceTokens: [DeviceToken!]
   getUserLeagueSummaries: [UserLeagueSummary!]!
   getUserNotificationPreferences: NotificationPreference
+  getUserPreferences: UserPreference
 
   """
   Returns true when the authenticated user holds the given entitlement. Admin users always return true.
@@ -4720,6 +4722,18 @@ type UserLeagueSummary {
   totalTeams: Int
   userScore: Float
   wins: Int
+}
+
+type UserPreference {
+  createdAt: String
+  id: Int
+  statsFormat: String
+  updatedAt: String
+  userId: Int
+}
+
+input UserPreferenceInput {
+  statsFormat: String
 }
 
 """

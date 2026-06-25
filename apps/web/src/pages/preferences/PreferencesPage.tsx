@@ -29,7 +29,9 @@ import {
   GetUserNotificationPreferences,
   type GetUserNotificationPreferencesQuery,
   useGetUserNotificationPreferencesQuery,
+  useGetUserPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
+  useUpdateUserPreferencesMutation,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import {
@@ -1286,6 +1288,15 @@ const PreferencesPage: React.FC = () => {
   }));
   const [saved, setSaved] = useState(false);
   const isInitialRender = useRef(true);
+
+  // Stats-format preference is persisted server-side so it syncs across devices
+  // (LS-7138). Hydrate the control from the server when signed in, and write
+  // changes back through the mutation below.
+  const { data: serverPrefsData } = useGetUserPreferencesQuery({
+    skip: !isAuthenticated,
+    fetchPolicy: 'cache-and-network',
+  });
+  const [updateUserPreferences] = useUpdateUserPreferencesMutation();
   const [collapsedSections, setCollapsedSections] = useState<
     Record<SectionId, boolean>
   >(() => loadCollapsedSections());
@@ -1305,15 +1316,34 @@ const PreferencesPage: React.FC = () => {
     });
   }, [themePreference]);
 
+  // Reflect the server-side stats-format preference once it loads (LS-7138), so
+  // a value set on another device is shown here instead of stale localStorage.
+  useEffect(() => {
+    const serverFormat = serverPrefsData?.getUserPreferences?.statsFormat;
+    if (serverFormat === 'standard' || serverFormat === 'expanded') {
+      setPrefs((prev) => {
+        if (prev.statsFormat === serverFormat) return prev;
+        return { ...prev, statsFormat: serverFormat };
+      });
+    }
+  }, [serverPrefsData]);
+
   const update = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
       if (key === 'theme') {
         setThemePreference(value as ThemePreference);
       }
+      // Stats format is persisted server-side so it syncs across devices
+      // (LS-7138); other prefs remain device-local for now.
+      if (key === 'statsFormat' && isAuthenticated) {
+        void updateUserPreferences({
+          variables: { input: { statsFormat: value as StatsFormat } },
+        });
+      }
       setPrefs((prev) => ({ ...prev, [key]: value }));
       setSaved(false);
     },
-    [setThemePreference],
+    [setThemePreference, isAuthenticated, updateUserPreferences],
   );
 
   // Auto-save on changes (skip the initial render).

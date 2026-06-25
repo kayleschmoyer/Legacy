@@ -14,6 +14,11 @@ const mockUseGetUserLeaguesQuery = jest.fn(() => ({
   data: null,
   loading: false,
 }));
+// Configurable server-preference state for the stats-format hydration tests
+// (LS-7138). Default to no server data so the existing tests are unaffected.
+let mockUserPrefsData: {
+  getUserPreferences: { statsFormat: string } | null;
+} | null = null;
 
 // Captures the `onPlayerDetails` callback the host passes to the shared shell so
 // a player click can be simulated directly (the shell renders null in tests).
@@ -48,6 +53,8 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
   // runs for a free viewer even if the handler is reached.
   // `canCustomizeColumns` is surfaced (data-testid="can-customize-columns") so
   // the host's premium-gating wiring (PST-003 / LS-7107) can be asserted.
+  // `statsFormat` is surfaced (data-testid="stats-format") so the host's
+  // server-hydration behavior can be asserted (LS-7138).
   PlayerStatsPage: (props: {
     onShare?: (relativeUrl: string) => void;
     onPlayerDetails?: (player: { id: string | number }) => void;
@@ -55,6 +62,7 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
     canExport?: boolean;
     canCustomizeColumns?: boolean;
     exportFormats?: readonly string[];
+    statsFormat?: string;
     [key: string]: unknown;
   }) => {
     mockStatsPageProps = props;
@@ -96,6 +104,7 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
         >
           Export XLSX
         </button>
+        <div data-testid="stats-format">{props.statsFormat ?? 'none'}</div>
       </>
     );
   },
@@ -161,6 +170,10 @@ jest.mock('@legacy-sports/graphql', () => ({
   useGetPlayerIdByBrefIdQuery: () => ({ data: null, loading: false }),
   useGetUserLeaguesQuery: (options?: unknown) =>
     mockUseGetUserLeaguesQuery(options as never),
+  useGetUserPreferencesQuery: () => ({
+    data: mockUserPrefsData,
+    loading: false,
+  }),
   Sport: { Baseball: 'Baseball', Football: 'Football' },
 }));
 
@@ -890,5 +903,91 @@ describe('PlayerStatsRoute export formats (PST-014 / LS-7112)', () => {
     render(<PlayerStatsRoute />);
     fireEvent.click(screen.getByTestId('export-xlsx-button'));
     expect(createObjectURL).not.toHaveBeenCalled();
+  });
+});
+
+// LS-7138 / PST-090: the stats-format preference is persisted server-side and
+// hydrated into the page via Apollo, with localStorage kept only as a cold-load
+// fallback. These tests exercise the hydration effect with real server data.
+describe('PlayerStatsRoute server-side stats-format hydration', () => {
+  const PREFS_KEY = 'ls_user_preferences';
+
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockFootballEnabled = true;
+    mockUserPrefsData = null;
+    mockIsAuthenticated = false;
+    localStorage.clear();
+  });
+
+  it('hydrates statsFormat from the server and mirrors it to localStorage', async () => {
+    // localStorage seeds 'standard'; the server says 'expanded' and must win.
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({ statsFormat: 'standard' }),
+    );
+    mockIsAuthenticated = true;
+    mockUserPrefsData = { getUserPreferences: { statsFormat: 'expanded' } };
+
+    render(<PlayerStatsRoute />);
+
+    expect(await screen.findByTestId('stats-format')).toHaveTextContent(
+      'expanded',
+    );
+    // The resolved server value is mirrored back into the localStorage blob so
+    // the next cold load reflects it.
+    const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as {
+      statsFormat?: string;
+    };
+    expect(stored.statsFormat).toBe('expanded');
+  });
+
+  it('preserves other localStorage keys when mirroring the server value', async () => {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({ statsFormat: 'standard', theme: 'dark' }),
+    );
+    mockIsAuthenticated = true;
+    mockUserPrefsData = { getUserPreferences: { statsFormat: 'expanded' } };
+
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('stats-format');
+
+    const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as {
+      statsFormat?: string;
+      theme?: string;
+    };
+    expect(stored).toEqual({ statsFormat: 'expanded', theme: 'dark' });
+  });
+
+  it('falls back to the localStorage value when the server returns no preferences', () => {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({ statsFormat: 'expanded' }),
+    );
+    mockIsAuthenticated = true;
+    mockUserPrefsData = { getUserPreferences: null };
+
+    render(<PlayerStatsRoute />);
+
+    expect(screen.getByTestId('stats-format')).toHaveTextContent('expanded');
+  });
+
+  it('ignores an unexpected server statsFormat value', () => {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({ statsFormat: 'standard' }),
+    );
+    mockIsAuthenticated = true;
+    mockUserPrefsData = {
+      getUserPreferences: { statsFormat: 'bogus' },
+    };
+
+    render(<PlayerStatsRoute />);
+
+    // Unknown values are not applied; the localStorage cold-load value stands.
+    expect(screen.getByTestId('stats-format')).toHaveTextContent('standard');
   });
 });

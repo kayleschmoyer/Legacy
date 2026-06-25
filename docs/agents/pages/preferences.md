@@ -28,11 +28,11 @@ Section collapse states persist to localStorage.
 
 ## Sports & Stats Section
 
-| Setting            | Options             | Storage                                          |
-| ------------------ | ------------------- | ------------------------------------------------ |
-| `defaultSport`     | Baseball / Football | localStorage                                     |
-| `statsFormat`      | Standard / Expanded | localStorage (`ls_user_preferences.statsFormat`) |
-| `showSeasonTotals` | toggle ON/OFF       | localStorage                                     |
+| Setting            | Options             | Storage                                                                                             |
+| ------------------ | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `defaultSport`     | Baseball / Football | localStorage                                                                                        |
+| `statsFormat`      | Standard / Expanded | Server-side (`user_preferences` table via `updateUserPreferences`), localStorage fallback (LS-7138) |
+| `showSeasonTotals` | toggle ON/OFF       | localStorage                                                                                        |
 
 ---
 

@@ -1,0 +1,19 @@
+fragment UserPreference on UserPreference {
+  id
+  userId
+  statsFormat
+  createdAt
+  updatedAt
+}
+
+query GetUserPreferences {
+  getUserPreferences {
+    ...UserPreference
+  }
+}
+
+mutation UpdateUserPreferences($input: UserPreferenceInput!) {
+  updateUserPreferences(input: $input) {
+    ...UserPreference
+  }
+}

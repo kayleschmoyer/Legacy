@@ -12,6 +12,7 @@ import './matchups';
 import './version';
 import './scoring';
 import './notifications';
+import './user-preferences';
 import './chat-and-tiebreakers';
 import './drafts';
 import './gdpr';

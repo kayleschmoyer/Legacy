@@ -33,6 +33,7 @@ import {
   Sport,
   useGetPlayerIdByBrefIdQuery,
   useGetUserLeaguesQuery,
+  useGetUserPreferencesQuery,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
@@ -970,6 +971,26 @@ export function writeVisibleColumnsPref(cols: string[] | null): void {
   }
 }
 
+/**
+ * Persist just the stats-format preference back into the shared
+ * `ls_user_preferences` blob, preserving any other keys. Used to keep the
+ * localStorage cold-load fallback in sync with the server value (LS-7138).
+ */
+function persistStatsFormatToLocalStorage(
+  statsFormat: 'standard' | 'expanded',
+): void {
+  try {
+    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({ ...parsed, statsFormat }),
+    );
+  } catch {
+    // Best-effort persistence; ignore storage errors (private mode, quota).
+  }
+}
+
 function readDefaultSport(): 'baseball' | 'football' {
   try {
     const raw = localStorage.getItem(PREFS_STORAGE_KEY);
@@ -1320,7 +1341,10 @@ export function PlayerStatsRoute() {
     return () => window.clearTimeout(timer);
   }, [liveMsg, shareFallbackUrl]);
 
-  // Stats format preference from user settings
+  // Stats format preference. localStorage seeds the initial value synchronously
+  // (cold-load fallback); the server value is the cross-device source of truth
+  // and overrides it once hydrated (LS-7138). `isAuthenticated` is already
+  // derived from useAuth() above for the auth-gated userLeagues query.
   const [statsFormat, setStatsFormat] = useState<'standard' | 'expanded'>(
     readStatsFormat,
   );
@@ -1347,6 +1371,21 @@ export function PlayerStatsRoute() {
     next.set('view', canonical);
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  // Hydrate the stats-format preference from the server when signed in, so a
+  // user who set it on another device sees the same format here. Mirrors the
+  // resolved value back into localStorage to keep the cold-load fallback fresh.
+  const { data: userPrefsData } = useGetUserPreferencesQuery({
+    skip: !isAuthenticated,
+    fetchPolicy: 'cache-and-network',
+  });
+  useEffect(() => {
+    const serverFormat = userPrefsData?.getUserPreferences?.statsFormat;
+    if (serverFormat === 'standard' || serverFormat === 'expanded') {
+      setStatsFormat(serverFormat);
+      persistStatsFormatToLocalStorage(serverFormat);
+    }
+  }, [userPrefsData]);
 
   // Parse URL parameters for initial state
   const initialState = useMemo(
