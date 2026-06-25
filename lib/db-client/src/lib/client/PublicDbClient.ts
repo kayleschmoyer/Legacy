@@ -554,6 +554,20 @@ export async function updateMatchupScore(
     updateData.team2Score = team2Score.toString();
   }
 
+  // When both scores are null/undefined, updateData is empty and Drizzle's
+  // .set({}) returns 0 rows — skip the update and return the existing row.
+  if (Object.keys(updateData).length === 0) {
+    const existing = await db
+      .select()
+      .from(Schema.matchups)
+      .where(eq(Schema.matchups.id, matchupId))
+      .then(TakeUniqueOrNull);
+    if (!existing) {
+      throw new Error(`Matchup ${matchupId} not found`);
+    }
+    return existing;
+  }
+
   const results = await db
     .update(Schema.matchups)
     .set(updateData)
@@ -561,7 +575,7 @@ export async function updateMatchupScore(
     .returning();
 
   if (!results[0]) {
-    throw new Error('Matchup not found');
+    throw new Error(`Matchup ${matchupId} not found`);
   }
 
   return results[0];
