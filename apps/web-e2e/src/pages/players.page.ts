@@ -108,6 +108,7 @@ class PlayerStatsSurface {
   readonly #search: Locator;
   readonly #battingGrid: Locator;
   readonly #filterControls: Locator;
+  readonly #pageSizeSelect: Locator;
 
   constructor(page: Page) {
     this.#page = page;
@@ -115,6 +116,9 @@ class PlayerStatsSurface {
     this.#search = page.getByPlaceholder('Search player name · min 2 chars');
     this.#battingGrid = page.getByTestId('player-stats-data-grid');
     this.#filterControls = page.getByTestId('filter-controls');
+    this.#pageSizeSelect = page
+      .getByTestId('page-size-select')
+      .locator('select');
   }
 
   // ── Actions ──────────────────────────────────────────────────────
@@ -134,6 +138,16 @@ class PlayerStatsSurface {
   /** Switch the stats view via its tab (Combined / Hitters / Pitchers). */
   async switchView(name: 'Combined' | 'Hitters' | 'Pitchers'): Promise<void> {
     await this.#page.getByRole('tab', { name }).click();
+  }
+
+  /** Select a rows-per-page value from the "Rows" dropdown (draft — call clickApplyFilters to commit). */
+  async selectPageSize(n: 10 | 25 | 50 | 100): Promise<void> {
+    await this.#pageSizeSelect.selectOption(String(n));
+  }
+
+  /** Click the "Apply filters" button to commit the current draft filter state. */
+  async clickApplyFilters(): Promise<void> {
+    await this.#page.getByTestId('apply-filters-button').click();
   }
 
   /** Click a column header by label (e.g. to sort). */
@@ -234,6 +248,30 @@ class PlayerStatsSurface {
   /** Assert the filter-controls toolbar is visible. */
   async expectFilterControls(): Promise<void> {
     await expect(this.#filterControls).toBeVisible();
+  }
+
+  /** Assert the "Rows" page-size selector is visible. */
+  async expectRowsSelectorVisible(): Promise<void> {
+    await expect(this.#pageSizeSelect).toBeVisible();
+  }
+
+  /** Assert a specific page-size option (e.g. 100) is present in the selector. */
+  async expectPageSizeOptionAvailable(n: number): Promise<void> {
+    await expect(
+      this.#pageSizeSelect.locator(`option[value="${n}"]`),
+    ).toBeAttached();
+  }
+
+  /** Assert a specific page-size option (e.g. 100) is NOT present in the selector. */
+  async expectPageSizeOptionAbsent(n: number): Promise<void> {
+    await expect(
+      this.#pageSizeSelect.locator(`option[value="${n}"]`),
+    ).not.toBeAttached();
+  }
+
+  /** Assert the selector's current value matches `n`. */
+  async expectPageSizeSelected(n: number): Promise<void> {
+    await expect(this.#pageSizeSelect).toHaveValue(String(n));
   }
 
   /** Assert the batting grid's pagination controls render. */

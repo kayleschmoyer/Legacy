@@ -384,6 +384,73 @@ test.describe('Player Stats Page (mocked) — error states @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LS-5593: Page size selector E2E coverage.
+// The toolbar "Rows" dropdown lets users choose 10 / 25 / 50 / 100 rows.
+// Combined view is capped at 50 to avoid 200 rows across both grids (PST-030).
+// Changes are draft until the user presses "Apply" (LS-7126); applying commits
+// the selection and round-trips it through the URL's pageSize param.
+// ---------------------------------------------------------------------------
+
+test.describe('Player Stats Page (mocked) — page size selector (LS-5593) @regression', () => {
+  test.beforeEach(async ({ page, playersPage }) => {
+    await mockPlayerStatsGraphQL(page);
+    await playersPage.gotoStats();
+  });
+
+  test('rows-per-page selector is visible in the filter toolbar', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.expectRowsSelectorVisible();
+  });
+
+  test('offers 10, 25, 50, and 100 rows in Hitters view', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.switchView('Hitters');
+    for (const n of [10, 25, 50, 100] as const) {
+      await playersPage.stats.expectPageSizeOptionAvailable(n);
+    }
+  });
+
+  test('offers 10, 25, 50, and 100 rows in Pitchers view', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.switchView('Pitchers');
+    for (const n of [10, 25, 50, 100] as const) {
+      await playersPage.stats.expectPageSizeOptionAvailable(n);
+    }
+  });
+
+  test('limits Combined view to 10, 25, 50 — excludes 100 (PST-030)', async ({
+    playersPage,
+  }) => {
+    // Combined view renders two grids; 100 rows each = 200 total (PST-030 / LS-7117).
+    await playersPage.stats.expectPageSizeOptionAvailable(10);
+    await playersPage.stats.expectPageSizeOptionAvailable(25);
+    await playersPage.stats.expectPageSizeOptionAvailable(50);
+    await playersPage.stats.expectPageSizeOptionAbsent(100);
+  });
+
+  test('selecting 10 rows and applying updates the URL pageSize param', async ({
+    page,
+    playersPage,
+  }) => {
+    await playersPage.stats.selectPageSize(10);
+    await playersPage.stats.clickApplyFilters();
+    await expect(page).toHaveURL(/[?&]pageSize=10/);
+  });
+
+  test('selecting 50 rows and applying updates the URL pageSize param', async ({
+    page,
+    playersPage,
+  }) => {
+    await playersPage.stats.selectPageSize(50);
+    await playersPage.stats.clickApplyFilters();
+    await expect(page).toHaveURL(/[?&]pageSize=50/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // LS-3501: /players/stats is a public route. Unauthenticated users must see the
 // player statistics content — not the "Build Your Dynasty" marketing landing page
 // rendered by EnhancedAuthGuard for protected routes. The route is listed in

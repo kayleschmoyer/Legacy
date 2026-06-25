@@ -1800,6 +1800,7 @@ export function PlayerStatsPage({
 
           {/* Rows per page */}
           <YStack
+            testID="page-size-select"
             style={{
               position: 'relative',
               justifyContent: 'center',
