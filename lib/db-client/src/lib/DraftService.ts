@@ -165,7 +165,9 @@ export class DraftService {
                 : 'Unknown rollback error';
             LOGGER.error(
               '❌ Failed to rollback database update:',
-              errorMessage,
+              rollbackError instanceof Error
+                ? rollbackError
+                : new Error(errorMessage),
             );
           }
         }
@@ -185,7 +187,7 @@ export class DraftService {
         league: updatedLeague,
         message: 'Draft queued successfully and processing started',
       };
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       const isUserFacing = error instanceof DraftUserInputError;
@@ -196,7 +198,10 @@ export class DraftService {
           leagueId,
         });
       } else {
-        LOGGER.error('❌ Failed to start draft:', errorMessage);
+        LOGGER.error(
+          '❌ Failed to start draft:',
+          error instanceof Error ? error : new Error(errorMessage),
+        );
       }
 
       // Try to get league details even in error case (if league exists)
