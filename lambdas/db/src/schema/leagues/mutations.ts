@@ -782,9 +782,16 @@ builder.mutationField('startDraft', (t) =>
           leagueId: args.leagueId,
           userId,
         });
-        throw new Error(
-          `Failed to start draft: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
+        // Surface the underlying reason (and a stable DRAFT_START_FAILED code)
+        // instead of a plain Error, which the GraphQL formatter masks as a
+        // generic "Internal server error". The real cause (e.g.
+        // "League N not found") was previously visible only in
+        // CloudWatch/Rollbar, causing repeated misdiagnosis of integration
+        // failures (LS-8239). DRAFT_START_FAILED is registered in
+        // CLIENT_FACING_CODES so the message reaches the client.
+        throw new GraphQLError(`Failed to start draft: ${err.message}`, {
+          extensions: { code: 'DRAFT_START_FAILED' },
+        });
       }
     },
   }),

@@ -27,4 +27,10 @@ export const CLIENT_FACING_CODES = new Set([
   'PERSISTED_QUERY_NOT_SUPPORTED',
   'SEASON_DRAFT_GAME_ALREADY_STARTED',
   'SEASON_DRAFT_GAME_FULL',
+  // startDraft surfaces the underlying failure reason (e.g. "League N not
+  // found") with this stable code instead of letting the formatter mask it as
+  // a generic "Internal server error". The reasons are server-controlled
+  // validation/operational strings, so surfacing them makes integration
+  // failures self-diagnosing without leaking sensitive internals (LS-8239).
+  'DRAFT_START_FAILED',
 ]);

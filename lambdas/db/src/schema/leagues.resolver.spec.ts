@@ -1204,6 +1204,52 @@ describe('League Mutations', () => {
         field.resolve({}, { leagueId: 1 }, mockContext, undefined as never),
       ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
     });
+
+    it('surfaces the underlying failure reason as a DRAFT_START_FAILED GraphQLError instead of masking it (LS-8239)', async () => {
+      // Three sequential .limit(1) reads before the try block:
+      //   1) commissioner membership check (passes the access gate),
+      //   2) leagueExists guard (league present, so it does NOT short-circuit),
+      //   3) savedDraft lookup (empty → resolver calls createDraftForLeague).
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ id: 1 }])
+        .mockResolvedValueOnce([]);
+
+      // Drive a non-GraphQLError, non-user-input failure by making
+      // createDraftForLeague reject with a *plain* Error. This is the masked
+      // scenario LS-8239 targets: an unexpected error that the formatter would
+      // otherwise turn into a generic "Internal server error". (User-input
+      // failures are separately classified as BAD_USER_INPUT by LS-8098.) A
+      // plain Error is never an `instanceof GraphQLError`, so it flows into the
+      // catch's rewrap path regardless of the jest module realm.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- match the resolver's module realm
+      const { createDraftForLeague } = require('@legacy-sports/db-client');
+      (createDraftForLeague as jest.Mock).mockRejectedValueOnce(
+        new Error('Draft queue URL not configured'),
+      );
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      // The real reason must reach the GraphQL layer with a stable code so the
+      // DRAFT_START_FAILED entry in CLIENT_FACING_CODES lets the formatter pass
+      // the message through to the client (self-diagnosing integration tests).
+      // Asserting on message + extensions.code (not `instanceof`) keeps this
+      // robust regardless of the jest module realm.
+      await expect(
+        field.resolve({}, { leagueId: 1 }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message: 'Failed to start draft: Draft queue URL not configured',
+        extensions: { code: 'DRAFT_START_FAILED' },
+      });
+    });
   });
 
   describe('createLeagueAndTeams mutation — auction entitlement gate (LS-5159)', () => {

@@ -13,6 +13,7 @@ describe('CLIENT_FACING_CODES', () => {
     'GAME_UNAVAILABLE',
     'PERSISTED_QUERY_NOT_FOUND',
     'PERSISTED_QUERY_NOT_SUPPORTED',
+    'DRAFT_START_FAILED',
   ])('classifies %s as client-facing', (code) => {
     expect(CLIENT_FACING_CODES.has(code)).toBe(true);
   });
