@@ -52,6 +52,23 @@ Consolidated skill for running and fixing ESLint, TypeScript type checking, buil
 
 > **Always use `make` targets** -- they set `NODE_OPTIONS` for the Windows windowsHide patch.
 
+## PC-Validation: nx_run_pc_chunk MCP Tool
+
+For cloud agents and any session where the Bash tool's ~120s timeout is a concern, use the
+`nx_run_pc_chunk` MCP tool instead of running `make pc-<chunk>` via Bash:
+
+```
+nx_run_pc_chunk({ chunk: "pc-typecheck" })   // runs make pc-typecheck with a 5-min timeout
+nx_run_pc_chunk({ chunk: "pc-lint" })
+nx_run_pc_chunk({ chunk: "pc-build" })
+```
+
+Chunks must run **in order**: `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`.
+
+Returns `{ chunk, passed, output }` on success; `isError: true` with failure output on failure.
+
+**Why**: `pnpm exec nx affected` and `make pc-*` calls run longer than the Bash tool's ~120s hard timeout in cloud sessions. Running them inline produces `"Tool execution was interrupted"`, causing agents to poll output files and stall. The MCP tool wraps each chunk with a 5-minute timeout so the call completes cleanly. A `PreToolUse` hook on `Bash` blocks inline nx/make-pc calls that don't use `run_in_background: true`, steering agents to this tool.
+
 ## PreToolUse Bash MCP-First Hook
 
 `.claude/hooks/guard-bash-mcp-first.sh` is a `PreToolUse` hook that intercepts `Bash` tool calls and **blocks** commands starting with `ls`, `find`, `cat` (plain file reads), `head`, `tail`, `grep`, or `rg`. Each block message points at the correct built-in replacement (`Glob`, `Grep`, `Read`) per the AGENTS.md "Concrete substitutions" table. Blocking is the backstop because doc-only reminders have repeatedly failed in long agent sessions.

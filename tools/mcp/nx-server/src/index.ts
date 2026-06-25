@@ -7,6 +7,7 @@ import { depGraph } from './tools/dep-graph.js';
 import { installPackage } from './tools/install-package.js';
 import { runAffected } from './tools/run-affected.js';
 import { runE2ESpecs } from './tools/run-e2e-specs.js';
+import { runPcChunk, PC_CHUNKS } from './tools/run-pc-chunk.js';
 import { runTarget } from './tools/run-target.js';
 import { showProject } from './tools/show-project.js';
 import { showProjects } from './tools/show-projects.js';
@@ -230,6 +231,28 @@ server.tool(
       .describe('Worktree path (default: repo root)'),
   },
   async (params) => runE2ESpecs(params),
+);
+
+// --- nx_run_pc_chunk ---
+server.tool(
+  'nx_run_pc_chunk',
+  'Prefer this over `make pc-<chunk>` via shell for cloud agents. Run a single pre-commit ' +
+    "validation chunk with a 5-minute timeout (avoids the Bash tool's ~120s inline limit). " +
+    'Chunks must run IN ORDER: pc-db-prep → pc-typecheck → pc-format → pc-lint → ' +
+    'pc-workflows → pc-test → pc-build. Returns structured pass/fail output.',
+  {
+    chunk: z
+      .enum(PC_CHUNKS)
+      .describe(
+        'Pre-commit validation chunk to run. One of: ' + PC_CHUNKS.join(', '),
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Worktree path (default: repo root)'),
+  },
+  async (params) => runPcChunk(params),
 );
 
 // Start the server

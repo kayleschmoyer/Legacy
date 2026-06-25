@@ -156,6 +156,21 @@
             "type": "command",
             "command": ".claude/hooks/guard-make-pc.sh",
             "windowsHide": true
+          },
+          {
+            "type": "command",
+            "command": "node .agents/hooks/enforce-background.mjs",
+            "windowsHide": true
+          }
+        ]
+      },
+      {
+        "matcher": "^Read$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .agents/hooks/block-tmp-polling.mjs",
+            "windowsHide": true
           }
         ]
       },
