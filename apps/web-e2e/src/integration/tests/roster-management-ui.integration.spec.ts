@@ -277,6 +277,14 @@ test.describe
   test('Phase 4: Verify commissioner roster is populated post-draft', async ({
     commissionerPage: page,
   }) => {
+    // The RosterTab fires GetTeamMembers + leaguePositions on first post-draft
+    // load. Under the nightly's 3-shard concurrency the shared live backend
+    // 429-throttles that first query burst, so the section headers can lag well
+    // past a fixed 3-reload gate (LS-8264 — the default reloadUntilVisible only
+    // budgets ~36s). Give the gate the test-budget headroom so it keeps
+    // re-firing the throttled query through the throttle tail (LS-8211).
+    test.setTimeout(150_000);
+
     await test.step('Navigate to My Roster tab', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/roster`);
       await page.waitForLoadState('load');
@@ -294,9 +302,13 @@ test.describe
       // replaced in LS-4674 (LS-5053). Auto-draft → roster query can lag a
       // render tick behind `waitForSeasonActive`, so reload until the first
       // section appears — mirrors the LS-5050 pattern in full-season-ui.
+      // Budget-aware (LS-8211/LS-8264): under 3-shard nightly load the first
+      // GetTeamMembers query 429-throttles; keep re-firing it across the budget
+      // instead of giving up after the default 3 reloads (~36s).
       await reloadUntilVisible(
         page,
         page.getByText('Starting Hitters', { exact: false }).first(),
+        { finalTimeoutMs: 30_000, budgetMs: 90_000 },
       );
       await expect(
         page.getByText('Starting Pitchers', { exact: false }).first(),

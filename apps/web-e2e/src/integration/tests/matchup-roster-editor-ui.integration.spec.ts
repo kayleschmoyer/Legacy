@@ -429,8 +429,16 @@ test.describe
     commissionerJwt,
   }) => {
     // Two independent reload loops (Edit Lineup + starters) can each run up to
-    // 30–60 s; add headroom beyond the default integration timeout.
-    test.setTimeout(180_000);
+    // 30–60 s; add headroom beyond the default integration timeout. The matchup
+    // detail page is the heaviest first-render in the suite (scoreboard +
+    // win-prob + roster comparison + roster editor all fire on mount, including
+    // the 141-field GetMatchupPlayers), so under the nightly's 3-shard
+    // concurrency it is the most likely to hit the live backend's 429 throttle
+    // tail — give the budget-aware Edit Lineup gate below room to outlast it,
+    // plus headroom for the later Unlocked/STARTERS/player-row gates so a
+    // throttled run still fails (or passes) on a gate assertion rather than the
+    // test-level timeout (LS-8264).
+    test.setTimeout(300_000);
 
     await test.step('GQL consistency gate: wait for commissioner team starters to be set', async () => {
       // autoPopulateFirstMatchupLineup runs asynchronously after draft completion
@@ -496,11 +504,18 @@ test.describe
       // (which page.reload() already precedes with waitForLoadState('load'))
       // lacks.
       const editLineup = page.getByText('Edit Lineup', { exact: true }).first();
+      // Budget-aware (LS-8211/LS-8264): a fixed 30-reload gate exhausts after
+      // ~110 s, which the nightly's sustained 3-shard throttle on this heavy
+      // page can outlast. Couple the gate to the test budget so it keeps
+      // re-firing the starved GetMatchupPlayers query — and bounds each reload's
+      // navigation to the remaining budget — until just before the deadline,
+      // breaking immediately once the editor renders (so a healthy page pays
+      // nothing extra).
       await reloadUntilVisible(page, editLineup, {
-        attempts: 30,
         pollTimeoutMs: 1_000,
         cooldownMs: 2_000,
-        finalTimeoutMs: 20_000,
+        finalTimeoutMs: 30_000,
+        budgetMs: 120_000,
       });
     });
 
