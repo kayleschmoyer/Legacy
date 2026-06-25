@@ -21,6 +21,7 @@ import { builder } from '../builder';
 import {
   AuthenticationError,
   ForbiddenError,
+  NotFoundError,
   UserInputError,
 } from '../graphql-errors';
 
@@ -517,7 +518,7 @@ builder.queryField('teamMembers', (t) =>
         .limit(1);
 
       if (team.length === 0) {
-        throw new Error('Team not found');
+        throw NotFoundError('Team not found');
       }
 
       // Check if user is a member of this league
@@ -939,7 +940,7 @@ builder.queryField('teamLeagueMembers', (t) =>
         .limit(1);
 
       if (teamRows.length === 0) {
-        throw new Error('Team not found');
+        throw NotFoundError('Team not found');
       }
 
       const leagueId = teamRows[0].leagueId;

@@ -8,7 +8,11 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq } from 'drizzle-orm';
 import { Team } from './types';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  NotFoundError,
+} from '../graphql-errors';
 import { builder } from '../builder';
 
 // ── AuctionState type ─────────────────────────────────────────────────────
@@ -32,7 +36,7 @@ AuctionState.implement({
       type: Team,
       resolve: async (parent, _args, context) => {
         const team = await context.loaders.teams.load(parent.nominatorTeamId);
-        if (!team) throw new Error('Nominator team not found');
+        if (!team) throw NotFoundError('Nominator team not found');
         return team;
       },
     }),
@@ -83,7 +87,7 @@ AuctionBudget.implement({
       type: Team,
       resolve: async (parent, _args, context) => {
         const team = await context.loaders.teams.load(parent.teamId);
-        if (!team) throw new Error('Team not found');
+        if (!team) throw NotFoundError('Team not found');
         return team;
       },
     }),

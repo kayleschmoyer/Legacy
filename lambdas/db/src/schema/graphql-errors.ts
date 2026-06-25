@@ -83,3 +83,16 @@ export function GameUnavailableError(
     extensions: { code: 'GAME_UNAVAILABLE' },
   });
 }
+
+/**
+ * Throw when a requested resource does not exist.
+ *
+ * Maps to Apollo code `NOT_FOUND` (HTTP 404 equivalent).
+ * These are expected user-facing conditions and should NOT be logged as system
+ * errors in Rollbar.
+ */
+export function NotFoundError(message: string): GraphQLError {
+  return new GraphQLError(message, {
+    extensions: { code: 'NOT_FOUND' },
+  });
+}

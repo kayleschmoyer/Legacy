@@ -13,6 +13,7 @@ import { LeagueMember, Team, TeamMember } from '../leagues/types';
 import {
   AuthenticationError,
   ForbiddenError,
+  NotFoundError,
   UserInputError,
 } from '../graphql-errors';
 
@@ -445,7 +446,7 @@ builder.mutationField('renameTeam', (t) =>
         .limit(1);
 
       if (teamRows.length === 0) {
-        throw new Error('Team not found');
+        throw NotFoundError('Team not found');
       }
 
       const oldName = teamRows[0].name;
@@ -569,7 +570,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
         .limit(1);
 
       if (teamRows.length === 0) {
-        throw new Error('Team not found');
+        throw NotFoundError('Team not found');
       }
 
       const leagueId = teamRows[0].leagueId;
@@ -745,7 +746,7 @@ builder.mutationField('removeAssistantManager', (t) =>
         .limit(1);
 
       if (teamRows.length === 0) {
-        throw new Error('Team not found');
+        throw NotFoundError('Team not found');
       }
 
       const leagueId = teamRows[0].leagueId;
@@ -1066,7 +1067,7 @@ builder.mutationField('updateTeamBranding', (t) =>
         });
 
       if (updated.length === 0) {
-        throw new Error('Team not found');
+        throw NotFoundError('Team not found');
       }
 
       LOGGER.info('Updated team branding', {
