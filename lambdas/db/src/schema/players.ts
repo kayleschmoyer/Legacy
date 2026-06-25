@@ -7,7 +7,7 @@ import type { PlayerOrderBy } from '@legacy-sports/db-client';
 import { eq } from 'drizzle-orm';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { builder } from './builder';
-import { hasEntitlement, requireEntitlement } from './authorization';
+import { hasEntitlement } from './authorization';
 import { ENTITLEMENTS } from './entitlements';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 import { SportKindEnum } from './leagues/types';
@@ -354,11 +354,18 @@ builder.queryField('players', (t) =>
       }),
     },
     resolve: async (root, args, context) => {
-      // Player-name search drives the Player Comparison feature, which is
-      // premium-only. Enforce auth + entitlement server-side (LS-7019).
-      if (args.search) {
-        if (!context.user) throw AuthenticationError();
-        await requireEntitlement(context, ENTITLEMENTS.player_comparison);
+      // Player-name search drives the Player Comparison feature. The comparison
+      // itself is premium-only, but free-tier users must still be able to *search*
+      // — the dropdown options render behind the UI <PremiumGate>, so a free user
+      // can see results without being able to build a comparison. Gating the
+      // search resolver itself wrongly returned an empty dropdown for free-tier
+      // callers (LS-8212; same class as the season-draft search bug LS-8127). The
+      // premium boundary is enforced where the value actually lives: the gated
+      // stat fields (scoring / careerBatting / careerAchievements) return null for
+      // free callers, and the comparison UI is wrapped in <PremiumGate>. We still
+      // require authentication to search (LS-7019).
+      if (args.search && !context.user) {
+        throw AuthenticationError();
       }
 
       const orderBy = (args.orderBy || 'careerGames') as PlayerOrderBy;

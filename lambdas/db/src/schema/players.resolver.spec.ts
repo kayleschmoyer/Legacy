@@ -362,7 +362,7 @@ describe('players resolver', () => {
     );
   });
 
-  // ── players (search — auth + premium gate, LS-7019) ──────────────────────
+  // ── players (search — auth required, premium gate removed: LS-7019/LS-8212) ─
 
   it('players: throws AuthenticationError when search is provided but user is unauthenticated', async () => {
     mockContext.user = null;
@@ -388,36 +388,40 @@ describe('players resolver', () => {
     expect(mockPlayersService.getPlayers).not.toHaveBeenCalled();
   });
 
-  it('players: throws PremiumRequiredError when search is provided but user is free tier', async () => {
+  it('players: allows search for an authenticated free-tier user (premium gate removed — LS-8212)', async () => {
+    // The Player Comparison search must return results for free-tier users —
+    // the dropdown options render behind the UI <PremiumGate>. The premium
+    // boundary is enforced per-field (scoring / careerBatting / careerAchievements
+    // return null) plus the UI gate, not by blocking the name search (LS-8212).
     mockContext.user = { id: 7, isAdmin: false };
-    // Subscription tier lookup returns free
-    mockDb.limit.mockResolvedValueOnce([{ tier: 'free' }]);
+    mockPlayersService.getPlayers.mockResolvedValueOnce([MOCK_PLAYER]);
 
-    await expect(
-      getQueryResolver('players')(
-        {},
-        {
-          limit: null,
-          offset: null,
-          orderBy: null,
-          orderDirection: null,
-          position: null,
-          search: 'Ruth',
-          excludeEmptyNames: false,
-          leagueId: null,
-        },
-        mockContext,
-        undefined as never,
-      ),
-    ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
+    const result = await getQueryResolver('players')(
+      {},
+      {
+        limit: 8,
+        offset: null,
+        orderBy: null,
+        orderDirection: null,
+        position: null,
+        search: 'Ruth',
+        excludeEmptyNames: false,
+        leagueId: null,
+      },
+      mockContext,
+      undefined as never,
+    );
 
-    expect(mockPlayersService.getPlayers).not.toHaveBeenCalled();
+    expect(result).toEqual([MOCK_PLAYER]);
+    expect(mockPlayersService.getPlayers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: expect.objectContaining({ fullNameLike: 'Ruth' }),
+      }),
+    );
   });
 
-  it('players: allows search when user has player_comparison entitlement', async () => {
+  it('players: allows search for a premium user (no tier lookup gate — LS-8212)', async () => {
     mockContext.user = { id: 7, isAdmin: false };
-    // Subscription tier lookup returns premium
-    mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]);
     mockPlayersService.getPlayers.mockResolvedValueOnce([MOCK_PLAYER]);
 
     const result = await getQueryResolver('players')(
@@ -602,6 +606,9 @@ describe('players resolver', () => {
   it('players: forwards adversarial search string as fullNameLike without modification', async () => {
     // The resolver must not sanitize or reject the input — parameterization
     // happens in the db-client (Drizzle ilike / sql tagged templates).
+    // Search still requires an authenticated caller (LS-7019), so set a user
+    // before exercising the forwarding path.
+    mockContext.user = { id: 7, isAdmin: false };
     mockPlayersService.getPlayers.mockResolvedValueOnce([]);
 
     const injectionInput = "' OR 1=1 --";
