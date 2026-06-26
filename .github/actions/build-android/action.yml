@@ -51,6 +51,11 @@ runs:
       run: |
         cd apps/app
         pnpm exec expo prebuild --platform android --no-install
+        # Expo prebuild regenerates android/ each run, creating a new random
+        # debug.keystore whose SHA-1 won't match the one registered in the
+        # Google Cloud OAuth client. Restore the committed keystore so Google
+        # Sign-In works on installed builds.
+        git checkout -- android/app/debug.keystore
         chmod +x android/gradlew
         echo "✅ Expo prebuild completed"
 
