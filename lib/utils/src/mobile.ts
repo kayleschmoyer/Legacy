@@ -11,6 +11,7 @@ export * from './lib/DbCredentials';
 export * from './lib/DbOptions';
 export * from './lib/ErrorHandling';
 export * from './lib/help-content';
+export * from './lib/notification-types';
 // Pure, Hermes-safe string helpers consumed by shared-components (OnThisDayFeed).
 // These must be re-exported here — Metro resolves '@legacy-sports/utils' to this
 // file via the package "react-native" field, so anything missing here is
