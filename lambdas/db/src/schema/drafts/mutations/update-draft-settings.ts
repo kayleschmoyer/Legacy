@@ -6,6 +6,7 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { eq } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 
 import { UpdateDraftSettingsInput, UpdateDraftSettingsPayload } from '../types';
 import { builder } from '../../builder';
@@ -370,6 +371,9 @@ builder.mutationField('updateDraftSettings', (t) =>
           playerPool: updatedPlayerPool,
         };
       } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
         LOGGER.error(
           'Error updating draft settings',
           error instanceof Error ? error : new Error(String(error)),

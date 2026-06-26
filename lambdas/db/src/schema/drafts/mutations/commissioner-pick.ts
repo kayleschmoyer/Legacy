@@ -10,6 +10,7 @@ import {
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, eq, sql } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 
 import { DraftPick } from '../types';
 import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
@@ -336,6 +337,9 @@ builder.mutationField('commissionerPick', (t) =>
 
         return result.draftPick;
       } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
         LOGGER.error(
           'Error making commissioner pick',
           error instanceof Error ? error : new Error(String(error)),

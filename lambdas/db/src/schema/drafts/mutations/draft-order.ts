@@ -6,6 +6,7 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, eq, sql } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 
 import { Draft } from '../types';
 import { builder } from '../../builder';
@@ -243,6 +244,9 @@ builder.mutationField('setDraftOrder', (t) =>
 
         return updatedDraft;
       } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
         LOGGER.error(
           'Error setting draft order',
           error instanceof Error ? error : new Error(String(error)),
@@ -417,6 +421,9 @@ builder.mutationField('randomizeDraftOrder', (t) =>
 
         return updatedDraft;
       } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
         LOGGER.error(
           'Error randomizing draft order',
           error instanceof Error ? error : new Error(String(error)),
