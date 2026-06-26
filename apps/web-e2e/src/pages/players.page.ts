@@ -220,6 +220,20 @@ class PlayerStatsSurface {
     ).toBeVisible();
   }
 
+  /** Assert the pitching-leaders heading is NOT in the DOM (Hitters tab active). */
+  async expectPitchingLeadersNotVisible(): Promise<void> {
+    await expect(
+      this.#page.getByText('MLB Career Pitching Leaders'),
+    ).not.toBeVisible();
+  }
+
+  /** Assert the batting-leaders heading is NOT in the DOM (Pitchers tab active). */
+  async expectBattingLeadersNotVisible(): Promise<void> {
+    await expect(
+      this.#page.getByText('MLB Career Batting Leaders').first(),
+    ).not.toBeVisible();
+  }
+
   /** Assert a player name is visible somewhere on the page. */
   async expectPlayerVisible(name: string, timeout?: number): Promise<void> {
     await expect(this.#page.getByText(name)).toBeVisible({ timeout });
@@ -243,6 +257,13 @@ class PlayerStatsSurface {
     await expect(
       this.#page.getByText(label, { exact: true }).first(),
     ).toBeAttached();
+  }
+
+  /** Assert a data-grid column header is NOT visible (grid is unmounted). */
+  async expectColumnHeaderAbsent(label: string): Promise<void> {
+    await expect(
+      this.#page.getByText(label, { exact: true }).first(),
+    ).not.toBeVisible();
   }
 
   /** Assert the filter-controls toolbar is visible. */

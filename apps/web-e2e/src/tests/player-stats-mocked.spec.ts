@@ -150,7 +150,7 @@ async function mockPlayerStatsGraphQL(
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
 
-    if (postData.includes('getcareerbattingstats')) {
+    if (postData.includes('"getcareerbattingstats"')) {
       if (opts.battingError) {
         await route.fulfill({
           status: 200,
@@ -191,7 +191,7 @@ async function mockPlayerStatsGraphQL(
           }),
         });
       }
-    } else if (postData.includes('getcareerpitchingstatscount')) {
+    } else if (postData.includes('"getcareerpitchingstatscount"')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -199,7 +199,7 @@ async function mockPlayerStatsGraphQL(
           data: { careerPitchingStatsCount: opts.pitchingEmpty ? 0 : 1 },
         }),
       });
-    } else if (postData.includes('getcareerpitchingstats')) {
+    } else if (postData.includes('"getcareerpitchingstats"')) {
       if (opts.pitchingError) {
         await route.fulfill({
           status: 200,
@@ -225,8 +225,8 @@ async function mockPlayerStatsGraphQL(
         });
       }
     } else if (
-      postData.includes('getusers') ||
-      postData.includes('getuserleagues')
+      postData.includes('"getusers"') ||
+      postData.includes('"getuserleagues"')
     ) {
       await route.fulfill({
         status: 200,
@@ -324,6 +324,84 @@ test.describe('Player Stats Page (mocked) – pitching tab @regression', () => {
 
   test('shows search input for pitching stats', async ({ playersPage }) => {
     await playersPage.stats.expectSearchVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-5601: View Mode Tabs (Combined / Hitters / Pitchers)
+// The feature toggles which data grids render. Each tab must show the correct
+// grid(s), hide the others, and carry the right aria-selected state.
+// ---------------------------------------------------------------------------
+
+test.describe('Player Stats Page (mocked) — view-mode tabs @regression', () => {
+  test.beforeEach(async ({ page, playersPage }) => {
+    await mockPlayerStatsGraphQL(page);
+    await playersPage.gotoStats();
+  });
+
+  test('Combined tab is selected by default and shows both grids', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.expectTabSelected('Combined');
+    await playersPage.stats.expectBattingLeaders();
+    await playersPage.stats.expectPitchingLeaders();
+  });
+
+  test('Hitters tab shows batting grid and removes pitching grid', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.switchView('Hitters');
+    await playersPage.stats.expectTabSelected('Hitters');
+    await playersPage.stats.expectBattingLeaders();
+    await playersPage.stats.expectPitchingLeadersNotVisible();
+  });
+
+  test('Pitchers tab shows pitching grid and removes batting grid', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.switchView('Pitchers');
+    await playersPage.stats.expectTabSelected('Pitchers');
+    await playersPage.stats.expectPitchingLeaders();
+    await playersPage.stats.expectBattingLeadersNotVisible();
+  });
+
+  test('Hitters tab shows HR column header and no ERA column header', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.switchView('Hitters');
+    await playersPage.stats.expectColumnHeader('HR');
+    // ERA is a pitching-only column — must be absent when pitching grid is unmounted
+    await playersPage.stats.expectColumnHeaderAbsent('ERA');
+  });
+
+  test('Pitchers tab shows ERA column header and no HR column header', async ({
+    playersPage,
+  }) => {
+    await playersPage.stats.switchView('Pitchers');
+    await playersPage.stats.expectColumnHeader('ERA');
+    // HR is a batting-only column — must be absent when batting grid is unmounted
+    await playersPage.stats.expectColumnHeaderAbsent('HR');
+  });
+
+  test('tabs cycle through all three modes in sequence', async ({
+    playersPage,
+  }) => {
+    // Start: Combined
+    await playersPage.stats.expectTabSelected('Combined');
+
+    // → Hitters
+    await playersPage.stats.switchView('Hitters');
+    await playersPage.stats.expectTabSelected('Hitters');
+
+    // → Pitchers
+    await playersPage.stats.switchView('Pitchers');
+    await playersPage.stats.expectTabSelected('Pitchers');
+
+    // → back to Combined
+    await playersPage.stats.switchView('Combined');
+    await playersPage.stats.expectTabSelected('Combined');
+    await playersPage.stats.expectBattingLeaders();
+    await playersPage.stats.expectPitchingLeaders();
   });
 });
 
