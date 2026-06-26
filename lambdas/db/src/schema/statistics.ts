@@ -942,6 +942,11 @@ SeasonFieldingRef.implement({
 // expensive DataLoader calls (WHERE id IN (...)) that exhaust the Lambda timeout
 // and return a 502 (LS-3113).
 const MAX_CAREER_BATTING_LIMIT = 5_000;
+// Free / unauthenticated callers are capped at 100 rows — the premium UI upsell
+// offers 250/500 options only to large_player_stats_page_size holders (PST-032 /
+// LS-7119). A hand-crafted request from a free user sending first=500 is silently
+// clamped here so the server remains the real enforcement boundary.
+const FREE_MAX_CAREER_BATTING_LIMIT = 100;
 
 // Maximum length of the free-text `searchTerm` filter. The value flows into an
 // `ILIKE '%term%'` pattern, so an oversized term wastes DB compute for no benefit
@@ -987,16 +992,28 @@ builder.queryField('careerBattingStats', (t) =>
       team: t.arg.string({ required: false }),
       playerType: t.arg.string({ required: false }),
     },
-    resolve: async (root, args) => {
-      // Convert relay pagination args to offset/limit, capping at MAX_CAREER_BATTING_LIMIT
+    resolve: async (root, args, context) => {
+      // Enforce the premium page-size cap server-side (PST-032 / LS-7119).
+      // Premium holders may request up to MAX_CAREER_BATTING_LIMIT rows;
+      // free / unauthenticated callers are silently capped at FREE_MAX_CAREER_BATTING_LIMIT
+      // so a hand-crafted request cannot bypass the UI gate.
+      const canRequestLargePageSize =
+        context.user !== null &&
+        context.user !== undefined &&
+        (await hasEntitlement(
+          context,
+          ENTITLEMENTS.large_player_stats_page_size,
+        ));
+      const effectiveCap = canRequestLargePageSize
+        ? MAX_CAREER_BATTING_LIMIT
+        : FREE_MAX_CAREER_BATTING_LIMIT;
+
+      // Convert relay pagination args to offset/limit, capping at effectiveCap
       // to prevent runaway queries that cause Lambda timeouts (LS-3113).
       // Math.max(0, ...) guards against a negative `first` value (GraphQL Int allows it)
       // which would otherwise produce an invalid LIMIT in the SQL query.
       const requestedLimit = args.first ?? 25;
-      const limit = Math.max(
-        0,
-        Math.min(requestedLimit, MAX_CAREER_BATTING_LIMIT),
-      );
+      const limit = Math.max(0, Math.min(requestedLimit, effectiveCap));
       const offset = args.after
         ? parseInt(Buffer.from(args.after, 'base64').toString())
         : 0;

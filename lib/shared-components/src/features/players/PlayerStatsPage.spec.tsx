@@ -608,6 +608,23 @@ describe('pageSizeOptionsForViewMode (LS-7117)', () => {
     first.push(250);
     expect(pageSizeOptionsForViewMode('hitters')).toEqual([10, 25, 50, 100]);
   });
+
+  // PST-032 / LS-7119: premium users see 250/500 in single-grid modes
+  it('adds 250/500 for premium in single-grid Hitters view', () => {
+    expect(pageSizeOptionsForViewMode('hitters', true)).toEqual([
+      10, 25, 50, 100, 250, 500,
+    ]);
+  });
+
+  it('adds 250/500 for premium in single-grid Pitchers view', () => {
+    expect(pageSizeOptionsForViewMode('pitchers', true)).toEqual([
+      10, 25, 50, 100, 250, 500,
+    ]);
+  });
+
+  it('withholds 250/500 even for premium in combined view', () => {
+    expect(pageSizeOptionsForViewMode('combined', true)).toEqual([10, 25, 50]);
+  });
 });
 
 describe('clampPageSizeForViewMode (LS-7117)', () => {

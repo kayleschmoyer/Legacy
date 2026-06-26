@@ -132,6 +132,12 @@ describe('parsePageSize', () => {
     expect(parsePageSize('100')).toBe(100);
   });
 
+  // LS-7119: 250 and 500 added to ALLOWED_PAGE_SIZES so premium deep-links parse.
+  it('passes 250 and 500 through unchanged (LS-7119 premium page sizes)', () => {
+    expect(parsePageSize('250')).toBe(250);
+    expect(parsePageSize('500')).toBe(500);
+  });
+
   // AC3: an absent param defaults to 25.
   it('defaults to 25 when the param is absent', () => {
     expect(parsePageSize(null)).toBe(25);

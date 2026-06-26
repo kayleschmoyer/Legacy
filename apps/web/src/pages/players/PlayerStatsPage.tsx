@@ -67,10 +67,11 @@ const MAX_GRAPHQL_INT = 2147483647;
 
 const SEARCH_PARAM_MAX_LENGTH = 64;
 
-// Allowed page sizes for the player-stats grid — mirrors the selector rendered
-// in PlayerStatsDataGrid ([10, 25, 50, 100]). Kept as a typed tuple so the
-// default (25) is provably a member of the set.
-const ALLOWED_PAGE_SIZES = [10, 25, 50, 100] as const;
+// Allowed page sizes for the player-stats grid. Includes premium-only sizes
+// (250, 500) so deep-linked URLs with those values parse correctly; the shared
+// component only surfaces these options when the viewer holds the
+// large_player_stats_page_size entitlement (PST-032 / LS-7119).
+const ALLOWED_PAGE_SIZES = [10, 25, 50, 100, 250, 500] as const;
 const DEFAULT_PAGE_SIZE = 25;
 
 /**
@@ -1269,6 +1270,9 @@ export function PlayerStatsRoute() {
   // can be copied manually (LS-7132 / PST-072).
   const [shareFallbackUrl, setShareFallbackUrl] = React.useState('');
   const isPremium = useHasEntitlement(ENTITLEMENTS.advanced_search_filters);
+  const isPremiumLargePageSize = useHasEntitlement(
+    ENTITLEMENTS.large_player_stats_page_size,
+  );
 
   // `/players/stats` is a PUBLIC, shareable route (LS-3548) — a shared link can
   // be opened by a signed-out recipient. Track auth state so we never fire
@@ -1908,12 +1912,17 @@ export function PlayerStatsRoute() {
           title="MLB Player Statistics"
           initialViewMode={initialState.viewMode}
           initialFilters={initialState.filters}
-          initialPageSize={initialState.pageSize}
+          initialPageSize={
+            isPremiumLargePageSize
+              ? initialState.pageSize
+              : Math.min(initialState.pageSize, 100)
+          }
           showHeader={true}
           showActions={true}
           canExport={true}
           exportFormats={isPremium ? ['json', 'csv', 'xlsx'] : ['json']}
           canCustomizeColumns={isPremium}
+          isPremiumPageSize={isPremiumLargePageSize}
           statsFormat={statsFormat}
           initialVisibleColumns={visibleColumns}
           onVisibleColumnsChange={handleVisibleColumnsChange}

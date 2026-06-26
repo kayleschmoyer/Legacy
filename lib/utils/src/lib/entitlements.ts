@@ -50,6 +50,7 @@ export const ENTITLEMENTS = {
   advanced_pitching_stats: 'advanced_pitching_stats',
   defensive_sabermetrics: 'defensive_sabermetrics',
   advanced_batting_stats: 'advanced_batting_stats',
+  large_player_stats_page_size: 'large_player_stats_page_size',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -90,6 +91,7 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.advanced_pitching_stats,
     ENTITLEMENTS.defensive_sabermetrics,
     ENTITLEMENTS.advanced_batting_stats,
+    ENTITLEMENTS.large_player_stats_page_size,
   ],
 };
 
@@ -115,6 +117,8 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   advanced_pitching_stats: 'Advanced pitching analytics (FIP, WHIP, K/9, BB/9)',
   defensive_sabermetrics: 'Advanced defensive sabermetrics (DRS, UZR, OAA)',
   advanced_batting_stats: 'Advanced batting sabermetrics (OPS, OPS+, BABIP)',
+  large_player_stats_page_size:
+    'Larger page sizes (250/500 rows) in Player Statistics',
 };
 
 export function tierHasEntitlement(

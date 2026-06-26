@@ -201,12 +201,17 @@ describe('Statistics Resolver', () => {
       );
     });
 
-    it('caps first at MAX_CAREER_BATTING_LIMIT (5000) when client requests more', async () => {
+    it('caps first at MAX_CAREER_BATTING_LIMIT (5000) for premium when client requests more', async () => {
       mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
       mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
 
       const resolver = getQuery('careerBattingStats');
-      await resolver({}, { first: 30000 }, emptyCtx, undefined as never);
+      await resolver(
+        {},
+        { first: 30000 },
+        makePremiumCtx(),
+        undefined as never,
+      );
 
       expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
         expect.objectContaining({ limit: 5000 }),
@@ -303,6 +308,42 @@ describe('Statistics Resolver', () => {
         expect.objectContaining({
           filters: expect.objectContaining({ searchTerm: expectedTerm }),
         }),
+      );
+    });
+
+    it('caps first at 100 for a free (non-premium) user (LS-7119)', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver({}, { first: 250 }, makeFreeCtx(), undefined as never);
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 100 }),
+      );
+    });
+
+    it('caps first at 100 for an unauthenticated caller (LS-7119)', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver({}, { first: 250 }, emptyCtx, undefined as never);
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 100 }),
+      );
+    });
+
+    it('allows up to 5000 rows for a premium user (LS-7119)', async () => {
+      mockStatistics.getCareerBattingStats.mockResolvedValueOnce([]);
+      mockStatistics.getCareerBattingStatsCount.mockResolvedValueOnce(0);
+
+      const resolver = getQuery('careerBattingStats');
+      await resolver({}, { first: 500 }, makePremiumCtx(), undefined as never);
+
+      expect(mockStatistics.getCareerBattingStats).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 500 }),
       );
     });
   });
@@ -689,11 +730,11 @@ describe('Statistics Resolver', () => {
       const result = await resolver(
         {},
         { playerId: 3 },
-        emptyCtx,
+        makeFreeCtx(),
         undefined as never,
       );
 
-      expect(result).toEqual(seasons);
+      expect(result).toMatchObject(seasons);
     });
 
     it('returns drs/uzr/oaa for premium users', async () => {

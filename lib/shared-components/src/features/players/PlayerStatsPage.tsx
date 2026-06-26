@@ -421,6 +421,13 @@ export interface PlayerStatsPageProps {
    * column control are unaffected.
    */
   canCustomizeColumns?: boolean;
+  /**
+   * Whether the current viewer holds the `large_player_stats_page_size` entitlement
+   * (PST-032 / LS-7119). When `true` the rows-per-page selector shows additional
+   * 250/500 options in single-grid modes. Defaults to `false` so non-premium callers
+   * are unaffected.
+   */
+  isPremiumPageSize?: boolean;
   /** Stats display format: 'standard' shows high-priority columns only, 'expanded' shows all */
   statsFormat?: 'standard' | 'expanded';
   /**
@@ -515,6 +522,10 @@ const SO_STEP = 10;
 
 // Rows-per-page choices for the toolbar selector.
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+// Additional rows-per-page options unlocked for premium subscribers (PST-032 / LS-7119).
+// Only offered in single-grid modes — combined view already withholds 100 to keep
+// peak un-virtualized row count bounded, and 2×250 would be excessive.
+const PREMIUM_PAGE_SIZE_OPTIONS = [250, 500] as const;
 // In 'combined' view both the batting and pitching grids render simultaneously, so a
 // pageSize of N paints 2×N rows in a single, un-virtualized layout (PST-030 / LS-7117).
 // Cap the largest page size out of combined view to keep peak row count bounded — the
@@ -670,13 +681,19 @@ export function buildShareUrl(
  * Rows-per-page options available for the given view mode (PST-030 / LS-7117).
  * 'combined' renders both grids at once, so the 100-row option is withheld there to
  * keep peak un-virtualized row count bounded; single-grid modes keep the full set.
+ * Premium subscribers additionally see 250/500 options in single-grid modes
+ * (PST-032 / LS-7119) — combined mode still caps at 50 regardless of tier.
  * Pure so the cap is unit-testable without mounting the Tamagui shell.
  */
 export function pageSizeOptionsForViewMode(
   viewMode: 'combined' | 'hitters' | 'pitchers',
+  isPremium = false,
 ): number[] {
-  return viewMode === 'combined'
-    ? PAGE_SIZE_OPTIONS.filter((n) => n <= COMBINED_MAX_PAGE_SIZE)
+  if (viewMode === 'combined') {
+    return PAGE_SIZE_OPTIONS.filter((n) => n <= COMBINED_MAX_PAGE_SIZE);
+  }
+  return isPremium
+    ? [...PAGE_SIZE_OPTIONS, ...PREMIUM_PAGE_SIZE_OPTIONS]
     : [...PAGE_SIZE_OPTIONS];
 }
 
@@ -715,6 +732,7 @@ export function PlayerStatsPage({
   canExport = true,
   canCustomizeColumns = true,
   exportFormats = ['json'],
+  isPremiumPageSize = false,
   statsFormat = 'expanded',
   initialVisibleColumns = null,
   onVisibleColumnsChange,
@@ -1155,7 +1173,11 @@ export function PlayerStatsPage({
 
   // Rows-per-page options narrow to exclude 100 in 'combined' view (PST-030 /
   // LS-7117), where both grids render at once and 100 would paint 200 rows.
-  const pageSizeOptions = pageSizeOptionsForViewMode(viewMode);
+  // Premium users additionally see 250/500 in single-grid modes (PST-032 / LS-7119).
+  const pageSizeOptions = pageSizeOptionsForViewMode(
+    viewMode,
+    isPremiumPageSize,
+  );
 
   // ── Column picker derived state (LS-7105) ──────────────────────
   // Groups for the currently-visible grids drive the picker list; the seed for
