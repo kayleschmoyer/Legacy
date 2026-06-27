@@ -140,9 +140,10 @@ export function FootballPositionFilter({ selected, onToggle, onClear }: Props) {
       style={
         isActive
           ? {
-              backgroundColor: withAlpha(accentColor, 0.15),
+              backgroundColor: withAlpha(accentColor, 0.3),
               borderColor: accentColor,
               color: label === 'All' ? TEXT_PRIMARY : accentColor,
+              textDecoration: 'underline',
             }
           : undefined
       }
