@@ -680,6 +680,7 @@ export function FootballPlayersPage({
   const [sort, setSort] = useState<FootballPlayerSortValue>({ dir: 'asc' });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allNodes, setAllNodes] = useState<PlayerListItem[]>([]);
+  const appendNextRef = useRef(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   // Premium advanced-search filters (LS-6489 / FPL-008).
@@ -793,6 +794,7 @@ export function FootballPlayersPage({
         sortField: sort.field,
         sortDir: sort.dir,
       };
+      appendNextRef.current = false;
       setCursor(undefined);
       setAllNodes([]);
     }
@@ -830,26 +832,26 @@ export function FootballPlayersPage({
     notifyOnNetworkStatusChange: true,
   });
 
-  // Accumulate pages as cursor changes
-  const prevCursorRef = useRef(cursor);
+  // Accumulate pages — append when Load More was clicked, replace otherwise.
+  // appendNextRef is set synchronously in loadMore and cleared by the filter-reset
+  // effect, so a filter change racing a cursor fetch never merges stale pages.
   useEffect(() => {
     if (!data?.footballPlayers?.nodes) return;
     const newNodes = data.footballPlayers.nodes;
-    if (prevCursorRef.current !== cursor) {
-      // cursor changed — append
-      setAllNodes((prev) => [...(prev ?? []), ...newNodes]);
+    if (appendNextRef.current) {
+      appendNextRef.current = false;
+      setAllNodes((prev) => [...prev, ...newNodes]);
     } else {
-      // same cursor — replace (initial load or filter change reset)
       setAllNodes(newNodes);
     }
-    prevCursorRef.current = cursor;
-  }, [data, cursor]);
+  }, [data]);
 
   const pageInfo = data?.footballPlayers?.pageInfo;
   const hasMore = pageInfo?.hasNextPage ?? false;
 
   const loadMore = useCallback(() => {
     if (pageInfo?.endCursor) {
+      appendNextRef.current = true;
       setCursor(pageInfo.endCursor);
     }
   }, [pageInfo?.endCursor]);
