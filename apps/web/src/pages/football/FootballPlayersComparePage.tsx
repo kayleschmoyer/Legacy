@@ -6,7 +6,10 @@ import {
   type FootballPlayerQuery,
   useFootballPlayerQuery,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { PageMeta } from '../../components/PageMeta';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -116,6 +119,7 @@ export function FootballPlayersComparePage() {
   const [searchParams] = useSearchParams();
   const idA = parseId(searchParams.get('a'));
   const idB = parseId(searchParams.get('b'));
+  const isPremium = useHasEntitlement(ENTITLEMENTS.player_comparison);
 
   const queryA = useFootballPlayerQuery({
     variables: { id: idA },
@@ -256,87 +260,95 @@ export function FootballPlayersComparePage() {
         )}
 
         {idsValid && !loading && !error && playerA && playerB && (
-          <YStack
-            backgroundColor={SURFACE_CARD}
-            borderWidth={1}
-            borderColor={OUTLINE_SUBTLE}
-            borderRadius={10}
-            overflow="hidden"
+          <PremiumGate
+            isPremium={isPremium}
+            featureName="Player Comparison"
+            featureDescription="Compare players side-by-side with a Premium subscription."
           >
-            {/* Column headers */}
-            <XStack
-              paddingVertical={16}
-              paddingHorizontal={12}
-              backgroundColor={SURFACE_PANEL}
-              borderBottomWidth={1}
-              borderBottomColor={OUTLINE_SUBTLE}
-              alignItems="center"
+            <YStack
+              backgroundColor={SURFACE_CARD}
+              borderWidth={1}
+              borderColor={OUTLINE_SUBTLE}
+              borderRadius={10}
+              overflow="hidden"
             >
-              <PlayerColumnHeader player={playerA} />
-              <YStack width={80} alignItems="center">
-                <Text
-                  fontSize={12}
-                  color={BRAND_GOLD}
-                  fontWeight="700"
-                  fontFamily={FONT_BODY}
-                >
-                  VS
-                </Text>
-              </YStack>
-              <PlayerColumnHeader player={playerB} />
-            </XStack>
-
-            {/* Stat rows */}
-            {visibleRows.length === 0 ? (
-              <YStack padding={24} alignItems="center">
-                <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
-                  No comparable stats available for these players.
-                </Text>
-              </YStack>
-            ) : (
-              visibleRows.map((row, idx) => (
-                <XStack
-                  key={row.label}
-                  paddingVertical={12}
-                  paddingHorizontal={12}
-                  alignItems="center"
-                  backgroundColor={
-                    idx % 2 === 0 ? 'transparent' : withAlpha(BRAND_NAVY, 0.08)
-                  }
-                >
+              {/* Column headers */}
+              <XStack
+                paddingVertical={16}
+                paddingHorizontal={12}
+                backgroundColor={SURFACE_PANEL}
+                borderBottomWidth={1}
+                borderBottomColor={OUTLINE_SUBTLE}
+                alignItems="center"
+              >
+                <PlayerColumnHeader player={playerA} />
+                <YStack width={80} alignItems="center">
                   <Text
-                    flex={1}
-                    fontSize={14}
-                    color={TEXT_PRIMARY}
-                    fontWeight="700"
-                    fontVariant={['tabular-nums']}
-                    textAlign="center"
-                  >
-                    {row.accessor(playerA)}
-                  </Text>
-                  <Text
-                    width={80}
                     fontSize={12}
-                    color={TEXT_MUTED}
-                    fontFamily={FONT_BODY}
-                    textAlign="center"
-                  >
-                    {row.label}
-                  </Text>
-                  <Text
-                    flex={1}
-                    fontSize={14}
-                    color={TEXT_PRIMARY}
+                    color={BRAND_GOLD}
                     fontWeight="700"
-                    fontVariant={['tabular-nums']}
-                    textAlign="center"
+                    fontFamily={FONT_BODY}
                   >
-                    {row.accessor(playerB)}
+                    VS
                   </Text>
-                </XStack>
-              ))
-            )}
-          </YStack>
+                </YStack>
+                <PlayerColumnHeader player={playerB} />
+              </XStack>
+
+              {/* Stat rows */}
+              {visibleRows.length === 0 ? (
+                <YStack padding={24} alignItems="center">
+                  <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+                    No comparable stats available for these players.
+                  </Text>
+                </YStack>
+              ) : (
+                visibleRows.map((row, idx) => (
+                  <XStack
+                    key={row.label}
+                    paddingVertical={12}
+                    paddingHorizontal={12}
+                    alignItems="center"
+                    backgroundColor={
+                      idx % 2 === 0
+                        ? 'transparent'
+                        : withAlpha(BRAND_NAVY, 0.08)
+                    }
+                  >
+                    <Text
+                      flex={1}
+                      fontSize={14}
+                      color={TEXT_PRIMARY}
+                      fontWeight="700"
+                      fontVariant={['tabular-nums']}
+                      textAlign="center"
+                    >
+                      {row.accessor(playerA)}
+                    </Text>
+                    <Text
+                      width={80}
+                      fontSize={12}
+                      color={TEXT_MUTED}
+                      fontFamily={FONT_BODY}
+                      textAlign="center"
+                    >
+                      {row.label}
+                    </Text>
+                    <Text
+                      flex={1}
+                      fontSize={14}
+                      color={TEXT_PRIMARY}
+                      fontWeight="700"
+                      fontVariant={['tabular-nums']}
+                      textAlign="center"
+                    >
+                      {row.accessor(playerB)}
+                    </Text>
+                  </XStack>
+                ))
+              )}
+            </YStack>
+          </PremiumGate>
         )}
       </YStack>
     </YStack>

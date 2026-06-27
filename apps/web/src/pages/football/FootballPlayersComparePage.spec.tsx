@@ -9,12 +9,15 @@
  *   3. Stat-row filtering — only categories where at least one player has a value
  *      are rendered; rows both players lack are hidden.
  *   4. Back navigation — in-app history vs cold-start deep-link fallback.
+ *   5. Premium gate — LS-6462 (FPL-037): PremiumGate wraps the table; free users
+ *      see the gate overlay, premium users see the full table.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFootballPlayerQuery } from '@legacy-sports/graphql';
 import { FootballPlayersComparePage } from './FootballPlayersComparePage';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -23,9 +26,29 @@ jest.mock('react-router-dom', () => ({
   useSearchParams: jest.fn(),
 }));
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
-jest.mock('@tamagui/lucide-icons', () => ({ ArrowLeft: () => null }));
+jest.mock('@tamagui/lucide-icons', () => ({
+  ArrowLeft: () => null,
+  Lock: () => null,
+}));
 jest.mock('@legacy-sports/graphql', () => ({
   useFootballPlayerQuery: jest.fn(),
+}));
+jest.mock('../../hooks/useIsPremium', () => ({
+  useHasEntitlement: jest.fn(() => true),
+}));
+jest.mock('../../components/PremiumGate', () => ({
+  PremiumGate: ({
+    isPremium,
+    children,
+  }: {
+    isPremium: boolean;
+    children: React.ReactNode;
+  }) => (
+    <div>
+      {!isPremium && <div data-testid="premium-feature-gate" />}
+      {children}
+    </div>
+  ),
 }));
 jest.mock('tamagui', () => {
   // Stand-in for every layout/text primitive the page renders. JSX uses the
@@ -41,6 +64,7 @@ jest.mock('tamagui', () => {
     Text: Box,
     XStack: Box,
     YStack: Box,
+    Button: Box,
     Spinner: () => <span data-testid="spinner" />,
   };
 });
@@ -51,6 +75,9 @@ const mockUseSearchParams = useSearchParams as jest.MockedFunction<
 >;
 const mockUseFootballPlayerQuery =
   useFootballPlayerQuery as jest.MockedFunction<typeof useFootballPlayerQuery>;
+const mockUseHasEntitlement = useHasEntitlement as jest.MockedFunction<
+  typeof useHasEntitlement
+>;
 const mockNavigate = jest.fn();
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -252,5 +279,39 @@ describe('FootballPlayersComparePage — back navigation', () => {
     fireEvent.click(screen.getByText('Back to players'));
 
     expect(mockNavigate).toHaveBeenCalledWith('/football/players');
+  });
+});
+
+// ── Premium gate (LS-6462 / FPL-037) ────────────────────────────────────────
+
+describe('FootballPlayersComparePage — premium gate', () => {
+  function setupBothPlayers() {
+    mockQueryByPlayer({
+      42: { data: { footballPlayer: PLAYER_A }, loading: false } as QueryResult,
+      7: { data: { footballPlayer: PLAYER_B }, loading: false } as QueryResult,
+    });
+  }
+
+  it('shows the gate overlay for free users when both players are loaded', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    setupBothPlayers();
+    render(<FootballPlayersComparePage />);
+
+    expect(screen.getByTestId('premium-feature-gate')).toBeTruthy();
+  });
+
+  it('does not show the gate overlay for premium users', () => {
+    mockUseHasEntitlement.mockReturnValue(true);
+    setupBothPlayers();
+    render(<FootballPlayersComparePage />);
+
+    expect(screen.queryByTestId('premium-feature-gate')).toBeNull();
+  });
+
+  it('calls useHasEntitlement with the player_comparison entitlement key', () => {
+    setupBothPlayers();
+    render(<FootballPlayersComparePage />);
+
+    expect(mockUseHasEntitlement).toHaveBeenCalledWith('player_comparison');
   });
 });
