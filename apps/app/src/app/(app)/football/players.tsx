@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
+  Pressable,
   SafeAreaView,
   TextInput,
 } from 'react-native';
-import { Select, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronDown, Star } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
@@ -110,6 +112,13 @@ const TEAM_OPTIONS: Array<{ value: string; label: string }> = [
       return ta.city.localeCompare(tb.city);
     }),
 ];
+
+function teamFilterLabel(value: string): string {
+  if (value === 'All') return 'All Teams';
+  if (value === 'FREE_AGENT') return 'Free Agents';
+  if (value === 'AFC' || value === 'NFC') return value;
+  return NFL_TEAMS[value]?.abbreviation ?? value;
+}
 
 function fmt(n: number | null | undefined): string {
   if (n == null) return '—';
@@ -578,6 +587,14 @@ export function FootballPlayers(): React.JSX.Element {
   // 'All' is never stored in the array — it is the clear affordance.
   const [positions, setPositions] = useState<FootballPosition[]>([]);
   const [teamFilter, setTeamFilter] = useState('All');
+  const [teamPickerOpen, setTeamPickerOpen] = useState(false);
+  const [teamSearch, setTeamSearch] = useState('');
+
+  const filteredTeamOptions = useMemo(() => {
+    const q = teamSearch.trim().toLowerCase();
+    if (!q) return TEAM_OPTIONS;
+    return TEAM_OPTIONS.filter((opt) => opt.label.toLowerCase().includes(q));
+  }, [teamSearch]);
 
   const handlePositionPress = useCallback((pos: FootballPosition) => {
     if (pos === 'All') {
@@ -886,62 +903,28 @@ export function FootballPlayers(): React.JSX.Element {
             />
           </XStack>
 
-          <Select
-            value={teamFilter}
-            onValueChange={setTeamFilter}
-            disablePreventBodyScroll
-            renderValue={(v) => {
-              if (v === 'All') return 'All Teams';
-              if (v === 'FREE_AGENT') return 'Free Agents';
-              if (v === 'AFC' || v === 'NFC') return v;
-              return NFL_TEAMS[v]?.abbreviation ?? v;
-            }}
+          <XStack
+            width={130}
+            height={36}
+            borderRadius="$2"
+            borderWidth={1}
+            borderColor="$glassBorder"
+            backgroundColor="$glassSurface"
+            paddingHorizontal={8}
+            alignItems="center"
+            justifyContent="space-between"
+            onPress={() => setTeamPickerOpen(true)}
+            pressStyle={{ opacity: 0.7 }}
+            testID="team-picker-trigger"
+            accessibilityLabel={`Team filter: ${teamFilterLabel(teamFilter)}`}
+            accessibilityHint="Double-tap to search teams"
+            accessibilityRole="button"
           >
-            <Select.Trigger
-              width={130}
-              borderColor="$glassBorder"
-              backgroundColor="$glassSurface"
-              color="$color"
-              iconAfter={ChevronDown}
-              borderRadius="$2"
-              paddingHorizontal={8}
-              height={36}
-            >
-              <Select.Value
-                placeholder="All Teams"
-                color="$color"
-                fontSize={13}
-              />
-            </Select.Trigger>
-
-            <Select.Content zIndex={200000}>
-              <Select.ScrollUpButton />
-              <Select.Viewport
-                backgroundColor="$background"
-                borderColor="$glassBorder"
-                borderWidth={1}
-                borderRadius="$3"
-                minWidth={220}
-              >
-                <Select.Group>
-                  {TEAM_OPTIONS.map((opt, i) => (
-                    <Select.Item
-                      key={opt.value}
-                      index={i}
-                      value={opt.value}
-                      backgroundColor="$background"
-                      hoverStyle={{ backgroundColor: '$glassSurface' }}
-                    >
-                      <Select.ItemText color="$color" fontSize={13}>
-                        {opt.label}
-                      </Select.ItemText>
-                    </Select.Item>
-                  ))}
-                </Select.Group>
-              </Select.Viewport>
-              <Select.ScrollDownButton />
-            </Select.Content>
-          </Select>
+            <Text color="$color" fontSize={13} numberOfLines={1} flexShrink={1}>
+              {teamFilterLabel(teamFilter)}
+            </Text>
+            <ChevronDown size={14} color="$color" />
+          </XStack>
         </XStack>
 
         {/* Projections upsell — shown to free users to surface the premium feature */}
@@ -1021,6 +1004,91 @@ export function FootballPlayers(): React.JSX.Element {
             }
           />
         )}
+
+        {/* Searchable team picker modal — replaces Tamagui Select for TalkBack/keyboard accessibility (LS-6495) */}
+        <Modal
+          visible={teamPickerOpen}
+          animationType="slide"
+          onRequestClose={() => {
+            setTeamPickerOpen(false);
+            setTeamSearch('');
+          }}
+          accessibilityViewIsModal
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
+            <XStack
+              paddingHorizontal={12}
+              paddingVertical={8}
+              gap={8}
+              alignItems="center"
+              borderBottomWidth={1}
+              borderBottomColor="$glassBorder"
+            >
+              <XStack
+                flex={1}
+                backgroundColor="$glassSurface"
+                borderWidth={1}
+                borderColor="$glassBorder"
+                borderRadius="$2"
+                paddingHorizontal={10}
+                height={44}
+                alignItems="center"
+              >
+                <TextInput
+                  autoFocus
+                  placeholder="Search teams..."
+                  placeholderTextColor="#666"
+                  value={teamSearch}
+                  onChangeText={setTeamSearch}
+                  accessibilityLabel="Search teams"
+                  style={{ flex: 1, color: '#fff', fontSize: 14, height: 44 }}
+                />
+              </XStack>
+              <Pressable
+                testID="team-picker-cancel"
+                onPress={() => {
+                  setTeamPickerOpen(false);
+                  setTeamSearch('');
+                }}
+                accessibilityLabel="Cancel"
+                accessibilityRole="button"
+              >
+                <Text color="#4A90D9" fontSize={15} fontWeight="600">
+                  Cancel
+                </Text>
+              </Pressable>
+            </XStack>
+            <FlatList
+              data={filteredTeamOptions}
+              keyExtractor={(item) => item.value}
+              accessibilityLabel="Team options list"
+              renderItem={({ item }) => (
+                <Pressable
+                  testID={`select-item-${item.value}`}
+                  onPress={() => {
+                    setTeamFilter(item.value);
+                    setTeamPickerOpen(false);
+                    setTeamSearch('');
+                  }}
+                  accessibilityLabel={item.label}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: teamFilter === item.value }}
+                  style={{
+                    padding: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#1A2A3A',
+                    backgroundColor:
+                      teamFilter === item.value ? '#1B3A5C33' : 'transparent',
+                  }}
+                >
+                  <Text color="$color" fontSize={15}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              )}
+            />
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

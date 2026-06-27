@@ -133,6 +133,20 @@ jest.mock('tamagui', () => {
   let mockSelectOnChange: ((val: string) => void) | null = null;
   return {
     ...mocks.tamaguiMocks,
+    XStack: ({
+      children,
+      onPress,
+      testID,
+    }: {
+      children: import('react').ReactNode;
+      onPress?: () => void;
+      testID?: string;
+      [key: string]: unknown;
+    }) => {
+      const { View } =
+        jest.requireActual<typeof import('react-native')>('react-native');
+      return createElement(View, { onPress, testID }, children);
+    },
     YStack: ({
       children,
       onPress,
@@ -728,6 +742,7 @@ describe('FootballPlayers', () => {
   describe('team filter', () => {
     it('passes conference variable when AFC is selected', () => {
       render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
       fireEvent.press(screen.getByTestId('select-item-AFC'));
       const calls = mockUseFootballPlayersQuery.mock.calls;
       const lastCall = calls[calls.length - 1] as [
@@ -739,6 +754,7 @@ describe('FootballPlayers', () => {
 
     it('passes conference variable when NFC is selected', () => {
       render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
       fireEvent.press(screen.getByTestId('select-item-NFC'));
       const calls = mockUseFootballPlayersQuery.mock.calls;
       const lastCall = calls[calls.length - 1] as [
@@ -750,6 +766,7 @@ describe('FootballPlayers', () => {
 
     it('passes nflTeam variable when a specific team is selected', () => {
       render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
       fireEvent.press(screen.getByTestId('select-item-KC'));
       const calls = mockUseFootballPlayersQuery.mock.calls;
       const lastCall = calls[calls.length - 1] as [
@@ -761,7 +778,9 @@ describe('FootballPlayers', () => {
 
     it('clears both filters when All Teams is selected after a conference filter', () => {
       render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
       fireEvent.press(screen.getByTestId('select-item-AFC'));
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
       fireEvent.press(screen.getByTestId('select-item-All'));
       const calls = mockUseFootballPlayersQuery.mock.calls;
       const lastCall = calls[calls.length - 1] as [
@@ -769,6 +788,41 @@ describe('FootballPlayers', () => {
       ];
       expect(lastCall[0].variables.nflTeam).toBeUndefined();
       expect(lastCall[0].variables.conference).toBeUndefined();
+    });
+  });
+
+  describe('team picker search (LS-6495)', () => {
+    it('opens a searchable modal with a search input when the trigger is pressed', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
+      expect(screen.getByPlaceholderText('Search teams...')).toBeTruthy();
+    });
+
+    it('filters team options by label when typing in the search box', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Search teams...'),
+        'Kansas',
+      );
+      expect(screen.getByTestId('select-item-KC')).toBeTruthy();
+      expect(screen.queryByTestId('select-item-DAL')).toBeNull();
+    });
+
+    it('closes the modal and clears search when Cancel is pressed', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
+      expect(screen.getByPlaceholderText('Search teams...')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('team-picker-cancel'));
+      expect(screen.queryByPlaceholderText('Search teams...')).toBeNull();
+    });
+
+    it('team items have accessibility labels for TalkBack navigation', () => {
+      render(<FootballPlayers />);
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
+      const afcItem = screen.getByTestId('select-item-AFC');
+      expect(afcItem.props.accessibilityLabel).toBe('AFC');
+      expect(afcItem.props.accessibilityRole).toBe('radio');
     });
   });
 
