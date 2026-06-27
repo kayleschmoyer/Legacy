@@ -1377,7 +1377,7 @@ export function FootballPlayersPage({
                 fontWeight="700"
                 fontFamily={FONT_BODY}
               >
-                Compare Players
+                Compare 2 Players
               </Text>
             </YStack>
           )}
