@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, styled, Text, XStack } from 'tamagui';
+import { ScrollView, styled, Text, XStack, YStack } from 'tamagui';
 import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
@@ -152,28 +152,37 @@ export function FootballPositionFilter({ selected, onToggle, onClear }: Props) {
   );
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 4 }}
+    <YStack
+      style={{
+        maskImage:
+          'linear-gradient(to right, black calc(100% - 40px), transparent)',
+        WebkitMaskImage:
+          'linear-gradient(to right, black calc(100% - 40px), transparent)',
+      }}
     >
-      <XStack
-        gap={8}
-        paddingVertical={4}
-        role="group"
-        aria-label="Filter by position"
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 4 }}
       >
-        {/* "All" clears the multi-select; active when nothing is selected. */}
-        {renderPill('All', 0, selected.length === 0, BRAND_NAVY)}
-        {POSITIONS.map((pos, i) =>
-          renderPill(
-            pos,
-            i + 1,
-            selected.includes(pos),
-            FOOTBALL_POSITION_COLORS[pos],
-          ),
-        )}
-      </XStack>
-    </ScrollView>
+        <XStack
+          gap={8}
+          paddingVertical={4}
+          role="group"
+          aria-label="Filter by position"
+        >
+          {/* "All" clears the multi-select; active when nothing is selected. */}
+          {renderPill('All', 0, selected.length === 0, BRAND_NAVY)}
+          {POSITIONS.map((pos, i) =>
+            renderPill(
+              pos,
+              i + 1,
+              selected.includes(pos),
+              FOOTBALL_POSITION_COLORS[pos],
+            ),
+          )}
+        </XStack>
+      </ScrollView>
+    </YStack>
   );
 }
