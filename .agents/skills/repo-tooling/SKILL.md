@@ -119,6 +119,7 @@ The hook is registered under `hooks.PreToolUse` in `.claude/settings.json` next 
 - **Always use `make` targets** over raw `pnpm exec nx` commands; **never run `pnpm exec nx reset` directly** — it destroys the pooled `node_modules` symlink in worktrees (LS-5242). Use `make clean-cache` (or `make reset`) instead, which re-links the symlink afterward. If you already ran `pnpm exec nx reset`, restore with `node scripts/modules-pool/link.mjs`.
 - **Always use `-w` flag** when installing packages (`pnpm add -w`)
 - **Avoid `node -e` on Windows for multi-line scripts** — complex quoting (backslashes, embedded quotes, `$`-expansion) is fragile in PowerShell. For any Node script longer than a trivial expression, write it to `scratch/<name>.js` and run `node scratch/<name>.js` instead
+- **`jq` is NOT available on Windows** — use Python with explicit UTF-8 encoding for JSON parsing instead of `jq` shell pipes
 - **Run `print-schema` before codegen** when Pothos resolvers have changed
 - **Check migration status before `make pc`** -- pending migrations cause failures
 
