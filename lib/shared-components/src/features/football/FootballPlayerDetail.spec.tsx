@@ -14,14 +14,17 @@ jest.mock('../stats/GameLogsTable', () => ({
   GameLogsTable: ({
     sport,
     initialPlayerId,
+    isPremium,
   }: {
     sport?: string;
     initialPlayerId?: string;
+    isPremium?: boolean;
   }) => (
     <div
       data-testid="game-logs-table"
       data-sport={sport}
       data-player-id={initialPlayerId}
+      data-is-premium={isPremium ? 'true' : 'false'}
     />
   ),
 }));
@@ -774,6 +777,18 @@ describe('FootballPlayerDetail', () => {
     const table = screen.getByTestId('game-logs-table');
     expect(table.getAttribute('data-sport')).toBe('nfl');
     expect(table.getAttribute('data-player-id')).toBe('1');
+  });
+
+  it('forwards isPremium=false to GameLogsTable for free users (LS-6459)', () => {
+    render(<FootballPlayerDetail player={QB_PLAYER} isPremium={false} />);
+    const table = screen.getByTestId('game-logs-table');
+    expect(table.getAttribute('data-is-premium')).toBe('false');
+  });
+
+  it('forwards isPremium=true to GameLogsTable for premium users (LS-6459)', () => {
+    render(<FootballPlayerDetail player={QB_PLAYER} isPremium />);
+    const table = screen.getByTestId('game-logs-table');
+    expect(table.getAttribute('data-is-premium')).toBe('true');
   });
 
   it('shows "Player not found." when notFound is true', () => {

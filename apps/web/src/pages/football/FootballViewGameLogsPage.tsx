@@ -25,7 +25,11 @@ export function FootballViewGameLogsPage() {
         description="Filter an NFL player's per-game logs by date, opponent, and home/away venue."
       />
       <PremiumGate isPremium={isPremium} featureName="Football Game Logs">
-        <GameLogsTable apiEndpoint={FOOTBALL_GAME_LOGS_ENDPOINT} sport="nfl" />
+        <GameLogsTable
+          apiEndpoint={FOOTBALL_GAME_LOGS_ENDPOINT}
+          sport="nfl"
+          isPremium={isPremium}
+        />
       </PremiumGate>
     </div>
   );

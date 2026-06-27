@@ -67,7 +67,21 @@ export const ADVANCED_STAT_KEYS = [
   'hardHitPct',
 ] as const;
 
-const ADVANCED_KEY_SET = new Set<string>(ADVANCED_STAT_KEYS);
+/**
+ * NFL-specific premium advanced per-game splits (LS-6459 / FPL-042).
+ * Hidden from non-premium users on the NFL game logs table.
+ * - snapPct: snap count percentage
+ * - tgt: targets (receiving)
+ * - routeShare: percentage of team routes run
+ */
+export const NFL_ADVANCED_STAT_KEYS = ['snapPct', 'tgt', 'routeShare'] as const;
+
+const MLB_ADVANCED_KEY_SET = new Set<string>(ADVANCED_STAT_KEYS);
+const NFL_ADVANCED_KEY_SET = new Set<string>(NFL_ADVANCED_STAT_KEYS);
+
+function advancedKeySet(sport: GameLogSport): Set<string> {
+  return sport === 'nfl' ? NFL_ADVANCED_KEY_SET : MLB_ADVANCED_KEY_SET;
+}
 
 /** localStorage key for column customization, namespaced per sport. (LS-7464) */
 const columnPrefsKey = (sport: string) => `gameLogs.${sport}.columns`;
@@ -1040,13 +1054,15 @@ function GameLogsTable({
     total != null ? `Showing ${showingCount} of ${total}` : null;
 
   /**
-   * Available columns after premium gating (LS-7463). Free users never see
-   * advanced FanGraphs/Statcast metrics — stripped entirely rather than shown
-   * with an in-table upgrade CTA.
+   * Available columns after premium gating (LS-7463, LS-6459). Free users
+   * never see advanced metrics — stripped entirely rather than shown with an
+   * in-table upgrade CTA. The key set is sport-specific: NFL premium splits
+   * differ from MLB Statcast metrics.
    */
+  const advancedKeys = useMemo(() => advancedKeySet(sport), [sport]);
   const availableStats = useMemo(
-    () => (isPremium ? stats : stats.filter((s) => !ADVANCED_KEY_SET.has(s))),
-    [stats, isPremium],
+    () => (isPremium ? stats : stats.filter((s) => !advancedKeys.has(s))),
+    [stats, isPremium, advancedKeys],
   );
 
   /**

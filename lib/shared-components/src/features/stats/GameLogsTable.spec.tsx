@@ -6,6 +6,7 @@ import {
   buildGameLogsRequestBody,
   compareCells,
   GameLogsTable,
+  NFL_ADVANCED_STAT_KEYS,
   reshapeGameLogs,
   validateDateRange,
 } from './GameLogsTable';
@@ -588,6 +589,78 @@ webDescribe('GameLogsTable premium advanced columns (LS-7463)', () => {
     clickSubmit(getByText);
 
     expect(await findByTestId(`game-logs-header-${advanced}`)).toBeTruthy();
+  });
+});
+
+webDescribe('GameLogsTable NFL premium advanced columns (LS-6459)', () => {
+  it('NFL_ADVANCED_STAT_KEYS contains snapPct, tgt, and routeShare', () => {
+    expect(NFL_ADVANCED_STAT_KEYS).toContain('snapPct');
+    expect(NFL_ADVANCED_STAT_KEYS).toContain('tgt');
+    expect(NFL_ADVANCED_STAT_KEYS).toContain('routeShare');
+  });
+
+  it('strips NFL advanced columns for free users on sport=nfl', async () => {
+    const advanced = NFL_ADVANCED_STAT_KEYS[0];
+    mockFetchOnce(makePaginatedWithStats(['rec', 'yds', advanced], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId, queryByTestId } =
+      render(<GameLogsTable sport="nfl" />);
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'nfl-1234' },
+    });
+    clickSubmit(getByText);
+
+    await findByTestId('game-logs-header-rec');
+    expect(queryByTestId(`game-logs-header-${advanced}`)).toBeNull();
+  });
+
+  it('shows NFL advanced columns for premium users on sport=nfl', async () => {
+    const advanced = NFL_ADVANCED_STAT_KEYS[0];
+    mockFetchOnce(makePaginatedWithStats(['rec', 'yds', advanced], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId } = render(
+      <GameLogsTable sport="nfl" isPremium />,
+    );
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'nfl-1234' },
+    });
+    clickSubmit(getByText);
+
+    expect(await findByTestId(`game-logs-header-${advanced}`)).toBeTruthy();
+  });
+
+  it('does not strip NFL advanced keys from MLB table (sport=mlb)', async () => {
+    const nflKey = NFL_ADVANCED_STAT_KEYS[0];
+    mockFetchOnce(makePaginatedWithStats(['AB', 'H', nflKey], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId } = render(
+      <GameLogsTable sport="mlb" />,
+    );
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'mlb-1234' },
+    });
+    clickSubmit(getByText);
+
+    // snapPct/tgt/routeShare are not in the MLB premium key set, so free MLB
+    // users should still see them if the API returns them.
+    expect(await findByTestId(`game-logs-header-${nflKey}`)).toBeTruthy();
+  });
+
+  it('does not strip MLB advanced keys from NFL table (sport=nfl)', async () => {
+    const mlbKey = ADVANCED_STAT_KEYS[0];
+    mockFetchOnce(makePaginatedWithStats(['rec', 'yds', mlbKey], 50, 162));
+
+    const { getByPlaceholderText, getByText, findByTestId } = render(
+      <GameLogsTable sport="nfl" />,
+    );
+    fireEvent.change(getByPlaceholderText('Enter player ID'), {
+      target: { value: 'nfl-1234' },
+    });
+    clickSubmit(getByText);
+
+    // wOBA/xBA/etc. are MLB premium keys and should not be stripped on the
+    // NFL table for free users.
+    expect(await findByTestId(`game-logs-header-${mlbKey}`)).toBeTruthy();
   });
 });
 

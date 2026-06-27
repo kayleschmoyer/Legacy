@@ -1231,6 +1231,7 @@ export function FootballPlayerDetail({
               sport="nfl"
               initialPlayerId={player.pfrId ?? String(player.id)}
               apiEndpoint={gameLogsApiEndpoint}
+              isPremium={isPremium}
             />
           </YStack>
         </YStack>
