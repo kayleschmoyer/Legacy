@@ -432,10 +432,12 @@ function ViewToggleButton({
   active,
   onPress,
   children,
+  accessibilityLabel,
 }: {
   active: boolean;
   onPress: () => void;
   children: React.ReactNode;
+  accessibilityLabel?: string;
 }) {
   return (
     <YStack
@@ -452,6 +454,8 @@ function ViewToggleButton({
       hoverStyle={{ borderColor: BRAND_NAVY }}
       pressStyle={{ opacity: 0.8 }}
       animation="quick"
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
     >
       {children}
     </YStack>
@@ -1066,6 +1070,7 @@ export function FootballPlayersPage({
             <ViewToggleButton
               active={viewMode === 'cards'}
               onPress={() => handleSetViewMode('cards')}
+              accessibilityLabel="Cards view"
             >
               <LayoutGrid
                 size={16}
@@ -1075,6 +1080,7 @@ export function FootballPlayersPage({
             <ViewToggleButton
               active={viewMode === 'table'}
               onPress={() => handleSetViewMode('table')}
+              accessibilityLabel="Table view"
             >
               <LayoutList
                 size={16}
@@ -1281,6 +1287,7 @@ export function FootballPlayersPage({
 
         {players.length > 0 && viewMode === 'cards' && (
           <YStack
+            testID="player-list-cards"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -1306,6 +1313,7 @@ export function FootballPlayersPage({
 
         {players.length > 0 && viewMode === 'table' && (
           <YStack
+            testID="player-list-table"
             backgroundColor={SURFACE_CARD}
             borderWidth={1}
             borderColor={OUTLINE_SUBTLE}
