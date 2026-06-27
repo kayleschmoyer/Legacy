@@ -27,6 +27,8 @@ export interface SearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
+  /** Accessible label for the search input (falls back to placeholder). */
+  accessibilityLabel?: string;
   /** When > 0, shows the Filter button with the count badge. */
   filterCount?: number;
   onFilterPress?: () => void;
@@ -114,6 +116,7 @@ export function SearchBar({
   value,
   onChangeText,
   placeholder = 'Search players, teams, eras…',
+  accessibilityLabel,
   filterCount,
   onFilterPress,
   chips,
@@ -132,6 +135,7 @@ export function SearchBar({
         borderWidth={1}
         borderColor={focused ? '$focusRing' : '$outlineSubtle'}
         borderRadius={9999}
+        minHeight={44}
         paddingVertical={6}
         paddingLeft={16}
         paddingRight={showFilter ? 6 : 16}
@@ -159,6 +163,8 @@ export function SearchBar({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
+          accessibilityLabel={accessibilityLabel ?? placeholder}
+          aria-label={accessibilityLabel ?? placeholder}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />

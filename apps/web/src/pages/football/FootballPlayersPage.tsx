@@ -952,7 +952,7 @@ export function FootballPlayersPage({
             borderColor={OUTLINE_SUBTLE}
             borderRadius={8}
             paddingHorizontal={12}
-            height={40}
+            height={44}
           >
             <Search size={16} color={TEXT_MUTED} />
             <Input
@@ -966,7 +966,7 @@ export function FootballPlayersPage({
               color={TEXT_PRIMARY}
               fontSize={14}
               fontFamily={FONT_BODY}
-              height={40}
+              height={44}
               paddingHorizontal={0}
               focusStyle={{ outlineWidth: 0 }}
               aria-label="Search players"
