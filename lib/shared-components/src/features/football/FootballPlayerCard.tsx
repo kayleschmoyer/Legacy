@@ -6,8 +6,11 @@ import {
   BRAND_GOLD,
   BRAND_NAVY,
   OUTLINE_SUBTLE,
-  POS_DEF,
+  POS_DB,
+  POS_DL,
+  POS_DST,
   POS_K,
+  POS_LB,
   POS_QB,
   POS_RB,
   POS_TE,
@@ -80,10 +83,10 @@ const POSITION_COLORS: Record<string, string> = {
   WR: POS_WR,
   TE: POS_TE,
   K: POS_K,
-  DST: POS_DEF,
-  DL: POS_DEF,
-  LB: POS_DEF,
-  DB: POS_DEF,
+  DST: POS_DST,
+  DL: POS_DL,
+  LB: POS_LB,
+  DB: POS_DB,
 };
 
 function getPositionColor(pos: string | null | undefined): string {
