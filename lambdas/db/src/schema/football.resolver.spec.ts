@@ -644,6 +644,73 @@ describe('football resolvers', () => {
       ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
     });
 
+    describe('nflTeam filter — relocated franchise expansion (LS-6492)', () => {
+      function compileWhereParams(): unknown[] {
+        const whereArg = mockDb.where.mock.calls[0][0];
+        return new PgDialect().sqlToQuery(whereArg).params;
+      }
+
+      it('includes OAK alongside LV when filtering by LV (Raiders relocation)', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, nflTeam: 'LV', search: null, after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const params = compileWhereParams();
+        expect(params).toContain('LV');
+        expect(params).toContain('OAK');
+      });
+
+      it('includes SD alongside LAC when filtering by LAC (Chargers relocation)', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, nflTeam: 'LAC', search: null, after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const params = compileWhereParams();
+        expect(params).toContain('LAC');
+        expect(params).toContain('SD');
+      });
+
+      it('includes STL alongside LAR when filtering by LAR (Rams relocation)', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, nflTeam: 'LAR', search: null, after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const params = compileWhereParams();
+        expect(params).toContain('LAR');
+        expect(params).toContain('STL');
+      });
+
+      it('uses only the current abbreviation for non-relocated teams (KC)', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, nflTeam: 'KC', search: null, after: null },
+          mockContext,
+          undefined as never,
+        );
+
+        const params = compileWhereParams();
+        expect(params).toContain('KC');
+        expect(params).toHaveLength(1);
+      });
+    });
+
     describe('positions multi-select (LS-6464)', () => {
       // Serialize the WHERE SQL passed to db.where() into bind params using
       // drizzle's own dialect so we can assert the real compiled query.

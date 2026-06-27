@@ -1867,6 +1867,16 @@ function isValidNflTeam(t: string): t is NflTeamAbbr {
   return (VALID_NFL_TEAMS as readonly string[]).includes(t);
 }
 
+// Relocated teams: maps current abbreviation → legacy abbreviations that may
+// still exist in player records imported before normalization.
+// Maintained here (not imported from shared-components) to avoid a
+// cross-package import in the lambda schema layer (LS-6492).
+const NFL_HISTORICAL_ABBRS: Partial<Record<NflTeamAbbr, string[]>> = {
+  LV: ['OAK'], // Raiders relocated from Oakland → Las Vegas (2020)
+  LAC: ['SD'], // Chargers relocated from San Diego → Los Angeles (2017)
+  LAR: ['STL'], // Rams relocated from St. Louis → Los Angeles (2016)
+};
+
 const VALID_CONFERENCES = ['AFC', 'NFC'] as const;
 type NflConference = (typeof VALID_CONFERENCES)[number];
 
@@ -2038,7 +2048,17 @@ builder.queryField('footballPlayers', (t) =>
         if (!isValidNflTeam(args.nflTeam)) {
           throw UserInputError(`Invalid NFL team: ${args.nflTeam}`);
         }
-        conditions.push(eq(PublicSchema.players.nflTeam, args.nflTeam));
+        const historical = NFL_HISTORICAL_ABBRS[args.nflTeam] ?? [];
+        if (historical.length > 0) {
+          conditions.push(
+            inArray(PublicSchema.players.nflTeam, [
+              args.nflTeam,
+              ...historical,
+            ]),
+          );
+        } else {
+          conditions.push(eq(PublicSchema.players.nflTeam, args.nflTeam));
+        }
       }
 
       if (args.conference) {
