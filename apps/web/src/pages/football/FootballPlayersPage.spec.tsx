@@ -50,6 +50,7 @@ jest.mock('@tamagui/lucide-icons', () => ({
   LayoutList: () => null,
   Search: () => null,
   SlidersHorizontal: () => null,
+  Star: () => null,
   X: () => null,
 }));
 
@@ -81,6 +82,10 @@ jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 
 jest.mock('../../components/PremiumGate', () => ({
   PremiumGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+jest.mock('../../components/UpgradeModal', () => ({
+  UpgradeModal: () => null,
 }));
 
 jest.mock('../../hooks/useIsPremium', () => ({ useIsPremium: () => false }));

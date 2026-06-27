@@ -6,6 +6,7 @@ import {
   LayoutList,
   Search,
   SlidersHorizontal,
+  Star,
   X,
 } from '@tamagui/lucide-icons';
 import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
@@ -29,6 +30,7 @@ import type { TeamFilter } from '../../components/football/FootballTeamFilter';
 import { FootballTeamFilter } from '../../components/football/FootballTeamFilter';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
+import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremium } from '../../hooks/useIsPremium';
 import {
   BG_DARK,
@@ -603,6 +605,68 @@ function parsePositions(raw: string | null): FootballPosition[] {
     .filter((s): s is FootballPosition => s !== '' && VALID_POSITIONS.has(s));
 }
 
+const ADVANCED_FILTERS_FEATURE_NAME = 'Advanced search filters';
+const ADVANCED_FILTERS_FEATURE_DESCRIPTION =
+  'Filter players by projected fantasy points, ADP rank, and injury status with Premium.';
+
+function ProjectionsUpsellBanner({ onUpgrade }: { onUpgrade: () => void }) {
+  return (
+    <XStack
+      backgroundColor={withAlpha(BRAND_GOLD, 0.08)}
+      borderWidth={1}
+      borderColor={withAlpha(BRAND_GOLD, 0.35)}
+      borderRadius={10}
+      padding={14}
+      gap={12}
+      alignItems="center"
+    >
+      <Star size={20} color={BRAND_GOLD} />
+      <YStack flex={1} gap={2}>
+        <Text
+          fontSize={14}
+          fontWeight="700"
+          color={BRAND_GOLD}
+          fontFamily={FONT_DISPLAY}
+        >
+          Unlock Projected Fantasy Points
+        </Text>
+        <Text fontSize={12} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+          Upgrade to Premium to see weekly projected points for every player.
+        </Text>
+      </YStack>
+      <YStack
+        paddingHorizontal={12}
+        paddingVertical={6}
+        borderRadius={6}
+        backgroundColor={BRAND_GOLD}
+        cursor="pointer"
+        onPress={onUpgrade}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e: { key: string; preventDefault: () => void }) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onUpgrade();
+          }
+        }}
+        pressStyle={{ opacity: 0.85 }}
+        hoverStyle={{ opacity: 0.9 }}
+        animation="quick"
+        flexShrink={0}
+      >
+        <Text
+          fontSize={12}
+          fontWeight="700"
+          color={BRAND_NAVY}
+          fontFamily={FONT_BODY}
+        >
+          Upgrade
+        </Text>
+      </YStack>
+    </XStack>
+  );
+}
+
 export interface FootballPlayersPageProps {
   /**
    * Render the page's built-in "Football Players" hero. Defaults to true for
@@ -650,6 +714,7 @@ export function FootballPlayersPage({
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
   const isPremium = useIsPremium();
+  const [showProjectionsModal, setShowProjectionsModal] = useState(false);
 
   // Fetch user's football leagues — used by both:
   // • LS-7042: All / Free Agents / Rostered availability filter (all users)
@@ -1152,8 +1217,8 @@ export function FootballPlayersPage({
         {showAdvanced && (
           <PremiumGate
             isPremium={isPremium}
-            featureName="Advanced search filters"
-            featureDescription="Filter players by projected fantasy points, ADP rank, and injury status with Premium."
+            featureName={ADVANCED_FILTERS_FEATURE_NAME}
+            featureDescription={ADVANCED_FILTERS_FEATURE_DESCRIPTION}
           >
             <AdvancedFiltersPanel
               injuryStatus={injuryStatusFilter}
@@ -1263,6 +1328,12 @@ export function FootballPlayersPage({
               ) : null,
             )}
           </YStack>
+        )}
+
+        {!isPremium && !isInitialLoad && players.length > 0 && (
+          <ProjectionsUpsellBanner
+            onUpgrade={() => setShowProjectionsModal(true)}
+          />
         )}
 
         {/* Load more */}
@@ -1382,6 +1453,14 @@ export function FootballPlayersPage({
             </YStack>
           )}
         </XStack>
+      )}
+      {!isPremium && (
+        <UpgradeModal
+          open={showProjectionsModal}
+          onOpenChange={setShowProjectionsModal}
+          featureName="Projected Fantasy Points"
+          featureDescription="Unlock weekly projected fantasy points for every player to make smarter start/sit decisions."
+        />
       )}
     </YStack>
   );
