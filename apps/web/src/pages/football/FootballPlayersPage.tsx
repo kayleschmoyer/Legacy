@@ -689,20 +689,34 @@ export function FootballPlayersPage({
   // comma-encoded (e.g. ?position=QB,RB). Single-value deep links from LS-6489
   // continue to work unchanged; multi-select is additive (LS-6464).
   const [searchParams, setSearchParams] = useSearchParams();
-  const positions = parsePositions(searchParams.get('position'));
-  // Resolve toggles against the live committed URL (window.location.search,
-  // which history.replaceState updates synchronously) rather than React's
-  // `searchParams` snapshot. Two rapid clicks fire before React re-renders, so
-  // a snapshot-based updater would race and drop the first selection; reading
-  // the live URL makes successive toggles accumulate deterministically
-  // (LS-6464).
+  // Position filter uses local state for immediate UI response — same pattern as
+  // teamFilter. URL-derived positions via v7_startTransition are aborted by
+  // concurrent Apollo loading updates, leaving aria-pressed stale (LS-6465).
+  // positionsRef tracks the latest value synchronously for rapid-toggle
+  // correctness without adding positions to togglePosition's dep array (LS-6464).
+  const positionsRef = useRef<FootballPosition[]>(
+    parsePositions(searchParams.get('position')),
+  );
+  const [positions, setPositionsState] = useState<FootballPosition[]>(() =>
+    parsePositions(searchParams.get('position')),
+  );
+
+  // Restore positions when the URL changes externally (e.g. browser back).
+  useEffect(() => {
+    const fromUrl = parsePositions(searchParams.get('position'));
+    positionsRef.current = fromUrl;
+    setPositionsState(fromUrl);
+  }, [searchParams]);
+
   const togglePosition = useCallback(
     (pos: FootballPosition) => {
-      const params = new URLSearchParams(window.location.search);
-      const current = parsePositions(params.get('position'));
+      const current = positionsRef.current;
       const next = current.includes(pos)
         ? current.filter((p) => p !== pos)
         : [...current, pos];
+      positionsRef.current = next;
+      setPositionsState(next);
+      const params = new URLSearchParams(window.location.search);
       if (next.length === 0) {
         params.delete('position');
       } else {
@@ -713,6 +727,8 @@ export function FootballPlayersPage({
     [setSearchParams],
   );
   const clearPositions = useCallback(() => {
+    positionsRef.current = [];
+    setPositionsState([]);
     const params = new URLSearchParams(window.location.search);
     params.delete('position');
     setSearchParams(params, { replace: true });
@@ -744,8 +760,37 @@ export function FootballPlayersPage({
     !hasFootballLeagues || availabilityFilter === 'all',
   );
 
-  const [teamFilter, setTeamFilter] = useState<TeamFilter>('All');
-  const [searchInput, setSearchInput] = useState('');
+  // Team filter uses local state for immediate UI response. URL-derived state
+  // (via v7_startTransition) defers the React update, which aborts concurrent
+  // Apollo state updates and prevents Tamagui Select.Value from re-rendering the
+  // trigger label. Local state is kept in sync with the URL so that:
+  //   • selections persist when navigating to a player detail page and back (LS-6465)
+  //   • deep links and browser-back restore the correct filter (useEffect below)
+  const [teamFilter, setTeamFilterState] = useState<TeamFilter>(
+    () => searchParams.get('team') ?? 'All',
+  );
+
+  // Restore team filter when the URL changes externally (e.g. browser back).
+  useEffect(() => {
+    setTeamFilterState(searchParams.get('team') ?? 'All');
+  }, [searchParams]);
+
+  const setTeamFilter = useCallback(
+    (team: TeamFilter) => {
+      setTeamFilterState(team);
+      const params = new URLSearchParams(window.location.search);
+      if (!team || team === 'All') {
+        params.delete('team');
+      } else {
+        params.set('team', team);
+      }
+      setSearchParams(params, { replace: true });
+    },
+    [setSearchParams],
+  );
+  const [searchInput, setSearchInput] = useState<string>(
+    () => searchParams.get('search') ?? '',
+  );
   const [sort, setSort] = useState<FootballPlayerSortValue>({ dir: 'asc' });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allNodes, setAllNodes] = useState<PlayerListItem[]>([]);
@@ -805,6 +850,32 @@ export function FootballPlayersPage({
   }
 
   const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Track the last value we synced to the URL so we can skip no-op calls.
+  // Using a ref (not searchParams) keeps this effect's deps free of URL state,
+  // so it never re-runs from team/position filter changes — only from actual
+  // changes to the debounced search term (LS-6465).
+  const lastSyncedSearchRef = useRef(searchParams.get('search') ?? '');
+
+  // Keep the `search` URL param in sync with the debounced input so that
+  // returning from a player detail page restores the search term (LS-6465).
+  useEffect(() => {
+    if (debouncedSearch === lastSyncedSearchRef.current) return;
+    lastSyncedSearchRef.current = debouncedSearch;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev.toString());
+        if (debouncedSearch) {
+          next.set('search', debouncedSearch);
+        } else {
+          next.delete('search');
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }, [debouncedSearch, setSearchParams]);
+
   const debouncedMinProjected = useDebounce(minProjectedInput, 300);
   const debouncedMaxAdp = useDebounce(maxAdpInput, 300);
 
@@ -899,6 +970,10 @@ export function FootballPlayersPage({
   const { data, loading, error } = useFootballPlayersQuery({
     variables: queryVars,
     notifyOnNetworkStatusChange: true,
+    // cache-and-network ensures a network request always fires when variables
+    // change, even back to a previously cached set. Required for E2E tests that
+    // use waitForRequest to verify the outgoing GraphQL variables (LS-5607/LS-5602).
+    fetchPolicy: 'cache-and-network',
   });
 
   // Accumulate pages — append when Load More was clicked, replace otherwise.

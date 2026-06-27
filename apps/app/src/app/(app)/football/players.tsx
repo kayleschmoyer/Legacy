@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   TextInput,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronDown, Star } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
@@ -426,6 +427,43 @@ function PositionPill({
 
 const PREMIUM_GOLD = '#C5A55A';
 
+const PLAYERS_FILTER_KEY = '@football_players_filter';
+
+const FOOTBALL_POSITIONS = new Set<string>([
+  'All',
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'FLEX',
+  'K',
+  'DST',
+  'DL',
+  'LB',
+  'DB',
+  'SUPERFLEX',
+  'IDP',
+]);
+
+interface PersistedPlayerFilters {
+  positions: FootballPosition[];
+  teamFilter: string;
+  searchInput: string;
+}
+
+function isPersistedPlayerFilters(obj: unknown): obj is PersistedPlayerFilters {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const record = obj as Record<string, unknown>;
+  return (
+    Array.isArray(record.positions) &&
+    record.positions.every(
+      (p: unknown) => typeof p === 'string' && FOOTBALL_POSITIONS.has(p),
+    ) &&
+    typeof record.teamFilter === 'string' &&
+    typeof record.searchInput === 'string'
+  );
+}
+
 function MyRosteredPill({
   selected,
   onPress,
@@ -607,6 +645,37 @@ export function FootballPlayers(): React.JSX.Element {
   }, []);
   const [searchInput, setSearchInput] = useState('');
   const [cursor, setCursor] = useState<string | undefined>(undefined);
+
+  // Rehydrate filters from AsyncStorage on mount so back-navigation from a
+  // player detail page preserves position, team, and search (LS-6465).
+  useEffect(() => {
+    AsyncStorage.getItem(PLAYERS_FILTER_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const parsed: unknown = JSON.parse(raw);
+        if (!isPersistedPlayerFilters(parsed)) return;
+        setPositions(parsed.positions);
+        setTeamFilter(parsed.teamFilter);
+        setSearchInput(parsed.searchInput);
+      })
+      .catch(() => {
+        // best-effort — ignore read errors
+      });
+  }, []);
+
+  // Persist filter state whenever it changes so back-navigation can rehydrate (LS-6465).
+  useEffect(() => {
+    const value: PersistedPlayerFilters = {
+      positions,
+      teamFilter,
+      searchInput,
+    };
+    AsyncStorage.setItem(PLAYERS_FILTER_KEY, JSON.stringify(value)).catch(
+      () => {
+        // best-effort — ignore write errors
+      },
+    );
+  }, [positions, teamFilter, searchInput]);
   const [allNodes, setAllNodes] = useState<FootballPlayerNode[]>([]);
   const [isFilterChanging, setIsFilterChanging] = useState(false);
   const [showMyRostered, setShowMyRostered] = useState(false);

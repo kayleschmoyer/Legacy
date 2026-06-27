@@ -1,6 +1,12 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 
 import PlayersRoute, { FootballPlayers, parseAdvancedSearch } from './players';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
@@ -26,6 +32,75 @@ jest.mock('../PlayerStats', () => {
 // expo-apple-authentication uses ESM export syntax; stub it out so Jest's
 // CommonJS runner never tries to parse it (regardless of transformIgnorePatterns
 // cache state). The real auth chain is broken anyway by the useSubscription mock.
+const mockAsyncStorageGetItem = jest.fn<Promise<string | null>, [string]>();
+const mockAsyncStorageSetItem = jest.fn<Promise<void>, [string, string]>();
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: (...args: [string]) => mockAsyncStorageGetItem(...args),
+    setItem: (...args: [string, string]) => mockAsyncStorageSetItem(...args),
+  },
+}));
+
+// FlatList uses VirtualizedList internally, which schedules a recurring
+// setTimeout(fn, 0) that causes `await act(async fn)` to loop infinitely
+// when fake timers are installed. Replace it with a simple synchronous
+// renderer so async tests can complete without the timer runaway.
+//
+// We use a Proxy rather than spreading {...RN} because react-native/index.js
+// exposes FlatList through a lazy getter; spreading triggers that getter,
+// which loads VirtualizedList → DevMenu → TurboModuleRegistry.getEnforcing,
+// throwing an invariant in the Jest environment. The Proxy intercepts only
+// the 'FlatList' property so the getter is never fired.
+jest.mock('react-native', () => {
+  const { createElement } = jest.requireActual<typeof import('react')>('react');
+  const actual =
+    jest.requireActual<typeof import('react-native')>('react-native');
+
+  const MockFlatList = ({
+    data,
+    renderItem,
+    keyExtractor,
+    ListEmptyComponent,
+    ListFooterComponent,
+  }: {
+    data?: readonly unknown[] | null;
+    renderItem: (info: {
+      item: unknown;
+      index: number;
+    }) => import('react').ReactNode;
+    keyExtractor?: (item: unknown, index: number) => string;
+    ListEmptyComponent?: import('react').ReactNode;
+    ListFooterComponent?: import('react').ReactNode;
+    [key: string]: unknown;
+  }): import('react').ReactElement => {
+    const items = data ?? [];
+    return createElement(
+      actual.View,
+      null,
+      items.length === 0
+        ? (ListEmptyComponent ?? null)
+        : items.map((item, index) =>
+            createElement(
+              actual.View,
+              {
+                key: keyExtractor ? keyExtractor(item, index) : String(index),
+              },
+              renderItem({ item, index }),
+            ),
+          ),
+      ListFooterComponent ?? null,
+    );
+  };
+
+  return new Proxy(actual, {
+    get(target, prop) {
+      if (prop === 'FlatList') return MockFlatList;
+      return Reflect.get(target, prop) as unknown;
+    },
+  });
+});
+
 jest.mock('expo-apple-authentication', () => ({
   __esModule: true,
   AppleAuthenticationScope: { EMAIL: 'email', FULL_NAME: 'fullName' },
@@ -373,6 +448,130 @@ describe('FootballPlayers', () => {
     mockUseMyRosterPlayerIds.mockReturnValue({
       playerIds: new Set<number>(),
       loading: false,
+    });
+    mockAsyncStorageGetItem.mockResolvedValue(null);
+    mockAsyncStorageSetItem.mockResolvedValue(undefined);
+  });
+
+  describe('AsyncStorage filter persistence (LS-6465)', () => {
+    it('rehydrates positions and team from AsyncStorage on mount', async () => {
+      const stored = JSON.stringify({
+        positions: ['WR', 'TE'],
+        teamFilter: 'KC',
+        searchInput: '',
+      });
+      mockAsyncStorageGetItem.mockResolvedValue(stored);
+      mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
+
+      await act(() => {
+        render(<FootballPlayers />);
+      });
+
+      await waitFor(() => {
+        const calls = mockUseFootballPlayersQuery.mock.calls;
+        const lastCall = calls[calls.length - 1] as [
+          { variables: { positions?: string[]; nflTeam?: string } },
+        ];
+        expect(lastCall[0].variables.positions).toEqual(['WR', 'TE']);
+        expect(lastCall[0].variables.nflTeam).toBe('KC');
+      });
+    });
+
+    it('rehydrates search input from AsyncStorage on mount', async () => {
+      jest.useFakeTimers();
+      const stored = JSON.stringify({
+        positions: [],
+        teamFilter: 'All',
+        searchInput: 'Hill',
+      });
+      mockAsyncStorageGetItem.mockResolvedValue(stored);
+      mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
+
+      await act(async () => {
+        render(<FootballPlayers />);
+        await Promise.resolve();
+      });
+      void act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      jest.useRealTimers();
+
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { search?: string } },
+      ];
+      expect(lastCall[0].variables.search).toBe('hill');
+    });
+
+    it('persists filters to AsyncStorage when positions change', async () => {
+      await act(async () => {
+        render(<FootballPlayers />);
+        await Promise.resolve();
+      });
+
+      fireEvent.press(screen.getAllByText('QB')[0]);
+
+      expect(mockAsyncStorageSetItem).toHaveBeenCalledWith(
+        '@football_players_filter',
+        expect.stringContaining('"positions":["QB"]'),
+      );
+    });
+
+    it('persists filters to AsyncStorage when team filter changes', async () => {
+      await act(async () => {
+        render(<FootballPlayers />);
+        await Promise.resolve();
+      });
+
+      fireEvent.press(screen.getByTestId('team-picker-trigger'));
+      fireEvent.press(screen.getByTestId('select-item-KC'));
+
+      expect(mockAsyncStorageSetItem).toHaveBeenCalledWith(
+        '@football_players_filter',
+        expect.stringContaining('"teamFilter":"KC"'),
+      );
+    });
+
+    it('silently ignores AsyncStorage read errors on mount', async () => {
+      mockAsyncStorageGetItem.mockRejectedValue(
+        new Error('storage unavailable'),
+      );
+
+      await act(async () => {
+        render(<FootballPlayers />);
+        await Promise.resolve();
+      });
+
+      // Component renders normally without throwing
+      expect(screen.getByPlaceholderText('Search players...')).toBeTruthy();
+    });
+
+    it('silently ignores malformed cached data on mount', async () => {
+      mockAsyncStorageGetItem.mockResolvedValue('{"positions":"not-an-array"}');
+
+      await act(async () => {
+        render(<FootballPlayers />);
+        await Promise.resolve();
+      });
+
+      // Malformed data is discarded — query runs with no filters
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(lastCall[0].variables.positions).toBeUndefined();
+    });
+
+    it('silently ignores AsyncStorage write errors when filters change', async () => {
+      mockAsyncStorageSetItem.mockRejectedValue(new Error('disk full'));
+
+      await act(async () => {
+        render(<FootballPlayers />);
+        await Promise.resolve();
+      });
+
+      // Should not throw when pressing a position pill
+      expect(() => fireEvent.press(screen.getAllByText('QB')[0])).not.toThrow();
     });
   });
 

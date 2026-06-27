@@ -272,9 +272,14 @@ describe('FootballPlayersPage — pagination state machine', () => {
     expect(screen.getByTestId('player-1')).toBeTruthy();
     expect(screen.getByTestId('player-2')).toBeTruthy();
 
-    // Filter changes to WR — new data arrives in same render
+    // Filter changes to WR — positions update happens first, old results cleared
     act(() => {
       mockSearchParams = new URLSearchParams('position=WR');
+      rerender(<FootballPlayersPage />);
+    });
+
+    // New data arrives from Apollo (new query triggered by positions change)
+    act(() => {
       mockUseFootballPlayersQuery.mockReturnValue(
         makePlayersResult([PLAYER_3], { hasNextPage: false, endCursor: null }),
       );
@@ -370,5 +375,86 @@ describe('FootballPlayersPage — pagination state machine', () => {
     expect(
       screen.getByText('Failed to load players. Please try again.'),
     ).toBeTruthy();
+  });
+
+  describe('URL-based filter persistence (LS-6465)', () => {
+    it('reads position filter from URL on initial render', () => {
+      mockSearchParams = new URLSearchParams('position=QB,RB');
+
+      render(<FootballPlayersPage />);
+
+      const firstCall = mockUseFootballPlayersQuery.mock.calls[0] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(firstCall[0].variables.positions).toEqual(['QB', 'RB']);
+    });
+
+    it('reads team filter from URL on initial render', () => {
+      mockSearchParams = new URLSearchParams('team=KC');
+
+      render(<FootballPlayersPage />);
+
+      const firstCall = mockUseFootballPlayersQuery.mock.calls[0] as [
+        { variables: { nflTeam?: string } },
+      ];
+      expect(firstCall[0].variables.nflTeam).toBe('KC');
+    });
+
+    it('reads search term from URL on initial render', () => {
+      mockSearchParams = new URLSearchParams('search=maho');
+
+      render(<FootballPlayersPage />);
+
+      const firstCall = mockUseFootballPlayersQuery.mock.calls[0] as [
+        { variables: { search?: string } },
+      ];
+      expect(firstCall[0].variables.search).toBe('maho');
+    });
+
+    it('restores position filter when URL changes (browser back)', () => {
+      const { rerender } = render(<FootballPlayersPage />);
+
+      act(() => {
+        mockSearchParams = new URLSearchParams('position=WR');
+        rerender(<FootballPlayersPage />);
+      });
+
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(lastCall[0].variables.positions).toEqual(['WR']);
+    });
+
+    it('restores team filter when URL changes (browser back)', () => {
+      const { rerender } = render(<FootballPlayersPage />);
+
+      act(() => {
+        mockSearchParams = new URLSearchParams('team=DAL');
+        rerender(<FootballPlayersPage />);
+      });
+
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { nflTeam?: string } },
+      ];
+      expect(lastCall[0].variables.nflTeam).toBe('DAL');
+    });
+
+    it('clears position filter when position param is removed from URL (browser back)', () => {
+      mockSearchParams = new URLSearchParams('position=QB');
+      const { rerender } = render(<FootballPlayersPage />);
+
+      act(() => {
+        mockSearchParams = new URLSearchParams('');
+        rerender(<FootballPlayersPage />);
+      });
+
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[] } },
+      ];
+      expect(lastCall[0].variables.positions).toBeUndefined();
+    });
   });
 });
