@@ -211,6 +211,12 @@ describe('football resolvers', () => {
           occurredAt: 'occurredAt',
         },
         leagueActivityEventType: { enumValues: [] },
+        footballTeamSeasonMetadata: {
+          season: 'season',
+          teamAbbreviation: 'teamAbbreviation',
+          byeWeek: 'byeWeek',
+          tier: 'tier',
+        },
       },
       InternalSchema: {
         usersInAppInternal: {
@@ -1819,6 +1825,149 @@ describe('football resolvers', () => {
           undefined as never,
         ),
       ).toBeNull();
+    });
+  });
+
+  // ── nflTeamSeasonMetadata (LS-8044) ─────────────────────────────────────────
+
+  describe('nflTeamSeasonMetadata query', () => {
+    function getResolver() {
+      const queryType = schema.getQueryType();
+      const field = queryType?.getFields().nflTeamSeasonMetadata;
+      if (!field?.resolve)
+        throw new Error('nflTeamSeasonMetadata resolver not found');
+      return field.resolve.bind(field);
+    }
+
+    it('exists in schema with correct return type', () => {
+      const queryType = schema.getQueryType();
+      const field = queryType?.getFields().nflTeamSeasonMetadata;
+      expect(field).toBeDefined();
+      // [NflTeamSeasonMetadata!]! — outer NonNull wrapping a list
+      expect('ofType' in (field?.type ?? {})).toBe(true);
+    });
+
+    it('NflTeamSeasonMetadata type exposes teamAbbreviation, season, byeWeek, sosTier fields', () => {
+      const type = schema.getType('NflTeamSeasonMetadata') as GraphQLObjectType;
+      expect(type).toBeDefined();
+      const fields = type.getFields();
+      expect(fields.teamAbbreviation).toBeDefined();
+      expect(fields.season).toBeDefined();
+      expect(fields.byeWeek).toBeDefined();
+      expect(fields.sosTier).toBeDefined();
+    });
+
+    it('teamAbbreviation, season, byeWeek, sosTier are all non-nullable', () => {
+      const type = schema.getType('NflTeamSeasonMetadata') as GraphQLObjectType;
+      const fields = type.getFields();
+      // Duck-type NonNull check (avoids duplicate graphql instance false negatives)
+      expect('ofType' in fields.teamAbbreviation.type).toBe(true);
+      expect('ofType' in fields.season.type).toBe(true);
+      expect('ofType' in fields.byeWeek.type).toBe(true);
+      expect('ofType' in fields.sosTier.type).toBe(true);
+    });
+
+    it('SosTier enum exists with easy, medium, hard values', () => {
+      const enumType = schema.getType('SosTier');
+      expect(enumType).toBeDefined();
+    });
+
+    it('returns team rows for an explicit season', async () => {
+      const rows = [
+        { teamAbbreviation: 'ARI', season: 2025, byeWeek: 11, tier: 'easy' },
+        { teamAbbreviation: 'ATL', season: 2025, byeWeek: 12, tier: 'hard' },
+      ];
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve(rows),
+      );
+
+      const result = (await getResolver()(
+        {},
+        { season: 2025 },
+        mockContext,
+        undefined as never,
+      )) as typeof rows;
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        teamAbbreviation: 'ARI',
+        season: 2025,
+        byeWeek: 11,
+        tier: 'easy',
+      });
+    });
+
+    it('returns empty array when no rows match the given season', async () => {
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([]),
+      );
+
+      const result = await getResolver()(
+        {},
+        { season: 9999 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('resolves current season via MAX when season arg is omitted', async () => {
+      const rows = [
+        { teamAbbreviation: 'BUF', season: 2025, byeWeek: 7, tier: 'medium' },
+      ];
+      // First query: MAX(season) → 2025
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([{ maxSeason: 2025 }]),
+      );
+      // Second query: rows for season 2025
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve(rows),
+      );
+
+      const result = (await getResolver()(
+        {},
+        { season: null },
+        mockContext,
+        undefined as never,
+      )) as typeof rows;
+
+      // Two DB round-trips: MAX(season) lookup + data fetch
+      expect(mockDb.then).toHaveBeenCalledTimes(2);
+      expect(result).toHaveLength(1);
+      expect(result[0].teamAbbreviation).toBe('BUF');
+    });
+
+    it('returns empty array when table is empty and season is omitted', async () => {
+      // MAX(season) returns null (table is empty)
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([{ maxSeason: null }]),
+      );
+
+      const result = await getResolver()(
+        {},
+        { season: null },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual([]);
+      // Only the MAX query should run — no second query for data
+      expect(mockDb.then).toHaveBeenCalledTimes(1);
+    });
+
+    it('sosTier resolver maps tier field on the parent object', () => {
+      const type = schema.getType('NflTeamSeasonMetadata') as GraphQLObjectType;
+      const sosTierField = type.getFields().sosTier;
+      expect(sosTierField?.resolve).toBeDefined();
+
+      const result = sosTierField.resolve!(
+        { teamAbbreviation: 'KC', season: 2025, byeWeek: 6, tier: 'hard' },
+        {},
+        mockContext,
+        undefined as never,
+      );
+      expect(result).toBe('hard');
     });
   });
 

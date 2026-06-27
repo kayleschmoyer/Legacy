@@ -48,6 +48,79 @@ function toFloat(v: string | null | undefined): number | null {
   return isNaN(n) ? null : n;
 }
 
+// ── NFL Team Season Metadata (LS-8044) ───────────────────────────────────────
+
+const SosTierEnum = builder.enumType('SosTier', {
+  description: 'Strength-of-schedule tier for an NFL team in a given season',
+  values: {
+    easy: { value: 'easy' },
+    medium: { value: 'medium' },
+    hard: { value: 'hard' },
+  },
+});
+
+const NflTeamSeasonMetadataRef = builder.objectRef<{
+  teamAbbreviation: string;
+  season: number;
+  byeWeek: number;
+  tier: 'easy' | 'medium' | 'hard';
+}>('NflTeamSeasonMetadata');
+
+NflTeamSeasonMetadataRef.implement({
+  description:
+    'Per-team bye week and strength-of-schedule tier for a given NFL season (LS-8044)',
+  fields: (t) => ({
+    teamAbbreviation: t.exposeString('teamAbbreviation', { nullable: false }),
+    season: t.exposeInt('season', { nullable: false }),
+    byeWeek: t.exposeInt('byeWeek', { nullable: false }),
+    sosTier: t.field({
+      type: SosTierEnum,
+      nullable: false,
+      resolve: (parent) => parent.tier,
+    }),
+  }),
+});
+
+builder.queryField('nflTeamSeasonMetadata', (t) =>
+  t.field({
+    type: [NflTeamSeasonMetadataRef],
+    nullable: false,
+    description:
+      'Bye week and SoS tier for every NFL team in the given season (LS-8044). ' +
+      'When season is omitted, returns the current season (highest seeded season in the table).',
+    args: {
+      season: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      const db = context.db;
+
+      let seasonFilter = args.season ?? null;
+      if (seasonFilter == null) {
+        const [row] = await db
+          .select({
+            maxSeason: sql<number>`MAX(${PublicSchema.footballTeamSeasonMetadata.season})`,
+          })
+          .from(PublicSchema.footballTeamSeasonMetadata);
+        seasonFilter = row?.maxSeason ?? null;
+      }
+
+      if (seasonFilter == null) return [];
+
+      return db
+        .select({
+          teamAbbreviation:
+            PublicSchema.footballTeamSeasonMetadata.teamAbbreviation,
+          season: PublicSchema.footballTeamSeasonMetadata.season,
+          byeWeek: PublicSchema.footballTeamSeasonMetadata.byeWeek,
+          tier: PublicSchema.footballTeamSeasonMetadata.tier,
+        })
+        .from(PublicSchema.footballTeamSeasonMetadata)
+        .where(eq(PublicSchema.footballTeamSeasonMetadata.season, seasonFilter))
+        .orderBy(PublicSchema.footballTeamSeasonMetadata.teamAbbreviation);
+    },
+  }),
+);
+
 // ── Season stat types ─────────────────────────────────────────────────────────
 
 const FootballSeasonPassingRef = builder.objectRef<{

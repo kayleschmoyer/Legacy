@@ -2746,6 +2746,16 @@ type MyAwardVote {
   playerLastName: String
 }
 
+"""
+Per-team bye week and strength-of-schedule tier for a given NFL season (LS-8044)
+"""
+type NflTeamSeasonMetadata {
+  byeWeek: Int!
+  season: Int!
+  sosTier: SosTier!
+  teamAbbreviation: String!
+}
+
 type NotificationHistoryItem {
   body: String
   channel: String
@@ -3402,6 +3412,11 @@ type Query {
   Get the current subscription for the authenticated user.
   """
   mySubscription: SubscriptionInfo
+
+  """
+  Bye week and SoS tier for every NFL team in the given season (LS-8044). When season is omitted, returns the current season (highest seeded season in the table).
+  """
+  nflTeamSeasonMetadata(season: Int): [NflTeamSeasonMetadata!]!
 
   """
   Notable historical game-log performances from today's calendar date across all seasons
@@ -4176,6 +4191,15 @@ input SetTeamLockInput {
   locked: Boolean!
   reason: String
   teamId: Int!
+}
+
+"""
+Strength-of-schedule tier for an NFL team in a given season
+"""
+enum SosTier {
+  easy
+  hard
+  medium
 }
 
 """

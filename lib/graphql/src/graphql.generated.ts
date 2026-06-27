@@ -2646,6 +2646,15 @@ export type MyAwardVote = {
   playerLastName?: Maybe<Scalars['String']['output']>;
 };
 
+/** Per-team bye week and strength-of-schedule tier for a given NFL season (LS-8044) */
+export type NflTeamSeasonMetadata = {
+  __typename?: 'NflTeamSeasonMetadata';
+  byeWeek: Scalars['Int']['output'];
+  season: Scalars['Int']['output'];
+  sosTier: SosTier;
+  teamAbbreviation: Scalars['String']['output'];
+};
+
 export type NotificationHistoryItem = {
   __typename?: 'NotificationHistoryItem';
   body?: Maybe<Scalars['String']['output']>;
@@ -3043,6 +3052,8 @@ export type Query = {
   myLeagues: Array<League>;
   /** Get the current subscription for the authenticated user. */
   mySubscription?: Maybe<SubscriptionInfo>;
+  /** Bye week and SoS tier for every NFL team in the given season (LS-8044). When season is omitted, returns the current season (highest seeded season in the table). */
+  nflTeamSeasonMetadata: Array<NflTeamSeasonMetadata>;
   /** Notable historical game-log performances from today's calendar date across all seasons */
   onThisDay?: Maybe<Array<OnThisDayEntry>>;
   /** Baseball events (signings, trades) that occurred on the given calendar date */
@@ -3494,6 +3505,10 @@ export type QueryMyAwardVotesArgs = {
 
 export type QueryMyLeaguesArgs = {
   sport?: InputMaybe<Sport>;
+};
+
+export type QueryNflTeamSeasonMetadataArgs = {
+  season?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryOnThisDayArgs = {
@@ -4180,6 +4195,13 @@ export type SetTeamLockInput = {
   reason?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['Int']['input'];
 };
+
+/** Strength-of-schedule tier for an NFL team in a given season */
+export enum SosTier {
+  Easy = 'easy',
+  Hard = 'hard',
+  Medium = 'medium',
+}
 
 /** Sport for a league (baseball or football). */
 export enum Sport {
