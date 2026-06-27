@@ -96,6 +96,55 @@ Key behaviours:
 - A single token uses one `ILIKE` condition; multiple tokens are AND-ed so
   `"Patrick Mahomes"` matches players whose first+last names contain both tokens.
 
+## Variant: Debounce Window and Cursor-Reset Interaction (LS-7641)
+
+The `nfl-player-search` feature has a secondary interaction layer that is a common
+source of UX bugs and was not previously enumerated in this story.
+
+### Debounce window (300 ms)
+
+The `useDebounce` hook delays propagating `searchInput` → `debouncedSearch` by
+300 ms. A new GraphQL request is only issued after `debouncedSearch` settles, not
+on every keystroke. This means:
+
+- Typing `"Mah"` three rapid keystrokes within 300 ms sends **one** request, not
+  three.
+- A query is never sent for the intermediate values the user types mid-word.
+- The 2-character minimum gate (`debouncedSearch.length >= 2`) is evaluated
+  against the **debounced** value, not the live input; a 1-character input that
+  races ahead of the debounce window does not trigger a request.
+
+### Cursor-reset on debounced search change
+
+When `debouncedSearch` changes (the `useEffect` at line 774 of
+`FootballPlayersPage.tsx`), two state mutations occur atomically:
+
+```typescript
+setCursor(undefined); // reset the pagination cursor to the first page
+setAllNodes([]); // discard any pages accumulated via 'Load more'
+```
+
+This means a search-term change discards the full accumulated list and reloads from
+page 1. Without this reset a search on a paginated result set would append the
+filtered first page to the existing (unfiltered) pages, producing duplicate or
+missing rows.
+
+### Race condition: fast typing + Load More
+
+The interaction between the debounce window and cursor-reset is the source of the
+UX bug described in GAP-002:
+
+1. User loads page 1 (cursor = `undefined`).
+2. User clicks **Load more** → cursor advances to `endCursor` from page 1.
+3. User begins typing a search term; within the 300 ms debounce window, the old
+   cursor is still live.
+4. The debounce fires → `debouncedSearch` changes → `setCursor(undefined)` + `setAllNodes([])`.
+5. The `useFootballPlayersQuery` re-runs with the new search and `cursor = undefined`,
+   returning a fresh page 1 of filtered results.
+
+Defined behavior (post-LS-7641): step 4 is guaranteed; the old cursor is always
+discarded when the search term changes, preventing duplicate/missing rows.
+
 ## Test Coverage
 
 ### Unit tests
@@ -126,6 +175,16 @@ Key behaviours:
 - `'multi-token search (first + last name) returns the correct player'`
 - `'clearing search via clear button restores all players'`
 
+`describe('NFL player name search — debounce and cursor-reset (LS-7641) @regression')`:
+
+- `'search query does not fire during the 300ms debounce window'`
+  — types 2+ chars, asserts no search-bearing request within 150 ms, then
+  asserts exactly one request after the full 300 ms window
+- `'changing the search term resets the pagination cursor and discards accumulated pages'`
+  — loads paginated mock (page 1 = Mahomes, page 2 = Allen), clicks Load more,
+  types a search term, then asserts Allen (from the discarded page 2) is no
+  longer visible after the debounce fires
+
 **Existing search / a11y tests** (in `apps/web-e2e/src/tests/football-position-filter-a11y.spec.ts`):
 
 `describe('Football players search — clear button & a11y @regression')`:
@@ -139,6 +198,6 @@ Key behaviours:
 
 - **Epic:** LS-5271 — QA — Page: Football Players List
 - **Feature discovery bucket:** LS-7599 (`feature-discovery-gaps`)
-- **GAP-002:** LS-7641 — 300 ms search debounce with separate debounced cursor reset
+- **GAP-002:** LS-7641 — 300 ms search debounce with separate debounced cursor reset (addressed by this variant)
 - **Implementation ref:** `apps/web/src/pages/football/FootballPlayersPage.tsx`
 - **Resolver:** `lambdas/db/src/schema/football.ts`

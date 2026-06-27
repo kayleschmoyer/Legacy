@@ -1,5 +1,5 @@
 /**
- * NFL Player Name Search — hermetic E2E tests (LS-5442, LS-7049)
+ * NFL Player Name Search — hermetic E2E tests (LS-5442, LS-7049, LS-7641)
  *
  * Verifies the search input on /football/players filters the displayed player
  * list by forwarding a `search` variable to the `FootballPlayers` GraphQL query.
@@ -13,6 +13,8 @@
  *  - Clearing via the "Clear search" button restores the full list
  *  - Accent-insensitive search: unaccented input matches accented names (LS-7049)
  *  - Accent-insensitive search: accented input matches accented stored names
+ *  - Debounce window: search query does not fire during the 300 ms window (LS-7641)
+ *  - Cursor reset: changing the search term discards accumulated pages (LS-7641)
  *
  * All GraphQL responses are mocked with route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -249,6 +251,109 @@ test.describe('NFL player name search @regression', () => {
     // All players should be visible again.
     await expect(page.getByText('Patrick Mahomes')).toBeVisible();
     await expect(page.getByText('Josh Allen')).toBeVisible();
+  });
+});
+
+// ── Debounce window and cursor-reset interaction (LS-7641) ───────────────────
+
+test.describe('NFL player name search — debounce and cursor-reset (LS-7641) @regression', () => {
+  test('search query does not fire during the 300ms debounce window', async ({
+    page,
+  }) => {
+    await mockSearchableFootballPlayers(page);
+    await page.goto(PAGE_URL);
+
+    const searchVariables: string[] = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/graphql') && req.method() === 'POST') {
+        try {
+          const parsed = JSON.parse(req.postData() ?? '') as {
+            operationName?: string;
+            variables?: { search?: string };
+          };
+          if (
+            parsed.operationName?.toLowerCase() === 'footballplayers' &&
+            parsed.variables?.search
+          ) {
+            searchVariables.push(parsed.variables.search);
+          }
+        } catch {
+          // ignore non-JSON bodies
+        }
+      }
+    });
+
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await search.fill('Ma');
+
+    // 150 ms in — within the 300 ms debounce window; no search request yet.
+    await page.waitForTimeout(150);
+    expect(searchVariables).toHaveLength(0);
+
+    // After the full debounce window; the search request should now have fired.
+    await page.waitForTimeout(250);
+    expect(searchVariables).toHaveLength(1);
+    expect(searchVariables[0]).toBe('Ma');
+  });
+
+  test('changing the search term resets the pagination cursor and discards accumulated pages', async ({
+    page,
+  }) => {
+    // Paginated mock: page 1 = Mahomes (hasNextPage: true), page 2 = Allen.
+    // Searching by name returns a filtered single-page result (no Load more).
+    await createGraphQLRouter(page, {
+      footballplayers: (route, { variables }) => {
+        const { search, after } = variables as {
+          search?: string;
+          after?: string;
+        };
+        if (search) {
+          return fulfillJson(
+            route,
+            playersResponse(filterBySearch(ALL_PLAYERS, search)),
+          );
+        }
+        if (!after) {
+          return fulfillJson(route, {
+            data: {
+              footballPlayers: {
+                nodes: [MAHOMES],
+                pageInfo: { hasNextPage: true, endCursor: 'cursor-abc' },
+              },
+            },
+          });
+        }
+        return fulfillJson(route, {
+          data: {
+            footballPlayers: {
+              nodes: [ALLEN],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        });
+      },
+    });
+    await page.goto(PAGE_URL);
+
+    // Page 1: Mahomes is visible and a 'Load more' button is present.
+    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+    await expect(page.getByText('Load more')).toBeVisible();
+
+    // Load page 2: Allen joins the accumulated list.
+    await page.getByText('Load more').click();
+    await expect(page.getByText('Josh Allen')).toBeVisible();
+
+    // Type a search term — the 300 ms debounce fires, cursor resets to
+    // undefined, and allNodes is replaced with the filtered first page.
+    const search = page.getByRole('textbox', { name: 'Search players' });
+    await search.fill('Mahomes');
+
+    // After the debounce window: only Mahomes from the fresh filtered page 1
+    // is visible; Allen (accumulated from the now-discarded page 2) is gone.
+    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+    await expect(page.getByText('Josh Allen')).not.toBeVisible();
+    // The filtered result has no next page, so Load more is also gone.
+    await expect(page.getByText('Load more')).not.toBeVisible();
   });
 });
 
