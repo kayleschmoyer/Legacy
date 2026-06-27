@@ -577,11 +577,15 @@ describe('FootballPlayers', () => {
   });
 
   describe('position filter', () => {
+    it('position pills render with testID for automation targeting (LS-6481)', () => {
+      render(<FootballPlayers />);
+      expect(screen.getByTestId('position-pill-All')).toBeTruthy();
+      expect(screen.getByTestId('position-pill-QB')).toBeTruthy();
+    });
+
     it('passes selected position to query when a pill is pressed', () => {
       render(<FootballPlayers />);
-      // Pills are rendered first in the FlatList before any player content;
-      // use getAllByText and pick the first occurrence (the pill).
-      fireEvent.press(screen.getAllByText('QB')[0]);
+      fireEvent.press(screen.getByTestId('position-pill-QB'));
       const calls = mockUseFootballPlayersQuery.mock.calls;
       const lastCall = calls[calls.length - 1] as [
         { variables: { positions?: string[] } },
@@ -591,8 +595,8 @@ describe('FootballPlayers', () => {
 
     it('passes undefined positions when "All" pill is selected', () => {
       render(<FootballPlayers />);
-      fireEvent.press(screen.getAllByText('QB')[0]);
-      fireEvent.press(screen.getByText('All'));
+      fireEvent.press(screen.getByTestId('position-pill-QB'));
+      fireEvent.press(screen.getByTestId('position-pill-All'));
       const calls = mockUseFootballPlayersQuery.mock.calls;
       const lastCall = calls[calls.length - 1] as [
         { variables: { positions?: string[] } },
@@ -602,8 +606,8 @@ describe('FootballPlayers', () => {
 
     it('accumulates multiple positions for multi-select (LS-6464)', () => {
       render(<FootballPlayers />);
-      fireEvent.press(screen.getAllByText('QB')[0]);
-      fireEvent.press(screen.getByText('WR'));
+      fireEvent.press(screen.getByTestId('position-pill-QB'));
+      fireEvent.press(screen.getByTestId('position-pill-WR'));
       const calls = mockUseFootballPlayersQuery.mock.calls;
       const lastCall = calls[calls.length - 1] as [
         { variables: { positions?: string[] } },
@@ -613,8 +617,8 @@ describe('FootballPlayers', () => {
 
     it('toggles a position off when its pill is pressed again', () => {
       render(<FootballPlayers />);
-      fireEvent.press(screen.getAllByText('QB')[0]);
-      fireEvent.press(screen.getAllByText('QB')[0]);
+      fireEvent.press(screen.getByTestId('position-pill-QB'));
+      fireEvent.press(screen.getByTestId('position-pill-QB'));
       const calls = mockUseFootballPlayersQuery.mock.calls;
       const lastCall = calls[calls.length - 1] as [
         { variables: { positions?: string[] } },
@@ -1067,7 +1071,7 @@ describe('FootballPlayers', () => {
         (key: string) => key === 'advanced_search_filters',
       );
       render(<FootballPlayers />);
-      fireEvent.press(screen.getAllByText('QB')[0]);
+      fireEvent.press(screen.getByTestId('position-pill-QB'));
       const input = screen.getByPlaceholderText('Search or pos:WR team:KC...');
       fireEvent.changeText(input, 'pos:WR');
       void act(() => {
