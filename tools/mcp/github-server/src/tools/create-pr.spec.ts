@@ -2,6 +2,7 @@ import { createPR } from './create-pr';
 
 jest.mock('../github-api', () => ({
   githubRest: jest.fn(),
+  githubGraphQL: jest.fn(),
 }));
 
 jest.mock('../auth', () => ({
@@ -10,9 +11,11 @@ jest.mock('../auth', () => ({
   isLambda: jest.fn(),
 }));
 
-const { githubRest: mockGithubRest } = jest.requireMock('../github-api') as {
-  githubRest: jest.Mock;
-};
+const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
+  jest.requireMock('../github-api') as {
+    githubRest: jest.Mock;
+    githubGraphQL: jest.Mock;
+  };
 const { getRepoOwnerName: mockGetRepoOwnerName, isLambda: mockIsLambda } =
   jest.requireMock('../auth') as {
     getRepoOwnerName: jest.Mock;
@@ -270,5 +273,85 @@ describe('createPR jira-link marker emission (LS-7895)', () => {
 
     expect(result.isError).toBe(true);
     expect(mockGithubRest).not.toHaveBeenCalled();
+  });
+});
+
+describe('createPR timeout reconciliation (LS-8213)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsLambda.mockReturnValue(true);
+    mockGetRepoOwnerName.mockResolvedValue({
+      owner: 'bkrupa',
+      name: 'legacy-sports',
+    });
+  });
+
+  it('returns the existing PR when creation times out but the PR was created server-side', async () => {
+    mockGithubRest.mockRejectedValue(
+      new Error('tool "github_create_pr" timed out after 60s'),
+    );
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: {
+          pullRequests: {
+            nodes: [
+              {
+                number: 5528,
+                url: 'https://github.com/bkrupa/legacy-sports/pull/5528',
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const result = await createPR({
+      title: 'LS-8213 fix(mcp): test',
+      body: 'body',
+      head: 'claude/some-branch',
+    });
+
+    expect(result.isError).toBeFalsy();
+    const text = result.content?.[0];
+    const parsed = JSON.parse(text && 'text' in text ? text.text : '{}');
+    expect(parsed.success).toBe(true);
+    expect(parsed.number).toBe(5528);
+    expect(parsed.note).toMatch(/timed out/i);
+    expect(mockGithubGraphQL).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ head: 'claude/some-branch' }),
+    );
+  });
+
+  it('returns error when creation times out and no PR is found via reconciliation', async () => {
+    mockGithubRest.mockRejectedValue(new Error('timed out after 60s'));
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: { pullRequests: { nodes: [] } },
+      },
+    });
+
+    const result = await createPR({
+      title: 'LS-8213 fix(mcp): test',
+      body: 'body',
+      head: 'claude/some-branch',
+    });
+
+    expect(result.isError).toBe(true);
+    const text = result.content?.[0];
+    expect(text && 'text' in text ? text.text : '').toMatch(/timed out/i);
+  });
+
+  it('returns error for non-timeout failures without attempting reconciliation', async () => {
+    mockGithubRest.mockRejectedValue(new Error('Validation Failed: 422'));
+
+    const result = await createPR({
+      title: 'LS-8213 fix(mcp): test',
+      body: 'body',
+      head: 'claude/some-branch',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockGithubGraphQL).not.toHaveBeenCalled();
   });
 });

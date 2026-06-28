@@ -3,7 +3,11 @@ import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { getRepoRoot, getRepoOwnerName, isLambda } from '../auth.js';
-import { githubRest } from '../github-api.js';
+import {
+  githubRest,
+  githubGraphQL,
+  type GraphQLResult,
+} from '../github-api.js';
 import type { ToolResult } from '../types.js';
 import {
   ensureJiraLinkMarker,
@@ -26,6 +30,41 @@ interface CreatePRParams {
 interface GitHubPRResponse {
   number: number;
   html_url: string;
+}
+
+interface ReconcilePRResponse {
+  repository: {
+    pullRequests: {
+      nodes: Array<{ number: number; url: string }>;
+    };
+  };
+}
+
+const RECONCILE_QUERY = `
+query($owner: String!, $repo: String!, $head: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(first: 1, states: [OPEN, CLOSED, MERGED], headRefName: $head, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      nodes { number url }
+    }
+  }
+}`;
+
+async function reconcilePR(
+  owner: string,
+  name: string,
+  head: string,
+): Promise<{ number: number; url: string } | null> {
+  try {
+    const result: GraphQLResult<ReconcilePRResponse> =
+      await githubGraphQL<ReconcilePRResponse>(RECONCILE_QUERY, {
+        owner,
+        repo: name,
+        head,
+      });
+    return result.data.repository.pullRequests.nodes[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function getCurrentBranch(cwd: string): Promise<string> {
@@ -147,6 +186,8 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
     params.jiraPrimary ?? extractPrimaryKey(params.title) ?? 'none';
   const body = ensureJiraLinkMarker(params.body, { primary, related });
 
+  // Hoisted so the catch block can use head for timeout reconciliation. (LS-8213)
+  let head = '';
   try {
     const repo = await getRepoOwnerName();
 
@@ -156,7 +197,6 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
     // if we pass the local name (it doesn't exist as a remote branch). We guard against the
     // "fresh worktree, upstream=origin/main" case by skipping upstream when it equals base.
     const base = params.base ?? 'main';
-    let head: string;
     if (params.head) {
       head = params.head;
     } else if (lambda) {
@@ -223,12 +263,36 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
       ],
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // On timeout the PR may have been created server-side. Attempt a reconciliation
+    // lookup by head branch before reporting failure. (LS-8213)
+    if (/timed? ?out/i.test(message) && head) {
+      const repo = await getRepoOwnerName().catch(() => null);
+      if (repo) {
+        const found = await reconcilePR(repo.owner, repo.name, head);
+        if (found) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: minifiedJson({
+                  success: true,
+                  number: found.number,
+                  url: found.url,
+                  note: 'Request timed out but PR was created server-side; reconciled via branch lookup.',
+                }),
+              },
+            ],
+          };
+        }
+      }
+    }
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: `Failed to create PR: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Failed to create PR: ${message}`,
         },
       ],
     };
