@@ -38,13 +38,31 @@ export interface AuditSessionBashParams {
 /**
  * Ordered list of Python interpreter candidates to try.
  * If the `PYTHON` env var is set, it is used as the sole candidate.
- * Otherwise: `python3` → `python`, plus common absolute paths for Linux/cloud
- * environments where the MCP server's spawned process may not inherit the full
- * shell PATH (e.g. Claude Code web sessions on Ubuntu), plus `py` on Windows.
+ * Otherwise on Windows: `py` launcher first (installed to C:\Windows\ by the
+ * Python installer, present on system PATH even when the user PATH is stripped
+ * in MCP server processes), then `python3`/`python` for non-launcher installs,
+ * then common absolute paths for Program Files / AppData installs.
+ * On Linux/macOS: `python3` → `python`, then common absolute paths for
+ * environments where the MCP server process doesn't inherit the full shell PATH.
  */
 export function pythonInterpreterCandidates(): string[] {
   if (process.env.PYTHON) return [process.env.PYTHON];
-  if (process.platform === 'win32') return ['python3', 'python', 'py'];
+  if (process.platform === 'win32') {
+    return [
+      'py',
+      'python3',
+      'python',
+      'C:\\Windows\\py.exe',
+      `${process.env.LOCALAPPDATA ?? 'C:\\Users\\Default\\AppData\\Local'}\\Programs\\Python\\Python313\\python.exe`,
+      `${process.env.LOCALAPPDATA ?? 'C:\\Users\\Default\\AppData\\Local'}\\Programs\\Python\\Python312\\python.exe`,
+      `${process.env.LOCALAPPDATA ?? 'C:\\Users\\Default\\AppData\\Local'}\\Programs\\Python\\Python311\\python.exe`,
+      `${process.env.LOCALAPPDATA ?? 'C:\\Users\\Default\\AppData\\Local'}\\Programs\\Python\\Python310\\python.exe`,
+      'C:\\Program Files\\Python313\\python.exe',
+      'C:\\Program Files\\Python312\\python.exe',
+      'C:\\Program Files\\Python311\\python.exe',
+      'C:\\Program Files\\Python310\\python.exe',
+    ];
+  }
   return [
     'python3',
     'python',

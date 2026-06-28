@@ -48,9 +48,18 @@ describe('pythonInterpreterCandidates', () => {
     ]);
   });
 
-  it('appends py on win32 so stock Windows installs resolve via the py launcher', () => {
+  it('puts py launcher first on win32 and adds absolute fallback paths', () => {
     setPlatform('win32');
-    expect(pythonInterpreterCandidates()).toEqual(['python3', 'python', 'py']);
+    const candidates = pythonInterpreterCandidates();
+    // py launcher is first — it lives in C:\Windows\ and survives PATH stripping
+    expect(candidates[0]).toBe('py');
+    // python3 and python follow for non-launcher installs
+    expect(candidates).toContain('python3');
+    expect(candidates).toContain('python');
+    // absolute fallback so the tool works even with a fully-stripped PATH
+    expect(
+      candidates.some((c) => c.includes('Python') && c.endsWith('python.exe')),
+    ).toBe(true);
   });
 
   it('honors the PYTHON env var as the sole candidate when set', () => {
