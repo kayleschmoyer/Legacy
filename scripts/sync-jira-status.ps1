@@ -357,23 +357,31 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
         # Check if branches are merged and PR status
         $mergedBranches = @()
         $activeBranches = @()
+        $closedPRBranches = @()  # Branches whose PR was closed without merging (abandoned/restarted)
         $prInfo = $null
-        
+
         # Check PR status first for all branches (more reliable than git merge check)
         foreach ($branch in $branchList) {
             $cleanBranch = $branch -replace '^remotes/origin/', ''
             $branchPRInfo = Get-PRStatus -Branch $cleanBranch
-            
+
             # Use PR merged status as source of truth if available
             if ($branchPRInfo.Exists -and $branchPRInfo.Merged) {
                 $mergedBranches += $cleanBranch
                 if (-not $prInfo) {
                     $prInfo = $branchPRInfo
                 }
+            } elseif ($branchPRInfo.Exists -and $branchPRInfo.State -eq "CLOSED") {
+                # A closed (non-merged) PR means the branch was abandoned or the ticket
+                # was restarted. Do not treat it as an active branch.
+                $closedPRBranches += $cleanBranch
+                if (-not $prInfo) {
+                    $prInfo = $branchPRInfo
+                }
             } else {
                 # Fall back to git branch merge check
                 $mergedCheck = git branch --merged main 2>$null | Where-Object { $_.Trim() -eq $cleanBranch }
-                
+
                 if ($mergedCheck) {
                     $mergedBranches += $cleanBranch
                 } else {
@@ -387,25 +395,47 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
         }
         
         Write-Info "Status: $status"
-        
+
         if ($prInfo -and $prInfo.Exists) {
             $prStateText = if ($prInfo.Merged) { "merged" } else { $prInfo.State }
             Write-Info "PR #$($prInfo.Number): $prStateText"
         }
-        
+
         if ($mergedBranches.Count -gt 0) {
             Write-Info "Merged branches: $($mergedBranches -join ', ')"
         }
-        
+
         if ($activeBranches.Count -gt 0) {
             Write-Info "Active branches: $($activeBranches -join ', ')"
         }
-        
+
+        if ($closedPRBranches.Count -gt 0) {
+            Write-Info "Closed-PR branches (abandoned/restarted): $($closedPRBranches -join ', ')"
+        }
+
         # Determine recommendation based on PR and branch state
         $recommendation = ""
         $shouldUpdate = $false
         $targetStatus = ""
-        
+
+        # Terminal non-Done statuses cannot be transitioned via the normal workflow.
+        # Leave them as-is and report in sync so they don't appear as "needs attention".
+        $terminalStatuses = @("Won't Do", "Cancelled", "Rejected", "Duplicate")
+        if ($status -in $terminalStatuses) {
+            $recommendation = "[OK] $status - skipping transition"
+            $effectiveStatus[$ticketKey] = $status
+            Write-Success $recommendation
+            $results += [PSCustomObject]@{
+                Ticket     = $ticketKey
+                Branches   = $branchList -join ', '
+                JiraStatus = $status
+                PRStatus   = if ($prInfo -and $prInfo.Exists) { if ($prInfo.Merged) { "Merged" } else { $prInfo.State } } else { "None" }
+                Merged     = if ($mergedBranches.Count -gt 0) { "Yes" } else { "No" }
+                Recommendation = $recommendation
+            }
+            continue
+        }
+
         # Priority 1: PR merged → Done
         if ($prInfo -and $prInfo.Merged -and $status -ne "Done") {
             $recommendation = "PR merged but ticket not Done"
@@ -436,6 +466,10 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
                 $recommendation = "Branch active and ticket in progress - OK"
             }
         }
+        # Priority 5: Only closed (non-merged) PRs — branch was abandoned or ticket restarted
+        elseif ($closedPRBranches.Count -gt 0 -and $mergedBranches.Count -eq 0 -and $activeBranches.Count -eq 0) {
+            $recommendation = "PR closed without merging - may be abandoned or restarted; verify ticket status"
+        }
         # All good
         elseif (($mergedBranches.Count -gt 0 -or ($prInfo -and $prInfo.Merged)) -and $status -eq "Done") {
             $recommendation = "[OK] In sync"
@@ -451,13 +485,18 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
         $transitionOk = $false
         if ($AutoUpdate -and $shouldUpdate -and $targetStatus) {
             $transitionOk = Invoke-JiraTransition -TicketKey $ticketKey -CurrentStatus $status -TargetStatus $targetStatus -IsDryRun:$DryRun
-            if (-not $transitionOk -and -not $DryRun) {
+            if ($transitionOk -or $DryRun) {
+                # Transition succeeded (or was simulated): treat as in sync for statistics.
+                $recommendation = "[OK] In sync"
+            } else {
                 Write-Error "Failed to transition $ticketKey from '$status' to '$targetStatus'"
             }
-        } elseif ($recommendation -and $recommendation -ne "[OK] In sync") {
-            Write-Warning $recommendation
-        } else {
+        }
+
+        if ($recommendation -eq "[OK] In sync") {
             Write-Success $recommendation
+        } elseif ($recommendation) {
+            Write-Warning $recommendation
         }
         
         $results += [PSCustomObject]@{
