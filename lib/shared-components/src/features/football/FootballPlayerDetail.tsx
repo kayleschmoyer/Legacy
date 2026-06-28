@@ -156,6 +156,12 @@ export interface FootballPlayerDetailPlayer {
   nflTeam?: string | null;
   isDst?: boolean | null;
   pfrId?: string | null;
+  /**
+   * Server-computed headshot URL (LS-6456). Derived server-side from pfrId so
+   * the URL format stays in sync with PFR. Falls back to client-side derivation
+   * in FootballPlayerHeader when absent.
+   */
+  headshotUrl?: string | null;
   careerStats?: FootballPlayerDetailStats | null;
   seasonStats?: FootballPlayerDetailSeasonStats | null;
   previousTeams: string[];

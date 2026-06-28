@@ -35,6 +35,10 @@ import { storeCameFrom } from '../../lib/came-from';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
+jest.mock('@legacy-sports/app-config/web', () => ({
+  config: { statsApiUrl: 'https://stats.example.com' },
+}));
+
 jest.mock('react-router-dom', () => ({
   useNavigate: jest.fn(),
   useParams: jest.fn(),
@@ -361,5 +365,36 @@ describe('FootballPlayerDetailPage — deep-link id validation (LS-6226)', () =>
       expect.objectContaining({ skip: false }),
     );
     expect(props().notFound).toBe(true);
+  });
+});
+
+// ── LS-6456: game logs API endpoint wiring ────────────────────────────────────
+
+describe('FootballPlayerDetailPage — game logs endpoint wiring (LS-6456)', () => {
+  function renderCapturingProps(id: string) {
+    let props: React.ComponentProps<typeof FootballPlayerDetail> | null = null;
+    mockFootballPlayerDetail.mockImplementation((p) => {
+      props = p;
+      return null;
+    });
+    mockUseParams.mockReturnValue({ id });
+    mockUseFootballPlayerQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof useFootballPlayerQuery>);
+    render(<FootballPlayerDetailPage />);
+    return () => {
+      if (!props) throw new Error('FootballPlayerDetail was not rendered');
+      return props;
+    };
+  }
+
+  it('passes the formatted stats-API URL as gameLogsApiEndpoint (LS-6456)', () => {
+    const props = renderCapturingProps('42');
+    // config.statsApiUrl is mocked to 'https://stats.example.com' (trailing slash stripped)
+    expect(props().gameLogsApiEndpoint).toBe(
+      'https://stats.example.com/nfl-game-logs',
+    );
   });
 });

@@ -36,6 +36,8 @@ export interface FootballPlayerHeaderPlayer {
   nflTeam?: string | null;
   isDst?: boolean | null;
   pfrId?: string | null;
+  /** Server-computed headshot URL (LS-6456). Preferred over client-side derivation when present. */
+  headshotUrl?: string | null;
   previousTeams?: string[];
 }
 
@@ -65,6 +67,7 @@ function getPfrHeadshotUrl(pfrId: string): string {
 
 function PlayerAvatar({
   pfrId,
+  headshotUrl: headshotUrlProp,
   playerName,
   teamPrimary,
   teamSecondary,
@@ -73,6 +76,7 @@ function PlayerAvatar({
   label,
 }: {
   pfrId?: string | null;
+  headshotUrl?: string | null;
   playerName: string;
   teamPrimary: string;
   teamSecondary: string;
@@ -81,7 +85,9 @@ function PlayerAvatar({
   label: string;
 }) {
   const [imgError, setImgError] = useState(false);
-  const headshotUrl = pfrId && !imgError ? getPfrHeadshotUrl(pfrId) : null;
+  const derivedUrl =
+    headshotUrlProp ?? (pfrId ? getPfrHeadshotUrl(pfrId) : null);
+  const headshotUrl = !imgError ? derivedUrl : null;
 
   return (
     <YStack
@@ -199,6 +205,7 @@ export function FootballPlayerHeader({ player }: FootballPlayerHeaderProps) {
     >
       <PlayerAvatar
         pfrId={player.pfrId}
+        headshotUrl={player.headshotUrl}
         playerName={playerName}
         teamPrimary={teamPrimary}
         teamSecondary={teamSecondary}

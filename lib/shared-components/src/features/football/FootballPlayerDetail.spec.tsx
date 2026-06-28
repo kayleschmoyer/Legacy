@@ -15,16 +15,19 @@ jest.mock('../stats/GameLogsTable', () => ({
     sport,
     initialPlayerId,
     isPremium,
+    apiEndpoint,
   }: {
     sport?: string;
     initialPlayerId?: string;
     isPremium?: boolean;
+    apiEndpoint?: string;
   }) => (
     <div
       data-testid="game-logs-table"
       data-sport={sport}
       data-player-id={initialPlayerId}
       data-is-premium={isPremium ? 'true' : 'false'}
+      data-api-endpoint={apiEndpoint ?? ''}
     />
   ),
 }));
@@ -789,6 +792,45 @@ describe('FootballPlayerDetail', () => {
     render(<FootballPlayerDetail player={QB_PLAYER} isPremium />);
     const table = screen.getByTestId('game-logs-table');
     expect(table.getAttribute('data-is-premium')).toBe('true');
+  });
+
+  it('uses pfrId as initialPlayerId when available (LS-6456)', () => {
+    const playerWithPfrId: FootballPlayerDetailPlayer = {
+      ...QB_PLAYER,
+      pfrId: 'MahoPa00',
+    };
+    render(<FootballPlayerDetail player={playerWithPfrId} />);
+    const table = screen.getByTestId('game-logs-table');
+    expect(table.getAttribute('data-player-id')).toBe('MahoPa00');
+  });
+
+  it('falls back to string id when pfrId is absent (LS-6456)', () => {
+    const playerNoPfr: FootballPlayerDetailPlayer = {
+      ...QB_PLAYER,
+      pfrId: null,
+    };
+    render(<FootballPlayerDetail player={playerNoPfr} />);
+    const table = screen.getByTestId('game-logs-table');
+    expect(table.getAttribute('data-player-id')).toBe('1');
+  });
+
+  it('forwards gameLogsApiEndpoint to GameLogsTable as apiEndpoint (LS-6456)', () => {
+    render(
+      <FootballPlayerDetail
+        player={QB_PLAYER}
+        gameLogsApiEndpoint="https://stats.example.com/nfl-game-logs"
+      />,
+    );
+    const table = screen.getByTestId('game-logs-table');
+    expect(table.getAttribute('data-api-endpoint')).toBe(
+      'https://stats.example.com/nfl-game-logs',
+    );
+  });
+
+  it('passes no apiEndpoint to GameLogsTable when gameLogsApiEndpoint is omitted (LS-6456)', () => {
+    render(<FootballPlayerDetail player={QB_PLAYER} />);
+    const table = screen.getByTestId('game-logs-table');
+    expect(table.getAttribute('data-api-endpoint')).toBe('');
   });
 
   it('shows "Player not found." when notFound is true', () => {

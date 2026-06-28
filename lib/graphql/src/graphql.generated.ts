@@ -8890,6 +8890,7 @@ export type FootballPlayerFragment = {
   isDst: boolean;
   nflTeam?: string | null;
   pfrId?: string | null;
+  headshotUrl?: string | null;
   previousTeams: Array<string>;
   injuryStatus?: string | null;
   injuryDesignation?: string | null;
@@ -9506,6 +9507,7 @@ export type GetFootballPlayerQuery = {
     isDst: boolean;
     nflTeam?: string | null;
     pfrId?: string | null;
+    headshotUrl?: string | null;
     previousTeams: Array<string>;
     injuryStatus?: string | null;
     injuryDesignation?: string | null;
@@ -9662,6 +9664,7 @@ export type GetFootballPlayersQuery = {
       isDst: boolean;
       nflTeam?: string | null;
       pfrId?: string | null;
+      headshotUrl?: string | null;
       previousTeams: Array<string>;
       injuryStatus?: string | null;
       injuryDesignation?: string | null;
@@ -13989,6 +13992,7 @@ export const FootballPlayerFragmentDoc = gql`
     isDst
     nflTeam
     pfrId
+    headshotUrl
     previousTeams
     injuryStatus
     injuryDesignation

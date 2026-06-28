@@ -6,6 +6,7 @@ fragment FootballPlayer on FootballPlayer {
   isDst
   nflTeam
   pfrId
+  headshotUrl
   previousTeams
   injuryStatus
   injuryDesignation
