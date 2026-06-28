@@ -462,15 +462,10 @@ function resolveWorktreePath(
   }
 
   // 1. Absolute path — supports ephemeral worktrees (e.g. .claude/worktrees/)
-  //    that are not registered via `make worktree`
+  //    that are not registered via `make worktree`, and the main repo root in
+  //    cloud sessions where there are no separate worktrees.
   if (isAbsolute(key)) {
     const normalized = resolve(key);
-    if (normalized === MAIN_REPO) {
-      return {
-        error:
-          'Absolute path resolves to the main repository root, which cannot be used as a worktree',
-      };
-    }
     if (!existsSync(normalized)) {
       return { error: `Absolute path does not exist: ${normalized}` };
     }
