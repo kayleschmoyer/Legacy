@@ -201,17 +201,22 @@ server.tool(
 // --- nx_run_e2e_specs ---
 server.tool(
   'nx_run_e2e_specs',
-  'Prefer this over raw `npx playwright test` shell commands. Run targeted hermetic Playwright specs locally. ' +
-    'Automatically selects a free E2E_PORT (avoids cross-worktree webServer collisions) and forces E2E_AUTH_MODE=ci ' +
-    '(hermetic JWT — no OAuth device-flow needed). ' +
-    'Requires dist/apps/web to exist — run nx_run({ project: "web", target: "build" }) first if missing. ' +
-    'Returns structured pass/fail counts and failing test details.',
+  'Prefer this over raw `npx playwright test` shell commands. ' +
+    'Hermetic mode (default): runs specs from src/tests/ against a local static build, ' +
+    'auto-selects a free E2E_PORT, and forces E2E_AUTH_MODE=ci (no OAuth needed). ' +
+    'Requires dist/apps/web — run nx_run({ project: "web", target: "build" }) first if missing. ' +
+    'Integration mode (integration: true): runs specs from src/integration/tests/ against the live backend ' +
+    '(api.legacy-fantasy.com) with workers=1 to avoid throttling. ' +
+    'Checks e2e JWT freshness (~/.legacy-sports/e2e-token.json) and E2EPOOLPASSWORD before launching. ' +
+    'Set withTracing: true to enable Playwright tracing; trace.zip paths are returned in traceArtifacts. ' +
+    'Returns a compact summary: pass/fail counts, failing test details, and (integration only) graphqlErrors and traceArtifacts.',
   {
     specs: z
       .array(z.string())
       .min(1)
       .describe(
-        'Spec file paths relative to apps/web-e2e/ (e.g. ["src/tests/roster-management.spec.ts", "src/tests/league-detail-tabs.spec.ts"]). Absolute paths are also accepted.',
+        'Spec file paths relative to apps/web-e2e/ (e.g. ["src/tests/roster-management.spec.ts"] for hermetic, ' +
+          '"src/integration/tests/league.spec.ts" for integration). Absolute paths are also accepted.',
       ),
     project: z
       .string()
@@ -229,6 +234,20 @@ server.tool(
       .string()
       .optional()
       .describe('Worktree path (default: repo root)'),
+    integration: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, runs specs against the live backend using playwright.integration.config.ts instead of the hermetic config. ' +
+          'Enforces workers=1. Checks JWT freshness and E2EPOOLPASSWORD before launching.',
+      ),
+    withTracing: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true (and integration: true), enables Playwright tracing (--trace=on). ' +
+          'Trace zip paths are returned in traceArtifacts for post-run inspection.',
+      ),
   },
   async (params) => runE2ESpecs(params),
 );

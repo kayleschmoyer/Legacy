@@ -1,8 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { readFile, rm } from 'node:fs/promises';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
@@ -21,6 +22,8 @@ const ALLOWED_PROJECTS = new Set([
 
 /** 3 minutes — generous for a few hermetic specs, tight enough to surface hangs. */
 const E2E_TIMEOUT_MS = 180_000;
+/** 8 minutes — integration specs hit the live backend and each can take up to 2 min. */
+const INTEGRATION_TIMEOUT_MS = 480_000;
 
 async function findFreePort(start: number): Promise<number> {
   for (let port = start; port <= start + 100; port++) {
@@ -144,6 +147,99 @@ function extractFailingTests(report: PWReport): FailingTest[] {
 }
 
 // ---------------------------------------------------------------------------
+// Integration-mode helpers
+// ---------------------------------------------------------------------------
+
+/** Cap for graphqlErrors summary field to keep response token-lean. */
+const GRAPHQL_ERRORS_MAX_CHARS = 5_000;
+
+/** Walk test-results/ and collect all trace.zip paths (relative to e2eAppDir). */
+async function findTraceZips(e2eAppDir: string): Promise<string[]> {
+  const resultsDir = path.join(e2eAppDir, 'test-results');
+  const zips: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    let entries: string[];
+    try {
+      entries = await readdir(dir);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      const full = path.join(dir, name);
+      if (name === 'trace.zip') {
+        zips.push(full);
+        continue;
+      }
+      try {
+        const s = await stat(full);
+        if (s.isDirectory()) await walk(full);
+      } catch {
+        // ignore unreadable entries
+      }
+    }
+  }
+  await walk(resultsDir);
+  return zips;
+}
+
+/** Extract GraphQL error objects from raw Playwright output (stdout+stderr). */
+function extractGraphqlErrors(output: string): string {
+  const lines = output.split('\n');
+  const errorParts: string[] = [];
+  let totalChars = 0;
+  for (const line of lines) {
+    if (!line.includes('"errors"') && !line.includes("'errors'")) continue;
+    const trimmed = line.trim();
+    if (totalChars + trimmed.length > GRAPHQL_ERRORS_MAX_CHARS) break;
+    errorParts.push(trimmed);
+    totalChars += trimmed.length + 1;
+  }
+  return errorParts.join('\n');
+}
+
+/** Check integration-mode preconditions. Returns an array of warning strings. */
+async function checkIntegrationPreconditions(): Promise<string[]> {
+  const warnings: string[] = [];
+
+  // Check JWT freshness: token cached at ~/.legacy-sports/e2e-token.json
+  const tokenPath = path.join(os.homedir(), '.legacy-sports', 'e2e-token.json');
+  if (!existsSync(tokenPath)) {
+    warnings.push(
+      'e2e JWT not found — run `make e2e-auth` to mint a fresh token before running integration specs.',
+    );
+  } else {
+    try {
+      const raw = await readFile(tokenPath, 'utf-8');
+      const parsed = JSON.parse(raw) as { expiresAt?: string | number };
+      const expiresAt = parsed.expiresAt;
+      if (expiresAt != null) {
+        const expMs =
+          typeof expiresAt === 'number' ? expiresAt : Date.parse(expiresAt);
+        if (!Number.isNaN(expMs) && expMs < Date.now()) {
+          warnings.push(
+            'e2e JWT has expired — run `make e2e-auth` to refresh it.',
+          );
+        }
+      }
+    } catch {
+      // Unreadable/malformed — treat as stale
+      warnings.push(
+        'e2e JWT file is unreadable — run `make e2e-auth` to mint a fresh token.',
+      );
+    }
+  }
+
+  // Check E2EPOOLPASSWORD for premium-seat personas (seat 3+)
+  if (!process.env['E2EPOOLPASSWORD']) {
+    warnings.push(
+      'E2EPOOLPASSWORD is not set — premium-seat personas (seat 3+) will fail. Only commissioner + manager1 (seats 1–2) are available.',
+    );
+  }
+
+  return warnings;
+}
+
+// ---------------------------------------------------------------------------
 // Tool implementation
 // ---------------------------------------------------------------------------
 
@@ -152,16 +248,23 @@ export interface RunE2ESpecsParams {
   project?: string;
   grep?: string;
   worktreePath?: string;
+  integration?: boolean;
+  withTracing?: boolean;
 }
 
 export async function runE2ESpecs(
   params: RunE2ESpecsParams,
 ): Promise<ToolResult> {
+  const integration = params.integration ?? false;
+  const withTracing = params.withTracing ?? false;
   const cwd = params.worktreePath ?? getRepoRoot();
   const e2eAppDir = path.join(cwd, 'apps', 'web-e2e');
-  const configPath = path.join(e2eAppDir, 'playwright.config.ts');
+  const configPath = path.join(
+    e2eAppDir,
+    integration ? 'playwright.integration.config.ts' : 'playwright.config.ts',
+  );
   const distDir = path.join(cwd, 'dist', 'apps', 'web');
-  // playwright.config.ts declares outputFile: 'test-results/results.json',
+  // Both configs declare outputFile: 'test-results/results.json',
   // which Playwright resolves relative to the config file's directory.
   const resultsFile = path.join(e2eAppDir, 'test-results', 'results.json');
 
@@ -212,9 +315,16 @@ export async function runE2ESpecs(
     };
   }
 
-  // --- Precondition: dist/apps/web must exist ---
+  // --- Integration-mode preconditions ---
 
-  if (!existsSync(distDir)) {
+  let preconditionWarnings: string[] = [];
+  if (integration) {
+    preconditionWarnings = await checkIntegrationPreconditions();
+  }
+
+  // --- Hermetic-mode precondition: dist/apps/web must exist ---
+
+  if (!integration && !existsSync(distDir)) {
     return {
       content: [
         {
@@ -229,21 +339,23 @@ export async function runE2ESpecs(
     };
   }
 
-  // --- Free port ---
+  // --- Free port (hermetic only) ---
 
-  let port: number;
-  try {
-    port = await findFreePort(4280);
-  } catch (err) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Failed to find a free port: ${err instanceof Error ? err.message : String(err)}`,
-        },
-      ],
-      isError: true,
-    };
+  let port: number | null = null;
+  if (!integration) {
+    try {
+      port = await findFreePort(4280);
+    } catch (err) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to find a free port: ${err instanceof Error ? err.message : String(err)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
   }
 
   // Remove stale results from a prior run so we can detect if playwright
@@ -283,19 +395,27 @@ export async function runE2ESpecs(
   if (params.grep != null) {
     args.push(`--grep=${params.grep}`);
   }
+  if (integration) {
+    // Enforce single-worker serialization even if config changes.
+    args.push('--workers=1');
+    if (withTracing) {
+      args.push('--trace=on');
+    }
+  }
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    E2E_AUTH_MODE: 'ci',
-    CI: 'true',
-    E2E_PORT: String(port),
-  };
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  if (!integration) {
+    env['E2E_AUTH_MODE'] = 'ci';
+    env['CI'] = 'true';
+    env['E2E_PORT'] = String(port);
+  }
 
   // --- Run Playwright (capture output even on non-zero exit) ---
 
   // Use pnpm.cmd on Windows to avoid shell:true (which would expose cmd.exe
   // injection vectors like ^ and %). On non-Windows, pnpm is a plain binary.
   const executable = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+  const timeoutMs = integration ? INTEGRATION_TIMEOUT_MS : E2E_TIMEOUT_MS;
 
   const runResult = await new Promise<{
     stdout: string;
@@ -307,7 +427,7 @@ export async function runE2ESpecs(
       args,
       {
         cwd,
-        timeout: E2E_TIMEOUT_MS,
+        timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024,
         env,
         windowsHide: true,
@@ -330,7 +450,7 @@ export async function runE2ESpecs(
       content: [
         {
           type: 'text',
-          text: `Playwright timed out after ${E2E_TIMEOUT_MS / 1000}s.\n\n${truncateOutput(
+          text: `Playwright timed out after ${timeoutMs / 1000}s.\n\n${truncateOutput(
             [runResult.stderr, runResult.stdout].filter(Boolean).join('\n'),
             MAX_OUTPUT_CHARS,
           )}`,
@@ -356,11 +476,14 @@ export async function runE2ESpecs(
   );
 
   if (report == null) {
+    const modeInfo = integration
+      ? 'integration mode (live backend)'
+      : `E2E_AUTH_MODE=ci, E2E_PORT=${port}`;
     return {
       content: [
         {
           type: 'text',
-          text: `Playwright did not produce a results file (E2E_AUTH_MODE=ci, E2E_PORT=${port}).\n\n${combinedOutput}`,
+          text: `Playwright did not produce a results file (${modeInfo}).\n\n${combinedOutput}`,
         },
       ],
       isError: true,
@@ -373,13 +496,22 @@ export async function runE2ESpecs(
   const flaky = stats.flaky ?? 0;
   const skipped = stats.skipped ?? 0;
 
+  // Integration-mode extras: trace artifacts and GraphQL error summary.
+  const traceZips =
+    integration && withTracing ? await findTraceZips(e2eAppDir) : [];
+  const graphqlErrors = integration
+    ? extractGraphqlErrors(combinedOutput)
+    : undefined;
+
   return {
     content: [
       {
         type: 'text',
         text: minifiedJson({
           success: failed === 0 && flaky === 0,
-          port,
+          mode: integration ? 'integration' : 'hermetic',
+          ...(port != null ? { port } : {}),
+          ...(preconditionWarnings.length > 0 ? { preconditionWarnings } : {}),
           stats: {
             total: passed + failed + flaky + skipped,
             passed,
@@ -389,6 +521,8 @@ export async function runE2ESpecs(
             durationMs: stats.duration ?? null,
           },
           failingTests: extractFailingTests(report),
+          ...(traceZips.length > 0 ? { traceArtifacts: traceZips } : {}),
+          ...(graphqlErrors ? { graphqlErrors } : {}),
           output: combinedOutput,
         }),
       },

@@ -8,7 +8,13 @@ jest.mock('node:child_process', () => ({ execFile: jest.fn() }));
 jest.mock('node:fs', () => ({ existsSync: jest.fn(() => true) }));
 jest.mock('node:fs/promises', () => ({
   readFile: jest.fn(),
+  readdir: jest.fn(() => Promise.resolve([])),
   rm: jest.fn(() => Promise.resolve()),
+  stat: jest.fn(() => Promise.resolve({ isDirectory: () => false })),
+}));
+jest.mock('node:os', () => ({
+  __esModule: true,
+  default: { homedir: jest.fn(() => '/home/user') },
 }));
 
 let listeningHandler: (() => void) | null = null;
@@ -327,6 +333,76 @@ describe('runE2ESpecs', () => {
       const callArgs = mockExecFile.mock.calls[0];
       const args = callArgs[1] as string[];
       expect(args).toContain('--project=firefox');
+    });
+  });
+
+  // --- Integration mode ---
+
+  describe('integration mode', () => {
+    const INTEGRATION_SPEC = 'src/integration/tests/league.spec.ts';
+    const FRESH_JWT = JSON.stringify({ expiresAt: Date.now() + 3_600_000 });
+
+    beforeEach(() => {
+      process.env['E2EPOOLPASSWORD'] = 'secret';
+      // JWT exists and is fresh; dist/apps/web not needed in integration mode.
+      mockExistsSync.mockImplementation((p: unknown) =>
+        String(p).includes('e2e-token.json'),
+      );
+      mockReadFile.mockImplementation((p: unknown) => {
+        if (String(p).includes('e2e-token.json')) {
+          return Promise.resolve(FRESH_JWT) as never;
+        }
+        return Promise.resolve(PASSING_REPORT) as never;
+      });
+      setupExecFile('', '');
+    });
+
+    afterEach(() => {
+      delete process.env['E2EPOOLPASSWORD'];
+    });
+
+    it('uses playwright.integration.config.ts and sets mode:"integration"', async () => {
+      const result = await runE2ESpecs({
+        specs: [INTEGRATION_SPEC],
+        integration: true,
+      });
+      const args = mockExecFile.mock.calls[0][1] as string[];
+      expect(args.find((a) => a.startsWith('--config='))).toMatch(
+        /playwright\.integration\.config\.ts/,
+      );
+      expect(args).toContain('--workers=1');
+      const payload = JSON.parse(result.content[0].text) as { mode: string };
+      expect(payload.mode).toBe('integration');
+    });
+
+    it('warns when e2e JWT is missing and omits E2E_AUTH_MODE from env', async () => {
+      mockExistsSync.mockReturnValue(false);
+      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+
+      const result = await runE2ESpecs({
+        specs: [INTEGRATION_SPEC],
+        integration: true,
+      });
+      const payload = JSON.parse(result.content[0].text) as {
+        preconditionWarnings?: string[];
+      };
+      expect(
+        payload.preconditionWarnings?.some((w) => /e2e JWT not found/.test(w)),
+      ).toBe(true);
+
+      const opts = mockExecFile.mock.calls[0][2] as {
+        env?: Record<string, string>;
+      };
+      expect(opts.env?.['E2E_AUTH_MODE']).toBeUndefined();
+    });
+
+    it('appends --trace=on only when withTracing:true', async () => {
+      await runE2ESpecs({
+        specs: [INTEGRATION_SPEC],
+        integration: true,
+        withTracing: true,
+      });
+      expect(mockExecFile.mock.calls[0][1] as string[]).toContain('--trace=on');
     });
   });
 });
