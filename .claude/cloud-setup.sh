@@ -68,34 +68,48 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Install git-lfs
+# 3. Install git-lfs (required by pre-push hook)
 # ---------------------------------------------------------------------------
-# The repo's pre-push hook (installed by `make setup-hooks`) requires
-# git-lfs to be on PATH — every push fails with exit 2 when it is absent,
-# even for diffs that contain no LFS-tracked files (LS-8140).
-#
-# apt-get update is run before the install so the package index is current
-# even when the gh install above was skipped (because gh was already present).
-# LS-8199 tracks the case where apt is unreachable and adds a static-binary
-# fallback + post-install verification on top of this baseline step.
-if ! command -v git-lfs &>/dev/null; then
-  echo "Installing git-lfs..."
-  apt-get update -qq 2>&1 | tail -1
-  if apt-get install -y -qq git-lfs 2>&1 | tail -1 && command -v git-lfs &>/dev/null; then
-    echo "git-lfs $(git-lfs version) installed"
+# The repo's pre-push hook requires git-lfs on PATH — every push fails with
+# exit 2 when it is absent. apt-get install git-lfs silently no-ops when PPAs
+# return 403 (LS-8199), so we verify the binary after apt and fall back to the
+# static binary from GitHub releases if apt failed to deliver it.
+_install_git_lfs_from_github() {
+  local version="3.6.1"
+  local url="https://github.com/git-lfs/git-lfs/releases/download/v${version}/git-lfs-linux-amd64-v${version}.tar.gz"
+  local tmp
+  tmp="$(mktemp -d)"
+  echo "git-lfs: apt did not install binary; downloading v${version} from GitHub releases..."
+  if curl -fsSL --retry 3 "$url" | tar -xz -C "$tmp"; then
+    mkdir -p "$HOME/bin"
+    find "$tmp" -name "git-lfs" -type f -exec cp {} "$HOME/bin/git-lfs" \;
+    chmod +x "$HOME/bin/git-lfs"
+    export PATH="$HOME/bin:$PATH"
+    echo "git-lfs: installed to ~/bin/git-lfs from GitHub releases"
   else
-    echo "WARNING: git-lfs install failed; pushes will fail if the pre-push hook requires it"
-    echo "  Workaround: git push --no-verify (requires user approval in auto-mode)"
-    echo "  Permanent fix: see LS-8199 for static-binary fallback"
+    echo "ERROR: git-lfs: failed to download fallback binary from GitHub releases" >&2
+    rm -rf "$tmp"
+    return 1
   fi
-else
-  echo "git-lfs already installed: $(git-lfs version)"
+  rm -rf "$tmp"
+}
+
+echo "Installing git-lfs..."
+apt-get update -qq 2>&1 | tail -1
+apt-get install -y -qq git-lfs 2>&1 | tail -1 || true
+
+if ! command -v git-lfs >/dev/null 2>&1 || ! git lfs version >/dev/null 2>&1; then
+  _install_git_lfs_from_github
 fi
 
-# Register lfs filters so smudge/clean work; --skip-smudge avoids downloading
-# LFS objects on clone, keeping cloud sessions lean.
-if command -v git-lfs &>/dev/null; then
+if command -v git-lfs >/dev/null 2>&1 && git lfs version >/dev/null 2>&1; then
   git lfs install --skip-smudge --force 2>/dev/null || true
+  echo "Git LFS: $(git lfs version)"
+else
+  echo "ERROR: git-lfs installation failed — git push will be blocked by the pre-push hook." >&2
+  echo "  Remediation: manually download git-lfs from https://github.com/git-lfs/git-lfs/releases" >&2
+  echo "  and place the binary in ~/bin/ (already on PATH), then run: git lfs install" >&2
+  exit 1
 fi
 
 # ---------------------------------------------------------------------------
@@ -181,4 +195,4 @@ if [ -z "${GITHUB_REPO_OWNER:-}" ] && [ -z "${GITHUB_REPO_NAME:-}" ]; then
   fi
 fi
 
-echo "=== Cloud setup complete ==="
+echo "=== Cloud setup complete (gh, pnpm, git-lfs, GitHub repo identity) ==="
