@@ -2,6 +2,9 @@ import { formatLogSearch, type LogMatch } from '../format.js';
 import { fetchRunLogs } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
+/** Deadline for a single ci_search_logs call — leaves ~5 s buffer before Lambda 30 s timeout. */
+const SEARCH_FETCH_TIMEOUT_MS = 20_000;
+
 interface SearchLogsParams {
   runId?: number;
   pattern: string;
@@ -101,7 +104,10 @@ export async function searchLogs(
   }
 
   try {
-    const rawLogs = await fetchRunLogs(params);
+    const rawLogs = await fetchRunLogs({
+      ...params,
+      signal: AbortSignal.timeout(SEARCH_FETCH_TIMEOUT_MS),
+    });
     const lines = rawLogs.split(/\r?\n/);
     const matches: LogMatch[] = [];
     let totalMatches = 0;
@@ -143,12 +149,23 @@ export async function searchLogs(
       ],
     };
   } catch (error) {
+    const isTimeout =
+      error instanceof Error &&
+      (error.name === 'TimeoutError' || error.name === 'AbortError');
+    const base = params.jobId
+      ? `job ${params.jobId}`
+      : `workflow run ${params.runId}`;
+    const detail = isTimeout
+      ? `timed out after ${SEARCH_FETCH_TIMEOUT_MS / 1000}s — the run may have many or large jobs. Retry with jobName or jobId to narrow scope.`
+      : error instanceof Error
+        ? error.message
+        : String(error);
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: `Failed to search logs for ${params.jobId ? `job ${params.jobId}` : `workflow run ${params.runId}`}: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Failed to search logs for ${base}: ${detail}`,
         },
       ],
     };

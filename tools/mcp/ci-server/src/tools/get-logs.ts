@@ -135,6 +135,9 @@ function applyCharLimits(
   return { processedLines, charTruncated };
 }
 
+/** Deadline for a single ci_get_logs call — leaves ~5 s buffer before Lambda 30 s timeout. */
+const LOG_FETCH_TIMEOUT_MS = 20_000;
+
 /**
  * Build the per-run log payload (the same JSON object the singular path
  * returns inline). Shared between singular and batch modes so the per-run
@@ -143,19 +146,21 @@ function applyCharLimits(
 async function buildRunPayload(
   runId: number | undefined,
   params: GetLogsParams,
+  signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const defaultLimit = params.errorSummary ? 10_000 : 500;
   const maxLines = params.maxLines ?? defaultLimit;
   const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
   const streamLimit = maxLines > 0 ? maxLines : 10_000;
 
-  const { lines, totalLines } = await fetchRunLogsRing(
+  const { lines, totalLines, skippedJobs } = await fetchRunLogsRing(
     {
       runId,
       jobId: params.jobId,
       failedOnly: params.failedOnly,
       attempt: params.attempt,
       jobName: params.jobName,
+      signal,
     },
     streamLimit,
   );
@@ -181,6 +186,12 @@ async function buildRunPayload(
       totalLogLines: totalLines,
       errorLines: summary.length,
       charTruncated,
+      ...(skippedJobs
+        ? {
+            skippedJobs,
+            hint: `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
+          }
+        : {}),
       logs: processedLines.join('\n'),
     };
   }
@@ -197,6 +208,12 @@ async function buildRunPayload(
     charTruncated,
     totalLines,
     returnedLines: processedLines.length,
+    ...(skippedJobs
+      ? {
+          skippedJobs,
+          hint: `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
+        }
+      : {}),
     logs: processedLines.join('\n'),
   };
 }
@@ -261,12 +278,13 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
       | { runId: number; payload: Record<string, unknown> }
       | { runId: number; error: string };
 
+    const batchSignal = AbortSignal.timeout(LOG_FETCH_TIMEOUT_MS);
     const outcomes = await mapWithConcurrency<number, Outcome>(
       runIds,
       BATCH_CONCURRENCY,
       async (runId) => {
         try {
-          const payload = await buildRunPayload(runId, params);
+          const payload = await buildRunPayload(runId, params, batchSignal);
           return { runId, payload };
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
@@ -308,17 +326,29 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
   // Singular path — preserve existing response shape (top-level fields, not
   // wrapped in logs/missing) so existing callers keep working.
   try {
-    const payload = await buildRunPayload(params.runId, params);
+    const signal = AbortSignal.timeout(LOG_FETCH_TIMEOUT_MS);
+    const payload = await buildRunPayload(params.runId, params, signal);
     return {
       content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
     };
   } catch (error) {
+    const isTimeout =
+      error instanceof Error &&
+      (error.name === 'TimeoutError' || error.name === 'AbortError');
+    const base = params.jobId
+      ? `job ${params.jobId}`
+      : `workflow run ${params.runId}`;
+    const detail = isTimeout
+      ? `timed out after ${LOG_FETCH_TIMEOUT_MS / 1000}s — the run may have many or large jobs. Retry with jobName or jobId to narrow scope.`
+      : error instanceof Error
+        ? error.message
+        : String(error);
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: `Failed to fetch logs for ${params.jobId ? `job ${params.jobId}` : `workflow run ${params.runId}`}: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Failed to fetch logs for ${base}: ${detail}`,
         },
       ],
     };

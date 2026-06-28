@@ -337,7 +337,10 @@ export async function githubGetText(path: string): Promise<string> {
  * Follows redirects automatically (e.g., 302 from job log endpoints).
  * Retries up to 3 times with exponential backoff on transient 5xx gateway errors (502/503/504).
  */
-export async function githubGetArrayBuffer(path: string): Promise<ArrayBuffer> {
+export async function githubGetArrayBuffer(
+  path: string,
+  options?: { signal?: AbortSignal },
+): Promise<ArrayBuffer> {
   const { token, slug } = await ensureAuth();
   const url = `${GITHUB_API}/repos/${slug}${path}`;
   return fetchWithRetry(
@@ -347,6 +350,7 @@ export async function githubGetArrayBuffer(path: string): Promise<ArrayBuffer> {
         ...buildHeaders(token),
         Accept: 'application/vnd.github+json',
       },
+      signal: options?.signal,
     },
     logRateLimit,
     `GET ${path} (arraybuffer)`,

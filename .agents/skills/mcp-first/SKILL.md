@@ -208,6 +208,8 @@ Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, `ci_rerun`, 
 
 **`ci_get_logs` transient 502/503/504 errors**: the log-blob fetch path retries automatically (3 attempts, exponential backoff) as of LS-8218. If `ci_get_logs` still fails after retries, use `get_job_logs` via `legacy-sports-github` as a fallback (see table below).
 
+**`ci_get_logs` / `ci_search_logs` on large `workflow_dispatch` runs (LS-8255)**: log fetches are capped at 10 jobs per call with a 20 s deadline. If the response includes `skippedJobs`, narrow scope using `jobName` or `jobId` to fetch specific job logs. Timeout errors include an actionable hint with the same guidance.
+
 When acting on **several runs at once** (unblocking or re-validating multiple PRs), prefer the batch variants over a per-run loop: `ci_rerun_batch({ runIds: [...] })` reruns up to 50 runs and `ci_view_run_batch({ runIds: [...] })` inspects up to 50, each returning the shared partial-failure shape `{ success, total, succeeded, failed }` so one run erroring never fails the whole call. The single-run tools remain for one-off use. (`ci_get_logs` already accepts `runIds` for batch log fetches.)
 
 | `gh` CLI command                            | MCP tool (use this)                                                                                                                                                                                                                                                                                                                                                                                                                                                  |

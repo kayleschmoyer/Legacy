@@ -8,7 +8,18 @@ export interface FetchRunLogsParams {
   failedOnly?: boolean;
   attempt?: number;
   jobName?: string;
+  /** Optional abort signal — aborts in-flight log downloads when triggered. */
+  signal?: AbortSignal;
 }
+
+/**
+ * Maximum number of failed jobs for which logs are fetched in a single call.
+ * Large matrix workflows (e.g. DB integration tests) can have dozens of failed
+ * jobs; fetching all of them easily exceeds the Lambda 30 s timeout. When the
+ * cap is hit, the response notes how many jobs were skipped so the caller can
+ * narrow the query with jobName or jobId.
+ */
+const MAX_LOG_JOBS = 10;
 
 interface GitHubJob {
   id: number;
@@ -31,10 +42,14 @@ interface GitHubJobsResponse {
 /** Maximum number of concurrent log fetches to avoid OOM and rate limiting. */
 const LOG_FETCH_CONCURRENCY = 5;
 
+/** Maximum uncompressed size per ZIP entry (50 MB) to prevent resource exhaustion. */
+const MAX_UNCOMPRESSED_ENTRY_BYTES = 50 * 1024 * 1024;
+
 /**
  * Extract text content from a ZIP archive buffer.
  * Uses Node built-in zlib (inflateRawSync) to decompress individual ZIP entries.
  * Concatenates all text files found in the archive.
+ * Skips entries whose declared uncompressed size exceeds MAX_UNCOMPRESSED_ENTRY_BYTES.
  */
 function extractTextFromZip(buffer: ArrayBuffer): string {
   const data = Buffer.from(buffer);
@@ -48,26 +63,33 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
 
     const compressionMethod = data.readUInt16LE(offset + 8);
     const compressedSize = data.readUInt32LE(offset + 18);
+    const uncompressedSize = data.readUInt32LE(offset + 22);
     const fileNameLength = data.readUInt16LE(offset + 26);
     const extraFieldLength = data.readUInt16LE(offset + 28);
 
     const dataOffset = offset + 30 + fileNameLength + extraFieldLength;
 
     if (compressedSize > 0 && dataOffset + compressedSize <= data.length) {
-      const compressedData = data.subarray(
-        dataOffset,
-        dataOffset + compressedSize,
-      );
-      try {
-        if (compressionMethod === 8) {
-          // Deflated — use inflateRaw
-          texts.push(inflateRawSync(compressedData).toString('utf-8'));
-        } else if (compressionMethod === 0) {
-          // Stored (no compression)
-          texts.push(compressedData.toString('utf-8'));
+      if (uncompressedSize > MAX_UNCOMPRESSED_ENTRY_BYTES) {
+        process.stderr.write(
+          `[ci-server] skipping ZIP entry: uncompressed size ${uncompressedSize} exceeds ${MAX_UNCOMPRESSED_ENTRY_BYTES} byte limit\n`,
+        );
+      } else {
+        const compressedData = data.subarray(
+          dataOffset,
+          dataOffset + compressedSize,
+        );
+        try {
+          if (compressionMethod === 8) {
+            // Deflated — use inflateRaw
+            texts.push(inflateRawSync(compressedData).toString('utf-8'));
+          } else if (compressionMethod === 0) {
+            // Stored (no compression)
+            texts.push(compressedData.toString('utf-8'));
+          }
+        } catch {
+          // Skip entries that fail to decompress
         }
-      } catch {
-        // Skip entries that fail to decompress
       }
     }
 
@@ -82,8 +104,13 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
  * GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs returns a 302 redirect
  * to a downloadable log archive (ZIP). We fetch as binary, unzip, and extract text.
  */
-async function fetchJobLogs(jobId: number): Promise<string> {
-  const buffer = await githubGetArrayBuffer(`/actions/jobs/${jobId}/logs`);
+async function fetchJobLogs(
+  jobId: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  const buffer = await githubGetArrayBuffer(`/actions/jobs/${jobId}/logs`, {
+    signal,
+  });
   // The response may be a ZIP archive or plain text depending on the server.
   // Check for ZIP magic bytes (PK\x03\x04).
   const header = new Uint8Array(buffer.slice(0, 4));
@@ -106,6 +133,7 @@ async function fetchJobLogs(jobId: number): Promise<string> {
 async function fetchAllJobs(
   runId: number,
   attemptSuffix: string,
+  signal?: AbortSignal,
 ): Promise<GitHubJob[]> {
   const allJobs: GitHubJob[] = [];
   let page = 1;
@@ -114,6 +142,7 @@ async function fetchAllJobs(
     const jobsData = await githubGet<GitHubJobsResponse>(
       `/actions/runs/${runId}${attemptSuffix}/jobs`,
       { per_page: '100', page: String(page) },
+      { signal },
     );
 
     allJobs.push(...jobsData.jobs);
@@ -134,6 +163,7 @@ async function fetchAllJobs(
 async function fetchJobLogsBatched(
   jobs: GitHubJob[],
   concurrency: number,
+  signal?: AbortSignal,
 ): Promise<string[]> {
   const results: string[] = [];
 
@@ -142,10 +172,11 @@ async function fetchJobLogsBatched(
     const batchResults = await Promise.all(
       batch.map(async (job) => {
         try {
-          const text = await fetchJobLogs(job.id);
+          const text = await fetchJobLogs(job.id, signal);
           return `${job.name}\n${text}`;
-        } catch {
-          return `${job.name}\n(Failed to fetch logs for this job)`;
+        } catch (err) {
+          const reason = isAbortError(err) ? 'timed out' : 'failed';
+          return `${job.name}\n(Log fetch ${reason} for this job)`;
         }
       }),
     );
@@ -153,6 +184,14 @@ async function fetchJobLogsBatched(
   }
 
   return results;
+}
+
+/** Returns true for AbortError / TimeoutError (DOMException name variants). */
+function isAbortError(err: unknown): boolean {
+  if (err instanceof Error) {
+    return err.name === 'AbortError' || err.name === 'TimeoutError';
+  }
+  return false;
 }
 
 /**
@@ -171,7 +210,7 @@ export async function fetchRunLogs(
 ): Promise<string> {
   // Single job requested — fetch directly
   if (params.jobId) {
-    return fetchJobLogs(params.jobId);
+    return fetchJobLogs(params.jobId, params.signal);
   }
 
   if (!params.runId) {
@@ -179,7 +218,11 @@ export async function fetchRunLogs(
   }
 
   const attemptSuffix = params.attempt ? `/attempts/${params.attempt}` : '';
-  const allJobs = await fetchAllJobs(params.runId, attemptSuffix);
+  const allJobs = await fetchAllJobs(
+    params.runId,
+    attemptSuffix,
+    params.signal,
+  );
 
   const failedOnly = params.failedOnly !== false;
   let jobs = failedOnly
@@ -197,8 +240,21 @@ export async function fetchRunLogs(
       : 'No jobs found in this workflow run.';
   }
 
+  const skipped = jobs.length > MAX_LOG_JOBS ? jobs.length - MAX_LOG_JOBS : 0;
+  if (skipped > 0) jobs = jobs.slice(0, MAX_LOG_JOBS);
+
   // Fetch logs with concurrency limiting to avoid OOM and rate limiting
-  const logEntries = await fetchJobLogsBatched(jobs, LOG_FETCH_CONCURRENCY);
+  const logEntries = await fetchJobLogsBatched(
+    jobs,
+    LOG_FETCH_CONCURRENCY,
+    params.signal,
+  );
+
+  if (skipped > 0) {
+    logEntries.push(
+      `(${skipped} additional job(s) omitted — use jobName or jobId to fetch specific job logs)`,
+    );
+  }
 
   return logEntries.join('\n\n');
 }
@@ -229,10 +285,10 @@ function trimRingBuffer(buffer: string[], maxLines: number): void {
 export async function fetchRunLogsRing(
   params: FetchRunLogsParams,
   maxLines: number,
-): Promise<{ lines: string[]; totalLines: number }> {
+): Promise<{ lines: string[]; totalLines: number; skippedJobs?: number }> {
   // Single job — fetch and trim directly
   if (params.jobId) {
-    const raw = await fetchJobLogs(params.jobId);
+    const raw = await fetchJobLogs(params.jobId, params.signal);
     const allLines = raw.split(/\r?\n/);
     return {
       lines: allLines.length <= maxLines ? allLines : allLines.slice(-maxLines),
@@ -245,7 +301,11 @@ export async function fetchRunLogsRing(
   }
 
   const attemptSuffix = params.attempt ? `/attempts/${params.attempt}` : '';
-  const allJobs = await fetchAllJobs(params.runId, attemptSuffix);
+  const allJobs = await fetchAllJobs(
+    params.runId,
+    attemptSuffix,
+    params.signal,
+  );
 
   const failedOnly = params.failedOnly !== false;
   let jobs = failedOnly
@@ -264,6 +324,10 @@ export async function fetchRunLogsRing(
     return { lines: [msg], totalLines: 1 };
   }
 
+  const skippedJobs =
+    jobs.length > MAX_LOG_JOBS ? jobs.length - MAX_LOG_JOBS : 0;
+  if (skippedJobs > 0) jobs = jobs.slice(0, MAX_LOG_JOBS);
+
   // Process per-job incrementally: keep a rolling buffer of the last maxLines lines
   const ringBuffer: string[] = [];
   let totalLines = 0;
@@ -273,12 +337,13 @@ export async function fetchRunLogsRing(
     const batchResults = await Promise.all(
       batch.map(async (job) => {
         try {
-          const text = await fetchJobLogs(job.id);
+          const text = await fetchJobLogs(job.id, params.signal);
           return { name: job.name, text };
-        } catch {
+        } catch (err) {
+          const reason = isAbortError(err) ? 'timed out' : 'failed';
           return {
             name: job.name,
-            text: '(Failed to fetch logs for this job)',
+            text: `(Log fetch ${reason} for this job)`,
           };
         }
       }),
@@ -301,5 +366,9 @@ export async function fetchRunLogsRing(
   }
 
   trimRingBuffer(ringBuffer, maxLines);
-  return { lines: ringBuffer, totalLines };
+  return {
+    lines: ringBuffer,
+    totalLines,
+    skippedJobs: skippedJobs || undefined,
+  };
 }

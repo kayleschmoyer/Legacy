@@ -67,7 +67,20 @@ export const handler = async (
   });
   if (authError) return authError;
 
-  await ensureCredentials();
+  try {
+    await ensureCredentials();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      statusCode: 500,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        error: { code: -32603, message: `CI server credential error: ${msg}` },
+        id: null,
+      }),
+    };
+  }
 
   const domainName = event.requestContext.domainName ?? 'localhost';
   const qs = event.rawQueryString ? `?${event.rawQueryString}` : '';
@@ -92,14 +105,16 @@ export const handler = async (
   const server = createServer();
   await server.connect(transport);
 
-  const response = await transport.handleRequest(request);
-  await server.close();
-
-  const responseBody = await response.text();
-  const headers: Record<string, string> = {};
-  response.headers.forEach((value, key) => {
-    headers[key] = value;
-  });
-
-  return { statusCode: response.status, headers, body: responseBody };
+  try {
+    const response = await transport.handleRequest(request);
+    const responseBody = await response.text();
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    return { statusCode: response.status, headers, body: responseBody };
+  } finally {
+    // Always close the server, even on errors, to avoid resource leaks.
+    await server.close().catch(() => undefined);
+  }
 };
