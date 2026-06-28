@@ -31,6 +31,7 @@ import {
   sep,
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
+import { scanStagedForConflictMarkers } from './conflict-markers';
 import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
 import { rebaseOntoMain } from './rebase-onto-main';
 import {
@@ -1285,6 +1286,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'string',
             description:
               "Explicit git ref or commit-ish to rebase onto, e.g. 'origin/main' or 'HEAD~3'. Defaults to twig parent if omitted; falls back to 'origin/main' if twig has no parent registered. Cannot be combined with 'abort' or 'skip'.",
+          },
+          disableRerere: {
+            type: 'boolean',
+            description:
+              'Disable rerere (reuse recorded resolution) for this rebase. Pass true when a bad rr-cache entry is causing conflict markers to be silently committed.',
           },
         },
       },
@@ -4671,11 +4677,12 @@ const handleCallTool = async (
     // worktree_rebase
     // -----------------------------------------------------------------------
     case 'worktree_rebase': {
-      const { worktree, abort, skip, base } = args as {
+      const { worktree, abort, skip, base, disableRerere } = args as {
         worktree?: string;
         abort?: boolean;
         skip?: boolean;
         base?: string;
+        disableRerere?: boolean;
       };
 
       const target = resolveTargetDir(worktree);
@@ -4812,6 +4819,16 @@ const handleCallTool = async (
           log.push(`(warning: could not update origin/main — ${reason})`);
         }
 
+        // Build rebase env — optionally disable rerere to avoid bad rr-cache replays
+        const rebaseEnv: Record<string, string> = {
+          ...NON_INTERACTIVE_GIT_ENV,
+        };
+        if (disableRerere) {
+          rebaseEnv['GIT_CONFIG_COUNT'] = '1';
+          rebaseEnv['GIT_CONFIG_KEY_0'] = 'rerere.enabled';
+          rebaseEnv['GIT_CONFIG_VALUE_0'] = 'false';
+        }
+
         // Rebase: use explicit base if provided, otherwise try twig, fall back to origin/main
         let rebaseOut = '';
         if (base) {
@@ -4825,14 +4842,14 @@ const handleCallTool = async (
           log.push(`$ git rebase ${rebaseTarget}`);
           rebaseOut = runGit(['rebase', rebaseTarget], cwd, {
             timeout: 120_000,
-            env: NON_INTERACTIVE_GIT_ENV,
+            env: rebaseEnv,
           });
         } else {
           try {
             log.push('$ twig rebase');
             rebaseOut = run('twig rebase', cwd, {
               timeout: 120_000,
-              env: NON_INTERACTIVE_GIT_ENV,
+              env: rebaseEnv,
             });
           } catch (twigErr: unknown) {
             const twigMsg =
@@ -4852,7 +4869,7 @@ const handleCallTool = async (
               log.push('$ git rebase origin/main');
               rebaseOut = run('git rebase origin/main', cwd, {
                 timeout: 120_000,
-                env: NON_INTERACTIVE_GIT_ENV,
+                env: rebaseEnv,
               });
             } else {
               throw twigErr;
@@ -4868,7 +4885,7 @@ const handleCallTool = async (
             log.push('$ git rebase origin/main');
             rebaseOut = run('git rebase origin/main', cwd, {
               timeout: 120_000,
-              env: NON_INTERACTIVE_GIT_ENV,
+              env: rebaseEnv,
             });
           }
         }
@@ -4897,7 +4914,7 @@ const handleCallTool = async (
               log.push('$ git rebase origin/main');
               const directRebase = run('git rebase origin/main', cwd, {
                 timeout: 120_000,
-                env: NON_INTERACTIVE_GIT_ENV,
+                env: rebaseEnv,
               });
               log.push(directRebase.trim());
             } else {
@@ -4911,6 +4928,24 @@ const handleCallTool = async (
               );
             }
           }
+        }
+
+        // Scan staged files for conflict markers — rerere can silently commit them
+        const markerFiles = scanStagedForConflictMarkers(cwd, runGit);
+        if (markerFiles.length > 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Conflict markers detected in staged files after rebase:\n${markerFiles.join('\n')}\n\n` +
+                  'rerere likely replayed a bad cached resolution. Inspect the listed files, ' +
+                  'remove all conflict markers, stage the fixes, then run worktree_rebase_continue. ' +
+                  'Or retry with disableRerere: true to bypass rr-cache entirely.',
+              },
+            ],
+            isError: true,
+          };
         }
 
         restoreNodeModulesSymlink(cwd, log);
