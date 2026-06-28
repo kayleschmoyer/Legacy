@@ -221,13 +221,30 @@ describe('getNotificationLink — LS-4086 dropdown navigation routing', () => {
     ).toBe('/notifications');
   });
 
-  it('routes trade notifications with a leagueId to the trades tab', () => {
+  it('routes trade notifications with a leagueId to the trade center', () => {
     expect(
       getNotificationLink({
         notificationType: 'trade_proposed',
         leagueId: 12,
       }),
-    ).toBe('/baseball/league/12/trades');
+    ).toBe('/trade-center?leagueId=12');
+  });
+
+  it('routes trade notifications with leagueId + tradeOfferId to trade center with offerId param', () => {
+    expect(
+      getNotificationLink({
+        notificationType: 'trade_proposed',
+        leagueId: 12,
+        tradeOfferId: 99,
+      }),
+    ).toBe('/trade-center?leagueId=12&offerId=99');
+    expect(
+      getNotificationLink({
+        notificationType: 'trade_vetoed',
+        leagueId: 5,
+        tradeOfferId: 7,
+      }),
+    ).toBe('/trade-center?leagueId=5&offerId=7');
   });
 
   it('falls back to /notifications when a trade notification has no leagueId', () => {

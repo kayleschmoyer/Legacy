@@ -116,15 +116,17 @@ export function getNotificationLink(notification: {
   notificationType?: string | null;
   matchupId?: number | null;
   leagueId?: number | null;
+  tradeOfferId?: number | null;
 }): string {
   const category = categorize(notification.notificationType);
-  const { matchupId, leagueId } = notification;
+  const { matchupId, leagueId, tradeOfferId } = notification;
 
   if ((category === 'matchup' || category === 'result') && matchupId != null) {
     return `/matchup/${matchupId}`;
   }
   if (category === 'trade' && leagueId != null) {
-    return `/baseball/league/${leagueId}/trades`;
+    const base = `/trade-center?leagueId=${leagueId}`;
+    return tradeOfferId != null ? `${base}&offerId=${tradeOfferId}` : base;
   }
   if (category === 'draft' && leagueId != null) {
     return `/baseball/league/${leagueId}`;

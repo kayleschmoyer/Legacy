@@ -27,6 +27,7 @@ type MockNotification = {
   channel: string;
   matchupId: number | null;
   leagueId: number | null;
+  tradeOfferId?: number | null;
   title: string;
   message: string;
   metadata: string | null;
@@ -151,7 +152,7 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
     );
   });
 
-  test('clicking a trade notification navigates to the league trades tab', async ({
+  test('clicking a trade notification navigates to the trade center', async ({
     page,
   }) => {
     await mockDropdownNotifications(page, [TRADE_NOTIFICATION]);
@@ -166,7 +167,34 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
     await item.click();
 
     await expect(page).toHaveURL(
-      new RegExp(`/baseball/league/${TRADE_NOTIFICATION.leagueId}/trades$`),
+      new RegExp(`/trade-center\\?leagueId=${TRADE_NOTIFICATION.leagueId}$`),
+    );
+  });
+
+  test('clicking a trade notification with a tradeOfferId navigates to the trade center with offerId param', async ({
+    page,
+  }) => {
+    const tradeNotificationWithOffer: MockNotification = {
+      ...TRADE_NOTIFICATION,
+      id: 1003,
+      tradeOfferId: 42,
+    };
+    await mockDropdownNotifications(page, [tradeNotificationWithOffer]);
+    await page.goto('/');
+    await page.waitForLoadState('load');
+
+    await page.getByTestId('notifications-trigger').first().click();
+
+    const item = page.getByTestId(
+      `notification-item-${tradeNotificationWithOffer.id}`,
+    );
+    await expect(item).toBeVisible();
+    await item.click();
+
+    await expect(page).toHaveURL(
+      new RegExp(
+        `/trade-center\\?leagueId=${tradeNotificationWithOffer.leagueId}&offerId=${tradeNotificationWithOffer.tradeOfferId}$`,
+      ),
     );
   });
 });
