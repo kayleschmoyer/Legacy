@@ -1,0 +1,71 @@
+name: Copilot Auto-Approve Recheck (W6)
+
+# Re-triggers the reviewer after all review threads on a PR are resolved,
+# without requiring a new push. Dispatched by the github_resolve_threads MCP
+# tool once all blocking threads are resolved and no code push has occurred.
+#
+# Toggling bot:ready-for-review causes review.yml (W1) to re-run, which
+# re-evaluates thread state and posts an updated bot-review commit status.
+#
+# Previously deleted in LS-3002; re-added in LS-8121 to fix the
+# github_resolve_threads recheck path that always 422'd.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to recheck after thread resolution"
+        required: true
+        type: number
+
+permissions:
+  pull-requests: write
+
+jobs:
+  recheck:
+    name: "Re-trigger reviewer after thread resolve"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Toggle bot:ready-for-review to trigger reviewer
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ inputs.pr_number }};
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const label = 'bot:ready-for-review';
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+
+            if (pr.draft) {
+              core.info(`PR #${prNumber} is a draft — skipping recheck`);
+              return;
+            }
+
+            if (pr.labels.some(l => l.name === label)) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+              } catch (e) {
+                if (e.status !== 404) throw e;
+              }
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: prNumber,
+              labels: [label],
+            });
+
+            core.info(`Toggled ${label} on PR #${prNumber} — reviewer (W1) will re-evaluate thread state`);
