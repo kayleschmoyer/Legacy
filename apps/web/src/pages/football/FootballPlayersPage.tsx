@@ -16,6 +16,7 @@ import {
   Sport,
   useFootballPlayerLeagueAvailabilityQuery,
   useFootballPlayersQuery,
+  useGetNflTeamSeasonMetadataQuery,
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
@@ -31,7 +32,7 @@ import { FootballTeamFilter } from '../../components/football/FootballTeamFilter
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { UpgradeModal } from '../../components/UpgradeModal';
-import { useIsPremium } from '../../hooks/useIsPremium';
+import { useHasEntitlement, useIsPremium } from '../../hooks/useIsPremium';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -734,7 +735,13 @@ export function FootballPlayersPage({
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
   const isPremium = useIsPremium();
+  const hasAdvancedFootballStats = useHasEntitlement('advanced_football_stats');
   const [showProjectionsModal, setShowProjectionsModal] = useState(false);
+
+  const { data: nflTeamMetadataData } = useGetNflTeamSeasonMetadataQuery({
+    skip: !hasAdvancedFootballStats,
+    fetchPolicy: 'cache-first',
+  });
 
   // Fetch user's football leagues — used by both:
   // • LS-7042: All / Free Agents / Rostered availability filter (all users)
@@ -1177,7 +1184,15 @@ export function FootballPlayersPage({
           <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
             Team:
           </Text>
-          <FootballTeamFilter selected={teamFilter} onChange={setTeamFilter} />
+          <FootballTeamFilter
+            selected={teamFilter}
+            onChange={setTeamFilter}
+            teamMetadata={
+              hasAdvancedFootballStats
+                ? (nflTeamMetadataData?.nflTeamSeasonMetadata ?? undefined)
+                : undefined
+            }
+          />
         </XStack>
 
         {/* Availability filter — visible when user is in at least one football league (LS-7042) */}

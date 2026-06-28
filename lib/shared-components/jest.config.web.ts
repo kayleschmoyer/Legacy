@@ -11,6 +11,13 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/jest-setup-web.js'],
   testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    // Apollo Client 4.x ships as "type":"module". jest's jsdom defaults to the
+    // 'browser' export condition, which resolves @apollo/client subpath exports
+    // to ESM files that can't be required in jest's CJS context. Adding 'require'
+    // ensures jest selects the CJS bundles (e.g. __cjs/react/index.cjs).
+    customExportConditions: ['browser', 'require', 'default', 'node'],
+  },
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': [
       'babel-jest',

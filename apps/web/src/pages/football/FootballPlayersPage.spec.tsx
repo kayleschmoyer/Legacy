@@ -15,10 +15,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useFootballPlayerLeagueAvailabilityQuery,
   useFootballPlayersQuery,
+  useGetNflTeamSeasonMetadataQuery,
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
 import { FootballPlayersPage } from './FootballPlayersPage';
+import { FootballTeamFilter } from '../../components/football/FootballTeamFilter';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +61,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   useFootballPlayersQuery: jest.fn(),
   useGetUserLeaguesQuery: jest.fn(),
   useFootballPlayerLeagueAvailabilityQuery: jest.fn(),
+  useGetNflTeamSeasonMetadataQuery: jest.fn(),
   Sport: { Football: 'FOOTBALL' },
 }));
 
@@ -75,7 +79,7 @@ jest.mock('../../components/football/FootballPositionFilter', () => ({
 }));
 
 jest.mock('../../components/football/FootballTeamFilter', () => ({
-  FootballTeamFilter: () => null,
+  FootballTeamFilter: jest.fn(() => null),
 }));
 
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
@@ -88,7 +92,10 @@ jest.mock('../../components/UpgradeModal', () => ({
   UpgradeModal: () => null,
 }));
 
-jest.mock('../../hooks/useIsPremium', () => ({ useIsPremium: () => false }));
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremium: () => false,
+  useHasEntitlement: jest.fn().mockReturnValue(false),
+}));
 
 jest.mock('../../hooks/useLeagueRosteredPlayerIds', () => ({
   useLeagueRosteredPlayerIds: () => ({ playerIds: new Set() }),
@@ -112,8 +119,18 @@ const mockUseFootballPlayerLeagueAvailabilityQuery =
   useFootballPlayerLeagueAvailabilityQuery as jest.MockedFunction<
     typeof useFootballPlayerLeagueAvailabilityQuery
   >;
+const mockUseGetNflTeamSeasonMetadataQuery =
+  useGetNflTeamSeasonMetadataQuery as jest.MockedFunction<
+    typeof useGetNflTeamSeasonMetadataQuery
+  >;
 const MockFootballPlayerCard = FootballPlayerCard as jest.MockedFunction<
   typeof FootballPlayerCard
+>;
+const MockFootballTeamFilter = FootballTeamFilter as jest.MockedFunction<
+  typeof FootballTeamFilter
+>;
+const mockUseHasEntitlement = useHasEntitlement as jest.MockedFunction<
+  typeof useHasEntitlement
 >;
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
@@ -196,6 +213,11 @@ beforeEach(() => {
     data: undefined,
     loading: false,
   } as unknown as ReturnType<typeof useFootballPlayerLeagueAvailabilityQuery>);
+  mockUseGetNflTeamSeasonMetadataQuery.mockReturnValue({
+    data: undefined,
+    loading: false,
+  } as unknown as ReturnType<typeof useGetNflTeamSeasonMetadataQuery>);
+  mockUseHasEntitlement.mockReturnValue(false);
   mockUseFootballPlayersQuery.mockReturnValue(loadingResult());
   MockFootballPlayerCard.mockImplementation(
     ({ player }) =>
@@ -455,6 +477,57 @@ describe('FootballPlayersPage — pagination state machine', () => {
         { variables: { positions?: string[] } },
       ];
       expect(lastCall[0].variables.positions).toBeUndefined();
+    });
+  });
+
+  describe('premium entitlement and team metadata integration (LS-8045)', () => {
+    it('skips the metadata query and passes no teamMetadata when not entitled', () => {
+      mockUseHasEntitlement.mockReturnValue(false);
+
+      render(<FootballPlayersPage />);
+
+      expect(mockUseGetNflTeamSeasonMetadataQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: true }),
+      );
+      const teamFilterProps = MockFootballTeamFilter.mock.calls[0]?.[0];
+      expect(teamFilterProps?.teamMetadata).toBeUndefined();
+    });
+
+    it('fetches metadata and passes teamMetadata to FootballTeamFilter when entitled', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      const metadata = [
+        {
+          teamAbbreviation: 'KC',
+          byeWeek: 14,
+          sosTier: 'easy' as const,
+          season: 2024,
+        },
+      ];
+      mockUseGetNflTeamSeasonMetadataQuery.mockReturnValue({
+        data: { nflTeamSeasonMetadata: metadata },
+        loading: false,
+      } as unknown as ReturnType<typeof useGetNflTeamSeasonMetadataQuery>);
+
+      render(<FootballPlayersPage />);
+
+      expect(mockUseGetNflTeamSeasonMetadataQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: false }),
+      );
+      const teamFilterProps = MockFootballTeamFilter.mock.calls[0]?.[0];
+      expect(teamFilterProps?.teamMetadata).toEqual(metadata);
+    });
+
+    it('passes no teamMetadata when entitled but query has not yet returned data', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+      mockUseGetNflTeamSeasonMetadataQuery.mockReturnValue({
+        data: undefined,
+        loading: true,
+      } as unknown as ReturnType<typeof useGetNflTeamSeasonMetadataQuery>);
+
+      render(<FootballPlayersPage />);
+
+      const teamFilterProps = MockFootballTeamFilter.mock.calls[0]?.[0];
+      expect(teamFilterProps?.teamMetadata).toBeUndefined();
     });
   });
 });

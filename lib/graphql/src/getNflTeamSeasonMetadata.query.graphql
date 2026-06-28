@@ -1,0 +1,8 @@
+query GetNflTeamSeasonMetadata($season: Int) {
+  nflTeamSeasonMetadata(season: $season) {
+    teamAbbreviation
+    byeWeek
+    sosTier
+    season
+  }
+}

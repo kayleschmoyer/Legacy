@@ -255,6 +255,9 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
 
   // ── Players ─────────────────────────────────────────────────────
   getplayercount: { data: { playerCount: 22184 } },
+  // Football bye-week + SoS badges (LS-8045) — empty array keeps badges hidden
+  // in non-entitled / default hermetic sessions; entitled specs supply their own mock.
+  getnflteamseasonmetadata: { data: { nflTeamSeasonMetadata: [] } },
   getallplayers: { data: { players: [] } },
   getplayerswithstats: { data: { playersWithStats: [] } },
   searchplayers: { data: { searchPlayers: [] } },

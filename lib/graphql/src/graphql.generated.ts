@@ -10146,6 +10146,21 @@ export type GetMinigamesStatsQuery = {
   } | null;
 };
 
+export type GetNflTeamSeasonMetadataQueryVariables = Exact<{
+  season?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetNflTeamSeasonMetadataQuery = {
+  __typename?: 'Query';
+  nflTeamSeasonMetadata: Array<{
+    __typename?: 'NflTeamSeasonMetadata';
+    teamAbbreviation: string;
+    byeWeek: number;
+    sosTier: SosTier;
+    season: number;
+  }>;
+};
+
 export type GetPlayersWithStatsQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -24835,6 +24850,95 @@ export type GetMinigamesStatsSuspenseQueryHookResult = ReturnType<
 export type GetMinigamesStatsQueryResult = Apollo.QueryResult<
   GetMinigamesStatsQuery,
   GetMinigamesStatsQueryVariables
+>;
+export const GetNflTeamSeasonMetadata = gql`
+  query GetNflTeamSeasonMetadata($season: Int) {
+    nflTeamSeasonMetadata(season: $season) {
+      teamAbbreviation
+      byeWeek
+      sosTier
+      season
+    }
+  }
+`;
+
+/**
+ * __useGetNflTeamSeasonMetadataQuery__
+ *
+ * To run a query within a React component, call `useGetNflTeamSeasonMetadataQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetNflTeamSeasonMetadataQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetNflTeamSeasonMetadataQuery({
+ *   variables: {
+ *      season: // value for 'season'
+ *   },
+ * });
+ */
+export function useGetNflTeamSeasonMetadataQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetNflTeamSeasonMetadataQuery,
+    GetNflTeamSeasonMetadataQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetNflTeamSeasonMetadataQuery,
+    GetNflTeamSeasonMetadataQueryVariables
+  >(GetNflTeamSeasonMetadata, options);
+}
+export function useGetNflTeamSeasonMetadataLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetNflTeamSeasonMetadataQuery,
+    GetNflTeamSeasonMetadataQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetNflTeamSeasonMetadataQuery,
+    GetNflTeamSeasonMetadataQueryVariables
+  >(GetNflTeamSeasonMetadata, options);
+}
+export function useGetNflTeamSeasonMetadataSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetNflTeamSeasonMetadataQuery,
+        GetNflTeamSeasonMetadataQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetNflTeamSeasonMetadataQuery,
+    GetNflTeamSeasonMetadataQueryVariables
+  >(
+    GetNflTeamSeasonMetadata,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetNflTeamSeasonMetadataQuery,
+          GetNflTeamSeasonMetadataQueryVariables
+        >,
+  );
+}
+export type GetNflTeamSeasonMetadataQueryHookResult = ReturnType<
+  typeof useGetNflTeamSeasonMetadataQuery
+>;
+export type GetNflTeamSeasonMetadataLazyQueryHookResult = ReturnType<
+  typeof useGetNflTeamSeasonMetadataLazyQuery
+>;
+export type GetNflTeamSeasonMetadataSuspenseQueryHookResult = ReturnType<
+  typeof useGetNflTeamSeasonMetadataSuspenseQuery
+>;
+export type GetNflTeamSeasonMetadataQueryResult = Apollo.QueryResult<
+  GetNflTeamSeasonMetadataQuery,
+  GetNflTeamSeasonMetadataQueryVariables
 >;
 export const GetPlayersWithStats = gql`
   query GetPlayersWithStats(

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Select, YStack } from 'tamagui';
+import { Select, XStack, YStack } from 'tamagui';
 import { Check, ChevronDown } from '@tamagui/lucide-icons';
 import type { NflTeam } from '@legacy-sports/shared-components';
-import { NFL_TEAMS } from '@legacy-sports/shared-components';
+import { NFL_TEAMS, StatusBadge } from '@legacy-sports/shared-components';
+import type { SosTier } from '@legacy-sports/graphql';
 import {
   OUTLINE_SUBTLE,
   SURFACE_CARD,
@@ -10,6 +11,12 @@ import {
   TEXT_MUTED,
   TEXT_PRIMARY,
 } from '../../constants/colors';
+
+export interface NflTeamMetadataEntry {
+  teamAbbreviation: string;
+  byeWeek: number;
+  sosTier: SosTier;
+}
 
 export type TeamFilter = string;
 
@@ -45,9 +52,23 @@ const TEAM_OPTIONS = Object.values(NFL_TEAMS)
     label: `${t.abbreviation} — ${t.fullName}`,
   }));
 
+const SOS_VARIANT: Record<SosTier, 'success' | 'warning' | 'error'> = {
+  easy: 'success',
+  medium: 'warning',
+  hard: 'error',
+};
+
+const SOS_LABEL: Record<SosTier, string> = {
+  easy: 'Easy',
+  medium: 'Med',
+  hard: 'Hard',
+};
+
 interface Props {
   selected: TeamFilter;
   onChange: (team: TeamFilter) => void;
+  /** Per-team bye/SoS metadata — only supplied for entitled premium users. */
+  teamMetadata?: NflTeamMetadataEntry[];
 }
 
 // Tamagui's BubbleSelect only populates native <select> options after the
@@ -64,7 +85,19 @@ const HIDDEN_SELECT_STYLE: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-export function FootballTeamFilter({ selected, onChange }: Props) {
+export function FootballTeamFilter({
+  selected,
+  onChange,
+  teamMetadata,
+}: Props) {
+  const metaByTeam = React.useMemo(() => {
+    if (!teamMetadata) return null;
+    const map = new Map<string, NflTeamMetadataEntry>();
+    for (const entry of teamMetadata) {
+      map.set(entry.teamAbbreviation, entry);
+    }
+    return map;
+  }, [teamMetadata]);
   const selectedLabel =
     selected === 'All'
       ? 'All Teams'
@@ -151,22 +184,44 @@ export function FootballTeamFilter({ selected, onChange }: Props) {
                 backgroundColor={OUTLINE_SUBTLE}
                 marginVertical={4}
               />
-              {TEAM_OPTIONS.map((opt, i) => (
-                <Select.Item
-                  key={opt.value}
-                  index={i + CONFERENCE_OPTIONS.length + 1}
-                  value={opt.value}
-                  backgroundColor={SURFACE_PANEL}
-                  hoverStyle={{ backgroundColor: SURFACE_CARD }}
-                >
-                  <Select.ItemText color={TEXT_MUTED} fontSize={13}>
-                    {opt.label}
-                  </Select.ItemText>
-                  <Select.ItemIndicator>
-                    <Check size={14} color={TEXT_PRIMARY} />
-                  </Select.ItemIndicator>
-                </Select.Item>
-              ))}
+              {TEAM_OPTIONS.map((opt, i) => {
+                const meta = metaByTeam?.get(opt.value);
+                return (
+                  <Select.Item
+                    key={opt.value}
+                    index={i + CONFERENCE_OPTIONS.length + 1}
+                    value={opt.value}
+                    backgroundColor={SURFACE_PANEL}
+                    hoverStyle={{ backgroundColor: SURFACE_CARD }}
+                  >
+                    <XStack flex={1} alignItems="center" gap={6}>
+                      <Select.ItemText color={TEXT_MUTED} fontSize={13}>
+                        {opt.label}
+                      </Select.ItemText>
+                      {meta != null && (
+                        <XStack
+                          gap={4}
+                          accessibilityLabel={`Bye week ${meta.byeWeek}, Strength of schedule: ${SOS_LABEL[meta.sosTier]}`}
+                        >
+                          <StatusBadge
+                            label={`Bye ${meta.byeWeek}`}
+                            variant="neutral"
+                            size="xs"
+                          />
+                          <StatusBadge
+                            label={`SoS: ${SOS_LABEL[meta.sosTier]}`}
+                            variant={SOS_VARIANT[meta.sosTier]}
+                            size="xs"
+                          />
+                        </XStack>
+                      )}
+                    </XStack>
+                    <Select.ItemIndicator>
+                      <Check size={14} color={TEXT_PRIMARY} />
+                    </Select.ItemIndicator>
+                  </Select.Item>
+                );
+              })}
             </Select.Group>
           </Select.Viewport>
           <Select.ScrollDownButton />
