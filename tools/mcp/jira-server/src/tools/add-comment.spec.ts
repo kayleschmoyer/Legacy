@@ -19,7 +19,10 @@ describe('addComment', () => {
   });
 
   it('posts a comment and returns success with commentId', async () => {
-    mockJiraRequest.mockResolvedValueOnce({ id: '99001' });
+    mockJiraRequest.mockResolvedValueOnce({
+      id: '99001',
+      created: '2026-06-28T12:00:00.000+0000',
+    });
 
     const result = await addComment({
       key: 'LS-123',
@@ -49,9 +52,9 @@ describe('addComment', () => {
     });
 
     const data = parse(result);
-    expect(data.success).toBe(true);
     expect(data.key).toBe('LS-123');
     expect(data.commentId).toBe('99001');
+    expect(data.created).toBe('2026-06-28T12:00:00.000+0000');
   });
 
   it('returns isError on API failure', async () => {

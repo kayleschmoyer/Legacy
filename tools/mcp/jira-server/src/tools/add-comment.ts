@@ -12,7 +12,7 @@ export async function addComment(
   const { key, body } = params;
 
   try {
-    const result = await jiraRequest<{ id: string }>({
+    const result = await jiraRequest<{ id: string; created: string }>({
       method: 'POST',
       path: `/rest/api/3/issue/${key}/comment`,
       body: {
@@ -34,10 +34,9 @@ export async function addComment(
         {
           type: 'text',
           text: JSON.stringify({
-            success: true,
             key,
             commentId: result?.id,
-            message: `Comment posted to ${key}`,
+            created: result?.created,
           }),
         },
       ],
