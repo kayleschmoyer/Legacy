@@ -98,6 +98,13 @@ const MAX_BATCH_RUNS = 10;
 /** Maximum number of concurrent run-log fetches in batch mode. */
 const BATCH_CONCURRENCY = 3;
 
+function applyHardCharCap(text: string, maxChars: number): string {
+  if (text.length > maxChars) {
+    return text.slice(0, maxChars) + `\n... [truncated at ${maxChars} chars]`;
+  }
+  return text;
+}
+
 /**
  * Applies per-line and total-character limits to a set of log lines.
  * Returns the processed lines and whether any truncation occurred.
@@ -301,11 +308,16 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
       }
     }
 
+    const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
+    const batchText = applyHardCharCap(
+      JSON.stringify({ logs, missing }, null, 2),
+      maxChars,
+    );
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ logs, missing }, null, 2),
+          text: batchText,
         },
       ],
     };
@@ -328,9 +340,9 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
   try {
     const signal = AbortSignal.timeout(LOG_FETCH_TIMEOUT_MS);
     const payload = await buildRunPayload(params.runId, params, signal);
-    return {
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
-    };
+    const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
+    const text = applyHardCharCap(JSON.stringify(payload, null, 2), maxChars);
+    return { content: [{ type: 'text', text }] };
   } catch (error) {
     const isTimeout =
       error instanceof Error &&

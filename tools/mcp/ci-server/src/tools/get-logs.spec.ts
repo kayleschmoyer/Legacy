@@ -140,4 +140,70 @@ describe('getLogs', () => {
       expect(payload.missing).toEqual([]);
     });
   });
+
+  describe('char limits (maxChars / truncateLineLength)', () => {
+    it('truncates per-line when truncateLineLength is set', async () => {
+      const longLine = 'x'.repeat(1000);
+      mockFetch.mockResolvedValue({
+        lines: [longLine, longLine],
+        totalLines: 2,
+      });
+
+      const result = await getLogs({ runId: 1, truncateLineLength: 50 });
+      expect(result.isError).toBeUndefined();
+      const payload = parsePayload(result.content[0].text);
+      const logsStr = payload.logs as string;
+      for (const line of logsStr.split('\n')) {
+        expect(line.length).toBeLessThanOrEqual(
+          50 + '...[line truncated]'.length,
+        );
+      }
+    });
+
+    it('caps total response text at maxChars for singular path', async () => {
+      // 12 lines of 10KB each — 120KB total, well over maxChars=80000
+      const bigLine = 'a'.repeat(10_000);
+      mockFetch.mockResolvedValue({
+        lines: Array.from({ length: 12 }, () => bigLine),
+        totalLines: 12,
+      });
+
+      const maxChars = 80_000;
+      const result = await getLogs({ runId: 1, maxChars });
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text.length).toBeLessThanOrEqual(
+        maxChars + '... [truncated at 80000 chars]'.length + 1,
+      );
+      expect(text).toContain('... [truncated at 80000 chars]');
+    });
+
+    it('caps total response text at maxChars for batch path', async () => {
+      const bigLine = 'a'.repeat(10_000);
+      mockFetch.mockResolvedValue({
+        lines: Array.from({ length: 12 }, () => bigLine),
+        totalLines: 12,
+      });
+
+      const maxChars = 80_000;
+      const result = await getLogs({ runIds: [1, 2], maxChars });
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text.length).toBeLessThanOrEqual(
+        maxChars + '... [truncated at 80000 chars]'.length + 1,
+      );
+      expect(text).toContain('... [truncated at 80000 chars]');
+    });
+
+    it('does not truncate when response fits within maxChars', async () => {
+      mockFetch.mockResolvedValue({ lines: ['short line'], totalLines: 1 });
+
+      const result = await getLogs({ runId: 1, maxChars: 10_000 });
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      expect(text).not.toContain('[truncated at');
+      // Text should be valid JSON
+      expect(() => JSON.parse(text)).not.toThrow();
+    });
+  });
 });
