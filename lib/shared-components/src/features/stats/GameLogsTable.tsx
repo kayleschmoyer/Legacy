@@ -45,7 +45,7 @@ const EM_DASH = '—';
  *  "missing" and rendered as em-dash; a real `0` is preserved. (LS-7461) */
 type CellValue = string | number | null | undefined;
 
-function renderCell(cell: CellValue): string | number {
+export function renderCell(cell: CellValue): string | number {
   if (cell === null || cell === undefined) return EM_DASH;
   if (typeof cell === 'string' && cell.trim() === '') return EM_DASH;
   return cell;

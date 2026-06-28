@@ -7,6 +7,7 @@ import {
   compareCells,
   GameLogsTable,
   NFL_ADVANCED_STAT_KEYS,
+  renderCell,
   reshapeGameLogs,
   validateDateRange,
 } from './GameLogsTable';
@@ -525,6 +526,36 @@ describe('compareCells (LS-7457)', () => {
   it('falls back to a numeric-aware locale compare for non-numeric strings', () => {
     expect(compareCells('2026-04-01', '2026-05-01', 'asc')).toBeLessThan(0);
     expect(compareCells('2026-04-01', '2026-05-01', 'desc')).toBeGreaterThan(0);
+  });
+});
+
+describe('renderCell (LS-7461)', () => {
+  it('returns em-dash for null', () => {
+    expect(renderCell(null)).toBe('—');
+  });
+
+  it('returns em-dash for undefined', () => {
+    expect(renderCell(undefined)).toBe('—');
+  });
+
+  it('returns em-dash for empty string', () => {
+    expect(renderCell('')).toBe('—');
+  });
+
+  it('returns em-dash for whitespace-only string', () => {
+    expect(renderCell('   ')).toBe('—');
+  });
+
+  it('passes through a real 0 without coercing to em-dash', () => {
+    expect(renderCell(0)).toBe(0);
+  });
+
+  it('passes through a non-empty string unchanged', () => {
+    expect(renderCell('42')).toBe('42');
+  });
+
+  it('passes through a positive number unchanged', () => {
+    expect(renderCell(3.14)).toBe(3.14);
   });
 });
 
