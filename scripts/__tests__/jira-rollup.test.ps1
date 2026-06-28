@@ -66,6 +66,23 @@ Assert-Equal $story "In Progress" "story rolls up from its tasks"
 $epic = Get-RolledUpStatus @($story, "To Do")
 Assert-Equal $epic "In Progress" "epic rolls up from the rolled-up story (bottom-up)"
 
+# --- Dry-run effectiveStatus: rollup derives from simulated child statuses, not stale Jira ---
+# When -DryRun simulates moving a child from 'To Do' to 'In Progress', sync-jira-status.ps1
+# records the target in $effectiveStatus and passes it to Get-RolledUpStatus instead of the
+# stale Jira value. These two cases confirm the function returns different results:
+Assert-Equal (Get-RolledUpStatus @("To Do")) "To Do" "dry-run control: stale child To Do -> parent stays To Do"
+Assert-Equal (Get-RolledUpStatus @("In Progress")) "In Progress" "dry-run effective: simulated child In Progress -> parent In Progress"
+
+# --- Parent-with-own-PR: children-derived rollup overrides branch-driven status ---
+# When a ticket is both a parent (has children) and has its own PR/branch, the per-ticket
+# pass may move it to Done (merged PR). Invoke-ParentRollup then runs Get-RolledUpStatus
+# against the children and overwrites the effective status with the children-derived result.
+# This verifies the derivation function produces the correct override target.
+$parentBranchDrivenStatus = "Done"   # per-ticket pass moved this to Done (merged PR)
+$rollupDerived = Get-RolledUpStatus @("In Progress", "To Do")
+Assert-Equal $rollupDerived "In Progress" "parent-with-own-PR: children-derived In Progress overrides branch-driven Done"
+Assert-Equal ($parentBranchDrivenStatus -ne $rollupDerived) $true "parent-with-own-PR: rollup status differs from branch-driven status"
+
 if ($script:failures -gt 0) {
     Write-Host "`n$($script:failures) assertion(s) FAILED" -ForegroundColor Red
     exit 1
