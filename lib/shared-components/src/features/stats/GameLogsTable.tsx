@@ -665,11 +665,7 @@ const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
             const row = isSentinel ? null : rows[vi.index];
             return (
               <div
-                key={
-                  isSentinel
-                    ? `sentinel-${vi.index}`
-                    : (row?.gameId ?? vi.index)
-                }
+                key={row ? row.gameId : `sentinel-${vi.index}`}
                 data-testid={
                   isSentinel
                     ? 'game-logs-loading-more'
