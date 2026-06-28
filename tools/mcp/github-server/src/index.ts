@@ -1454,7 +1454,7 @@ export function createServer(): McpServer {
   // --- github_view_pr ---
   server.tool(
     'github_view_pr',
-    'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. View PR details: title, body, state, checks, reviews, diff stats, and changed files list (path, additions, deletions, status). Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. By default returns a compact card: number, title, state, isDraft, headRefName, baseRefName, url, labels, reviewDecision, additions, deletions, changedFiles, commits.totalCount, and checksSummary. Pass optional "fields" array to opt-in to heavy fields: "body" (full PR description), "files" (changed-files list), "reviews", "assignees", "milestone". Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
       number: z.coerce
         .number()
@@ -1468,6 +1468,12 @@ export function createServer(): McpServer {
         .positive()
         .optional()
         .describe('Alias for "number" — use either, not both'),
+      fields: z
+        .array(z.enum(['body', 'files', 'reviews', 'assignees', 'milestone']))
+        .optional()
+        .describe(
+          'Opt-in extra fields beyond the compact default. E.g. ["body","files"] to include the PR description and changed-files list.',
+        ),
     },
     async (params) => {
       const resolved = params.number ?? params.prNumber;
@@ -1482,7 +1488,7 @@ export function createServer(): McpServer {
           ],
         };
       }
-      return viewPR({ number: resolved });
+      return viewPR({ number: resolved, fields: params.fields });
     },
   );
 

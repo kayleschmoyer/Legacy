@@ -3,8 +3,14 @@ import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
 import type { ToolResult, CICheck } from '../types.js';
 
+type ViewPRField = 'body' | 'files' | 'reviews' | 'assignees' | 'milestone';
+
 interface ViewPRParams {
   number: number;
+  /** Opt-in fields to include beyond the compact default. Compact default: number, title, state,
+   *  isDraft, headRefName, baseRefName, url, labels, additions, deletions, changedFiles,
+   *  commits.totalCount, statusCheckRollup. Pass e.g. ["body","files"] for richer output. */
+  fields?: ViewPRField[];
 }
 
 interface CheckRunNode {
@@ -206,47 +212,79 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
     const checkNodes =
       commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
 
-    const output = {
+    const include = new Set<ViewPRField>(params.fields ?? []);
+
+    const checksRaw = normalizeChecks(checkNodes);
+    const failed = checksRaw.filter(
+      (c) =>
+        c.conclusion &&
+        c.conclusion !== 'SUCCESS' &&
+        c.conclusion !== 'SKIPPED' &&
+        c.conclusion !== 'NEUTRAL',
+    );
+    const pending = checksRaw.filter((c) => !c.conclusion);
+    const passed = checksRaw.filter(
+      (c) =>
+        c.conclusion === 'SUCCESS' ||
+        c.conclusion === 'SKIPPED' ||
+        c.conclusion === 'NEUTRAL',
+    );
+
+    const output: Record<string, unknown> = {
       number: pr.number,
       title: pr.title,
-      body: pr.body,
       state: pr.state,
+      isDraft: pr.isDraft,
       headRefName: pr.headRefName,
       baseRefName: pr.baseRefName,
-      author: { login: pr.author?.login ?? 'unknown' },
-      createdAt: pr.createdAt,
-      updatedAt: pr.updatedAt,
-      mergedAt: pr.mergedAt,
-      closedAt: pr.closedAt,
       url: pr.url,
       labels: pr.labels.nodes,
-      isDraft: pr.isDraft,
       reviewDecision: pr.reviewDecision,
       additions: pr.additions,
       deletions: pr.deletions,
       changedFiles: pr.changedFiles,
-      files: pr.files.nodes.map((f) => ({
+      commits: { totalCount: pr.commits.totalCount },
+      checksSummary: {
+        total: checksRaw.length,
+        passed: passed.length,
+        pending: pending.length,
+        failed: failed.length,
+        failedNames: failed.map((c) => c.name),
+      },
+    };
+
+    if (include.has('body')) {
+      output['body'] = pr.body;
+    }
+
+    if (include.has('files')) {
+      output['files'] = pr.files.nodes.map((f) => ({
         path: f.path,
         additions: f.additions,
         deletions: f.deletions,
         status: mapChangeType(f.changeType),
-      })),
-      ...(pr.files.pageInfo.hasNextPage
-        ? {
-            filesNote:
-              'Truncated to first 100 files; PR has more changed files.',
-          }
-        : {}),
-      commits: { totalCount: pr.commits.totalCount },
-      statusCheckRollup: normalizeChecks(checkNodes),
-      reviews: pr.reviews.nodes.map((r) => ({
+      }));
+      if (pr.files.pageInfo.hasNextPage) {
+        output['filesNote'] =
+          'Truncated to first 100 files; PR has more changed files.';
+      }
+    }
+
+    if (include.has('reviews')) {
+      output['reviews'] = pr.reviews.nodes.map((r) => ({
         author: { login: r.author?.login ?? 'unknown' },
         state: r.state,
         submittedAt: r.submittedAt,
-      })),
-      assignees: pr.assignees.nodes.map((a) => ({ login: a.login })),
-      milestone: pr.milestone,
-    };
+      }));
+    }
+
+    if (include.has('assignees')) {
+      output['assignees'] = pr.assignees.nodes.map((a) => ({ login: a.login }));
+    }
+
+    if (include.has('milestone')) {
+      output['milestone'] = pr.milestone;
+    }
 
     return {
       content: [{ type: 'text', text: minifiedJson(output) }],

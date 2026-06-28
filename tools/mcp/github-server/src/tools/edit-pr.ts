@@ -43,6 +43,9 @@ export async function editPR(params: EditPRParams): Promise<ToolResult> {
       path: `/repos/${repo.owner}/${repo.name}/pulls/${number}`,
       body: patchBody,
     });
+    const updatedFields: Record<string, string> = {};
+    if (title !== undefined) updatedFields['title'] = pr.title;
+    if (body !== undefined) updatedFields['body'] = pr.body ?? '';
     return {
       content: [
         {
@@ -50,9 +53,8 @@ export async function editPR(params: EditPRParams): Promise<ToolResult> {
           text: minifiedJson({
             success: true,
             number: pr.number,
-            title: pr.title,
-            body: pr.body,
             url: pr.html_url,
+            updatedFields,
           }),
         },
       ],
