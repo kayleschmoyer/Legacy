@@ -6,6 +6,7 @@ import { join, resolve, relative, isAbsolute } from 'node:path';
 import { existsSync } from 'node:fs';
 import { runCommand, getRepoRoot } from './run-command.js';
 import { runTarget } from './tools/run-target.js';
+import { validatePR } from './tools/validate-pr.js';
 import { makeRunStatus, makeRunWait } from './tools/make-run-bg.js';
 import { worktreeCreate } from './tools/worktree-create.js';
 import { wtSetup } from './tools/wt-setup.js';
@@ -650,6 +651,39 @@ server.tool(
       ],
     };
   },
+);
+
+// --- validate_pr ---
+server.tool(
+  'validate_pr',
+  'Semantic one-shot for the mandatory migrate-before-pc gate: checks DB migration status → applies pending migrations → runs make pc. ' +
+    'Guarantees the AGENTS.md invariant order and short-circuits on migration failure (does not run pc on a broken DB). ' +
+    'Returns { migrations: { applied, pending, needsMigration }, pc: { passed, steps, errors } }. ' +
+    'Use runPcInBackground: true in cloud sessions to avoid the ~60s MCP transport timeout; poll with make_run_wait({ jobId }). ' +
+    'Use sanctionedChunks: true to run the seven pc steps individually (pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build).',
+  {
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Worktree or repo root (default: repo root)'),
+    sanctionedChunks: z
+      .boolean()
+      .optional()
+      .describe(
+        'Run the seven pc chunks individually instead of make pc (timeout-resilient for cloud sessions). ' +
+          'Ignored when runPcInBackground: true.',
+      ),
+    runPcInBackground: z
+      .boolean()
+      .optional()
+      .describe(
+        'Spawn make pc as a background job and return immediately with a { jobId }. ' +
+          'Use make_run_wait({ jobId }) to poll for completion. ' +
+          'Recommended for cloud sessions where the MCP transport timeout would kill a synchronous make pc call.',
+      ),
+  },
+  async (params) => validatePR(params),
 );
 
 // Start the server

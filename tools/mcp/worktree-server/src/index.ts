@@ -32,6 +32,7 @@ import {
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
+import { rebaseOntoMain } from './rebase-onto-main';
 import {
   type BranchEntry,
   formatBranchList,
@@ -2280,6 +2281,40 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'string',
             description:
               "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted.",
+          },
+        },
+        required: [],
+      },
+    },
+    {
+      name: 'worktree_rebase_onto_main',
+      description:
+        'Semantic one-shot rebase: fetch origin/main → rebase current branch onto it → push with --force-with-lease. ' +
+        'Replaces the three-step worktree_fetch → worktree_rebase(base: "origin/main") → worktree_push sequence. ' +
+        'Aborts and reports if conflict markers are detected post-rebase rather than pushing a broken state. ' +
+        'Refuses to operate on the main branch.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree.',
+          },
+          onto: {
+            type: 'string',
+            description: 'Branch to rebase onto (default: "main").',
+          },
+          disableRerere: {
+            type: 'boolean',
+            description:
+              'Disable git rerere during the rebase (set rerere.enabled=false). ' +
+              'Use when a bad rr-cache entry is causing silent conflict-marker commits.',
+          },
+          pushTimeoutMs: {
+            type: 'number',
+            description:
+              'Timeout for git push in milliseconds (default: 120000).',
           },
         },
         required: [],
@@ -5318,6 +5353,64 @@ const handleCallTool = async (
             },
           ],
           isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_rebase_onto_main
+    // -----------------------------------------------------------------------
+    case 'worktree_rebase_onto_main': {
+      const {
+        worktree: wtKey,
+        onto: ontoRaw,
+        disableRerere: disableRerereRaw,
+        pushTimeoutMs: pushTimeoutRaw,
+      } = args as {
+        worktree?: string;
+        onto?: string;
+        disableRerere?: boolean;
+        pushTimeoutMs?: number;
+      };
+
+      const onto = ontoRaw ?? 'main';
+      const disableRerere = disableRerereRaw === true;
+      const pushTimeoutMs =
+        typeof pushTimeoutRaw === 'number' && pushTimeoutRaw > 0
+          ? pushTimeoutRaw
+          : 120_000;
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      try {
+        return rebaseOntoMain(
+          cwd,
+          { onto, disableRerere, pushTimeoutMs },
+          {
+            runGit,
+            runShell: run,
+            nonInteractiveEnv: NON_INTERACTIVE_GIT_ENV,
+          },
+        );
+      } catch (err: unknown) {
+        const e = err as { stderr?: string; stdout?: string; message?: string };
+        const detail =
+          e.stderr?.trim() || e.stdout?.trim() || e.message || String(err);
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `worktree_rebase_onto_main failed: ${detail}`,
+            },
+          ],
         };
       }
     }

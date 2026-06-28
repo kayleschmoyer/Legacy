@@ -66,6 +66,8 @@ import { bulkEdit } from './tools/bulk-edit.js';
 import { bulkComment } from './tools/bulk-comment.js';
 import { bulkReplyToReview } from './tools/bulk-reply-to-review.js';
 import { getJobLogs } from './tools/get-job-logs.js';
+import { openPR } from './tools/open-pr.js';
+import { diagnose } from './tools/diagnose.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -1997,6 +1999,71 @@ export function createServer(): McpServer {
         maxChars: params.max_chars,
         errorSummary: params.error_summary,
       }),
+  );
+
+  // --- github_open_pr ---
+  server.tool(
+    'github_open_pr',
+    'Semantic one-shot for the Ship step: push branch → create PR as draft → mark ready for review → apply bot:ready-for-review label. ' +
+      'Replaces the six-step worktree_push → github_create_pr → github_mark_pr_ready → github_manage_labels(add: bot:ready-for-review) sequence. ' +
+      'The jira-link marker is auto-inserted when jiraKey is provided. ' +
+      'Pass draft: true to leave the PR in draft state (skips mark-ready and label). ' +
+      'Pass push: false if the branch is already pushed.',
+    {
+      title: z.string().trim().min(1).describe('PR title'),
+      body: z.string().describe('PR body (markdown)'),
+      base: z
+        .string()
+        .trim()
+        .optional()
+        .describe('Base branch (default: main)'),
+      draft: z
+        .boolean()
+        .optional()
+        .describe(
+          'Leave PR in draft (default: false — creates a ready-for-review PR)',
+        ),
+      head: z
+        .string()
+        .trim()
+        .optional()
+        .describe(
+          'Remote branch name. Required in Lambda mode; auto-detected from worktreePath otherwise.',
+        ),
+      worktreePath: z
+        .string()
+        .trim()
+        .optional()
+        .describe(
+          'Absolute path to the local worktree for branch auto-detection and push',
+        ),
+      jiraKey: z
+        .string()
+        .trim()
+        .optional()
+        .describe(
+          'Jira ticket key (e.g. LS-1234). Auto-inserted as the jira-link marker in the PR body.',
+        ),
+      push: z
+        .boolean()
+        .optional()
+        .describe(
+          'Push branch before creating PR (default: true). Pass false if already pushed.',
+        ),
+    },
+    async (params) => openPR(params),
+  );
+
+  // --- github_pr_diagnose ---
+  server.tool(
+    'github_pr_diagnose',
+    'Semantic one-shot for CI failure investigation: returns a compact markdown report with PR state, CI summary, failing job list with extracted error context, and a recommended next action. ' +
+      'Replaces the 4-5 call chain: github_view_pr → github_get_check_runs → github_pr_why_blocked → ci_find_session → ci_get_logs. ' +
+      'For full CI log lines, fetch logs separately via ci_get_logs after using this tool to identify which jobs are failing.',
+    {
+      prNumber: z.number().int().positive().describe('PR number to diagnose'),
+    },
+    async (params) => diagnose(params),
   );
 
   return server;
