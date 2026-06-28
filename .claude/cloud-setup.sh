@@ -68,7 +68,35 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Install Node.js dependencies
+# 3. Deepen the shallow clone so origin/main merge-base exists
+# ---------------------------------------------------------------------------
+# Cloud sessions start with a shallow clone. Without shared history,
+# `git diff origin/main...HEAD` fails with "no merge base", causing make pc
+# to fall back to whole-repo validation (slow + false format failures).
+# Fetching enough history ensures classify-changes.js can scope the run.
+if git rev-parse --is-shallow-repository 2>/dev/null | grep -q '^true$'; then
+  echo "Shallow clone detected — deepening to establish merge-base with origin/main..."
+  # --deepen=200 covers typical PR depths without fetching the full history.
+  # Fall back to --unshallow if the branch history is unusually deep.
+  if git fetch --deepen=200 origin main 2>&1 | tail -1; then
+    if git merge-base origin/main HEAD >/dev/null 2>&1; then
+      echo "Merge-base established: $(git merge-base origin/main HEAD | head -c 12)"
+    else
+      echo "Deepen insufficient — attempting --unshallow..."
+      git fetch --unshallow origin 2>&1 | tail -1 || echo "WARNING: --unshallow failed; make pc will use whole-repo fail-safe"
+      git merge-base origin/main HEAD >/dev/null 2>&1 \
+        && echo "Merge-base established after unshallow" \
+        || echo "WARNING: merge-base still unavailable; make pc will use whole-repo fail-safe"
+    fi
+  else
+    echo "WARNING: git fetch --deepen=200 failed; make pc will use whole-repo fail-safe"
+  fi
+else
+  echo "Full clone detected — merge-base check skipped"
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Install Node.js dependencies
 # ---------------------------------------------------------------------------
 # Required for `make pc` (lint, typecheck, test, build) on code changes.
 # Uses corepack to activate the correct pnpm version, then installs deps.
@@ -89,7 +117,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
+# 5. Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
 # ---------------------------------------------------------------------------
 # In cloud sessions, git remote URLs may be proxy URLs that don't expose the
 # real GitHub owner/repo. These env vars let the MCP server skip remote
