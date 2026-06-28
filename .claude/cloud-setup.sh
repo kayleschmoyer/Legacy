@@ -131,20 +131,37 @@ fi
 # ---------------------------------------------------------------------------
 # Required for `make pc` (lint, typecheck, test, build) on code changes.
 # Uses corepack to activate the correct pnpm version, then installs deps.
-if command -v corepack &>/dev/null; then
-  corepack enable
-  corepack prepare pnpm@9.12.1 --activate 2>/dev/null || true
-  echo "pnpm $(pnpm --version 2>/dev/null || echo 'unknown') activated"
+#
+# Fast-path: skip install if node_modules/.bin/tsx is already present and
+# executable. This makes the script safe to re-run on every SessionStart
+# without incurring the full ~60s install cost when deps are already complete.
+# (LS-8113: cloud sessions start with an incomplete node_modules; this script
+# is also registered as a SessionStart hook so it runs on every session start.)
+TSX_BIN="$REPO_DIR/node_modules/.bin/tsx"
+if [ -f "$TSX_BIN" ] && [ -x "$TSX_BIN" ]; then
+  echo "node_modules/.bin/tsx present — skipping pnpm install (dependencies already complete)"
 else
-  echo "WARNING: corepack not found — skipping pnpm install"
-fi
+  if command -v corepack &>/dev/null; then
+    corepack enable
+    corepack prepare pnpm@9.12.1 --activate 2>/dev/null || true
+    echo "pnpm $(pnpm --version 2>/dev/null || echo 'unknown') activated"
+  else
+    echo "WARNING: corepack not found — skipping pnpm install"
+  fi
 
-if command -v pnpm &>/dev/null; then
-  echo "Installing dependencies (pnpm install)..."
-  pnpm install --frozen-lockfile 2>&1 | tail -3
-  echo "Dependencies installed"
-else
-  echo "WARNING: pnpm not available — make pc will not work for code changes"
+  if command -v pnpm &>/dev/null; then
+    echo "node_modules/.bin/tsx absent — installing dependencies (LS-8113)..."
+    pnpm install --frozen-lockfile 2>&1 | tail -5
+    # Verify tsx is now present; warn if still missing so the agent can triage.
+    if [ -f "$TSX_BIN" ] && [ -x "$TSX_BIN" ]; then
+      echo "Dependencies installed — node_modules/.bin/tsx confirmed present"
+    else
+      echo "WARNING: pnpm install completed but node_modules/.bin/tsx is still absent"
+      echo "  MCP stdio servers may not connect. Run 'pnpm install' manually and restart."
+    fi
+  else
+    echo "WARNING: pnpm not available — make pc will not work for code changes"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
