@@ -9,7 +9,7 @@ interface ViewPRParams {
   number: number;
   /** Opt-in fields to include beyond the compact default. Compact default: number, title, state,
    *  isDraft, headRefName, baseRefName, url, labels, additions, deletions, changedFiles,
-   *  commits.totalCount, statusCheckRollup. Pass e.g. ["body","files"] for richer output. */
+   *  commits.totalCount, checksSummary. Pass e.g. ["body","files"] for richer output. */
   fields?: ViewPRField[];
 }
 
