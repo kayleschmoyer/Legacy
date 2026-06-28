@@ -144,3 +144,110 @@ export function truncateOutput(output: string, maxChars: number): string {
 
   return `${head}\n\n... [${omitted.toLocaleString()} characters omitted] ...\n\n${tail}`;
 }
+
+/**
+ * Matches prettier per-file output lines: `apps/web/Foo.tsx 123ms (unchanged)` or `lib/Bar.ts 45ms`
+ * Requires at least one path separator so plain single-word lines don't match.
+ */
+const PRETTIER_FILE_LINE_RE = /^(\S+\/\S+)\s+\d+ms(?:\s+\(unchanged\))?$/;
+
+/**
+ * Collapse prettier per-file listings in output.
+ * Consecutive prettier file lines are replaced with a single summary:
+ *   [Formatting: 1180 files checked, 2 changed — lib/foo.ts, lib/bar.ts]
+ * Changed files (those lacking "(unchanged)") are listed by name so the agent
+ * can see what was actually reformatted without wading through the full dump.
+ */
+export function compressFormatterOutput(output: string): string {
+  const lines = output.split('\n');
+  const result: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    if (trimmed && PRETTIER_FILE_LINE_RE.test(trimmed)) {
+      let total = 0;
+      const changed: string[] = [];
+      while (i < lines.length) {
+        const t = lines[i].trim();
+        if (!t || !PRETTIER_FILE_LINE_RE.test(t)) break;
+        total++;
+        if (!/\(unchanged\)/.test(t)) {
+          changed.push(t.replace(/\s+\d+ms(?:\s+\(unchanged\))?$/, ''));
+        }
+        i++;
+      }
+      const changedSuffix =
+        changed.length > 0
+          ? ` — ${changed.slice(0, 10).join(', ')}${changed.length > 10 ? ` (+${changed.length - 10} more)` : ''}`
+          : '';
+      result.push(
+        `[Formatting: ${total} files checked, ${changed.length} changed${changedSuffix}]`,
+      );
+    } else {
+      result.push(lines[i]);
+      i++;
+    }
+  }
+
+  return result.join('\n');
+}
+
+const STEP_HEADER_GLOBAL_RE = /^(\d+\/\d+\s+.+?\.{3})\s*$/gm;
+const MAX_STEP_BODY_LINES = 20;
+
+/**
+ * For each make-pc step section, truncate the body to MAX_STEP_BODY_LINES lines.
+ * Appends "[N more lines — run step directly for full output]" when truncated.
+ */
+export function truncateStepErrors(output: string): string {
+  const headers: Array<{ index: number; length: number }> = [];
+  STEP_HEADER_GLOBAL_RE.lastIndex = 0;
+  let m;
+  while ((m = STEP_HEADER_GLOBAL_RE.exec(output)) !== null) {
+    headers.push({ index: m.index, length: m[0].length });
+  }
+  if (headers.length === 0) return output;
+
+  const parts: string[] = [];
+  parts.push(output.slice(0, headers[0].index));
+
+  for (let i = 0; i < headers.length; i++) {
+    const { index, length } = headers[i];
+    const nextStart =
+      i + 1 < headers.length ? headers[i + 1].index : output.length;
+    parts.push(output.slice(index, index + length));
+    const body = output.slice(index + length, nextStart);
+    const bodyLines = body.split('\n');
+    // body starts with '\n' (the newline separating the step header from its
+    // content), so bodyLines[0] is always ''. Strip a trailing '' as well so
+    // the content count is the same regardless of whether the section ends
+    // with a newline.
+    const trimmed =
+      bodyLines.at(-1) === '' ? bodyLines.slice(0, -1) : bodyLines;
+    const contentLineCount = trimmed.length - 1; // subtract leading ''
+    if (contentLineCount > MAX_STEP_BODY_LINES) {
+      const remaining = contentLineCount - MAX_STEP_BODY_LINES;
+      parts.push(trimmed.slice(0, MAX_STEP_BODY_LINES + 1).join('\n'));
+      parts.push(
+        `\n[${remaining} more lines — run step directly for full output]`,
+      );
+    } else {
+      parts.push(body);
+    }
+  }
+
+  return parts.join('');
+}
+
+/**
+ * Build a compact output string suitable for MCP responses (default mode).
+ * Suppresses prettier per-file listings and truncates per-step bodies to 20 lines.
+ * For the full raw output, callers should use truncateOutput directly.
+ */
+export function buildCompactOutput(output: string, maxChars: number): string {
+  return truncateOutput(
+    truncateStepErrors(compressFormatterOutput(output)),
+    maxChars,
+  );
+}

@@ -10,6 +10,7 @@ import {
   parseSteps,
   extractErrors,
   truncateOutput,
+  buildCompactOutput,
 } from './run-target-utils.js';
 
 interface JobRecord {
@@ -21,6 +22,7 @@ interface JobRecord {
   exitCode: number | null;
   done: boolean;
   error: string | null;
+  verbose: boolean;
 }
 
 // In-memory registry — lives for the lifetime of the MCP server process.
@@ -53,6 +55,7 @@ export function startMakeInBackground(
   target: string,
   workDir: string,
   timeoutMs: number,
+  verbose = false,
 ): { jobId: string; logPath: string } {
   const jobId = newJobId();
   const logPath = join(ensureLogDir(), `${jobId}.log`);
@@ -73,6 +76,7 @@ export function startMakeInBackground(
     exitCode: null,
     done: false,
     error: null,
+    verbose,
   };
   jobRegistry.set(jobId, record);
 
@@ -156,7 +160,9 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
       const errors = extractErrors(log);
       if (errors.length > 0) result.errors = errors;
     }
-    result.output = truncateOutput(output, MAX_OUTPUT_CHARS);
+    result.output = record.verbose
+      ? truncateOutput(output, MAX_OUTPUT_CHARS)
+      : buildCompactOutput(output, MAX_OUTPUT_CHARS);
 
     return {
       content: [{ type: 'text', text: minifiedJson(result) }],
@@ -176,7 +182,9 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
           worktreePath: record.workDir,
           elapsedSec,
           ...(record.error ? { error: record.error } : {}),
-          output: truncateOutput(output, MAX_OUTPUT_CHARS),
+          output: record.verbose
+            ? truncateOutput(output, MAX_OUTPUT_CHARS)
+            : buildCompactOutput(output, MAX_OUTPUT_CHARS),
         }),
       },
     ],

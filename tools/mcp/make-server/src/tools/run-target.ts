@@ -8,6 +8,7 @@ import {
   parseSteps,
   extractErrors,
   truncateOutput,
+  buildCompactOutput,
   parseAndValidateVariables,
 } from './run-target-utils.js';
 import { startMakeInBackground } from './make-run-bg.js';
@@ -133,6 +134,7 @@ interface RunTargetParams {
   variables?: string;
   timeoutMs?: number;
   runInBackground?: boolean;
+  verbose?: boolean;
 }
 
 /** Return the last N lines of output for timeout partial-output fields. */
@@ -212,6 +214,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       target,
       workDir,
       timeoutMs,
+      params.verbose ?? false,
     );
     return {
       content: [
@@ -257,7 +260,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
           : `${target} failed${failedCount > 0 ? ` (${failedCount} ${failedCount === 1 ? 'step failed' : 'steps failed'})` : ''}`,
       };
       if (steps.length > 0) result.steps = steps;
-      result.output = truncateOutput(output, MAX_OUTPUT_CHARS);
+      result.output = params.verbose
+        ? truncateOutput(output, MAX_OUTPUT_CHARS)
+        : buildCompactOutput(output, MAX_OUTPUT_CHARS);
       return {
         content: [{ type: 'text', text: minifiedJson(result) }],
       };
@@ -271,7 +276,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             success: true,
             target,
             worktreePath: workDir,
-            output: truncateOutput(output, MAX_OUTPUT_CHARS),
+            output: params.verbose
+              ? truncateOutput(output, MAX_OUTPUT_CHARS)
+              : buildCompactOutput(output, MAX_OUTPUT_CHARS),
           }),
         },
       ],
@@ -373,7 +380,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
                 : `${target} failed after auto-committing formatter output`,
             };
             if (retrySteps.length > 0) retryResult.steps = retrySteps;
-            retryResult.output = truncateOutput(retryOutput, MAX_OUTPUT_CHARS);
+            retryResult.output = params.verbose
+              ? truncateOutput(retryOutput, MAX_OUTPUT_CHARS)
+              : buildCompactOutput(retryOutput, MAX_OUTPUT_CHARS);
             return {
               content: [{ type: 'text', text: minifiedJson(retryResult) }],
               isError: !allPassed,
@@ -395,7 +404,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             };
             if (retrySteps.length > 0) retryResult.steps = retrySteps;
             if (retryErrors.length > 0) retryResult.errors = retryErrors;
-            retryResult.output = truncateOutput(retryMsg, MAX_OUTPUT_CHARS);
+            retryResult.output = params.verbose
+              ? truncateOutput(retryMsg, MAX_OUTPUT_CHARS)
+              : buildCompactOutput(retryMsg, MAX_OUTPUT_CHARS);
             return {
               content: [{ type: 'text', text: minifiedJson(retryResult) }],
               isError: true,
@@ -430,7 +441,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
           };
           if (gitSteps.length > 0) gitResult.steps = gitSteps;
           if (gitErrors.length > 0) gitResult.errors = gitErrors;
-          gitResult.output = truncateOutput(errorMsg, MAX_OUTPUT_CHARS);
+          gitResult.output = params.verbose
+            ? truncateOutput(errorMsg, MAX_OUTPUT_CHARS)
+            : buildCompactOutput(errorMsg, MAX_OUTPUT_CHARS);
           return {
             content: [{ type: 'text', text: minifiedJson(gitResult) }],
             isError: true,
@@ -448,7 +461,9 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       };
       if (steps.length > 0) result.steps = steps;
       if (errors.length > 0) result.errors = errors;
-      result.output = truncateOutput(errorMsg, MAX_OUTPUT_CHARS);
+      result.output = params.verbose
+        ? truncateOutput(errorMsg, MAX_OUTPUT_CHARS)
+        : buildCompactOutput(errorMsg, MAX_OUTPUT_CHARS);
       return {
         content: [{ type: 'text', text: minifiedJson(result) }],
         isError: true,
