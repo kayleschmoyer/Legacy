@@ -90,6 +90,8 @@ These are the specific built-in tool substitutions agents should reach for autom
 
 Prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For affected targets, prefer `nx_run_affected` over `pnpm exec nx affected -t <target>`. Fall back to shell commands only when the MCP server is unavailable.
 
+> **Never invoke `node_modules/.bin/nx run …` or `jest` directly via Bash for test runs.** These bypass the MCP layer and fail when `node_modules/.bin/tsx` is missing (MCP server health-check warning at session start). Always use `nx_run` / `nx_run_affected` instead. Use `nx_show_projects` instead of `node_modules/.bin/nx show projects`. (LS-8078)
+
 | Shell command                                                                                                                            | MCP tool (use this)                                                                           |
 | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `pnpm exec nx typecheck web`                                                                                                             | `nx_run({ target: "typecheck", project: "web" })`                                             |
@@ -98,6 +100,11 @@ Prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For aff
 | `pnpm exec nx build api`                                                                                                                 | `nx_run({ target: "build", project: "api" })`                                                 |
 | `pnpm exec nx affected -t typecheck`                                                                                                     | `nx_run_affected({ targets: ["typecheck"] })`                                                 |
 | `pnpm exec nx affected -t test --base=main`                                                                                              | `nx_run_affected({ targets: ["test"], base: "main" })`                                        |
+| `node_modules/.bin/nx run db:test --testPathPattern=…`                                                                                   | `nx_run({ target: "test", project: "db", testPathPattern: "…" })`                             |
+| `node_modules/.bin/nx run shared-components:test --testPathPatterns=…`                                                                   | `nx_run({ target: "test", project: "shared-components", testPathPattern: "…" })`              |
+| `node_modules/.bin/jest "spec-name" --no-coverage` (direct jest invocation)                                                              | `nx_run({ target: "test", project: "<project>", testPathPattern: "spec-name" })`              |
+| `/home/user/legacy-sports/node_modules/.bin/jest "spec" --no-coverage` (absolute path)                                                   | `nx_run({ target: "test", project: "<project>", testPathPattern: "spec" })`                   |
+| `node_modules/.bin/nx show projects`                                                                                                     | `nx_show_projects({})`                                                                        |
 | `E2E_AUTH_MODE=ci E2E_PORT=4283 npx playwright test --config=apps/web-e2e/playwright.config.ts --project=chromium src/tests/foo.spec.ts` | `nx_run_e2e_specs({ specs: ["src/tests/foo.spec.ts"], project: "chromium" })`                 |
 | `make pc-typecheck` / `make pc-lint` / `make pc-build` (cloud or timeout-prone sessions)                                                 | `nx_run_pc_chunk({ chunk: "pc-typecheck" })` / `nx_run_pc_chunk({ chunk: "pc-lint" })` / etc. |
 
