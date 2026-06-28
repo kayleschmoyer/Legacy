@@ -48,7 +48,7 @@ Consolidated skill for running and fixing ESLint, TypeScript type checking, buil
 | Validate skills     | `make lint-skills`                          | Validates all `.agents/skills/` via `agentskills`                                                        |
 | Generate diagrams   | `make diagrams`                             | Mermaid `.mmd` → `.svg` under `.agents/skills/**/diagrams/`; requires `mmdc` (`@mermaid-js/mermaid-cli`) |
 
-> **MCP first**: prefer `nx_run` / `nx_run_affected` MCP tools over shell commands when available.
+> **MCP first**: prefer `nx_run` / `nx_run_affected` MCP tools over shell commands when available. For test runs specifically, **never** invoke `node_modules/.bin/nx run`, `node_modules/.bin/jest`, or absolute-path `jest` via Bash — use `nx_run({ target: "test", project: "…", testPathPattern?: "…" })`. Use `nx_show_projects` instead of `node_modules/.bin/nx show projects`. See `.agents/skills/mcp-first/SKILL.md` — Nx Targets for the full substitution table. (LS-8078)
 
 > **Always use `make` targets** -- they set `NODE_OPTIONS` for the Windows windowsHide patch.
 
