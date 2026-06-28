@@ -5,28 +5,13 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { readGitRemoteUrl } from './git-config.js';
+import { fetchWithRetry, sanitizeErrorBody } from './http-retry.js';
+
+export { sanitizeErrorBody } from './http-retry.js';
 
 const GITHUB_API = 'https://api.github.com';
 const DEFAULT_APP_ID = '3158619';
 const DEFAULT_INSTALLATION_ID = '118260223';
-
-/** Truncate API error bodies and redact potential auth tokens. */
-export function sanitizeErrorBody(text: string, maxLen = 500): string {
-  let sanitized = text
-    .replace(/Bearer\s+[A-Za-z0-9_\-.]+/gi, 'Bearer ***')
-    .replace(/Basic\s+[A-Za-z0-9+/=]+/gi, 'Basic ***')
-    .replace(/token\s+[A-Za-z0-9_\-.]+/gi, 'token ***')
-    .replace(/ghp_[A-Za-z0-9_]+/g, 'ghp_***')
-    .replace(/gho_[A-Za-z0-9_]+/g, 'gho_***')
-    .replace(/ghs_[A-Za-z0-9_]+/g, 'ghs_***')
-    .replace(/ghu_[A-Za-z0-9_]+/g, 'ghu_***')
-    .replace(/github_pat_[A-Za-z0-9_]+/g, 'github_pat_***');
-  if (sanitized.length > maxLen) {
-    const suffix = '... (truncated)';
-    sanitized = sanitized.slice(0, maxLen - suffix.length) + suffix;
-  }
-  return sanitized;
-}
 
 /** Resolve the repository root from this script's location (tools/mcp/ci-server/src/). */
 export function getRepoRoot(): string {
@@ -350,25 +335,22 @@ export async function githubGetText(path: string): Promise<string> {
  * Make a GET request to the GitHub REST API, returning the response as an ArrayBuffer.
  * Used for binary endpoints like Actions log downloads that return ZIP archives.
  * Follows redirects automatically (e.g., 302 from job log endpoints).
+ * Retries up to 3 times with exponential backoff on transient 5xx gateway errors (502/503/504).
  */
 export async function githubGetArrayBuffer(path: string): Promise<ArrayBuffer> {
   const { token, slug } = await ensureAuth();
   const url = `${GITHUB_API}/repos/${slug}${path}`;
-
-  const res = await fetch(url, {
-    headers: {
-      ...buildHeaders(token),
-      Accept: 'application/vnd.github+json',
+  return fetchWithRetry(
+    url,
+    {
+      headers: {
+        ...buildHeaders(token),
+        Accept: 'application/vnd.github+json',
+      },
     },
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
-  }
-
-  logRateLimit(res, `GET ${path} (arraybuffer)`);
-  return res.arrayBuffer();
+    logRateLimit,
+    `GET ${path} (arraybuffer)`,
+  );
 }
 
 /** Make a PUT request to the GitHub REST API. Used for state-toggling endpoints (e.g. workflow enable/disable). */

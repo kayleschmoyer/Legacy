@@ -59,7 +59,10 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
           `[get-job-logs] skipping ZIP entry: uncompressed size ${uncompressedSize} exceeds ${MAX_UNCOMPRESSED_ENTRY_BYTES} byte limit\n`,
         );
       } else {
-        const compressed = data.subarray(dataOffset, dataOffset + compressedSize);
+        const compressed = data.subarray(
+          dataOffset,
+          dataOffset + compressedSize,
+        );
         try {
           if (compressionMethod === 8) {
             texts.push(inflateRawSync(compressed).toString('utf-8'));
