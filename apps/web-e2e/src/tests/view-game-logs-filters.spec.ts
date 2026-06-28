@@ -29,8 +29,9 @@ test.describe('View Game Logs — Opponent + Home/Away filters @regression', () 
     page,
   }) => {
     const options = page.locator('[data-testid="opponent-filter"] option');
-    // 30 MLB teams + the "All opponents" placeholder.
-    await expect(options).toHaveCount(31);
+    // Premium users see exactly 30 options (the 30 MLB teams); no "All opponents"
+    // placeholder is added because the select becomes multi-select for premium.
+    await expect(options).toHaveCount(30);
   });
 
   test('selecting an opponent + Home toggle posts the combined filter (LS-7466, LS-7467)', async ({
