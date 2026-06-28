@@ -1,7 +1,7 @@
 import React from 'react';
 import type { TradeOfferFragment } from '@legacy-sports/graphql';
 import { getVerdict, PremiumTradeTools, tradeValue } from './PremiumTradeTools';
-import { render } from '../../test-utils';
+import { render, waitFor } from '../../test-utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -219,6 +219,56 @@ describe('PremiumTradeTools — null / undefined TradeOfferFragment fields', () 
 });
 
 // ---------------------------------------------------------------------------
+// PremiumTradeTools — collapsible toggle (AC5)
+// ---------------------------------------------------------------------------
+
+describe('PremiumTradeTools — collapsible toggle', () => {
+  it('is collapsed by default and shows no content', () => {
+    const { queryByTestId } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[]}
+        isPremium
+      />,
+    );
+    expect(queryByTestId('premium-trade-tools-gate')).toBeNull();
+    expect(queryByTestId('value-calculator')).toBeNull();
+    expect(queryByTestId('trade-analyzer-empty')).toBeNull();
+  });
+
+  it('expands to show content when header is clicked', async () => {
+    const { findByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    // Tab bar is visible after expansion
+    expect(await findByText('Trade Analyzer')).toBeTruthy();
+    expect(await findByText('Value Calculator')).toBeTruthy();
+  });
+
+  it('collapses again when header is clicked a second time', async () => {
+    const { findByText, queryByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[]}
+        isPremium
+      />,
+    );
+    const header = await findByText('Premium Trade Tools');
+    header.click(); // expand
+    // Verify expanded (tab bar visible)
+    expect(await findByText('Trade Analyzer')).toBeTruthy();
+    header.click(); // collapse
+    // Tab bar disappears
+    await waitFor(() => expect(queryByText('Trade Analyzer')).toBeNull());
+  });
+});
+
+// ---------------------------------------------------------------------------
 // PremiumTradeTools — premium gate
 // ---------------------------------------------------------------------------
 
@@ -264,5 +314,201 @@ describe('PremiumTradeTools — premium gate', () => {
     const btn = (await findByText('Upgrade to Premium')).closest('button');
     btn?.click();
     expect(onUpgrade).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PremiumTradeTools — Trade Analyzer (AC3)
+// ---------------------------------------------------------------------------
+
+describe('PremiumTradeTools — Trade Analyzer', () => {
+  const offer = makeOffer({
+    id: 42,
+    proposingTeamName: 'Sluggers',
+    players: [
+      {
+        __typename: 'TradeOfferPlayer',
+        id: 1,
+        tradeOfferId: 42,
+        playerId: 10,
+        fromTeamId: OTHER_TEAM_ID,
+        playerName: 'Mike Trout',
+        playerPosition: 'CF', // 7.0 — "You Get" side
+      },
+      {
+        __typename: 'TradeOfferPlayer',
+        id: 2,
+        tradeOfferId: 42,
+        playerId: 20,
+        fromTeamId: USER_TEAM_ID,
+        playerName: 'Shohei Ohtani',
+        playerPosition: 'SP', // 8.5 — "You Give" side
+      },
+    ],
+  });
+
+  it('shows empty state when there are no pending trades', async () => {
+    const { findByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    expect(await findByText(/No pending trade offers to analyze/)).toBeTruthy();
+  });
+
+  it('lists pending offers by counterpart team name', async () => {
+    const { findByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    expect(await findByText('Sluggers')).toBeTruthy();
+  });
+
+  it('shows value breakdown and verdict badge when an offer is selected', async () => {
+    const { findByText, findByTestId } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    // Select the offer
+    (await findByText('Sluggers')).click();
+    // Player names and verdict badge are visible
+    expect(await findByText('Mike Trout')).toBeTruthy();
+    expect(await findByText('Shohei Ohtani')).toBeTruthy();
+    expect(await findByTestId('trade-verdict')).toBeTruthy();
+  });
+
+  it('deselects the offer and hides the analysis when clicked again', async () => {
+    const { findByText, queryByTestId } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    const offerBtn = await findByText('Sluggers');
+    offerBtn.click(); // select
+    offerBtn.click(); // deselect
+    expect(queryByTestId('trade-verdict')).toBeNull();
+  });
+
+  it('displays player names in the value breakdown', async () => {
+    const { findByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[offer]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    (await findByText('Sluggers')).click();
+    expect(await findByText('Mike Trout')).toBeTruthy();
+    expect(await findByText('Shohei Ohtani')).toBeTruthy();
+  });
+
+  it('renders the correct verdict label for a strongly unfavorable trade', async () => {
+    // Giving SP (8.5), getting RP (6.0) — >20% loss → strong-edge-them
+    const unfavorableOffer = makeOffer({
+      id: 99,
+      proposingTeamName: 'Rivals',
+      players: [
+        {
+          __typename: 'TradeOfferPlayer',
+          id: 10,
+          tradeOfferId: 99,
+          playerId: 30,
+          fromTeamId: USER_TEAM_ID,
+          playerName: 'Ace Pitcher',
+          playerPosition: 'SP', // 8.5 give
+        },
+        {
+          __typename: 'TradeOfferPlayer',
+          id: 11,
+          tradeOfferId: 99,
+          playerId: 31,
+          fromTeamId: OTHER_TEAM_ID,
+          playerName: 'Reliever',
+          playerPosition: 'RP', // 6.0 get
+        },
+      ],
+    });
+    const { findByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[unfavorableOffer]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    (await findByText('Rivals')).click();
+    expect(await findByText('Strong edge for the other team')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PremiumTradeTools — Value Calculator (AC4)
+// ---------------------------------------------------------------------------
+
+describe('PremiumTradeTools — Value Calculator', () => {
+  it('shows baseball positions by default', async () => {
+    const { findByText, findByTestId } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    (await findByText('Value Calculator')).click();
+    const calc = await findByTestId('value-calculator');
+    expect(calc).toBeTruthy();
+    // Baseball positions are visible by default
+    expect(await findByText('Starting Pitcher')).toBeTruthy();
+    expect(await findByText('Shortstop')).toBeTruthy();
+  });
+
+  it('switches to football positions when football toggle is pressed', async () => {
+    const { findByText, queryByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    (await findByText('Value Calculator')).click();
+    (await findByText('football')).click();
+    // Football positions are shown
+    expect(await findByText('Quarterback')).toBeTruthy();
+    expect(await findByText('Running Back')).toBeTruthy();
+    // Baseball positions are gone
+    expect(queryByText('Starting Pitcher')).toBeNull();
+  });
+
+  it('switches back to baseball positions when baseball toggle is re-pressed', async () => {
+    const { findByText, queryByText } = render(
+      <PremiumTradeTools
+        userTeamId={USER_TEAM_ID}
+        pendingTrades={[]}
+        isPremium
+      />,
+    );
+    (await findByText('Premium Trade Tools')).click();
+    (await findByText('Value Calculator')).click();
+    (await findByText('football')).click();
+    (await findByText('baseball')).click();
+    expect(await findByText('Starting Pitcher')).toBeTruthy();
+    expect(queryByText('Quarterback')).toBeNull();
   });
 });
