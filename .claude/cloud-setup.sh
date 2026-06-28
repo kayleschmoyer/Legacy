@@ -68,7 +68,38 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Deepen the shallow clone so origin/main merge-base exists
+# 3. Install git-lfs
+# ---------------------------------------------------------------------------
+# The repo's pre-push hook (installed by `make setup-hooks`) requires
+# git-lfs to be on PATH — every push fails with exit 2 when it is absent,
+# even for diffs that contain no LFS-tracked files (LS-8140).
+#
+# apt-get update is run before the install so the package index is current
+# even when the gh install above was skipped (because gh was already present).
+# LS-8199 tracks the case where apt is unreachable and adds a static-binary
+# fallback + post-install verification on top of this baseline step.
+if ! command -v git-lfs &>/dev/null; then
+  echo "Installing git-lfs..."
+  apt-get update -qq 2>&1 | tail -1
+  if apt-get install -y -qq git-lfs 2>&1 | tail -1 && command -v git-lfs &>/dev/null; then
+    echo "git-lfs $(git-lfs version) installed"
+  else
+    echo "WARNING: git-lfs install failed; pushes will fail if the pre-push hook requires it"
+    echo "  Workaround: git push --no-verify (requires user approval in auto-mode)"
+    echo "  Permanent fix: see LS-8199 for static-binary fallback"
+  fi
+else
+  echo "git-lfs already installed: $(git-lfs version)"
+fi
+
+# Register lfs filters so smudge/clean work; --skip-smudge avoids downloading
+# LFS objects on clone, keeping cloud sessions lean.
+if command -v git-lfs &>/dev/null; then
+  git lfs install --skip-smudge --force 2>/dev/null || true
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Deepen the shallow clone so origin/main merge-base exists
 # ---------------------------------------------------------------------------
 # Cloud sessions start with a shallow clone. Without shared history,
 # `git diff origin/main...HEAD` fails with "no merge base", causing make pc
@@ -96,7 +127,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Install Node.js dependencies
+# 5. Install Node.js dependencies
 # ---------------------------------------------------------------------------
 # Required for `make pc` (lint, typecheck, test, build) on code changes.
 # Uses corepack to activate the correct pnpm version, then installs deps.
@@ -117,7 +148,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
+# 6. Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
 # ---------------------------------------------------------------------------
 # In cloud sessions, git remote URLs may be proxy URLs that don't expose the
 # real GitHub owner/repo. These env vars let the MCP server skip remote
