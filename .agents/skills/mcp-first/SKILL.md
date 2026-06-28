@@ -211,7 +211,7 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 
 ## CI Operations
 
-Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, `ci_rerun`, `ci_rerun_failed_jobs`, and `ci_retry_failed` instead of `gh run` commands via Bash. These tools parse and structure log output for agent consumption. When the triage path is "this run failed → rerun the failed jobs", prefer the semantic one-shot `ci_retry_failed({ runId })` — it returns the failed-job list and an error-pattern snippet from the original logs in the same call.
+Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, `ci_rerun`, `ci_rerun_failed_jobs`, and `ci_retry_failed` instead of `gh run` commands via Bash. `ci_list_runs` accepts `limit` up to 100 (default 10). These tools parse and structure log output for agent consumption. When the triage path is "this run failed → rerun the failed jobs", prefer the semantic one-shot `ci_retry_failed({ runId })` — it returns the failed-job list and an error-pattern snippet from the original logs in the same call.
 
 **`ci_get_logs` transient 502/503/504 errors**: the log-blob fetch path retries automatically (3 attempts, exponential backoff) as of LS-8218. If `ci_get_logs` still fails after retries, use `get_job_logs` via `legacy-sports-github` as a fallback (see table below).
 

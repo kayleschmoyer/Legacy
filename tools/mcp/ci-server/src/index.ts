@@ -148,9 +148,9 @@ export function createServer(): McpServer {
         .number()
         .int()
         .positive()
-        .max(25)
+        .max(100)
         .default(10)
-        .describe('Max results (default: 10, max: 25)'),
+        .describe('Max results (default: 10, max: 100)'),
     },
     async (params) => listRuns(params),
   );
