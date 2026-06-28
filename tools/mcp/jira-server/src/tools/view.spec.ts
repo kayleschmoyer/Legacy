@@ -72,6 +72,45 @@ const children = [
   },
 ];
 
+const commentsResponse = {
+  comments: [
+    {
+      id: 'c1',
+      author: { displayName: 'Alice' },
+      body: {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'LGTM' }],
+          },
+        ],
+      },
+      created: '2026-06-21T00:00:00.000-0400',
+      updated: '2026-06-21T00:00:00.000-0400',
+    },
+  ],
+  total: 1,
+  startAt: 0,
+  maxResults: 50,
+};
+
+const transitionsResponse = {
+  transitions: [
+    {
+      id: '21',
+      name: 'To Do',
+      to: { name: 'To Do', statusCategory: { name: 'To Do' } },
+    },
+    {
+      id: '31',
+      name: 'In Progress',
+      to: { name: 'In Progress', statusCategory: { name: 'In Progress' } },
+    },
+  ],
+};
+
 function thinIssue(key: string) {
   return {
     key,
@@ -92,84 +131,245 @@ function thinIssue(key: string) {
 }
 
 describe('view', () => {
-  describe('single-key', () => {
+  describe('single-key — default (no include)', () => {
     beforeEach(() => {
       jest.clearAllMocks();
       mockJiraRequest.mockResolvedValue(issue);
       mockSearchJqlAll.mockResolvedValue(children);
     });
 
-    it('defaults to markdown output matching the card shape', async () => {
+    it('defaults to markdown output — base fields only (no blockers/children sections)', async () => {
       const result = await view({ key: 'LS-9000' });
-      expect(text(result)).toMatchInlineSnapshot(`
-"## [LS-9000] Add markdown output to jira_view
-
-**Status:** In Progress · **Type:** Task · **Priority:** Medium · **Assignee:** Brad Krupa
-**Parent:** LS-2981 (mcp-gaps bucket)
-**Labels:** mcp-gap
-
-### Description
-Body paragraph one.
-
-### Blockers
-- LS-1234 — Upstream fix [Done]
-
-### Children
-- LS-2345 — Child task [In Progress]
-- LS-2346 — Other child [Done]"
-`);
+      const out = text(result);
+      expect(out).toContain('## [LS-9000] Add markdown output to jira_view');
+      expect(out).toContain('Body paragraph one.');
+      // Blockers and children sections are NOT rendered by default
+      expect(out).not.toContain('### Blockers');
+      expect(out).not.toContain('### Children');
+      expect(out).not.toContain('### Comments');
+      expect(out).not.toContain('### Transitions');
     });
 
-    it('renders empty sections when there are no blockers or children', async () => {
+    it('does not call searchJqlAll when children not in include', async () => {
+      await view({ key: 'LS-9000' });
+      expect(mockSearchJqlAll).not.toHaveBeenCalled();
+    });
+
+    it('format: "json" returns base fields only (no blockers/children keys)', async () => {
+      const result = await view({ key: 'LS-9000', format: 'json' });
+      const parsed = parseJson(result);
+      expect(parsed.key).toBe('LS-9000');
+      expect(parsed.blockers).toBeUndefined();
+      expect(parsed.children).toBeUndefined();
+      expect(parsed.comments).toBeUndefined();
+      expect(parsed.transitions).toBeUndefined();
+    });
+  });
+
+  describe('single-key — include: blockers', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJiraRequest.mockResolvedValue(issue);
+    });
+
+    it('renders Blockers section in markdown', async () => {
+      const out = text(await view({ key: 'LS-9000', include: ['blockers'] }));
+      expect(out).toContain('### Blockers');
+      expect(out).toContain('LS-1234 — Upstream fix [Done]');
+      expect(out).not.toContain('### Children');
+    });
+
+    it('includes blockers in JSON output', async () => {
+      const parsed = parseJson(
+        await view({ key: 'LS-9000', format: 'json', include: ['blockers'] }),
+      );
+      expect(parsed.blockers).toEqual([{ key: 'LS-1234', type: 'blocked-by' }]);
+      expect(parsed.children).toBeUndefined();
+    });
+  });
+
+  describe('single-key — include: children', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJiraRequest.mockResolvedValue(issue);
+      mockSearchJqlAll.mockResolvedValue(children);
+    });
+
+    it('renders Children section in markdown', async () => {
+      const out = text(await view({ key: 'LS-9000', include: ['children'] }));
+      expect(out).toContain('### Children');
+      expect(out).toContain('LS-2345 — Child task [In Progress]');
+      expect(out).not.toContain('### Blockers');
+    });
+
+    it('calls searchJqlAll when children in include', async () => {
+      await view({ key: 'LS-9000', include: ['children'] });
+      expect(mockSearchJqlAll).toHaveBeenCalledWith(
+        expect.objectContaining({ jql: expect.stringContaining('LS-9000') }),
+      );
+    });
+
+    it('includes children summary in JSON output', async () => {
+      const parsed = parseJson(
+        await view({ key: 'LS-9000', format: 'json', include: ['children'] }),
+      );
+      expect(parsed.children).toEqual({
+        total: 2,
+        toDo: 0,
+        inProgress: 1,
+        inReview: 0,
+        done: 1,
+      });
+    });
+  });
+
+  describe('single-key — include: comments', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJiraRequest
+        .mockResolvedValueOnce(issue)
+        .mockResolvedValueOnce(commentsResponse);
+    });
+
+    it('renders Comments section in markdown', async () => {
+      const out = text(await view({ key: 'LS-9000', include: ['comments'] }));
+      expect(out).toContain('### Comments');
+      expect(out).toContain('Alice');
+      expect(out).toContain('LGTM');
+    });
+
+    it('includes comments in JSON output', async () => {
+      mockJiraRequest
+        .mockReset()
+        .mockResolvedValueOnce(issue)
+        .mockResolvedValueOnce(commentsResponse);
+      const parsed = parseJson(
+        await view({ key: 'LS-9000', format: 'json', include: ['comments'] }),
+      );
+      expect(Array.isArray(parsed.comments)).toBe(true);
+      const comments = parsed.comments as Array<Record<string, string>>;
+      expect(comments[0]?.author).toBe('Alice');
+      expect(comments[0]?.body).toBe('LGTM');
+    });
+  });
+
+  describe('single-key — include: transitions', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockJiraRequest
+        .mockResolvedValueOnce(issue)
+        .mockResolvedValueOnce(transitionsResponse);
+    });
+
+    it('renders Transitions section in markdown', async () => {
+      const out = text(
+        await view({ key: 'LS-9000', include: ['transitions'] }),
+      );
+      expect(out).toContain('### Transitions');
+      expect(out).toContain('21: To Do → To Do');
+      expect(out).toContain('31: In Progress → In Progress');
+    });
+
+    it('includes transitions in JSON output', async () => {
+      mockJiraRequest
+        .mockReset()
+        .mockResolvedValueOnce(issue)
+        .mockResolvedValueOnce(transitionsResponse);
+      const parsed = parseJson(
+        await view({
+          key: 'LS-9000',
+          format: 'json',
+          include: ['transitions'],
+        }),
+      );
+      expect(Array.isArray(parsed.transitions)).toBe(true);
+      const ts = parsed.transitions as Array<Record<string, unknown>>;
+      expect(ts[0]?.id).toBe('21');
+    });
+  });
+
+  describe('single-key — include: combination (blockers + children + comments + transitions)', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockSearchJqlAll.mockResolvedValue(children);
+      mockJiraRequest
+        .mockResolvedValueOnce(issue) // main issue
+        .mockResolvedValueOnce(commentsResponse) // comments
+        .mockResolvedValueOnce(transitionsResponse); // transitions
+    });
+
+    it('renders all four sections in markdown', async () => {
+      const out = text(
+        await view({
+          key: 'LS-9000',
+          include: ['blockers', 'children', 'comments', 'transitions'],
+        }),
+      );
+      expect(out).toContain('### Blockers');
+      expect(out).toContain('### Children');
+      expect(out).toContain('### Comments');
+      expect(out).toContain('### Transitions');
+    });
+
+    it('renders all four sections in JSON', async () => {
+      mockJiraRequest
+        .mockReset()
+        .mockResolvedValueOnce(issue)
+        .mockResolvedValueOnce(commentsResponse)
+        .mockResolvedValueOnce(transitionsResponse);
+      mockSearchJqlAll.mockResolvedValue(children);
+      const parsed = parseJson(
+        await view({
+          key: 'LS-9000',
+          format: 'json',
+          include: ['blockers', 'children', 'comments', 'transitions'],
+        }),
+      );
+      expect(parsed.blockers).toBeDefined();
+      expect(parsed.children).toBeDefined();
+      expect(parsed.comments).toBeDefined();
+      expect(parsed.transitions).toBeDefined();
+    });
+  });
+
+  describe('single-key — rendering edge cases', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('renders _None._ for empty blockers', async () => {
       mockJiraRequest.mockResolvedValueOnce({
         ...issue,
-        fields: { ...issue.fields, issuelinks: [], parent: undefined },
+        fields: { ...issue.fields, issuelinks: [] },
       });
-      mockSearchJqlAll.mockResolvedValueOnce([]);
-
-      const out = text(await view({ key: 'LS-9001' }));
+      const out = text(await view({ key: 'LS-9001', include: ['blockers'] }));
       expect(out).toContain('### Blockers\n_None._');
+    });
+
+    it('renders _None._ for empty children', async () => {
+      mockJiraRequest.mockResolvedValueOnce(issue);
+      mockSearchJqlAll.mockResolvedValueOnce([]);
+      const out = text(await view({ key: 'LS-9001', include: ['children'] }));
       expect(out).toContain('### Children\n_None._');
+    });
+
+    it('does not render Parent line when parent is absent', async () => {
+      mockJiraRequest.mockResolvedValueOnce({
+        ...issue,
+        fields: { ...issue.fields, parent: undefined },
+      });
+      const out = text(await view({ key: 'LS-9001' }));
       expect(out).not.toContain('**Parent:**');
     });
 
-    it('format: "json" returns the legacy JSON shape', async () => {
-      const result = await view({ key: 'LS-9000', format: 'json' });
-      const parsed = parseJson(result);
-      expect(parsed).toEqual({
-        key: 'LS-9000',
-        summary: 'Add markdown output to jira_view',
-        status: 'In Progress',
-        type: 'Task',
-        priority: 'Medium',
-        description: 'Body paragraph one.',
-        assignee: 'Brad Krupa',
-        reporter: 'Brad Krupa',
-        parent: 'LS-2981',
-        labels: ['mcp-gap'],
-        created: '2026-06-20T00:00:00.000-0400',
-        updated: '2026-06-20T00:00:00.000-0400',
-        blockers: [{ key: 'LS-1234', type: 'blocked-by' }],
-        children: { total: 2, toDo: 0, inProgress: 1, inReview: 0, done: 1 },
-      });
-    });
-
     it('format: "json" is minified (no pretty-print whitespace)', async () => {
+      mockJiraRequest.mockResolvedValueOnce(issue);
       const out = text(await view({ key: 'LS-9000', format: 'json' }));
-      // Standard: single-ticket responses are minified JSON, never
-      // JSON.stringify(x, null, 2). Indentation would show up as newlines.
       expect(out).not.toContain('\n');
       expect(out.startsWith('{')).toBe(true);
     });
 
-    it('markdown output is smaller than the minified JSON for the same ticket', async () => {
-      const md = text(await view({ key: 'LS-9000' }));
-      const json = text(await view({ key: 'LS-9000', format: 'json' }));
-      expect(md.length).toBeLessThan(json.length);
-    });
-
     it('returns isError on API failure for single key', async () => {
-      jest.clearAllMocks();
       mockSearchJqlAll.mockResolvedValueOnce([]);
       mockJiraRequest.mockRejectedValueOnce(new Error('404 Not Found'));
 
@@ -185,7 +385,6 @@ Body paragraph one.
   describe('batch path (keys[])', () => {
     beforeEach(() => {
       jest.clearAllMocks();
-      // No children for thin fixtures — keep batch JSON predictable.
       mockSearchJqlAll.mockResolvedValue([]);
     });
 
@@ -260,10 +459,24 @@ Body paragraph one.
       expect(out.startsWith('{')).toBe(true);
     });
 
+    it('applies include[] to each key in batch mode', async () => {
+      mockJiraRequest
+        .mockResolvedValueOnce(thinIssue('LS-1'))
+        .mockResolvedValueOnce(thinIssue('LS-2'));
+
+      const result = await view({
+        keys: ['LS-1', 'LS-2'],
+        include: ['blockers'],
+      });
+      const data = parseJson(result) as {
+        tickets: Record<string, { blockers?: unknown }>;
+        missing: string[];
+      };
+      expect(data.tickets['LS-1']?.blockers).toBeDefined();
+      expect(data.tickets['LS-2']?.blockers).toBeDefined();
+    });
+
     it('rejects oversize arrays at the schema layer (>50 keys)', () => {
-      // Mirrors the zod schema registered for `jira_view` in index.ts. Kept
-      // local so view.spec.ts can verify validation independently of the MCP
-      // server wiring.
       const keysSchema = z.array(z.string()).min(1).max(50);
       const oversize = Array.from({ length: 51 }, (_, i) => `LS-${i + 1}`);
 

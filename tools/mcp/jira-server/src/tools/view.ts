@@ -1,13 +1,24 @@
-import { minifiedJson } from '@legacy-sports/mcp-format';
+import {
+  minifiedJson,
+  markdownTable,
+  pickFields,
+} from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
 import { matchesStatus } from '../locale.js';
+import { COMMENT_COLUMNS } from '../format.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
+export type IncludeOption =
+  | 'comments'
+  | 'transitions'
+  | 'blockers'
+  | 'children';
+
 export type ViewParams =
-  | { key: string; format?: 'markdown' | 'json' }
-  | { keys: string[] };
+  | { key: string; format?: 'markdown' | 'json'; include?: IncludeOption[] }
+  | { keys: string[]; include?: IncludeOption[] };
 
 interface JiraIssueLink {
   type: { name: string; inward: string };
@@ -56,6 +67,20 @@ interface ChildCounts {
   done: number;
 }
 
+interface CommentInfo {
+  [field: string]: unknown;
+  id: string;
+  author: string;
+  created: string;
+  body: string;
+}
+
+interface TransitionInfo {
+  id: string;
+  name: string;
+  to: { name: string; statusCategory: string };
+}
+
 interface Ticket {
   key: string;
   summary: string;
@@ -70,8 +95,10 @@ interface Ticket {
   labels: string[];
   created: string;
   updated: string;
-  blockers: BlockerInfo[];
-  children: ChildInfo[];
+  blockers?: BlockerInfo[];
+  children?: ChildInfo[];
+  comments?: CommentInfo[];
+  transitions?: TransitionInfo[];
 }
 
 /** Extract blocker keys (and, when expanded, summary/status) from issue links. */
@@ -100,6 +127,69 @@ function summarizeChildren(children: ChildInfo[]): ChildCounts {
     else counts.toDo++;
   }
   return { total: children.length, ...counts };
+}
+
+async function fetchCommentsForKey(key: string): Promise<CommentInfo[]> {
+  interface JiraComment {
+    id: string;
+    author: { displayName: string };
+    body: unknown;
+    created: string;
+  }
+  interface JiraCommentsResponse {
+    comments: JiraComment[];
+    total: number;
+  }
+
+  const allComments: JiraComment[] = [];
+  let startAt = 0;
+  const maxResults = 50;
+  let total = Infinity;
+
+  while (allComments.length < total) {
+    const result = await jiraRequest<JiraCommentsResponse>({
+      method: 'GET',
+      path: `/rest/api/3/issue/${key}/comment`,
+      query: {
+        orderBy: 'created',
+        startAt: String(startAt),
+        maxResults: String(maxResults),
+      },
+    });
+    total = result.total;
+    allComments.push(...result.comments);
+    startAt += result.comments.length;
+    if (result.comments.length === 0) break;
+  }
+
+  return allComments.map((c) => ({
+    id: c.id,
+    author: c.author.displayName,
+    created: c.created,
+    body: extractAdfText(c.body),
+  }));
+}
+
+async function fetchTransitionsForKey(key: string): Promise<TransitionInfo[]> {
+  interface JiraTransition {
+    id: string;
+    name: string;
+    to: { name: string; statusCategory: { name: string } };
+  }
+  interface TransitionsResponse {
+    transitions: JiraTransition[];
+  }
+
+  const { transitions } = await jiraRequest<TransitionsResponse>({
+    method: 'GET',
+    path: `/rest/api/3/issue/${key}/transitions`,
+  });
+
+  return transitions.map((t) => ({
+    id: t.id,
+    name: t.name,
+    to: { name: t.to.name, statusCategory: t.to.statusCategory.name },
+  }));
 }
 
 /** Render the ticket as the markdown card defined in LS-8173. */
@@ -131,25 +221,55 @@ export function renderMarkdown(ticket: Ticket): string {
   lines.push('### Description');
   lines.push(ticket.description.trim() || '_No description._');
 
-  lines.push('');
-  lines.push('### Blockers');
-  if (ticket.blockers.length === 0) {
-    lines.push('_None._');
-  } else {
-    for (const b of ticket.blockers) {
-      const summary = b.summary ? ` — ${b.summary}` : '';
-      const status = b.status ? ` [${b.status}]` : '';
-      lines.push(`- ${b.key}${summary}${status}`);
+  if (ticket.blockers !== undefined) {
+    lines.push('');
+    lines.push('### Blockers');
+    if (ticket.blockers.length === 0) {
+      lines.push('_None._');
+    } else {
+      for (const b of ticket.blockers) {
+        const summary = b.summary ? ` — ${b.summary}` : '';
+        const status = b.status ? ` [${b.status}]` : '';
+        lines.push(`- ${b.key}${summary}${status}`);
+      }
     }
   }
 
-  lines.push('');
-  lines.push('### Children');
-  if (ticket.children.length === 0) {
-    lines.push('_None._');
-  } else {
-    for (const c of ticket.children) {
-      lines.push(`- ${c.key} — ${c.summary} [${c.status}]`);
+  if (ticket.children !== undefined) {
+    lines.push('');
+    lines.push('### Children');
+    if (ticket.children.length === 0) {
+      lines.push('_None._');
+    } else {
+      for (const c of ticket.children) {
+        lines.push(`- ${c.key} — ${c.summary} [${c.status}]`);
+      }
+    }
+  }
+
+  if (ticket.transitions !== undefined) {
+    lines.push('');
+    lines.push('### Transitions');
+    if (ticket.transitions.length === 0) {
+      lines.push('_None._');
+    } else {
+      for (const t of ticket.transitions) {
+        lines.push(`- ${t.id}: ${t.name} → ${t.to.name}`);
+      }
+    }
+  }
+
+  if (ticket.comments !== undefined) {
+    lines.push('');
+    lines.push('### Comments');
+    if (ticket.comments.length === 0) {
+      lines.push('_No comments._');
+    } else {
+      lines.push(
+        markdownTable(pickFields(ticket.comments, COMMENT_COLUMNS), {
+          columns: COMMENT_COLUMNS,
+        }),
+      );
     }
   }
 
@@ -171,41 +291,64 @@ function ticketToJson(ticket: Ticket): Record<string, unknown> {
     labels: ticket.labels,
     created: ticket.created,
     updated: ticket.updated,
-    blockers: ticket.blockers.map((b) => ({ key: b.key, type: b.type })),
   };
-  if (ticket.children.length > 0) {
+  if (ticket.blockers !== undefined) {
+    json.blockers = ticket.blockers.map((b) => ({ key: b.key, type: b.type }));
+  }
+  if (ticket.children !== undefined && ticket.children.length > 0) {
     json.children = summarizeChildren(ticket.children);
+  }
+  if (ticket.comments !== undefined) {
+    json.comments = pickFields(ticket.comments, COMMENT_COLUMNS);
+  }
+  if (ticket.transitions !== undefined) {
+    json.transitions = ticket.transitions;
   }
   return json;
 }
 
-/** Fetch and assemble a single ticket. Throws on failure. */
-async function fetchTicket(key: string): Promise<Ticket> {
-  // Fetch issue details and child issues concurrently to reduce latency.
-  // Child search materializes full issue objects but only summary + status
-  // are used. Epics rarely exceed 100 children and the Jira search API does
-  // not support returning only aggregated counts.
-  const [issue, childResult] = await Promise.all([
-    jiraRequest<JiraIssueResponse>({
-      method: 'GET',
-      path: `/rest/api/3/issue/${key}`,
-      query: {
-        fields:
-          'summary,status,issuetype,description,assignee,reporter,parent,issuelinks,labels,priority,created,updated',
-      },
-    }),
-    searchJqlAll<{ summary: string; status: { name: string } }>({
-      jql: `parent = ${JSON.stringify(key)}`,
-      fields: ['summary', 'status'],
-      maxResults: 100,
-    }).catch(() => undefined as undefined), // Non-critical — omit on error
-  ]);
+/** Fetch and assemble a single ticket, with optional sub-resources. */
+async function fetchTicket(
+  key: string,
+  include: IncludeOption[] = [],
+): Promise<Ticket> {
+  const wantChildren = include.includes('children');
+  const wantBlockers = include.includes('blockers');
+  const wantComments = include.includes('comments');
+  const wantTransitions = include.includes('transitions');
 
-  const children: ChildInfo[] = (childResult ?? []).map((c) => ({
-    key: c.key,
-    summary: c.fields.summary,
-    status: c.fields.status.name,
-  }));
+  const [issue, childResult, commentResult, transitionResult] =
+    await Promise.all([
+      jiraRequest<JiraIssueResponse>({
+        method: 'GET',
+        path: `/rest/api/3/issue/${key}`,
+        query: {
+          fields:
+            'summary,status,issuetype,description,assignee,reporter,parent,issuelinks,labels,priority,created,updated',
+        },
+      }),
+      wantChildren
+        ? searchJqlAll<{ summary: string; status: { name: string } }>({
+            jql: `parent = ${JSON.stringify(key)}`,
+            fields: ['summary', 'status'],
+            maxResults: 100,
+          }).catch(() => undefined as undefined)
+        : Promise.resolve(undefined),
+      wantComments
+        ? fetchCommentsForKey(key).catch(() => undefined as undefined)
+        : Promise.resolve(undefined),
+      wantTransitions
+        ? fetchTransitionsForKey(key).catch(() => undefined as undefined)
+        : Promise.resolve(undefined),
+    ]);
+
+  const children: ChildInfo[] | undefined = wantChildren
+    ? (childResult ?? []).map((c) => ({
+        key: c.key,
+        summary: c.fields.summary,
+        status: c.fields.status.name,
+      }))
+    : undefined;
 
   return {
     key: issue.key,
@@ -221,26 +364,42 @@ async function fetchTicket(key: string): Promise<Ticket> {
     labels: issue.fields.labels,
     created: issue.fields.created,
     updated: issue.fields.updated,
-    blockers: extractBlockers(issue.fields.issuelinks),
+    blockers: wantBlockers
+      ? extractBlockers(issue.fields.issuelinks)
+      : undefined,
     children,
+    comments: commentResult,
+    transitions: transitionResult,
   };
 }
 
 /**
  * View ticket details via REST API.
  *
- * Single-key mode (`{ key, format? }`): returns the markdown card by default,
- * or the legacy JSON shape when `format: 'json'`.
- * Batch mode (`{ keys }`): fetches up to 50 tickets in parallel and returns
- * `{ tickets: { [key]: <ticket-json> }, missing: [key, ...] }`. Per-key
- * failures (404, transient errors) are isolated to `missing[]`; the call as a
- * whole still succeeds so partial results are not lost. Batch always emits
- * the JSON shape per ticket — markdown is reserved for single-ticket reads.
+ * Single-key mode (`{ key, format?, include? }`): returns the markdown card by
+ * default, or the legacy JSON shape when `format: 'json'`.
+ *
+ * Batch mode (`{ keys, include? }`): fetches up to 50 tickets in parallel and
+ * returns `{ tickets: { [key]: <ticket-json> }, missing: [key, ...] }`.
+ *
+ * `include` controls which sub-resources are fetched alongside base fields:
+ * - `'blockers'` — linked blocker issues (extracted from issue links, no extra API call)
+ * - `'children'` — child issues (one JQL query per key)
+ * - `'comments'` — all comments ordered by creation date (one API call per key)
+ * - `'transitions'` — available workflow transitions (one API call per key)
+ *
+ * Default (include omitted) returns base fields only.
+ * Each key in batch mode resolves the same include[].
+ * Per-key failures are isolated to `missing[]`; the call as a whole succeeds.
  */
 export async function view(params: ViewParams): Promise<CallToolResult> {
+  const include = params.include ?? [];
+
   if ('keys' in params) {
     const { keys } = params;
-    const results = await Promise.allSettled(keys.map((k) => fetchTicket(k)));
+    const results = await Promise.allSettled(
+      keys.map((k) => fetchTicket(k, include)),
+    );
     const tickets: Record<string, Record<string, unknown>> = {};
     const missing: string[] = [];
     keys.forEach((key, i) => {
@@ -263,7 +422,7 @@ export async function view(params: ViewParams): Promise<CallToolResult> {
 
   const { key, format = 'markdown' } = params;
   try {
-    const ticket = await fetchTicket(key);
+    const ticket = await fetchTicket(key, include);
     const text =
       format === 'json'
         ? minifiedJson(ticketToJson(ticket))

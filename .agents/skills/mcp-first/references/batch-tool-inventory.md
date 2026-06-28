@@ -86,26 +86,26 @@ specific skills · **P2** occasional batching benefit.
 
 ### jira-server (19 tools) → LS-8034
 
-| Tool                                            | Class          | Notes                                              |
-| ----------------------------------------------- | -------------- | -------------------------------------------------- |
-| `jira_transition`                               | 🔴 needs-batch | **P0.** Sweeps move N tickets to In Progress/Done. |
-| `jira_edit_ticket`                              | 🔴 needs-batch | **P0.** Bulk field edits (labels, sprint, parent). |
-| `jira_set_parent`                               | 🔴 needs-batch | P1 — fold into `jira_edit_batch`.                  |
-| `jira_link_issues`                              | 🔴 needs-batch | P1 — link N blockers in slice/define.              |
-| `jira_list_children`                            | 🔴 needs-batch | P1 — accept multiple parent keys.                  |
-| `jira_view`                                     | 🔴 needs-batch | P2 — triage reads many tickets.                    |
-| `jira_add_comment`                              | 🔴 needs-batch | P2 — status-stamp N tickets.                       |
-| `jira_bulk_create_tickets`                      | ✅ batched     | Reference implementation.                          |
-| `jira_create_ticket`                            | ⚪ single-use  | Single creation retained for one-offs.             |
-| `jira_search`                                   | ⚪ single-use  | Returns a list already (JQL).                      |
-| `jira_get_transitions`                          | ⚪ single-use  | Lookup.                                            |
-| `jira_get_comments`                             | ⚪ single-use  | Read.                                              |
-| `jira_check_blockers`                           | ⚪ single-use  | Read.                                              |
-| `jira_claim_ticket`                             | ⚪ single-use  | One claim per session.                             |
-| `jira_delete_ticket`                            | ⚪ single-use  | Rare; could batch later if needed.                 |
-| `jira_get_bucket_epic` / `jira_set_bucket_epic` | ⚪ single-use  | Config.                                            |
-| `jira_rollover_sync`                            | ⚪ single-use  | Already a bulk operation internally.               |
-| `jira_auth_status`                              | ⚪ single-use  | Pre-flight.                                        |
+| Tool                                            | Class          | Notes                                                                       |
+| ----------------------------------------------- | -------------- | --------------------------------------------------------------------------- |
+| `jira_transition`                               | 🔴 needs-batch | **P0.** Sweeps move N tickets to In Progress/Done.                          |
+| `jira_edit_ticket`                              | 🔴 needs-batch | **P0.** Bulk field edits (labels, sprint, parent).                          |
+| `jira_set_parent`                               | 🔴 needs-batch | P1 — fold into `jira_edit_batch`.                                           |
+| `jira_link_issues`                              | 🔴 needs-batch | P1 — link N blockers in slice/define.                                       |
+| `jira_list_children`                            | 🔴 needs-batch | P1 — accept multiple parent keys.                                           |
+| `jira_view`                                     | 🔴 needs-batch | P2 — triage reads many tickets.                                             |
+| `jira_add_comment`                              | 🔴 needs-batch | P2 — status-stamp N tickets.                                                |
+| `jira_bulk_create_tickets`                      | ✅ batched     | Reference implementation.                                                   |
+| `jira_create_ticket`                            | ⚪ single-use  | Single creation retained for one-offs.                                      |
+| `jira_search`                                   | ⚪ single-use  | Returns a list already (JQL).                                               |
+| `jira_view` (`include: ['transitions']`)        | ⚪ single-use  | Lookup — use jira_view with include instead of former jira_get_transitions. |
+| `jira_view` (`include: ['comments']`)           | ⚪ single-use  | Read — use jira_view with include instead of former jira_get_comments.      |
+| `jira_check_blockers`                           | ⚪ single-use  | Read.                                                                       |
+| `jira_claim_ticket`                             | ⚪ single-use  | One claim per session.                                                      |
+| `jira_delete_ticket`                            | ⚪ single-use  | Rare; could batch later if needed.                                          |
+| `jira_get_bucket_epic` / `jira_set_bucket_epic` | ⚪ single-use  | Config.                                                                     |
+| `jira_rollover_sync`                            | ⚪ single-use  | Already a bulk operation internally.                                        |
+| `jira_auth_status`                              | ⚪ single-use  | Pre-flight.                                                                 |
 
 ### github-server (~49 tools) → LS-8035
 

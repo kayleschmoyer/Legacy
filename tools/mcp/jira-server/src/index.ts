@@ -6,7 +6,6 @@ import { addComment } from './tools/add-comment.js';
 import { checkBlockers } from './tools/check-blockers.js';
 import { createTicket } from './tools/create-ticket.js';
 import { editTicket } from './tools/edit-ticket.js';
-import { getComments } from './tools/get-comments.js';
 import { linkIssues } from './tools/link-issues.js';
 import { getAllDescendants } from './tools/get-all-descendants.js';
 import { listChildren } from './tools/list-children.js';
@@ -14,7 +13,7 @@ import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
 import { consolidatedTransition, VALID_STATUSES } from './tools/transition.js';
-import { view } from './tools/view.js';
+import { view, type IncludeOption } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { bulkEdit } from './tools/bulk-edit.js';
 import { bulkLinkIssues } from './tools/bulk-link-issues.js';
@@ -22,7 +21,6 @@ import { bulkListChildren } from './tools/bulk-list-children.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { rolloverSync } from './tools/rollover-sync.js';
 import { claimTicket } from './tools/claim-ticket.js';
-import { getTransitions } from './tools/get-transitions.js';
 import { startWork } from './tools/start-work.js';
 import { jiraKeysSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
@@ -340,38 +338,6 @@ server.tool(
   async (params) => bulkListChildren(params),
 );
 
-// --- jira_get_comments ---
-server.tool(
-  'jira_get_comments',
-  'Fetch all comments on a ticket, ordered by creation date. Single-key mode (`key`) returns a Markdown table. Batch mode (`keys`, 1-50) returns `{ comments: { [key]: [...] }, missing: [key, ...] }` with per-ticket failures isolated to `missing[]`.',
-  {
-    key: z
-      .string()
-      .regex(
-        /^[A-Z][A-Z0-9_]+-\d+$/,
-        'Must be a valid Jira issue key (e.g., LS-1137)',
-      )
-      .optional()
-      .describe('Single ticket key. Provide either `key` or `keys`, not both.'),
-    keys: z
-      .array(
-        z
-          .string()
-          .regex(
-            /^[A-Z][A-Z0-9_]+-\d+$/,
-            'Each key must be a valid Jira issue key (e.g., LS-1137)',
-          ),
-      )
-      .min(1)
-      .max(50)
-      .optional()
-      .describe(
-        'Batch mode: 1-50 ticket keys. Returns `{ comments: { [key]: [...] }, missing: [...] }`.',
-      ),
-  },
-  async (params) => getComments(params),
-);
-
 // --- jira_add_comment ---
 server.tool(
   'jira_add_comment',
@@ -615,24 +581,6 @@ server.tool(
   },
 );
 
-// --- jira_get_transitions ---
-server.tool(
-  'jira_get_transitions',
-  'List available workflow transitions for a Jira issue. Returns [{id, name, to: {name, statusCategory}}]. ' +
-    'Use this instead of mcp__*__getTransitionsForJiraIssue (Atlassian plugin) — that tool has a known bug ' +
-    'where it may return issue data instead of a transitions array.',
-  {
-    key: z
-      .string()
-      .regex(
-        /^[A-Z][A-Z0-9_]+-\d+$/,
-        'Must be a valid Jira issue key (e.g., LS-123)',
-      )
-      .describe('Ticket key'),
-  },
-  async (params) => getTransitions(params),
-);
-
 // --- jira_claim_ticket (deprecated alias) ---
 server.tool(
   'jira_claim_ticket',
@@ -674,7 +622,7 @@ server.tool(
     'Returns { key, status, previousStatus, assignee, idempotent, warnings }. ' +
     'Assignee precedence matches jira_claim_ticket: explicit `assignee` param > ' +
     'JIRA_ASSIGNEE_EMAIL > JIRA_ASSIGNEE_ACCOUNT_ID > authenticated service account. ' +
-    'Prefer this over the four-call chain (jira_view → jira_get_transitions → ' +
+    "Prefer this over the four-call chain (jira_view → jira_view({ include: ['transitions'] }) → " +
     'jira_transition → assignee PUT) for the standard "start work" flow. Use ' +
     'jira_claim_ticket when you also need blocker checks, child summaries, or branch ' +
     'recommendations.',
@@ -698,22 +646,28 @@ server.tool(
 );
 
 // --- jira_view ---
+const includeOptionSchema = z.enum([
+  'comments',
+  'transitions',
+  'blockers',
+  'children',
+]);
+
 server.tool(
   'jira_view',
-  'View ticket details including linked blockers. ' +
-    'Single-key mode: pass `key` (and optionally `format`) to get a compact markdown card by default, or the legacy JSON shape with `format: "json"`. ' +
-    'Batch mode: pass `keys` (1-50 ticket keys) to fetch all in one call. ' +
-    'Batch responses have shape `{ tickets: { [key]: <ticket-json> }, missing: [key, ...] }`; ' +
-    'any key that 404s or otherwise fails is isolated to `missing[]` so partial results are not lost. ' +
-    'Batch always returns the JSON shape per ticket — markdown is reserved for single-ticket reads. ' +
-    'Exactly one of `key` or `keys` must be provided.',
+  'View ticket details. By default returns base fields only (summary, status, type, description, etc.). ' +
+    'Pass `include` to fetch additional sub-resources in the same call — replaces the former jira_get_comments and jira_get_transitions tools. ' +
+    'Single-key mode: pass `key` (and optionally `format`) to get a compact markdown card by default, or JSON with `format: "json"`. ' +
+    'Batch mode: pass `keys` (1-50 ticket keys) to fetch all in one call; responses are `{ tickets: { [key]: <ticket-json> }, missing: [key, ...] }`. ' +
+    'Exactly one of `key` or `keys` must be provided. ' +
+    'include options: "blockers" (linked blocker issues), "children" (child issues via JQL), ' +
+    '"comments" (all comments ordered by creation), "transitions" (available workflow transitions). ' +
+    'Each include option that triggers an extra API call (comments, transitions, children) fires one request per key in parallel.',
   {
     key: z
       .string()
       .optional()
-      .describe(
-        'Single ticket key (legacy path; mutually exclusive with `keys`)',
-      ),
+      .describe('Single ticket key (mutually exclusive with `keys`)'),
     keys: z
       .array(z.string())
       .min(1)
@@ -726,7 +680,14 @@ server.tool(
       .enum(['markdown', 'json'])
       .optional()
       .describe(
-        'Output format for single-key mode. "markdown" (default) returns a compact card optimized for agent reading; "json" returns the legacy structured shape. Ignored in batch mode (batch always returns JSON).',
+        'Output format for single-key mode. "markdown" (default) returns a compact card; "json" returns the structured shape. Ignored in batch mode.',
+      ),
+    include: z
+      .array(includeOptionSchema)
+      .optional()
+      .describe(
+        'Sub-resources to fetch alongside base fields. Omit for base fields only. ' +
+          '"blockers": linked blockers. "children": child issues. "comments": all comments. "transitions": available workflow transitions.',
       ),
   },
   async (params) => {
@@ -741,8 +702,10 @@ server.tool(
         ],
       };
     }
-    if (params.keys) return view({ keys: params.keys });
-    if (params.key) return view({ key: params.key, format: params.format });
+    const include = params.include as IncludeOption[] | undefined;
+    if (params.keys) return view({ keys: params.keys, include });
+    if (params.key)
+      return view({ key: params.key, format: params.format, include });
     return {
       isError: true,
       content: [

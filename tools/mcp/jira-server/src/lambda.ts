@@ -12,18 +12,16 @@ import { z } from 'zod';
 import { checkBlockers } from './tools/check-blockers.js';
 import { createTicket } from './tools/create-ticket.js';
 import { editTicket } from './tools/edit-ticket.js';
-import { getComments } from './tools/get-comments.js';
 import { linkIssues } from './tools/link-issues.js';
 import { listChildren } from './tools/list-children.js';
 import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
 import { consolidatedTransition, VALID_STATUSES } from './tools/transition.js';
-import { view } from './tools/view.js';
+import { view, type IncludeOption } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { claimTicket } from './tools/claim-ticket.js';
-import { getTransitions } from './tools/get-transitions.js';
 import { jiraKeysSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
 import {
@@ -174,22 +172,6 @@ function createMcpServer(): McpServer {
     async (p) => editTicket(p),
   );
   server.tool(
-    'jira_get_comments',
-    'Fetch all comments on a ticket. Single-key (`key`) returns a Markdown table; batch (`keys`, 1-50) returns `{ comments, missing }`.',
-    {
-      key: z
-        .string()
-        .regex(/^[A-Z][A-Z0-9_]+-\d+$/)
-        .optional(),
-      keys: z
-        .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
-        .min(1)
-        .max(50)
-        .optional(),
-    },
-    async (p) => getComments(p),
-  );
-  server.tool(
     'jira_link_issues',
     'Create a link between two tickets.',
     {
@@ -287,12 +269,6 @@ function createMcpServer(): McpServer {
     },
   );
   server.tool(
-    'jira_get_transitions',
-    'List available transitions for a Jira issue.',
-    { key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/) },
-    async (p) => getTransitions(p),
-  );
-  server.tool(
     'jira_claim_ticket',
     'DEPRECATED: use `jira_transition({ keys, status: "In Progress", action: "claim" })`. ' +
       'Kept as a thin alias for one release. Returns action: "PROCEED", "STOP", or "ALREADY_CLAIMED".',
@@ -309,12 +285,41 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_view',
-    'View ticket details including linked blockers. Returns a compact markdown card by default; pass format: "json" for the structured shape.',
+    'View ticket details. Base fields by default; pass include[] to also fetch comments, transitions, blockers, or children. ' +
+      'Replaces jira_get_comments and jira_get_transitions. Returns markdown card by default; pass format: "json" for the structured shape.',
     {
-      key: z.string(),
+      key: z.string().optional(),
+      keys: z.array(z.string()).min(1).max(50).optional(),
       format: z.enum(['markdown', 'json']).optional(),
+      include: z
+        .array(z.enum(['comments', 'transitions', 'blockers', 'children']))
+        .optional(),
     },
-    async (p) => view(p),
+    async (p) => {
+      if (p.keys && p.key) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'jira_view: provide exactly one of `key` or `keys`, not both.',
+            },
+          ],
+        };
+      }
+      const include = p.include as IncludeOption[] | undefined;
+      if (p.keys) return view({ keys: p.keys, include });
+      if (p.key) return view({ key: p.key, format: p.format, include });
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'jira_view: must provide either `key` (single) or `keys` (batch, 1-50).',
+          },
+        ],
+      };
+    },
   );
   server.tool(
     'jira_delete_ticket',

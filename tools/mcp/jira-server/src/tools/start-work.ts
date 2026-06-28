@@ -32,7 +32,7 @@ interface JiraIssueResponse {
 /**
  * Semantic one-shot for Step 3 of the ticket spine ("Jira → In Progress").
  *
- * Wraps the four-call chain (jira_view → jira_get_transitions →
+ * Wraps the four-call chain (jira_view → jira_view({ include: ['transitions'] }) →
  * jira_transition → assignee PUT) into a single side-effecting call. Idempotent
  * on already-In-Progress tickets; refuses tickets that are Done.
  */

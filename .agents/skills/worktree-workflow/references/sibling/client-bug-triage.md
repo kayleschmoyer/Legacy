@@ -52,7 +52,7 @@ Read the ticket description thoroughly. Client bug reports typically include:
 - **Screenshots or screen recordings** (if available)
 - **Device/browser info** (if available)
 
-Also check ticket comments for additional context using `jira_get_comments`.
+Also check ticket comments for additional context using `jira_view({ key: "LS-####", include: ["comments"] })`.
 
 ### 3. Reproduce the bug and capture "before" evidence
 

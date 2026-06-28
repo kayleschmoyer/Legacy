@@ -44,10 +44,9 @@ Wraps Jira operations with guardrails using the Jira REST API (with env var / ne
 - **jira_edit_ticket** — Update ticket fields including sprint assignment
 - **jira_delete_ticket** — Close tickets by transitioning to "Won't Do" with a comment
 - **jira_transition** — Transition ticket status with validation
-- **jira_view** — Structured ticket details (summary, status, type, priority, description, assignee, reporter, labels, timestamps, blockers)
+- **jira_view** — Structured ticket details (base fields by default; pass `include: ['comments','transitions','blockers','children']` to fetch sub-resources in one call — replaces former `jira_get_comments` and `jira_get_transitions`)
 - **jira_check_blockers** — Automates the 3-way dependency check
 - **jira_set_parent** — Set parent epic via Jira REST API
-- **jira_get_comments** — Fetch all comments on a ticket with author and plain-text body
 
 #### OAuth 2.0 Setup
 

@@ -1,8 +1,8 @@
 // Shared token-efficient formatting for jira-server's list-shaped tools
-// (jira_search, jira_list_children, jira_get_comments). The cross-server
+// (jira_search, jira_list_children, jira_view comments). The cross-server
 // standard and helper live in `@legacy-sports/mcp-format` (epic LS-8018 /
 // LS-8019); this module only pins the per-tool column sets (the first-order
-// field-selection lever) and the pagination-hint footer so the three list
+// field-selection lever) and the pagination-hint footer so the list
 // tools render identically.
 
 /** jira_search (full): fields an agent reads off a search result row. */
@@ -29,10 +29,10 @@ export const CHILD_COLUMNS = [
 ] as const;
 
 /**
- * jira_get_comments: `updated` is dropped — it equals `created` for the vast
- * majority of comments and agents read author/body/created. `body` is kept full
- * (clarifications and ACs added as comments are the payload) but the Markdown
- * table flattens its newlines to spaces.
+ * jira_view (include: ['comments']): `updated` is dropped — it equals `created`
+ * for the vast majority of comments and agents read author/body/created. `body`
+ * is kept full (clarifications and ACs added as comments are the payload) but the
+ * Markdown table flattens its newlines to spaces.
  */
 export const COMMENT_COLUMNS = ['id', 'author', 'created', 'body'] as const;
 
