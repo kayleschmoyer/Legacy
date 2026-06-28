@@ -15,38 +15,65 @@ import {
  * reports, or runs that predate the reporter — we inflate the embedded
  * report.json and render the identical layout server-side.
  */
+/** Numeric-only run IDs resolve to nightly-{id} or manual-{id} on GH Pages. */
+const NUMERIC_ID_RE = /^\d+$/;
+
 export async function getPlaywrightReport(params: {
   reportName: string;
 }): Promise<ToolResult> {
   const { reportName } = params;
-  const url = reportUrlFor(reportName);
 
-  const published = await fetchPlaywrightSummary(reportName);
-  if (published && published.trim() !== '') {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `${published}\n\n---\n_Source: ${url}summary.md_`,
-        },
-      ],
-    };
+  // Try the name directly; for bare numeric run IDs also try nightly-{id} and
+  // manual-{id} — the CI workflow deploys under those prefixes.
+  const namesToTry = [reportName];
+  if (NUMERIC_ID_RE.test(reportName)) {
+    namesToTry.push(`nightly-${reportName}`, `manual-${reportName}`);
   }
 
-  const report = await fetchPlaywrightReport(reportName);
-  if ('error' in report) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: report.error }],
-    };
+  for (const name of namesToTry) {
+    const url = reportUrlFor(name);
+
+    const published = await fetchPlaywrightSummary(name);
+    if (published && published.trim() !== '') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${published}\n\n---\n_Source: ${url}summary.md_`,
+          },
+        ],
+      };
+    }
+
+    const report = await fetchPlaywrightReport(name);
+    if (!('error' in report)) {
+      const markdown = renderReportAsMarkdown(report);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${markdown}\n\n---\n_Source: ${url} (rendered from report.json)_`,
+          },
+        ],
+      };
+    }
+
+    // If this was the only name to try, surface the error.
+    if (namesToTry.length === 1) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: report.error }],
+      };
+    }
   }
 
-  const markdown = renderReportAsMarkdown(report);
+  const triedNames = namesToTry.join(', ');
   return {
+    isError: true,
     content: [
       {
         type: 'text',
-        text: `${markdown}\n\n---\n_Source: ${url} (rendered from report.json)_`,
+        text: `Report not found. Tried: ${triedNames}. If this is an integration nightly run, pass source="s3" to ci_get_playwright_test_result with the numeric run ID to fetch from S3 instead.`,
       },
     ],
   };

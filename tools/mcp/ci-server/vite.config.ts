@@ -38,6 +38,8 @@ export default defineConfig({
         'querystring',
         'zlib',
         '@aws-sdk/client-secrets-manager',
+        '@aws-sdk/client-s3',
+        '@aws-sdk/s3-request-presigner',
       ],
     },
     target: 'node20',

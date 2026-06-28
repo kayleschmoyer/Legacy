@@ -463,8 +463,9 @@ describe('FootballPlayers', () => {
       mockAsyncStorageGetItem.mockResolvedValue(stored);
       mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
 
-      await act(() => {
+      await act(async () => {
         render(<FootballPlayers />);
+        await Promise.resolve();
       });
 
       await waitFor(() => {

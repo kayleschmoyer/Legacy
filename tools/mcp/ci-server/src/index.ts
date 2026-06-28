@@ -441,7 +441,8 @@ export function createServer(): McpServer {
       'Returns overall stats (total/passed/failed/skipped/flaky), per-file breakdowns, ' +
       'lists of failed/flaky test titles, and a skippedTests array with { name, file, reason } ' +
       'for every skipped test (reason comes from the test annotation description). ' +
-      'Report names follow the pattern "pr-{number}" (for PRs) or "manual-{number}" or "{run_id}" (for push/nightly runs). ' +
+      'When reportName is a bare numeric run ID, automatically tries nightly-{id} and manual-{id} as fallbacks ' +
+      'so you do not need to know the exact deployed name. ' +
       'Example: ci_get_playwright_report({ reportName: "pr-2173" })',
     {
       reportName: z
@@ -451,7 +452,7 @@ export function createServer(): McpServer {
           'reportName must contain only alphanumeric characters, hyphens, underscores, and dots — no path separators or special characters allowed',
         )
         .describe(
-          'Report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), or the numeric GitHub run ID for push/nightly runs.',
+          'Report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), "nightly-{run_id}" for nightly runs, or a bare numeric GitHub run ID (auto-expanded to nightly-/manual- fallbacks).',
         ),
     },
     async (params) => getPlaywrightReport(params),
@@ -459,13 +460,22 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_get_playwright_test_result',
-    'Read a SINGLE test result out of a Playwright report deployed to legacy-sports-deploys. ' +
+    'Read a SINGLE test result out of a Playwright report (GH Pages) or list S3 blob artifacts for a CI run. ' +
       'Use this (not ci_get_playwright_report) when you already know which test is failing and just need ' +
       'its error, snippet, stdout/stderr, and attachment list — it keeps the full report out of context. ' +
       "Matches testTitle as a case-insensitive substring against each test's full title " +
       '(describe path joined with " > "). If multiple tests match, returns a candidates list instead ' +
       'of a single result; pass fileName to disambiguate. String fields are truncated to ~4000 chars ' +
-      'so a chatty test cannot overflow the response.',
+      'so a chatty test cannot overflow the response.\n\n' +
+      'GH Pages mode (source="gh-pages", default): fetches from the legacy-sports-deploys gh-pages branch. ' +
+      'When reportName is a bare numeric run ID, automatically tries nightly-{id} and manual-{id} as fallbacks ' +
+      'so you do not need to know the exact deployed name.\n\n' +
+      'S3 mode (source="s3"): for integration nightly runs whose GH Pages report is absent or when you need ' +
+      'the raw Playwright blob artifacts. Resolves the run ID to a HEAD SHA via the GitHub API, lists all ' +
+      'blob zip files under s3://legacy-sports-dev-ci-artifacts/ci-artifacts/{sha}/playwright-blobs/, and ' +
+      'returns 1-hour presigned GET URLs. Objects expire after 3 days — older runs return empty:true. ' +
+      'Each blob zip is a Playwright blob-reporter archive; use playwright merge-reports or unzip to extract ' +
+      'individual test-results (error-context.md, trace.zip).',
     {
       reportName: z
         .string()
@@ -474,19 +484,34 @@ export function createServer(): McpServer {
           'reportName must contain only alphanumeric characters, hyphens, underscores, and dots — no path separators or special characters allowed',
         )
         .describe(
-          'Report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), or the numeric GitHub run ID for push/nightly runs.',
+          'Report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), "nightly-{run_id}" for nightly runs, or a bare numeric GitHub run ID (auto-expanded to nightly-/manual- fallbacks in gh-pages mode, or used directly in s3 mode).',
         ),
       testTitle: z
         .string()
         .min(1)
         .describe(
-          'Substring of the test\'s full title (case-insensitive). Full title is the describe path joined by " > ", ending with the test name.',
+          'Substring of the test\'s full title (case-insensitive). Full title is the describe path joined by " > ", ending with the test name. Used as a filter hint in s3 mode (not parsed from blobs).',
         ),
       fileName: z
         .string()
         .optional()
         .describe(
-          'Optional substring filter on the spec file name (case-insensitive) to disambiguate identical titles across files.',
+          'Optional substring filter on the spec file name (case-insensitive) to disambiguate identical titles across files (gh-pages mode only).',
+        ),
+      source: z
+        .enum(['gh-pages', 's3'])
+        .optional()
+        .describe(
+          'Artifact source. "gh-pages" (default): fetch from legacy-sports-deploys GitHub Pages. "s3": resolve HEAD SHA from run ID and return presigned S3 URLs for Playwright blob archives — use when the GH Pages report is absent or for raw integration CI artifacts.',
+        ),
+      maxChars: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(100_000)
+        .optional()
+        .describe(
+          'Reserved for future use (default: 10000). Presigned URLs cannot be truncated (they would become invalid), so s3 mode always returns full artifact fields. In gh-pages mode a fixed 4000-char per-field cap (MAX_FIELD_CHARS) is applied instead.',
         ),
     },
     async (params) => getPlaywrightTestResult(params),

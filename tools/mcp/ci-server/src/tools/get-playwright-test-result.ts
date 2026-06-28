@@ -7,10 +7,15 @@ import {
   type PlaywrightTestFile,
   type PlaywrightTestResult,
 } from '../playwright-report.js';
+import { resolveRunSha, listPlaywrightS3Artifacts } from '../s3-artifacts.js';
 
 /** Hard cap on any single string field in the response. Prevents a chatty
  * test (huge stdout / multi-MB snippet) from blowing past MCP limits. */
 const MAX_FIELD_CHARS = 4000;
+
+/** Numeric-only run IDs — the GH Pages deployment uses nightly-{id} or
+ * manual-{id}, so a bare number never matches a deployed report name. */
+const NUMERIC_ID_RE = /^\d+$/;
 
 function truncate(input: string | undefined | null): string | null {
   if (input == null) return null;
@@ -110,14 +115,122 @@ export async function getPlaywrightTestResult(params: {
   reportName: string;
   testTitle: string;
   fileName?: string;
+  source?: 'gh-pages' | 's3';
+  maxChars?: number;
 }): Promise<ToolResult> {
-  const { reportName, testTitle, fileName } = params;
+  const {
+    reportName,
+    testTitle,
+    fileName,
+    source = 'gh-pages',
+    maxChars = 10000,
+  } = params;
 
-  const report = await fetchPlaywrightReport(reportName);
-  if ('error' in report) {
+  // S3 mode: resolve HEAD SHA from the run ID, list blob artifacts, return
+  // presigned URLs. Does not attempt GH Pages at all.
+  if (source === 's3') {
+    const runId = parseInt(reportName, 10);
+    if (isNaN(runId) || !NUMERIC_ID_RE.test(reportName)) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: 'source=s3 requires reportName to be a numeric GitHub run ID (e.g. "28115361551").',
+          },
+        ],
+      };
+    }
+
+    let sha: string;
+    try {
+      sha = await resolveRunSha(runId);
+    } catch (err) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Failed to resolve run ${runId} to a commit SHA: ${err instanceof Error ? err.message : String(err)}`,
+          },
+        ],
+      };
+    }
+
+    let s3Result;
+    try {
+      s3Result = await listPlaywrightS3Artifacts(sha);
+    } catch (err) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Failed to list S3 artifacts for SHA ${sha}: ${err instanceof Error ? err.message : String(err)}. Ensure the Lambda execution role has s3:ListBucket and s3:GetObject on the ci-artifacts bucket.`,
+          },
+        ],
+      };
+    }
+
+    const ghPagesName = `nightly-${runId}`;
+    const response = {
+      source: 's3' as const,
+      runId,
+      sha,
+      ghPagesReportName: ghPagesName,
+      ghPagesNote: `If the nightly GH Pages report was deployed, try ci_get_playwright_test_result with reportName="${ghPagesName}".`,
+      s3Prefix: s3Result.s3Prefix,
+      artifactCount: s3Result.artifacts.length,
+      empty: s3Result.empty,
+      emptyNote: s3Result.empty
+        ? 'No blob artifacts found. S3 objects expire after 3 days — this run may be too old.'
+        : undefined,
+      testTitleFilter: testTitle,
+      fileNameFilter: fileName ?? null,
+      note: 'Presigned URLs expire in 1 hour. Each artifact is a Playwright blob zip containing test results. Use playwright merge-reports or inspect the zip to extract individual test error-context.md / trace.zip files.',
+      artifacts: s3Result.artifacts,
+    };
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+    };
+  }
+
+  // GH Pages mode (default): try the supplied name directly; if it is a
+  // bare numeric run ID, also try the nightly-{id} and manual-{id} variants
+  // that CI actually deploys under.
+  const namesToTry: string[] = [reportName];
+  if (NUMERIC_ID_RE.test(reportName)) {
+    namesToTry.push(`nightly-${reportName}`, `manual-${reportName}`);
+  }
+
+  let report;
+  let resolvedName = reportName;
+  for (const name of namesToTry) {
+    const candidate = await fetchPlaywrightReport(name);
+    if (!('error' in candidate)) {
+      report = candidate;
+      resolvedName = name;
+      break;
+    }
+    // Keep trying; store last error in case all fail.
+    report = candidate;
+  }
+
+  if (!report || 'error' in report) {
+    const triedNames = namesToTry.join(', ');
+    const baseError =
+      report && 'error' in report ? report.error : 'Unknown fetch error';
     return {
       isError: true,
-      content: [{ type: 'text', text: report.error }],
+      content: [
+        {
+          type: 'text',
+          text:
+            `${baseError}\n\nTried report names: ${triedNames}.\n` +
+            `If this is an integration nightly run, pass source="s3" with the numeric run ID to fetch from S3 instead.`,
+        },
+      ],
     };
   }
 
@@ -136,12 +249,12 @@ export async function getPlaywrightTestResult(params: {
     }
   }
 
-  const url = reportUrlFor(reportName);
+  const url = reportUrlFor(resolvedName);
 
   if (matches.length === 0) {
     const response: TestResultResponse = {
       matched: false,
-      reportName,
+      reportName: resolvedName,
       url,
       candidates: [],
       message: fileNeedle
@@ -156,7 +269,7 @@ export async function getPlaywrightTestResult(params: {
   if (matches.length > 1) {
     const response: TestResultResponse = {
       matched: false,
-      reportName,
+      reportName: resolvedName,
       url,
       candidates: matches.slice(0, 25).map(({ file, test }) => ({
         title: fullTitle(test),
@@ -183,7 +296,7 @@ export async function getPlaywrightTestResult(params: {
   const results = test.results ?? [];
   const response: TestResultResponse = {
     matched: true,
-    reportName,
+    reportName: resolvedName,
     url,
     test: {
       title: fullTitle(test),
