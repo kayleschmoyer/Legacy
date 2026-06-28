@@ -328,10 +328,11 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
     Write-Host "`n[TICKET] $ticketKey" -ForegroundColor Cyan
     Write-Info "Branches: $($branchList -join ', ')"
 
-    # Get ticket info from Jira
+    # Get ticket info from Jira (JSON avoids false-positive regex matches against
+    # description/comment text that may contain "Status: <some text>").
     try {
-        $ticketOutput = acli jira workitem view $ticketKey 2>&1 | Out-String
-        
+        $ticketJson = acli jira workitem view $ticketKey --fields "key,status" --json 2>&1 | Out-String
+
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "Could not fetch ticket $ticketKey (may be deleted or inaccessible)"
             $results += [PSCustomObject]@{
@@ -344,11 +345,12 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             }
             continue
         }
-        
-        # Parse status from output
-        if ($ticketOutput -match 'Status:\s*(.+?)(\r|\n|$)') {
-            $status = $matches[1].Trim()
-        } else {
+
+        try {
+            $ticketObj = $ticketJson | ConvertFrom-Json
+            $status = $ticketObj.fields.status.name
+            if (-not $status) { $status = "UNKNOWN" }
+        } catch {
             $status = "UNKNOWN"
         }
         
