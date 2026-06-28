@@ -916,6 +916,20 @@ describe('FootballPlayers', () => {
       expect(lastCall[0].variables.search).toBe('mahomes');
     });
 
+    it('passes undefined search when input is a single character (FPL-004)', () => {
+      render(<FootballPlayers />);
+      const input = screen.getByPlaceholderText('Search players...');
+      fireEvent.changeText(input, 'A');
+      void act(() => {
+        jest.advanceTimersByTime(300);
+      });
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { search?: string } },
+      ];
+      expect(lastCall[0].variables.search).toBeUndefined();
+    });
+
     it('passes undefined search when input is cleared after debounce', () => {
       render(<FootballPlayers />);
       const input = screen.getByPlaceholderText('Search players...');

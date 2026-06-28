@@ -433,6 +433,17 @@ describe('FootballPlayersPage — pagination state machine', () => {
       expect(firstCall[0].variables.search).toBe('maho');
     });
 
+    it('passes undefined search when URL search term is a single character (FPL-004)', () => {
+      mockSearchParams = new URLSearchParams('search=a');
+
+      render(<FootballPlayersPage />);
+
+      const firstCall = mockUseFootballPlayersQuery.mock.calls[0] as [
+        { variables: { search?: string } },
+      ];
+      expect(firstCall[0].variables.search).toBeUndefined();
+    });
+
     it('restores position filter when URL changes (browser back)', () => {
       const { rerender } = render(<FootballPlayersPage />);
 
