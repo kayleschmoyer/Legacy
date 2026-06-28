@@ -53,7 +53,7 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 - **No suppression** — fix root causes; never use `@ts-ignore` or `eslint-disable`. See `.agents/skills/standards/SKILL.md`.
 - **E2E tests are hermetic** — never use `route.continue()` in `apps/web-e2e/src/tests/`; use `route.fulfill()`. Exception: `apps/web-e2e/src/integration/tests/` is a live-backend suite.
 - **Prefer `.graphql` + codegen over inline `gql`** — define queries in `.graphql` files and import generated hooks from `graphql.generated.ts`.
-- **Shared-components-first** — before building UI in `apps/web` or `apps/app`, check `lib/shared-components` first.
+- **Shared-components-first** — before building UI in `apps/web` or `apps/app`, check `lib/shared-components`; build shared cross-platform components and adapt by viewport — see `.agents/skills/shared-components-first/SKILL.md`.
 
 ## Task Completion Signal
 
