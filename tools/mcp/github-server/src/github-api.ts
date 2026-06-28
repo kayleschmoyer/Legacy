@@ -140,6 +140,46 @@ async function doRest<T>(opts: RestOptions, canRetry: boolean): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * Make an authenticated GET to the GitHub REST API, returning raw bytes.
+ * Used for binary endpoints like Actions log downloads that serve ZIP archives
+ * or plain-text logs behind a 302 redirect.
+ */
+export async function githubGetArrayBuffer(
+  owner: string,
+  repo: string,
+  path: string,
+): Promise<ArrayBuffer> {
+  const headers = await buildHeaders();
+  const url = `https://api.github.com/repos/${owner}/${repo}${path}`;
+
+  const response = await fetch(url, { headers });
+
+  if (response.status === 401) {
+    await invalidateToken();
+    const retryHeaders = await buildHeaders();
+    const retryResponse = await fetch(url, { headers: retryHeaders });
+    if (!retryResponse.ok) {
+      const text = await retryResponse.text();
+      throw new Error(
+        `GitHub API GET ${path} failed (${retryResponse.status}): ${sanitizeErrorBody(text)}`,
+      );
+    }
+    logRateLimit(retryResponse.headers, `GET ${path}`);
+    return retryResponse.arrayBuffer();
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `GitHub API GET ${path} failed (${response.status}): ${sanitizeErrorBody(text)}`,
+    );
+  }
+
+  logRateLimit(response.headers, `GET ${path}`);
+  return response.arrayBuffer();
+}
+
 export interface GraphQLError {
   message: string;
   type?: string;

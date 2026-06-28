@@ -65,6 +65,7 @@ import { bulkRebase } from './tools/bulk-rebase.js';
 import { bulkEdit } from './tools/bulk-edit.js';
 import { bulkComment } from './tools/bulk-comment.js';
 import { bulkReplyToReview } from './tools/bulk-reply-to-review.js';
+import { getJobLogs } from './tools/get-job-logs.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -1938,6 +1939,64 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => resolveActionShas(params),
+  );
+
+  server.tool(
+    'get_job_logs',
+    'Fetch GitHub Actions job logs with server-side truncation. Returns the last tail_lines lines (default 200) and caps output at max_chars (default 10 000) with a truncation indicator. Use error_summary to extract only error/failure lines for faster CI triage. Provide job_id for a single job or run_id (with optional failed_only) to fetch logs for all jobs in a run.',
+    {
+      job_id: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Specific job ID. Required when run_id is not provided.'),
+      run_id: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Workflow run ID. Fetches logs for all jobs in the run (filtered by failed_only). Required when job_id is not provided.',
+        ),
+      failed_only: z
+        .boolean()
+        .default(true)
+        .describe(
+          'When using run_id, only fetch logs for failed jobs (default: true).',
+        ),
+      tail_lines: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(200)
+        .describe(
+          'Maximum number of lines to return from the end of the log (default: 200). The tool always truncates server-side before returning, so the response is bounded regardless of log size.',
+        ),
+      max_chars: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(10_000)
+        .describe(
+          'Hard cap on total output characters (default: 10 000). Truncated output is suffixed with "... [truncated, N total bytes]".',
+        ),
+      error_summary: z
+        .boolean()
+        .default(false)
+        .describe(
+          'When true, extract only lines matching error/failure patterns (error, FAIL, failed, exit code, etc.) plus 2 lines of context. Dramatically reduces token usage for CI-diagnosis tasks.',
+        ),
+    },
+    async (params) =>
+      getJobLogs({
+        jobId: params.job_id,
+        runId: params.run_id,
+        failedOnly: params.failed_only,
+        tailLines: params.tail_lines,
+        maxChars: params.max_chars,
+        errorSummary: params.error_summary,
+      }),
   );
 
   return server;
