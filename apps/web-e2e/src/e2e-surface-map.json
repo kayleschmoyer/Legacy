@@ -406,6 +406,11 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/league-limit-indicator.spec.ts": [
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/pages/baseball/**",
+      "lib/shared-components/src/features/baseball/**"
+    ],
     "apps/web-e2e/src/tests/baseball-ui.spec.ts": [
       "apps/web/src/pages/baseball/**",
       "apps/web/src/pages/football/**",
