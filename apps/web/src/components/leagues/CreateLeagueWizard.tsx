@@ -136,8 +136,11 @@ export function wizardReducer(
 
 export function validateStep(step: Step, state: WizardState): string | null {
   if (step === 'settings') {
-    if (!state.name.trim()) return 'League name is required.';
-    if (state.name.trim().length > 50)
+    const trimmedName = state.name.trim();
+    if (!trimmedName) return 'League name is required.';
+    if (trimmedName.length < 3)
+      return 'League name must be at least 3 characters.';
+    if (trimmedName.length > 50)
       return 'League name must be 50 characters or fewer.';
   }
   return null;

@@ -268,8 +268,12 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const username = context.user.username || 'User';
 
       // ── Input validation ────────────────────────────────────────────────────
-      if (leagueName.trim().length === 0) {
+      const trimmedLeagueName = leagueName.trim();
+      if (trimmedLeagueName.length === 0) {
         throw UserInputError('League name cannot be empty');
+      }
+      if (trimmedLeagueName.length < 3) {
+        throw UserInputError('League name must be at least 3 characters');
       }
       if (leagueName.length > MAX_LEAGUE_NAME_LENGTH) {
         throw UserInputError(
