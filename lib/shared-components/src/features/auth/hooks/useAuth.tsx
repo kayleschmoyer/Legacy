@@ -80,6 +80,12 @@ interface AuthContextType {
   updateUserProfile: (
     updates: Partial<Pick<User, 'username' | 'picture'>>,
   ) => void;
+  /**
+   * Restore a session directly from a stored JWT string without an OAuth round-trip.
+   * Used by the mobile biometric auth flow: after biometric verification succeeds,
+   * pass the stored JWT to restore auth state locally.
+   */
+  loginWithToken: (jwt: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -864,6 +870,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     [authService, isImpersonating, user],
   );
 
+  const loginWithToken = useCallback(
+    (jwt: string): Promise<void> => {
+      dispatchAuth({ type: 'AUTH_START' });
+      try {
+        const user = decodeUserFromToken(jwt);
+        if (!user || !user.id) {
+          throw new Error('Invalid stored token: cannot decode user');
+        }
+        authService.storeUserProfile(user);
+        dispatchAuth({ type: 'AUTH_SUCCESS', payload: user });
+        dispatchAuth({ type: 'TOKEN_UPDATED', payload: jwt });
+        scheduleProactiveRefresh(jwt);
+        return Promise.resolve();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Token login failed';
+        dispatchAuth({ type: 'AUTH_FAILURE', payload: errorMessage });
+        return Promise.reject(
+          error instanceof Error ? error : new Error(errorMessage),
+        );
+      }
+    },
+    [authService, decodeUserFromToken, scheduleProactiveRefresh],
+  );
+
   const loginWithProvider = useCallback(async (): Promise<void> => {
     dispatchAuth({ type: 'AUTH_START' });
 
@@ -894,6 +925,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       loginWithOAuth,
       loginWithProvider,
       hydrateSession,
+      loginWithToken,
       logout,
       clearError,
       isImpersonating,
@@ -912,6 +944,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       loginWithOAuth,
       loginWithProvider,
       hydrateSession,
+      loginWithToken,
       logout,
       clearError,
       isImpersonating,
