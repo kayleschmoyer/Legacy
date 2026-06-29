@@ -371,28 +371,18 @@ test.describe('Playoff Bracket — no bracket state @smoke', () => {
     );
     // Standings should still render
     await expect(page.getByText('Alpha Squad')).toBeVisible();
-    // V2 StandingsTab renders the Playoff Bracket section whenever
-    // league.playoffEnabled is true, with an empty-state placeholder when no
-    // bracket data exists. (Legacy V1 hid the heading entirely.)
+    // The shared PlayoffBracket component is hidden entirely when no bracket
+    // data exists (same as legacy V1 — no empty-state placeholder is shown).
     await expect(
-      page.getByText('Playoff bracket has not been set yet.'),
-    ).toBeVisible();
+      page.getByRole('heading', { name: 'Playoff Bracket' }),
+    ).not.toBeVisible();
   });
 });
 
-// LS-4171: V2 StandingsTab renders the bracket via the inline BracketView
-// component (apps/web/src/pages/baseball/league-detail-v2/tabs/Standings.tsx).
-// Compared to the legacy PlayoffBracketDisplay it:
-//   - Uses the raw round string from the API (`wildcard`, `semifinals`,
-//     `finals`) rather than human-readable labels (`Wild Card`, `Semifinals`,
-//     `Championship`).
-//   - Does not render Final / Live status badges, the Champion callout, or
-//     a "TBD" placeholder for unassigned seeds (it shows the em-dash "—").
-//   - Does not render a `2024 Season` subtitle — Section sub shows the
-//     playoff format string (e.g. "4-team").
-// The completed/in-progress/scheduled describe blocks below were rewritten
-// to match V2's actual output. Tests for legacy-only badges and the Champion
-// callout were removed, since V2 doesn't render those affordances yet.
+// LS-7810: The V2 StandingsTab now uses the shared PlayoffBracket component
+// from @legacy-sports/shared-components (the inline BracketView was removed).
+// The shared component renders human-readable round labels (`Wild Card`,
+// `Semifinals`, `Championship`) and shows `TBD` for unassigned seeds.
 
 test.describe('Playoff Bracket – completed bracket @regression', () => {
   test.beforeEach(async ({ page }) => {
@@ -408,12 +398,11 @@ test.describe('Playoff Bracket – completed bracket @regression', () => {
   });
 
   test('shows wildcard round header', async ({ page }) => {
-    // V2 BracketView renders the raw round string from the matchup data.
-    await expect(page.getByText('wildcard', { exact: true })).toBeVisible();
+    await expect(page.getByText('Wild Card', { exact: true })).toBeVisible();
   });
 
   test('shows finals round header', async ({ page }) => {
-    await expect(page.getByText('finals', { exact: true })).toBeVisible();
+    await expect(page.getByText('Championship', { exact: true })).toBeVisible();
   });
 
   test('shows team names from wild card matchup', async ({ page }) => {
@@ -441,7 +430,7 @@ test.describe('Playoff Bracket – in-progress bracket @regression', () => {
   });
 
   test('shows semifinals round header', async ({ page }) => {
-    await expect(page.getByText('semifinals', { exact: true })).toBeVisible();
+    await expect(page.getByText('Semifinals', { exact: true })).toBeVisible();
   });
 
   test('shows in-progress scores', async ({ page }) => {
@@ -463,16 +452,11 @@ test.describe('Playoff Bracket — scheduled bracket @regression', () => {
     ).toBeVisible();
   });
 
-  test('shows em-dash placeholder when team seeds are not yet assigned', async ({
+  test('shows TBD placeholder when team seeds are not yet assigned', async ({
     page,
   }) => {
-    // V2 renders unassigned seeds with data-assigned="false" — the cell text
-    // is '—', but the assertion uses the testid for stability.
-    await expect(
-      page
-        .locator('[data-testid="playoff-bracket-team"][data-assigned="false"]')
-        .first(),
-    ).toBeVisible();
+    // The shared PlayoffBracket renders 'TBD' for unassigned seeds.
+    await expect(page.getByText('TBD').first()).toBeVisible();
   });
 });
 

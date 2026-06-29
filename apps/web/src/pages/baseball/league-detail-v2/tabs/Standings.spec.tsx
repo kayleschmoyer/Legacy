@@ -21,10 +21,10 @@ let mockBracket: Record<string, unknown> | null = null;
 
 jest.mock('@legacy-sports/shared-components', () => ({
   StandingsTable: jest.fn(() => <div data-testid="standings-table" />),
+  PlayoffBracket: jest.fn(() => <div data-testid="playoff-bracket" />),
 }));
 
 jest.mock('@legacy-sports/graphql', () => ({
-  PlayoffMatchupStatus: { Completed: 'completed' },
   Sport: { Baseball: 'baseball', Football: 'football' },
   useGetLeagueStandingsQuery: jest.fn(() => ({
     data: { getLeagueStandings: mockStandings },
@@ -169,7 +169,7 @@ describe('StandingsTab', () => {
     expect(lastProps().subtitle).toMatch(/Sorted by win percentage$/);
   });
 
-  it('renders the playoff bracket section when a bracket is present', () => {
+  it('renders the playoff bracket when a bracket is present', () => {
     mockStandings = [makeRow()];
     mockBracket = { matchups: [], status: 'pending', championTeam: null };
     render(
@@ -180,13 +180,10 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(screen.getByText('Playoff Bracket')).toBeInTheDocument();
-    expect(
-      screen.getByText('Playoff bracket has not been set yet.'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('playoff-bracket')).toBeInTheDocument();
   });
 
-  it('hides the playoff bracket section when no bracket and playoffs disabled', () => {
+  it('hides the playoff bracket when no bracket data is returned', () => {
     mockStandings = [makeRow()];
     mockBracket = null;
     render(
@@ -197,6 +194,6 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(screen.queryByText('Playoff Bracket')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('playoff-bracket')).not.toBeInTheDocument();
   });
 });
