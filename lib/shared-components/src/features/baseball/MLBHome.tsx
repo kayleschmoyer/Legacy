@@ -883,6 +883,9 @@ export function MLBHome({
                   >
                     Build a private competition or join friends to unlock live
                     matchups, draft tools, and performance tracking.
+                    {leagueCap && !isPremium
+                      ? ` Free plan includes ${leagueCap.limit} league${leagueCap.limit === 1 ? '' : 's'}.`
+                      : null}
                   </Paragraph>
                   <XStack gap="$3" flexWrap="wrap" justifyContent="center">
                     {atCap ? (

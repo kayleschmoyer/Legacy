@@ -246,6 +246,31 @@ describe('MLBHome', () => {
     expect(onUpgrade).toHaveBeenCalledTimes(1);
   });
 
+  it('mentions the free-tier cap in the empty-state copy when leagueCap is provided', () => {
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={[]}
+        leagueCap={{ count: 0, limit: 3, atLimit: false, onUpgrade: jest.fn() }}
+      />,
+    );
+    expect(
+      screen.getByText(/Free plan includes 3 leagues/),
+    ).toBeInTheDocument();
+  });
+
+  it('does not mention the cap in empty-state copy when isPremium', () => {
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={[]}
+        leagueCap={{ count: 0, limit: 3, atLimit: false, onUpgrade: jest.fn() }}
+        isPremium
+      />,
+    );
+    expect(screen.queryByText(/Free plan includes/)).not.toBeInTheDocument();
+  });
+
   it('shows "Unlimited leagues" badge for premium users and hides the cap indicator', () => {
     render(<MLBHome {...baseProps} leagues={LEAGUES} isPremium />);
     expect(screen.getByText('Unlimited leagues')).toBeInTheDocument();
