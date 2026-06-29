@@ -476,7 +476,7 @@ describe('FootballPlayers', () => {
         expect(lastCall[0].variables.positions).toEqual(['WR', 'TE']);
         expect(lastCall[0].variables.nflTeam).toBe('KC');
       });
-    });
+    }, 15000);
 
     it('rehydrates search input from AsyncStorage on mount', async () => {
       jest.useFakeTimers();

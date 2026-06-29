@@ -24,7 +24,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive_icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#001944"
       },
       "package": "com.legacysports.app",
       "googleServicesFile": "./android/app/google-services.json",
