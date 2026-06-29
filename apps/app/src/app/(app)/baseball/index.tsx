@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Share } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Button, H3, ScrollView, Spinner, Text, YStack } from 'tamagui';
 import {
   MLBHome,
@@ -38,6 +38,15 @@ export default function BaseballHome() {
       mountedRef.current = false;
     };
   }, []);
+
+  // Close any open modal when the screen regains focus (e.g. after the user
+  // navigates to the join screen and presses back — BBH-030 / LS-5864).
+  useFocusEffect(
+    useCallback(() => {
+      setInviteModalVisible(false);
+    }, []),
+  );
+
   const userInfo = useAuthorizedUserInfo();
   const router = useRouter();
   const isAuthenticated = Boolean(userInfo?.id);
@@ -182,7 +191,7 @@ export default function BaseballHome() {
         onSignIn={() => router.navigate('/login')}
         userName={userInfo?.username ?? 'Manager'}
         onCreateLeague={handleCreateLeague}
-        onJoinLeague={() => router.navigate('/baseball/league/join')}
+        onJoinLeague={() => router.push('/baseball/league/join')}
         onMockDraft={() => router.navigate('/baseball/mock-draft')}
         onScoreboard={() => router.navigate('/baseball/scoreboard')}
         onViewLeague={(id) =>

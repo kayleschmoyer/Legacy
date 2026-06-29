@@ -26,9 +26,15 @@ type RNComponents = {
 
 const mockNavigate = jest.fn();
 const mockPush = jest.fn();
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
-}));
+jest.mock('expo-router', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
+    useFocusEffect: (cb: () => unknown) => {
+      ReactActual.useEffect(cb, []);
+    },
+  };
+});
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -375,7 +381,7 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
     it('navigates to join-by-code', () => {
       render(<BaseballHome />);
       fireEvent.press(screen.getByTestId('join'));
-      expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/join');
+      expect(mockPush).toHaveBeenCalledWith('/baseball/league/join');
     });
 
     it('navigates to a league when a league is viewed', () => {
