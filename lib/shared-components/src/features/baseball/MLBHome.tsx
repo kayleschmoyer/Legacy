@@ -158,6 +158,12 @@ export function MLBHome({
 }: MLBHomeProps) {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const leaguesCount = leagues.length;
   const hasLeagues = leaguesCount > 0;
@@ -199,7 +205,7 @@ export function MLBHome({
       ];
 
   const filteredLeagues = leagues.filter((l) =>
-    (l?.name || '').toLowerCase().includes(search.trim().toLowerCase()),
+    (l?.name || '').toLowerCase().includes(debouncedSearch.trim().toLowerCase()),
   );
 
   const atCap = !!leagueCap?.atLimit;
@@ -768,7 +774,7 @@ export function MLBHome({
               gap="$5"
               minHeight={280}
             >
-              {search.trim() ? (
+              {debouncedSearch.trim() ? (
                 <>
                   <H2 fontSize="$8" fontWeight="700" color="$color">
                     No leagues match your search

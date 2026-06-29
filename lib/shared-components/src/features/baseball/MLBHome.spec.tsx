@@ -1,4 +1,5 @@
 import React from 'react';
+import { act } from '@testing-library/react';
 import { MLBHome, type MLBHomeLeague } from './MLBHome';
 import { fireEvent, render, screen } from '../../test-utils';
 
@@ -138,12 +139,17 @@ describe('MLBHome', () => {
   });
 
   it('filters the league list via search', () => {
+    jest.useFakeTimers();
     render(<MLBHome {...baseProps} leagues={LEAGUES} />);
     fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
       target: { value: 'Saturday' },
     });
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
     expect(screen.getByText('Saturday Sluggers')).toBeInTheDocument();
     expect(screen.queryByText('Sunday Stars')).not.toBeInTheDocument();
+    jest.useRealTimers();
   });
 
   it('shows the error notice (not the empty state) when error is set', () => {
