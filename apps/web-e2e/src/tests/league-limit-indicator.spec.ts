@@ -3,14 +3,13 @@
  *
  * The shared `MLBHome` component renders a `leagueCap` indicator ("Your leagues: X/Y")
  * for free-tier users, and an "Unlimited leagues" badge (LS-5870) for premium users
- * via the `isPremium` prop. The web wrapper (`BaseballScreen`) passes `leagueCap`
- * for authenticated users and `isPremium` for premium users.
+ * via the `isPremium` prop. `BaseballScreen` computes and passes `leagueCap` to
+ * `MLBHome`, so the Create button is disabled when a free-tier user is at the cap.
  *
  * These tests cover the web surface for the league-slots context:
  *   - The baseball hub renders all mocked leagues for both free and premium users
  *   - Premium users see the "Unlimited leagues" badge
- *   - The "Create" button is present and enabled regardless of league count on web
- *     (the web wrapper does not gate creation by the free-tier cap)
+ *   - The "Create" button is disabled on web for a free-tier user at the cap limit
  *   - The "Your leagues" section heading is always visible
  *
  * GraphQL responses are mocked via route.fulfill() — no live backend required.
@@ -102,11 +101,9 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
     ).toBeVisible();
   });
 
-  test('Create button is present and enabled on web for free-tier user at the cap limit', async ({
+  test('Create button is disabled on web for free-tier user at the cap limit', async ({
     page,
   }) => {
-    // The web BaseballScreen does not pass leagueCap to MLBHome, so the
-    // Create button is never disabled by the free-tier cap on this platform.
     await useTier(page, 'free');
     await mockThreeLeagues(page);
     await page.goto('/baseball');
@@ -116,7 +113,7 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
       .getByRole('button', { name: /create a new baseball league/i })
       .first();
     await expect(createBtn).toBeVisible();
-    await expect(createBtn).toBeEnabled();
+    await expect(createBtn).toBeDisabled();
   });
 
   test('baseball hub renders all three mocked leagues for a premium user', async ({

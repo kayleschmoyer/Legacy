@@ -3830,6 +3830,9 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/scroll-restoration.spec.ts": [
+      "apps/web/src/app/**"
+    ],
     "apps/web-e2e/src/tests/season-awards.spec.ts": [
       "apps/web/src/pages/management/**",
       "apps/web/src/features/management/**",

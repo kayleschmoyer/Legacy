@@ -1,5 +1,13 @@
 import React, { Suspense, useEffect, useState } from 'react';
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  Link,
+  Navigate,
+  NavigationType,
+  Route,
+  Routes,
+  useLocation,
+  useNavigationType,
+} from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   Paragraph,
@@ -491,16 +499,48 @@ function App() {
   useWebPushRegistration();
 
   const { pathname } = useLocation();
+  const navigationType = useNavigationType();
 
-  // Scroll to top on every route change so navigating from a long page
-  // (e.g. /pricing → /help) doesn't land mid-page.
+  // Save scroll position before navigating away, restore on back/forward (POP).
+  // For new navigations (PUSH/REPLACE), scroll to top so landing mid-page is avoided.
   useEffect(() => {
     if (
-      typeof window !== 'undefined' &&
-      typeof window.scrollTo === 'function'
+      typeof window === 'undefined' ||
+      typeof window.scrollTo !== 'function'
     ) {
-      window.scrollTo(0, 0);
+      return;
     }
+    if (navigationType === NavigationType.Pop) {
+      let saved: string | null = null;
+      try {
+        saved = sessionStorage.getItem(`scroll:${pathname}`);
+      } catch {
+        // Ignore storage errors (private browsing, quota exceeded).
+      }
+      if (saved !== null) {
+        const y = parseInt(saved, 10);
+        // Defer so the page has time to render before restoring position.
+        requestAnimationFrame(() => window.scrollTo(0, y));
+        return;
+      }
+    }
+    window.scrollTo(0, 0);
+  }, [pathname, navigationType]);
+
+  // Capture scroll position just before the user navigates away.
+  useEffect(() => {
+    const save = () => {
+      try {
+        sessionStorage.setItem(`scroll:${pathname}`, String(window.scrollY));
+      } catch {
+        // Ignore storage errors (private browsing, quota exceeded).
+      }
+    };
+    window.addEventListener('beforeunload', save);
+    return () => {
+      save();
+      window.removeEventListener('beforeunload', save);
+    };
   }, [pathname]);
 
   return (
