@@ -165,6 +165,16 @@ const FootballViewGameLogsPage = lazyWithRetry(() =>
     default: m.FootballViewGameLogsPage,
   })),
 );
+const ForgotPasswordPage = lazyWithRetry(() =>
+  import('../pages/forgot-password/ForgotPasswordPage').then((m) => ({
+    default: m.ForgotPasswordPage,
+  })),
+);
+const ResetPasswordPage = lazyWithRetry(() =>
+  import('../pages/reset-password/ResetPasswordPage').then((m) => ({
+    default: m.ResetPasswordPage,
+  })),
+);
 /** Route-level guard for admin pages — redirects non-admins to home.
  *  Defense-in-depth alongside the in-page accessLevel check in AdminPage. */
 function AdminGuard({
@@ -776,6 +786,8 @@ function App() {
             {/* /faq is a common alias that users and crawlers reach — redirect to the
                 pricing page which contains the FAQ accordion section. */}
             <Route path="/faq" element={<Navigate to="/pricing" replace />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Routes>
         </Suspense>
       </YStack>

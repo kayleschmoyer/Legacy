@@ -125,6 +125,10 @@ const PUBLIC_PATHS = [
   // Notifications section shows a sign-in card when unauthed
   // (LS-4791).
   `${basePath}/preferences`,
+  // /forgot-password and /reset-password must be accessible without auth —
+  // users who forgot their password cannot sign in first (LS-7574).
+  `${basePath}/forgot-password`,
+  `${basePath}/reset-password`,
 ];
 
 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
