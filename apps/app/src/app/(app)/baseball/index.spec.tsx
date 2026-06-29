@@ -184,6 +184,25 @@ const MOCK_LEAGUES = [
   },
 ];
 
+const FOOTBALL_LEAGUES = [
+  {
+    id: 10,
+    name: 'Grid Iron Legends',
+    sport: 'football',
+    draftStatus: null,
+    currentWeekNumber: null,
+    weekAdvanceStatus: null,
+  },
+  {
+    id: 11,
+    name: 'Touchdown Club',
+    sport: 'football',
+    draftStatus: null,
+    currentWeekNumber: null,
+    weekAdvanceStatus: null,
+  },
+];
+
 describe('BaseballHome (mobile MLBHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -280,6 +299,21 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
         'Unlimited Leagues',
       );
     });
+
+    it('counts all leagues across sports toward the cap (LS-5867)', () => {
+      // 2 football + 1 baseball = 3 total → at cap even though only 1 is baseball.
+      // The backend enforces the cap across all sports; the baseball screen must
+      // reflect the same cross-sport count so the displayed limit matches what
+      // the server will enforce.
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [...FOOTBALL_LEAGUES, MOCK_LEAGUES[0]],
+        },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      expect(screen.getByText('cap:3/3:true')).toBeTruthy();
+    });
   });
 
   describe('create + navigation', () => {
@@ -290,6 +324,23 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
             ...MOCK_LEAGUES,
             { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
+        },
+        loading: false,
+      });
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('create'));
+      await waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalledWith('subscription-settings'),
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('redirects to upgrade when at cap via cross-sport leagues (LS-5867)', async () => {
+      // 2 football + 1 baseball = 3 total → server cap reached across sports;
+      // the baseball creation path must gate here, not silently allow a 4th league.
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [...FOOTBALL_LEAGUES, MOCK_LEAGUES[0]],
         },
         loading: false,
       });
