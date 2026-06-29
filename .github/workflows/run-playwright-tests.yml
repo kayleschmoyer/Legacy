@@ -415,6 +415,12 @@ jobs:
         if: matrix.suite == 'e2e'
         shell: bash
         env:
+          # The nightly schedule instruments this build for coverage
+          # (COLLECT_COVERAGE=1 → vite-plugin-istanbul), which pushes build-time
+          # heap past V8's default ~2 GB cap and OOMs (LS: nightly e2e build).
+          # Match the 4 GB heap every other web build in the repo already uses
+          # (ci-pipeline.yml, deploy-web.yml, deploy-pr-preview.yml).
+          NODE_OPTIONS: "--max-old-space-size=4096"
           VITE_JIRA_PROXY_URL: "https://e2e-placeholder.test/jira"
           VITE_GIPHY_API_KEY: "e2e-placeholder-key"
           # Placeholder so the conditional "Continue with Discord" CTA on
