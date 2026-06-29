@@ -175,8 +175,14 @@ class ReactNativeRollbarImplementation implements RollbarInterface {
     return {
       accessToken,
       environment,
-      captureUncaught: true,
-      captureUnhandledRejections: true,
+      // Keep Rollbar's own global error hooks OFF on React Native. The `rollbar`
+      // browser SDK wires these via browser-only globals
+      // (window.onerror / addEventListener('unhandledrejection')) that don't
+      // exist under Hermes — enabling them throws "undefined is not a function"
+      // from captureUnhandledRejections during init (LS-1948). Errors are
+      // already forwarded via ErrorBoundary → LOGGER.error → RollbarOutputDestination.
+      captureUncaught: false,
+      captureUnhandledRejections: false,
       verbose: isDev,
       release,
     };
