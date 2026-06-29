@@ -14,6 +14,7 @@ import { iamGetPolicy } from './tools/iam-get-policy.js';
 import { describeSecurityGroups } from './tools/security-groups.js';
 import { lambdaStatus } from './tools/lambda-status.js';
 import { LAMBDA_FUNCTIONS, logsTail } from './tools/logs-tail.js';
+import { logsFilter, MAX_EVENTS, MAX_CHARS } from './tools/logs-filter.js';
 import {
   describeSecret,
   getSecretValue,
@@ -133,6 +134,51 @@ server.tool(
       ),
   },
   async (params) => logsTail(params),
+);
+
+// --- aws_logs_filter ---
+server.tool(
+  'aws_logs_filter',
+  `Search CloudWatch log events by log group and optional filter pattern. Accepts any log group name (including leading-slash names like /aws/lambda/... and /aws/apigateway/...) and returns structured { timestamp, message } events. Hard-capped at ${MAX_EVENTS} events or ${MAX_CHARS} chars (whichever is smaller); returns truncated: true when the cap is hit. Use startTime/endTime (epoch ms) to scope a specific window. Prefer this over shell aws logs filter-log-events to avoid Windows path mangling and encoding issues.`,
+  {
+    logGroup: z
+      .string()
+      .describe(
+        'CloudWatch log group name. Leading slash required for AWS-managed groups (e.g. /aws/lambda/legacy-sports-dev-graphql, /aws/apigateway/legacy-sports-dev-api/access-logs).',
+      ),
+    filterPattern: z
+      .string()
+      .optional()
+      .describe(
+        'CloudWatch filter pattern (e.g. "ERROR", "{ $.statusCode = 500 }", "deleteAllLeagues"). Omit to return all events.',
+      ),
+    startTime: z
+      .number()
+      .int()
+      .optional()
+      .describe('Start of the time range as epoch milliseconds (inclusive).'),
+    endTime: z
+      .number()
+      .int()
+      .optional()
+      .describe('End of the time range as epoch milliseconds (exclusive).'),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(MAX_EVENTS)
+      .default(MAX_EVENTS)
+      .describe(
+        `Maximum number of events to return (default: ${MAX_EVENTS}, hard cap: ${MAX_EVENTS}). Output is also capped at ${MAX_CHARS} chars.`,
+      ),
+    format: z
+      .enum(['markdown', 'json'])
+      .default('markdown')
+      .describe(
+        'Output shape. `markdown` (default) renders a header block plus a timestamped code block — cheaper for the agent to read. `json` returns the full structured payload.',
+      ),
+  },
+  async (params) => logsFilter(params),
 );
 
 // --- aws_lambda_status ---
