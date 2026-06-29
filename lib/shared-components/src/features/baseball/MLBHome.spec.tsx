@@ -219,6 +219,31 @@ describe('MLBHome', () => {
     expect(onUpgrade).toHaveBeenCalledTimes(1);
   });
 
+  it('shows Upgrade CTAs (hero + empty state) instead of Create when at cap with no leagues', () => {
+    const onUpgrade = jest.fn();
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={[]}
+        leagueCap={{ count: 3, limit: 3, atLimit: true, onUpgrade }}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', {
+        name: 'Create your first baseball league',
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Create a new baseball league' }),
+    ).not.toBeInTheDocument();
+    const upgradeBtns = screen.getAllByRole('button', {
+      name: 'Upgrade to add more leagues',
+    });
+    expect(upgradeBtns.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(upgradeBtns[0]);
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
+  });
+
   it('renders an Invite Friends action only when onInviteFriends is provided', () => {
     const { rerender } = render(<MLBHome {...baseProps} leagues={LEAGUES} />);
     expect(screen.queryByText('Invite Friends')).not.toBeInTheDocument();

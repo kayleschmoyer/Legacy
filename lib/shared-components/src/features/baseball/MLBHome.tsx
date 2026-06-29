@@ -248,7 +248,10 @@ export function MLBHome({
   const atCap = !!leagueCap?.atLimit;
 
   const handleCreatePress = () => {
-    if (atCap) return;
+    if (atCap) {
+      leagueCap?.onUpgrade();
+      return;
+    }
     setShowCreateDialog(true);
   };
 
@@ -407,18 +410,29 @@ export function MLBHome({
                 {`Welcome back, ${userName}. ${heroSubtitleCopy}`}
               </Paragraph>
               <XStack gap="$3" flexWrap="wrap" marginTop="$2">
-                <Button
-                  backgroundColor={BRAND_NAVY_LIGHT}
-                  borderRadius="$6"
-                  disabled={atCap}
-                  opacity={atCap ? 0.5 : 1}
-                  onPress={handleCreatePress}
-                  accessibilityLabel="Create a new baseball league"
-                >
-                  <Text color="$color1" fontWeight="700">
-                    Create League
-                  </Text>
-                </Button>
+                {atCap ? (
+                  <Button
+                    backgroundColor={BRAND_GOLD}
+                    borderRadius="$6"
+                    onPress={() => leagueCap?.onUpgrade()}
+                    accessibilityLabel="Upgrade to add more leagues"
+                  >
+                    <Text color={BRAND_NAVY} fontWeight="700">
+                      Upgrade to add more leagues
+                    </Text>
+                  </Button>
+                ) : (
+                  <Button
+                    backgroundColor={BRAND_NAVY_LIGHT}
+                    borderRadius="$6"
+                    onPress={handleCreatePress}
+                    accessibilityLabel="Create a new baseball league"
+                  >
+                    <Text color="$color1" fontWeight="700">
+                      Create League
+                    </Text>
+                  </Button>
+                )}
                 <Button
                   backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
                   borderColor={withAlpha(BRAND_NAVY, 0.42)}
@@ -857,18 +871,29 @@ export function MLBHome({
                     matchups, draft tools, and performance tracking.
                   </Paragraph>
                   <XStack gap="$3" flexWrap="wrap" justifyContent="center">
-                    <Button
-                      backgroundColor={BRAND_NAVY_LIGHT}
-                      borderRadius="$6"
-                      disabled={atCap}
-                      opacity={atCap ? 0.5 : 1}
-                      onPress={handleCreatePress}
-                      accessibilityLabel="Create your first baseball league"
-                    >
-                      <Text color="$color1" fontWeight="700">
-                        Create your first league
-                      </Text>
-                    </Button>
+                    {atCap ? (
+                      <Button
+                        backgroundColor={BRAND_GOLD}
+                        borderRadius="$6"
+                        onPress={() => leagueCap?.onUpgrade()}
+                        accessibilityLabel="Upgrade to add more leagues"
+                      >
+                        <Text color={BRAND_NAVY} fontWeight="700">
+                          Upgrade to add more leagues
+                        </Text>
+                      </Button>
+                    ) : (
+                      <Button
+                        backgroundColor={BRAND_NAVY_LIGHT}
+                        borderRadius="$6"
+                        onPress={handleCreatePress}
+                        accessibilityLabel="Create your first baseball league"
+                      >
+                        <Text color="$color1" fontWeight="700">
+                          Create your first league
+                        </Text>
+                      </Button>
+                    )}
                     <Button
                       backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
                       borderColor={withAlpha(BRAND_NAVY, 0.42)}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { type MLBHomeLeagueCap } from '@legacy-sports/shared-components/baseball';
 import { BaseballScreen } from './BaseballScreen';
 
 interface HarnessLeague {
@@ -12,6 +13,7 @@ interface MLBHomeHarnessProps {
   error?: boolean;
   isAuthenticated?: boolean;
   leagues: HarnessLeague[];
+  leagueCap?: MLBHomeLeagueCap;
   onViewLeague: (id: number) => void;
   onJoinLeague: () => void;
   onCreateLeague: (input: Record<string, unknown>) => Promise<void>;
@@ -48,6 +50,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
       <span>error:{String(props.error)}</span>
       <span>auth:{String(props.isAuthenticated)}</span>
       <span>leagues:{props.leagues.map((l) => l.name).join(',')}</span>
+      <span data-testid="at-limit">{String(!!props.leagueCap?.atLimit)}</span>
       <button onClick={() => props.onViewLeague(7)}>view</button>
       <button onClick={() => props.onJoinLeague()}>join</button>
       <button
@@ -67,6 +70,9 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
       >
         create
       </button>
+      {props.leagueCap?.atLimit ? (
+        <button onClick={() => props.leagueCap?.onUpgrade()}>upgrade</button>
+      ) : null}
     </div>
   ),
 }));
@@ -83,6 +89,19 @@ jest.mock('@legacy-sports/graphql', () => ({
   GetUserLeagues: {},
 }));
 
+const mockUseIsPremiumStatus = jest.fn(() => ({
+  isPremium: false,
+  isLoading: false,
+}));
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremiumStatus: () => mockUseIsPremiumStatus(),
+}));
+
+jest.mock('../UpgradeModal', () => ({
+  UpgradeModal: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="upgrade-modal" /> : null,
+}));
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseAuth.mockReturnValue({
@@ -97,6 +116,10 @@ beforeEach(() => {
   });
   mockCreateLeague.mockResolvedValue({
     data: { createLeagueAndTeams: { league: { id: 123 } } },
+  });
+  mockUseIsPremiumStatus.mockReturnValue({
+    isPremium: false,
+    isLoading: false,
   });
 });
 
@@ -156,5 +179,83 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/7');
     fireEvent.click(screen.getByText('join'));
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/join');
+  });
+});
+
+describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
+  function leaguesOfCount(n: number) {
+    return Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `L${i}` }));
+  }
+
+  it('does not set atLimit when user is below the cap', () => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(2) },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+    render(<BaseballScreen />);
+    expect(screen.getByTestId('at-limit').textContent).toBe('false');
+    expect(screen.queryByTestId('upgrade-modal')).not.toBeInTheDocument();
+  });
+
+  it('sets atLimit and opens the upgrade modal when a free user is at the cap', () => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(3) },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+    render(<BaseballScreen />);
+    expect(screen.getByTestId('at-limit').textContent).toBe('true');
+    fireEvent.click(screen.getByText('upgrade'));
+    expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument();
+  });
+
+  it('does not set atLimit for a premium user at/above the cap', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(5) },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+    render(<BaseballScreen />);
+    expect(screen.getByTestId('at-limit').textContent).toBe('false');
+  });
+
+  it('does not gate while premium status is still resolving', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: true,
+    });
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(4) },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+    render(<BaseballScreen />);
+    expect(screen.getByTestId('at-limit').textContent).toBe('false');
+  });
+
+  it('counts leagues across all sports toward the cap', () => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [
+          { id: 1, name: 'Football A' },
+          { id: 2, name: 'Football B' },
+          { id: 3, name: 'Baseball A' },
+        ],
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+    render(<BaseballScreen />);
+    expect(screen.getByTestId('at-limit').textContent).toBe('true');
   });
 });

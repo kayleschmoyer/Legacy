@@ -12,7 +12,14 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../PageMeta';
+import { UpgradeModal } from '../UpgradeModal';
+import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { formatDisplayName } from '../../lib/formatDisplayName';
+
+// Free accounts may participate in at most this many non-mock leagues. Mirrors
+// FREE_TIER_LEAGUE_LIMIT in the db lambda. The server is authoritative; this
+// client-side check proactively gates CTAs instead of letting the mutation fail.
+const FREE_TIER_LEAGUE_LIMIT = 3;
 
 /**
  * Web data wrapper for the shared `MLBHome` (LS-7716). Mirrors the football
@@ -23,6 +30,8 @@ import { formatDisplayName } from '../../lib/formatDisplayName';
 export function BaseballScreen() {
   const navigate = useNavigate();
   const auth = useAuth();
+  const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
+  const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
 
   const { data, loading, error, refetch } = useGetUserLeaguesQuery({
     // Only run the query if user is authenticated
@@ -75,6 +84,21 @@ export function BaseballScreen() {
   // can render when the query fails.
   const showSpinner =
     auth.isLoading || (!!auth.user && (loading || (!data && !error)));
+
+  // Count all leagues across sports — the backend cap is global (LS-5804).
+  const activeLeagueCount = (data?.userLeagues ?? []).filter(Boolean).length;
+  const atLeagueCap =
+    !premiumLoading &&
+    !isPremium &&
+    activeLeagueCount >= FREE_TIER_LEAGUE_LIMIT;
+  const leagueCap = auth?.user
+    ? {
+        count: activeLeagueCount,
+        limit: FREE_TIER_LEAGUE_LIMIT,
+        atLimit: atLeagueCap,
+        onUpgrade: () => setShowUpgradeModal(true),
+      }
+    : undefined;
 
   const handleCreateLeague = async (input: QuickCreateLeagueInput) => {
     const result = await createLeague({
@@ -133,8 +157,15 @@ export function BaseballScreen() {
               : '';
             navigate(`/baseball/league/create${params}`);
           }}
+          leagueCap={leagueCap}
         />
       </div>
+      <UpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        featureName="Unlimited league creation"
+        featureDescription={`Free accounts can be part of up to ${FREE_TIER_LEAGUE_LIMIT} leagues. Upgrade to Premium to create and join unlimited leagues.`}
+      />
     </>
   );
 }
