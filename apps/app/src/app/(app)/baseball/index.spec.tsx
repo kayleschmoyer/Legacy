@@ -67,6 +67,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
       leagues: { name?: string | null }[];
       loading?: boolean;
       error?: boolean;
+      isAuthenticated?: boolean;
       leagueCap?: {
         count: number;
         limit: number;
@@ -77,11 +78,13 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
       onJoinLeague: () => void;
       onViewLeague: (id: number) => void;
       onInviteFriends?: () => void;
+      onSignIn?: () => void;
     }) => (
       <View testID="mlb-home">
         <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
         <Text>{`loading:${String(props.loading)}`}</Text>
         <Text>{`error:${String(props.error)}`}</Text>
+        <Text>{`isAuthenticated:${String(props.isAuthenticated ?? true)}`}</Text>
         <Text>{`cap:${
           props.leagueCap
             ? `${props.leagueCap.count}/${props.leagueCap.limit}:${props.leagueCap.atLimit}`
@@ -125,9 +128,12 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
   };
 });
 
-const mockUserInfo = { id: 1, username: 'testuser' };
+const mockUseAuthorizedUserInfo = jest.fn(() => ({
+  id: 1,
+  username: 'testuser',
+}));
 jest.mock('../../../common/auth/AuthorizedUserContext', () => ({
-  useAuthorizedUserInfo: () => mockUserInfo,
+  useAuthorizedUserInfo: () => mockUseAuthorizedUserInfo(),
 }));
 
 const mockUseGetUserLeaguesQuery: jest.MockedFunction<
@@ -181,6 +187,7 @@ const MOCK_LEAGUES = [
 describe('BaseballHome (mobile MLBHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAuthorizedUserInfo.mockReturnValue({ id: 1, username: 'testuser' });
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: { userLeagues: MOCK_LEAGUES },
       loading: false,
@@ -420,6 +427,31 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
           resolveShare({ action: Share.sharedAction }),
         ),
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe('unauthenticated state (LS-5806)', () => {
+    it('skips the query and passes isAuthenticated:false + error:false to MLBHome', () => {
+      mockUseAuthorizedUserInfo.mockReturnValue(null);
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: undefined,
+        loading: false,
+      });
+      render(<BaseballHome />);
+      expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: true });
+      expect(screen.getByText('error:false')).toBeTruthy();
+      expect(screen.getByText('isAuthenticated:false')).toBeTruthy();
+    });
+
+    it('does not flag leaguesLoadFailed when the user id is null', () => {
+      mockUseAuthorizedUserInfo.mockReturnValue({ id: null, username: null });
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: undefined,
+        loading: false,
+      });
+      render(<BaseballHome />);
+      expect(screen.getByText('error:false')).toBeTruthy();
+      expect(screen.getByText('isAuthenticated:false')).toBeTruthy();
     });
   });
 });

@@ -40,10 +40,11 @@ export default function BaseballHome() {
   }, []);
   const userInfo = useAuthorizedUserInfo();
   const router = useRouter();
+  const isAuthenticated = Boolean(userInfo?.id);
 
   const { data, loading: loadingLeagues } = useGetUserLeaguesQuery({
     // Only run the query if user is authenticated
-    skip: !userInfo?.id,
+    skip: !isAuthenticated,
   });
 
   const [createLeague] = useCreateLeagueMutation();
@@ -107,7 +108,10 @@ export default function BaseballHome() {
   // and the invite modal.
   const userLeagues = data?.userLeagues;
   const rawLeagues = userLeagues ?? [];
-  const leaguesLoadFailed = !loadingLeagues && userLeagues == null;
+  // Only flag a load failure when authenticated — a skipped query (unauthenticated)
+  // returning null is intentional, not an error (LS-5806).
+  const leaguesLoadFailed =
+    isAuthenticated && !loadingLeagues && userLeagues == null;
 
   const leagues = React.useMemo(
     () =>
@@ -174,6 +178,8 @@ export default function BaseballHome() {
         leagues={leagues}
         loading={loadingLeagues}
         error={leaguesLoadFailed}
+        isAuthenticated={isAuthenticated}
+        onSignIn={() => router.navigate('/login')}
         userName={userInfo?.username ?? 'Manager'}
         onCreateLeague={handleCreateLeague}
         onJoinLeague={() => router.navigate('/baseball/league/join')}
