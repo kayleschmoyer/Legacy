@@ -205,6 +205,8 @@ export function CreateLeagueDialog({
           key="content"
           bordered
           elevate
+          animation="quick"
+          enterStyle={{ opacity: 0, scale: 0.97 }}
           maxWidth={560}
           width="100%"
           maxHeight="90%"

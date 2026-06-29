@@ -177,6 +177,13 @@ describe('CreateLeagueDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
+  it('league name input has no autoFocus (prevents Android keyboard timing race with dialog animation)', () => {
+    render(<CreateLeagueDialog {...baseProps} />);
+    const input = screen.getByPlaceholderText(/Saturday Sluggers/i);
+    expect(input).not.toHaveAttribute('autoFocus');
+    expect(input).not.toHaveAttribute('autofocus');
+  });
+
   it('submits when Enter is pressed in the league name input', () => {
     const onSubmit = jest.fn().mockReturnValue(new Promise(() => undefined));
     render(<CreateLeagueDialog {...baseProps} onSubmit={onSubmit} />);
