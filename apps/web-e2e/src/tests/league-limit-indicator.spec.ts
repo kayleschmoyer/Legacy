@@ -1,16 +1,14 @@
 /**
- * Baseball Home — League Limit / Slots Indicator (LS-5339)
+ * Baseball Home — League Limit / Slots Indicator (LS-5339, LS-5870)
  *
- * The shared `MLBHome` component supports a `leagueCap` prop that renders a
- * "Your leagues: X/Y" counter and an upgrade link for free-tier users at their
- * league cap. The web wrapper (`BaseballScreen`) does NOT currently pass
- * `leagueCap`, so the cap indicator is absent on this platform — see the
- * feature.md at
- * docs/agents/qa-coverage/jira-page-epics/pages/baseball-home/features/league-limit-indicator/feature.md
- * for the full gap note.
+ * The shared `MLBHome` component renders a `leagueCap` indicator ("Your leagues: X/Y")
+ * for free-tier users, and an "Unlimited leagues" badge (LS-5870) for premium users
+ * via the `isPremium` prop. The web wrapper (`BaseballScreen`) passes `leagueCap`
+ * for authenticated users and `isPremium` for premium users.
  *
  * These tests cover the web surface for the league-slots context:
  *   - The baseball hub renders all mocked leagues for both free and premium users
+ *   - Premium users see the "Unlimited leagues" badge
  *   - The "Create" button is present and enabled regardless of league count on web
  *     (the web wrapper does not gate creation by the free-tier cap)
  *   - The "Your leagues" section heading is always visible
@@ -128,6 +126,17 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
     await expect(page.getByText('Alpha League').first()).toBeVisible();
     await expect(page.getByText('Beta League').first()).toBeVisible();
     await expect(page.getByText('Gamma League').first()).toBeVisible();
+  });
+
+  test('premium user sees "Unlimited leagues" badge on the baseball home page', async ({
+    page,
+  }) => {
+    await mockThreeLeagues(page);
+    await page.goto('/baseball');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByText('Unlimited leagues')).toBeVisible();
+    await expect(page.getByText(/Your leagues:/)).not.toBeVisible();
   });
 
   test('league-cap indicator text is absent on web (cap UI is mobile-only)', async ({

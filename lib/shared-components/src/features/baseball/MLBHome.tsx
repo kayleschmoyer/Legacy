@@ -85,6 +85,8 @@ export interface MLBHomeProps {
   onAdvancedCreate?: (leagueName: string) => void;
   /** Free-tier league-cap context (mobile, LS-5182). */
   leagueCap?: MLBHomeLeagueCap;
+  /** When true, renders an "Unlimited leagues" badge instead of the free-tier cap indicator (LS-5870). */
+  isPremium?: boolean;
 }
 
 interface LeagueBadge {
@@ -168,6 +170,7 @@ export function MLBHome({
   onInviteFriends,
   onAdvancedCreate,
   leagueCap,
+  isPremium,
 }: MLBHomeProps) {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -613,8 +616,19 @@ export function MLBHome({
           </YStack>
         ) : null}
 
-        {/* Free-tier league-cap indicator + invite (mobile extras) */}
-        {leagueCap ? (
+        {/* League-cap indicator: free-tier count/limit, or premium unlimited badge (LS-5870) */}
+        {isPremium ? (
+          <XStack alignItems="center" gap="$2">
+            <Text
+              color={BRAND_GOLD}
+              fontSize="$4"
+              fontWeight="bold"
+              accessibilityLabel="You have unlimited leagues"
+            >
+              Unlimited leagues
+            </Text>
+          </XStack>
+        ) : leagueCap ? (
           <XStack alignItems="center" flexWrap="wrap" gap="$2">
             <Text color="$gray11" fontSize="$4">
               Your leagues: {leagueCap.count}/{leagueCap.limit}

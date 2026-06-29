@@ -246,6 +246,12 @@ describe('MLBHome', () => {
     expect(onUpgrade).toHaveBeenCalledTimes(1);
   });
 
+  it('shows "Unlimited leagues" badge for premium users and hides the cap indicator', () => {
+    render(<MLBHome {...baseProps} leagues={LEAGUES} isPremium />);
+    expect(screen.getByText('Unlimited leagues')).toBeInTheDocument();
+    expect(screen.queryByText(/Your leagues:/)).not.toBeInTheDocument();
+  });
+
   it('renders an Invite Friends action only when onInviteFriends is provided', () => {
     const { rerender } = render(<MLBHome {...baseProps} leagues={LEAGUES} />);
     expect(screen.queryByText('Invite Friends')).not.toBeInTheDocument();

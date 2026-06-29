@@ -12,8 +12,8 @@ and — when the user has reached their limit — an `"— Upgrade to add more"`
 navigates to the subscription upgrade screen.
 
 For free users the "Create" button is also disabled when `atLimit: true`, enforcing the cap
-at the UI layer. Premium users never see the indicator; the cap UI is hidden when `leagueCap`
-is omitted.
+at the UI layer. Premium users see an "Unlimited leagues" badge instead (LS-5870) — passed
+via the `isPremium` prop on `MLBHome`; the free-tier count/limit row is hidden.
 
 The free-tier cap is **3 active leagues** (`FREE_TIER_LEAGUE_LIMIT = 3` in
 `apps/app/src/features/subscription/constants.ts`), mirroring the server-enforced limit in
@@ -68,9 +68,9 @@ leagueCap={
 
 **Web wrapper (web):** `apps/web/src/components/baseball/BaseballScreen.tsx`
 
-The web wrapper does **not** currently pass `leagueCap` to `MLBHome` — the cap indicator is
-absent on the web platform. The `Create` button on web is never disabled by the free-tier cap.
-This is a known platform gap; the unit tests cover the shared component in isolation.
+The web wrapper passes `leagueCap` for authenticated users and `isPremium` for premium users.
+The `Create` button on web is never disabled by the free-tier cap (atLimit is only enforced
+on mobile). Premium users see the "Unlimited leagues" badge via `isPremium` (LS-5870).
 
 ## Test Coverage
 
@@ -96,6 +96,7 @@ File: `apps/web-e2e/src/tests/league-limit-indicator.spec.ts`
 - Create League button is present and enabled (cap indicator is web-only gap — web wrapper
   does not pass leagueCap, so the button is never disabled by the cap on this platform)
 - Create League button is present and enabled for a premium user with three leagues
+- Premium user sees "Unlimited leagues" badge (LS-5870)
 
 ## Related
 

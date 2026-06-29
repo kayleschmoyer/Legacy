@@ -186,6 +186,7 @@ export default function BaseballHome() {
           })
         }
         onInviteFriends={openInviteModal}
+        isPremium={isPremium && !subscriptionLoading && leaguesLoaded}
         leagueCap={
           showLeagueCap
             ? {

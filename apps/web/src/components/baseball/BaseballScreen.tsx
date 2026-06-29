@@ -159,6 +159,7 @@ export function BaseballScreen() {
               : '';
             navigate(`/baseball/league/create${params}`);
           }}
+          isPremium={isPremium && !premiumLoading}
           leagueCap={leagueCap}
         />
       </div>
