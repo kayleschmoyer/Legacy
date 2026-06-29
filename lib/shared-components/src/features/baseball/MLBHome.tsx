@@ -83,6 +83,8 @@ export interface MLBHomeProps {
   onInviteFriends?: () => void;
   /** When provided, the dialog shows an "Advanced settings" link. */
   onAdvancedCreate?: (leagueName: string) => void;
+  /** When provided, renders a "Browse Players" action linking to the players directory (LS-5812). */
+  onBrowsePlayers?: () => void;
   /** Free-tier league-cap context (mobile, LS-5182). */
   leagueCap?: MLBHomeLeagueCap;
   /** When true, renders an "Unlimited leagues" badge instead of the free-tier cap indicator (LS-5870). */
@@ -169,6 +171,7 @@ export function MLBHome({
   onSignIn,
   onInviteFriends,
   onAdvancedCreate,
+  onBrowsePlayers,
   leagueCap,
   isPremium,
 }: MLBHomeProps) {
@@ -366,6 +369,20 @@ export function MLBHome({
                   </Text>
                 </Button>
               ) : null}
+              {onBrowsePlayers ? (
+                <Button
+                  backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+                  borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                  borderWidth={1}
+                  borderRadius="$5"
+                  onPress={onBrowsePlayers}
+                  accessibilityLabel="Browse baseball players"
+                >
+                  <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                    Players
+                  </Text>
+                </Button>
+              ) : null}
             </XStack>
           </XStack>
         ) : (
@@ -473,6 +490,20 @@ export function MLBHome({
                   >
                     <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                       Live Scores
+                    </Text>
+                  </Button>
+                ) : null}
+                {onBrowsePlayers ? (
+                  <Button
+                    backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                    borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                    borderWidth={1}
+                    borderRadius="$6"
+                    onPress={onBrowsePlayers}
+                    accessibilityLabel="Browse baseball players"
+                  >
+                    <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                      Players
                     </Text>
                   </Button>
                 ) : null}

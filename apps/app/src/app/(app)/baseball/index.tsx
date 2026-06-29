@@ -201,6 +201,7 @@ export default function BaseballHome() {
           })
         }
         onInviteFriends={openInviteModal}
+        onBrowsePlayers={() => router.navigate('/baseball/players')}
         isPremium={isPremium && !subscriptionLoading && leaguesLoaded}
         leagueCap={
           showLeagueCap

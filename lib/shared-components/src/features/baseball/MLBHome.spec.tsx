@@ -316,6 +316,39 @@ describe('MLBHome', () => {
     expect(onScoreboard).toHaveBeenCalledTimes(1);
   });
 
+  it('does not render a Players button when onBrowsePlayers is omitted', () => {
+    render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    expect(
+      screen.queryByRole('button', { name: 'Browse baseball players' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders a Players button in the compact hero and calls onBrowsePlayers when provided', () => {
+    const onBrowsePlayers = jest.fn();
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        onBrowsePlayers={onBrowsePlayers}
+      />,
+    );
+    const btn = screen.getByRole('button', { name: 'Browse baseball players' });
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onBrowsePlayers).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a Players button in the full hero when the user has no leagues', () => {
+    const onBrowsePlayers = jest.fn();
+    render(
+      <MLBHome {...baseProps} leagues={[]} onBrowsePlayers={onBrowsePlayers} />,
+    );
+    const btn = screen.getByRole('button', { name: 'Browse baseball players' });
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onBrowsePlayers).toHaveBeenCalledTimes(1);
+  });
+
   describe('frozen / archived leagues', () => {
     it('excludes tier-frozen leagues from the active list and shows the archived toggle', () => {
       render(<MLBHome {...baseProps} leagues={[...LEAGUES, FROZEN_LEAGUE]} />);
