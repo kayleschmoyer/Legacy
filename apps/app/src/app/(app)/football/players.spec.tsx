@@ -110,6 +110,15 @@ jest.mock('expo-apple-authentication', () => ({
 
 jest.mock('@legacy-sports/shared-components', () => ({
   BRAND_GOLD: '#D4AF37',
+  BRAND_SEAM_RED_LIGHT: '#E63950',
+  AMBER: '#F59E0B',
+  AMBER_LIGHT: '#FBBF24',
+  ORANGE: '#F97316',
+  TEXT_MUTED: '#9CAAC5',
+  withAlpha: (hex: string, alpha: number) =>
+    `${hex}${Math.round(alpha * 255)
+      .toString(16)
+      .padStart(2, '0')}`,
   NFL_TEAMS: {
     KC: {
       abbreviation: 'KC',
@@ -750,6 +759,68 @@ describe('FootballPlayers', () => {
       });
       render(<FootballPlayers />);
       expect(screen.getByText('Load more')).toBeTruthy();
+    });
+  });
+
+  describe('injury badge (LS-6250)', () => {
+    it('renders injury status text when injuryStatus is present', () => {
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [{ ...QB_PLAYER, injuryStatus: 'Questionable' }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      expect(screen.getByText('Questionable')).toBeTruthy();
+    });
+
+    it('does not render an injury badge when injuryStatus is null', () => {
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [{ ...QB_PLAYER, injuryStatus: null }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      expect(screen.queryByText('Out')).toBeNull();
+      expect(screen.queryByText('Questionable')).toBeNull();
+    });
+
+    it.each(['Out', 'IR', 'Doubtful', 'Questionable', 'Day-to-Day', 'PUP'])(
+      'renders injury badge for status "%s"',
+      (status) => {
+        mockUseFootballPlayersQuery.mockReturnValue({
+          ...defaultQueryResult,
+          data: {
+            footballPlayers: {
+              nodes: [{ ...QB_PLAYER, injuryStatus: status }],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        });
+        render(<FootballPlayers />);
+        expect(screen.getByText(status)).toBeTruthy();
+      },
+    );
+
+    it('renders an injury badge for an unrecognised status', () => {
+      mockUseFootballPlayersQuery.mockReturnValue({
+        ...defaultQueryResult,
+        data: {
+          footballPlayers: {
+            nodes: [{ ...QB_PLAYER, injuryStatus: 'Game-Time Decision' }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      });
+      render(<FootballPlayers />);
+      expect(screen.getByText('Game-Time Decision')).toBeTruthy();
     });
   });
 

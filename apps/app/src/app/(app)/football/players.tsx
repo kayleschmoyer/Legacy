@@ -14,9 +14,15 @@ import { ChevronDown, Star } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import {
+  AMBER,
+  AMBER_LIGHT,
   BRAND_GOLD,
+  BRAND_SEAM_RED_LIGHT,
   NFL_TEAMS,
+  ORANGE,
   TEAM_FILTER_OPTIONS_BY_SPORT,
+  TEXT_MUTED,
+  withAlpha,
 } from '@legacy-sports/shared-components';
 import { StatCategory } from '@legacy-sports/shared-components/football';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
@@ -285,6 +291,54 @@ function PlayerStats({ player }: { player: FootballPlayerNode }) {
   );
 }
 
+const INJURY_COLORS: Record<string, { bg: string; text: string }> = {
+  out: {
+    bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15),
+    text: BRAND_SEAM_RED_LIGHT,
+  },
+  ir: { bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15), text: BRAND_SEAM_RED_LIGHT },
+  pup: {
+    bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15),
+    text: BRAND_SEAM_RED_LIGHT,
+  },
+  doubtful: { bg: withAlpha(ORANGE, 0.15), text: ORANGE },
+  questionable: { bg: withAlpha(AMBER_LIGHT, 0.15), text: AMBER },
+  'day-to-day': { bg: withAlpha(AMBER_LIGHT, 0.15), text: AMBER },
+};
+
+function injuryColors(status: string): { bg: string; text: string } {
+  return (
+    INJURY_COLORS[status.toLowerCase()] ?? {
+      bg: withAlpha(TEXT_MUTED, 0.12),
+      text: TEXT_MUTED,
+    }
+  );
+}
+
+function InjuryChip({ status }: { status: string }) {
+  const colors = injuryColors(status);
+  return (
+    <YStack
+      paddingHorizontal={6}
+      paddingVertical={2}
+      borderRadius="$1"
+      backgroundColor={colors.bg}
+      borderWidth={1}
+      borderColor={withAlpha(colors.text, 0.4)}
+    >
+      <Text
+        fontSize={10}
+        fontWeight="800"
+        color={colors.text}
+        textTransform="uppercase"
+        letterSpacing={0.4}
+      >
+        {status}
+      </Text>
+    </YStack>
+  );
+}
+
 function PlayerRow({
   player,
   onPress,
@@ -366,6 +420,7 @@ function PlayerRow({
                 {displayPos}
               </Text>
             </YStack>
+            {player.injuryStatus && <InjuryChip status={player.injuryStatus} />}
             {player.nflTeam && (
               <Text fontSize={12} color="$textMuted">
                 {isDst && teamData
