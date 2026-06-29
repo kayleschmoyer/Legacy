@@ -31,4 +31,9 @@
 #
 # LS-4909: touch to force runner-terraform-apply.yml to re-roll the launch
 # template after rebuild-runner-ami.yml builds the new JDK-17 AMI.
+#
+# LS-4919: carrier touch to trigger rebuild-runner-ami.yml and pick up recent
+# Packer-template tool-baking changes (e.g. Android SDK path fixes). The
+# workflow will commit updated playwright_version + AMI tfvars back to this
+# branch; runner-terraform-apply.yml rolls the launch template on merge.
 runner_ami_playwright_version = "1.59.1"
