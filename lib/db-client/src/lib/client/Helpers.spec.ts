@@ -1,0 +1,214 @@
+import { runWithClient } from './Helpers';
+
+jest.mock('drizzle-orm', () => ({
+  sql: jest.fn().mockReturnValue({}),
+}));
+
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
+const mockClose = jest.fn();
+const mockExecute = jest.fn();
+const mockInitialize = jest.fn();
+
+let mockIsInitialized = false;
+
+jest.mock('./abstract/PgDbConnection', () => ({
+  PgDbConnection: jest.fn().mockImplementation(() => ({
+    get isInitialized() {
+      return mockIsInitialized;
+    },
+    initialize: mockInitialize,
+    close: mockClose,
+    db: { execute: mockExecute },
+  })),
+}));
+
+jest.mock('../../drizzle/public/schema', () => ({}));
+jest.mock('../../drizzle/internal/schema', () => ({}));
+
+const SCHEMA = {};
+const OPTIONS = { type: 'pg-remote' as const };
+
+describe('runWithClient', () => {
+  let setTimeoutSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Make retry delays instant so tests don't need fake timers.
+    setTimeoutSpy = jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation((fn) => {
+        if (typeof fn === 'function') {
+          // Cast to a specific callable type to satisfy @typescript-eslint/no-unsafe-call;
+          // only void-returning callbacks are passed to setTimeout in runWithClient.
+          (fn as () => void)();
+        }
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      });
+    mockIsInitialized = false;
+    mockInitialize.mockResolvedValue(undefined);
+    mockClose.mockResolvedValue(undefined);
+    mockExecute.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('happy path', () => {
+    it('returns the callback result on first attempt', async () => {
+      const callback = jest.fn().mockResolvedValue('result');
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).resolves.toBe(
+        'result',
+      );
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(mockClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs the health-check query before the callback', async () => {
+      const order: string[] = [];
+      mockExecute.mockImplementation(() => {
+        order.push('health');
+        return Promise.resolve([]);
+      });
+      const callback = jest.fn().mockImplementation(() => {
+        order.push('callback');
+        return Promise.resolve('ok');
+      });
+      await runWithClient(OPTIONS, SCHEMA, callback);
+      expect(order).toEqual(['health', 'callback']);
+    });
+  });
+
+  describe('retry on transient pg errors', () => {
+    it('retries once and succeeds when first attempt has a transient pg error', async () => {
+      const transientErr = Object.assign(new Error('connection failure'), {
+        code: '08006',
+      });
+      const callback = jest
+        .fn()
+        .mockRejectedValueOnce(transientErr)
+        .mockResolvedValueOnce('ok');
+
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).resolves.toBe(
+        'ok',
+      );
+      expect(callback).toHaveBeenCalledTimes(2);
+      // Closed after the failing attempt and after the successful one
+      expect(mockClose).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries a transient error wrapped in a DrizzleQueryError-style cause chain', async () => {
+      const pgErr = Object.assign(new Error('admin shutdown'), {
+        code: '57P01',
+      });
+      const drizzleErr = Object.assign(
+        new Error('Failed query: select ... from "app_internal"."users"'),
+        { cause: pgErr },
+      );
+      const callback = jest
+        .fn()
+        .mockRejectedValueOnce(drizzleErr)
+        .mockResolvedValueOnce('recovered');
+
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).resolves.toBe(
+        'recovered',
+      );
+      expect(callback).toHaveBeenCalledTimes(2);
+    });
+
+    it('exhausts retries and throws when all attempts fail with transient errors', async () => {
+      const transientErr = Object.assign(new Error('connection failure'), {
+        code: '08006',
+      });
+      const callback = jest.fn().mockRejectedValue(transientErr);
+
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).rejects.toThrow(
+        'connection failure',
+      );
+      // 1 initial + 2 retries = 3 total attempts
+      expect(callback).toHaveBeenCalledTimes(3);
+    });
+
+    it('closes the connection on each failed attempt', async () => {
+      const transientErr = Object.assign(new Error('connection failure'), {
+        code: '08006',
+      });
+      const callback = jest.fn().mockRejectedValue(transientErr);
+
+      await runWithClient(OPTIONS, SCHEMA, callback).catch(() => undefined);
+      // close() called once per attempt (3 total: 1 initial + 2 retries)
+      expect(mockClose).toHaveBeenCalledTimes(3);
+    });
+
+    it('uses exponential back-off between retries', async () => {
+      const transientErr = Object.assign(new Error('conn failure'), {
+        code: '08003',
+      });
+      const callback = jest.fn().mockRejectedValue(transientErr);
+
+      await runWithClient(OPTIONS, SCHEMA, callback).catch(() => undefined);
+
+      // Assert via setTimeout spy args rather than LOGGER.warn to avoid
+      // @typescript-eslint/unbound-method / no-unsafe-member-access.
+      // This directly tests the back-off timing values passed to setTimeout.
+      expect(setTimeoutSpy).toHaveBeenNthCalledWith(
+        1,
+        expect.any(Function),
+        100,
+      );
+      expect(setTimeoutSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.any(Function),
+        200,
+      );
+    });
+  });
+
+  describe('no retry on non-transient errors', () => {
+    it('throws immediately without retrying on a plain Error', async () => {
+      const appErr = new Error('some business logic error');
+      const callback = jest.fn().mockRejectedValue(appErr);
+
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).rejects.toThrow(
+        'some business logic error',
+      );
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws immediately without retrying on a non-transient pg error (23505)', async () => {
+      const pgErr = Object.assign(new Error('duplicate key'), {
+        code: '23505',
+      });
+      const callback = jest.fn().mockRejectedValue(pgErr);
+
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).rejects.toThrow(
+        'duplicate key',
+      );
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('health-check failure', () => {
+    it('retries when the health-check query itself fails with a transient error', async () => {
+      const transientErr = Object.assign(new Error('connection gone'), {
+        code: '08003',
+      });
+      // First execute (health-check) fails; subsequent calls succeed
+      mockExecute.mockRejectedValueOnce(transientErr).mockResolvedValue([]);
+      const callback = jest.fn().mockResolvedValue('ok');
+
+      await expect(runWithClient(OPTIONS, SCHEMA, callback)).resolves.toBe(
+        'ok',
+      );
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+  });
+});

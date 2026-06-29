@@ -1,12 +1,6 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import PlayersRoute, { FootballPlayers, parseAdvancedSearch } from './players';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
@@ -455,6 +449,12 @@ describe('FootballPlayers', () => {
 
   describe('AsyncStorage filter persistence (LS-6465)', () => {
     it('rehydrates positions and team from AsyncStorage on mount', async () => {
+      // useDebounce inside FootballPlayers schedules a 300ms setTimeout on every
+      // render. RNTL 14 alpha's act() detects the pending real timer and hangs.
+      // Use fake timers so act() can advance and complete synchronously, then
+      // advance past the debounce delay before asserting (mirrors the adjacent
+      // "rehydrates search input" test below).
+      jest.useFakeTimers();
       const stored = JSON.stringify({
         positions: ['WR', 'TE'],
         teamFilter: 'KC',
@@ -467,16 +467,18 @@ describe('FootballPlayers', () => {
         render(<FootballPlayers />);
         await Promise.resolve();
       });
-
-      await waitFor(() => {
-        const calls = mockUseFootballPlayersQuery.mock.calls;
-        const lastCall = calls[calls.length - 1] as [
-          { variables: { positions?: string[]; nflTeam?: string } },
-        ];
-        expect(lastCall[0].variables.positions).toEqual(['WR', 'TE']);
-        expect(lastCall[0].variables.nflTeam).toBe('KC');
+      void act(() => {
+        jest.advanceTimersByTime(300);
       });
-    }, 15000);
+      jest.useRealTimers();
+
+      const calls = mockUseFootballPlayersQuery.mock.calls;
+      const lastCall = calls[calls.length - 1] as [
+        { variables: { positions?: string[]; nflTeam?: string } },
+      ];
+      expect(lastCall[0].variables.positions).toEqual(['WR', 'TE']);
+      expect(lastCall[0].variables.nflTeam).toBe('KC');
+    });
 
     it('rehydrates search input from AsyncStorage on mount', async () => {
       jest.useFakeTimers();

@@ -34,9 +34,10 @@ if (isDevelopment) {
         await connection.close();
         connectionCache.delete(key);
       } catch (err) {
-        LOGGER.error(`Failed to close connection ${key}`, {
-          error: err instanceof Error ? err.message : String(err),
-        });
+        LOGGER.error(
+          `Failed to close connection ${key}`,
+          err instanceof Error ? err : new Error(String(err)),
+        );
       }
     }
   };
@@ -100,57 +101,128 @@ export function getDbConnection<TSchema extends Record<string, unknown>>(
   }
 }
 
+// Postgres SQLSTATE codes that indicate a transient connection failure safe to
+// retry. These arise from Aurora scaling events, mid-session connection recycling,
+// or brief network blips. Because no write has been committed when these fire,
+// retrying the full runWithClient cycle (new connection → health-check → callback)
+// is safe. See LS-8001.
+const TRANSIENT_PG_CODES = new Set([
+  '08000', // connection_exception
+  '08003', // connection_does_not_exist
+  '08006', // connection_failure
+  '57P01', // admin_shutdown  — Aurora replica restart / scale-down
+  '57P02', // crash_shutdown
+  '57P03', // cannot_connect_now — Aurora cold-resume
+]);
+
+const MAX_QUERY_RETRIES = 2;
+const RETRY_DELAY_BASE_MS = 100;
+
+// Walk err → err.cause → … and return the first transient SQLSTATE code found.
+function extractTransientPgCode(err: unknown): string | undefined {
+  let current: unknown = err;
+  const seen = new Set<unknown>();
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    const code = (current as Error & { code?: unknown }).code;
+    if (typeof code === 'string' && TRANSIENT_PG_CODES.has(code)) return code;
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
+/**
+ * Open a database connection, run `callback`, and close the connection.
+ *
+ * Retries up to MAX_QUERY_RETRIES times on transient Aurora connection errors
+ * (SQLSTATE 08xxx / 57Pxx). These codes signal that the TCP connection was
+ * severed *before* any write reached the server, so the server-side transaction
+ * was never opened and a retry is unconditionally safe.
+ *
+ * **Idempotency contract:** because the callback may execute more than once,
+ * callers must ensure it is idempotent (e.g. upserts rather than blind
+ * INSERTs, or operations guarded by a unique constraint). A callback that
+ * performs a non-idempotent write and encounters a transient error will see
+ * that write retried.
+ */
 export async function runWithClient<T, TSchema extends Record<string, unknown>>(
   options: DbOptions,
   schema: TSchema,
   callback: (client: GenericDatabase<TSchema>) => Promise<T>,
 ): Promise<T> {
-  const connection: BaseDbConnection<TSchema> = getDbConnection(
-    options,
-    schema,
-  );
+  for (let attempt = 0; attempt <= MAX_QUERY_RETRIES; attempt++) {
+    const connection: BaseDbConnection<TSchema> = getDbConnection(
+      options,
+      schema,
+    );
 
-  let initializationFailed = false;
+    let initializationFailed = false;
+    let transientError = false;
 
-  try {
-    // Only initialize if not already initialized (important for cached connections)
-    if (!connection.isInitialized) {
-      LOGGER.debug('Initializing connection');
-      await connection.initialize();
-    } else {
-      LOGGER.debug('Using already initialized connection');
-    }
-
-    LOGGER.debug('authorizing...');
-
-    await connection.db.execute(sql`select 1 + 1`);
-
-    LOGGER.debug('initializing models');
-
-    return await callback(connection.db);
-  } catch (err) {
-    // If initialization failed, mark it so we clean up even in dev mode
-    if (!connection.isInitialized) {
-      initializationFailed = true;
-    }
-    throw err;
-  } finally {
-    // In development with caching, don't close the connection UNLESS initialization failed
-    if (!isDevelopment || initializationFailed) {
-      try {
-        LOGGER.debug('Disconnecting client');
-        await connection.close();
-        LOGGER.debug('Client disconnected');
-      } catch (err) {
-        LOGGER.debug('Could not disconnect client');
-        if (err instanceof Error) {
-          LOGGER.debug(err.message);
-        }
+    try {
+      // Only initialize if not already initialized (important for cached connections)
+      if (!connection.isInitialized) {
+        LOGGER.debug('Initializing connection');
+        await connection.initialize();
+      } else {
+        LOGGER.debug('Using already initialized connection');
       }
-    } else {
-      LOGGER.debug('Keeping connection open (dev mode)');
+
+      LOGGER.debug('authorizing...');
+
+      await connection.db.execute(sql`select 1 + 1`);
+
+      LOGGER.debug('initializing models');
+
+      return await callback(connection.db);
+    } catch (err) {
+      // If initialization failed, mark it so we clean up even in dev mode
+      if (!connection.isInitialized) {
+        initializationFailed = true;
+      }
+      const pgCode = extractTransientPgCode(err);
+      transientError = pgCode !== undefined;
+      if (transientError && attempt < MAX_QUERY_RETRIES) {
+        const delayMs = RETRY_DELAY_BASE_MS * (attempt + 1);
+        LOGGER.warn(
+          `Transient DB connection error (pgCode=${pgCode}), retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_QUERY_RETRIES})`,
+          err instanceof Error ? err : new Error(String(err)),
+        );
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+        // Falls through to finally for cleanup; loop continues with a fresh connection
+      } else {
+        throw err;
+      }
+    } finally {
+      // Force-close (and evict from dev-mode cache) on any transient error so
+      // the next iteration always starts with a fresh connection.
+      if (!isDevelopment || initializationFailed || transientError) {
+        try {
+          LOGGER.debug('Disconnecting client');
+          await connection.close();
+          if (isDevelopment && transientError) {
+            connectionCache.delete(getCacheKey(options));
+          }
+          LOGGER.debug('Client disconnected');
+        } catch (err) {
+          LOGGER.debug('Could not disconnect client');
+          if (err instanceof Error) {
+            LOGGER.debug(err.message);
+          }
+        }
+      } else {
+        LOGGER.debug('Keeping connection open (dev mode)');
+      }
     }
+    // Reaches here only when: transientError=true AND attempt < MAX_QUERY_RETRIES
+    // Next loop iteration fetches a fresh connection via getDbConnection
   }
+
+  // Unreachable: every iteration either returns (success) or throws (non-transient
+  // error, or last-attempt transient error). TypeScript cannot prove this statically.
+  throw new Error(
+    'runWithClient: retry loop exhausted without return or throw',
+  );
 }
 
 export function runWithPublicClient<T>(
