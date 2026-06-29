@@ -10,7 +10,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { H3, Spinner, Text, YStack } from 'tamagui';
+import { Button, H3, Spinner, Text, YStack } from 'tamagui';
+import { ShoppingCart } from '@tamagui/lucide-icons';
 import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
@@ -52,7 +53,7 @@ import { toIntId } from '../../../../common/utilities/RouteUtils';
 import { setLastVisitedLeague } from '../../../../common/utilities/lastVisitedLeague';
 import { useSubscription } from '../../../../features/subscription/useSubscription';
 
-const BASEBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
+const BASE_BASEBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster' },
   { id: 'matchups', label: 'Matchups' },
@@ -218,6 +219,14 @@ export default function LeagueId(): React.JSX.Element {
   }, [numLeagueId, leagueLoaded]);
 
   const isMember = isCommissioner || userTeamId != null;
+
+  const leagueTabs = useMemo<readonly LeagueTabDef[]>(() => {
+    if (!league?.waiverEnabled) return BASE_BASEBALL_LEAGUE_TABS;
+    const withWaivers = [...BASE_BASEBALL_LEAGUE_TABS];
+    const tradesIdx = withWaivers.findIndex((t) => t.id === 'trades');
+    withWaivers.splice(tradesIdx + 1, 0, { id: 'waivers', label: 'Waivers' });
+    return withWaivers;
+  }, [league?.waiverEnabled]);
 
   // Effective view-as role: honour the user's toggle when valid, else fall
   // back to their highest actual role.
@@ -430,7 +439,7 @@ export default function LeagueId(): React.JSX.Element {
       seasons={seasonOptions}
       isCommissioner={isCommissioner}
       isMember={isMember}
-      tabs={BASEBALL_LEAGUE_TABS}
+      tabs={leagueTabs}
       activeTab={selectedTab}
       onTabChange={setSelectedTab}
       onBack={() => router.back()}
@@ -546,6 +555,37 @@ export default function LeagueId(): React.JSX.Element {
               ) : (
                 <Text color="$textMuted">
                   Join this league to propose and manage trades.
+                </Text>
+              )}
+            </YStack>
+          </ScrollView>
+        </YStack>
+      )}
+
+      {selectedTab === 'waivers' && (
+        <YStack flex={1}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+            <YStack padding="$3" gap="$4">
+              {userTeamId ? (
+                <>
+                  <PendingWaiverClaims teamId={userTeamId} />
+                  <Button
+                    size="$4"
+                    onPress={() =>
+                      router.navigate({
+                        pathname: '/FreeAgents' as never,
+                        params: { leagueId: String(numLeagueId) },
+                      } as never)
+                    }
+                    icon={<ShoppingCart size={18} />}
+                    accessibilityRole="button"
+                  >
+                    Browse Free Agents & Submit Claim
+                  </Button>
+                </>
+              ) : (
+                <Text color="$textMuted">
+                  Join this league to view and submit waiver claims.
                 </Text>
               )}
             </YStack>

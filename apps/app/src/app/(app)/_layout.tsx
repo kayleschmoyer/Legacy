@@ -150,6 +150,11 @@ export default function Layout() {
             options={{ title: 'Player Details' }}
           />
           <Stack.Screen name="DirectMessages" options={{ title: 'Messages' }} />
+          <Stack.Screen
+            name="TradeCenterPage"
+            options={{ title: 'Trade Center' }}
+          />
+          <Stack.Screen name="WaiversPage" options={{ title: 'Waivers' }} />
           <Stack.Screen name="management" options={{ title: 'Management' }} />
 
           {/* Games */}

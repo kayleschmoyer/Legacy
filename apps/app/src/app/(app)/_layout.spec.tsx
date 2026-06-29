@@ -156,6 +156,8 @@ const EXPECTED_SCREENS = [
   'PlayerStats',
   'PlayerDetail',
   'DirectMessages',
+  'TradeCenterPage',
+  'WaiversPage',
   'management',
   'games/index',
   'disclosure-game/index',
@@ -177,7 +179,6 @@ const EXPECTED_SCREENS = [
 const REMOVED_FROM_NAV = [
   'view_game_logs',
   'view_career_stats',
-  'TradeCenterPage',
   'admin-revenue',
 ];
 

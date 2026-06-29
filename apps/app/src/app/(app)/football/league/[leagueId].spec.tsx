@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import FootballLeagueId from './[leagueId]';
@@ -519,6 +519,60 @@ describe('FootballLeagueId', () => {
     it('does not render quick standings section when standings is empty', () => {
       render(<FootballLeagueId />);
       expect(screen.queryByText('View All →')).toBeNull();
+    });
+  });
+
+  describe('waivers tab', () => {
+    it('does not render Waivers tab when waiverEnabled is false', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, waiverEnabled: false } },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.queryByTestId('tab-waivers')).toBeNull();
+    });
+
+    it('renders Waivers tab when waiverEnabled is true', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, waiverEnabled: true } },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.getByTestId('tab-waivers')).toBeTruthy();
+    });
+
+    it('shows PendingWaiverClaims and browse button when user has a team', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, waiverEnabled: true } },
+        loading: false,
+      });
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: 10 }, loading: false },
+      ]);
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-waivers'));
+      expect(screen.getByTestId('pending-waiver-claims')).toBeTruthy();
+      expect(
+        screen.getByText('Browse Free Agents & Submit Claim'),
+      ).toBeTruthy();
+    });
+
+    it('navigates to FreeAgents on browse button press', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, waiverEnabled: true } },
+        loading: false,
+      });
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: 10 }, loading: false },
+      ]);
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-waivers'));
+      fireEvent.press(screen.getByText('Browse Free Agents & Submit Claim'));
+      expect(mockNavigate).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/FreeAgents' }),
+      );
     });
   });
 });
