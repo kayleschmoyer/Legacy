@@ -190,6 +190,17 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
     expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: false });
   });
 
+  it('passes empty leagues and no error to MLBHome when the user has no leagues (LS-5803)', () => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: [] },
+      loading: false,
+    });
+    render(<BaseballHome />);
+    expect(screen.getByText('leagues:')).toBeTruthy();
+    expect(screen.getByText('error:false')).toBeTruthy();
+    expect(screen.getByText('loading:false')).toBeTruthy();
+  });
+
   describe('free-tier league cap (LS-5182)', () => {
     it('passes the N/limit cap for a free user below the cap', () => {
       render(<BaseballHome />);
