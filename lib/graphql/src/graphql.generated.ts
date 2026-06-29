@@ -5777,6 +5777,7 @@ export type GetUserLeaguesQuery = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    tierFrozenAt?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -5854,6 +5855,7 @@ export type StartDraftMutation = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    tierFrozenAt?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -6039,6 +6041,7 @@ export type AppLeagueFragment = {
   customEraStartYear?: number | null;
   customEraEndYear?: number | null;
   frozenAt?: string | null;
+  tierFrozenAt?: string | null;
   seasonNumber?: number | null;
   logoUrl?: string | null;
   bannerUrl?: string | null;
@@ -6102,6 +6105,7 @@ export type CreateLeagueMutation = {
       customEraStartYear?: number | null;
       customEraEndYear?: number | null;
       frozenAt?: string | null;
+      tierFrozenAt?: string | null;
       seasonNumber?: number | null;
       logoUrl?: string | null;
       bannerUrl?: string | null;
@@ -9782,6 +9786,7 @@ export type GetLeagueByIdQuery = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    tierFrozenAt?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -13369,6 +13374,7 @@ export const AppLeagueFragmentDoc = gql`
     customEraStartYear
     customEraEndYear
     frozenAt
+    tierFrozenAt
     seasonNumber
     logoUrl
     bannerUrl

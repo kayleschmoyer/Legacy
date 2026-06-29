@@ -124,6 +124,7 @@ fragment AppLeague on League {
   customEraStartYear
   customEraEndYear
   frozenAt
+  tierFrozenAt
   seasonNumber
   logoUrl
   bannerUrl

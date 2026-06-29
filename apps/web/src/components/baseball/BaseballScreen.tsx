@@ -62,6 +62,8 @@ export function BaseballScreen() {
         currentWeekNumber: l?.currentWeekNumber,
         weekAdvanceStatus: l?.weekAdvanceStatus,
         maxRosterSize: l?.maxRosterSize,
+        tierFrozenAt: l?.tierFrozenAt,
+        frozenAt: l?.frozenAt,
       })),
     [data?.userLeagues],
   );

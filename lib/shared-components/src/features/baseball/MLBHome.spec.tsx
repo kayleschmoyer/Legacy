@@ -106,6 +106,22 @@ const LEAGUES: MLBHomeLeague[] = [
   },
 ];
 
+const FROZEN_LEAGUE: MLBHomeLeague = {
+  id: 3,
+  name: 'Frozen Fossils',
+  draftStatus: 'completed',
+  currentWeekNumber: 10,
+  tierFrozenAt: '2024-03-01T00:00:00.000Z',
+};
+
+const RENEW_FROZEN_LEAGUE: MLBHomeLeague = {
+  id: 4,
+  name: 'Ended Eagles',
+  draftStatus: 'completed',
+  currentWeekNumber: 20,
+  frozenAt: '2024-11-01T00:00:00.000Z',
+};
+
 const baseProps = {
   onCreateLeague: jest.fn().mockResolvedValue(undefined),
   onJoinLeague: jest.fn(),
@@ -240,5 +256,45 @@ describe('MLBHome', () => {
     expect(btn).toBeInTheDocument();
     fireEvent.click(btn);
     expect(onScoreboard).toHaveBeenCalledTimes(1);
+  });
+
+  describe('frozen / archived leagues', () => {
+    it('excludes tier-frozen leagues from the active list and shows the archived toggle', () => {
+      render(<MLBHome {...baseProps} leagues={[...LEAGUES, FROZEN_LEAGUE]} />);
+      expect(screen.queryByText('Frozen Fossils')).not.toBeInTheDocument();
+      expect(screen.getByText(/Archived leagues \(1\)/)).toBeInTheDocument();
+    });
+
+    it('expands the archived section when the toggle is clicked', () => {
+      render(<MLBHome {...baseProps} leagues={[...LEAGUES, FROZEN_LEAGUE]} />);
+      fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+      expect(screen.getByText('Frozen Fossils')).toBeInTheDocument();
+      // Badge label is 'Archived' (textTransform="uppercase" is CSS-only in tests)
+      expect(screen.getByText('Archived')).toBeInTheDocument();
+    });
+
+    it('shows the Archived badge (not the draft-status badge) for frozenAt leagues', () => {
+      render(
+        <MLBHome {...baseProps} leagues={[...LEAGUES, RENEW_FROZEN_LEAGUE]} />,
+      );
+      fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+      expect(screen.getByText('Ended Eagles')).toBeInTheDocument();
+      // Badge label is 'Archived'; 'Week 20' must NOT appear for the archived league
+      expect(screen.getByText('Archived')).toBeInTheDocument();
+      expect(screen.queryByText('Week 20')).not.toBeInTheDocument();
+    });
+
+    it('does not render the archived section when all leagues are active', () => {
+      render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+      expect(screen.queryByText(/Archived leagues/)).not.toBeInTheDocument();
+    });
+
+    it('does not show frozen leagues in the active league grid', () => {
+      render(<MLBHome {...baseProps} leagues={[LEAGUES[0], FROZEN_LEAGUE]} />);
+      // Active grid shows only the non-frozen league
+      expect(screen.getByText('Saturday Sluggers')).toBeInTheDocument();
+      // Frozen league is hidden until the toggle is clicked
+      expect(screen.queryByText('Frozen Fossils')).not.toBeInTheDocument();
+    });
   });
 });

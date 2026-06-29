@@ -38,6 +38,8 @@ export interface MLBHomeLeague {
   currentWeekNumber?: number | null;
   weekAdvanceStatus?: string | null;
   maxRosterSize?: number | null;
+  tierFrozenAt?: string | null;
+  frozenAt?: string | null;
 }
 
 /**
@@ -92,11 +94,20 @@ interface LeagueBadge {
   text: string;
 }
 
-/** Map a draft status to a display badge. Ported from web BaseballLandingPage. */
 function getLeagueBadge(
   draftStatus?: string | null,
   weekNumber?: number | null,
+  tierFrozenAt?: string | null,
+  frozenAt?: string | null,
 ): LeagueBadge {
+  if (tierFrozenAt || frozenAt) {
+    return {
+      label: 'Archived',
+      bg: withAlpha(SLATE_400, 0.12),
+      border: withAlpha(SLATE_400, 0.3),
+      text: '$gray11',
+    };
+  }
   switch (draftStatus) {
     case 'in-progress':
       return {
@@ -159,25 +170,33 @@ export function MLBHome({
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [search, setSearch] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
+  const [showArchived, setShowArchived] = React.useState(false);
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 200);
     return () => clearTimeout(timer);
   }, [search]);
 
-  const leaguesCount = leagues.length;
+  const activeLeagues = leagues.filter((l) => !l.tierFrozenAt && !l.frozenAt);
+  const archivedLeagues = leagues.filter(
+    (l) => !!(l.tierFrozenAt || l.frozenAt),
+  );
+
+  const leaguesCount = activeLeagues.length;
   const hasLeagues = leaguesCount > 0;
   const currentYear = new Date().getFullYear();
 
   const averageRosterSize =
     leaguesCount > 0
       ? Math.round(
-          leagues.reduce((total, l) => total + (l.maxRosterSize || 0), 0) /
-            leaguesCount,
+          activeLeagues.reduce(
+            (total, l) => total + (l.maxRosterSize || 0),
+            0,
+          ) / leaguesCount,
         )
       : 0;
   const currentWeek =
-    leagues.reduce(
+    activeLeagues.reduce(
       (maxWeek, l) =>
         l.currentWeekNumber && l.currentWeekNumber > maxWeek
           ? l.currentWeekNumber
@@ -204,8 +223,15 @@ export function MLBHome({
         'Use invite codes to bring your league together in seconds.',
       ];
 
-  const filteredLeagues = leagues.filter((l) =>
-    (l?.name || '').toLowerCase().includes(debouncedSearch.trim().toLowerCase()),
+  const filteredLeagues = activeLeagues.filter((l) =>
+    (l?.name || '')
+      .toLowerCase()
+      .includes(debouncedSearch.trim().toLowerCase()),
+  );
+  const filteredArchived = archivedLeagues.filter((l) =>
+    (l?.name || '')
+      .toLowerCase()
+      .includes(debouncedSearch.trim().toLowerCase()),
   );
 
   const atCap = !!leagueCap?.atLimit;
@@ -655,6 +681,8 @@ export function MLBHome({
                 const badge = getLeagueBadge(
                   league.draftStatus,
                   league.currentWeekNumber,
+                  league.tierFrozenAt,
+                  league.frozenAt,
                 );
                 return (
                   <XStack
@@ -832,6 +860,108 @@ export function MLBHome({
               )}
             </YStack>
           )}
+
+          {/* Archived leagues — collapsed by default */}
+          {archivedLeagues.length > 0 ? (
+            <YStack gap="$3" marginTop="$2">
+              <XStack
+                alignItems="center"
+                gap="$2"
+                cursor="pointer"
+                onPress={() => setShowArchived((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showArchived
+                    ? 'Hide archived leagues'
+                    : 'Show archived leagues'
+                }
+              >
+                <Text
+                  fontSize="$3"
+                  color="$glassTextMuted"
+                  textTransform="uppercase"
+                  letterSpacing={1}
+                  fontWeight="600"
+                >
+                  {showArchived ? '▾' : '▸'} Archived leagues (
+                  {filteredArchived.length})
+                </Text>
+              </XStack>
+              {showArchived
+                ? filteredArchived.map((league) => {
+                    const badge = getLeagueBadge(
+                      league.draftStatus,
+                      league.currentWeekNumber,
+                      league.tierFrozenAt,
+                      league.frozenAt,
+                    );
+                    return (
+                      <XStack
+                        key={league.id}
+                        backgroundColor="$glassSurface"
+                        borderRadius="$6"
+                        borderWidth={1}
+                        borderColor="$glassBorder"
+                        padding="$4"
+                        paddingHorizontal="$5"
+                        flexDirection="column"
+                        alignItems="flex-start"
+                        gap="$4"
+                        opacity={0.65}
+                        $gtSm={{ flexDirection: 'row', alignItems: 'center' }}
+                      >
+                        <YStack gap="$1" flex={1} minWidth={160}>
+                          <H3 fontSize="$6" fontWeight="700" color="$color">
+                            {league.name || 'Unnamed League'}
+                          </H3>
+                          <Paragraph fontSize="$2" color="$textMuted">
+                            {league.maxRosterSize
+                              ? `${league.maxRosterSize}-slot roster`
+                              : 'Season dashboard'}
+                          </Paragraph>
+                        </YStack>
+                        <XStack alignItems="center" gap="$3">
+                          <XStack
+                            backgroundColor={badge.bg}
+                            borderColor={badge.border}
+                            borderWidth={1}
+                            borderRadius="$5"
+                            paddingHorizontal="$3"
+                            paddingVertical="$1"
+                          >
+                            <Text
+                              fontSize={11}
+                              fontWeight="700"
+                              color={badge.text}
+                              textTransform="uppercase"
+                              letterSpacing={0.5}
+                            >
+                              {badge.label}
+                            </Text>
+                          </XStack>
+                        </XStack>
+                        <Button
+                          backgroundColor={withAlpha(BRAND_NAVY, 0.16)}
+                          borderColor={withAlpha(BRAND_NAVY, 0.45)}
+                          borderWidth={1}
+                          borderRadius="$5"
+                          onPress={() => onViewLeague(league.id)}
+                          accessibilityLabel={`View ${league.name || 'league'}`}
+                        >
+                          <Text
+                            fontWeight="700"
+                            color={BRAND_GOLD_LIGHT}
+                            fontSize="$2"
+                          >
+                            View
+                          </Text>
+                        </Button>
+                      </XStack>
+                    );
+                  })
+                : null}
+            </YStack>
+          ) : null}
         </YStack>
       </YStack>
 
