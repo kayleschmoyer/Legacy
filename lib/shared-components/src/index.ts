@@ -138,8 +138,6 @@ export * from './features/teams/useTeamBranding';
 export * from './features/shared/FilterOptions';
 
 // Baseball components
-export * from './features/baseball/PlayersOverview';
-export * from './features/baseball/MLBHome';
 export * from './features/baseball/LeagueDetailFreeAgentsTab';
 // Re-export the create-league dialog + its types from the root. The numeric
 // form-default constants (DEFAULT_NUM_TEAMS, etc.) are intentionally NOT
