@@ -297,4 +297,50 @@ describe('MLBHome', () => {
       expect(screen.queryByText('Frozen Fossils')).not.toBeInTheDocument();
     });
   });
+
+  it('shows only the first 20 leagues and a "show more" button when there are more than 20', () => {
+    const manyLeagues: MLBHomeLeague[] = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      name: `League ${i + 1}`,
+    }));
+    render(<MLBHome {...baseProps} leagues={manyLeagues} />);
+    expect(screen.getByText('League 1')).toBeInTheDocument();
+    expect(screen.getByText('League 20')).toBeInTheDocument();
+    expect(screen.queryByText('League 21')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Show 5 more leagues/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('reveals the remaining leagues when "show more" is clicked', () => {
+    const manyLeagues: MLBHomeLeague[] = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      name: `League ${i + 1}`,
+    }));
+    render(<MLBHome {...baseProps} leagues={manyLeagues} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /Show 5 more leagues/i }),
+    );
+    expect(screen.getByText('League 21')).toBeInTheDocument();
+    expect(screen.getByText('League 25')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Show .* more leagues/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('resets pagination to the first page when the search term changes', () => {
+    const manyLeagues: MLBHomeLeague[] = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      name: i < 20 ? `Alpha ${i + 1}` : `Beta ${i - 19}`,
+    }));
+    render(<MLBHome {...baseProps} leagues={manyLeagues} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /Show 5 more leagues/i }),
+    );
+    expect(screen.getByText('Beta 5')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
+      target: { value: 'a' },
+    });
+    expect(screen.queryByText('Beta 5')).not.toBeInTheDocument();
+  });
 });

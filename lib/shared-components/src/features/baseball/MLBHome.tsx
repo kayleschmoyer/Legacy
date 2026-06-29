@@ -145,6 +145,8 @@ function getLeagueBadge(
   }
 }
 
+const LEAGUES_PAGE_SIZE = 20;
+
 /**
  * Shared, presentational baseball home (LS-7716). Mirrors the `NFLHome` pattern:
  * leagues array + callbacks, no data fetching. Consumed by the web
@@ -233,6 +235,15 @@ export function MLBHome({
       .toLowerCase()
       .includes(debouncedSearch.trim().toLowerCase()),
   );
+
+  const [visibleCount, setVisibleCount] = React.useState(LEAGUES_PAGE_SIZE);
+
+  React.useEffect(() => {
+    setVisibleCount(LEAGUES_PAGE_SIZE);
+  }, [search]);
+
+  const visibleLeagues = filteredLeagues.slice(0, visibleCount);
+  const hiddenCount = filteredLeagues.length - visibleLeagues.length;
 
   const atCap = !!leagueCap?.atLimit;
 
@@ -677,7 +688,7 @@ export function MLBHome({
 
           {error ? null : filteredLeagues.length > 0 ? (
             <YStack gap="$3" testID="leagues-grid">
-              {filteredLeagues.map((league) => {
+              {visibleLeagues.map((league) => {
                 const badge = getLeagueBadge(
                   league.draftStatus,
                   league.currentWeekNumber,
@@ -789,6 +800,21 @@ export function MLBHome({
                   </XStack>
                 );
               })}
+              {hiddenCount > 0 ? (
+                <Button
+                  alignSelf="flex-start"
+                  backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                  borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                  borderWidth={1}
+                  borderRadius="$5"
+                  onPress={() => setVisibleCount((c) => c + LEAGUES_PAGE_SIZE)}
+                  accessibilityLabel={`Show ${hiddenCount} more league${hiddenCount === 1 ? '' : 's'}`}
+                >
+                  <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                    Show {hiddenCount} more league{hiddenCount === 1 ? '' : 's'}
+                  </Text>
+                </Button>
+              ) : null}
             </YStack>
           ) : (
             <YStack

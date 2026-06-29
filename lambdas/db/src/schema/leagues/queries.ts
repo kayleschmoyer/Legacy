@@ -291,7 +291,8 @@ builder.queryField('userLeagues', (t) =>
               eq(PublicSchema.leagues.isMockDraft, false),
             ),
           )
-          .orderBy(PublicSchema.leagues.id);
+          .orderBy(PublicSchema.leagues.id)
+          .limit(50);
 
         return results.map((league) => ({
           id: league.id,
@@ -391,7 +392,8 @@ builder.queryField('myLeagues', (t) =>
             eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
           )
           .where(and(...conditions))
-          .orderBy(PublicSchema.leagues.id);
+          .orderBy(PublicSchema.leagues.id)
+          .limit(50);
 
         return results.map((league) => ({
           id: league.id,
