@@ -584,6 +584,7 @@ const VirtualBodyWeb: React.FC<VirtualBodyProps> = ({
         height: SCROLLER_HEIGHT_PX,
         overflow: 'auto',
         border: '1px solid #ddd',
+        minWidth: 0,
       }}
     >
       <div style={{ minWidth: MIN_TABLE_WIDTH_PX }}>

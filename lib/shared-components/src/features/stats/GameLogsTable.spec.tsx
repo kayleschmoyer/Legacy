@@ -107,6 +107,29 @@ describe('GameLogsTable', () => {
     expect(getByPlaceholderText('Enter player ID')).toBeTruthy();
     expect(getByText('Get Player Data')).toBeTruthy();
   });
+
+  // VGL-010 — virtual scroller must have minWidth:0 so overflow:auto actually
+  // constrains the flex item to available space on small screens instead of
+  // expanding the page.
+  webDescribe('VGL-010 horizontal scroll wrapper (LS-7459)', () => {
+    it('virtual scroller has minWidth 0 to prevent viewport overflow in flex context', async () => {
+      mockFetchOnce(makePaginated(1, 5, 5));
+      const { getByPlaceholderText, getByText, findByTestId } = render(
+        <GameLogsTable />,
+      );
+      fireEvent.change(getByPlaceholderText('Enter player ID'), {
+        target: { value: 'mlb-1234' },
+      });
+      act(() => {
+        fireEvent.click(
+          getByText('Get Player Data').closest('button') ??
+            getByText('Get Player Data'),
+        );
+      });
+      const scroller = await findByTestId('game-logs-virtual-scroller');
+      expect(scroller).toHaveStyle({ minWidth: 0 });
+    });
+  });
 });
 
 describe('GameLogsTable input validation', () => {
