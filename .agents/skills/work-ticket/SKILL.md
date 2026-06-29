@@ -426,7 +426,7 @@ This mode runs whenever the user invokes `/work-ticket` on an **Epic** (always),
    })
    ```
 
-5. **Spawn chips (when user picks 'all' or a subset)**: re-verify each selected ticket is still "To Do" via `jira_view` (skip if not), then dispatch via `mcp__ccd_session__spawn_task`. **Do NOT transition the child to "In Progress" yourself** — the chip claims it atomically via `jira_claim_ticket` as its first action; the chip prompt template below already instructs it to do so. Claiming upfront would strand the ticket if the chip fails to start. **Chip prompts must be self-contained.** Each prompt must:
+5. **Spawn chips (when user picks 'all' or a subset)**: batch-verify all selected tickets are still "To Do" in a single call — `jira_view(keys: [<all selected keys>])` returns `{ tickets, missing }`. Keys in `missing[]` or whose `.status` is no longer "To Do" are skipped; dispatch only the remaining "To Do" tickets via `mcp__ccd_session__spawn_task`. **Do NOT transition the child to "In Progress" yourself** — the chip claims it atomically via `jira_claim_ticket` as its first action; the chip prompt template below already instructs it to do so. Claiming upfront would strand the ticket if the chip fails to start. **Chip prompts must be self-contained.** Each prompt must:
    - Invoke the **per-bucket slash command** for the child (see [`references/bucket-epic-routing.md`](references/bucket-epic-routing.md) — design-sync children use `/implement-design`, mcp-gaps / client-bugs / generic use `/work-ticket`). The chip works the child directly, never the epic.
    - Include the **originating epic key** for traceability.
    - Include **domain context derivable from the parent** when a convention exists. Known mappings:
@@ -518,8 +518,9 @@ Used **only** when `--batch` is passed (or implied by user phrasing like "work a
 
 3. **Dispatch every unblocked To Do descendant** (do **not** claim upfront — chips claim themselves):
 
-   For each ticket:
-   - Re-verify via `jira_view` — if no longer "To Do" (race with another agent), skip and record in the `skipped (status changed)` set.
+   **Batch-verify all candidates first** (one call, not N): `jira_view(keys: [<all candidate keys>])` returns `{ tickets, missing }`. Keys in `missing[]` or whose `.status` is no longer "To Do" go directly to the `skipped (status changed)` set. Dispatch only the remaining "To Do" tickets.
+
+   For each ticket in the verified "To Do" set:
    - **Check the `blocked` field from `jira_get_all_descendants` — if `blocked: true`, skip the ticket and record it in the `skipped (blocked)` set along with its `blockers[]`.** If the descendants result is more than a minute old, re-fetch with `jira_get_all_descendants(key: "LS-####", status: "To Do")` to get fresh blocker state before dispatching. Skipping blocked tickets prevents the chip from immediately failing inside its first `jira_claim_ticket` call.
    - Spawn a chip via `mcp__ccd_session__spawn_task` using the Parent Dispatch Mode chip template (step 5). Inject parent-derived context where applicable (design bundle path, etc.).
 

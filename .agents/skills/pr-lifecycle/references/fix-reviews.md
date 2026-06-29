@@ -63,7 +63,8 @@ Do not enter a fix-review loop beyond 2 rounds.
 For fixing across multiple PRs:
 
 1. `github_pr_scan()` to find PRs with unresolved reviews (draft PRs are excluded by default — they are still being worked on by their creating agent)
-2. For each PR: check out branch in worktree, fix comments, validate, commit, push, **then resolve threads**
+   1b. **Batch-fetch ticket context upfront**: extract the Jira ticket key from each PR title (`LS-\d+` pattern), then call `jira_view(keys: [<all extracted keys>])` (up to 50) to retrieve ACs and Out of Scope for every PR in one round-trip. Store the resulting `tickets` map so step 3's re-grounding uses local data instead of a per-PR `jira_view` call.
+2. For each PR: check out branch in worktree, look up ticket context from the map fetched in step 1b (no additional `jira_view` call needed), fix comments, validate, commit, push, **then resolve threads**
 3. At batch scale (>10 PRs): skip `make pc` per-PR and rely on CI
 4. **Thread resolution is part of the push step, not a separate phase.** Resolve threads for each PR immediately after pushing — do not defer to a later "resolve pass". Collect thread `id` values when reading threads (step 2) and call `github_resolve_threads` right after the push succeeds. This ensures re-triggered Copilot reviews see a clean thread state.
 
