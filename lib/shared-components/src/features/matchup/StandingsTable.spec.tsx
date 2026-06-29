@@ -202,42 +202,79 @@ describe('StandingsTable', () => {
     expect(getByText('Blaze')).toBeTruthy();
   });
 
-  it('renders the point differential (Diff = PF − PA)', () => {
-    const { getByText } = render(<StandingsTable standings={mockStandings} />);
-
-    // Thunder: 1250.5 − 1100.2 = +150.3
+  it('renders Diff column with correct sign for positive difference', () => {
+    const { getByText } = render(
+      <StandingsTable
+        standings={[
+          makeTeam({
+            teamId: '1',
+            teamName: 'Rockets',
+            pointsFor: 1400.8,
+            pointsAgainst: 1250.5,
+          }),
+        ]}
+      />,
+    );
+    // diff = 1400.8 - 1250.5 = 150.3
     expect(getByText('+150.3')).toBeTruthy();
   });
 
-  it('shows a "You" chip on the current user row', () => {
+  it('renders Diff column with minus sign for negative difference', () => {
     const { getByText } = render(
-      <StandingsTable standings={mockStandings} currentUserTeamId={1} />,
+      <StandingsTable
+        standings={[
+          makeTeam({
+            teamId: '1',
+            teamName: 'Underdogs',
+            pointsFor: 900.0,
+            pointsAgainst: 1100.5,
+          }),
+        ]}
+      />,
     );
-    expect(getByText('You')).toBeTruthy();
+    // diff = 900.0 - 1100.5 = -200.5
+    expect(getByText('-200.5')).toBeTruthy();
   });
 
-  it('does not show a "You" chip when no current user is set', () => {
+  it('shows "You" chip on the current user\'s row', () => {
+    const { getAllByText } = render(
+      <StandingsTable standings={mockStandings} currentUserTeamId={2} />,
+    );
+    // "You" chip should appear exactly once (on team 2 = Lightning)
+    const youChips = getAllByText('You');
+    expect(youChips.length).toBe(1);
+  });
+
+  it('does not show "You" chip when currentUserTeamId is null', () => {
     const { queryByText } = render(
-      <StandingsTable standings={mockStandings} />,
+      <StandingsTable standings={mockStandings} currentUserTeamId={null} />,
     );
     expect(queryByText('You')).toBeNull();
   });
 
-  it('invokes onTeamPress with the numeric team id when a row is pressed', () => {
+  it('calls onTeamPress with the correct teamId when a row is pressed', () => {
     const onTeamPress = jest.fn();
     const { getByText } = render(
       <StandingsTable standings={mockStandings} onTeamPress={onTeamPress} />,
     );
-
     fireEvent.click(getByText('Thunder'));
     expect(onTeamPress).toHaveBeenCalledWith(1);
   });
 
-  it('renders an optional subtitle', () => {
+  it('renders custom title', () => {
     const { getByText } = render(
-      <StandingsTable standings={mockStandings} subtitle="3 teams" />,
+      <StandingsTable standings={mockStandings} title="AFC East" />,
     );
+    expect(getByText('AFC East')).toBeTruthy();
+  });
 
-    expect(getByText('3 teams')).toBeTruthy();
+  it('renders subtitle when provided', () => {
+    const { getByText } = render(
+      <StandingsTable
+        standings={mockStandings}
+        subtitle="Sorted by win percentage"
+      />,
+    );
+    expect(getByText('Sorted by win percentage')).toBeTruthy();
   });
 });

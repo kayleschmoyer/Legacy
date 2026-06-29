@@ -1,26 +1,22 @@
 /**
  * Tests for StandingsTab (LS-7814).
  *
- * The standings table is now the shared `StandingsTable` from
- * `@legacy-sports/shared-components` (the web-only custom table was deleted).
- * These tests verify the tab's own responsibilities: wiring standings/props
- * through to the shared table, the team-list fallback, subtitle computation,
- * and the playoff bracket gate. Column rendering, Win % formatting, division
- * grouping, and the "You" highlight are covered by the shared component's own
- * spec (lib/shared-components/.../StandingsTable.spec.tsx).
+ * Verifies that StandingsTab correctly wires GraphQL data to the shared
+ * StandingsTable component: standings prop, currentUserTeamId, onTeamPress,
+ * subtitle, and team-list fallback when standings are empty.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
-import { StandingsTable } from '@legacy-sports/shared-components';
 import { StandingsTab } from './Standings';
 
 let mockStandings: ReadonlyArray<Record<string, unknown>> = [];
 let mockBracket: Record<string, unknown> | null = null;
 
+const mockStandingsTable = jest.fn(() => null);
 jest.mock('@legacy-sports/shared-components', () => ({
-  StandingsTable: jest.fn(() => <div data-testid="standings-table" />),
+  StandingsTable: (props: any) => mockStandingsTable(props),
   PlayoffBracket: jest.fn(() => <div data-testid="playoff-bracket" />),
 }));
 
@@ -35,17 +31,15 @@ jest.mock('@legacy-sports/graphql', () => ({
   })),
 }));
 
-const StandingsTableMock = StandingsTable as unknown as jest.Mock;
-
 const league = {
   id: 1,
   name: 'Test League',
-  sport: 'baseball',
   playoffEnabled: false,
   playoffFormat: 'Single elimination',
 } as any;
 
 const makeRow = (overrides: Record<string, unknown> = {}) => ({
+  __typename: 'TeamStanding',
   teamId: '100',
   teamName: 'Team A',
   wins: 8,
@@ -61,28 +55,16 @@ const makeRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-interface CapturedProps {
-  standings: Array<Record<string, unknown>>;
-  loading?: boolean;
-  currentUserTeamId: number | null;
-  onTeamPress: unknown;
-  subtitle: string;
-}
-
-const lastProps = (): CapturedProps =>
-  StandingsTableMock.mock.calls[
-    StandingsTableMock.mock.calls.length - 1
-  ][0] as CapturedProps;
-
 beforeEach(() => {
   mockStandings = [];
   mockBracket = null;
-  StandingsTableMock.mockClear();
+  mockStandingsTable.mockClear();
 });
 
 describe('StandingsTab', () => {
-  it('passes fetched standings through to the shared StandingsTable', () => {
-    mockStandings = [makeRow()];
+  it('passes standings array to StandingsTable', () => {
+    const row = makeRow();
+    mockStandings = [row];
     render(
       <StandingsTab
         league={league}
@@ -91,59 +73,43 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(screen.getByTestId('standings-table')).toBeInTheDocument();
-    expect(lastProps().standings).toHaveLength(1);
-    expect(lastProps().standings[0].teamName).toBe('Team A');
+    expect(mockStandingsTable).toHaveBeenCalledWith(
+      expect.objectContaining({ standings: [row] }),
+    );
   });
 
-  it('wires currentUserTeamId and onTeamPress through to the shared table', () => {
-    const onTeam = jest.fn();
+  it('passes currentUserTeamId to StandingsTable', () => {
     mockStandings = [makeRow({ teamId: '42' })];
     render(
-      <StandingsTab league={league} teams={[]} myTeamId={42} onTeam={onTeam} />,
-    );
-    expect(lastProps().currentUserTeamId).toBe(42);
-    expect(lastProps().onTeamPress).toBe(onTeam);
-  });
-
-  it('falls back to the team list when no standings are available', () => {
-    mockStandings = [];
-    render(
       <StandingsTab
         league={league}
-        teams={
-          [
-            { id: 7, name: 'Fallback FC', primaryColor: '#ff0033' },
-            { id: 8, name: 'Bench United' },
-          ] as any
-        }
-        myTeamId={null}
+        teams={[]}
+        myTeamId={42}
         onTeam={jest.fn()}
       />,
     );
-    const { standings } = lastProps();
-    expect(standings).toHaveLength(2);
-    expect(standings[0]).toMatchObject({
-      teamId: '7',
-      teamName: 'Fallback FC',
-    });
-    expect(standings[0].wins).toBeNull();
+    expect(mockStandingsTable).toHaveBeenCalledWith(
+      expect.objectContaining({ currentUserTeamId: 42 }),
+    );
   });
 
-  it('passes an empty array when there are no standings and no teams', () => {
-    mockStandings = [];
+  it('passes onTeamPress to StandingsTable', () => {
+    mockStandings = [makeRow()];
+    const onTeam = jest.fn();
     render(
       <StandingsTab
         league={league}
         teams={[]}
         myTeamId={null}
-        onTeam={jest.fn()}
+        onTeam={onTeam}
       />,
     );
-    expect(lastProps().standings).toHaveLength(0);
+    expect(mockStandingsTable).toHaveBeenCalledWith(
+      expect.objectContaining({ onTeamPress: onTeam }),
+    );
   });
 
-  it('shows a football subtitle for football leagues', () => {
+  it('shows football subtitle "Sorted by W, then PF" for football leagues', () => {
     mockStandings = [makeRow()];
     render(
       <StandingsTab
@@ -153,10 +119,11 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(lastProps().subtitle).toMatch(/then PF/);
+    const subtitle = mockStandingsTable.mock.calls[0][0].subtitle as string;
+    expect(subtitle).toMatch(/Sorted by W, then PF/);
   });
 
-  it('shows a baseball subtitle for baseball leagues', () => {
+  it('shows baseball subtitle "Sorted by win percentage" for baseball leagues', () => {
     mockStandings = [makeRow()];
     render(
       <StandingsTab
@@ -166,7 +133,44 @@ describe('StandingsTab', () => {
         onTeam={jest.fn()}
       />,
     );
-    expect(lastProps().subtitle).toMatch(/Sorted by win percentage$/);
+    const subtitle = mockStandingsTable.mock.calls[0][0].subtitle as string;
+    expect(subtitle).toMatch(/Sorted by win percentage/);
+  });
+
+  it('falls back to teams list when standings are empty', () => {
+    mockStandings = [];
+    const teams = [
+      { id: 10, name: 'Fallback Team', primaryColor: null },
+      { id: 11, name: 'Other Team', primaryColor: null },
+    ] as any;
+    render(
+      <StandingsTab
+        league={league}
+        teams={teams}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    const standings = mockStandingsTable.mock.calls[0][0]
+      .standings as Array<any>;
+    expect(standings).toHaveLength(2);
+    expect(standings[0].teamName).toBe('Fallback Team');
+    expect(standings[1].teamName).toBe('Other Team');
+  });
+
+  it('renders empty StandingsTable when no standings and no teams', () => {
+    mockStandings = [];
+    render(
+      <StandingsTab
+        league={league}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    expect(mockStandingsTable).toHaveBeenCalledWith(
+      expect.objectContaining({ standings: [] }),
+    );
   });
 
   it('renders the playoff bracket when a bracket is present', () => {

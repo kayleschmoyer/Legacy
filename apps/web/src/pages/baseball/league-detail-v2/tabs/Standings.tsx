@@ -49,36 +49,33 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
     errorPolicy: 'all',
   });
 
-  // Feed the shared StandingsTable. When standings haven't been computed yet
-  // (e.g. a freshly created league before any games), fall back to the team
-  // list so members still see their teams instead of an empty table.
+  // Fall back to unsorted team list when no standings exist yet.
   const standingsForTable = useMemo(() => {
     if (standings.length > 0) return standings;
     return teams
       .filter((t) => t.id != null)
       .map((t) => ({
         __typename: 'TeamStanding' as const,
-        teamId: t.id != null ? String(t.id) : null,
+        teamId: String(t.id),
         teamName: t.name ?? 'Team',
+        primaryColor: t.primaryColor ?? null,
+        secondaryColor: null,
+        avatarUrl: null,
         wins: null,
         losses: null,
         ties: null,
         winPercentage: null,
         pointsFor: null,
         pointsAgainst: null,
-        avatarUrl: null,
-        primaryColor: t.primaryColor ?? null,
-        secondaryColor: null,
         divisionId: null,
       }));
   }, [standings, teams]);
 
-  const teamCount = standingsForTable.length;
   const subtitle = standingsLoading
     ? 'Loading…'
     : isFootball
-      ? `${teamCount} teams · Sorted by win percentage, then PF`
-      : `${teamCount} teams · Sorted by win percentage`;
+      ? `${standingsForTable.length} teams · Sorted by W, then PF`
+      : `${standingsForTable.length} teams · Sorted by win percentage`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -87,6 +84,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         loading={standingsLoading}
         currentUserTeamId={myTeamId}
         onTeamPress={onTeam}
+        title="League Standings"
         subtitle={subtitle}
       />
 

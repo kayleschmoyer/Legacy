@@ -359,12 +359,8 @@ export function StandingsTable({
     </Text>
   );
 
-  // Header renders as a semantic <thead><tr><th scope="col"> on web (via the
-  // Tamagui `tag` prop, which survives the optimizing compiler — `role` does
-  // not) and carries matching ARIA roles for native screen readers. This keeps
-  // the standings table accessible cross-platform after the LS-7814
-  // consolidation onto this shared component (which previously rendered an
-  // HTML <table> in the web league-detail tab).
+  // Header uses semantic table markup via Tamagui `tag` prop for cross-platform
+  // accessibility (ARIA roles for native, HTML semantics for web).
   const HeaderRow = () => (
     <YStack tag="thead" role="rowgroup">
       <XStack
