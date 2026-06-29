@@ -136,7 +136,7 @@ describe('MLBHome', () => {
   it('shows the full hero and empty state when the user has no leagues', () => {
     render(<MLBHome {...baseProps} leagues={[]} />);
     expect(screen.getByText(/Season Hub/)).toBeInTheDocument();
-    expect(screen.getByText('No leagues yet')).toBeInTheDocument();
+    expect(screen.getByText('No baseball leagues yet')).toBeInTheDocument();
     expect(screen.queryByText('+ Create')).not.toBeInTheDocument();
   });
 
@@ -173,7 +173,9 @@ describe('MLBHome', () => {
     expect(
       screen.getByText(/Could not load your leagues/i),
     ).toBeInTheDocument();
-    expect(screen.queryByText('No leagues yet')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('No baseball leagues yet'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows only a spinner while loading', () => {

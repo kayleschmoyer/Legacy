@@ -6,6 +6,7 @@ import { BaseballScreen } from './BaseballScreen';
 interface HarnessLeague {
   id?: number | null;
   name?: string | null;
+  sport?: string | null;
 }
 interface MLBHomeHarnessProps {
   userName?: string;
@@ -87,6 +88,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetUserLeaguesQuery(opts),
   useCreateLeagueAndTeamsMutation: () => [mockCreateLeague, { loading: false }],
   GetUserLeagues: {},
+  Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
 const mockUseIsPremiumStatus = jest.fn(() => ({
@@ -109,7 +111,9 @@ beforeEach(() => {
     user: { username: 'schmoyer21@gmail.com' },
   });
   mockUseGetUserLeaguesQuery.mockReturnValue({
-    data: { userLeagues: [{ id: 1, name: 'Saturday Sluggers' }] },
+    data: {
+      userLeagues: [{ id: 1, name: 'Saturday Sluggers', sport: 'baseball' }],
+    },
     loading: false,
     error: undefined,
     refetch: mockRefetch,

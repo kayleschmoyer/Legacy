@@ -9,6 +9,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
+  Sport,
   useCreateLeagueMutation,
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
@@ -110,14 +111,17 @@ export default function BaseballHome() {
 
   const leagues = React.useMemo(
     () =>
-      (userLeagues ?? []).filter(Boolean).map((l) => ({
-        id: l?.id ?? 0,
-        name: l?.name,
-        draftStatus: l?.draftStatus,
-        currentWeekNumber: l?.currentWeekNumber,
-        weekAdvanceStatus: l?.weekAdvanceStatus,
-        maxRosterSize: l?.maxRosterSize,
-      })),
+      (userLeagues ?? [])
+        .filter(Boolean)
+        .filter((l) => l?.sport === Sport.Baseball)
+        .map((l) => ({
+          id: l?.id ?? 0,
+          name: l?.name,
+          draftStatus: l?.draftStatus,
+          currentWeekNumber: l?.currentWeekNumber,
+          weekAdvanceStatus: l?.weekAdvanceStatus,
+          maxRosterSize: l?.maxRosterSize,
+        })),
     [userLeagues],
   );
 

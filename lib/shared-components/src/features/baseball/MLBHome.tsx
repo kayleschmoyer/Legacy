@@ -859,7 +859,7 @@ export function MLBHome({
               ) : (
                 <>
                   <H2 fontSize="$8" fontWeight="700" color="$color">
-                    No leagues yet
+                    No baseball leagues yet
                   </H2>
                   <Paragraph
                     fontSize="$4"

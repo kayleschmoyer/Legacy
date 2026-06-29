@@ -138,6 +138,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeaguesQuery: (options?: { skip?: boolean }) =>
     mockUseGetUserLeaguesQuery(options),
   useCreateLeagueMutation: () => [mockCreateLeague, { loading: false }],
+  Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
 interface SubscriptionResult {
@@ -161,8 +162,20 @@ jest.mock('../../../utils/analytics', () => ({
 // ── Test data ────────────────────────────────────────────────────────────────
 
 const MOCK_LEAGUES = [
-  { id: 1, name: 'Fantasy Legends', maxRosterSize: 25, inviteCode: 'ABC12345' },
-  { id: 2, name: 'Slugger League', maxRosterSize: 30, inviteCode: 'XYZ78901' },
+  {
+    id: 1,
+    name: 'Fantasy Legends',
+    maxRosterSize: 25,
+    inviteCode: 'ABC12345',
+    sport: 'baseball',
+  },
+  {
+    id: 2,
+    name: 'Slugger League',
+    maxRosterSize: 30,
+    inviteCode: 'XYZ78901',
+    sport: 'baseball',
+  },
 ];
 
 describe('BaseballHome (mobile MLBHome wrapper)', () => {
@@ -212,7 +225,7 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
         data: {
           userLeagues: [
             ...MOCK_LEAGUES,
-            { id: 3, name: 'Third', inviteCode: 'C3' },
+            { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
         },
         loading: false,
@@ -248,7 +261,7 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
         data: {
           userLeagues: [
             ...MOCK_LEAGUES,
-            { id: 3, name: 'Third', inviteCode: 'C3' },
+            { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
         },
         loading: false,
@@ -268,7 +281,7 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
         data: {
           userLeagues: [
             ...MOCK_LEAGUES,
-            { id: 3, name: 'Third', inviteCode: 'C3' },
+            { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
         },
         loading: false,

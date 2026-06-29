@@ -8,6 +8,7 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
+  Sport,
   useCreateLeagueAndTeamsMutation,
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
@@ -60,20 +61,21 @@ export function BaseballScreen() {
     },
   });
 
-  // Preserve the previous BaseballLandingPage behavior: list every league the
-  // user belongs to (no sport filter), mapped to the shared `MLBHome` shape.
   const leagues = React.useMemo(
     () =>
-      (data?.userLeagues ?? []).filter(Boolean).map((l) => ({
-        id: l?.id ?? 0,
-        name: l?.name,
-        draftStatus: l?.draftStatus,
-        currentWeekNumber: l?.currentWeekNumber,
-        weekAdvanceStatus: l?.weekAdvanceStatus,
-        maxRosterSize: l?.maxRosterSize,
-        tierFrozenAt: l?.tierFrozenAt,
-        frozenAt: l?.frozenAt,
-      })),
+      (data?.userLeagues ?? [])
+        .filter(Boolean)
+        .filter((l) => l?.sport === Sport.Baseball)
+        .map((l) => ({
+          id: l?.id ?? 0,
+          name: l?.name,
+          draftStatus: l?.draftStatus,
+          currentWeekNumber: l?.currentWeekNumber,
+          weekAdvanceStatus: l?.weekAdvanceStatus,
+          maxRosterSize: l?.maxRosterSize,
+          tierFrozenAt: l?.tierFrozenAt,
+          frozenAt: l?.frozenAt,
+        })),
     [data?.userLeagues],
   );
 
