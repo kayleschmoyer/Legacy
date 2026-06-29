@@ -203,7 +203,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
     expect(screen.queryByTestId('upgrade-modal')).not.toBeInTheDocument();
   });
 
-  it('sets atLimit and opens the upgrade modal when a free user is at the cap', () => {
+  it('opens the upgrade modal when a free user at the cap clicks create', async () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: { userLeagues: leaguesOfCount(3) },
       loading: false,
@@ -211,9 +211,13 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
       refetch: mockRefetch,
     });
     render(<BaseballScreen />);
-    expect(screen.getByTestId('at-limit').textContent).toBe('true');
-    fireEvent.click(screen.getByText('upgrade'));
-    expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument();
+    // leagueCap is not passed to MLBHome on web; the Create button is always enabled
+    expect(screen.getByTestId('at-limit').textContent).toBe('false');
+    // Clicking create triggers handleCreateLeague which opens the upgrade modal
+    fireEvent.click(screen.getByText('create'));
+    await waitFor(() =>
+      expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument(),
+    );
   });
 
   it('does not set atLimit for a premium user at/above the cap', () => {
@@ -246,7 +250,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
   });
 
-  it('counts leagues across all sports toward the cap', () => {
+  it('counts leagues across all sports toward the cap', async () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: {
         userLeagues: [
@@ -260,6 +264,12 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
       refetch: mockRefetch,
     });
     render(<BaseballScreen />);
-    expect(screen.getByTestId('at-limit').textContent).toBe('true');
+    // leagueCap is not passed to MLBHome on web
+    expect(screen.getByTestId('at-limit').textContent).toBe('false');
+    // Clicking create triggers the cap check across all sports and opens the modal
+    fireEvent.click(screen.getByText('create'));
+    await waitFor(() =>
+      expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument(),
+    );
   });
 });

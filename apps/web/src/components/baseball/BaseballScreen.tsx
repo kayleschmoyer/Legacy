@@ -93,16 +93,11 @@ export function BaseballScreen() {
     !premiumLoading &&
     !isPremium &&
     activeLeagueCount >= FREE_TIER_LEAGUE_LIMIT;
-  const leagueCap = auth?.user
-    ? {
-        count: activeLeagueCount,
-        limit: FREE_TIER_LEAGUE_LIMIT,
-        atLimit: atLeagueCap,
-        onUpgrade: () => setShowUpgradeModal(true),
-      }
-    : undefined;
-
   const handleCreateLeague = async (input: QuickCreateLeagueInput) => {
+    if (atLeagueCap) {
+      setShowUpgradeModal(true);
+      return;
+    }
     const result = await createLeague({
       variables: {
         input: {
@@ -161,7 +156,6 @@ export function BaseballScreen() {
           }}
           onBrowsePlayers={() => navigate('/players')}
           isPremium={isPremium && !premiumLoading}
-          leagueCap={leagueCap}
         />
       </div>
       <UpgradeModal

@@ -22,6 +22,7 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { useThemeContext } from '../../context/ThemeContext';
+import { useIsPremium } from '../../hooks/useIsPremium';
 
 /* ─── Routes ─── */
 
@@ -93,6 +94,7 @@ export function HomePage(): React.JSX.Element {
   const [showArchived, setShowArchived] = useState(false);
   const { resolvedTheme } = useThemeContext();
   const isLight = resolvedTheme === 'light';
+  const isPremium = useIsPremium();
 
   const defaultSport = useMemo(() => readDefaultSport(), []);
 
@@ -205,6 +207,7 @@ export function HomePage(): React.JSX.Element {
           error={error}
           defaultSport={defaultSport}
           isLight={isLight}
+          isPremium={isPremium}
           onThisDay={onThisDay}
           onShowArchived={handleShowArchived}
           onRetry={() => void refetchSummaries()}
@@ -219,6 +222,8 @@ export function HomePage(): React.JSX.Element {
           }
           onStartMockDraft={() => navigate(MOCK_DRAFT_ROUTE)}
           onHowItWorks={() => setTutorialOpen(true)}
+          onCreateSalaryCapLeague={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
+          onCreateAuctionLeague={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
         />
       </div>
     </>

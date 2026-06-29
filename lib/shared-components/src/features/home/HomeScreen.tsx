@@ -115,6 +115,8 @@ export interface HomeScreenProps {
   defaultSport?: 'baseball' | 'football';
   /** Light theme variant for sport-card backgrounds. */
   isLight?: boolean;
+  /** Whether the current user has an active premium subscription. Controls premium-only CTAs in the empty state. */
+  isPremium?: boolean;
 
   loading?: boolean;
   error?: boolean;
@@ -133,6 +135,10 @@ export interface HomeScreenProps {
   onStartMockDraft?: () => void;
   onPlayerPress?: (playerId: number) => void;
   onHowItWorks?: () => void;
+  /** Navigate to create a salary cap league. Shown only when isPremium is true. */
+  onCreateSalaryCapLeague?: () => void;
+  /** Navigate to create an auction draft league. Shown only when isPremium is true. */
+  onCreateAuctionLeague?: () => void;
 }
 
 /* ─── Sport config ─── */
@@ -1029,6 +1035,80 @@ function OnThisDayPanel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ─── Premium empty-state CTAs ─── */
+
+function PremiumEmptyStateCtas({
+  onCreateSalaryCapLeague,
+  onCreateAuctionLeague,
+}: {
+  onCreateSalaryCapLeague?: () => void;
+  onCreateAuctionLeague?: () => void;
+}) {
+  return (
+    <YStack
+      testID="home-premium-empty-ctas"
+      backgroundColor={withAlpha(BRAND_GOLD, 0.07)}
+      borderWidth={1}
+      borderColor={withAlpha(BRAND_GOLD, 0.28)}
+      borderRadius={16}
+      padding={22}
+      gap="$3"
+    >
+      <XStack alignItems="center" gap="$2">
+        <XStack
+          backgroundColor={withAlpha(BRAND_GOLD, 0.16)}
+          borderWidth={1}
+          borderColor={withAlpha(BRAND_GOLD, 0.4)}
+          borderRadius={9999}
+          paddingVertical={4}
+          paddingHorizontal={10}
+        >
+          <Text
+            fontFamily={DISPLAY_FONT}
+            fontWeight="700"
+            fontSize={10}
+            letterSpacing={1.4}
+            textTransform="uppercase"
+            color={BRAND_GOLD_LIGHT}
+          >
+            Premium
+          </Text>
+        </XStack>
+        <Text
+          fontFamily={DISPLAY_FONT}
+          fontWeight="700"
+          fontSize={15}
+          color={TEXT_INTERFACE}
+        >
+          Exclusive league types unlocked
+        </Text>
+      </XStack>
+      <Text fontFamily={BODY_FONT} fontSize={14} color={TEXT_SECONDARY}>
+        Your subscription unlocks salary cap enforcement and auction drafts —
+        the most competitive formats in the archive.
+      </Text>
+      <XStack gap="$2" flexWrap="wrap" marginTop="$1">
+        {onCreateSalaryCapLeague ? (
+          <ActionButton
+            label="Create Salary Cap League"
+            variant="gold"
+            onPress={onCreateSalaryCapLeague}
+            testID="home-premium-salary-cap-cta"
+          />
+        ) : null}
+        {onCreateAuctionLeague ? (
+          <ActionButton
+            label="Try Auction Draft"
+            variant="outline"
+            onPress={onCreateAuctionLeague}
+            testID="home-premium-auction-cta"
+          />
+        ) : null}
+      </XStack>
+    </YStack>
+  );
+}
+
 /* ─── HomeScreen ─── */
 
 /**
@@ -1048,6 +1128,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     onThisDay,
     defaultSport = 'baseball',
     isLight = false,
+    isPremium = false,
     loading = false,
     error = false,
     showArchived = false,
@@ -1063,6 +1144,8 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     onViewSport,
     onStartMockDraft,
     onHowItWorks,
+    onCreateSalaryCapLeague,
+    onCreateAuctionLeague,
   } = props;
 
   const sortedSummaries = useMemo(() => sortByUrgency(leagues), [leagues]);
@@ -1462,6 +1545,12 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
               />
             ) : null}
           </XStack>
+          {isPremium && (onCreateSalaryCapLeague || onCreateAuctionLeague) ? (
+            <PremiumEmptyStateCtas
+              onCreateSalaryCapLeague={onCreateSalaryCapLeague}
+              onCreateAuctionLeague={onCreateAuctionLeague}
+            />
+          ) : null}
         </YStack>
 
         <YStack gap="$5">

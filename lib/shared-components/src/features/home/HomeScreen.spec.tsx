@@ -45,6 +45,56 @@ describe('HomeScreen', () => {
       expect(getByText('Join League')).toBeTruthy();
     });
 
+    it('does not show premium CTAs when isPremium is false', () => {
+      const { queryByText } = render(
+        <HomeScreen
+          {...baseProps}
+          isPremium={false}
+          onCreateSalaryCapLeague={jest.fn()}
+          onCreateAuctionLeague={jest.fn()}
+        />,
+      );
+      expect(queryByText('Create Salary Cap League')).toBeNull();
+      expect(queryByText('Try Auction Draft')).toBeNull();
+    });
+
+    it('shows premium CTAs when isPremium is true', () => {
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          isPremium
+          onCreateSalaryCapLeague={jest.fn()}
+          onCreateAuctionLeague={jest.fn()}
+        />,
+      );
+      expect(getByText('Exclusive league types unlocked')).toBeTruthy();
+      expect(getByText('Create Salary Cap League')).toBeTruthy();
+      expect(getByText('Try Auction Draft')).toBeTruthy();
+    });
+
+    it('fires onCreateSalaryCapLeague and onCreateAuctionLeague from premium CTAs', () => {
+      const onCreateSalaryCapLeague = jest.fn();
+      const onCreateAuctionLeague = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          isPremium
+          onCreateSalaryCapLeague={onCreateSalaryCapLeague}
+          onCreateAuctionLeague={onCreateAuctionLeague}
+        />,
+      );
+      fireEvent.click(getByText('Create Salary Cap League'));
+      fireEvent.click(getByText('Try Auction Draft'));
+      expect(onCreateSalaryCapLeague).toHaveBeenCalledTimes(1);
+      expect(onCreateAuctionLeague).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not show premium CTAs when isPremium is true but callbacks are absent', () => {
+      const { queryByText } = render(<HomeScreen {...baseProps} isPremium />);
+      expect(queryByText('Create Salary Cap League')).toBeNull();
+      expect(queryByText('Try Auction Draft')).toBeNull();
+    });
+
     it('fires onCreateLeague and onJoinLeague from the empty-state CTAs', () => {
       const onCreateLeague = jest.fn();
       const onJoinLeague = jest.fn();
