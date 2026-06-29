@@ -26,11 +26,15 @@ jest.mock('tamagui', () => {
     Text: ({
       children,
       onPress,
+      role,
     }: {
       children?: unknown;
       onPress?: () => void;
+      role?: string;
     }) => (
-      <span onClick={onPress}>{children as React.ReactNode | undefined}</span>
+      <span onClick={onPress} role={role}>
+        {children as React.ReactNode | undefined}
+      </span>
     ),
     XStack: Box,
     YStack: Box,
@@ -201,6 +205,190 @@ describe('LeagueTradeBlock', () => {
     );
     expect(getAllByText('AVAILABLE')).toHaveLength(3);
     expect(queryAllByText('Remove')).toHaveLength(0);
+  });
+
+  describe('asking price display', () => {
+    it('shows "Asking: price" label when player has askingPrice set', () => {
+      const playersWithPrice = [
+        {
+          id: 1,
+          teamId: 2,
+          playerId: 10,
+          askingPrice: '$50M',
+          player: { firstName: 'Mike', lastName: 'Trout' },
+        },
+      ];
+      jest.mocked(useGetLeagueTradeBlockQuery).mockReturnValue({
+        data: { leagueTradeBlock: playersWithPrice },
+        loading: false,
+        error: undefined,
+      } as unknown as ReturnType<typeof useGetLeagueTradeBlockQuery>);
+      jest
+        .mocked(useSetTradeBlockMutation)
+        .mockReturnValue([
+          mockSetTradeBlock,
+          { loading: false },
+        ] as unknown as ReturnType<typeof useSetTradeBlockMutation>);
+
+      const { getByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={null} />,
+      );
+      expect(getByText('Asking: $50M')).toBeTruthy();
+    });
+
+    it('shows "Edit Price" button label for own-team player with existing asking price', () => {
+      const playersWithPrice = [
+        {
+          id: 1,
+          teamId: 1,
+          playerId: 10,
+          askingPrice: '$50M',
+          player: { firstName: 'Mike', lastName: 'Trout' },
+        },
+      ];
+      jest.mocked(useGetLeagueTradeBlockQuery).mockReturnValue({
+        data: { leagueTradeBlock: playersWithPrice },
+        loading: false,
+        error: undefined,
+      } as unknown as ReturnType<typeof useGetLeagueTradeBlockQuery>);
+      jest
+        .mocked(useSetTradeBlockMutation)
+        .mockReturnValue([
+          mockSetTradeBlock,
+          { loading: false },
+        ] as unknown as ReturnType<typeof useSetTradeBlockMutation>);
+
+      const { getByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+      expect(getByText('Edit Price')).toBeTruthy();
+    });
+  });
+
+  describe('expandable list', () => {
+    const manyPlayers = Array.from({ length: 8 }, (_, i) => ({
+      id: i + 1,
+      teamId: 2,
+      playerId: i + 1,
+      player: { firstName: `Player${i + 1}`, lastName: 'Name' },
+    }));
+
+    function setupManyPlayers() {
+      jest.mocked(useGetLeagueTradeBlockQuery).mockReturnValue({
+        data: { leagueTradeBlock: manyPlayers },
+        loading: false,
+        error: undefined,
+      } as unknown as ReturnType<typeof useGetLeagueTradeBlockQuery>);
+      jest
+        .mocked(useSetTradeBlockMutation)
+        .mockReturnValue([
+          mockSetTradeBlock,
+          { loading: false },
+        ] as unknown as ReturnType<typeof useSetTradeBlockMutation>);
+    }
+
+    it('shows only the first 5 players when there are more than 5', () => {
+      setupManyPlayers();
+      const { getByText, queryByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={null} />,
+      );
+      expect(getByText('Player5 Name')).toBeTruthy();
+      expect(queryByText('Player6 Name')).toBeFalsy();
+    });
+
+    it('shows "Show N more" button when there are more than 5 players', () => {
+      setupManyPlayers();
+      const { getByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={null} />,
+      );
+      expect(getByText('Show 3 more')).toBeTruthy();
+    });
+
+    it('reveals remaining players after clicking "Show N more"', () => {
+      setupManyPlayers();
+      const { getByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={null} />,
+      );
+      act(() => {
+        fireEvent.click(getByText('Show 3 more'));
+      });
+      expect(getByText('Player6 Name')).toBeTruthy();
+      expect(getByText('Player8 Name')).toBeTruthy();
+    });
+
+    it('shows "Show fewer" toggle after expanding', () => {
+      setupManyPlayers();
+      const { getByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={null} />,
+      );
+      act(() => {
+        fireEvent.click(getByText('Show 3 more'));
+      });
+      expect(getByText('Show fewer')).toBeTruthy();
+    });
+
+    it('collapses back to 5 players after clicking "Show fewer"', () => {
+      setupManyPlayers();
+      const { getByText, queryByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={null} />,
+      );
+      act(() => {
+        fireEvent.click(getByText('Show 3 more'));
+      });
+      act(() => {
+        fireEvent.click(getByText('Show fewer'));
+      });
+      expect(queryByText('Player6 Name')).toBeFalsy();
+      expect(getByText('Player5 Name')).toBeTruthy();
+    });
+
+    it('does not show expand button when 5 or fewer players are on the trade block', () => {
+      setupMock();
+      const { queryByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={null} />,
+      );
+      expect(queryByText(/Show \d+ more/)).toBeFalsy();
+    });
+  });
+
+  describe('remove from trade block', () => {
+    it('calls setTradeBlock with onTradeBlock: false when Remove is pressed', async () => {
+      setupMock();
+      mockSetTradeBlock.mockResolvedValueOnce({ data: {} });
+
+      const { getAllByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+
+      act(() => {
+        fireEvent.click(getAllByText('Remove')[0]);
+      });
+
+      await waitFor(() => {
+        expect(mockSetTradeBlock).toHaveBeenCalledWith({
+          variables: { teamMemberId: 1, onTradeBlock: false },
+        });
+      });
+    });
+  });
+
+  describe('mutation error state accessibility', () => {
+    it('renders mutation error with role="alert" for screen reader accessibility', async () => {
+      setupMock();
+      mockSetTradeBlock.mockRejectedValueOnce(new Error('Server error'));
+
+      const { getAllByText, getByRole } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+
+      act(() => {
+        fireEvent.click(getAllByText('Remove')[0]);
+      });
+
+      await waitFor(() => {
+        expect(getByRole('alert')).toBeTruthy();
+      });
+    });
   });
 
   describe('mutation error handling', () => {

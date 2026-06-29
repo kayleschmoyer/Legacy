@@ -29,9 +29,16 @@ const originalError = console.error;
 const tamaguiPropWarnings = [
   'borderColor',
   'borderWidth',
+  'borderRadius',
+  'borderTopLeftRadius',
+  'borderTopRightRadius',
+  'borderBottomLeftRadius',
+  'borderBottomRightRadius',
   'flexWrap',
+  'flexDirection',
   'justifyContent',
   'alignItems',
+  'alignSelf',
   'gap',
   'rowGap',
   'columnGap',
@@ -40,13 +47,83 @@ const tamaguiPropWarnings = [
   'marginTop',
   'marginLeft',
   'marginRight',
+  'marginHorizontal',
+  'marginVertical',
   'paddingBottom',
   'paddingTop',
   'paddingLeft',
   'paddingRight',
+  'paddingHorizontal',
+  'paddingVertical',
   'userSelect',
   'pointerEvents',
+  'backgroundColor',
+  'backgroundImage',
+  'hoverStyle',
+  'pressStyle',
+  'focusStyle',
+  'focusVisibleStyle',
+  'enterStyle',
+  'exitStyle',
+  'animation',
+  'animateOnly',
+  'textAlign',
+  'fontSize',
+  'fontWeight',
+  'fontFamily',
+  'lineHeight',
+  'letterSpacing',
+  'numberOfLines',
+  'ellipsizeMode',
+  'minHeight',
+  'maxHeight',
+  'maxWidth',
+  'minWidth',
+  'zIndex',
+  'overflow',
+  'opacity',
+  'elevation',
+  'shadowColor',
+  'shadowOffset',
+  'shadowOpacity',
+  'shadowRadius',
+  'accessibilityRole',
+  'accessibilityLabel',
+  'accessibilityHint',
+  'accessibilityState',
+  'accessibilityValue',
+  'accessible',
+  'hitSlop',
+  'pressRetentionOffset',
+  'unstyled',
+  'circular',
+  'bordered',
+  'chromeless',
+  'themeInverse',
+  'space',
+  'spaceDirection',
+  'separator',
 ];
+
+const rnEventHandlers = new Set([
+  'onPress',
+  'onPressIn',
+  'onPressOut',
+  'onLongPress',
+  'onChangeText',
+  'onEndEditing',
+  'onSubmitEditing',
+  'onContentSizeChange',
+  'onScroll',
+  'onMomentumScrollEnd',
+  'onScrollBeginDrag',
+  'onScrollEndDrag',
+  'onLayout',
+  'onStartShouldSetResponder',
+  'onMoveShouldSetResponder',
+  'onResponderGrant',
+  'onResponderRelease',
+]);
 
 beforeAll(() => {
   console.error = (...args: any[]) => {
@@ -91,6 +168,13 @@ beforeAll(() => {
         args[1].startsWith('$')
       ) {
         return;
+      }
+      // Skip React Native event handler warnings (e.g. "Unknown event handler property `onPress`")
+      if (firstArg.includes('Unknown event handler property')) {
+        const propName = typeof args[1] === 'string' ? args[1] : '';
+        if (rnEventHandlers.has(propName)) {
+          return;
+        }
       }
     }
     originalError.call(console, ...args);
