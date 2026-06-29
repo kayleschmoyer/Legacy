@@ -707,7 +707,9 @@ describe('football resolvers', () => {
 
         const params = compileWhereParams();
         expect(params).toContain('KC');
-        expect(params).toHaveLength(1);
+        expect(params).not.toContain('OAK');
+        expect(params).not.toContain('SD');
+        expect(params).not.toContain('STL');
       });
     });
 

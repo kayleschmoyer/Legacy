@@ -33,7 +33,9 @@ export const ALLOWED_POSITIONS_FOOTBALL: Readonly<
   TE: ['TE'],
   K: ['K'],
   DEF: ['DEF', 'DST'],
+  DST: ['DST'],
   FLEX: ['RB', 'WR', 'TE'],
+  BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DST'],
 });
 
 /** Canonical fill order for unfilled slots — earlier entries are higher priority. */
