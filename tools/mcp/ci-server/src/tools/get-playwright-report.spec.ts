@@ -5,7 +5,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 // the report module stays loadable — the fetchers it backs are mocked anyway.
 jest.mock('../github-api.js', () => ({
   buildHeaders: jest.fn(),
-  getToken: jest.fn(),
+  getDeploysToken: jest.fn(),
 }));
 
 // Keep renderReportAsMarkdown / reportUrlFor real so we exercise the actual

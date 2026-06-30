@@ -1,5 +1,5 @@
 import { inflateRawSync } from 'node:zlib';
-import { buildHeaders, getToken } from './github-api.js';
+import { buildHeaders, getDeploysToken } from './github-api.js';
 
 export const DEPLOYS_REPO = 'bkrupa/legacy-sports-deploys';
 export const DEPLOYS_BRANCH = 'gh-pages';
@@ -19,7 +19,7 @@ export async function fetchFileContent(
   path: string,
   ref: string,
 ): Promise<string> {
-  const token = await getToken();
+  const token = await getDeploysToken();
   const url = `https://api.github.com/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`;
   const res = await fetch(url, {
     headers: buildHeaders(token),

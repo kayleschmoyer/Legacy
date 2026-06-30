@@ -191,6 +191,98 @@ export async function getToken(): Promise<string> {
   return (await resolveToken()).token;
 }
 
+// Cache for the deploys-repo token (generated via PREVIEW_APP credentials)
+let cachedDeploysToken: string | undefined;
+let cachedDeploysTokenExpiry: Date | undefined;
+
+/**
+ * Generate or return a cached installation token for `bkrupa/legacy-sports-deploys`.
+ *
+ * Uses PREVIEW_APP_PRIVATE_KEY + PREVIEW_APP_ID when configured — the same
+ * GitHub App the CI deploy workflows use — so the read token is correctly scoped to
+ * the deploys repo. Falls back to `getToken()` when those vars are absent (works when
+ * GH_TOKEN is a broad PAT with access to both repos).
+ */
+export async function getDeploysToken(): Promise<string> {
+  const now = new Date();
+  if (
+    cachedDeploysToken &&
+    (!cachedDeploysTokenExpiry || cachedDeploysTokenExpiry > now)
+  ) {
+    return cachedDeploysToken;
+  }
+
+  const rawKey = process.env['PREVIEW_APP_PRIVATE_KEY'];
+  const appId = process.env['PREVIEW_APP_ID'];
+
+  if (rawKey && appId) {
+    const privateKey = rawKey.includes('-----BEGIN')
+      ? rawKey
+      : rawKey.replace(/\\n/g, '\n');
+    const jwt = createAppJWT(privateKey, appId.trim());
+
+    // Discover the PREVIEW_APP installation on the deploys repo
+    const installRes = await fetch(
+      `${GITHUB_API}/repos/bkrupa/legacy-sports-deploys/installation`,
+      {
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'legacy-sports-ci-server',
+        },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+
+    if (!installRes.ok) {
+      const body = await installRes.text();
+      process.stderr.write(
+        `[ci-server] PREVIEW_APP installation discovery failed (${installRes.status}): ${sanitizeErrorBody(body)} — falling back to main token.\n`,
+      );
+    } else {
+      const install = (await installRes.json()) as { id: number };
+      const tokenRes = await fetch(
+        `${GITHUB_API}/app/installations/${install.id}/access_tokens`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'legacy-sports-ci-server',
+          },
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+
+      if (!tokenRes.ok) {
+        const body = await tokenRes.text();
+        process.stderr.write(
+          `[ci-server] PREVIEW_APP token exchange failed (${tokenRes.status}): ${sanitizeErrorBody(body)} — falling back to main token.\n`,
+        );
+      } else {
+        const data = (await tokenRes.json()) as {
+          token: string;
+          expires_at?: string;
+        };
+        if (data.token) {
+          cachedDeploysToken = data.token;
+          if (data.expires_at) {
+            cachedDeploysTokenExpiry = new Date(
+              new Date(data.expires_at).getTime() - 5 * 60 * 1000,
+            );
+          }
+          return cachedDeploysToken;
+        }
+      }
+    }
+  }
+
+  // Fall back to the main token (works when GH_TOKEN is a PAT with access to both repos)
+  return getToken();
+}
+
 /** Parse owner/repo from the git remote origin URL. */
 async function getRepoSlug(): Promise<string> {
   // In Lambda environments there is no .git directory and git is not on PATH.
