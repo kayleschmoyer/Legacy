@@ -224,6 +224,18 @@ interface MockOptions {
   teamMembers?: typeof MOCK_TEAM_MEMBERS | [];
   /** Override the league inviteCode (null simulates a league whose invite code hasn't been generated yet) */
   inviteCode?: string | null;
+  /**
+   * Override the team ID returned by getuserteamid.
+   * Pass null to simulate a spectator who has no team in the league.
+   * Defaults to 1 (the test user's team).
+   */
+  userTeamId?: number | null;
+  /**
+   * Override the league owner ID in the mock league response.
+   * Defaults to 1 (matches the test user, making them commissioner).
+   * Pass a different value (e.g. 999) to simulate a non-commissioner view.
+   */
+  leagueOwner?: number;
   /** Capture rename mutation calls */
   onRenameTeam?: (variables: {
     teamId: number;
@@ -243,9 +255,17 @@ async function mockLeagueDetailGraphQL(
     teamMembers = MOCK_TEAM_MEMBERS,
     inviteCode,
     onRenameTeam,
+    userTeamId = 1,
+    leagueOwner = 1,
   } = opts;
   const leagueForResponse =
-    inviteCode === undefined ? MOCK_LEAGUE : { ...MOCK_LEAGUE, inviteCode };
+    inviteCode !== undefined || leagueOwner !== 1
+      ? {
+          ...MOCK_LEAGUE,
+          ...(inviteCode !== undefined ? { inviteCode } : {}),
+          owner: leagueOwner,
+        }
+      : MOCK_LEAGUE;
 
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
@@ -308,7 +328,18 @@ async function mockLeagueDetailGraphQL(
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { userTeamId: 1 } }),
+        body: JSON.stringify({ data: { userTeamId } }),
+      });
+    } else if (
+      postData.includes('getteamtradeoffers') ||
+      postData.includes('getleaguetradeoffers')
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { teamTradeOffers: [], leagueTradeOffers: [] },
+        }),
       });
     } else if (
       postData.includes('getteammembers') ||
@@ -818,5 +849,70 @@ test.describe('QR code loading skeleton — LS-4018 @regression', () => {
 
     await expect(leaguePage.qrCodeSvg).toBeVisible();
     await expect(leaguePage.qrCodeSkeleton).toHaveCount(0);
+  });
+});
+
+// ── Trades Tab ────────────────────────────────────────────────────────────────
+
+test.describe('Trades Tab — navigation @smoke', () => {
+  test('navigates to trades tab without error', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+    await leaguePage.gotoDetail(1, 'trades');
+
+    await expect(page).toHaveURL('/baseball/league/1/trades');
+    await leaguePage.expectNoAppError();
+  });
+
+  test('clicking the Trades tab navigates from overview', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+    await leaguePage.gotoDetail(1, 'overview');
+
+    await leaguePage.openTab('Trades');
+    await expect(page).toHaveURL(/\/trades/);
+    await leaguePage.expectNoAppError();
+  });
+});
+
+test.describe('Trades Tab — member view @regression', () => {
+  test('renders Trading Center heading for league members', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+    await leaguePage.gotoDetail(1, 'trades');
+
+    await expect(leaguePage.testId('trade-center-heading')).toBeVisible();
+    await leaguePage.expectNoAppError();
+  });
+
+  test('does not show spectator banner for league members', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+    await leaguePage.gotoDetail(1, 'trades');
+
+    await expect(leaguePage.text('Spectator Mode')).not.toBeVisible();
+  });
+});
+
+test.describe('Trades Tab — spectator guard @regression', () => {
+  test('shows spectator banner and empty state for non-members', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page, { userTeamId: null, leagueOwner: 999 });
+    await leaguePage.gotoDetail(1, 'trades');
+
+    await expect(leaguePage.text('Spectator Mode')).toBeVisible();
+    await expect(leaguePage.testId('trade-center-heading')).toBeVisible();
+    await expect(leaguePage.text('Join this league to trade')).toBeVisible();
+    await leaguePage.expectNoAppError();
   });
 });
