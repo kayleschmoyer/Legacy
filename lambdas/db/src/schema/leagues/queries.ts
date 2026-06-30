@@ -1359,6 +1359,7 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           and(
             eq(PublicSchema.leagueMembers.userId, userId),
             ne(PublicSchema.leagues.leaguePhase, 'offseason'),
+            eq(PublicSchema.leagues.isMockDraft, false),
           ),
         )
         .orderBy(PublicSchema.leagues.id);
@@ -1602,6 +1603,7 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
           and(
             eq(PublicSchema.leagueMembers.userId, userId),
             eq(PublicSchema.leagues.leaguePhase, 'offseason'),
+            eq(PublicSchema.leagues.isMockDraft, false),
           ),
         )
         .orderBy(PublicSchema.leagues.id);

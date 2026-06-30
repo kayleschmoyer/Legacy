@@ -128,6 +128,7 @@ export default function BaseballHome() {
       (userLeagues ?? [])
         .filter(Boolean)
         .filter((l) => l?.sport === Sport.Baseball)
+        .filter((l) => !l.isMockDraft)
         .map((l) => ({
           id: l?.id ?? 0,
           name: l?.name,
