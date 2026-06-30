@@ -23,6 +23,7 @@ import { useCurrentUserInfo } from '../common/auth/AuthHooks';
 import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 import { ThemeProvider } from '../context/ThemeContext';
 import { setUserProperties } from '../utils/analytics';
+import { installGlobalErrorCapture } from '../lib/installGlobalErrorCapture';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -55,6 +56,10 @@ const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
+
+// Install global JS error capture after Rollbar so LOGGER → RollbarOutputDestination
+// is ready to receive errors. Must run before any component renders.
+installGlobalErrorCapture();
 
 /**
  * Runs inside AppProvider (Apollo context) to set analytics identity and
