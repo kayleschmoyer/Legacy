@@ -31,7 +31,7 @@ make pc                          # MUST pass before pushing
 git push --force-with-lease origin HEAD
 ```
 
-> Always use a cross-platform no-op editor in automated/agent workflows to prevent Git from blocking on editor prompts. `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=true` are Unix-specific; prefer the MCP tools or `GIT_EDITOR='node -e "process.exit(0)"'` (and `GIT_SEQUENCE_EDITOR='node -e "process.exit(0)"'` when a sequenced rebase step needs it).
+> Always use a cross-platform no-op editor in automated/agent workflows to prevent Git from blocking on editor prompts. `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR=true` are Unix-specific; prefer the MCP tools or `GIT_EDITOR='node -e "process.exit(0)"'` (and `GIT_SEQUENCE_EDITOR='node -e "process.exit(0)"'` when a sequenced rebase step needs it). After resolving conflicts, use **`worktree_rebase_continue()`** (MCP) instead of `GIT_EDITOR=true git rebase --continue` — the tool suppresses the editor prompt internally.
 
 ## Decision Tree
 

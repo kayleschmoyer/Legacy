@@ -80,6 +80,10 @@ For each conflicted source file, the agent should:
 
 #### 2e. Continue Through All Commits
 
+**MCP (preferred):** `worktree_rebase_continue()` — suppresses the editor prompt internally; no `GIT_EDITOR` override needed.
+
+**Shell fallback:**
+
 ```bash
 # Set a cross-platform no-op GIT_EDITOR to avoid blocking on commit-message prompts
 GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
@@ -154,7 +158,8 @@ The lockfile should never be manually merged. Regenerate it:
 # Accept either side first to clear the conflict
 git checkout --theirs pnpm-lock.yaml
 git add pnpm-lock.yaml
-GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue
+# Preferred: worktree_rebase_continue() via MCP
+GIT_EDITOR='node -e "process.exit(0)"' git rebase --continue  # shell fallback
 
 # After rebase completes, regenerate the lockfile
 pnpm install --no-frozen-lockfile
