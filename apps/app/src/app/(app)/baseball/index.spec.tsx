@@ -145,13 +145,18 @@ jest.mock('../../../common/auth/AuthorizedUserContext', () => ({
   useAuthorizedUserInfo: () => mockUseAuthorizedUserInfo(),
 }));
 
-const mockUseGetUserLeaguesQuery: jest.MockedFunction<
-  (options?: { skip?: boolean }) => { data: unknown; loading: boolean }
+const mockUseGetMyLeaguesQuery: jest.MockedFunction<
+  (options?: { variables?: { sport?: string }; skip?: boolean }) => {
+    data: unknown;
+    loading: boolean;
+  }
 > = jest.fn();
 const mockCreateLeague = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetUserLeaguesQuery: (options?: { skip?: boolean }) =>
-    mockUseGetUserLeaguesQuery(options),
+  useGetMyLeaguesQuery: (options?: {
+    variables?: { sport?: string };
+    skip?: boolean;
+  }) => mockUseGetMyLeaguesQuery(options),
   useCreateLeagueMutation: () => [mockCreateLeague, { loading: false }],
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));
@@ -193,31 +198,12 @@ const MOCK_LEAGUES = [
   },
 ];
 
-const FOOTBALL_LEAGUES = [
-  {
-    id: 10,
-    name: 'Grid Iron Legends',
-    sport: 'football',
-    draftStatus: null,
-    currentWeekNumber: null,
-    weekAdvanceStatus: null,
-  },
-  {
-    id: 11,
-    name: 'Touchdown Club',
-    sport: 'football',
-    draftStatus: null,
-    currentWeekNumber: null,
-    weekAdvanceStatus: null,
-  },
-];
-
 describe('BaseballHome (mobile MLBHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuthorizedUserInfo.mockReturnValue({ id: 1, username: 'testuser' });
-    mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: MOCK_LEAGUES },
+    mockUseGetMyLeaguesQuery.mockReturnValue({
+      data: { myLeagues: MOCK_LEAGUES },
       loading: false,
     });
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
@@ -235,12 +221,15 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
 
   it('passes skip based on authentication', () => {
     render(<BaseballHome />);
-    expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: false });
+    expect(mockUseGetMyLeaguesQuery).toHaveBeenCalledWith({
+      variables: { sport: 'baseball' },
+      skip: false,
+    });
   });
 
   it('passes empty leagues and no error to MLBHome when the user has no leagues (LS-5803)', () => {
-    mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: [] },
+    mockUseGetMyLeaguesQuery.mockReturnValue({
+      data: { myLeagues: [] },
       loading: false,
     });
     render(<BaseballHome />);
@@ -256,9 +245,9 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
     });
 
     it('marks atLimit at the cap', () => {
-      mockUseGetUserLeaguesQuery.mockReturnValue({
+      mockUseGetMyLeaguesQuery.mockReturnValue({
         data: {
-          userLeagues: [
+          myLeagues: [
             ...MOCK_LEAGUES,
             { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
@@ -282,7 +271,7 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
     });
 
     it('omits the cap and flags error when the query failed', () => {
-      mockUseGetUserLeaguesQuery.mockReturnValue({
+      mockUseGetMyLeaguesQuery.mockReturnValue({
         data: null,
         loading: false,
       });
@@ -292,9 +281,9 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
     });
 
     it('navigates to upgrade and tracks analytics on upgrade press', () => {
-      mockUseGetUserLeaguesQuery.mockReturnValue({
+      mockUseGetMyLeaguesQuery.mockReturnValue({
         data: {
-          userLeagues: [
+          myLeagues: [
             ...MOCK_LEAGUES,
             { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
@@ -309,14 +298,13 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
       );
     });
 
-    it('counts all leagues across sports toward the cap (LS-5867)', () => {
-      // 2 football + 1 baseball = 3 total → at cap even though only 1 is baseball.
-      // The backend enforces the cap across all sports; the baseball screen must
-      // reflect the same cross-sport count so the displayed limit matches what
-      // the server will enforce.
-      mockUseGetUserLeaguesQuery.mockReturnValue({
+    it('counts baseball leagues from myLeagues toward the cap (LS-5795)', () => {
+      mockUseGetMyLeaguesQuery.mockReturnValue({
         data: {
-          userLeagues: [...FOOTBALL_LEAGUES, MOCK_LEAGUES[0]],
+          myLeagues: [
+            ...MOCK_LEAGUES,
+            { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
+          ],
         },
         loading: false,
       });
@@ -327,29 +315,12 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
 
   describe('create + navigation', () => {
     it('redirects to upgrade instead of creating when at the free-tier cap (LS-5013)', async () => {
-      mockUseGetUserLeaguesQuery.mockReturnValue({
+      mockUseGetMyLeaguesQuery.mockReturnValue({
         data: {
-          userLeagues: [
+          myLeagues: [
             ...MOCK_LEAGUES,
             { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
-        },
-        loading: false,
-      });
-      render(<BaseballHome />);
-      fireEvent.press(screen.getByTestId('create'));
-      await waitFor(() =>
-        expect(mockNavigate).toHaveBeenCalledWith('subscription-settings'),
-      );
-      expect(mockCreateLeague).not.toHaveBeenCalled();
-    });
-
-    it('redirects to upgrade when at cap via cross-sport leagues (LS-5867)', async () => {
-      // 2 football + 1 baseball = 3 total → server cap reached across sports;
-      // the baseball creation path must gate here, not silently allow a 4th league.
-      mockUseGetUserLeaguesQuery.mockReturnValue({
-        data: {
-          userLeagues: [...FOOTBALL_LEAGUES, MOCK_LEAGUES[0]],
         },
         loading: false,
       });
@@ -452,8 +423,8 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
     });
 
     it('shows an empty-state message when there are no leagues to invite to', () => {
-      mockUseGetUserLeaguesQuery.mockReturnValue({
-        data: { userLeagues: [] },
+      mockUseGetMyLeaguesQuery.mockReturnValue({
+        data: { myLeagues: [] },
         loading: false,
       });
       render(<BaseballHome />);
@@ -493,7 +464,7 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
   describe('unauthenticated state (LS-5806)', () => {
     beforeEach(() => {
       mockUseAuthorizedUserInfo.mockReturnValue(null);
-      mockUseGetUserLeaguesQuery.mockReturnValue({
+      mockUseGetMyLeaguesQuery.mockReturnValue({
         data: undefined,
         loading: false,
       });
@@ -501,7 +472,9 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
 
     it('skips the query and passes isAuthenticated:false + error:false to MLBHome', () => {
       render(<BaseballHome />);
-      expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: true });
+      expect(mockUseGetMyLeaguesQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: true }),
+      );
       expect(screen.getByText('error:false')).toBeTruthy();
       expect(screen.getByText('isAuthenticated:false')).toBeTruthy();
     });

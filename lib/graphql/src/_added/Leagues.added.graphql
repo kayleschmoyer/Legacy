@@ -19,6 +19,13 @@ query GetUserLeagues {
   }
 }
 
+query GetMyLeagues($sport: Sport) {
+  myLeagues(sport: $sport) {
+    ...League
+    ...AppLeague
+  }
+}
+
 mutation DeleteAllLeagues($systemWide: Boolean) {
   deleteAllLeagues(systemWide: $systemWide)
 }

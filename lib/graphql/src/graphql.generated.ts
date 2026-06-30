@@ -5789,6 +5789,73 @@ export type GetUserLeaguesQuery = {
   }>;
 };
 
+export type GetMyLeaguesQueryVariables = Exact<{
+  sport?: InputMaybe<Sport>;
+}>;
+
+export type GetMyLeaguesQuery = {
+  __typename?: 'Query';
+  myLeagues: Array<{
+    __typename?: 'League';
+    id?: number | null;
+    name?: string | null;
+    owner?: number | null;
+    sport?: Sport | null;
+    defensiveFormat?: DefensiveFormat | null;
+    maxRosterSize?: number | null;
+    currentMatchup?: number | null;
+    currentWeekNumber?: number | null;
+    draftStatus?: string | null;
+    leaguePhase?: string | null;
+    inviteCode?: string | null;
+    playerPool?: string | null;
+    weekAdvanceStatus?: string | null;
+    waiverType?: string | null;
+    waiverEnabled?: boolean | null;
+    faabBudgetDefault?: number | null;
+    pitcherStartsPerMatchup?: number | null;
+    gamesPerMatchup?: number | null;
+    minCareerGames?: number | null;
+    minCareerSeasons?: number | null;
+    totalMatchups?: number | null;
+    playoffEnabled?: boolean | null;
+    playoffFormat?: string | null;
+    playoffMultiWeek?: boolean | null;
+    lmNotes?: string | null;
+    isMockDraft?: boolean | null;
+    isPublic?: boolean | null;
+    logoUrl?: string | null;
+    bannerUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    previousLeagueId?: number | null;
+    frozenAt?: string | null;
+    seasonNumber?: number | null;
+    salaryCapEnabled?: boolean | null;
+    salaryCap?: number | null;
+    salaryFloor?: number | null;
+    luxuryTaxThreshold?: number | null;
+    minSalary?: number | null;
+    salaryEscalationPct?: number | null;
+    salaryDecayPct?: number | null;
+    auctionBudget?: number | null;
+    auctionMinBid?: number | null;
+    eraFilter?: string | null;
+    baseballHofOnly?: boolean | null;
+    customEraStartYear?: number | null;
+    customEraEndYear?: number | null;
+    tradeDeadlineWeek?: number | null;
+    userMembership?: {
+      __typename?: 'LeagueMember';
+      leagueId?: number | null;
+      userId?: number | null;
+      teamId?: number | null;
+      permissionLevel?: string | null;
+      username?: string | null;
+    } | null;
+  }>;
+};
+
 export type DeleteAllLeaguesMutationVariables = Exact<{
   systemWide?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
@@ -16904,6 +16971,92 @@ export type GetUserLeaguesSuspenseQueryHookResult = ReturnType<
 export type GetUserLeaguesQueryResult = Apollo.QueryResult<
   GetUserLeaguesQuery,
   GetUserLeaguesQueryVariables
+>;
+export const GetMyLeagues = gql`
+  query GetMyLeagues($sport: Sport) {
+    myLeagues(sport: $sport) {
+      ...League
+      ...AppLeague
+    }
+  }
+  ${LeagueFragmentDoc}
+  ${AppLeagueFragmentDoc}
+`;
+
+/**
+ * __useGetMyLeaguesQuery__
+ *
+ * To run a query within a React component, call `useGetMyLeaguesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyLeaguesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyLeaguesQuery({
+ *   variables: {
+ *      sport: // value for 'sport'
+ *   },
+ * });
+ */
+export function useGetMyLeaguesQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMyLeaguesQuery,
+    GetMyLeaguesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetMyLeaguesQuery, GetMyLeaguesQueryVariables>(
+    GetMyLeagues,
+    options,
+  );
+}
+export function useGetMyLeaguesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMyLeaguesQuery,
+    GetMyLeaguesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetMyLeaguesQuery, GetMyLeaguesQueryVariables>(
+    GetMyLeagues,
+    options,
+  );
+}
+export function useGetMyLeaguesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMyLeaguesQuery,
+        GetMyLeaguesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<GetMyLeaguesQuery, GetMyLeaguesQueryVariables>(
+    GetMyLeagues,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMyLeaguesQuery,
+          GetMyLeaguesQueryVariables
+        >,
+  );
+}
+export type GetMyLeaguesQueryHookResult = ReturnType<
+  typeof useGetMyLeaguesQuery
+>;
+export type GetMyLeaguesLazyQueryHookResult = ReturnType<
+  typeof useGetMyLeaguesLazyQuery
+>;
+export type GetMyLeaguesSuspenseQueryHookResult = ReturnType<
+  typeof useGetMyLeaguesSuspenseQuery
+>;
+export type GetMyLeaguesQueryResult = Apollo.QueryResult<
+  GetMyLeaguesQuery,
+  GetMyLeaguesQueryVariables
 >;
 export const DeleteAllLeagues = gql`
   mutation DeleteAllLeagues($systemWide: Boolean) {

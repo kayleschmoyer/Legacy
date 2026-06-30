@@ -20,7 +20,7 @@ interface MLBHomeHarnessProps {
   onCreateLeague: (input: Record<string, unknown>) => Promise<void>;
 }
 interface LeaguesQueryResult {
-  data?: { userLeagues: HarnessLeague[] };
+  data?: { myLeagues: HarnessLeague[] };
   loading: boolean;
   error?: Error;
   refetch: () => void;
@@ -87,14 +87,19 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
 
 const mockCreateLeague = jest.fn();
 const mockRefetch = jest.fn();
-const mockUseGetUserLeaguesQuery: jest.MockedFunction<
-  (opts: { skip?: boolean }) => LeaguesQueryResult
+const mockUseGetMyLeaguesQuery: jest.MockedFunction<
+  (opts: {
+    variables?: { sport?: string };
+    skip?: boolean;
+  }) => LeaguesQueryResult
 > = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetUserLeaguesQuery: (opts: { skip?: boolean }) =>
-    mockUseGetUserLeaguesQuery(opts),
+  useGetMyLeaguesQuery: (opts: {
+    variables?: { sport?: string };
+    skip?: boolean;
+  }) => mockUseGetMyLeaguesQuery(opts),
   useCreateLeagueAndTeamsMutation: () => [mockCreateLeague, { loading: false }],
-  GetUserLeagues: {},
+  GetMyLeagues: {},
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
@@ -112,9 +117,9 @@ beforeEach(() => {
     isLoading: false,
     user: { username: 'schmoyer21@gmail.com' },
   });
-  mockUseGetUserLeaguesQuery.mockReturnValue({
+  mockUseGetMyLeaguesQuery.mockReturnValue({
     data: {
-      userLeagues: [{ id: 1, name: 'Saturday Sluggers', sport: 'baseball' }],
+      myLeagues: [{ id: 1, name: 'Saturday Sluggers', sport: 'baseball' }],
     },
     loading: false,
     error: undefined,
@@ -138,7 +143,7 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
   });
 
   it('passes the loading guard while data is undefined and no error', () => {
-    mockUseGetUserLeaguesQuery.mockReturnValue({
+    mockUseGetMyLeaguesQuery.mockReturnValue({
       data: undefined,
       loading: false,
       error: undefined,
@@ -149,7 +154,7 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
   });
 
   it('surfaces the error flag when the query fails', () => {
-    mockUseGetUserLeaguesQuery.mockReturnValue({
+    mockUseGetMyLeaguesQuery.mockReturnValue({
       data: undefined,
       loading: false,
       error: new Error('boom'),
@@ -202,8 +207,8 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
   }
 
   it('does not set atLimit when user is below the cap', () => {
-    mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: leaguesOfCount(2) },
+    mockUseGetMyLeaguesQuery.mockReturnValue({
+      data: { myLeagues: leaguesOfCount(2) },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -213,8 +218,8 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
   });
 
   it('never sets atLimit on web (web does not hard-gate creation) but upgrade CTA navigates to /pricing', () => {
-    mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: leaguesOfCount(3) },
+    mockUseGetMyLeaguesQuery.mockReturnValue({
+      data: { myLeagues: leaguesOfCount(3) },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -232,8 +237,8 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
       isPremium: true,
       isLoading: false,
     });
-    mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: leaguesOfCount(5) },
+    mockUseGetMyLeaguesQuery.mockReturnValue({
+      data: { myLeagues: leaguesOfCount(5) },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -247,8 +252,8 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
       isPremium: false,
       isLoading: true,
     });
-    mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: leaguesOfCount(4) },
+    mockUseGetMyLeaguesQuery.mockReturnValue({
+      data: { myLeagues: leaguesOfCount(4) },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -257,13 +262,13 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
   });
 
-  it('counts leagues across all sports toward the cap count display (atLimit stays false on web)', () => {
-    mockUseGetUserLeaguesQuery.mockReturnValue({
+  it('counts baseball leagues from myLeagues toward the cap count display (LS-5795)', () => {
+    mockUseGetMyLeaguesQuery.mockReturnValue({
       data: {
-        userLeagues: [
-          { id: 1, name: 'Football A' },
-          { id: 2, name: 'Football B' },
-          { id: 3, name: 'Baseball A' },
+        myLeagues: [
+          { id: 1, name: 'Baseball A' },
+          { id: 2, name: 'Baseball B' },
+          { id: 3, name: 'Baseball C' },
         ],
       },
       loading: false,
@@ -271,7 +276,9 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
       refetch: mockRefetch,
     });
     render(<BaseballScreen />);
-    // atLimit is always false on web even when the cross-sport count hits the cap.
+    // atLimit is always false on web even when the baseball count hits the cap.
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
+    // The upgrade CTA appears once the cap is reached.
+    expect(screen.getByText('upgrade')).toBeInTheDocument();
   });
 });

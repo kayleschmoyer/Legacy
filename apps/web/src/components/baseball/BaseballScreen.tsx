@@ -6,11 +6,11 @@ import {
 } from '@legacy-sports/shared-components/baseball';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
-  GetUserLeagues,
-  GetUserLeaguesQuery,
+  GetMyLeagues,
+  GetMyLeaguesQuery,
   Sport,
   useCreateLeagueAndTeamsMutation,
-  useGetUserLeaguesQuery,
+  useGetMyLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../PageMeta';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
@@ -31,7 +31,8 @@ export function BaseballScreen() {
   const navigate = useNavigate();
   const auth = useAuth();
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
-  const { data, loading, error, refetch } = useGetUserLeaguesQuery({
+  const { data, loading, error, refetch } = useGetMyLeaguesQuery({
+    variables: { sport: Sport.Baseball },
     // Only run the query if user is authenticated
     skip: !auth?.user,
     // Always refetch from network so deletions/adds are reflected immediately
@@ -43,13 +44,15 @@ export function BaseballScreen() {
       const newLeague = created?.createLeagueAndTeams?.league;
       if (!newLeague) return;
       try {
-        const existing = cache.readQuery<GetUserLeaguesQuery>({
-          query: GetUserLeagues,
+        const existing = cache.readQuery<GetMyLeaguesQuery>({
+          query: GetMyLeagues,
+          variables: { sport: Sport.Baseball },
         });
-        if (existing?.userLeagues) {
+        if (existing?.myLeagues) {
           cache.writeQuery({
-            query: GetUserLeagues,
-            data: { userLeagues: [...existing.userLeagues, newLeague] },
+            query: GetMyLeagues,
+            variables: { sport: Sport.Baseball },
+            data: { myLeagues: [...existing.myLeagues, newLeague] },
           });
         }
       } catch {
@@ -60,21 +63,17 @@ export function BaseballScreen() {
 
   const leagues = React.useMemo(
     () =>
-      (data?.userLeagues ?? [])
-        .filter(Boolean)
-        .filter((l) => l?.sport === Sport.Baseball)
-        .map((l) => ({
-          id: l?.id ?? 0,
-          name: l?.name,
-          draftStatus: l?.draftStatus,
-          currentWeekNumber: l?.currentWeekNumber,
-          weekAdvanceStatus: l?.weekAdvanceStatus,
-          maxRosterSize: l?.maxRosterSize,
-          tierFrozenAt: l?.tierFrozenAt,
-          frozenAt: l?.frozenAt,
-          permissionLevel: l?.userMembership?.permissionLevel,
-        })),
-    [data?.userLeagues],
+      (data?.myLeagues ?? []).filter(Boolean).map((l) => ({
+        id: l?.id ?? 0,
+        name: l?.name,
+        draftStatus: l?.draftStatus,
+        currentWeekNumber: l?.currentWeekNumber,
+        weekAdvanceStatus: l?.weekAdvanceStatus,
+        maxRosterSize: l?.maxRosterSize,
+        frozenAt: l?.frozenAt,
+        permissionLevel: l?.userMembership?.permissionLevel,
+      })),
+    [data?.myLeagues],
   );
 
   // Loading guard: cover the one-render window between auth resolving and Apollo
@@ -86,7 +85,7 @@ export function BaseballScreen() {
     auth.isLoading || (!!auth.user && (loading || (!data && !error)));
 
   // Count all leagues across sports — the backend cap is global (LS-5804).
-  const activeLeagueCount = (data?.userLeagues ?? []).filter(Boolean).length;
+  const activeLeagueCount = (data?.myLeagues ?? []).filter(Boolean).length;
   // Only show the cap indicator (and upgrade CTA) for authenticated non-premium
   // users once we know their subscription status. Mirrors the native guard in
   // baseball/index.tsx (showLeagueCap).

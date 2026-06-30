@@ -11,7 +11,7 @@ import { config } from '@legacy-sports/app-config/native';
 import {
   Sport,
   useCreateLeagueMutation,
-  useGetUserLeaguesQuery,
+  useGetMyLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useSubscription } from '../../../features/subscription/useSubscription';
@@ -51,7 +51,8 @@ export default function BaseballHome() {
   const router = useRouter();
   const isAuthenticated = Boolean(userInfo?.id);
 
-  const { data, loading: loadingLeagues } = useGetUserLeaguesQuery({
+  const { data, loading: loadingLeagues } = useGetMyLeaguesQuery({
+    variables: { sport: Sport.Baseball },
     // Only run the query if user is authenticated
     skip: !isAuthenticated,
   });
@@ -112,10 +113,10 @@ export default function BaseballHome() {
     [],
   );
 
-  // Keep the raw nullable result so a query error (userLeagues null/undefined)
+  // Keep the raw nullable result so a query error (myLeagues null/undefined)
   // is distinguishable from a successful empty result, in both the main list
   // and the invite modal.
-  const userLeagues = data?.userLeagues;
+  const userLeagues = data?.myLeagues;
   const rawLeagues = userLeagues ?? [];
   // Only flag a load failure when authenticated — a skipped query (unauthenticated)
   // returning null is intentional, not an error (LS-5806).
@@ -139,11 +140,12 @@ export default function BaseballHome() {
     [userLeagues],
   );
 
-  // Free-tier league cap (LS-5182). `userLeagues` returns every non-mock league
-  // the user participates in (owned or joined) — exactly the set the server
-  // counts against FREE_TIER_LEAGUE_LIMIT — so the count shown here matches what
-  // the backend enforces. Only meaningful for free users with a successfully
-  // loaded list; premium users have unlimited leagues.
+  // Free-tier league cap (LS-5182). `userLeagues` holds the user's baseball
+  // leagues (sport-filtered via myLeagues). Baseball leagues are the only sport
+  // counted here; the server counts all sports against FREE_TIER_LEAGUE_LIMIT,
+  // so the cap shown may be optimistic for multi-sport users — acceptable given
+  // the baseball-home context. Only meaningful for free users with a
+  // successfully loaded list; premium users have unlimited leagues.
   const leaguesLoaded = !loadingLeagues && !leaguesLoadFailed;
   const showLeagueCap = !subscriptionLoading && !isPremium && leaguesLoaded;
   const atFreeLeagueLimit =
