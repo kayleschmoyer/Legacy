@@ -214,11 +214,9 @@ describe('MLBHome', () => {
     expect(screen.getByTestId('mock-create-dialog')).toBeInTheDocument();
   });
 
-  it('invokes onViewLeague when a league View button is pressed', () => {
+  it('invokes onViewLeague when a league row is pressed', () => {
     render(<MLBHome {...baseProps} leagues={LEAGUES} />);
-    fireEvent.click(
-      screen.getAllByRole('button', { name: /View Saturday/ })[0],
-    );
+    fireEvent.click(screen.getByText('Saturday Sluggers'));
     expect(baseProps.onViewLeague).toHaveBeenCalledWith(1);
   });
 

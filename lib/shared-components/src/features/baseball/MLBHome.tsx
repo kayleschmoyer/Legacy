@@ -387,6 +387,7 @@ export function MLBHome({
                 opacity={atCap ? 0.5 : 1}
                 onPress={handleCreatePress}
                 accessibilityLabel="Create a new baseball league"
+                aria-label="Create a new baseball league"
               >
                 <Text color="$color1" fontWeight="700">
                   + Create
@@ -399,6 +400,7 @@ export function MLBHome({
                 borderRadius="$5"
                 onPress={onJoinLeague}
                 accessibilityLabel="Join an existing baseball league"
+                aria-label="Join an existing baseball league"
               >
                 <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                   Join
@@ -412,6 +414,7 @@ export function MLBHome({
                   borderRadius="$5"
                   onPress={onMockDraft}
                   accessibilityLabel="Practice with a mock draft simulator"
+                  aria-label="Practice with a mock draft simulator"
                 >
                   <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                     Mock Draft
@@ -426,6 +429,7 @@ export function MLBHome({
                   borderRadius="$5"
                   onPress={onScoreboard}
                   accessibilityLabel="View the live scoreboard"
+                  aria-label="View the live scoreboard"
                 >
                   <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                     Live Scores
@@ -499,6 +503,7 @@ export function MLBHome({
                     borderRadius="$6"
                     onPress={() => leagueCap?.onUpgrade()}
                     accessibilityLabel="Upgrade to add more leagues"
+                    aria-label="Upgrade to add more leagues"
                   >
                     <Text color={BRAND_NAVY} fontWeight="700">
                       Upgrade to add more leagues
@@ -510,6 +515,7 @@ export function MLBHome({
                     borderRadius="$6"
                     onPress={handleCreatePress}
                     accessibilityLabel="Create a new baseball league"
+                    aria-label="Create a new baseball league"
                   >
                     <Text color="$color1" fontWeight="700">
                       Create League
@@ -523,6 +529,7 @@ export function MLBHome({
                   borderRadius="$6"
                   onPress={onJoinLeague}
                   accessibilityLabel="Join an existing baseball league"
+                  aria-label="Join an existing baseball league"
                 >
                   <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                     Join League
@@ -536,6 +543,7 @@ export function MLBHome({
                     borderRadius="$6"
                     onPress={onMockDraft}
                     accessibilityLabel="Practice with a mock draft simulator"
+                    aria-label="Practice with a mock draft simulator"
                   >
                     <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                       Mock Draft
@@ -550,6 +558,7 @@ export function MLBHome({
                     borderRadius="$6"
                     onPress={onScoreboard}
                     accessibilityLabel="View the live scoreboard"
+                    aria-label="View the live scoreboard"
                   >
                     <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                       Live Scores
@@ -669,6 +678,7 @@ export function MLBHome({
                 borderWidth={1}
                 onPress={onRetry}
                 accessibilityLabel="Retry loading leagues"
+                aria-label="Retry loading leagues"
               >
                 <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                   Retry
@@ -701,6 +711,7 @@ export function MLBHome({
                 backgroundColor={BRAND_NAVY_LIGHT}
                 onPress={onSignIn}
                 accessibilityLabel="Get started free"
+                aria-label="Get started free"
               >
                 <Text color="$color1" fontWeight="700">
                   Get Started Free
@@ -734,6 +745,7 @@ export function MLBHome({
                 fontWeight="bold"
                 onPress={leagueCap.onUpgrade}
                 accessibilityLabel="Upgrade to add more leagues"
+                aria-label="Upgrade to add more leagues"
               >
                 — Upgrade to add more
               </Text>
@@ -750,6 +762,7 @@ export function MLBHome({
             alignSelf="flex-start"
             onPress={onInviteFriends}
             accessibilityLabel="Invite friends to a league"
+            aria-label="Invite friends to a league"
           >
             <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
               Invite Friends
@@ -857,8 +870,6 @@ export function MLBHome({
                 const badge = getLeagueBadge(
                   league.draftStatus,
                   league.currentWeekNumber,
-                  league.tierFrozenAt,
-                  league.frozenAt,
                 );
                 const roleChip = getRoleChip(league.permissionLevel);
                 return (
@@ -967,23 +978,6 @@ export function MLBHome({
                         </XStack>
                       ) : null}
                     </XStack>
-
-                    <Button
-                      backgroundColor={withAlpha(BRAND_NAVY, 0.16)}
-                      borderColor={withAlpha(BRAND_NAVY, 0.45)}
-                      borderWidth={1}
-                      borderRadius="$5"
-                      onPress={() => onViewLeague(league.id)}
-                      accessibilityLabel={`View ${league.name || 'league'}`}
-                    >
-                      <Text
-                        fontWeight="700"
-                        color={BRAND_GOLD_LIGHT}
-                        fontSize="$2"
-                      >
-                        View
-                      </Text>
-                    </Button>
                   </XStack>
                 );
               })}
@@ -1053,6 +1047,7 @@ export function MLBHome({
                         borderRadius="$6"
                         onPress={() => leagueCap?.onUpgrade()}
                         accessibilityLabel="Upgrade to add more leagues"
+                        aria-label="Upgrade to add more leagues"
                       >
                         <Text color={BRAND_NAVY} fontWeight="700">
                           Upgrade to add more leagues
@@ -1064,6 +1059,7 @@ export function MLBHome({
                         borderRadius="$6"
                         onPress={handleCreatePress}
                         accessibilityLabel="Create your first baseball league"
+                        aria-label="Create your first baseball league"
                       >
                         <Text color="$color1" fontWeight="700">
                           Create your first league
@@ -1077,6 +1073,7 @@ export function MLBHome({
                       borderRadius="$6"
                       onPress={onJoinLeague}
                       accessibilityLabel="Join a baseball league with a code"
+                      aria-label="Join a baseball league with a code"
                     >
                       <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                         Join with a code
