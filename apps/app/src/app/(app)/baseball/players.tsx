@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  FlatList,
-  KeyboardAvoidingView,
-  SafeAreaView,
-  TextInput,
-} from 'react-native';
+import { FlatList, KeyboardAvoidingView, TextInput } from 'react-native';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
 import type { BaseballPlayersQuery } from '@legacy-sports/graphql';
@@ -14,6 +9,7 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useBaseballRosteredPlayerIds } from './hooks/useBaseballRosteredPlayerIds';
+import { SafeScreen } from '../../../components/SafeScreen';
 
 type BaseballPlayerNode = NonNullable<
   NonNullable<BaseballPlayersQuery['players']>[number]
@@ -331,7 +327,7 @@ export default function BaseballPlayers(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
+      <SafeScreen>
         {/* Position filter pills */}
         <FlatList
           data={POSITIONS}
@@ -520,7 +516,7 @@ export default function BaseballPlayers(): React.JSX.Element {
             }
           />
         )}
-      </SafeAreaView>
+      </SafeScreen>
     </KeyboardAvoidingView>
   );
 }

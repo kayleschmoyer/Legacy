@@ -6,9 +6,8 @@
  * (web-canonical principle LS-7790).
  */
 import { useState } from 'react';
-import { SafeAreaView, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import {
-  BG_DARK,
   ScoreboardContainer,
   type ScoreboardGame,
   type SportKey,
@@ -16,6 +15,7 @@ import {
   useScoreboardLivePolling,
 } from '@legacy-sports/shared-components';
 import { useGetScoreboardQuery } from '@legacy-sports/graphql';
+import { SafeScreen } from '../../../components/SafeScreen';
 import { ScoreboardDateNav } from '../../../components/scoreboard/ScoreboardDateNav';
 
 export default function ScoreboardScreen(): React.JSX.Element {
@@ -38,7 +38,7 @@ export default function ScoreboardScreen(): React.JSX.Element {
   useScoreboardLivePolling({ games, date, startPolling, stopPolling });
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: BG_DARK }}>
+    <SafeScreen>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1 }}
@@ -58,7 +58,7 @@ export default function ScoreboardScreen(): React.JSX.Element {
           dateNav={<ScoreboardDateNav date={date} onChange={setDate} />}
         />
       </ScrollView>
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 

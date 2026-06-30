@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Pressable,
-  SafeAreaView,
   TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,6 +32,7 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
+import { SafeScreen } from '../../../components/SafeScreen';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 import PlayerStatsScreen from '../PlayerStats';
 
@@ -893,7 +893,7 @@ export function FootballPlayers(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
+      <SafeScreen>
         {/* Position filter pills */}
         <FlatList
           data={visiblePositions}
@@ -1139,7 +1139,7 @@ export function FootballPlayers(): React.JSX.Element {
           }}
           accessibilityViewIsModal
         >
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
+          <SafeScreen>
             <XStack
               paddingHorizontal={12}
               paddingVertical={8}
@@ -1211,9 +1211,9 @@ export function FootballPlayers(): React.JSX.Element {
                 </Pressable>
               )}
             />
-          </SafeAreaView>
+          </SafeScreen>
         </Modal>
-      </SafeAreaView>
+      </SafeScreen>
     </KeyboardAvoidingView>
   );
 }

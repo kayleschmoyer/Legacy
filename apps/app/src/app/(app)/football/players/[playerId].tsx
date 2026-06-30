@@ -1,10 +1,10 @@
-import { SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   FOOTBALL_PLAYER_DETAIL_POLL_MS,
   FootballPlayerDetail,
 } from '@legacy-sports/shared-components/football';
 import { useFootballPlayerQuery } from '@legacy-sports/graphql';
+import { SafeScreen } from '../../../../components/SafeScreen';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
 import { useSubscription } from '../../../../features/subscription/useSubscription';
 
@@ -24,7 +24,7 @@ export default function FootballPlayerDetailScreen(): React.JSX.Element {
   });
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0F1A' }}>
+    <SafeScreen>
       <FootballPlayerDetail
         player={data?.footballPlayer}
         loading={loading}
@@ -33,7 +33,7 @@ export default function FootballPlayerDetailScreen(): React.JSX.Element {
         isPremium={isPremium}
         onUpgrade={() => router.navigate('subscription-settings')}
       />
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 
