@@ -27,7 +27,7 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 - **Kill background servers when done** — stop all `isBackground=true` processes. Run `make kill-stale`; call `browser_cleanup`.
 - **Self-review before every push (mandatory gate)** — run `/review` and read every changed file against `.agents/skills/pr-lifecycle/references/common-review-patterns.md` before pushing.
 - **Run migrations before `make pc` (mandatory)** — run `db_migration_status` then `db_migrate`. Shell fallback: `pnpm --prefix lib/db-client run db:status` and `db:up`.
-- **Validate with seven `pc-*` chunks in order** — `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`. **Cloud and timeout-prone sessions: never `make_run(target: "pc")`** — use `nx_run_pc_chunk` MCP tool instead. See `.agents/skills/workflow-overview/SKILL.md`.
+- **Validate with seven `pc-*` chunks in order** — `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`. **Cloud and timeout-prone sessions: ⛔ never `make pc`, never `make_run(target: "pc")`, never Bash `make pc`** — use `nx_run_pc_chunk` MCP tool for every chunk. See `.agents/skills/workflow-overview/SKILL.md`.
 - **CI status and PR activity are surfaced natively** — after pushing, failures and review events arrive as push notifications. ⛔ **Never use `sleep` + polling loops.**
 - **Compact every 35 tool calls** — a hook emits `[COMPACT REMINDER]` at every 35th tool call. Run `/compact` immediately then resume.
 - **Resolve PR review threads** — call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` directly.
