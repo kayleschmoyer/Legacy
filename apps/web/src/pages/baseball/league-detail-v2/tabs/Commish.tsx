@@ -35,6 +35,7 @@ interface AccordSection {
   badge?: React.ReactNode;
   content: React.ReactNode;
   testId?: string;
+  disabled?: boolean;
 }
 
 const Accord: React.FC<{
@@ -46,9 +47,15 @@ const Accord: React.FC<{
     <button
       type="button"
       className="ls-accord-head"
-      onClick={onToggle}
-      aria-expanded={open}
+      onClick={section.disabled ? undefined : onToggle}
+      aria-expanded={section.disabled ? undefined : open}
+      aria-disabled={section.disabled}
       data-testid={section.testId}
+      style={
+        section.disabled
+          ? { cursor: 'default', pointerEvents: 'none' }
+          : undefined
+      }
     >
       <div className="ls-accord-title">
         <div className={`icon-wrap ${section.iconClass ?? ''}`}>
@@ -57,7 +64,11 @@ const Accord: React.FC<{
         <span className="label">{section.label}</span>
         {section.badge}
       </div>
-      <I.ChevronDown className="ls-chev" size={16} />
+      <I.ChevronDown
+        className="ls-chev"
+        size={16}
+        style={section.disabled ? { opacity: 0.3 } : undefined}
+      />
     </button>
     {open ? (
       <div className="ls-accord-body" role="region" aria-label={section.label}>
@@ -275,6 +286,19 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       id: 'scoring',
       label: 'Scoring Rules',
       icon: <I.List size={16} />,
+      ...(isFootball
+        ? {
+            badge: (
+              <span
+                className="ls-chip"
+                style={{ marginLeft: 8, fontSize: 9, opacity: 0.6 }}
+              >
+                Coming Soon
+              </span>
+            ),
+            disabled: true,
+          }
+        : {}),
       content: leagueId ? (
         isFootball ? (
           <div

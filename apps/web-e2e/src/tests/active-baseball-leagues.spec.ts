@@ -44,8 +44,8 @@ async function mockUserLeagues(
   leagues: typeof MOCK_LEAGUES | [],
 ) {
   await createGraphQLRouter(page, {
-    getuserleagues: (route) =>
-      fulfillJson(route, { data: { userLeagues: leagues } }),
+    getmyleagues: (route) =>
+      fulfillJson(route, { data: { myLeagues: leagues } }),
   });
 }
 
@@ -126,21 +126,21 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.waitForLoadState('load');
 
     await page
-      .getByRole('button', { name: /view active sluggers/i })
+      .getByRole('link', { name: /view active sluggers/i })
       .first()
       .click();
 
     await expect(page).toHaveURL(/\/baseball\/league\/103/);
   });
 
-  test('empty state "No leagues yet" is shown when the user has no leagues', async ({
+  test('empty state "No baseball leagues yet" is shown when the user has no leagues', async ({
     page,
   }) => {
     await mockUserLeagues(page, []);
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('No leagues yet')).toBeVisible();
+    await expect(page.getByText('No baseball leagues yet')).toBeVisible();
   });
 
   test('"In Season" badge appears for a completed league with no week number', async ({
@@ -227,10 +227,10 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     page,
   }) => {
     await createGraphQLRouter(page, {
-      getuserleagues: (route) =>
+      getmyleagues: (route) =>
         fulfillJson(route, {
           errors: [{ message: 'Internal server error' }],
-          data: { userLeagues: null },
+          data: { myLeagues: null },
         }),
     });
     await page.goto('/baseball');
