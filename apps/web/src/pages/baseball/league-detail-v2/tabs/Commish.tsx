@@ -156,7 +156,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
             navigate(`/baseball/league/${leagueId}/draft`)
           }
           onNavigateToLeague={(newLeagueId) =>
-            navigate(`/baseball/league/${newLeagueId}`)
+            navigate(`/baseball/league/${newLeagueId}/commish`)
           }
         />
       ) : null,
