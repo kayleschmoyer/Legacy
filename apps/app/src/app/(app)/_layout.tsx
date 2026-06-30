@@ -63,6 +63,10 @@ export default function Layout() {
             name="football/players"
             options={{ title: 'Players' }}
           />
+          <Stack.Screen
+            name="baseball/players"
+            options={{ title: 'Players' }}
+          />
 
           {/* Live scoreboard */}
           <Stack.Screen

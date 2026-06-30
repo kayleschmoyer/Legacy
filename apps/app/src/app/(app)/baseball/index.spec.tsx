@@ -86,6 +86,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
       onInviteFriends?: () => void;
       onSignIn?: () => void;
       onAdvancedCreate?: (leagueName: string) => void;
+      onBrowsePlayers?: () => void;
     }) => (
       <View testID="mlb-home">
         <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
@@ -120,6 +121,12 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
           onPress={() => props.leagueCap?.onUpgrade()}
         >
           <Text>upgrade</Text>
+        </Pressable>
+        <Pressable
+          testID="browse-players"
+          onPress={() => props.onBrowsePlayers?.()}
+        >
+          <Text>browse-players</Text>
         </Pressable>
         <Pressable
           testID="create"
@@ -378,6 +385,12 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
         pathname: '/baseball/league/[leagueId]',
         params: { leagueId: 2 },
       });
+    });
+
+    it('navigates to /baseball/players when Browse Players is pressed (LS-5812)', () => {
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('browse-players'));
+      expect(mockNavigate).toHaveBeenCalledWith('/baseball/players');
     });
   });
 
