@@ -369,7 +369,10 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
     it('navigates to the advanced LeagueCreatePage when onAdvancedCreate is called (LS-5818)', () => {
       render(<BaseballHome />);
       fireEvent.press(screen.getByTestId('advanced-create'));
-      expect(mockPush).toHaveBeenCalledWith('/baseball/league/create');
+      // The mock triggers onAdvancedCreate('My League'); the handler encodes the name as a query param
+      expect(mockPush).toHaveBeenCalledWith(
+        '/baseball/league/create?name=My%20League',
+      );
     });
 
     it('navigates to join-by-code', () => {

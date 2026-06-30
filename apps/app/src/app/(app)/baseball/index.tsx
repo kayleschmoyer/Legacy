@@ -195,6 +195,12 @@ export default function BaseballHome() {
         onSignIn={() => router.navigate('/login')}
         userName={userInfo?.username ?? 'Manager'}
         onCreateLeague={handleCreateLeague}
+        onAdvancedCreate={(leagueName) => {
+          const params = leagueName.trim()
+            ? `?name=${encodeURIComponent(leagueName.trim())}`
+            : '';
+          router.push(`/baseball/league/create${params}` as never);
+        }}
         onJoinLeague={() => router.push('/baseball/league/join')}
         onMockDraft={() => router.navigate('/baseball/mock-draft')}
         onScoreboard={() => router.navigate('/baseball/scoreboard')}
@@ -204,7 +210,6 @@ export default function BaseballHome() {
             params: { leagueId: id },
           })
         }
-        onAdvancedCreate={() => router.push('/baseball/league/create')}
         onInviteFriends={openInviteModal}
         onBrowsePlayers={() => router.navigate('/baseball/players')}
         onSwitchSport={(sport) => router.navigate(`/${sport}`)}
