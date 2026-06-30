@@ -277,7 +277,13 @@ jobs:
 
           # Open PRs first: when a ticket has both an open PR and an older
           # merged PR, the open PR's expectation wins (see SEEN_KEYS below).
-          PRS=$(jq -c -n --argjson open "$OPEN_PRS" --argjson merged "$MERGED_PRS" '$open + $merged')
+          # Use temp files to avoid ARG_MAX limits when PR lists are large.
+          OPEN_FILE=$(mktemp)
+          MERGED_FILE=$(mktemp)
+          printf '%s' "$OPEN_PRS" > "$OPEN_FILE"
+          printf '%s' "$MERGED_PRS" > "$MERGED_FILE"
+          PRS=$(jq -c -s '.[0] + .[1]' "$OPEN_FILE" "$MERGED_FILE")
+          rm -f "$OPEN_FILE" "$MERGED_FILE"
           TOTAL=$(echo "$PRS" | jq 'length')
           echo "Scanning $TOTAL PRs (open + merged since $MERGED_SINCE), auto-repair: $AUTO_REPAIR"
 
