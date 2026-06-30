@@ -18,7 +18,7 @@
 	pre-commit pc quick-check format-commit \
 	pc-db-prep pc-typecheck pc-format pc-lint pc-workflows pc-test pc-build \
 	wt-setup modules-link modules-gc \
-	stabilize-after-rebase lint-review-patterns ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret \
+	stabilize-after-rebase lint-review-patterns lint-touch-map ci-classify-failure dev-env-health e2e-scope scaffold-story scan-secret \
 	ship-pr
 .DEFAULT_GOAL := help
 
@@ -1004,6 +1004,9 @@ stabilize-after-rebase: ## Post-rebase stabilization (install → schema → cod
 
 lint-review-patterns: ## Run mechanical self-review checks against git diff
 	@node scripts/lint-review-patterns.js
+
+lint-touch-map: ## Check documentation touch-map freshness (dry-run)
+	@node scripts/lint-touch-map.js --dry-run
 
 ci-classify-failure: ## Classify CI failure from log text. Usage: make ci-classify-failure LOG="error text"
 	@node scripts/ci-classify-failure.js --log="$(LOG)"

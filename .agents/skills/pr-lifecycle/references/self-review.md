@@ -30,7 +30,7 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 3. **Check documentation touch-map freshness** (surfaces the gap pre-push, while you can still fix it in the same diff):
 
    ```bash
-   node scripts/lint-touch-map.js --dry-run
+   make lint-touch-map
    ```
 
    `--dry-run` skips all GitHub API calls and just prints any gaps to stdout. If it reports a gap, **resolve it now** — do not wait for CI to post the `docs: touch-map gap` label. Per [documentation-freshness.md → Resolving a touch-map gap](../../dev-process/gates/documentation-freshness.md), take exactly one of: (1) update the linked doc, (2) correct/narrow the touch-map row in the same PR if it's a false positive, or (3) post a one-line justification on the PR. A clean run prints `✓ no documentation gaps`.

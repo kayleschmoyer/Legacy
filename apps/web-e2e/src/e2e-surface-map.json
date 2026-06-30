@@ -407,9 +407,11 @@
       "lib/websocket-client/src/**"
     ],
     "apps/web-e2e/src/tests/active-baseball-leagues.spec.ts": [
-      "apps/web/src/components/baseball/**",
       "apps/web/src/pages/baseball/**",
-      "lib/shared-components/src/features/baseball/**"
+      "apps/web/src/components/baseball/**",
+      "apps/web/src/features/baseball/**",
+      "lib/shared-components/src/features/baseball/**",
+      "lambdas/db/src/**"
     ],
     "apps/web-e2e/src/tests/league-limit-indicator.spec.ts": [
       "apps/web/src/components/baseball/**",

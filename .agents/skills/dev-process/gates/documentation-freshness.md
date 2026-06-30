@@ -35,7 +35,7 @@ The `lint-touch-map` CI check is **advisory** — it never blocks the merge queu
 2. **Correct or narrow the touch-map** — if the rule is a false positive (the changed file does not actually affect the linked doc), fix the row in [`documentation-freshness.md`](documentation-freshness.md) **in this same PR** so the next PR doesn't hit the same noise. Narrowing a coarse glob counts as resolving the gap.
 3. **Post a one-line justification** — if neither 1 nor 2 fits, comment on the PR explaining why no doc update is warranted (e.g. "workflow change is a no-op CI tweak unrelated to the phase tables"). This leaves a paper trail instead of an ignored label.
 
-**Do not end a turn with an un-actioned `docs: touch-map gap`.** Surfacing the gap pre-push (the `/review` self-review gate runs `node scripts/lint-touch-map.js --dry-run`) means you should normally resolve it before the PR ever exists — by the time the CI label appears, the resolution should already be in the diff.
+**Do not end a turn with an un-actioned `docs: touch-map gap`.** Surfacing the gap pre-push (the `/review` self-review gate runs `make lint-touch-map`) means you should normally resolve it before the PR ever exists — by the time the CI label appears, the resolution should already be in the diff.
 
 ## The quarterly audit ritual
 

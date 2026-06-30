@@ -7987,6 +7987,7 @@ const handleCallTool = async (
         'lint',
         'lint-fix',
         'lint-review-patterns',
+        'lint-touch-map',
         'typecheck',
         'pc',
         'build',
