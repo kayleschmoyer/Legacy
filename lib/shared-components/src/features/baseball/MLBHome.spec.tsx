@@ -175,6 +175,82 @@ describe('MLBHome', () => {
     expect(screen.getByText('Week 4')).toBeInTheDocument();
   });
 
+  it('renders "Draft Scheduled" badge for a queued league (LS-5332)', () => {
+    const league: MLBHomeLeague = {
+      id: 3,
+      name: 'Queued League',
+      draftStatus: 'queued',
+    };
+    render(<MLBHome {...baseProps} leagues={[league]} />);
+    expect(screen.getByText('Draft Scheduled')).toBeInTheDocument();
+  });
+
+  it('renders "In Season" badge for a completed league without a week number (LS-5332)', () => {
+    const league: MLBHomeLeague = {
+      id: 4,
+      name: 'Season League',
+      draftStatus: 'completed',
+    };
+    render(<MLBHome {...baseProps} leagues={[league]} />);
+    expect(screen.getByText('In Season')).toBeInTheDocument();
+  });
+
+  it('renders "Advancing" badge when weekAdvanceStatus is processing (LS-5332)', () => {
+    const league: MLBHomeLeague = {
+      id: 5,
+      name: 'Advancing League',
+      draftStatus: 'completed',
+      currentWeekNumber: 6,
+      weekAdvanceStatus: 'processing',
+    };
+    render(<MLBHome {...baseProps} leagues={[league]} />);
+    expect(screen.getByText('Advancing')).toBeInTheDocument();
+  });
+
+  it('renders "Advancing" badge when weekAdvanceStatus is queued (LS-5332)', () => {
+    const league: MLBHomeLeague = {
+      id: 8,
+      name: 'Queued Advance League',
+      draftStatus: 'completed',
+      currentWeekNumber: 6,
+      weekAdvanceStatus: 'queued',
+    };
+    render(<MLBHome {...baseProps} leagues={[league]} />);
+    expect(screen.getByText('Advancing')).toBeInTheDocument();
+  });
+
+  it('renders "Advance failed" badge when weekAdvanceStatus is failed (LS-5332)', () => {
+    const league: MLBHomeLeague = {
+      id: 6,
+      name: 'Failed League',
+      draftStatus: 'completed',
+      currentWeekNumber: 3,
+      weekAdvanceStatus: 'failed',
+    };
+    render(<MLBHome {...baseProps} leagues={[league]} />);
+    expect(screen.getByText('Advance failed')).toBeInTheDocument();
+  });
+
+  it('renders a title-cased badge for an unknown draftStatus value (LS-5332)', () => {
+    const league: MLBHomeLeague = {
+      id: 7,
+      name: 'Mystery League',
+      draftStatus: 'custom-status',
+    };
+    render(<MLBHome {...baseProps} leagues={[league]} />);
+    expect(screen.getByText('Custom Status')).toBeInTheDocument();
+  });
+
+  it('shows "No leagues match your search" when search yields no results (LS-5332)', () => {
+    render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
+      target: { value: 'xyznotfound' },
+    });
+    expect(
+      screen.getByText('No leagues match your search'),
+    ).toBeInTheDocument();
+  });
+
   it('filters the league list via search', () => {
     jest.useFakeTimers();
     render(<MLBHome {...baseProps} leagues={LEAGUES} />);
