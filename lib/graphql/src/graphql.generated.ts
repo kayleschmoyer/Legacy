@@ -5845,6 +5845,7 @@ export type GetMyLeaguesQuery = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    tierFrozenAt?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;

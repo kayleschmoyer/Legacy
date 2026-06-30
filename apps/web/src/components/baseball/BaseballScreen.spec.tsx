@@ -54,6 +54,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 interface MLBHomeHarnessPropsExtended extends MLBHomeHarnessProps {
   onMockDraft?: () => void;
   onMockDraftUpgrade?: () => void;
+  onSwitchSport?: (sport: string) => void;
 }
 
 // Capture the props the wrapper feeds into the shared component and expose
@@ -67,6 +68,9 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
       <span>auth:{String(props.isAuthenticated)}</span>
       <span>leagues:{props.leagues.map((l) => l.name).join(',')}</span>
       <span data-testid="at-limit">{String(!!props.leagueCap?.atLimit)}</span>
+      <span data-testid="has-switch-sport">
+        {String(!!props.onSwitchSport)}
+      </span>
       <button onClick={() => props.onViewLeague(7)}>view</button>
       <button onClick={() => props.onJoinLeague()}>join</button>
       {props.onMockDraft ? (
@@ -75,6 +79,11 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
       {props.onMockDraftUpgrade ? (
         <button onClick={() => props.onMockDraftUpgrade?.()}>
           mock-draft-upgrade
+        </button>
+      ) : null}
+      {props.onSwitchSport ? (
+        <button onClick={() => props.onSwitchSport?.('football')}>
+          switch-sport
         </button>
       ) : null}
       <button
@@ -132,6 +141,11 @@ jest.mock('../../hooks/useIsPremium', () => ({
   useIsPremiumStatus: () => mockUseIsPremiumStatus(),
 }));
 
+const mockUseFeatureIsOn = jest.fn(() => false);
+jest.mock('../../context/GrowthBookProvider', () => ({
+  useFeatureIsOn: (flag: string) => mockUseFeatureIsOn(flag),
+}));
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseAuth.mockReturnValue({
@@ -153,6 +167,7 @@ beforeEach(() => {
     isPremium: false,
     isLoading: false,
   });
+  mockUseFeatureIsOn.mockReturnValue(false);
 });
 
 describe('BaseballScreen (web MLBHome wrapper)', () => {
@@ -228,6 +243,20 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
     expect(screen.getByTestId('upgrade-modal').textContent).toContain(
       'Unlimited mock drafts',
     );
+  });
+
+  it('omits onSwitchSport when football_enabled flag is off (LS-5815)', () => {
+    mockUseFeatureIsOn.mockReturnValue(false);
+    render(<BaseballScreen />);
+    expect(screen.getByTestId('has-switch-sport').textContent).toBe('false');
+  });
+
+  it('passes onSwitchSport and navigates when football_enabled flag is on (LS-5815)', () => {
+    mockUseFeatureIsOn.mockReturnValue(true);
+    render(<BaseballScreen />);
+    expect(screen.getByTestId('has-switch-sport').textContent).toBe('true');
+    fireEvent.click(screen.getByText('switch-sport'));
+    expect(mockNavigate).toHaveBeenCalledWith('/football');
   });
 });
 

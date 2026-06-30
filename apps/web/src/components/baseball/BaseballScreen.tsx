@@ -16,6 +16,7 @@ import { PageMeta } from '../PageMeta';
 import { UpgradeModal } from '../UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { formatDisplayName } from '../../lib/formatDisplayName';
+import { useFeatureIsOn } from '../../context/GrowthBookProvider';
 
 // Free accounts may participate in at most this many non-mock leagues. Mirrors
 // FREE_TIER_LEAGUE_LIMIT in the db lambda. The server is authoritative; this
@@ -34,7 +35,7 @@ export function BaseballScreen() {
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const [showMockDraftUpgradeModal, setShowMockDraftUpgradeModal] =
     React.useState(false);
-
+  const footballEnabled = useFeatureIsOn('football_enabled');
   const { data, loading, error, refetch } = useGetMyLeaguesQuery({
     variables: { sport: Sport.Baseball },
     // Only run the query if user is authenticated
@@ -169,6 +170,9 @@ export function BaseballScreen() {
           onBrowsePlayers={() => navigate('/players')}
           isPremium={isPremium && !premiumLoading}
           leagueCap={leagueCap}
+          onSwitchSport={
+            footballEnabled ? (sport) => navigate(`/${sport}`) : undefined
+          }
         />
       </div>
       <UpgradeModal

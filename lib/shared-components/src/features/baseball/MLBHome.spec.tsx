@@ -487,6 +487,55 @@ describe('MLBHome', () => {
     expect(screen.queryByText('Beta 5')).not.toBeInTheDocument();
   });
 
+  describe('sport switcher (LS-5815)', () => {
+    it('does not render the sport switcher when onSwitchSport is omitted', () => {
+      render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+      expect(
+        screen.queryByRole('button', { name: 'Switch to Football' }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Also play:')).not.toBeInTheDocument();
+    });
+
+    it('renders a Football button when onSwitchSport is provided', () => {
+      const onSwitchSport = jest.fn();
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={LEAGUES}
+          onSwitchSport={onSwitchSport}
+        />,
+      );
+      expect(
+        screen.getByRole('button', { name: 'Switch to Football' }),
+      ).toBeInTheDocument();
+    });
+
+    it('calls onSwitchSport with "football" when the Football button is pressed', () => {
+      const onSwitchSport = jest.fn();
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={LEAGUES}
+          onSwitchSport={onSwitchSport}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Switch to Football' }),
+      );
+      expect(onSwitchSport).toHaveBeenCalledWith('football');
+    });
+
+    it('renders the sport switcher in the empty-league state too', () => {
+      const onSwitchSport = jest.fn();
+      render(
+        <MLBHome {...baseProps} leagues={[]} onSwitchSport={onSwitchSport} />,
+      );
+      expect(
+        screen.getByRole('button', { name: 'Switch to Football' }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it('does not render a Mock Draft button when onMockDraft is omitted', () => {
     render(<MLBHome {...baseProps} leagues={LEAGUES} />);
     expect(screen.queryByText('Mock Draft')).not.toBeInTheDocument();

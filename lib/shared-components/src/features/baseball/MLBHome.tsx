@@ -93,6 +93,12 @@ export interface MLBHomeProps {
   leagueCap?: MLBHomeLeagueCap;
   /** When true, renders an "Unlimited leagues" badge instead of the free-tier cap indicator (LS-5870). */
   isPremium?: boolean;
+  /**
+   * When provided, renders a compact in-page sport switcher (LS-5815). Called
+   * with the sport key the user selected. Only pass sports that are currently
+   * available — the switcher renders a button per entry.
+   */
+  onSwitchSport?: (sport: 'football') => void;
 }
 
 interface LeagueBadge {
@@ -269,6 +275,7 @@ export function MLBHome({
   onBrowsePlayers,
   leagueCap,
   isPremium,
+  onSwitchSport,
 }: MLBHomeProps) {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -700,6 +707,30 @@ export function MLBHome({
             </YStack>
           </XStack>
         )}
+
+        {/* In-page sport switcher (LS-5815) */}
+        {onSwitchSport ? (
+          <XStack alignItems="center" gap="$3" flexWrap="wrap">
+            <Text fontSize="$3" color="$glassTextMuted" fontWeight="600">
+              Also play:
+            </Text>
+            <Button
+              size="$2"
+              backgroundColor={withAlpha(BRAND_NAVY, 0.1)}
+              borderColor={withAlpha(BRAND_NAVY, 0.3)}
+              borderWidth={1}
+              borderRadius="$5"
+              onPress={() => onSwitchSport('football')}
+              accessibilityLabel="Switch to Football"
+              aria-label="Switch to Football"
+              testID="sport-switcher-football"
+            >
+              <Text fontSize={12} fontWeight="600" color="$gray11">
+                Football
+              </Text>
+            </Button>
+          </XStack>
+        ) : null}
 
         {/* Error notice */}
         {error ? (

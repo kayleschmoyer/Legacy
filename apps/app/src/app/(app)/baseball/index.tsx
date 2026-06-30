@@ -207,6 +207,7 @@ export default function BaseballHome() {
         onAdvancedCreate={() => router.push('/baseball/league/create')}
         onInviteFriends={openInviteModal}
         onBrowsePlayers={() => router.navigate('/baseball/players')}
+        onSwitchSport={(sport) => router.navigate(`/${sport}`)}
         isPremium={isPremium && !subscriptionLoading && leaguesLoaded}
         leagueCap={
           showLeagueCap
