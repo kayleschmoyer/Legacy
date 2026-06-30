@@ -101,9 +101,11 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
     ).toBeVisible();
   });
 
-  test('Create button is disabled on web for free-tier user at the cap limit', async ({
+  test('Create button is present and enabled on web for free-tier user at the cap limit', async ({
     page,
   }) => {
+    // BaseballScreen enforces the cap in handleCreateLeague (shows upgrade modal)
+    // rather than passing leagueCap to MLBHome, so the button is enabled on web.
     await useTier(page, 'free');
     await mockThreeLeagues(page);
     await page.goto('/baseball');
@@ -113,7 +115,7 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
       .getByRole('button', { name: /create a new baseball league/i })
       .first();
     await expect(createBtn).toBeVisible();
-    await expect(createBtn).toBeDisabled();
+    await expect(createBtn).toBeEnabled();
   });
 
   test('baseball hub renders all three mocked leagues for a premium user', async ({

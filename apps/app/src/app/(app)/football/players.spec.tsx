@@ -458,21 +458,24 @@ describe('FootballPlayers', () => {
 
   describe('AsyncStorage filter persistence (LS-6465)', () => {
     it('rehydrates positions and team from AsyncStorage on mount', async () => {
-      // Positions and teamFilter are not debounced. One Promise.resolve() inside
-      // act() is enough to flush the AsyncStorage mock's already-resolved promise
-      // and let React process the resulting state update.
-      // Timeout raised to 15 s: CI runners are slow enough that the multi-render
-      // cascade (rehydrate → prevFiltersRef reset → re-render) can exceed 5 s.
       const stored = JSON.stringify({
         positions: ['WR', 'TE'],
         teamFilter: 'KC',
         searchInput: '',
       });
-      mockAsyncStorageGetItem.mockResolvedValue(stored);
+      // Use a deferred promise so the .then() fires inside act(), keeping all
+      // state updates within the act boundary and avoiding draining deadlocks.
+      let resolveGetItem!: (value: string | null) => void;
+      const pendingGetItem = new Promise<string | null>((resolve) => {
+        resolveGetItem = resolve;
+      });
+      mockAsyncStorageGetItem.mockReturnValue(pendingGetItem);
       mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
 
+      render(<FootballPlayers />);
+
       await act(async () => {
-        render(<FootballPlayers />);
+        resolveGetItem(stored);
         await Promise.resolve();
       });
 
@@ -482,37 +485,44 @@ describe('FootballPlayers', () => {
       ];
       expect(lastCall[0].variables.positions).toEqual(['WR', 'TE']);
       expect(lastCall[0].variables.nflTeam).toBe('KC');
-    }, 15000);
+    });
 
     it('rehydrates search input from AsyncStorage on mount', async () => {
-      // searchInput goes through a 300ms useDebounce. Fake timers let us advance
-      // past it deterministically. advanceTimersByTime only fires already-scheduled
-      // timers (not ones created by callbacks), so there is no infinite loop.
-      jest.useFakeTimers();
       const stored = JSON.stringify({
         positions: [],
         teamFilter: 'All',
         searchInput: 'Hill',
       });
-      mockAsyncStorageGetItem.mockResolvedValue(stored);
+      let resolveGetItem!: (value: string | null) => void;
+      const pendingGetItem = new Promise<string | null>((resolve) => {
+        resolveGetItem = resolve;
+      });
+      mockAsyncStorageGetItem.mockReturnValue(pendingGetItem);
       mockUseFootballPlayersQuery.mockReturnValue(defaultQueryResult);
 
-      await act(async () => {
+      jest.useFakeTimers();
+      try {
         render(<FootballPlayers />);
-        await Promise.resolve(); // flush AsyncStorage → searchInput='Hill' state set
-      });
-      // Fire the 300ms debounce timer so normalizedSearch becomes 'hill'.
-      await act(() => {
-        jest.advanceTimersByTime(300);
-      });
-      jest.useRealTimers();
 
-      const calls = mockUseFootballPlayersQuery.mock.calls;
-      const lastCall = calls[calls.length - 1] as [
-        { variables: { search?: string } },
-      ];
-      expect(lastCall[0].variables.search).toBe('hill');
-    }, 15000);
+        await act(async () => {
+          resolveGetItem(stored);
+          await Promise.resolve();
+        });
+
+        // Fire the searchInput debounce (300 ms) so normalizedSearch updates
+        void act(() => {
+          jest.advanceTimersByTime(400);
+        });
+
+        const calls = mockUseFootballPlayersQuery.mock.calls;
+        const lastCall = calls[calls.length - 1] as [
+          { variables: { search?: string } },
+        ];
+        expect(lastCall[0].variables.search).toBe('hill');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
 
     it('persists filters to AsyncStorage when positions change', async () => {
       await act(async () => {

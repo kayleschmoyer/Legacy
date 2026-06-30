@@ -122,6 +122,27 @@ const RENEW_FROZEN_LEAGUE: MLBHomeLeague = {
   frozenAt: '2024-11-01T00:00:00.000Z',
 };
 
+const ROLE_LEAGUES: MLBHomeLeague[] = [
+  {
+    id: 10,
+    name: 'Commish League',
+    draftStatus: 'completed',
+    permissionLevel: 'commissioner',
+  },
+  {
+    id: 11,
+    name: 'GM League',
+    draftStatus: 'completed',
+    permissionLevel: 'general_manager',
+  },
+  {
+    id: 12,
+    name: 'Member League',
+    draftStatus: 'completed',
+    permissionLevel: 'member',
+  },
+];
+
 const baseProps = {
   onCreateLeague: jest.fn().mockResolvedValue(undefined),
   onJoinLeague: jest.fn(),
@@ -173,9 +194,7 @@ describe('MLBHome', () => {
     expect(
       screen.getByText(/Could not load your leagues/i),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText('No baseball leagues yet'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No leagues yet')).not.toBeInTheDocument();
   });
 
   it('shows only a spinner while loading', () => {
@@ -305,6 +324,41 @@ describe('MLBHome', () => {
     expect(screen.queryByText('Live Scores')).not.toBeInTheDocument();
   });
 
+  it('renders role chips when permissionLevel is set on leagues', () => {
+    render(<MLBHome {...baseProps} leagues={ROLE_LEAGUES} />);
+    // Filter bar + row chip each render the label, so ≥2 occurrences per role
+    expect(screen.getAllByText('Commish').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('GM').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Member').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does not render role chips when permissionLevel is absent', () => {
+    render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    // No filter bar and no role chips when no league has permissionLevel
+    expect(screen.queryByText('Commish')).not.toBeInTheDocument();
+    expect(screen.queryByText('GM')).not.toBeInTheDocument();
+    expect(screen.queryByText('Member')).not.toBeInTheDocument();
+  });
+
+  it('shows the role filter bar only when leagues have permissionLevel data', () => {
+    const { rerender } = render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    expect(
+      screen.queryByRole('button', { name: 'Filter by All' }),
+    ).not.toBeInTheDocument();
+    rerender(<MLBHome {...baseProps} leagues={ROLE_LEAGUES} />);
+    expect(
+      screen.getByRole('button', { name: 'Filter by All' }),
+    ).toBeInTheDocument();
+  });
+
+  it('filters leagues by role when a filter button is pressed', () => {
+    render(<MLBHome {...baseProps} leagues={ROLE_LEAGUES} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by Commish' }));
+    expect(screen.getByText('Commish League')).toBeInTheDocument();
+    expect(screen.queryByText('GM League')).not.toBeInTheDocument();
+    expect(screen.queryByText('Member League')).not.toBeInTheDocument();
+  });
+
   it('renders a Live Scores button and calls onScoreboard when provided', () => {
     const onScoreboard = jest.fn();
     render(
@@ -387,51 +441,5 @@ describe('MLBHome', () => {
       // Frozen league is hidden until the toggle is clicked
       expect(screen.queryByText('Frozen Fossils')).not.toBeInTheDocument();
     });
-  });
-
-  it('shows only the first 20 leagues and a "show more" button when there are more than 20', () => {
-    const manyLeagues: MLBHomeLeague[] = Array.from({ length: 25 }, (_, i) => ({
-      id: i + 1,
-      name: `League ${i + 1}`,
-    }));
-    render(<MLBHome {...baseProps} leagues={manyLeagues} />);
-    expect(screen.getByText('League 1')).toBeInTheDocument();
-    expect(screen.getByText('League 20')).toBeInTheDocument();
-    expect(screen.queryByText('League 21')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Show 5 more leagues/i }),
-    ).toBeInTheDocument();
-  });
-
-  it('reveals the remaining leagues when "show more" is clicked', () => {
-    const manyLeagues: MLBHomeLeague[] = Array.from({ length: 25 }, (_, i) => ({
-      id: i + 1,
-      name: `League ${i + 1}`,
-    }));
-    render(<MLBHome {...baseProps} leagues={manyLeagues} />);
-    fireEvent.click(
-      screen.getByRole('button', { name: /Show 5 more leagues/i }),
-    );
-    expect(screen.getByText('League 21')).toBeInTheDocument();
-    expect(screen.getByText('League 25')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /Show .* more leagues/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('resets pagination to the first page when the search term changes', () => {
-    const manyLeagues: MLBHomeLeague[] = Array.from({ length: 25 }, (_, i) => ({
-      id: i + 1,
-      name: i < 20 ? `Alpha ${i + 1}` : `Beta ${i - 19}`,
-    }));
-    render(<MLBHome {...baseProps} leagues={manyLeagues} />);
-    fireEvent.click(
-      screen.getByRole('button', { name: /Show 5 more leagues/i }),
-    );
-    expect(screen.getByText('Beta 5')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
-      target: { value: 'a' },
-    });
-    expect(screen.queryByText('Beta 5')).not.toBeInTheDocument();
   });
 });

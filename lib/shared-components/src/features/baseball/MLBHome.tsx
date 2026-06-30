@@ -40,6 +40,8 @@ export interface MLBHomeLeague {
   maxRosterSize?: number | null;
   tierFrozenAt?: string | null;
   frozenAt?: string | null;
+  /** The current user's permission level in this league (e.g. 'commissioner', 'general_manager'). */
+  permissionLevel?: string | null;
 }
 
 /**
@@ -151,6 +153,62 @@ function getLeagueBadge(
 
 const LEAGUES_PAGE_SIZE = 20;
 
+type RoleFilter = 'all' | 'commissioner' | 'general_manager' | 'member';
+
+interface RoleChip {
+  label: string;
+  bg: string;
+  border: string;
+  text: string;
+}
+
+function getRoleChip(permissionLevel?: string | null): RoleChip | null {
+  switch (permissionLevel) {
+    case 'commissioner':
+      return {
+        label: 'Commish',
+        bg: withAlpha(BRAND_NAVY, 0.22),
+        border: withAlpha(BRAND_NAVY, 0.55),
+        text: BRAND_GOLD_LIGHT,
+      };
+    case 'general_manager':
+      return {
+        label: 'GM',
+        bg: withAlpha(BRAND_GOLD, 0.16),
+        border: withAlpha(BRAND_GOLD, 0.4),
+        text: BRAND_GOLD,
+      };
+    case 'assistant_manager':
+      return {
+        label: 'Asst GM',
+        bg: withAlpha(SLATE_400, 0.14),
+        border: withAlpha(SLATE_400, 0.35),
+        text: '$gray11',
+      };
+    default:
+      if (!permissionLevel) return null;
+      return {
+        label: 'Member',
+        bg: withAlpha(SLATE_400, 0.1),
+        border: withAlpha(SLATE_400, 0.28),
+        text: '$gray10',
+      };
+  }
+}
+
+function matchesRoleFilter(
+  permissionLevel: string | null | undefined,
+  filter: RoleFilter,
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'commissioner') return permissionLevel === 'commissioner';
+  if (filter === 'general_manager')
+    return permissionLevel === 'general_manager';
+  // 'member' bucket: everything that isn't commissioner/GM (including assistant_manager, null)
+  return (
+    permissionLevel !== 'commissioner' && permissionLevel !== 'general_manager'
+  );
+}
 /**
  * Shared, presentational baseball home (LS-7716). Mirrors the `NFLHome` pattern:
  * leagues array + callbacks, no data fetching. Consumed by the web
@@ -179,6 +237,7 @@ export function MLBHome({
   const [search, setSearch] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [showArchived, setShowArchived] = React.useState(false);
+  const [roleFilter, setRoleFilter] = React.useState<RoleFilter>('all');
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 200);
@@ -231,10 +290,14 @@ export function MLBHome({
         'Use invite codes to bring your league together in seconds.',
       ];
 
-  const filteredLeagues = activeLeagues.filter((l) =>
-    (l?.name || '')
-      .toLowerCase()
-      .includes(debouncedSearch.trim().toLowerCase()),
+  const hasRoleData = leagues.some((l) => l.permissionLevel != null);
+
+  const filteredLeagues = activeLeagues.filter(
+    (l) =>
+      (l?.name || '')
+        .toLowerCase()
+        .includes(debouncedSearch.trim().toLowerCase()) &&
+      matchesRoleFilter(l.permissionLevel, roleFilter),
   );
   const filteredArchived = archivedLeagues.filter((l) =>
     (l?.name || '')
@@ -745,6 +808,49 @@ export function MLBHome({
             ) : null}
           </XStack>
 
+          {hasRoleData && hasLeagues ? (
+            <XStack gap="$2" flexWrap="wrap" testID="role-filter-bar">
+              {(
+                [
+                  { key: 'all', label: 'All' },
+                  { key: 'commissioner', label: 'Commish' },
+                  { key: 'general_manager', label: 'GM' },
+                  { key: 'member', label: 'Member' },
+                ] as { key: RoleFilter; label: string }[]
+              ).map(({ key, label }) => {
+                const active = roleFilter === key;
+                return (
+                  <Button
+                    key={key}
+                    size="$2"
+                    backgroundColor={
+                      active
+                        ? withAlpha(BRAND_NAVY, 0.8)
+                        : withAlpha(BRAND_NAVY, 0.1)
+                    }
+                    borderColor={
+                      active
+                        ? withAlpha(BRAND_NAVY, 0.9)
+                        : withAlpha(BRAND_NAVY, 0.3)
+                    }
+                    borderWidth={1}
+                    borderRadius="$5"
+                    onPress={() => setRoleFilter(key)}
+                    accessibilityLabel={`Filter by ${label}`}
+                  >
+                    <Text
+                      fontSize={12}
+                      fontWeight={active ? '700' : '500'}
+                      color={active ? BRAND_GOLD_LIGHT : '$gray11'}
+                    >
+                      {label}
+                    </Text>
+                  </Button>
+                );
+              })}
+            </XStack>
+          ) : null}
+
           {error ? null : filteredLeagues.length > 0 ? (
             <YStack gap="$3" testID="leagues-grid">
               {visibleLeagues.map((league) => {
@@ -754,6 +860,7 @@ export function MLBHome({
                   league.tierFrozenAt,
                   league.frozenAt,
                 );
+                const roleChip = getRoleChip(league.permissionLevel);
                 return (
                   <XStack
                     key={league.id}
@@ -806,6 +913,27 @@ export function MLBHome({
                           {badge.label}
                         </Text>
                       </XStack>
+                      {roleChip ? (
+                        <XStack
+                          backgroundColor={roleChip.bg}
+                          borderColor={roleChip.border}
+                          borderWidth={1}
+                          borderRadius="$5"
+                          paddingHorizontal="$3"
+                          paddingVertical="$1"
+                          testID={`role-chip-${league.id}`}
+                        >
+                          <Text
+                            fontSize={11}
+                            fontWeight="600"
+                            color={roleChip.text}
+                            textTransform="uppercase"
+                            letterSpacing={0.5}
+                          >
+                            {roleChip.label}
+                          </Text>
+                        </XStack>
+                      ) : null}
                       {league.weekAdvanceStatus === 'processing' ||
                       league.weekAdvanceStatus === 'queued' ? (
                         <XStack

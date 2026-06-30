@@ -134,6 +134,7 @@ export default function BaseballHome() {
           currentWeekNumber: l?.currentWeekNumber,
           weekAdvanceStatus: l?.weekAdvanceStatus,
           maxRosterSize: l?.maxRosterSize,
+          permissionLevel: l?.userMembership?.permissionLevel,
         })),
     [userLeagues],
   );

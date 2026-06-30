@@ -75,6 +75,7 @@ export function BaseballScreen() {
           maxRosterSize: l?.maxRosterSize,
           tierFrozenAt: l?.tierFrozenAt,
           frozenAt: l?.frozenAt,
+          permissionLevel: l?.userMembership?.permissionLevel,
         })),
     [data?.userLeagues],
   );
