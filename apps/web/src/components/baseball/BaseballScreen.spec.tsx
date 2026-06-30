@@ -78,7 +78,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
       >
         create
       </button>
-      {props.leagueCap?.atLimit ? (
+      {props.leagueCap ? (
         <button onClick={() => props.leagueCap?.onUpgrade()}>upgrade</button>
       ) : null}
     </div>
@@ -104,11 +104,6 @@ const mockUseIsPremiumStatus = jest.fn(() => ({
 }));
 jest.mock('../../hooks/useIsPremium', () => ({
   useIsPremiumStatus: () => mockUseIsPremiumStatus(),
-}));
-
-jest.mock('../UpgradeModal', () => ({
-  UpgradeModal: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="upgrade-modal" /> : null,
 }));
 
 beforeEach(() => {
@@ -213,10 +208,9 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
     });
     render(<BaseballScreen />);
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
-    expect(screen.queryByTestId('upgrade-modal')).not.toBeInTheDocument();
   });
 
-  it('opens the upgrade modal when a free user at the cap clicks create', async () => {
+  it('never sets atLimit on web (web does not hard-gate creation) but upgrade CTA navigates to /pricing', () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: { userLeagues: leaguesOfCount(3) },
       loading: false,
@@ -224,13 +218,11 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
       refetch: mockRefetch,
     });
     render(<BaseballScreen />);
-    // leagueCap is not passed to MLBHome on web; the Create button is always enabled
+    // Web always passes atLimit: false so the create button stays enabled (LS-5869).
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
-    // Clicking create triggers handleCreateLeague which opens the upgrade modal
-    fireEvent.click(screen.getByText('create'));
-    await waitFor(() =>
-      expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument(),
-    );
+    // The upgrade CTA is still present and navigates to /pricing.
+    fireEvent.click(screen.getByText('upgrade'));
+    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
   });
 
   it('does not set atLimit for a premium user at/above the cap', () => {
@@ -263,7 +255,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
   });
 
-  it('counts leagues across all sports toward the cap', async () => {
+  it('counts leagues across all sports toward the cap count display (atLimit stays false on web)', () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: {
         userLeagues: [
@@ -277,12 +269,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
       refetch: mockRefetch,
     });
     render(<BaseballScreen />);
-    // leagueCap is not passed to MLBHome on web
+    // atLimit is always false on web even when the cross-sport count hits the cap.
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
-    // Clicking create triggers the cap check across all sports and opens the modal
-    fireEvent.click(screen.getByText('create'));
-    await waitFor(() =>
-      expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument(),
-    );
   });
 });

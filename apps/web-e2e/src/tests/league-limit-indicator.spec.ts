@@ -2,15 +2,18 @@
  * Baseball Home — League Limit / Slots Indicator (LS-5339, LS-5870)
  *
  * The shared `MLBHome` component renders a `leagueCap` indicator ("Your leagues: X/Y")
- * for free-tier users, and an "Unlimited leagues" badge (LS-5870) for premium users
- * via the `isPremium` prop. `BaseballScreen` computes and passes `leagueCap` to
- * `MLBHome`, so the Create button is disabled when a free-tier user is at the cap.
+ * for free-tier users (LS-5869), and an "Unlimited leagues" badge (LS-5870) for premium
+ * users via the `isPremium` prop. The web wrapper (`BaseballScreen`) passes `leagueCap`
+ * for authenticated free-tier users — always with `atLimit: false` so the Create button
+ * stays enabled — and `isPremium` for premium users.
  *
  * These tests cover the web surface for the league-slots context:
  *   - The baseball hub renders all mocked leagues for both free and premium users
  *   - Premium users see the "Unlimited leagues" badge
- *   - The "Create" button is disabled on web for a free-tier user at the cap limit
+ *   - The "Create" button is present and enabled regardless of league count on web
+ *     (web never hard-gates creation even when the free-tier cap is reached)
  *   - The "Your leagues" section heading is always visible
+ *   - The league-cap indicator and upgrade CTA are visible for free-tier users
  *
  * GraphQL responses are mocked via route.fulfill() — no live backend required.
  */
@@ -33,6 +36,8 @@ const THREE_LEAGUES = [
     currentWeekNumber: 7,
     weekAdvanceStatus: null,
     maxRosterSize: 25,
+    tierFrozenAt: null,
+    frozenAt: null,
     inviteCode: 'AAA00001',
   },
   {
@@ -44,6 +49,8 @@ const THREE_LEAGUES = [
     currentWeekNumber: null,
     weekAdvanceStatus: null,
     maxRosterSize: 25,
+    tierFrozenAt: null,
+    frozenAt: null,
     inviteCode: 'BBB00002',
   },
   {
@@ -55,6 +62,8 @@ const THREE_LEAGUES = [
     currentWeekNumber: null,
     weekAdvanceStatus: null,
     maxRosterSize: 25,
+    tierFrozenAt: null,
+    frozenAt: null,
     inviteCode: 'CCC00003',
   },
 ];
@@ -101,11 +110,11 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
     ).toBeVisible();
   });
 
-  test('Create button is present and enabled on web for free-tier user at the cap limit', async ({
+  test('Create button is present and enabled on web for free-tier user at the cap limit (LS-5869)', async ({
     page,
   }) => {
-    // BaseballScreen enforces the cap in handleCreateLeague (shows upgrade modal)
-    // rather than passing leagueCap to MLBHome, so the button is enabled on web.
+    // Web passes leagueCap to MLBHome with atLimit: false so the button is never
+    // disabled — web does not hard-gate creation (LS-5869).
     await useTier(page, 'free');
     await mockThreeLeagues(page);
     await page.goto('/baseball');
@@ -141,17 +150,18 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
     await expect(page.getByText(/Your leagues:/)).not.toBeVisible();
   });
 
-  test('league-cap indicator text is absent on web (cap UI is mobile-only)', async ({
+  test('league-cap indicator text is visible on web for free-tier users (LS-5869)', async ({
     page,
   }) => {
-    // The shared MLBHome cap indicator ("Your leagues: X/Y") is only rendered
-    // when leagueCap is passed. BaseballScreen does not pass it, so the text
-    // must never appear on the web platform regardless of league count or tier.
+    // BaseballScreen now passes leagueCap to MLBHome (LS-5869) so that free-tier
+    // users see the upgrade affordance. The "Your leagues: X/Y" counter and the
+    // "— Upgrade to Premium" link should be present on the web platform.
     await useTier(page, 'free');
     await mockThreeLeagues(page);
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/Your leagues:/)).not.toBeVisible();
+    await expect(page.getByText(/Your leagues:/)).toBeVisible();
+    await expect(page.getByText(/Upgrade to/i)).toBeVisible();
   });
 });

@@ -738,18 +738,26 @@ export function MLBHome({
             <Text color="$gray11" fontSize="$4">
               Your leagues: {leagueCap.count}/{leagueCap.limit}
             </Text>
-            {leagueCap.atLimit ? (
-              <Text
-                color={BRAND_GOLD}
-                fontSize="$4"
-                fontWeight="bold"
-                onPress={leagueCap.onUpgrade}
-                accessibilityLabel="Upgrade to add more leagues"
-                aria-label="Upgrade to add more leagues"
-              >
-                — Upgrade to add more
-              </Text>
-            ) : null}
+            <Text
+              color={BRAND_GOLD}
+              fontSize="$4"
+              fontWeight="bold"
+              onPress={leagueCap.onUpgrade}
+              accessibilityLabel={
+                leagueCap.atLimit
+                  ? 'Upgrade to add more leagues'
+                  : 'Upgrade to Premium'
+              }
+              aria-label={
+                leagueCap.atLimit
+                  ? 'Upgrade to add more leagues'
+                  : 'Upgrade to Premium'
+              }
+            >
+              {leagueCap.atLimit
+                ? '— Upgrade to add more'
+                : '— Upgrade to Premium'}
+            </Text>
           </XStack>
         ) : null}
 
