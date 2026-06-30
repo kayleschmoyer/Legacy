@@ -147,6 +147,53 @@ describe('CreateLeagueModal', () => {
     expect(queryByText('Cap Amount')).toBeNull();
   });
 
+  it('shows playoff format options on Roster step', () => {
+    const { getByText } = render(<CreateLeagueModal {...defaultProps} />);
+    act(() => {
+      fireEvent.click(getByText('Roster'));
+    });
+    expect(getByText('4-Team')).toBeTruthy();
+    expect(getByText('6-Team · Premium')).toBeTruthy();
+    expect(getByText('8-Team · Premium')).toBeTruthy();
+  });
+
+  it('shows unlocked playoff format options for premium users on Roster step', () => {
+    const { getByText } = render(
+      <CreateLeagueModal {...defaultProps} isPremium />,
+    );
+    act(() => {
+      fireEvent.click(getByText('Roster'));
+    });
+    expect(getByText('4-Team')).toBeTruthy();
+    expect(getByText('6-Team')).toBeTruthy();
+    expect(getByText('8-Team')).toBeTruthy();
+  });
+
+  it('clicking locked 6-team playoff option opens upgrade modal for non-premium user', () => {
+    const { getByText } = render(<CreateLeagueModal {...defaultProps} />);
+    act(() => {
+      fireEvent.click(getByText('Roster'));
+    });
+    act(() => {
+      fireEvent.click(getByText('6-Team · Premium'));
+    });
+    expect(getByText(/Upgrade to Legacy Commissioner/)).toBeTruthy();
+  });
+
+  it('salary cap toggle enables without upgrade modal for premium users', () => {
+    const { getByText, queryByText } = render(
+      <CreateLeagueModal {...defaultProps} isPremium />,
+    );
+    act(() => {
+      fireEvent.click(getByText('Waivers'));
+    });
+    act(() => {
+      fireEvent.click(getByText('On'));
+    });
+    expect(queryByText(/Upgrade to Legacy Commissioner/)).toBeNull();
+    expect(getByText('Cap Amount')).toBeTruthy();
+  });
+
   it('calls onSubmit with form data when Create League is pressed on last step', () => {
     const onSubmit = jest.fn().mockResolvedValue(undefined);
     const { getByText, getByPlaceholderText, getByRole } = render(

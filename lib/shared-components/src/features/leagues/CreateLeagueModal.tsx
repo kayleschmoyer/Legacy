@@ -72,6 +72,7 @@ export interface CreateLeagueFormData {
   auctionBudget?: number;
   auctionMinBid?: number;
   draftTime?: string;
+  playoffFormat: '4-team' | '6-team' | '8-team';
 }
 
 export interface CreateLeagueModalProps {
@@ -195,6 +196,7 @@ const DEFAULT_FORM: Omit<CreateLeagueFormData, 'sport'> = {
   salaryCapEnabled: false,
   salaryCap: 250,
   isPublic: false,
+  playoffFormat: '4-team',
 };
 
 function makeDefaultForm(
@@ -648,10 +650,14 @@ function RosterStep({
   f,
   set,
   disabled,
+  isPremium,
+  onUpgrade,
 }: {
   f: CreateLeagueFormData;
   set: (patch: Partial<CreateLeagueFormData>) => void;
   disabled: boolean;
+  isPremium: boolean;
+  onUpgrade: (feature: string) => void;
 }) {
   // Resolve sport-appropriate pool options without a type cast: sports beyond
   // the current SportKind coverage fall back to baseball pools.
@@ -702,6 +708,34 @@ function RosterStep({
         />
         <FieldHint>
           Narrow the league to a single conference's talent, or open it up.
+        </FieldHint>
+      </YStack>
+
+      <YStack gap="$1">
+        <FieldLabel>Playoff Format</FieldLabel>
+        <BtnGroup
+          value={f.playoffFormat}
+          options={[
+            { label: '4-Team', value: '4-team' as const },
+            {
+              label: isPremium ? '6-Team' : '6-Team · Premium',
+              value: '6-team' as const,
+              locked: !isPremium,
+            },
+            {
+              label: isPremium ? '8-Team' : '8-Team · Premium',
+              value: '8-team' as const,
+              locked: !isPremium,
+            },
+          ]}
+          onChange={(v) => set({ playoffFormat: v })}
+          onLockedPress={() => onUpgrade('Advanced playoff formats')}
+          disabled={disabled}
+        />
+        <FieldHint>
+          {isPremium
+            ? 'Choose how many teams advance to the playoffs.'
+            : '6-team and 8-team playoffs require Legacy Commissioner.'}
         </FieldHint>
       </YStack>
     </YStack>
@@ -1160,6 +1194,7 @@ function Scorecard({ f }: { f: CreateLeagueFormData }) {
             ? `FAAB $${f.faabBudgetDefault}`
             : 'STD WAIVERS'}
           {f.salaryCapEnabled ? ` · $${f.salaryCap}M CAP` : ''}
+          {` · PLAYOFFS: ${f.playoffFormat.toUpperCase()}`}
         </Text>
       </YStack>
     </XStack>
@@ -1351,6 +1386,9 @@ function CreateLeagueModal({
           baseballHofOnly: false,
           waiverType: prev.waiverType === 'faab' ? 'standard' : prev.waiverType,
           salaryCapEnabled: false,
+          playoffFormat: ['6-team', '8-team'].includes(prev.playoffFormat)
+            ? '4-team'
+            : prev.playoffFormat,
         };
       });
     }
@@ -1423,7 +1461,15 @@ function CreateLeagueModal({
       case 'basic':
         return <BasicStep f={formData} set={set} disabled={disabled} />;
       case 'roster':
-        return <RosterStep f={formData} set={set} disabled={disabled} />;
+        return (
+          <RosterStep
+            f={formData}
+            set={set}
+            disabled={disabled}
+            isPremium={isPremium}
+            onUpgrade={setUpgradeFeature}
+          />
+        );
       case 'era':
         return (
           <EraStep

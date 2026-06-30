@@ -36,6 +36,7 @@ export interface SportHomeProps {
   quickActions?: QuickAction[];
   loading?: boolean;
   error?: string | null;
+  isPremium?: boolean;
 }
 
 function SportHome({
@@ -49,6 +50,7 @@ function SportHome({
   quickActions = [],
   loading = false,
   error,
+  isPremium = false,
 }: SportHomeProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -269,6 +271,7 @@ function SportHome({
         onSubmit={onCreateLeague}
         loading={loading}
         error={error}
+        isPremium={isPremium}
       />
 
       {/* Join League Modal */}
