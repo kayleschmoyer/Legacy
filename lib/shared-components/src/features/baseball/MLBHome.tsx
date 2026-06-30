@@ -427,8 +427,6 @@ export function MLBHome({
               <Button
                 backgroundColor={BRAND_NAVY_LIGHT}
                 borderRadius="$5"
-                disabled={atCap}
-                opacity={atCap ? 0.5 : 1}
                 onPress={handleCreatePress}
                 accessibilityLabel="Create a new baseball league"
                 aria-label="Create a new baseball league"
@@ -1153,6 +1151,30 @@ export function MLBHome({
                           Create your first league
                         </Text>
                       </Button>
+                    )}
+                    {isPremium && !atCap && onAdvancedCreate && (
+                      <>
+                        <Button
+                          backgroundColor={BRAND_GOLD}
+                          borderRadius="$6"
+                          onPress={() => onAdvancedCreate('')}
+                          accessibilityLabel="Create a salary cap baseball league"
+                        >
+                          <Text color={BRAND_NAVY} fontWeight="700">
+                            Create Salary Cap League
+                          </Text>
+                        </Button>
+                        <Button
+                          backgroundColor={BRAND_GOLD}
+                          borderRadius="$6"
+                          onPress={() => onAdvancedCreate('')}
+                          accessibilityLabel="Try auction draft in a baseball league"
+                        >
+                          <Text color={BRAND_NAVY} fontWeight="700">
+                            Try Auction Draft
+                          </Text>
+                        </Button>
+                      </>
                     )}
                     <Button
                       backgroundColor={withAlpha(BRAND_NAVY, 0.12)}

@@ -242,13 +242,18 @@ describe('MLBHome', () => {
   });
 
   it('shows "No leagues match your search" when search yields no results (LS-5332)', () => {
+    jest.useFakeTimers();
     render(<MLBHome {...baseProps} leagues={LEAGUES} />);
     fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
       target: { value: 'xyznotfound' },
     });
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
     expect(
       screen.getByText('No leagues match your search'),
     ).toBeInTheDocument();
+    jest.useRealTimers();
   });
 
   it('filters the league list via search', () => {
@@ -296,7 +301,7 @@ describe('MLBHome', () => {
     expect(baseProps.onViewLeague).toHaveBeenCalledWith(1);
   });
 
-  it('renders the league-cap indicator and disables Create at the cap', () => {
+  it('renders the league-cap indicator and triggers upgrade flow when Create is clicked at cap', () => {
     const onUpgrade = jest.fn();
     render(
       <MLBHome
@@ -309,8 +314,8 @@ describe('MLBHome', () => {
     const createBtn = screen.getByRole('button', {
       name: 'Create a new baseball league',
     });
-    expect(createBtn).toBeDisabled();
-    fireEvent.click(screen.getByText('— Upgrade to add more'));
+    expect(createBtn).toBeEnabled();
+    fireEvent.click(createBtn);
     expect(onUpgrade).toHaveBeenCalledTimes(1);
   });
 
@@ -368,6 +373,125 @@ describe('MLBHome', () => {
     render(<MLBHome {...baseProps} leagues={LEAGUES} isPremium />);
     expect(screen.getByText('Unlimited leagues')).toBeInTheDocument();
     expect(screen.queryByText(/Your leagues:/)).not.toBeInTheDocument();
+  });
+
+  describe('premium empty state CTAs (LS-5807)', () => {
+    it('shows premium-only CTAs when isPremium and no leagues and onAdvancedCreate is provided', () => {
+      const onAdvancedCreate = jest.fn();
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={[]}
+          isPremium
+          onAdvancedCreate={onAdvancedCreate}
+        />,
+      );
+      expect(
+        screen.getByRole('button', {
+          name: 'Create a salary cap baseball league',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', {
+          name: 'Try auction draft in a baseball league',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it('calls onAdvancedCreate when the salary cap CTA is pressed', () => {
+      const onAdvancedCreate = jest.fn();
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={[]}
+          isPremium
+          onAdvancedCreate={onAdvancedCreate}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Create a salary cap baseball league',
+        }),
+      );
+      expect(onAdvancedCreate).toHaveBeenCalledWith('');
+    });
+
+    it('calls onAdvancedCreate when the auction draft CTA is pressed', () => {
+      const onAdvancedCreate = jest.fn();
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={[]}
+          isPremium
+          onAdvancedCreate={onAdvancedCreate}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Try auction draft in a baseball league',
+        }),
+      );
+      expect(onAdvancedCreate).toHaveBeenCalledWith('');
+    });
+
+    it('does not show premium CTAs for free users', () => {
+      const onAdvancedCreate = jest.fn();
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={[]}
+          isPremium={false}
+          onAdvancedCreate={onAdvancedCreate}
+        />,
+      );
+      expect(
+        screen.queryByRole('button', {
+          name: 'Create a salary cap baseball league',
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', {
+          name: 'Try auction draft in a baseball league',
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not show premium CTAs when onAdvancedCreate is omitted', () => {
+      render(<MLBHome {...baseProps} leagues={[]} isPremium />);
+      expect(
+        screen.queryByRole('button', {
+          name: 'Create a salary cap baseball league',
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', {
+          name: 'Try auction draft in a baseball league',
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not show premium CTAs when user is at cap', () => {
+      const onAdvancedCreate = jest.fn();
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={[]}
+          isPremium
+          onAdvancedCreate={onAdvancedCreate}
+          leagueCap={{
+            count: 3,
+            limit: 3,
+            atLimit: true,
+            onUpgrade: jest.fn(),
+          }}
+        />,
+      );
+      expect(
+        screen.queryByRole('button', {
+          name: 'Create a salary cap baseball league',
+        }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('renders an Invite Friends action only when onInviteFriends is provided', () => {

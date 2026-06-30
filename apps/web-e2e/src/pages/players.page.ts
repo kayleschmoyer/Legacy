@@ -383,7 +383,10 @@ class PlayerDetailSurface {
 
   constructor(page: Page) {
     this.#page = page;
-    this.#dialog = page.locator('div[role="dialog"]');
+    // Scope to aria-modal="true" to match only BaseModal content and exclude
+    // other Tamagui elements (sheets, select portals) that also use role="dialog"
+    // but are not true modal dialogs (LS-5807 fix).
+    this.#dialog = page.locator('[role="dialog"][aria-modal="true"]');
     this.#loading = page.getByTestId('player-detail-loading');
   }
 
