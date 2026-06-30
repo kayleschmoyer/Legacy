@@ -133,6 +133,19 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   },
   getonthisday: { data: { onThisDay: [] } },
   getonthisdayevents: { data: { onThisDayEvents: [] } },
+  // LS-5809: home page queries mock-draft usage to gate the CTA for free users.
+  // Default to unlimited so the Start Mock Draft button renders enabled.
+  getmymockdraftusage: {
+    data: {
+      getMyMockDraftUsage: {
+        __typename: 'MockDraftUsage',
+        used: 0,
+        limit: null,
+        remaining: null,
+        isUnlimited: true,
+      },
+    },
+  },
 
   // ── League detail (fires when visiting /baseball/league/:id) ──────
   getleaguebyid: leagueByIdResponse(),

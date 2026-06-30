@@ -9,6 +9,7 @@ import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
 import {
   useGetArchivedUserLeagueSummariesLazyQuery,
   useGetArchivedUserLeagueSummariesQuery,
+  useGetMyMockDraftUsageQuery,
   useGetUserLeagueSummariesQuery,
   type UserLeagueSummaryFragment,
 } from '@legacy-sports/graphql';
@@ -120,6 +121,17 @@ export function HomePage(): React.JSX.Element {
   const cachedArchivedCount =
     archivedCachedData?.getArchivedUserLeagueSummaries?.length ?? null;
 
+  const { data: mockDraftUsageData } = useGetMyMockDraftUsageQuery({
+    skip: !auth?.user,
+    fetchPolicy: 'cache-and-network',
+  });
+  const mockDraftUsage = mockDraftUsageData?.getMyMockDraftUsage;
+  const mockDraftAtCap =
+    mockDraftUsage != null &&
+    mockDraftUsage.isUnlimited !== true &&
+    mockDraftUsage.remaining != null &&
+    mockDraftUsage.remaining <= 0;
+
   const handleShowArchived = useCallback(() => {
     setShowArchived(true);
     void fetchArchived();
@@ -221,6 +233,7 @@ export function HomePage(): React.JSX.Element {
             navigate(sport === 'football' ? '/football' : '/baseball')
           }
           onStartMockDraft={() => navigate(MOCK_DRAFT_ROUTE)}
+          mockDraftAtCap={mockDraftAtCap}
           onHowItWorks={() => setTutorialOpen(true)}
           onCreateSalaryCapLeague={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}
           onCreateAuctionLeague={() => navigate(CREATE_BASEBALL_LEAGUE_ROUTE)}

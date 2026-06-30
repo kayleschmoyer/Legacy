@@ -146,6 +146,45 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('mock draft CTA', () => {
+    it('renders the Start Mock Draft button when onStartMockDraft is provided', () => {
+      const onStartMockDraft = jest.fn();
+      const { getByText } = render(
+        <HomeScreen {...baseProps} onStartMockDraft={onStartMockDraft} />,
+      );
+      expect(getByText('Start Mock Draft')).toBeTruthy();
+    });
+
+    it('calls onStartMockDraft when the button is pressed and not at cap', () => {
+      const onStartMockDraft = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          onStartMockDraft={onStartMockDraft}
+          mockDraftAtCap={false}
+        />,
+      );
+      fireEvent.click(getByText('Start Mock Draft'));
+      expect(onStartMockDraft).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables the button and shows at-cap message when mockDraftAtCap is true', () => {
+      const onStartMockDraft = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          onStartMockDraft={onStartMockDraft}
+          mockDraftAtCap
+        />,
+      );
+      fireEvent.click(getByText('Start Mock Draft'));
+      expect(onStartMockDraft).not.toHaveBeenCalled();
+      expect(
+        getByText(/you've used your free mock drafts this week/i),
+      ).toBeTruthy();
+    });
+  });
+
   describe('loading and error states', () => {
     it('renders the loading view', () => {
       const { getByText } = render(<HomeScreen {...baseProps} loading />);

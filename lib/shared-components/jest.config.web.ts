@@ -8,6 +8,15 @@ module.exports = {
     '^__PLATFORM_COMPONENTS__$': '<rootDir>/src/platform-components/web',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
+    // Apollo Client 4.x exports @apollo/client/react with nested export conditions
+    // that Jest's resolver does not recurse into, causing it to fall through to the
+    // ESM bundle which cannot load in Jest's CJS context. Map directly to the CJS build.
+    '^@apollo/client/react$':
+      '<rootDir>/../../node_modules/@apollo/client/__cjs/react/index.cjs',
+    '^@apollo/client/testing/react$':
+      '<rootDir>/../../node_modules/@apollo/client/__cjs/testing/react/index.cjs',
+    '^@apollo/client/testing$':
+      '<rootDir>/../../node_modules/@apollo/client/__cjs/testing/index.cjs',
   },
   setupFilesAfterEnv: ['<rootDir>/jest-setup-web.js'],
   testEnvironment: 'jsdom',

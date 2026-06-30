@@ -133,6 +133,8 @@ export interface HomeScreenProps {
   onBrowseStats: () => void;
   onViewSport: (sportKey: 'baseball' | 'football') => void;
   onStartMockDraft?: () => void;
+  /** When true, the mock-draft CTA button is disabled (free user at weekly cap). */
+  mockDraftAtCap?: boolean;
   onPlayerPress?: (playerId: number) => void;
   onHowItWorks?: () => void;
   /** Navigate to create a salary cap league. Shown only when isPremium is true. */
@@ -928,7 +930,13 @@ function StatsCta({
 
 /* ─── Mock draft CTA ─── */
 
-function MockDraftCta({ onPress }: { onPress: () => void }) {
+function MockDraftCta({
+  onPress,
+  atCap = false,
+}: {
+  onPress: () => void;
+  atCap?: boolean;
+}) {
   return (
     <XStack
       backgroundColor={SURFACE_PANEL}
@@ -967,11 +975,17 @@ function MockDraftCta({ onPress }: { onPress: () => void }) {
           See who falls to your pick.
         </Text>
         <Text fontFamily={BODY_FONT} fontSize={14} color={TEXT_SECONDARY}>
-          Run a 12-team snake against bots in under ten minutes. Once you join a
-          real league, mocks pull from that league&apos;s exact era and ruleset.
+          {atCap
+            ? "You've used your free mock drafts this week. Upgrade or check back next week."
+            : 'Run a 12-team snake against bots in under ten minutes. Once you join a real league, mocks pull from that league’s exact era and ruleset.'}
         </Text>
       </YStack>
-      <ActionButton label="Start Mock Draft" variant="navy" onPress={onPress} />
+      <ActionButton
+        label="Start Mock Draft"
+        variant="navy"
+        onPress={onPress}
+        disabled={atCap}
+      />
     </XStack>
   );
 }
@@ -1143,6 +1157,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     onBrowseStats,
     onViewSport,
     onStartMockDraft,
+    mockDraftAtCap,
     onHowItWorks,
     onCreateSalaryCapLeague,
     onCreateAuctionLeague,
@@ -1582,7 +1597,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
         {onStartMockDraft ? (
           <YStack gap="$5">
             <SectionHead eyebrow="Scout the room" title="Try a mock draft" />
-            <MockDraftCta onPress={onStartMockDraft} />
+            <MockDraftCta onPress={onStartMockDraft} atCap={mockDraftAtCap} />
           </YStack>
         ) : null}
 
