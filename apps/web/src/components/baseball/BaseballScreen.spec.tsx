@@ -194,7 +194,9 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
   });
 });
 
-describe('BaseballScreen — free-tier league cap gating (LS-5804)', () => {
+// LS-5806: leagueCap gating is mobile-only on web; BaseballScreen does not
+// pass the leagueCap prop to MLBHome so atLimit is always false on web.
+describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () => {
   function leaguesOfCount(n: number) {
     return Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `L${i}` }));
   }

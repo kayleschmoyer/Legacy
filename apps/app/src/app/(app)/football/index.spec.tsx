@@ -34,15 +34,18 @@ jest.mock('@legacy-sports/shared-components/football', () => {
       leagues: { name?: string | null }[];
       loading?: boolean;
       error?: boolean;
+      isAuthenticated?: boolean;
       onCreateLeague: () => void;
       onJoinLeague?: () => void;
       onBrowseLeagues?: () => void;
       onViewLeague: (id: string | number) => void;
+      onSignIn?: () => void;
     }) => (
       <View testID="nfl-home">
         <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
         <Text>{`loading:${String(props.loading)}`}</Text>
         <Text>{`error:${String(props.error)}`}</Text>
+        <Text>{`isAuthenticated:${String(props.isAuthenticated)}`}</Text>
         <Pressable testID="create" onPress={() => props.onCreateLeague()}>
           <Text>create</Text>
         </Pressable>
@@ -52,14 +55,20 @@ jest.mock('@legacy-sports/shared-components/football', () => {
         <Pressable testID="view" onPress={() => props.onViewLeague(7)}>
           <Text>view</Text>
         </Pressable>
+        <Pressable testID="sign-in" onPress={() => props.onSignIn?.()}>
+          <Text>sign-in</Text>
+        </Pressable>
       </View>
     ),
   };
 });
 
-const mockUserInfo = { id: 1, username: 'testuser' };
+const mockUseAuthorizedUserInfo = jest.fn(() => ({
+  id: 1,
+  username: 'testuser',
+}));
 jest.mock('../../../common/auth/AuthorizedUserContext', () => ({
-  useAuthorizedUserInfo: () => mockUserInfo,
+  useAuthorizedUserInfo: () => mockUseAuthorizedUserInfo(),
 }));
 
 const mockUseGetUserLeaguesQuery: jest.MockedFunction<
@@ -134,6 +143,7 @@ const BASEBALL_LEAGUE = {
 describe('FootballHome (mobile NFLHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAuthorizedUserInfo.mockReturnValue({ id: 1, username: 'testuser' });
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: { userLeagues: FOOTBALL_LEAGUES },
       loading: false,
@@ -301,6 +311,32 @@ describe('FootballHome (mobile NFLHome wrapper)', () => {
         pathname: '/football/league/[leagueId]',
         params: { leagueId: 7 },
       });
+    });
+  });
+
+  describe('unauthenticated state (LS-5806)', () => {
+    beforeEach(() => {
+      mockUseAuthorizedUserInfo.mockReturnValue(null);
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: undefined,
+        loading: false,
+      });
+    });
+
+    it('passes isAuthenticated:false to NFLHome when user is not signed in', () => {
+      render(<FootballHome />);
+      expect(screen.getByText('isAuthenticated:false')).toBeTruthy();
+    });
+
+    it('navigates to login when onSignIn is pressed', () => {
+      render(<FootballHome />);
+      fireEvent.press(screen.getByTestId('sign-in'));
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
+    });
+
+    it('skips the leagues query when unauthenticated', () => {
+      render(<FootballHome />);
+      expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: true });
     });
   });
 });

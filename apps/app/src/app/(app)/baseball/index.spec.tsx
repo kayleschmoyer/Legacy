@@ -105,6 +105,9 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
         <Pressable testID="view" onPress={() => props.onViewLeague(2)}>
           <Text>view</Text>
         </Pressable>
+        <Pressable testID="sign-in" onPress={() => props.onSignIn?.()}>
+          <Text>sign-in</Text>
+        </Pressable>
         <Pressable
           testID="cap-upgrade"
           onPress={() => props.leagueCap?.onUpgrade()}
@@ -488,12 +491,15 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
   });
 
   describe('unauthenticated state (LS-5806)', () => {
-    it('skips the query and passes isAuthenticated:false + error:false to MLBHome', () => {
+    beforeEach(() => {
       mockUseAuthorizedUserInfo.mockReturnValue(null);
       mockUseGetUserLeaguesQuery.mockReturnValue({
         data: undefined,
         loading: false,
       });
+    });
+
+    it('skips the query and passes isAuthenticated:false + error:false to MLBHome', () => {
       render(<BaseballHome />);
       expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: true });
       expect(screen.getByText('error:false')).toBeTruthy();
@@ -502,13 +508,15 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
 
     it('does not flag leaguesLoadFailed when the user id is null', () => {
       mockUseAuthorizedUserInfo.mockReturnValue({ id: null, username: null });
-      mockUseGetUserLeaguesQuery.mockReturnValue({
-        data: undefined,
-        loading: false,
-      });
       render(<BaseballHome />);
       expect(screen.getByText('error:false')).toBeTruthy();
       expect(screen.getByText('isAuthenticated:false')).toBeTruthy();
+    });
+
+    it('navigates to login when onSignIn is pressed', () => {
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('sign-in'));
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
   });
 });

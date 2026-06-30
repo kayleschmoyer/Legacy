@@ -68,6 +68,8 @@ export default function FootballHome() {
       leagues={leagues}
       loading={loading && !data}
       error={!!error}
+      isAuthenticated={!!userInfo?.id}
+      onSignIn={() => router.navigate('/login')}
       onCreateLeague={handleCreateLeague}
       onJoinLeague={() => router.push('/football/league/join')}
       onBrowseLeagues={() => router.push('/league-discovery')}

@@ -29,10 +29,14 @@ export interface NFLHomeProps {
   leagues?: NFLHomeLeague[];
   loading?: boolean;
   error?: boolean;
+  /** When false, renders a sign-in CTA instead of the leagues list. Defaults to true. */
+  isAuthenticated?: boolean;
   onCreateLeague: () => void;
   onJoinLeague?: () => void;
   onBrowseLeagues?: () => void;
   onViewLeague: (leagueId: string | number) => void;
+  /** Navigate to sign-in from the unauthenticated notice. */
+  onSignIn?: () => void;
 }
 
 function getLeagueStatusLabel(league: NFLHomeLeague): string {
@@ -50,10 +54,12 @@ function NFLHome({
   leagues = [],
   loading = false,
   error = false,
+  isAuthenticated = true,
   onCreateLeague,
   onJoinLeague,
   onBrowseLeagues,
   onViewLeague,
+  onSignIn,
 }: NFLHomeProps) {
   const hasLeagues = leagues.length > 0;
 
@@ -239,7 +245,30 @@ function NFLHome({
             padding="$3"
             gap="$2"
           >
-            {loading ? (
+            {!isAuthenticated ? (
+              <YStack alignItems="center" padding="$5" gap="$3">
+                <Text fontSize="$5" color="$color" textAlign="center">
+                  Sign in to manage your fantasy football leagues
+                </Text>
+                <Text color="$gray10" fontSize="$3" textAlign="center">
+                  Authentication is required to access drafts, invite codes, and
+                  lineup management.
+                </Text>
+                {onSignIn ? (
+                  <Button
+                    alignSelf="flex-start"
+                    backgroundColor="$orange9"
+                    borderRadius="$3"
+                    onPress={onSignIn}
+                    accessibilityLabel="Sign in to get started"
+                  >
+                    <Text color="white" fontWeight="700">
+                      Get Started Free
+                    </Text>
+                  </Button>
+                ) : null}
+              </YStack>
+            ) : loading ? (
               <YStack alignItems="center" padding="$5">
                 <Spinner size="large" color="$orange9" />
               </YStack>
