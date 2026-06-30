@@ -10,6 +10,12 @@ import { FootballTeamHeader } from './football/team/[teamId]';
 import { AuthorizedUserContextProvider } from '../../common/auth/AuthorizedUserContext';
 import { useCurrentUserInfo } from '../../common/auth/AuthHooks';
 import { usePushNotifications } from '../../features/notifications/hooks/usePushNotifications';
+import { useThemeContext } from '../../context/ThemeContext';
+
+const HEADER_BG: Record<'dark' | 'light', string> = {
+  dark: '#0A0F1A',
+  light: '#f5f5f5',
+};
 
 // The authenticated app lands on the five-tab shell. `/` redirects there via
 // `index`, so the tab group is the anchor of the navigation stack and every
@@ -22,6 +28,7 @@ export const unstable_settings = {
 
 export default function Layout() {
   const { data: currentUser, loading } = useCurrentUserInfo();
+  const { resolvedTheme } = useThemeContext();
 
   usePushNotifications(currentUser?.id ?? null);
 
@@ -39,7 +46,7 @@ export default function Layout() {
         <Stack
           screenOptions={{
             headerStyle: {
-              backgroundColor: '#f5f5f5',
+              backgroundColor: HEADER_BG[resolvedTheme],
             },
           }}
         >

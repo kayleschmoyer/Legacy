@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useEffect } from 'react';
-import { TamaguiProvider } from 'tamagui';
+import { TamaguiProvider, Theme } from 'tamagui';
 import { Slot } from 'expo-router';
 import {
   GrowthBook,
@@ -21,7 +21,7 @@ import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { useCurrentUserInfo } from '../common/auth/AuthHooks';
 import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
-import { ThemeProvider } from '../context/ThemeContext';
+import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
 import { setUserProperties } from '../utils/analytics';
 import { installGlobalErrorCapture } from '../lib/installGlobalErrorCapture';
 
@@ -106,6 +106,20 @@ function AuthenticatedContent(): React.JSX.Element {
 }
 
 /**
+ * Reads the resolved theme from ThemeContext and applies it as a Tamagui Theme
+ * wrapper so every component under it re-renders with the correct token set.
+ * Must be rendered inside ThemeProvider and TamaguiProvider.
+ */
+function ThemedApp(): React.JSX.Element {
+  const { resolvedTheme } = useThemeContext();
+  return (
+    <Theme name={resolvedTheme}>
+      <InnerLayout />
+    </Theme>
+  );
+}
+
+/**
  * Inner layout — provides the OAuth context and renders the router outlet.
  *
  * Auth gating is the router's job, NOT a top-level guard: the public `/login`
@@ -172,13 +186,13 @@ export default function Layout() {
     <TamaguiProvider
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- tamaguiConfig typed as any internally by tamagui package; safe to pass
       config={tamaguiConfig}
-      defaultTheme="dark"
+      defaultTheme="light"
     >
       <GrowthBookProvider growthbook={growthbook}>
         <ErrorBoundary>
           {/* ThemeProvider must live inside TamaguiProvider so the Theme component works */}
           <ThemeProvider>
-            <InnerLayout />
+            <ThemedApp />
           </ThemeProvider>
         </ErrorBoundary>
       </GrowthBookProvider>

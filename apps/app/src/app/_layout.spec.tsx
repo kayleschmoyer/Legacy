@@ -67,12 +67,18 @@ jest.mock('@legacy-sports/shared-components', () => ({
 
 jest.mock('tamagui', () => ({
   TamaguiProvider: ({ children }: { children: React.ReactNode }) => children,
+  Theme: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 jest.mock('@legacy-sports/tamagui-config', () => ({ tamaguiConfig: {} }));
 
 jest.mock('../context/ThemeContext', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+  useThemeContext: () => ({
+    resolvedTheme: 'dark',
+    themePreference: 'system',
+    setThemePreference: jest.fn(),
+  }),
 }));
 
 jest.mock('../common/auth/mobileOAuthConfig', () => ({

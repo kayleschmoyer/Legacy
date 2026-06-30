@@ -15,6 +15,7 @@ import {
   useGetArchivedUserLeagueSummariesQuery,
   useGetUserLeagueSummariesQuery,
 } from '@legacy-sports/graphql';
+import { useThemeContext } from '../../../context/ThemeContext';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import BaseballHomeScreen from '../baseball/index';
 import FootballHomeScreen from '../football/index';
@@ -40,12 +41,18 @@ function SportBackBar({
   topInset: number;
   onBack: () => void;
 }) {
+  const { resolvedTheme } = useThemeContext();
+  const isDark = resolvedTheme === 'dark';
+  const bg = isDark ? '#0A0F1A' : '#f5f5f5';
+  const border = isDark ? '#1E2D45' : '#E2E8F0';
+  const textColor = isDark ? '#DEE6FF' : '#1B3A5C';
+
   return (
     <XStack
       alignItems="center"
-      backgroundColor="#f5f5f5"
+      backgroundColor={bg}
       borderBottomWidth={1}
-      borderBottomColor="#E2E8F0"
+      borderBottomColor={border}
       paddingTop={topInset}
       paddingHorizontal="$4"
       paddingVertical="$3"
@@ -57,8 +64,8 @@ function SportBackBar({
         accessibilityLabel="Back to Sports"
         style={{ flexDirection: 'row', alignItems: 'center' }}
       >
-        <ChevronLeft size={24} color="#1B3A5C" />
-        <Text color="#1B3A5C" fontSize="$4">
+        <ChevronLeft size={24} color={textColor} />
+        <Text color={textColor} fontSize="$4">
           Sports
         </Text>
       </Pressable>
@@ -66,7 +73,7 @@ function SportBackBar({
         flex={1}
         textAlign="center"
         fontWeight="600"
-        color="#1B3A5C"
+        color={textColor}
         fontSize="$5"
         marginRight="$8"
       >
