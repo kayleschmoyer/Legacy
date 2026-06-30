@@ -1,7 +1,7 @@
 import { test as base, expect } from './auth-enhanced';
 import { extractOperationName } from './shared-mocks';
 
-import { userLeaguesResponse } from '../mocks/graphql';
+import { myLeaguesResponse, userLeaguesResponse } from '../mocks/graphql';
 import { mockDraft } from '../mocks/graphql/draft.mocks';
 import {
   leagueByIdResponse,
@@ -64,6 +64,13 @@ export const test = base.extend({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(userLeaguesResponse()),
+        });
+      } else if (op === 'getmyleagues') {
+        // Baseball hub uses GetMyLeagues (renamed from GetUserLeagues in LS-5810)
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(myLeaguesResponse()),
         });
       } else if (op === 'initializedraft') {
         // Flip stateful draftStatus so subsequent GetLeagueById calls

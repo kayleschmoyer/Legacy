@@ -74,8 +74,8 @@ const THREE_LEAGUES = [
 
 async function mockThreeLeagues(page: import('@playwright/test').Page) {
   await createGraphQLRouter(page, {
-    getuserleagues: (route) =>
-      fulfillJson(route, { data: { userLeagues: THREE_LEAGUES } }),
+    getmyleagues: (route) =>
+      fulfillJson(route, { data: { myLeagues: THREE_LEAGUES } }),
   });
 }
 

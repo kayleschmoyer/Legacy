@@ -515,4 +515,60 @@ describe('MLBHome', () => {
     fireEvent.click(btn);
     expect(onMockDraft).toHaveBeenCalledTimes(1);
   });
+
+  describe('Mock Draft upsell ribbon', () => {
+    it('shows "2 / week free" microcopy and upgrade link for free users with onMockDraft', () => {
+      const onMockDraft = jest.fn();
+      const onMockDraftUpgrade = jest.fn();
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={LEAGUES}
+          onMockDraft={onMockDraft}
+          onMockDraftUpgrade={onMockDraftUpgrade}
+          isPremium={false}
+        />,
+      );
+      expect(
+        screen.getAllByText('2 / week free').length,
+      ).toBeGreaterThanOrEqual(1);
+      const upgradeLinks = screen.getAllByText('Unlimited with Premium');
+      expect(upgradeLinks.length).toBeGreaterThanOrEqual(1);
+      fireEvent.click(upgradeLinks[0]);
+      expect(onMockDraftUpgrade).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides the upsell ribbon for premium users', () => {
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={LEAGUES}
+          onMockDraft={jest.fn()}
+          onMockDraftUpgrade={jest.fn()}
+          isPremium
+        />,
+      );
+      expect(screen.queryByText('2 / week free')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Unlimited with Premium'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('hides the upgrade link when onMockDraftUpgrade is not provided', () => {
+      render(
+        <MLBHome
+          {...baseProps}
+          leagues={LEAGUES}
+          onMockDraft={jest.fn()}
+          isPremium={false}
+        />,
+      );
+      expect(
+        screen.getAllByText('2 / week free').length,
+      ).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.queryByText('Unlimited with Premium'),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

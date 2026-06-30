@@ -14,7 +14,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { userLeaguesResponse } from '../mocks/graphql';
+import { myLeaguesResponse } from '../mocks/graphql';
 import {
   joinLeagueByCodeResponse,
   validateInviteCodeResponse,
@@ -36,14 +36,14 @@ async function mockBaseballHub(
   await page.route(isGraphQLEndpoint, async (route) => {
     const { op } = parseGraphQLRequest(route);
 
-    if (op === 'getuserleagues') {
+    if (op === 'getmyleagues') {
       const leagues = options.withLeagues
         ? [
             { id: 1, name: 'Sluggers United', draftStatus: 'completed' },
             { id: 2, name: 'Diamond Rivals', draftStatus: 'not-started' },
           ]
         : [];
-      await fulfillJson(route, userLeaguesResponse(leagues));
+      await fulfillJson(route, myLeaguesResponse(leagues));
       return;
     }
 
@@ -183,8 +183,8 @@ test.describe('Join Baseball League CTA — end-to-end flow @regression', () => 
     await page.route(isGraphQLEndpoint, async (route) => {
       const { op } = parseGraphQLRequest(route);
 
-      if (op === 'getuserleagues') {
-        await fulfillJson(route, userLeaguesResponse());
+      if (op === 'getmyleagues') {
+        await fulfillJson(route, myLeaguesResponse());
         return;
       }
       if (op === 'validateinvitecode') {

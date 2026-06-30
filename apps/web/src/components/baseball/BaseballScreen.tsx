@@ -13,6 +13,7 @@ import {
   useGetMyLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../PageMeta';
+import { UpgradeModal } from '../UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { formatDisplayName } from '../../lib/formatDisplayName';
 
@@ -31,6 +32,9 @@ export function BaseballScreen() {
   const navigate = useNavigate();
   const auth = useAuth();
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
+  const [showMockDraftUpgradeModal, setShowMockDraftUpgradeModal] =
+    React.useState(false);
+
   const { data, loading, error, refetch } = useGetMyLeaguesQuery({
     variables: { sport: Sport.Baseball },
     // Only run the query if user is authenticated
@@ -149,6 +153,7 @@ export function BaseballScreen() {
           onCreateLeague={handleCreateLeague}
           onJoinLeague={() => navigate('/baseball/league/join')}
           onMockDraft={() => navigate('/baseball/mock-draft')}
+          onMockDraftUpgrade={() => setShowMockDraftUpgradeModal(true)}
           onViewLeague={(id) => navigate(`/baseball/league/${id}`)}
           onRetry={() => void refetch()}
           onSignIn={() => navigate('/')}
@@ -163,6 +168,12 @@ export function BaseballScreen() {
           leagueCap={leagueCap}
         />
       </div>
+      <UpgradeModal
+        open={showMockDraftUpgradeModal}
+        onOpenChange={setShowMockDraftUpgradeModal}
+        featureName="Unlimited mock drafts"
+        featureDescription="Free accounts can run 2 mock drafts per week. Upgrade to Premium for unlimited mock drafts anytime."
+      />
     </>
   );
 }

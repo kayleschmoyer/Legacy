@@ -208,6 +208,14 @@ export function userLeaguesResponse(leagues?: Partial<MockLeague>[]) {
   };
 }
 
+export function myLeaguesResponse(leagues?: Partial<MockLeague>[]) {
+  return {
+    data: {
+      myLeagues: (leagues ?? [{}]).map((l) => mockLeague(l)),
+    },
+  };
+}
+
 export function leagueTeamsResponse(teams?: Partial<MockTeam>[]) {
   return {
     data: {

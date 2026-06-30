@@ -21,6 +21,7 @@ export {
   leagueAtWeekResponse,
   leagueInPlayoffsResponse,
   userLeaguesResponse,
+  myLeaguesResponse,
   leagueTeamsResponse,
   leaguePositionsResponse,
   userTeamIdResponse,

@@ -118,6 +118,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
     },
   },
   getuserleagues: { data: { userLeagues: [] } },
+  getmyleagues: { data: { myLeagues: [] } },
   getpublicleagues: { data: { publicLeagues: [] } },
   // ProfileSettingsPage fires MyIdentities on load (useMyIdentitiesQuery, LS-7825).
   // An empty array renders the "No linked providers found." branch cleanly; an

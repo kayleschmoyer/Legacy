@@ -33,6 +33,16 @@ jest.mock('react-router-dom', () => ({
 
 jest.mock('../PageMeta', () => ({ PageMeta: () => null }));
 
+jest.mock('../UpgradeModal', () => ({
+  UpgradeModal: ({
+    open,
+    featureName,
+  }: {
+    open: boolean;
+    featureName?: string;
+  }) => (open ? <div data-testid="upgrade-modal">{featureName}</div> : null),
+}));
+
 const mockUseAuth = jest.fn(() => ({
   isLoading: false,
   user: { username: 'schmoyer21@gmail.com' },
@@ -43,6 +53,7 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 
 interface MLBHomeHarnessPropsExtended extends MLBHomeHarnessProps {
   onMockDraft?: () => void;
+  onMockDraftUpgrade?: () => void;
 }
 
 // Capture the props the wrapper feeds into the shared component and expose
@@ -60,6 +71,11 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
       <button onClick={() => props.onJoinLeague()}>join</button>
       {props.onMockDraft ? (
         <button onClick={() => props.onMockDraft?.()}>mock-draft</button>
+      ) : null}
+      {props.onMockDraftUpgrade ? (
+        <button onClick={() => props.onMockDraftUpgrade?.()}>
+          mock-draft-upgrade
+        </button>
       ) : null}
       <button
         onClick={() =>
@@ -99,6 +115,11 @@ jest.mock('@legacy-sports/graphql', () => ({
     skip?: boolean;
   }) => mockUseGetMyLeaguesQuery(opts),
   useCreateLeagueAndTeamsMutation: () => [mockCreateLeague, { loading: false }],
+  useGetStripePricesQuery: () => ({
+    data: undefined,
+    loading: false,
+    error: undefined,
+  }),
   GetMyLeagues: {},
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));
@@ -196,6 +217,17 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
     render(<BaseballScreen />);
     fireEvent.click(screen.getByText('mock-draft'));
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft');
+  });
+
+  it('wires onMockDraftUpgrade to open the mock-draft UpgradeModal', async () => {
+    render(<BaseballScreen />);
+    fireEvent.click(screen.getByText('mock-draft-upgrade'));
+    await waitFor(() =>
+      expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('upgrade-modal').textContent).toContain(
+      'Unlimited mock drafts',
+    );
   });
 });
 

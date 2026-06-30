@@ -74,6 +74,8 @@ export interface MLBHomeProps {
   onCreateLeague: (input: QuickCreateLeagueInput) => Promise<void>;
   onJoinLeague: () => void;
   onMockDraft?: () => void;
+  /** Called when the free-tier "Unlimited with Premium" mock-draft upsell link is pressed. */
+  onMockDraftUpgrade?: () => void;
   /** When provided, renders a "Live Scores" action linking to the scoreboard. */
   onScoreboard?: () => void;
   onViewLeague: (leagueId: number | string) => void;
@@ -209,6 +211,40 @@ function matchesRoleFilter(
     permissionLevel !== 'commissioner' && permissionLevel !== 'general_manager'
   );
 }
+
+function MockDraftUpsell({
+  isPremium,
+  onMockDraftUpgrade,
+}: {
+  isPremium?: boolean;
+  onMockDraftUpgrade?: () => void;
+}) {
+  if (isPremium !== false) return null;
+  return (
+    <YStack alignItems="center" gap="$0.5">
+      <Text
+        fontSize="$2"
+        color="$glassTextMuted"
+        accessibilityLabel="2 mock drafts per week on free tier"
+      >
+        2 / week free
+      </Text>
+      {onMockDraftUpgrade ? (
+        <Text
+          fontSize="$2"
+          color={BRAND_GOLD}
+          fontWeight="600"
+          onPress={onMockDraftUpgrade}
+          accessibilityLabel="Upgrade to Premium for unlimited mock drafts"
+          aria-label="Upgrade to Premium for unlimited mock drafts"
+        >
+          Unlimited with Premium
+        </Text>
+      ) : null}
+    </YStack>
+  );
+}
+
 /**
  * Shared, presentational baseball home (LS-7716). Mirrors the `NFLHome` pattern:
  * leagues array + callbacks, no data fetching. Consumed by the web
@@ -223,6 +259,7 @@ export function MLBHome({
   onCreateLeague,
   onJoinLeague,
   onMockDraft,
+  onMockDraftUpgrade,
   onScoreboard,
   onViewLeague,
   onRetry,
@@ -407,19 +444,25 @@ export function MLBHome({
                 </Text>
               </Button>
               {onMockDraft ? (
-                <Button
-                  backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
-                  borderColor={withAlpha(BRAND_NAVY, 0.42)}
-                  borderWidth={1}
-                  borderRadius="$5"
-                  onPress={onMockDraft}
-                  accessibilityLabel="Practice with a mock draft simulator"
-                  aria-label="Practice with a mock draft simulator"
-                >
-                  <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
-                    Mock Draft
-                  </Text>
-                </Button>
+                <YStack alignItems="center" gap="$1">
+                  <Button
+                    backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+                    borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                    borderWidth={1}
+                    borderRadius="$5"
+                    onPress={onMockDraft}
+                    accessibilityLabel="Practice with a mock draft simulator"
+                    aria-label="Practice with a mock draft simulator"
+                  >
+                    <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                      Mock Draft
+                    </Text>
+                  </Button>
+                  <MockDraftUpsell
+                    isPremium={isPremium}
+                    onMockDraftUpgrade={onMockDraftUpgrade}
+                  />
+                </YStack>
               ) : null}
               {onScoreboard ? (
                 <Button
@@ -536,19 +579,25 @@ export function MLBHome({
                   </Text>
                 </Button>
                 {onMockDraft ? (
-                  <Button
-                    backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
-                    borderColor={withAlpha(BRAND_NAVY, 0.42)}
-                    borderWidth={1}
-                    borderRadius="$6"
-                    onPress={onMockDraft}
-                    accessibilityLabel="Practice with a mock draft simulator"
-                    aria-label="Practice with a mock draft simulator"
-                  >
-                    <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
-                      Mock Draft
-                    </Text>
-                  </Button>
+                  <YStack alignItems="center" gap="$1">
+                    <Button
+                      backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                      borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                      borderWidth={1}
+                      borderRadius="$6"
+                      onPress={onMockDraft}
+                      accessibilityLabel="Practice with a mock draft simulator"
+                      aria-label="Practice with a mock draft simulator"
+                    >
+                      <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                        Mock Draft
+                      </Text>
+                    </Button>
+                    <MockDraftUpsell
+                      isPremium={isPremium}
+                      onMockDraftUpgrade={onMockDraftUpgrade}
+                    />
+                  </YStack>
                 ) : null}
                 {onScoreboard ? (
                   <Button

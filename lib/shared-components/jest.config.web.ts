@@ -17,6 +17,10 @@ module.exports = {
       '<rootDir>/../../node_modules/@apollo/client/__cjs/testing/react/index.cjs',
     '^@apollo/client/testing$':
       '<rootDir>/../../node_modules/@apollo/client/__cjs/testing/index.cjs',
+    // Apollo Client 4.x: root package resolves to core only in CJS; merge
+    // react hooks so generated files (`import * as Apollo from '@apollo/client'`)
+    // can find Apollo.useQuery, Apollo.useLazyQuery, etc.
+    '^@apollo/client$': '<rootDir>/jest-apollo-shim.cjs',
   },
   setupFilesAfterEnv: ['<rootDir>/jest-setup-web.js'],
   testEnvironment: 'jsdom',
