@@ -829,11 +829,41 @@ export async function claimUnassignedTeamForUser(
     userId: number;
     teamName: string;
     permissionLevel: LeaguePermissionLevel;
+    // When provided and hasUnlimitedLeagues is false, the cap is re-checked
+    // atomically inside the transaction under a pg_advisory_xact_lock,
+    // eliminating the TOCTOU race between requireJoinLeagueCapacity and
+    // the membership INSERT (LS-5862).
+    capCheck?: { hasUnlimitedLeagues: boolean; limit: number };
   },
 ): Promise<ClaimResult> {
-  const { leagueId, userId, teamName, permissionLevel } = params;
+  const { leagueId, userId, teamName, permissionLevel, capCheck } = params;
 
   return db.transaction(async (tx) => {
+    if (capCheck && !capCheck.hasUnlimitedLeagues) {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(CAST(${userId} AS bigint))`,
+      );
+      const [{ leagueCount }] = await tx
+        .select({ leagueCount: count() })
+        .from(PublicSchema.leagueMembers)
+        .innerJoin(
+          PublicSchema.leagues,
+          eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+        )
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.userId, userId),
+            eq(PublicSchema.leagues.isMockDraft, false),
+            isNull(PublicSchema.leagues.frozenAt),
+          ),
+        );
+      if (Number(leagueCount) >= capCheck.limit) {
+        throw PremiumRequiredError(
+          'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
+        );
+      }
+    }
+
     const candidates = await tx.execute(sql`
       SELECT t.id
       FROM teams t
@@ -899,9 +929,13 @@ export async function claimUnassignedTeamForUser(
 async function requireJoinLeagueCapacity(
   context: Context,
   userId: number,
-): Promise<void> {
-  if (await hasEntitlement(context, ENTITLEMENTS.unlimited_leagues)) {
-    return;
+): Promise<{ hasUnlimitedLeagues: boolean }> {
+  const hasUnlimitedLeagues = await hasEntitlement(
+    context,
+    ENTITLEMENTS.unlimited_leagues,
+  );
+  if (hasUnlimitedLeagues) {
+    return { hasUnlimitedLeagues: true };
   }
   const [{ leagueCount }] = await context.db
     .select({ leagueCount: count() })
@@ -924,6 +958,7 @@ async function requireJoinLeagueCapacity(
       'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
     );
   }
+  return { hasUnlimitedLeagues: false };
 }
 
 async function notifyLeagueMembersOfJoin(
@@ -1017,7 +1052,11 @@ builder.mutationField('joinLeagueByCode', (t) =>
         }
 
         // Enforce the free-tier active-league cap before joining (LS-5172).
-        await requireJoinLeagueCapacity(context, userId);
+        // The return value is threaded into claimUnassignedTeamForUser so the
+        // TOCTOU-safe re-check inside the transaction reuses the entitlement
+        // result without a second round-trip (LS-5862).
+        const { hasUnlimitedLeagues: joinByCodeUnlimited } =
+          await requireJoinLeagueCapacity(context, userId);
 
         // LS-2497: atomic claim — wraps team selection + rename + membership
         // insert in a transaction with a row-level lock so two concurrent
@@ -1027,6 +1066,7 @@ builder.mutationField('joinLeagueByCode', (t) =>
           userId,
           teamName,
           permissionLevel: 'general_manager',
+          capCheck: { hasUnlimitedLeagues: joinByCodeUnlimited, limit: 3 },
         });
 
         if ('fullLeague' in claim) {
@@ -1242,7 +1282,8 @@ builder.mutationField('joinLeague', (t) =>
         }
 
         // Enforce the free-tier active-league cap before joining (LS-5172).
-        await requireJoinLeagueCapacity(context, userId);
+        const { hasUnlimitedLeagues: joinUnlimited } =
+          await requireJoinLeagueCapacity(context, userId);
 
         // LS-2497: atomic claim (transaction + row-level lock) — see
         // claimUnassignedTeamForUser above for why this replaces the previous
@@ -1252,6 +1293,7 @@ builder.mutationField('joinLeague', (t) =>
           userId,
           teamName,
           permissionLevel: 'general_manager',
+          capCheck: { hasUnlimitedLeagues: joinUnlimited, limit: 3 },
         });
 
         if ('fullLeague' in claim) {
@@ -2376,7 +2418,8 @@ builder.mutationField('joinPublicLeague', (t) =>
         }
 
         // Enforce the free-tier active-league cap before joining (LS-5172).
-        await requireJoinLeagueCapacity(context, userId);
+        const { hasUnlimitedLeagues: joinPublicUnlimited } =
+          await requireJoinLeagueCapacity(context, userId);
 
         // LS-2497: atomic claim (transaction + row-level lock) — see
         // claimUnassignedTeamForUser above for why this replaces the previous
@@ -2386,6 +2429,7 @@ builder.mutationField('joinPublicLeague', (t) =>
           userId,
           teamName: teamName.trim(),
           permissionLevel: 'general_manager',
+          capCheck: { hasUnlimitedLeagues: joinPublicUnlimited, limit: 3 },
         });
 
         if ('fullLeague' in claim) {

@@ -1,20 +1,21 @@
 /**
  * Unit tests for the free-tier active-league cap on the three join mutations
- * (`joinLeagueByCode`, `joinLeague`, `joinPublicLeague`) — LS-5172.
+ * (`joinLeagueByCode`, `joinLeague`, `joinPublicLeague`) — LS-5172 / LS-5862.
  *
  * Before LS-5172 the `unlimited_leagues` entitlement was enforced only on
  * league creation/renewal, so a free user already at their cap could join
  * unlimited additional leagues via invite code or public join. These tests
- * verify the new `requireJoinLeagueCapacity` guard at the resolver level
- * without a live Postgres connection, mirroring the harness used by
- * `renew-league.spec.ts`.
+ * verify the `requireJoinLeagueCapacity` pre-check and the TOCTOU-safe
+ * in-transaction re-check (added in LS-5862) inside `claimUnassignedTeamForUser`.
  *
- * The guard runs after the resolver confirms the user is not already a member
- * and before the atomic team claim. When the user is below the cap (or holds
- * the `unlimited_leagues` entitlement) the resolver proceeds to the claim,
- * which — with no unassigned team in the mocked DB — reports the league as
- * full. The "league is full" outcome therefore proves the entitlement gate was
- * passed rather than throwing the premium error.
+ * Read sequence per mutation (free-tier, below-cap path):
+ *   league lookup → membership check → subscription tier → pre-check count →
+ *   [transaction] in-tx count (after advisory lock)
+ *
+ * When the user is below the cap (or holds the `unlimited_leagues` entitlement)
+ * the resolver proceeds to the claim, which — with no unassigned team in the
+ * mocked DB — reports the league as full. The "league is full" outcome therefore
+ * proves the entitlement gate was passed rather than throwing the premium error.
  */
 import type { GraphQLSchema } from 'graphql';
 
@@ -127,13 +128,16 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
   // ── joinLeagueByCode ──────────────────────────────────────────────────────
   describe('joinLeagueByCode', () => {
     // Reads in order: league lookup, existing-membership, subscription tier,
-    // active-league count.
+    // pre-check count, in-transaction count (LS-5862 TOCTOU re-check).
+    // The 5th slot is only consumed on the below-cap free path; it is harmless
+    // (and never read) on the at-cap or premium paths.
     function setup(tier: 'free' | 'premium', leagueCount: number) {
       const readQueue: unknown[] = [
         [{ id: 7, name: 'Test League', owner: 99, faabBudgetDefault: 100 }],
         [], // not already a member
         [{ tier }],
-        [{ leagueCount }],
+        [{ leagueCount }], // pre-check (requireJoinLeagueCapacity)
+        [{ leagueCount }], // in-transaction re-check (claimUnassignedTeamForUser)
       ];
       const db = makeChainableDb(readQueue);
       return {
@@ -202,7 +206,8 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
         ],
         [], // not already a member
         [{ tier }],
-        [{ leagueCount }],
+        [{ leagueCount }], // pre-check
+        [{ leagueCount }], // in-transaction re-check (LS-5862)
       ];
       const db = makeChainableDb(readQueue);
       return {
@@ -265,7 +270,8 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
         ],
         [], // not already a member
         [{ tier }],
-        [{ leagueCount }],
+        [{ leagueCount }], // pre-check
+        [{ leagueCount }], // in-transaction re-check (LS-5862)
       ];
       const db = makeChainableDb(readQueue);
       return {
