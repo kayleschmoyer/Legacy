@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
@@ -91,6 +91,25 @@ export const CommishTab: React.FC<CommishTabProps> = ({
   const [waiverSuccess, setWaiverSuccess] = useState<string | null>(null);
   const [waiverError, setWaiverError] = useState<string | null>(null);
   const leagueId = league.id ?? 0;
+
+  useEffect(() => {
+    if (!waiverSuccess) return;
+    const id = setTimeout(() => setWaiverSuccess(null), 5000);
+    return () => clearTimeout(id);
+  }, [waiverSuccess]);
+
+  useEffect(() => {
+    if (!waiverError) return;
+    const id = setTimeout(() => setWaiverError(null), 5000);
+    return () => clearTimeout(id);
+  }, [waiverError]);
+
+  useEffect(() => {
+    if (openId !== 'waivers') {
+      setWaiverSuccess(null);
+      setWaiverError(null);
+    }
+  }, [openId]);
 
   const {
     profile: scoringProfile,
