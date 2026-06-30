@@ -4,19 +4,48 @@
  * Mirrors the logic in scripts/audit-session-bash.py — see that file for the
  * canonical project-slug rules. Kept in TypeScript so MCP tools that need to
  * scan transcripts can do so without shelling out to Python.
+ *
+ * Cross-platform: works on Linux/macOS (homedir path) and Windows (APPDATA path).
  */
 
 import { homedir } from 'node:os';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, resolve, sep } from 'node:path';
 
-/** Locate the ~/.claude/projects directory; throws if it does not exist. */
+/**
+ * Locate the Claude Code projects directory, probing platform-appropriate
+ * paths so the tool works in both local Windows sessions and Linux/macOS/cloud
+ * environments.
+ *
+ * Search order:
+ *   1. $CLAUDE_PROJECTS_DIR env-var override (useful for custom installs / tests)
+ *   2. ~/.claude/projects  (Linux, macOS, Windows Git-Bash / WSL)
+ *   3. %APPDATA%\Claude\projects  (native Windows Claude Code install)
+ */
 export function findClaudeProjectsDir(): string {
-  const dir = join(homedir(), '.claude', 'projects');
-  if (!existsSync(dir)) {
-    throw new Error(`Could not find Claude projects directory: ${dir}`);
+  const candidates: string[] = [];
+
+  const envOverride = process.env['CLAUDE_PROJECTS_DIR'];
+  if (envOverride) {
+    candidates.push(envOverride);
   }
-  return dir;
+
+  candidates.push(join(homedir(), '.claude', 'projects'));
+
+  const appData = process.env['APPDATA'];
+  if (appData) {
+    candidates.push(join(appData, 'Claude', 'projects'));
+  }
+
+  for (const dir of candidates) {
+    if (existsSync(dir)) {
+      return dir;
+    }
+  }
+
+  throw new Error(
+    `Could not find Claude projects directory. Tried: ${candidates.join(', ')}`,
+  );
 }
 
 /**
