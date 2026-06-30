@@ -1797,7 +1797,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
       } = args.input;
       const userId = context.user.id;
 
-      // Verify user is General Manager or commissioner
+      // Verify user is commissioner
       const membership = await context.db
         .select({
           permissionLevel: PublicSchema.leagueMembers.permissionLevel,
@@ -1815,14 +1815,8 @@ builder.mutationField('updateLeagueSettings', (t) =>
         throw ForbiddenError('You are not a member of this league');
       }
 
-      // Both 'general_manager' and 'commissioner' can update settings
-      if (
-        membership[0].permissionLevel !== 'general_manager' &&
-        membership[0].permissionLevel !== 'commissioner'
-      ) {
-        throw ForbiddenError(
-          'Only a general manager or commissioner can update league settings',
-        );
+      if (membership[0].permissionLevel !== 'commissioner') {
+        throw ForbiddenError('Only a commissioner can update league settings');
       }
 
       // Build change descriptions for the chat notification
