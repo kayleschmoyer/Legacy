@@ -413,6 +413,13 @@
       "lib/shared-components/src/features/baseball/**",
       "lambdas/db/src/**"
     ],
+    "apps/web-e2e/src/tests/overview-tab.spec.ts": [
+      "apps/web/src/pages/baseball/league-detail-v2/**",
+      "apps/web/src/features/baseball/**",
+      "lib/shared-components/src/features/leagues/**",
+      "lib/shared-components/src/features/baseball/**",
+      "lambdas/db/src/**"
+    ],
     "apps/web-e2e/src/tests/league-limit-indicator.spec.ts": [
       "apps/web/src/components/baseball/**",
       "apps/web/src/pages/baseball/**",
