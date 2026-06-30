@@ -85,6 +85,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
       onViewLeague: (id: number) => void;
       onInviteFriends?: () => void;
       onSignIn?: () => void;
+      onAdvancedCreate?: (leagueName: string) => void;
     }) => (
       <View testID="mlb-home">
         <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
@@ -107,6 +108,12 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
         </Pressable>
         <Pressable testID="sign-in" onPress={() => props.onSignIn?.()}>
           <Text>sign-in</Text>
+        </Pressable>
+        <Pressable
+          testID="advanced-create"
+          onPress={() => props.onAdvancedCreate?.('My League')}
+        >
+          <Text>advanced-create</Text>
         </Pressable>
         <Pressable
           testID="cap-upgrade"
@@ -350,6 +357,12 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
           params: { leagueId: 99 },
         }),
       );
+    });
+
+    it('navigates to the advanced LeagueCreatePage when onAdvancedCreate is called (LS-5818)', () => {
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('advanced-create'));
+      expect(mockPush).toHaveBeenCalledWith('/baseball/league/create');
     });
 
     it('navigates to join-by-code', () => {

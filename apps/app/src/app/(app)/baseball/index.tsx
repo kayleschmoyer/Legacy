@@ -203,6 +203,7 @@ export default function BaseballHome() {
             params: { leagueId: id },
           })
         }
+        onAdvancedCreate={() => router.push('/baseball/league/create')}
         onInviteFriends={openInviteModal}
         onBrowsePlayers={() => router.navigate('/baseball/players')}
         isPremium={isPremium && !subscriptionLoading && leaguesLoaded}
