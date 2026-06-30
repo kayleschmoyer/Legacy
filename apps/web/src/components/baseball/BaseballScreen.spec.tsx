@@ -41,10 +41,14 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+interface MLBHomeHarnessPropsExtended extends MLBHomeHarnessProps {
+  onMockDraft?: () => void;
+}
+
 // Capture the props the wrapper feeds into the shared component and expose
 // buttons that fire its callbacks so we can assert the data wiring.
 jest.mock('@legacy-sports/shared-components/baseball', () => ({
-  MLBHome: (props: MLBHomeHarnessProps) => (
+  MLBHome: (props: MLBHomeHarnessPropsExtended) => (
     <div data-testid="mlb-home">
       <span>userName:{props.userName}</span>
       <span>loading:{String(props.loading)}</span>
@@ -54,6 +58,9 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
       <span data-testid="at-limit">{String(!!props.leagueCap?.atLimit)}</span>
       <button onClick={() => props.onViewLeague(7)}>view</button>
       <button onClick={() => props.onJoinLeague()}>join</button>
+      {props.onMockDraft ? (
+        <button onClick={() => props.onMockDraft?.()}>mock-draft</button>
+      ) : null}
       <button
         onClick={() =>
           void props.onCreateLeague({
@@ -183,6 +190,12 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/7');
     fireEvent.click(screen.getByText('join'));
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/join');
+  });
+
+  it('wires onMockDraft to navigate to /baseball/mock-draft', () => {
+    render(<BaseballScreen />);
+    fireEvent.click(screen.getByText('mock-draft'));
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft');
   });
 });
 
