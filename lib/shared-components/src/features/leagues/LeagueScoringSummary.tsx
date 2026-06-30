@@ -95,12 +95,6 @@ function multiplierColor(value: number, isOverride: boolean): string {
   return '$gray10';
 }
 
-const chipContainerStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-};
-
 export function LeagueScoringSummary(
   props: LeagueScoringSummaryProps,
 ): React.JSX.Element {
@@ -249,7 +243,7 @@ export function LeagueScoringSummary(
                 </XStack>
 
                 {/* Stat chips */}
-                <div style={chipContainerStyle}>
+                <XStack flexWrap="wrap" gap="$2">
                   {entries.map(([key, value]) => {
                     const numValue = value;
                     const defaultValue = defaults[group.key][key];
@@ -295,7 +289,7 @@ export function LeagueScoringSummary(
                       </XStack>
                     );
                   })}
-                </div>
+                </XStack>
               </YStack>
             );
           })}
