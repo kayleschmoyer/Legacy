@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { getToken, invalidateToken, getRepoOwnerName } from '../auth.js';
 import type { ToolResult } from '../types.js';
 
 interface PrDiffParams {
@@ -6,47 +6,69 @@ interface PrDiffParams {
   maxBytes?: number;
 }
 
-const GH_CMD = process.platform === 'win32' ? 'gh.exe' : 'gh';
-
 const DEFAULT_MAX_BYTES = 500_000;
-const MAX_BUFFER_BYTES = 20 * 1024 * 1024; // 20 MB hard cap for execFile buffer
+const BASE_URL = 'https://api.github.com';
+const API_VERSION = '2022-11-28';
 
-export function prDiff(params: PrDiffParams): Promise<ToolResult> {
-  const maxBytes = params.maxBytes ?? DEFAULT_MAX_BYTES;
-  return new Promise((resolve) => {
-    execFile(
-      GH_CMD,
-      ['pr', 'diff', String(params.prNumber)],
-      { timeout: 30_000, shell: false, maxBuffer: MAX_BUFFER_BYTES },
-      (err, stdout, stderr) => {
-        if (err) {
-          resolve({
-            isError: true,
-            content: [
-              {
-                type: 'text',
-                text: `Failed to get diff for PR #${params.prNumber}: ${stderr || err.message}`,
-              },
-            ],
-          });
-          return;
-        }
-
-        const diff =
-          stdout.length > maxBytes ? stdout.slice(0, maxBytes) : stdout;
-        const truncated = stdout.length > maxBytes;
-
-        resolve({
-          content: [
-            {
-              type: 'text',
-              text: truncated
-                ? `${diff}\n\n[Diff truncated at ${maxBytes} bytes. Use maxBytes to increase the limit.]`
-                : diff,
-            },
-          ],
-        });
-      },
-    );
+async function fetchPrDiff(
+  owner: string,
+  repoName: string,
+  prNumber: number,
+  canRetry: boolean,
+): Promise<string> {
+  const token = await getToken();
+  const url = `${BASE_URL}/repos/${owner}/${repoName}/pulls/${prNumber}`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github.diff',
+      'X-GitHub-Api-Version': API_VERSION,
+    },
   });
+
+  if (response.status === 401 && canRetry) {
+    await invalidateToken();
+    return fetchPrDiff(owner, repoName, prNumber, false);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `GitHub API GET /repos/${owner}/${repoName}/pulls/${prNumber} failed (${response.status}): ${text.slice(0, 2000)}`,
+    );
+  }
+
+  return response.text();
+}
+
+export async function prDiff(params: PrDiffParams): Promise<ToolResult> {
+  const maxBytes = params.maxBytes ?? DEFAULT_MAX_BYTES;
+  try {
+    const repo = await getRepoOwnerName();
+    const raw = await fetchPrDiff(repo.owner, repo.name, params.prNumber, true);
+
+    const truncated = raw.length > maxBytes;
+    const diff = truncated ? raw.slice(0, maxBytes) : raw;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: truncated
+            ? `${diff}\n\n[Diff truncated at ${maxBytes} bytes. Pass a larger maxBytes to see more.]`
+            : diff,
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `Failed to get diff for PR #${params.prNumber}: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
 }
