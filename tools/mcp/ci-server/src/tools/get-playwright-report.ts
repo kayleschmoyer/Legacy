@@ -14,14 +14,41 @@ import {
  * HTML report (one HTTP GET, no zip inflation); when it is absent — historical
  * reports, or runs that predate the reporter — we inflate the embedded
  * report.json and render the identical layout server-side.
+ *
+ * Resolution priority when multiple params are provided:
+ *   prNumber → "pr-{n}"  (most specific — targets the PR's latest E2E run)
+ *   runId    → "{id}"    (numeric, auto-expanded to nightly-/manual- fallbacks)
+ *   reportName           (exact name, also numeric-expanded when all-digits)
  */
 /** Numeric-only run IDs resolve to nightly-{id} or manual-{id} on GH Pages. */
 const NUMERIC_ID_RE = /^\d+$/;
 
 export async function getPlaywrightReport(params: {
-  reportName: string;
+  reportName?: string;
+  prNumber?: number;
+  runId?: number;
 }): Promise<ToolResult> {
-  const { reportName } = params;
+  const { prNumber, runId } = params;
+
+  // Resolve the effective report name from whichever resolution input was given.
+  const reportName =
+    prNumber !== undefined
+      ? `pr-${prNumber}`
+      : runId !== undefined
+        ? String(runId)
+        : params.reportName;
+
+  if (!reportName) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'One of prNumber, runId, or reportName is required.',
+        },
+      ],
+    };
+  }
 
   // Try the name directly; for bare numeric run IDs also try nightly-{id} and
   // manual-{id} — the CI workflow deploys under those prefixes.

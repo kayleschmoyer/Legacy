@@ -213,3 +213,58 @@ describe('getPlaywrightReport — rendered fallback', () => {
     expect(result.content[0].text).toBe('boom');
   });
 });
+
+describe('getPlaywrightReport — missing params guard', () => {
+  it('returns an error when no resolution input is provided', async () => {
+    const result = await getPlaywrightReport({});
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('required');
+  });
+});
+
+describe('getPlaywrightReport — prNumber resolution', () => {
+  it('resolves prNumber to pr-{n} and fetches the summary', async () => {
+    mockSummary.mockResolvedValue('# E2E Report — ✅ PASSED\n\nfrom pr');
+
+    const result = await getPlaywrightReport({ prNumber: 5271 });
+
+    expect(mockSummary).toHaveBeenCalledWith('pr-5271');
+    expect(result.content[0].text).toContain('from pr');
+  });
+
+  it('falls back to report.json when no summary for prNumber', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({
+      stats: {
+        total: 1,
+        expected: 1,
+        unexpected: 0,
+        flaky: 0,
+        skipped: 0,
+        ok: true,
+      },
+      files: [],
+    });
+
+    const result = await getPlaywrightReport({ prNumber: 42 });
+
+    expect(mockFetch).toHaveBeenCalledWith('pr-42');
+    expect(result.content[0].text).toContain('# E2E Report');
+  });
+});
+
+describe('getPlaywrightReport — runId resolution', () => {
+  it('resolves runId by numeric expansion (nightly-/manual- fallbacks)', async () => {
+    // First call (bare id) returns null; second (nightly-{id}) returns summary.
+    mockSummary
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('# E2E Report — ✅ PASSED\n\nnightly');
+    mockFetch.mockResolvedValue({ error: 'not found' });
+
+    const result = await getPlaywrightReport({ runId: 99999 });
+
+    expect(mockSummary).toHaveBeenNthCalledWith(1, '99999');
+    expect(mockSummary).toHaveBeenNthCalledWith(2, 'nightly-99999');
+    expect(result.content[0].text).toContain('nightly');
+  });
+});

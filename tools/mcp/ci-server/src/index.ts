@@ -441,9 +441,11 @@ export function createServer(): McpServer {
       'Returns overall stats (total/passed/failed/skipped/flaky), per-file breakdowns, ' +
       'lists of failed/flaky test titles, and a skippedTests array with { name, file, reason } ' +
       'for every skipped test (reason comes from the test annotation description). ' +
-      'When reportName is a bare numeric run ID, automatically tries nightly-{id} and manual-{id} as fallbacks ' +
-      'so you do not need to know the exact deployed name. ' +
-      'Example: ci_get_playwright_report({ reportName: "pr-2173" })',
+      'Pass prNumber to auto-resolve the report for a PR (e.g. { prNumber: 5271 }). ' +
+      'Pass runId to auto-resolve by GitHub Actions run ID (auto-expanded to nightly-/manual- fallbacks). ' +
+      'Pass reportName when you already know the exact deployed name (e.g. "pr-2173", "manual-146"). ' +
+      'At least one of prNumber, runId, or reportName is required. If multiple are provided, prNumber takes precedence, then runId, then reportName. ' +
+      'Examples: ci_get_playwright_report({ prNumber: 5271 }) · ci_get_playwright_report({ runId: 12345678 }) · ci_get_playwright_report({ reportName: "pr-2173" })',
     {
       reportName: z
         .string()
@@ -451,11 +453,45 @@ export function createServer(): McpServer {
           /^[\w.-]+$/,
           'reportName must contain only alphanumeric characters, hyphens, underscores, and dots — no path separators or special characters allowed',
         )
+        .optional()
         .describe(
-          'Report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), "nightly-{run_id}" for nightly runs, or a bare numeric GitHub run ID (auto-expanded to nightly-/manual- fallbacks).',
+          'Exact report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), "nightly-{run_id}" for nightly runs, or a bare numeric GitHub run ID (auto-expanded to nightly-/manual- fallbacks). Omit when using prNumber or runId.',
+        ),
+      prNumber: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'GitHub PR number. Auto-resolves to the report deployed under "pr-{prNumber}". Use this when triaging CI failures on a specific PR.',
+        ),
+      runId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'GitHub Actions workflow run ID. Auto-expanded to nightly-{id} or manual-{id} fallbacks when not found directly.',
         ),
     },
-    async (params) => getPlaywrightReport(params),
+    async (params) => {
+      if (
+        params.prNumber === undefined &&
+        params.runId === undefined &&
+        params.reportName === undefined
+      ) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text' as const,
+              text: 'One of prNumber, runId, or reportName is required.',
+            },
+          ],
+        };
+      }
+      return getPlaywrightReport(params);
+    },
   );
 
   server.tool(
