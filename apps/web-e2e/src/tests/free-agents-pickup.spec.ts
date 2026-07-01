@@ -404,9 +404,11 @@ test.describe('Free Agents — search and filter @critical', () => {
     await page.goto(FREE_AGENTS_URL);
     await page.waitForLoadState('load');
 
-    // Click on the "SS" position filter chip (use role=button to avoid matching
-    // the Silver Slugger "SS" accolade badges rendered inside player rows)
-    await page.getByRole('button', { name: 'SS', exact: true }).click();
+    // Click on the "SS" position filter chip. aria-label is "Filter by position: SS"
+    // which avoids ambiguity with Silver Slugger "SS" accolade text in player rows.
+    await page
+      .getByRole('button', { name: 'Filter by position: SS', exact: true })
+      .click();
 
     // Wait for the query to fire with the new position filter
     await expect.poll(() => queryPositions, { timeout: 5000 }).toContain('SS');

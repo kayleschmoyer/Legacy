@@ -311,29 +311,33 @@ const FilterPill: React.FC<{
   active: boolean;
   onPress: () => void;
   testID?: string;
-}> = ({ label, active, onPress, testID }) => (
-  <Text
-    testID={testID}
-    onPress={onPress}
-    tabIndex={0}
-    onKeyDown={keyActivate(onPress)}
-    paddingHorizontal="$2.5"
-    paddingVertical="$1"
-    borderRadius="$10"
-    fontSize={12}
-    fontWeight={active ? '700' : '500'}
-    backgroundColor={active ? '$brandNavy' : '$surfaceCard'}
-    color={active ? 'white' : '$textMuted'}
-    borderWidth={1}
-    borderColor={active ? '$brandNavy' : '$surfacePanelBorder'}
-    pressStyle={{ opacity: 0.7 }}
-    accessibilityRole="button"
-    accessibilityLabel={label === 'ALL' ? 'All positions' : label}
-    accessibilityState={{ selected: active }}
-  >
-    {label}
-  </Text>
-);
+}> = ({ label, active, onPress, testID }) => {
+  const ariaLabel =
+    label === 'ALL' ? 'All positions' : `Filter by position: ${label}`;
+  return (
+    <Text
+      testID={testID}
+      onPress={onPress}
+      tabIndex={0}
+      onKeyDown={keyActivate(onPress)}
+      paddingHorizontal="$2.5"
+      paddingVertical="$1"
+      borderRadius="$10"
+      fontSize={12}
+      fontWeight={active ? '700' : '500'}
+      backgroundColor={active ? '$brandNavy' : '$surfaceCard'}
+      color={active ? 'white' : '$textMuted'}
+      borderWidth={1}
+      borderColor={active ? '$brandNavy' : '$surfacePanelBorder'}
+      pressStyle={{ opacity: 0.7 }}
+      accessibilityRole="button"
+      aria-pressed={active}
+      aria-label={ariaLabel}
+    >
+      {label}
+    </Text>
+  );
+};
 
 const GroupToggle: React.FC<{
   label: string;
@@ -356,7 +360,7 @@ const GroupToggle: React.FC<{
     pressStyle={{ opacity: 0.7 }}
     accessibilityRole="button"
     accessibilityLabel={label}
-    accessibilityState={{ selected: active }}
+    aria-pressed={active}
   >
     {label}
   </Text>
@@ -636,7 +640,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 6, paddingVertical: 2 }}
           >
-            <XStack gap="$1.5">
+            <XStack gap="$1.5" role="group" aria-label="Position filter">
               {positions.map((p) => (
                 <FilterPill
                   key={p}
