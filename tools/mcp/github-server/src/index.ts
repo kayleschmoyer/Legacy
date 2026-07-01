@@ -13,7 +13,6 @@ import type { TokenSource } from './auth.js';
 import type { ToolResult } from './types.js';
 import { closePR } from './tools/close-pr.js';
 import { createLabel } from './tools/create-label.js';
-import { createPR } from './tools/create-pr.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
 import { listPRs } from './tools/list-prs.js';
@@ -23,7 +22,6 @@ import { markPRReady } from './tools/mark-pr-ready.js';
 import { mergePR } from './tools/merge-pr.js';
 import { prDashboard } from './tools/pr-dashboard.js';
 import { prScan } from './tools/pr-scan.js';
-import { rebasePR } from './tools/rebase-pr.js';
 import {
   replyToReview,
   resolveReplyToReviewInput,
@@ -505,48 +503,6 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => listLabels(params),
-  );
-
-  // --- github_create_pr ---
-  server.tool(
-    'github_create_pr',
-    'Prefer this over `gh pr create` via shell. Create a pull request. Title should include Jira key. Automatically prepends the structured `<!-- jira-link -->` marker (the source of truth for ticket linkage) to the body: primary key from jiraPrimary, else the first LS-#### in the title, else "none".',
-    {
-      title: z.string().describe('PR title with Jira key'),
-      body: z.string().describe('PR body (markdown)'),
-      jiraPrimary: z
-        .string()
-        .regex(
-          /^(LS-\d+|none)$/,
-          'Must be a single LS-#### key or the literal "none"',
-        )
-        .optional()
-        .describe(
-          'Primary Jira key for the jira-link marker (exactly one, the ticket this PR works on), or "none" for bot/dependabot PRs. Defaults to the first LS-#### key found in the title, falling back to "none".',
-        ),
-      jiraRelated: z
-        .union([z.string(), z.array(z.string())])
-        .optional()
-        .describe(
-          'Optional related Jira keys (array or comma/space-separated string). Informational only — never auto-transitioned by jira-branch-sync.',
-        ),
-      base: z.string().default('main').describe('Base branch (default: main)'),
-      draft: coercedBoolean.default(false).describe('Create as draft'),
-      head: z
-        .string()
-        .optional()
-        .describe(
-          'Remote branch name to use as PR head. If omitted and worktreePath is provided, auto-detected from the local branch name in that worktree (git rev-parse --abbrev-ref HEAD). If omitted and no worktreePath, auto-detected from the upstream tracking ref (git @{upstream}), falling back to the local branch name. Use this when the local branch name differs from the pushed remote branch name.',
-        ),
-      worktreePath: z
-        .string()
-        .refine((p) => !p || /^([A-Za-z]:[/\\]|\/)/.test(p), {
-          message: 'worktreePath must be an absolute path',
-        })
-        .optional()
-        .describe('Worktree path to run gh from'),
-    },
-    async (params) => createPR(params),
   );
 
   // --- github_get_repo_info ---
@@ -1249,16 +1205,6 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => prScan(params),
-  );
-
-  // --- github_rebase_pr ---
-  server.tool(
-    'github_rebase_pr',
-    'Rebase a PR branch onto base and force-push. Returns conflict details on failure.',
-    {
-      number: z.coerce.number().int().positive().describe('PR number'),
-    },
-    async (params) => rebasePR(params),
   );
 
   // --- github_bulk_rebase ---
