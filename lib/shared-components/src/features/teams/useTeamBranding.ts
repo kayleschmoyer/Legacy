@@ -42,13 +42,19 @@ export const initialsFromTeamName = (name?: string | null): string => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-/** Uppercase hex colors so preset comparisons are stable; pass through others. */
+/** Uppercase hex colors so preset comparisons are stable; pass through others.
+ * Bare 3- or 6-char hex strings (e.g. "FF0000" or "F00") are coerced to
+ * #-prefixed form so they render as valid CSS colors instead of being silently
+ * ignored by the browser (LS-5964). */
 export const normalizeTeamColor = (
   c: string | null | undefined,
   fallback: string,
 ): string => {
   if (!c) return fallback;
-  return c.startsWith('#') ? c.toUpperCase() : c;
+  if (c.startsWith('#')) return c.toUpperCase();
+  if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c.toUpperCase()}`;
+  if (/^[0-9A-Fa-f]{3}$/.test(c)) return `#${c.toUpperCase()}`;
+  return c;
 };
 
 /** Minimal team shape the editor seeds from. */
