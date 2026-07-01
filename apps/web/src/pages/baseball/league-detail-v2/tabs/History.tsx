@@ -94,7 +94,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
     error: recordsError,
   } = useGetAllTimeRecordsQuery({
     variables: { leagueId },
-    skip: !leagueId,
+    skip: !leagueId || seasons.length === 0,
     errorPolicy: 'all',
   });
 
