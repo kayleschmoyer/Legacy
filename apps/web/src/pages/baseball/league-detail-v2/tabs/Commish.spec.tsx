@@ -47,10 +47,16 @@ jest.mock('../../../../lib/scoring', () => ({
   }),
 }));
 
-// --- generated enums -------------------------------------------------------
+// --- generated enums + queries ---------------------------------------------
+let mockAuditLogsResult: { data: any; loading: boolean; error: any } = {
+  data: undefined,
+  loading: false,
+  error: undefined,
+};
 jest.mock('@legacy-sports/graphql', () => ({
   DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   Sport: { Baseball: 'baseball', Football: 'football' },
+  useGetCommissionerAuditLogsQuery: () => mockAuditLogsResult,
 }));
 
 // --- heavy sub-components --------------------------------------------------
@@ -248,5 +254,104 @@ describe('CommishTab — DraftSettingsControl premium wiring (LS-5017)', () => {
       'data-ispremium',
       'true',
     );
+  });
+});
+
+describe('CommishTab — AuditLogPanel (LS-5921)', () => {
+  afterEach(() => {
+    mockAuditLogsResult = { data: undefined, loading: false, error: undefined };
+  });
+
+  const openAuditLog = () => {
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByText('Audit Log'));
+  };
+
+  it('renders "Audit Log" accordion section', () => {
+    renderCommish({ sport: 'baseball' });
+    expect(screen.getByText('Audit Log')).toBeInTheDocument();
+  });
+
+  it('shows loading state when query is in flight and no data yet', () => {
+    mockAuditLogsResult = { data: undefined, loading: true, error: undefined };
+    openAuditLog();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+  });
+
+  it('shows error message when query fails', () => {
+    mockAuditLogsResult = {
+      data: undefined,
+      loading: false,
+      error: new Error('network error'),
+    };
+    openAuditLog();
+    expect(screen.getByText('Failed to load audit log.')).toBeInTheDocument();
+  });
+
+  it('shows empty-state message when there are no audit log entries', () => {
+    mockAuditLogsResult = {
+      data: { commissionerAuditLogs: [] },
+      loading: false,
+      error: undefined,
+    };
+    openAuditLog();
+    expect(
+      screen.getByText('No commissioner actions recorded yet.'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders audit log entries with action label and reason', () => {
+    mockAuditLogsResult = {
+      data: {
+        commissionerAuditLogs: [
+          {
+            id: 1,
+            action: 'force_add',
+            reason: 'Test reason',
+            createdAt: '2024-01-15T12:00:00Z',
+          },
+        ],
+      },
+      loading: false,
+      error: undefined,
+    };
+    openAuditLog();
+    expect(screen.getByText('Force Add')).toBeInTheDocument();
+    expect(screen.getByText('Reason: Test reason')).toBeInTheDocument();
+  });
+
+  it('shows "Load more" button when returned entries equal the page size', () => {
+    const entries = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      action: 'force_drop',
+      reason: null,
+      createdAt: '2024-01-15T12:00:00Z',
+    }));
+    mockAuditLogsResult = {
+      data: { commissionerAuditLogs: entries },
+      loading: false,
+      error: undefined,
+    };
+    openAuditLog();
+    expect(screen.getByText('Load more')).toBeInTheDocument();
+  });
+
+  it('hides "Load more" button when fewer entries than page size are returned', () => {
+    mockAuditLogsResult = {
+      data: {
+        commissionerAuditLogs: [
+          {
+            id: 1,
+            action: 'force_add',
+            reason: null,
+            createdAt: '2024-01-15T12:00:00Z',
+          },
+        ],
+      },
+      loading: false,
+      error: undefined,
+    };
+    openAuditLog();
+    expect(screen.queryByText('Load more')).not.toBeInTheDocument();
   });
 });

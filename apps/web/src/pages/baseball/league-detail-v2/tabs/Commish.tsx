@@ -6,6 +6,7 @@ import {
   type LeagueFragment,
   Sport,
   type TeamFragment,
+  useGetCommissionerAuditLogsQuery,
 } from '@legacy-sports/graphql';
 import {
   useCurrentWeek,
@@ -77,6 +78,120 @@ const Accord: React.FC<{
     ) : null}
   </div>
 );
+
+const ACTION_LABELS: Record<string, string> = {
+  force_add: 'Force Add',
+  force_drop: 'Force Drop',
+  lock_team: 'Lock Team',
+  unlock_team: 'Unlock Team',
+  bulk_drop_players: 'Bulk Drop',
+  recalculate_scores: 'Recalculate Scores',
+};
+
+const AUDIT_PAGE_SIZE = 25;
+
+function AuditLogPanel({ leagueId }: { leagueId: number }) {
+  const [limit, setLimit] = useState(AUDIT_PAGE_SIZE);
+  const { data, loading, error } = useGetCommissionerAuditLogsQuery({
+    variables: { leagueId, limit },
+    fetchPolicy: 'cache-and-network',
+  });
+
+  const logs = [...(data?.commissionerAuditLogs ?? [])].sort((a, b) => {
+    const dateA = a.createdAt ? new Date(String(a.createdAt)).getTime() : 0;
+    const dateB = b.createdAt ? new Date(String(b.createdAt)).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  const hasMore = logs.length === limit;
+
+  if (loading && logs.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '24px 16px',
+          textAlign: 'center',
+          color: 'var(--fg3)',
+          fontSize: 13,
+        }}
+      >
+        Loading…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '12px 16px', color: '#c41e3a', fontSize: 13 }}>
+        Failed to load audit log.
+      </div>
+    );
+  }
+
+  if (logs.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '24px 16px',
+          textAlign: 'center',
+          color: 'var(--fg3)',
+          fontSize: 13,
+        }}
+      >
+        No commissioner actions recorded yet.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {logs.map((log) => (
+        <div
+          key={log.id}
+          style={{
+            background: 'var(--surface2)',
+            border: '1px solid var(--border1)',
+            borderRadius: 6,
+            padding: '10px 12px',
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: 13 }}>
+            {log.action ? (ACTION_LABELS[log.action] ?? log.action) : ''}
+          </div>
+          {log.reason ? (
+            <div style={{ fontSize: 12, color: 'var(--fg2)', marginTop: 2 }}>
+              Reason: {log.reason}
+            </div>
+          ) : null}
+          <div style={{ fontSize: 11, color: 'var(--fg3)', marginTop: 4 }}>
+            {log.createdAt
+              ? new Date(String(log.createdAt)).toLocaleString()
+              : ''}
+          </div>
+        </div>
+      ))}
+      {hasMore ? (
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => setLimit((prev) => prev + AUDIT_PAGE_SIZE)}
+          style={{
+            marginTop: 4,
+            padding: '8px 16px',
+            fontSize: 13,
+            color: 'var(--fg2)',
+            background: 'var(--surface2)',
+            border: '1px solid var(--border1)',
+            borderRadius: 6,
+            cursor: loading ? 'default' : 'pointer',
+          }}
+        >
+          {loading ? 'Loading…' : 'Load more'}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 export interface CommishTabProps {
   league: LeagueFragment;
@@ -363,6 +478,13 @@ export const CommishTab: React.FC<CommishTabProps> = ({
           />
         </PremiumGate>
       ) : null,
+    },
+    {
+      id: 'audit-log',
+      label: 'Audit Log',
+      iconClass: 'gold',
+      icon: <I.List size={16} />,
+      content: leagueId ? <AuditLogPanel leagueId={leagueId} /> : null,
     },
     {
       id: 'danger',
