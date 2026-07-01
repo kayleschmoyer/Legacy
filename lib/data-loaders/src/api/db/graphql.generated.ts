@@ -4327,6 +4327,7 @@ export type TeamStanding = {
   averagePointsAgainst?: Maybe<Scalars['Float']['output']>;
   averagePointsFor?: Maybe<Scalars['Float']['output']>;
   divisionId?: Maybe<Scalars['Int']['output']>;
+  divisionName?: Maybe<Scalars['String']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
   pointsAgainst?: Maybe<Scalars['Float']['output']>;
   pointsFor?: Maybe<Scalars['Float']['output']>;

@@ -704,6 +704,68 @@ describe('Matchup History', () => {
     });
   });
 
+  describe('divisionName computation in calculateStandings', () => {
+    const noMatchups: SimpleMatchup[] = [];
+
+    it('sets divisionName to null when no divisions are assigned', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A', divisionId: null },
+        { id: 2, name: 'Team B', divisionId: null },
+      ];
+      mockDb = buildStandingsMockDb(mockTeams, noMatchups);
+      const standings = await calculateStandings(mockDb, 1);
+      for (const s of standings) {
+        expect(s.divisionName).toBeNull();
+      }
+    });
+
+    it('assigns "Division 1" when only one division exists', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A', divisionId: 1 },
+        { id: 2, name: 'Team B', divisionId: 1 },
+      ];
+      mockDb = buildStandingsMockDb(mockTeams, noMatchups);
+      const standings = await calculateStandings(mockDb, 1);
+      for (const s of standings) {
+        expect(s.divisionName).toBe('Division 1');
+      }
+    });
+
+    it('assigns ordinal labels "Division 1" and "Division 2" for two divisions', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A', divisionId: 1 },
+        { id: 2, name: 'Team B', divisionId: 1 },
+        { id: 3, name: 'Team C', divisionId: 2 },
+        { id: 4, name: 'Team D', divisionId: 2 },
+      ];
+      mockDb = buildStandingsMockDb(mockTeams, noMatchups);
+      const standings = await calculateStandings(mockDb, 1);
+      const div1Teams = standings.filter((s) => s.divisionId === 1);
+      const div2Teams = standings.filter((s) => s.divisionId === 2);
+      expect(div1Teams.every((s) => s.divisionName === 'Division 1')).toBe(
+        true,
+      );
+      expect(div2Teams.every((s) => s.divisionName === 'Division 2')).toBe(
+        true,
+      );
+    });
+
+    it('derives ordinal from sorted rank so non-sequential IDs label correctly', async () => {
+      // divisionIds 3 and 7 → sorted rank 1 and 2 → "Division 1" and "Division 2"
+      const mockTeams = [
+        { id: 1, name: 'Team A', divisionId: 7 },
+        { id: 2, name: 'Team B', divisionId: 3 },
+        { id: 3, name: 'Team C', divisionId: 3 },
+      ];
+      mockDb = buildStandingsMockDb(mockTeams, noMatchups);
+      const standings = await calculateStandings(mockDb, 1);
+      const div3 = standings.filter((s) => s.divisionId === 3);
+      const div7 = standings.filter((s) => s.divisionId === 7);
+      expect(div3.every((s) => s.divisionName === 'Division 1')).toBe(true);
+      expect(div7.every((s) => s.divisionName === 'Division 2')).toBe(true);
+    });
+  });
+
   describe('getSeasonResults', () => {
     it('should return complete season summary', async () => {
       const mockTeams = [

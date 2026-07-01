@@ -373,10 +373,12 @@ export function StandingsTable({
       new Set(standings.map((s) => s.divisionId ?? 0)),
     ).sort((a, b) => a - b);
 
-    return uniqueIds.map((divId) => {
+    return uniqueIds.map((divId, idx) => {
       const divTeams = standings.filter((s) => (s.divisionId ?? 0) === divId);
+      const name = divTeams[0]?.divisionName ?? `Division ${idx + 1}`;
       return {
         divisionId: divId,
+        divisionName: name,
         teams: sortStandings(divTeams, sortKey, sortDirection),
       };
     });
@@ -585,13 +587,13 @@ export function StandingsTable({
                 marginBottom="$1"
               >
                 <Text fontSize="$3" fontWeight="700" color="$gray11">
-                  Division {group.divisionId}
+                  {group.divisionName}
                 </Text>
               </XStack>
               <YStack
                 tag="table"
                 role="table"
-                aria-label={`${title} — Division ${group.divisionId}`}
+                aria-label={`${title} — ${group.divisionName}`}
               >
                 <HeaderRow />
                 <YStack tag="tbody" role="rowgroup">

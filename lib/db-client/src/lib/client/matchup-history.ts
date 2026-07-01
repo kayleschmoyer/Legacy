@@ -42,6 +42,8 @@ export interface TeamStanding {
   secondaryColor?: string | null;
   /** Division this team belongs to; null means the league has no divisions */
   divisionId?: number | null;
+  /** Human-readable division label (e.g. "Division 1"); null when no divisions */
+  divisionName?: string | null;
 }
 
 /**
@@ -288,9 +290,22 @@ async function _computeStandings(
     return [];
   }
 
+  // Build a sorted ordinal map so division labels read "Division 1", "Division 2", …
+  // regardless of the raw integer IDs stored in the DB.
+  const sortedDivisionIds = Array.from(
+    new Set(
+      teams.map((t) => t.divisionId).filter((id): id is number => id != null),
+    ),
+  ).sort((a, b) => a - b);
+  const divisionOrdinal = new Map(
+    sortedDivisionIds.map((id, idx) => [id, idx + 1]),
+  );
+
   // Initialize standings map
   const standingsMap = new Map<number, TeamStanding>();
   for (const team of teams) {
+    const divId = team.divisionId ?? null;
+    const ordinal = divId != null ? (divisionOrdinal.get(divId) ?? null) : null;
     standingsMap.set(team.id, {
       teamId: team.id,
       teamName: team.name,
@@ -306,7 +321,8 @@ async function _computeStandings(
       avatarUrl: team.avatarUrl,
       primaryColor: team.primaryColor,
       secondaryColor: team.secondaryColor,
-      divisionId: team.divisionId ?? null,
+      divisionId: divId,
+      divisionName: ordinal != null ? `Division ${ordinal}` : null,
     });
   }
 

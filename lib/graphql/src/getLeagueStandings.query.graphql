@@ -12,5 +12,6 @@ query GetLeagueStandings($leagueId: Int!) {
     primaryColor
     secondaryColor
     divisionId
+    divisionName
   }
 }

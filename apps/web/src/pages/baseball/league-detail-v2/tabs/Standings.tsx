@@ -68,6 +68,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         pointsFor: null,
         pointsAgainst: null,
         divisionId: null,
+        divisionName: null,
       }));
   }, [standings, teams]);
 

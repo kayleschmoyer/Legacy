@@ -4356,6 +4356,7 @@ type TeamStanding {
   averagePointsAgainst: Float
   averagePointsFor: Float
   divisionId: Int
+  divisionName: String
   losses: Int
   pointsAgainst: Float
   pointsFor: Float

@@ -4333,6 +4333,7 @@ export type TeamStanding = {
   averagePointsAgainst?: Maybe<Scalars['Float']['output']>;
   averagePointsFor?: Maybe<Scalars['Float']['output']>;
   divisionId?: Maybe<Scalars['Int']['output']>;
+  divisionName?: Maybe<Scalars['String']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
   pointsAgainst?: Maybe<Scalars['Float']['output']>;
   pointsFor?: Maybe<Scalars['Float']['output']>;
@@ -9886,6 +9887,7 @@ export type GetLeagueStandingsQuery = {
     primaryColor?: string | null;
     secondaryColor?: string | null;
     divisionId?: number | null;
+    divisionName?: string | null;
   }> | null;
 };
 
@@ -24267,6 +24269,7 @@ export const GetLeagueStandings = gql`
       primaryColor
       secondaryColor
       divisionId
+      divisionName
     }
   }
 `;
