@@ -39,10 +39,12 @@ import { PremiumGate } from '../../../components/PremiumGate';
 /** Subscribes to page-level WS events that need to refetch league-level data. */
 function LeagueWSPageHandler({
   onDraftStarted,
+  onSubscriptionUpdated,
 }: {
   onDraftStarted: () => void;
+  onSubscriptionUpdated: () => void;
 }) {
-  useLeagueWebSocket({ onDraftStarted });
+  useLeagueWebSocket({ onDraftStarted, onSubscriptionUpdated });
   return null;
 }
 
@@ -322,6 +324,9 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     >
       <LeagueWSPageHandler
         onDraftStarted={() => {
+          void refetchLeague();
+        }}
+        onSubscriptionUpdated={() => {
           void refetchLeague();
         }}
       />
