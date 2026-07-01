@@ -43,12 +43,14 @@ export const TeamTab: React.FC<TeamTabProps> = ({
     currentTeamName,
     trimmedName,
     nameDirty,
+    brandingDirty,
     renaming,
     savingBranding,
     savedFlash,
     presetColors,
     saveName,
     saveBranding,
+    resetBranding,
   } = useTeamBranding({
     teamId: myTeamId,
     leagueId: league.id ?? null,
@@ -301,26 +303,44 @@ export const TeamTab: React.FC<TeamTabProps> = ({
               </div>
             </div>
 
-            <button
-              type="button"
-              className="ls-btn ls-btn-gold block"
-              style={{ marginTop: 14 }}
-              onClick={() => {
-                void saveBranding();
+            <div
+              style={{
+                marginTop: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
               }}
-              disabled={savingBranding}
             >
-              {savedFlash === 'branding' ? (
-                <>
-                  <I.Check size={12} /> Saved
-                </>
-              ) : (
-                <>
-                  <I.Check size={12} />{' '}
-                  {savingBranding ? 'Saving…' : 'Save Branding'}
-                </>
+              <button
+                type="button"
+                className="ls-btn ls-btn-gold block"
+                onClick={() => {
+                  void saveBranding();
+                }}
+                disabled={savingBranding}
+              >
+                {savedFlash === 'branding' ? (
+                  <>
+                    <I.Check size={12} /> Saved
+                  </>
+                ) : (
+                  <>
+                    <I.Check size={12} />{' '}
+                    {savingBranding ? 'Saving…' : 'Save Branding'}
+                  </>
+                )}
+              </button>
+              {brandingDirty && !savingBranding && (
+                <button
+                  type="button"
+                  className="ls-btn ls-btn-ghost"
+                  data-testid="discard-branding"
+                  onClick={resetBranding}
+                >
+                  Discard changes
+                </button>
               )}
-            </button>
+            </div>
           </div>
         </div>
       </Section>

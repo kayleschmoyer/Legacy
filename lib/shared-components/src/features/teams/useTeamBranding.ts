@@ -90,6 +90,8 @@ export interface UseTeamBrandingResult {
   trimmedName: string;
   /** True when the trimmed name is non-empty and differs from the saved name. */
   nameDirty: boolean;
+  /** True when colors or logo differ from the last-persisted values. */
+  brandingDirty: boolean;
   renaming: boolean;
   savingBranding: boolean;
   savedFlash: SavedFlash;
@@ -98,6 +100,8 @@ export interface UseTeamBrandingResult {
   saveName: () => Promise<void>;
   /** Persist colors + logo. No-op when missing ids. */
   saveBranding: () => Promise<void>;
+  /** Reset colors + logo back to the last-persisted values. */
+  resetBranding: () => void;
 }
 
 export function useTeamBranding({
@@ -163,6 +167,23 @@ export function useTeamBranding({
   const currentTeamName = team?.name ?? '';
   const trimmedName = name.trim();
   const nameDirty = trimmedName.length > 0 && trimmedName !== currentTeamName;
+
+  const savedPrimary = normalizeTeamColor(team?.primaryColor, DEFAULT_PRIMARY);
+  const savedSecondary = normalizeTeamColor(
+    team?.secondaryColor,
+    DEFAULT_SECONDARY,
+  );
+  const savedLogoUrl = team?.logoUrl ?? '';
+  const brandingDirty =
+    primaryColor !== savedPrimary ||
+    secondaryColor !== savedSecondary ||
+    logoUrl !== savedLogoUrl;
+
+  const resetBranding = useCallback(() => {
+    setPrimaryColor(savedPrimary);
+    setSecondaryColor(savedSecondary);
+    setLogoUrl(savedLogoUrl);
+  }, [savedPrimary, savedSecondary, savedLogoUrl]);
 
   const reportError = useCallback(
     (err: unknown) => {
@@ -239,11 +260,13 @@ export function useTeamBranding({
     currentTeamName,
     trimmedName,
     nameDirty,
+    brandingDirty,
     renaming,
     savingBranding,
     savedFlash,
     presetColors: TEAM_BRANDING_PRESET_COLORS,
     saveName,
     saveBranding,
+    resetBranding,
   };
 }
