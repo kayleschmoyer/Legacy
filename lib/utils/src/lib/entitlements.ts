@@ -51,6 +51,7 @@ export const ENTITLEMENTS = {
   defensive_sabermetrics: 'defensive_sabermetrics',
   advanced_batting_stats: 'advanced_batting_stats',
   large_player_stats_page_size: 'large_player_stats_page_size',
+  league_history_analytics: 'league_history_analytics',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -92,6 +93,7 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.defensive_sabermetrics,
     ENTITLEMENTS.advanced_batting_stats,
     ENTITLEMENTS.large_player_stats_page_size,
+    ENTITLEMENTS.league_history_analytics,
   ],
 };
 
@@ -119,6 +121,8 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   advanced_batting_stats: 'Advanced batting sabermetrics (OPS, OPS+, BABIP)',
   large_player_stats_page_size:
     'Larger page sizes (250/500 rows) in Player Statistics',
+  league_history_analytics:
+    'Premium league history analytics (championship leaderboard, manager awards)',
 };
 
 export function tierHasEntitlement(

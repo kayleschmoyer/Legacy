@@ -6,6 +6,7 @@ import {
   useGetLeagueHistoryQuery,
   useGetLeagueStandingsQuery,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { safeCssColor } from '../../../../utils/safeCssColor';
 import { I } from '../Icons';
 import {
@@ -15,6 +16,9 @@ import {
   Rank,
   Section,
 } from '../Shared';
+import { PremiumGate } from '../../../../components/PremiumGate';
+import { useHasEntitlement } from '../../../../hooks/useIsPremium';
+import { useLeagueChampionsAnalytics } from '../../../../hooks/useLeagueChampionsAnalytics';
 
 export interface HistoryTabProps {
   league: LeagueFragment;
@@ -50,6 +54,9 @@ const formatDate = (iso?: string | null): string => {
 
 export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
   const leagueId = league.id ?? 0;
+  const hasHistoryAnalytics = useHasEntitlement(
+    ENTITLEMENTS.league_history_analytics,
+  );
 
   const {
     data: historyData,
@@ -139,10 +146,8 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
     [recordsData?.getAllTimeRecords],
   );
 
-  const champions = useMemo(
-    () => seasons.filter((s) => s.frozenAt && s.championTeamName),
-    [seasons],
-  );
+  const { champions, championshipLeaderboard } =
+    useLeagueChampionsAnalytics(seasons);
 
   if (!league.id) {
     return <Empty title="History unavailable" />;
@@ -392,9 +397,9 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
               gap: 14,
             }}
           >
-            {champions.map((c) => (
+            {champions.map((c, i) => (
               <div
-                key={c.leagueId}
+                key={c.leagueId ?? c.seasonNumber ?? i}
                 style={{
                   padding: 14,
                   background:
@@ -467,6 +472,175 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
             ))}
           </div>
         </Section>
+      ) : null}
+
+      {/* Premium Analytics — Championship Leaderboard & Manager Awards */}
+      {champions.length > 0 ? (
+        <PremiumGate
+          isPremium={hasHistoryAnalytics}
+          featureName="League History Analytics"
+          featureDescription="Unlock championship leaderboards and manager award history with a Premium subscription."
+        >
+          <Section
+            title="Championship Leaderboard"
+            sub="All-time titles won by each team"
+          >
+            {championshipLeaderboard.length === 0 ? (
+              <Empty
+                icon={<I.Trophy size={28} />}
+                title="No championships yet"
+                sub="Leaderboard appears after the first season concludes."
+              />
+            ) : (
+              <div className="ls-table-wrap">
+                <table
+                  className="ls-table"
+                  aria-label="Championship Leaderboard"
+                >
+                  <thead>
+                    <tr>
+                      <th scope="col" style={{ width: 60 }}>
+                        Rank
+                      </th>
+                      <th scope="col">Team</th>
+                      <th scope="col" className="num">
+                        Titles
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {championshipLeaderboard.map(({ teamName, titles }, i) => (
+                      <tr key={teamName}>
+                        <td>
+                          <Rank n={i + 1} />
+                        </td>
+                        <td>
+                          <div className="ls-team-cell">
+                            <div
+                              className={`ls-avatar sm ${colorFromString(teamName)}`}
+                            >
+                              {initialsFromName(teamName)}
+                            </div>
+                            <span className="name" style={{ fontWeight: 600 }}>
+                              {teamName}
+                            </span>
+                            {i === 0 ? (
+                              <I.Crown
+                                size={14}
+                                style={{ color: 'var(--brand-gold-light)' }}
+                              />
+                            ) : null}
+                          </div>
+                        </td>
+                        <td
+                          className="num"
+                          style={{
+                            fontWeight: 700,
+                            color: 'var(--brand-gold-light)',
+                          }}
+                        >
+                          {titles}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+
+          <div style={{ marginTop: 20 }}>
+            <Section
+              title="Manager Awards"
+              sub="Championship winners by season"
+            >
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))',
+                  gap: 12,
+                }}
+              >
+                {champions.map((c, i) => (
+                  <div
+                    key={c.leagueId ?? c.seasonNumber ?? i}
+                    style={{
+                      padding: 14,
+                      background:
+                        'linear-gradient(135deg, rgba(197,165,90,0.10), var(--surface-card) 65%)',
+                      border: '1px solid rgba(197,165,90,.3)',
+                      borderRadius: 'var(--radius-4)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: 'var(--fg3)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '.06em',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Season {c.seasonNumber} Champion
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <I.Trophy
+                        size={16}
+                        style={{
+                          color: 'var(--brand-gold-light)',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontWeight: 700,
+                          fontSize: 15,
+                          color: 'var(--fg1-strong)',
+                        }}
+                      >
+                        {c.championTeamName ?? 'Unknown'}
+                      </span>
+                    </div>
+                    {c.runnerUpTeamName ? (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: 'var(--fg3)',
+                        }}
+                      >
+                        Runner-up: {c.runnerUpTeamName}
+                      </div>
+                    ) : null}
+                    {c.championScore != null ? (
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          color: 'var(--fg4)',
+                          marginTop: 4,
+                        }}
+                      >
+                        {c.championScore.toFixed(1)}
+                        {c.runnerUpScore != null
+                          ? ` – ${c.runnerUpScore.toFixed(1)}`
+                          : ''}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          </div>
+        </PremiumGate>
       ) : null}
     </div>
   );

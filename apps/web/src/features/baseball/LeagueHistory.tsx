@@ -6,6 +6,7 @@ import {
   Calendar,
   Crown,
   Flame,
+  Star,
   Target,
   TrendingUp,
   Trophy,
@@ -16,6 +17,7 @@ import {
   useGetLeagueHistoryQuery,
   useGetLeagueStandingsQuery,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   AMBER,
   BRAND_GOLD_LIGHT,
@@ -23,6 +25,9 @@ import {
   WHITE,
   withAlpha,
 } from '../../constants/colors';
+import { PremiumGate } from '../../components/PremiumGate';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
+import { useLeagueChampionsAnalytics } from '../../hooks/useLeagueChampionsAnalytics';
 
 export interface LeagueHistoryProps {
   leagueId: number;
@@ -86,6 +91,9 @@ export function LeagueHistory({
   const [selectedSeasonLeagueId, setSelectedSeasonLeagueId] = useState<
     number | null
   >(null);
+  const hasHistoryAnalytics = useHasEntitlement(
+    ENTITLEMENTS.league_history_analytics,
+  );
 
   const {
     data: historyData,
@@ -139,6 +147,9 @@ export function LeagueHistory({
     () => recordsData?.getAllTimeRecords ?? [],
     [recordsData],
   );
+
+  const { champions, championshipLeaderboard } =
+    useLeagueChampionsAnalytics(seasons);
 
   if (historyLoading) {
     return (
@@ -504,6 +515,165 @@ export function LeagueHistory({
             </XStack>
           </YStack>
         </SectionCard>
+      )}
+
+      {/* Premium Analytics — Championship Leaderboard & Manager Awards */}
+      {champions.length > 0 && (
+        <PremiumGate
+          isPremium={hasHistoryAnalytics}
+          featureName="League History Analytics"
+          featureDescription="Unlock championship leaderboards and manager award history with a Premium subscription."
+        >
+          <YStack gap="$4">
+            {/* Championship Leaderboard */}
+            <SectionCard>
+              <YStack gap="$3">
+                <XStack alignItems="center" gap="$2">
+                  <Star size={18} color="$brandGoldLight" />
+                  <H4>Championship Leaderboard</H4>
+                </XStack>
+                {championshipLeaderboard.length === 0 ? (
+                  <Text color="$textMuted" fontSize={13}>
+                    No championships recorded yet.
+                  </Text>
+                ) : (
+                  <YStack>
+                    <XStack
+                      paddingHorizontal="$3"
+                      paddingVertical="$2"
+                      borderBottomWidth={1}
+                      borderColor="$surfacePanelBorder"
+                    >
+                      <Text
+                        width={32}
+                        fontSize={11}
+                        fontWeight="600"
+                        color="$textMuted"
+                      >
+                        #
+                      </Text>
+                      <Text
+                        flex={1}
+                        fontSize={11}
+                        fontWeight="600"
+                        color="$textMuted"
+                      >
+                        Team
+                      </Text>
+                      <Text
+                        width={60}
+                        textAlign="right"
+                        fontSize={11}
+                        fontWeight="600"
+                        color="$textMuted"
+                      >
+                        Titles
+                      </Text>
+                    </XStack>
+                    {championshipLeaderboard.map(
+                      ({ teamName, titles }, idx) => (
+                        <XStack
+                          key={teamName}
+                          paddingHorizontal="$3"
+                          paddingVertical="$2"
+                          backgroundColor={
+                            idx % 2 === 0 ? 'transparent' : '$surfaceSubtle'
+                          }
+                          borderRadius="$2"
+                          alignItems="center"
+                        >
+                          <Text width={32} fontSize={13} fontWeight="600">
+                            {idx + 1}
+                          </Text>
+                          <XStack flex={1} alignItems="center" gap="$2">
+                            <Text fontSize={13} fontWeight="600">
+                              {teamName}
+                            </Text>
+                            {idx === 0 && (
+                              <Crown size={14} color="$brandGoldLight" />
+                            )}
+                          </XStack>
+                          <Text
+                            width={60}
+                            textAlign="right"
+                            fontSize={14}
+                            fontWeight="700"
+                            color="$brandGoldLight"
+                          >
+                            {titles}
+                          </Text>
+                        </XStack>
+                      ),
+                    )}
+                  </YStack>
+                )}
+              </YStack>
+            </SectionCard>
+
+            {/* Manager Awards */}
+            <SectionCard>
+              <YStack gap="$3">
+                <XStack alignItems="center" gap="$2">
+                  <Trophy size={18} color="$brandGoldLight" />
+                  <H4>Manager Awards</H4>
+                </XStack>
+                <XStack gap="$3" flexWrap="wrap">
+                  {champions.map((c, i) => (
+                    <YStack
+                      key={c.leagueId ?? c.seasonNumber ?? i}
+                      flex={1}
+                      minWidth={160}
+                      padding="$3"
+                      borderRadius="$4"
+                      borderWidth={1}
+                      borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.25)}
+                      style={{
+                        background: `linear-gradient(135deg, ${withAlpha(AMBER, 0.08)} 0%, ${withAlpha(BRAND_NAVY, 0.25)} 70%)`,
+                      }}
+                      gap="$1"
+                    >
+                      <Text
+                        fontSize={10}
+                        fontWeight="600"
+                        color="$textMuted"
+                        style={{ textTransform: 'uppercase', letterSpacing: 1 }}
+                      >
+                        Season {c.seasonNumber}
+                      </Text>
+                      <XStack alignItems="center" gap="$2" marginTop="$1">
+                        <Trophy size={14} color="$brandGoldLight" />
+                        <Text
+                          fontWeight="700"
+                          fontSize={14}
+                          style={{ color: WHITE }}
+                        >
+                          {c.championTeamName ?? 'Unknown'}
+                        </Text>
+                      </XStack>
+                      {c.runnerUpTeamName && (
+                        <Text fontSize={12} color="$textMuted">
+                          vs {c.runnerUpTeamName}
+                        </Text>
+                      )}
+                      {c.championScore != null && (
+                        <Text
+                          fontSize={11}
+                          color="$textMuted"
+                          style={{ marginTop: 4 }}
+                        >
+                          {c.championScore.toFixed(1)}
+                          {c.runnerUpScore != null
+                            ? ` – ${c.runnerUpScore.toFixed(1)}`
+                            : ''}
+                        </Text>
+                      )}
+                    </YStack>
+                  ))}
+                </XStack>
+              </YStack>
+            </SectionCard>
+          </YStack>
+        </PremiumGate>
       )}
 
       {/* All-Time Records */}
