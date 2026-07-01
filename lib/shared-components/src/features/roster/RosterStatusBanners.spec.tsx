@@ -8,9 +8,9 @@ describe('RosterStatusBanners', () => {
     expect(screen.getByText('Historical Mode')).toBeTruthy();
   });
 
-  it('renders the provisional banner on a future week', () => {
+  it('renders the read-only banner on a future week', () => {
     render(<RosterStatusBanners isPast={false} isFuture />);
-    expect(screen.getByText('Future Week — Provisional Lineup')).toBeTruthy();
+    expect(screen.getByText('Future Week — Read Only')).toBeTruthy();
   });
 
   it('renders nothing on the current week', () => {

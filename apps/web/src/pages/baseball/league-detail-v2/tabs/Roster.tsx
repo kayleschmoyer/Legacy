@@ -157,7 +157,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         }}
         loading={loading}
         error={error ?? null}
-        readOnly={isPast}
+        readOnly={isPast || isFuture}
       />
     </div>
   );

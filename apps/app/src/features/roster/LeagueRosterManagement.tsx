@@ -107,7 +107,7 @@ export function LeagueRosterManagement({
           onPlayerSwap={onPlayerSwap}
           onPlayerPress={onPlayerPress}
           loading={loading}
-          readOnly={isPast}
+          readOnly={isPast || isFuture}
         />
       </YStack>
     </ScrollView>

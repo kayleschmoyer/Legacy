@@ -77,8 +77,8 @@ export function RosterStatusBanners({
       <Banner
         kind="warning"
         icon={<Info size={18} color="var(--orange11)" />}
-        title="Future Week — Provisional Lineup"
-        sub="Changes you make will apply to this week and all future matchups until updated again."
+        title="Future Week — Read Only"
+        sub="Lineup changes are not available for future weeks. Return to the current week to update your lineup."
       />
     );
   }

@@ -50,6 +50,7 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
       <View>
         <RNText>week-nav</RNText>
         <RNText onPress={() => onWeekChange(week - 1)}>go-prev</RNText>
+        <RNText onPress={() => onWeekChange(week + 1)}>go-next</RNText>
       </View>
     ),
     RosterStatusBanners: ({
@@ -101,6 +102,18 @@ describe('LeagueRosterManagement', () => {
   it('hides week navigation when no current week is provided', () => {
     render(<LeagueRosterManagement {...baseProps} />);
     expect(screen.queryByText('week-nav')).toBeNull();
+  });
+
+  it('makes the board read-only and shows the future banner on future weeks', () => {
+    render(
+      <LeagueRosterManagement {...baseProps} currentWeek={3} totalWeeks={10} />,
+    );
+    // Advance from current week (3 → 4): a future week.
+    fireEvent.press(screen.getByText('go-next'));
+    expect(screen.getByText('banner-future')).toBeTruthy();
+    expect(screen.getByText('board-readonly-true')).toBeTruthy();
+    // Pending banners only show on the current week.
+    expect(screen.queryByText('pending-trades')).toBeNull();
   });
 
   it('makes the board read-only and shows the historical banner on past weeks', () => {
