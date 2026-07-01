@@ -1,13 +1,11 @@
 /**
- * Regression guard for LS-5015: advanced playoff formats must be gated by
- * subscription tier in LeagueSettingsControl.
+ * Regression guard for LS-5912: advanced playoff formats must be gated behind
+ * PremiumGate in LeagueSettingsControl so non-premium users see an upgrade
+ * prompt instead of disabled buttons, and so saving with an existing advanced
+ * format never triggers a server-side ForbiddenError.
  *
- * The always-free 4-team format must remain selectable for free-tier users,
- * while the premium 6-team and 8-team formats are individually locked (disabled
- * with a "(premium)" affordance). For premium users every format is selectable.
- *
- * Previously a single over-broad <PremiumGate> wrapped all three options, which
- * blocked free users from the free 4-team format entirely.
+ * The always-free 4-team format must remain selectable for free-tier users.
+ * For premium users every format is selectable.
  */
 import React from 'react';
 import { LeagueSettingsControl } from './LeagueSettingsControl';
@@ -66,7 +64,18 @@ jest.mock('../../utils/colors', () => ({
 }));
 
 jest.mock('../../components/PremiumGate', () => ({
-  PremiumGate: ({ children }: Children) => <div>{children}</div>,
+  PremiumGate: ({
+    children,
+    isPremium,
+    featureName,
+  }: Children & { isPremium: boolean; featureName: string }) =>
+    isPremium ? (
+      <div>{children}</div>
+    ) : (
+      <div data-testid="premium-gate-locked">
+        {featureName} — Upgrade to Premium
+      </div>
+    ),
 }));
 
 const defaultProps = {
@@ -77,23 +86,27 @@ const defaultProps = {
   currentPlayoffFormat: '4-team',
 };
 
-describe('LeagueSettingsControl — advanced playoff format gating (LS-5015)', () => {
-  it('locks 6-team and 8-team but leaves 4-team selectable for free users', () => {
+describe('LeagueSettingsControl — advanced playoff format gating (LS-5912)', () => {
+  it('shows 4-team freely and replaces 6-team/8-team with PremiumGate for free users', () => {
     render(<LeagueSettingsControl {...defaultProps} isPremium={false} />);
 
-    const fourTeam = screen.getByRole('button', {
-      name: 'Playoff format: 4-team',
-    });
-    const sixTeam = screen.getByRole('button', {
-      name: 'Playoff format: 6-team (premium)',
-    });
-    const eightTeam = screen.getByRole('button', {
-      name: 'Playoff format: 8-team (premium)',
-    });
+    expect(
+      screen.getByRole('button', { name: 'Playoff format: 4-team' }),
+    ).toBeEnabled();
 
-    expect(fourTeam).toBeEnabled();
-    expect(sixTeam).toBeDisabled();
-    expect(eightTeam).toBeDisabled();
+    // Advanced formats replaced by PremiumGate locked card (salary cap has one too)
+    const lockedGates = screen.getAllByTestId('premium-gate-locked');
+    expect(
+      lockedGates.some((el) =>
+        el.textContent?.includes('Advanced Playoff Formats'),
+      ),
+    ).toBe(true);
+    expect(
+      screen.queryByRole('button', { name: 'Playoff format: 6-team' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Playoff format: 8-team' }),
+    ).not.toBeInTheDocument();
   });
 
   it('leaves every playoff format selectable for premium users', () => {
@@ -109,9 +122,25 @@ describe('LeagueSettingsControl — advanced playoff format gating (LS-5015)', (
       screen.getByRole('button', { name: 'Playoff format: 8-team' }),
     ).toBeEnabled();
     expect(
-      screen.queryByRole('button', {
-        name: 'Playoff format: 6-team (premium)',
-      }),
-    ).not.toBeInTheDocument();
+      screen
+        .queryAllByTestId('premium-gate-locked')
+        .some((el) => el.textContent?.includes('Advanced Playoff Formats')),
+    ).toBe(false);
+  });
+
+  it('clamps an advanced format to 4-team for a non-premium user (prevents ForbiddenError)', () => {
+    // League was set to 6-team while premium, user downgraded — form should show 4-team
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        currentPlayoffFormat="6-team"
+        isPremium={false}
+      />,
+    );
+
+    // 4-team button should be selected (aria-pressed=true)
+    expect(
+      screen.getByRole('button', { name: 'Playoff format: 4-team' }),
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 });

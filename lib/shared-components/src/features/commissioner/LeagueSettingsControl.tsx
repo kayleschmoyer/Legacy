@@ -82,6 +82,10 @@ const PLAYOFF_FORMAT_OPTIONS = [
   { label: '8-team', value: '8-team' },
 ] as const;
 
+function isAdvancedPlayoffFormat(format: string): boolean {
+  return format === '6-team' || format === '8-team';
+}
+
 /**
  * LeagueSettingsControl — Commissioner control for league-level matchup settings.
  *
@@ -117,7 +121,13 @@ export function LeagueSettingsControl({
   );
   const [totalMatchups, setTotalMatchups] = useState(currentTotalMatchups);
   const [playoffEnabled, setPlayoffEnabled] = useState(currentPlayoffEnabled);
-  const [playoffFormat, setPlayoffFormat] = useState(currentPlayoffFormat);
+  const effectiveCurrentPlayoffFormat =
+    !isPremium && isAdvancedPlayoffFormat(currentPlayoffFormat)
+      ? '4-team'
+      : currentPlayoffFormat;
+  const [playoffFormat, setPlayoffFormat] = useState(
+    effectiveCurrentPlayoffFormat,
+  );
   const [playoffMultiWeek, setPlayoffMultiWeek] = useState(
     currentPlayoffMultiWeek,
   );
@@ -155,7 +165,7 @@ export function LeagueSettingsControl({
           careerSeasons !== currentMinCareerSeasons ||
           totMatchups !== currentTotalMatchups ||
           poEnabled !== currentPlayoffEnabled ||
-          poFormat !== currentPlayoffFormat ||
+          poFormat !== effectiveCurrentPlayoffFormat ||
           poMultiWeek !== currentPlayoffMultiWeek ||
           scEnabled !== currentSalaryCapEnabled ||
           sc !== currentSalaryCap,
@@ -168,7 +178,7 @@ export function LeagueSettingsControl({
       currentMinCareerSeasons,
       currentTotalMatchups,
       currentPlayoffEnabled,
-      currentPlayoffFormat,
+      effectiveCurrentPlayoffFormat,
       currentPlayoffMultiWeek,
       currentSalaryCapEnabled,
       currentSalaryCap,
@@ -431,7 +441,7 @@ export function LeagueSettingsControl({
     setMinCareerSeasons(currentMinCareerSeasons);
     setTotalMatchups(currentTotalMatchups);
     setPlayoffEnabled(currentPlayoffEnabled);
-    setPlayoffFormat(currentPlayoffFormat);
+    setPlayoffFormat(effectiveCurrentPlayoffFormat);
     setPlayoffMultiWeek(currentPlayoffMultiWeek);
     setSalaryCapEnabled(currentSalaryCapEnabled);
     setSalaryCap(currentSalaryCap);
@@ -849,21 +859,13 @@ export function LeagueSettingsControl({
                   <Text fontSize="$2" color="$gray10">
                     Number of teams that qualify for the playoffs. 6-team
                     includes a wildcard round; 8-team has two wildcard rounds.
-                    {!isPremium && (
-                      <Text fontSize="$2" color="$gray10">
-                        {' '}
-                        Advanced formats (6-team, 8-team) require a premium
-                        subscription.
-                      </Text>
-                    )}
                   </Text>
                 </YStack>
                 <XStack gap="$2" flexWrap="wrap">
-                  {PLAYOFF_FORMAT_OPTIONS.map((option) => {
+                  {PLAYOFF_FORMAT_OPTIONS.filter(
+                    (o) => o.value === '4-team',
+                  ).map((option) => {
                     const isSelected = playoffFormat === option.value;
-                    const isAdvanced =
-                      option.value === '6-team' || option.value === '8-team';
-                    const isFormatLocked = isAdvanced && !isPremium;
                     return (
                       <Button
                         key={option.value}
@@ -877,23 +879,14 @@ export function LeagueSettingsControl({
                         borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
                         borderWidth={1}
                         borderRadius="$3"
-                        onPress={() => {
-                          if (isFormatLocked) return;
-                          handlePlayoffFormatChange(option.value);
-                        }}
-                        disabled={saving || isFormatLocked}
-                        opacity={saving || isFormatLocked ? 0.5 : 1}
-                        icon={
-                          isFormatLocked ? (
-                            <Lock size={12} color="$gray10" />
-                          ) : isSelected ? (
-                            <Check size={14} />
-                          ) : undefined
-                        }
+                        onPress={() => handlePlayoffFormatChange(option.value)}
+                        disabled={saving}
+                        opacity={saving ? 0.5 : 1}
+                        icon={isSelected ? <Check size={14} /> : undefined}
                         aria-pressed={isSelected}
-                        aria-label={`Playoff format: ${option.label}${isFormatLocked ? ' (premium)' : ''}`}
+                        aria-label={`Playoff format: ${option.label}`}
                         hoverStyle={
-                          saving || isFormatLocked
+                          saving
                             ? undefined
                             : {
                                 backgroundColor: isSelected
@@ -913,6 +906,60 @@ export function LeagueSettingsControl({
                     );
                   })}
                 </XStack>
+                <PremiumGate
+                  isPremium={isPremium}
+                  featureName="Advanced Playoff Formats"
+                  featureDescription="Unlock 6-team and 8-team playoff brackets with wildcard rounds."
+                  onUpgrade={onUpgrade}
+                >
+                  <XStack gap="$2" flexWrap="wrap">
+                    {PLAYOFF_FORMAT_OPTIONS.filter(
+                      (o) => o.value !== '4-team',
+                    ).map((option) => {
+                      const isSelected = playoffFormat === option.value;
+                      return (
+                        <Button
+                          key={option.value}
+                          size="$3"
+                          theme={isSelected ? 'active' : 'alt2'}
+                          backgroundColor={
+                            isSelected
+                              ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
+                              : '$gray3'
+                          }
+                          borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
+                          borderWidth={1}
+                          borderRadius="$3"
+                          onPress={() =>
+                            handlePlayoffFormatChange(option.value)
+                          }
+                          disabled={saving}
+                          opacity={saving ? 0.5 : 1}
+                          icon={isSelected ? <Check size={14} /> : undefined}
+                          aria-pressed={isSelected}
+                          aria-label={`Playoff format: ${option.label}`}
+                          hoverStyle={
+                            saving
+                              ? undefined
+                              : {
+                                  backgroundColor: isSelected
+                                    ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
+                                    : '$gray4',
+                                }
+                          }
+                        >
+                          <Text
+                            fontSize="$2"
+                            fontWeight={isSelected ? '700' : '400'}
+                            color={isSelected ? 'white' : '$color'}
+                          >
+                            {option.label}
+                          </Text>
+                        </Button>
+                      );
+                    })}
+                  </XStack>
+                </PremiumGate>
               </YStack>
 
               <Separator />
