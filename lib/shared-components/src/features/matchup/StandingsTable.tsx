@@ -32,6 +32,12 @@ export interface StandingsTableProps {
   currentUserTeamId?: number | null;
   /** Row press handler — invoked with the numeric team id when a row is tapped. */
   onTeamPress?: (teamId: number) => void;
+  /**
+   * When provided, the team name cell renders as an `<a href>` so users can
+   * right-click → "Open in new tab" and keyboard users get a semantic link.
+   * Invoked with the numeric team id; return the destination URL string.
+   */
+  getTeamUrl?: (teamId: number) => string;
   /** Header title (defaults to "League Standings"). */
   title?: string;
   /** Optional subtitle rendered under the title. */
@@ -116,6 +122,7 @@ interface StandingsRowProps {
   rank: number;
   isCurrentUser: boolean;
   onTeamPress?: (teamId: number) => void;
+  getTeamUrl?: (teamId: number) => string;
   waiverOrder?: number | null;
   showWaiverOrder?: boolean;
 }
@@ -126,12 +133,15 @@ function StandingsRow({
   rank,
   isCurrentUser,
   onTeamPress,
+  getTeamUrl,
   waiverOrder,
   showWaiverOrder,
 }: StandingsRowProps) {
   const [hovered, setHovered] = useState(false);
   const teamId = standing.teamId != null ? Number(standing.teamId) : null;
   const pressable = onTeamPress != null && teamId != null;
+  const teamUrl =
+    teamId != null && getTeamUrl != null ? getTeamUrl(teamId) : undefined;
   const diff = diffOf(standing);
   const diffColor =
     diff == null
@@ -199,9 +209,25 @@ function StandingsRow({
             borderRadius={4}
           />
           <Text
+            tag={teamUrl ? 'a' : undefined}
+            {...(teamUrl
+              ? ({
+                  href: teamUrl,
+                  onClick: (e: React.MouseEvent) => {
+                    if (e.button === 0) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (onTeamPress != null && teamId != null) {
+                        onTeamPress(teamId);
+                      }
+                    }
+                  },
+                } as Record<string, unknown>)
+              : {})}
             fontSize="$3"
             fontWeight="600"
             color={isCurrentUser ? BRAND_GOLD_LIGHT : undefined}
+            textDecorationLine="none"
           >
             {standing.teamName ?? `Team ${standing.teamId}`}
           </Text>
@@ -317,6 +343,7 @@ export function StandingsTable({
   error = null,
   currentUserTeamId = null,
   onTeamPress,
+  getTeamUrl,
   title = 'League Standings',
   subtitle,
   showWaiverOrder = false,
@@ -576,6 +603,7 @@ export function StandingsTable({
                       rank={index + 1}
                       isCurrentUser={isCurrentUser(standing)}
                       onTeamPress={onTeamPress}
+                      getTeamUrl={getTeamUrl}
                       showWaiverOrder={showWaiverOrder}
                       waiverOrder={
                         standing.teamId != null

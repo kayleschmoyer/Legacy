@@ -93,6 +93,24 @@ describe('StandingsTab', () => {
     );
   });
 
+  it('passes getTeamUrl to StandingsTable that maps teamId to the baseball team route', () => {
+    mockStandings = [makeRow({ teamId: '7' })];
+    render(
+      <StandingsTab
+        league={league}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    const { getTeamUrl } = mockStandingsTable.mock.calls[0][0] as {
+      getTeamUrl: (id: number) => string;
+    };
+    expect(typeof getTeamUrl).toBe('function');
+    expect(getTeamUrl(7)).toBe('/baseball/teams/7');
+    expect(getTeamUrl(42)).toBe('/baseball/teams/42');
+  });
+
   it('passes onTeamPress to StandingsTable', () => {
     mockStandings = [makeRow()];
     const onTeam = jest.fn();
