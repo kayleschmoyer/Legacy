@@ -6,6 +6,7 @@ import {
   useGetLeagueHistoryQuery,
   useGetLeagueStandingsQuery,
 } from '@legacy-sports/graphql';
+import { safeCssColor } from '../../../../utils/safeCssColor';
 import { I } from '../Icons';
 import {
   colorFromString,
@@ -291,8 +292,8 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
                             <div
                               className={`ls-avatar sm ${colorFromString(t.teamName)}`}
                               style={
-                                t.primaryColor
-                                  ? { background: t.primaryColor }
+                                safeCssColor(t.primaryColor)
+                                  ? { background: safeCssColor(t.primaryColor) }
                                   : undefined
                               }
                             >
