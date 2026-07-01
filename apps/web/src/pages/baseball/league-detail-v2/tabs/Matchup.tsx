@@ -155,7 +155,9 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
             type="button"
             className="ls-navbtn"
             disabled={
-              league.totalMatchups != null && week >= league.totalMatchups
+              league.totalMatchups != null
+                ? week >= league.totalMatchups
+                : !matchups || matchups.length === 0
             }
             onClick={() => setWeek((w) => w + 1)}
             aria-label="Next week"
