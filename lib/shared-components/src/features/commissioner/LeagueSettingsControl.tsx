@@ -138,7 +138,9 @@ export function LeagueSettingsControl({
   const [hasChanges, setHasChanges] = useState(false);
 
   const resolvedSport = sport === 'football' ? 'football' : 'baseball';
-  const sportBounds = GAMES_PER_MATCHUP_BY_SPORT[resolvedSport];
+  const sportBounds =
+    GAMES_PER_MATCHUP_BY_SPORT[resolvedSport] ??
+    GAMES_PER_MATCHUP_BY_SPORT.baseball;
   const gamesPerMatchupOptions = buildGamesPerMatchupOptions(sportBounds.max);
 
   const isLocked = draftStatus === 'completed';
@@ -493,10 +495,8 @@ export function LeagueSettingsControl({
 
         <YStack
           gap="$4"
-          style={{
-            opacity: isLocked ? 0.5 : 1,
-            pointerEvents: isLocked ? 'none' : undefined,
-          }}
+          opacity={isLocked ? 0.5 : 1}
+          pointerEvents={isLocked ? 'none' : 'auto'}
         >
           {/* Games Per Matchup */}
           <YStack gap="$2">
