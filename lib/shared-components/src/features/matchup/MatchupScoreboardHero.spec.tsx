@@ -89,4 +89,22 @@ describe('MatchupScoreboardHero', () => {
     expect(screen.getByText('Team A')).toBeTruthy();
     expect(screen.getByText('Team B')).toBeTruthy();
   });
+
+  it('renders non-interactive avatars when a team id is null (BYE slot)', () => {
+    // When team1.id is null the pressable flag must be false — the avatar
+    // should carry no pointer cursor even if onTeamPress is provided.
+    const onTeamPress = jest.fn();
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({
+          team1: { id: null, name: 'BYE' },
+          onTeamPress,
+        })}
+      />,
+    );
+    expect(screen.getByText('BYE')).toBeTruthy();
+    // onTeamPress must NOT be called for the null-id team — the component
+    // renders but exposes no pressable handler for that side.
+    expect(onTeamPress).not.toHaveBeenCalled();
+  });
 });
