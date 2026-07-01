@@ -494,6 +494,30 @@ describe('MLBHome', () => {
     });
   });
 
+  it('shows "Unlimited mock drafts" badge for premium users when onMockDraft is provided', () => {
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        isPremium
+        onMockDraft={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Unlimited mock drafts')).toBeInTheDocument();
+  });
+
+  it('does not show "Unlimited mock drafts" badge when isPremium but onMockDraft is omitted', () => {
+    render(<MLBHome {...baseProps} leagues={LEAGUES} isPremium />);
+    expect(screen.queryByText('Unlimited mock drafts')).not.toBeInTheDocument();
+  });
+
+  it('does not show "Unlimited mock drafts" badge for non-premium users', () => {
+    render(
+      <MLBHome {...baseProps} leagues={LEAGUES} onMockDraft={jest.fn()} />,
+    );
+    expect(screen.queryByText('Unlimited mock drafts')).not.toBeInTheDocument();
+  });
+
   it('renders an Invite Friends action only when onInviteFriends is provided', () => {
     const { rerender } = render(<MLBHome {...baseProps} leagues={LEAGUES} />);
     expect(screen.queryByText('Invite Friends')).not.toBeInTheDocument();

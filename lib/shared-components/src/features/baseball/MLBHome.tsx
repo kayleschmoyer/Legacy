@@ -799,9 +799,9 @@ export function MLBHome({
           </YStack>
         ) : null}
 
-        {/* League-cap indicator: free-tier count/limit, or premium unlimited badge (LS-5870) */}
+        {/* League-cap indicator: free-tier count/limit, or premium unlimited badges — leagues always shown, mock drafts only when onMockDraft is provided (LS-5870, LS-5811) */}
         {isPremium ? (
-          <XStack alignItems="center" gap="$2">
+          <XStack alignItems="center" gap="$4" flexWrap="wrap">
             <Text
               color={BRAND_GOLD}
               fontSize="$4"
@@ -810,6 +810,16 @@ export function MLBHome({
             >
               Unlimited leagues
             </Text>
+            {onMockDraft ? (
+              <Text
+                color={BRAND_GOLD}
+                fontSize="$4"
+                fontWeight="bold"
+                accessibilityLabel="You have unlimited mock drafts"
+              >
+                Unlimited mock drafts
+              </Text>
+            ) : null}
           </XStack>
         ) : leagueCap ? (
           <XStack alignItems="center" flexWrap="wrap" gap="$2">
