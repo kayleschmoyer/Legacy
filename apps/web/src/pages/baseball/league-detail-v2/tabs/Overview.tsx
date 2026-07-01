@@ -484,7 +484,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           kind="gold"
           icon={<I.Bell size={20} />}
           title="Commissioner Announcement"
-          sub={league.lmNotes}
+          sub={
+            league.lmNotes.length > 2000
+              ? `${league.lmNotes.slice(0, 2000)}…`
+              : league.lmNotes
+          }
         />
       ) : null}
 

@@ -413,6 +413,18 @@ describe('Commissioner Tools Resolver', () => {
       expect(result.success).toBe(true);
       expect(result.message).toContain('updated');
     });
+
+    it('throws when note exceeds 2000 characters', async () => {
+      const resolver = getMutation('updateCommissionerNote');
+      await expect(
+        resolver(
+          {},
+          { input: { leagueId: 1, note: 'a'.repeat(2001) } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('2000 characters or fewer');
+    });
   });
 
   // ── setTeamLock ────────────────────────────────────────────────────────────

@@ -536,6 +536,12 @@ builder.mutationField('updateCommissionerNote', (t) =>
 
       const { leagueId, note } = args.input;
 
+      if (note != null && note.length > 2000) {
+        throw UserInputError(
+          'Commissioner note must be 2000 characters or fewer.',
+        );
+      }
+
       if (!(await checkAdminInDb(context))) {
         await verifyCommissionerAccess(context.db, leagueId, context.user.id);
       }
