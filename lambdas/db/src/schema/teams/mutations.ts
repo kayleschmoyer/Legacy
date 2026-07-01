@@ -395,10 +395,10 @@ builder.mutationField('renameTeam', (t) =>
 
       const name = args.newName.trim();
       if (name.length === 0) {
-        throw new Error('Team name cannot be empty');
+        throw UserInputError('Team name cannot be empty');
       }
-      if (name.length > 100) {
-        throw new Error('Team name cannot exceed 100 characters');
+      if (name.length > 40) {
+        throw UserInputError('Team name cannot exceed 40 characters');
       }
 
       const { teamId, leagueId } = args;
