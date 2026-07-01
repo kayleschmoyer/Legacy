@@ -370,6 +370,7 @@ export interface OverviewTabProps {
   teams: readonly TeamFragment[];
   myTeamId: number | null;
   isCommissioner: boolean;
+  isMember: boolean;
   onTab: (t: TabId) => void;
   onTeam: (teamId: number) => void;
   onJoinDraft: () => void;
@@ -382,6 +383,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   teams,
   myTeamId,
   isCommissioner,
+  isMember,
   onTab,
   onTeam,
   onJoinDraft,
@@ -459,7 +461,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {isDrafting ? (
+      {isDrafting && isMember ? (
         <Banner
           kind="live"
           icon={<I.Zap size={20} />}

@@ -182,6 +182,7 @@ describe('OverviewTab — Invite section anchor (LS-7968)', () => {
         teams={[]}
         myTeamId={null}
         isCommissioner={true}
+        isMember={true}
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}
@@ -199,6 +200,7 @@ describe('OverviewTab — Invite section anchor (LS-7968)', () => {
         teams={[]}
         myTeamId={null}
         isCommissioner={false}
+        isMember={false}
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}
@@ -230,8 +232,9 @@ describe('OverviewTab — Join Draft Room (LS-4916)', () => {
       <OverviewTab
         league={baseLeague}
         teams={[]}
-        myTeamId={null}
+        myTeamId={1}
         isCommissioner={false}
+        isMember={true}
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={onJoinDraft}
@@ -254,6 +257,27 @@ describe('OverviewTab — Join Draft Room (LS-4916)', () => {
         teams={[]}
         myTeamId={null}
         isCommissioner={false}
+        isMember={false}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: /join draft room/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides Join Draft Room button for non-members when draft is in progress (LS-5949)', () => {
+    render(
+      <OverviewTab
+        league={baseLeague}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={false}
+        isMember={false}
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}

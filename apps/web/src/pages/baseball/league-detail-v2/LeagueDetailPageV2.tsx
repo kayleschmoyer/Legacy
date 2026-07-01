@@ -390,6 +390,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
                 teams={teams}
                 myTeamId={userTeamId ?? null}
                 isCommissioner={effIsCommish}
+                isMember={effIsMember}
                 onTab={setTab}
                 onTeam={onTeamNav}
                 onJoinDraft={() =>
