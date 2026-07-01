@@ -548,7 +548,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
             flexWrap="wrap"
             gap="$2"
           >
-            <YStack flex={1} minWidth={140}>
+            <YStack flex={1} minWidth={140} gap="$1">
               <Text
                 fontFamily="$heading"
                 fontWeight="700"
@@ -561,6 +561,28 @@ export const LeagueDetailFreeAgentsTab: React.FC<
               <Text fontSize={12} color="$textMuted">
                 {subTitle}
               </Text>
+              {league.waiverType?.toLowerCase() === 'faab' ? (
+                <XStack alignSelf="flex-start">
+                  <Text
+                    fontSize={10}
+                    fontWeight="700"
+                    fontFamily="$heading"
+                    letterSpacing={0.6}
+                    textTransform="uppercase"
+                    color={BRAND_GOLD_LIGHT}
+                    paddingHorizontal="$2"
+                    paddingVertical={3}
+                    borderRadius="$10"
+                    borderWidth={1}
+                    borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.4)}
+                    backgroundColor={withAlpha(BRAND_GOLD_LIGHT, 0.12)}
+                    accessibilityRole="text"
+                    accessibilityLabel="Premium league — FAAB enabled by commissioner's Premium subscription"
+                  >
+                    Premium league
+                  </Text>
+                </XStack>
+              ) : null}
             </YStack>
             <XStack
               backgroundColor="$surfaceCard"
