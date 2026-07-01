@@ -69,6 +69,7 @@
     "legacy-sports-aws",
     "legacy-sports-browser",
     "legacy-sports-ci",
+    "legacy-sports-db-admin",
     "legacy-sports-github",
     "legacy-sports-jira",
     "legacy-sports-make",
