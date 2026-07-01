@@ -402,7 +402,11 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_dispatch_workflow',
-    'Trigger a GitHub Actions workflow_dispatch event. Accepts workflow file name (e.g. "deploy.yml") or numeric ID, plus optional ref and input parameters.',
+    'Trigger a GitHub Actions workflow_dispatch event. Accepts workflow file name (e.g. "deploy.yml") or numeric ID, plus optional ref and input parameters. ' +
+      'Set waitForCompletion: true to block until the run finishes (or timeoutSeconds is reached) and return the final conclusion. ' +
+      'This is the MCP-native alternative to `gh run watch` for non-PR dispatched runs — avoids the shell fallback and session-resume watcher-death problem. ' +
+      'When waitForCompletion is false (default), the tool returns immediately and the agent must use ci_list_runs then ci_view_run to track the run. ' +
+      'Note: PR-associated runs notify natively via push events; use waitForCompletion only for workflow_dispatch runs that have no associated PR.',
     {
       workflow: z
         .union([z.string(), z.number().int()])
@@ -430,6 +434,24 @@ export function createServer(): McpServer {
         .describe(
           'Key-value map of workflow input parameters (all values must be strings). ' +
             'Accepts either a plain object or a JSON string.',
+        ),
+      waitForCompletion: coercedBoolean
+        .default(false)
+        .describe(
+          'When true, polls until the triggered run reaches a terminal state (completed) and returns ' +
+            '{ runId, runNumber, url, conclusion, durationSeconds }. ' +
+            'If the run does not complete within timeoutSeconds, returns { timedOut: true } plus a hint. ' +
+            'Use this instead of `gh run watch` for non-PR workflow_dispatch runs. Default: false.',
+        ),
+      timeoutSeconds: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(3600)
+        .default(600)
+        .describe(
+          'Maximum seconds to wait when waitForCompletion is true (default: 600, max: 3600). ' +
+            'The tool returns a timedOut result if the run has not completed by this deadline.',
         ),
     },
     async (params) => dispatchWorkflow(params),
