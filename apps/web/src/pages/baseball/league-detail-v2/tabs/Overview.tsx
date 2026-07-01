@@ -103,6 +103,15 @@ const QuickStandings: React.FC<{
           key={row.teamId ?? row.rank}
           className={`ls-qstandings-row ${row.isMine ? 'me' : ''}`}
           onClick={() => row.teamId != null && onTeam(row.teamId)}
+          role="button"
+          tabIndex={0}
+          aria-label={`Open ${row.name}`}
+          onKeyDown={(e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && row.teamId != null) {
+              e.preventDefault();
+              onTeam(row.teamId);
+            }
+          }}
         >
           <Rank n={row.rank} />
           <div
