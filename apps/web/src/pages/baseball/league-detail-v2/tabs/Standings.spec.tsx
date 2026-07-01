@@ -200,4 +200,20 @@ describe('StandingsTab', () => {
     );
     expect(screen.queryByTestId('playoff-bracket')).not.toBeInTheDocument();
   });
+
+  // BLD-032: playoffFormat is a commissioner-configured value and must not be
+  // shown to spectators in the standings subtitle (LS-5965).
+  it('does not expose playoffFormat in the subtitle shown to all viewers', () => {
+    mockStandings = [makeRow()];
+    render(
+      <StandingsTab
+        league={{ ...league, playoffFormat: 'Single elimination' }}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    const subtitle = mockStandingsTable.mock.calls[0][0].subtitle as string;
+    expect(subtitle).not.toContain('Single elimination');
+  });
 });
