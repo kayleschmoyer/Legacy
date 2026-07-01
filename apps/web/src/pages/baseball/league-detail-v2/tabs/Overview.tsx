@@ -145,7 +145,7 @@ const QuickStandings: React.FC<{
 export const DuesCompact: React.FC<{ leagueId: number }> = ({ leagueId }) => {
   const { data } = useGetLeagueDuesStatusQuery({
     variables: { leagueId },
-    fetchPolicy: 'cache-and-network',
+    fetchPolicy: 'cache-first',
     errorPolicy: 'all',
   });
   const settings = data?.leagueDuesSettings;
