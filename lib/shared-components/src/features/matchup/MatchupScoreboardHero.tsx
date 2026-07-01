@@ -188,49 +188,64 @@ interface StatusConfig {
 }
 
 function statusConfigFor(status?: string | null): StatusConfig {
-  if (status === MatchupStatus.InProgress) {
-    return {
-      bg: withAlpha(GREEN, 0.16),
-      border: withAlpha(GREEN, 0.5),
-      text: GREEN_LIGHT,
-      label: 'Live',
-      live: true,
-    };
-  }
-  if (status === MatchupStatus.Completed) {
-    return {
-      bg: withAlpha(BRAND_NAVY_LIGHT, 0.18),
-      border: withAlpha(BRAND_NAVY_LIGHT, 0.5),
-      text: BRAND_GOLD_LIGHT,
-      label: 'Final',
-      live: false,
-    };
-  }
-  if (status === MatchupStatus.Cancelled) {
+  if (status == null) {
     return {
       bg: withAlpha(TEXT_MUTED, 0.14),
       border: withAlpha(TEXT_MUTED, 0.4),
       text: TEXT_MUTED,
-      label: 'Cancelled',
+      label: 'Status unknown',
       live: false,
     };
   }
-  if (status === MatchupStatus.Scheduled) {
-    return {
-      bg: withAlpha(TEXT_MUTED, 0.14),
-      border: withAlpha(TEXT_MUTED, 0.4),
-      text: TEXT_MUTED,
-      label: 'Scheduled',
-      live: false,
-    };
+  // Cast to MatchupStatus so TypeScript enforces exhaustiveness via the never default.
+  const s = status as MatchupStatus;
+  switch (s) {
+    case MatchupStatus.InProgress:
+      return {
+        bg: withAlpha(GREEN, 0.16),
+        border: withAlpha(GREEN, 0.5),
+        text: GREEN_LIGHT,
+        label: 'Live',
+        live: true,
+      };
+    case MatchupStatus.Completed:
+      return {
+        bg: withAlpha(BRAND_NAVY_LIGHT, 0.18),
+        border: withAlpha(BRAND_NAVY_LIGHT, 0.5),
+        text: BRAND_GOLD_LIGHT,
+        label: 'Final',
+        live: false,
+      };
+    case MatchupStatus.Cancelled:
+      return {
+        bg: withAlpha(TEXT_MUTED, 0.14),
+        border: withAlpha(TEXT_MUTED, 0.4),
+        text: TEXT_MUTED,
+        label: 'Cancelled',
+        live: false,
+      };
+    case MatchupStatus.Scheduled:
+      return {
+        bg: withAlpha(TEXT_MUTED, 0.14),
+        border: withAlpha(TEXT_MUTED, 0.4),
+        text: TEXT_MUTED,
+        label: 'Scheduled',
+        live: false,
+      };
+    default: {
+      // Compile-time exhaustiveness: adding a new MatchupStatus without a case
+      // here will cause a TypeScript error.
+      const _exhaustive: never = s;
+      void _exhaustive;
+      return {
+        bg: withAlpha(TEXT_MUTED, 0.14),
+        border: withAlpha(TEXT_MUTED, 0.4),
+        text: TEXT_MUTED,
+        label: 'Status unknown',
+        live: false,
+      };
+    }
   }
-  return {
-    bg: withAlpha(TEXT_MUTED, 0.14),
-    border: withAlpha(TEXT_MUTED, 0.4),
-    text: TEXT_MUTED,
-    label: 'Status unknown',
-    live: false,
-  };
 }
 
 // ── Team panel ──────────────────────────────────────────────────────────────

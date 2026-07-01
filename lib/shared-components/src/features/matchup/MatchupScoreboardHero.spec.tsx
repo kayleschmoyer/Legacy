@@ -107,4 +107,32 @@ describe('MatchupScoreboardHero', () => {
     // renders but exposes no pressable handler for that side.
     expect(onTeamPress).not.toHaveBeenCalled();
   });
+
+  it('shows the Cancelled chip for cancelled matchups', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({ status: MatchupStatus.Cancelled })}
+      />,
+    );
+    expect(screen.getByText('Cancelled · Week 5')).toBeTruthy();
+  });
+
+  it('shows the Scheduled chip for scheduled matchups', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({ status: MatchupStatus.Scheduled })}
+      />,
+    );
+    expect(screen.getByText('Scheduled · Week 5')).toBeTruthy();
+  });
+
+  it('shows "Status unknown" chip when status is null', () => {
+    render(<MatchupScoreboardHero {...baseProps({ status: null })} />);
+    expect(screen.getByText('Status unknown · Week 5')).toBeTruthy();
+  });
+
+  it('shows "Status unknown" chip when status is undefined', () => {
+    render(<MatchupScoreboardHero {...baseProps({ status: undefined })} />);
+    expect(screen.getByText('Status unknown · Week 5')).toBeTruthy();
+  });
 });
