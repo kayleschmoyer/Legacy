@@ -85,10 +85,10 @@ export interface MLBHomeProps {
   onSignIn?: () => void;
   /** When provided, renders an "Invite Friends" action (mobile, LS-5203). */
   onInviteFriends?: () => void;
+  /** When provided, renders a "Browse Players" entry to player discovery (LS-5335, LS-5812). */
+  onBrowsePlayers?: () => void;
   /** When provided, the dialog shows an "Advanced settings" link. */
   onAdvancedCreate?: (leagueName: string) => void;
-  /** When provided, renders a "Browse Players" action linking to the players directory (LS-5812). */
-  onBrowsePlayers?: () => void;
   /** Free-tier league-cap context (mobile, LS-5182). */
   leagueCap?: MLBHomeLeagueCap;
   /** When true, renders an "Unlimited leagues" badge instead of the free-tier cap indicator (LS-5870). */
@@ -271,8 +271,8 @@ export function MLBHome({
   onRetry,
   onSignIn,
   onInviteFriends,
-  onAdvancedCreate,
   onBrowsePlayers,
+  onAdvancedCreate,
   leagueCap,
   isPremium,
   onSwitchSport,
@@ -469,6 +469,20 @@ export function MLBHome({
                   />
                 </YStack>
               ) : null}
+              {onBrowsePlayers ? (
+                <Button
+                  backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
+                  borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                  borderWidth={1}
+                  borderRadius="$5"
+                  onPress={onBrowsePlayers}
+                  accessibilityLabel="Browse baseball players"
+                >
+                  <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                    Browse Players
+                  </Text>
+                </Button>
+              ) : null}
               {onScoreboard ? (
                 <Button
                   backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
@@ -481,20 +495,6 @@ export function MLBHome({
                 >
                   <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                     Live Scores
-                  </Text>
-                </Button>
-              ) : null}
-              {onBrowsePlayers ? (
-                <Button
-                  backgroundColor={withAlpha(BRAND_NAVY, 0.14)}
-                  borderColor={withAlpha(BRAND_NAVY, 0.42)}
-                  borderWidth={1}
-                  borderRadius="$5"
-                  onPress={onBrowsePlayers}
-                  accessibilityLabel="Browse baseball players"
-                >
-                  <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
-                    Players
                   </Text>
                 </Button>
               ) : null}
@@ -604,6 +604,20 @@ export function MLBHome({
                     />
                   </YStack>
                 ) : null}
+                {onBrowsePlayers ? (
+                  <Button
+                    backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
+                    borderColor={withAlpha(BRAND_NAVY, 0.42)}
+                    borderWidth={1}
+                    borderRadius="$6"
+                    onPress={onBrowsePlayers}
+                    accessibilityLabel="Browse baseball players"
+                  >
+                    <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
+                      Browse Players
+                    </Text>
+                  </Button>
+                ) : null}
                 {onScoreboard ? (
                   <Button
                     backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
@@ -616,20 +630,6 @@ export function MLBHome({
                   >
                     <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                       Live Scores
-                    </Text>
-                  </Button>
-                ) : null}
-                {onBrowsePlayers ? (
-                  <Button
-                    backgroundColor={withAlpha(BRAND_NAVY, 0.12)}
-                    borderColor={withAlpha(BRAND_NAVY, 0.42)}
-                    borderWidth={1}
-                    borderRadius="$6"
-                    onPress={onBrowsePlayers}
-                    accessibilityLabel="Browse baseball players"
-                  >
-                    <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
-                      Players
                     </Text>
                   </Button>
                 ) : null}

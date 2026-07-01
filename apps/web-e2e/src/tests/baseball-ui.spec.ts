@@ -367,6 +367,38 @@ unauthTest.describe(
 // baseball hub heading.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Player Discovery Entry (LS-5335)
+// ---------------------------------------------------------------------------
+
+test.describe('Baseball Hub — Player Discovery Entry (LS-5335) @critical', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/baseball');
+    await page.waitForLoadState('load');
+  });
+
+  test('Browse Players button is visible on the baseball hub', async ({
+    page,
+  }) => {
+    // The hero buttons on the baseball hub use Tamagui Button components that
+    // render as role="button" divs; getByText matches text content reliably
+    // across all Tamagui rendering modes (mirrors the Create/Join League pattern).
+    await expect(page.getByText('Browse Players').first()).toBeVisible();
+  });
+
+  test('Browse Players button navigates to the players discovery list', async ({
+    page,
+  }) => {
+    const browseBtn = page
+      .getByRole('button', { name: /browse players/i })
+      .or(page.getByText('Browse Players').first());
+    await expect(browseBtn.first()).toBeVisible();
+    await browseBtn.first().click();
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL('/players');
+  });
+});
+
 test.describe('Baseball Hub — functional 404 regression (LS-3472) @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/baseball');
