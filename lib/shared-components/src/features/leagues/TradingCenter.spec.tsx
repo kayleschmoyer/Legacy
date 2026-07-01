@@ -933,6 +933,28 @@ describe('TradingCenter — Trade History pagination', () => {
     expect(utils.queryByText('Load more')).toBeNull();
   });
 
+  // Regression guard for BLD-034: completed trades must NOT be silently capped at 10.
+  it('renders all 11 completed trades when 11 are returned — no silent cap at 10', async () => {
+    const elevenTrades = makePageOfOffers(11, 200);
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: elevenTrades },
+      loading: false,
+      refetch: jest.fn(),
+      fetchMore: jest
+        .fn()
+        .mockResolvedValue({ data: { leagueTradeOffers: [] } }),
+    };
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await openHistory(utils);
+    await waitFor(() => {
+      expect(utils.getAllByText('ACCEPTED')).toHaveLength(11);
+    });
+    // 11 < PAGE_SIZE so no "Load more" button
+    expect(utils.queryByText('Load more')).toBeNull();
+  });
+
   it('appends next page when Load more is clicked', async () => {
     const firstPage = makePageOfOffers(PAGE_SIZE, 200);
     const secondPage = makePageOfOffers(3, 300);
