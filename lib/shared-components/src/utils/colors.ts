@@ -163,6 +163,11 @@ export const SLATE_300 = '#CBD5E1';
 export const SLATE_100 = '#F1F5F9';
 export const GRAY_50 = '#F9FAFB';
 
+// -- Rank Badge Colors -----------------------------------------------
+
+/** Silver medal tone for 2nd-place rank badges in standings tables. */
+export const RANK_SILVER = '#A8A9AD';
+
 // -- Neutrals --------------------------------------------------------
 
 export const GRAY = '#6B7280';

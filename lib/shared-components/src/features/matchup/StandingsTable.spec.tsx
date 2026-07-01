@@ -277,4 +277,39 @@ describe('StandingsTable', () => {
     );
     expect(getByText('Sorted by win percentage')).toBeTruthy();
   });
+
+  it('renders rank badges with numeric positions', () => {
+    const { getByText } = render(<StandingsTable standings={mockStandings} />);
+    // Rank badges show 1, 2, 3 for three teams
+    expect(getByText('1')).toBeTruthy();
+    expect(getByText('2')).toBeTruthy();
+    expect(getByText('3')).toBeTruthy();
+  });
+
+  it('renders Waiver column header when showWaiverOrder is true', () => {
+    const { getByText } = render(
+      <StandingsTable standings={mockStandings} showWaiverOrder />,
+    );
+    expect(getByText('Waiver')).toBeTruthy();
+  });
+
+  it('does not render Waiver column header when showWaiverOrder is false', () => {
+    const { queryByText } = render(
+      <StandingsTable standings={mockStandings} showWaiverOrder={false} />,
+    );
+    expect(queryByText('Waiver')).toBeNull();
+  });
+
+  it('renders waiver order values from waiverOrders map', () => {
+    const { getByText } = render(
+      <StandingsTable
+        standings={mockStandings}
+        showWaiverOrder
+        waiverOrders={{ '1': 15, '2': 11, '3': 13 }}
+      />,
+    );
+    expect(getByText('15')).toBeTruthy();
+    expect(getByText('11')).toBeTruthy();
+    expect(getByText('13')).toBeTruthy();
+  });
 });

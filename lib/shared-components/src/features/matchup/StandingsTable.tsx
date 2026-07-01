@@ -1,8 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import { Card, H3, Separator, Text, XStack, YStack } from 'tamagui';
+import { Eye } from '@tamagui/lucide-icons';
 import { type GetLeagueStandingsQuery } from '@legacy-sports/graphql';
-import { BRAND_GOLD, BRAND_GOLD_LIGHT, withAlpha } from '../../utils/colors';
+import {
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
+  GRAY,
+  RANK_SILVER,
+  withAlpha,
+} from '../../utils/colors';
 import { AvatarImage } from '../../components/AvatarImage';
+
+function rankBadgeColor(rank: number): string {
+  if (rank === 1 || rank === 3) return BRAND_GOLD;
+  if (rank === 2) return RANK_SILVER;
+  return GRAY;
+}
 
 type StandingRecord = NonNullable<
   GetLeagueStandingsQuery['getLeagueStandings']
@@ -23,6 +36,10 @@ export interface StandingsTableProps {
   title?: string;
   /** Optional subtitle rendered under the title. */
   subtitle?: string;
+  /** When true, renders the Waiver Order column. */
+  showWaiverOrder?: boolean;
+  /** Map of teamId (string) → waiver order position. */
+  waiverOrders?: Record<string, number>;
 }
 
 type SortKey =
@@ -99,6 +116,8 @@ interface StandingsRowProps {
   rank: number;
   isCurrentUser: boolean;
   onTeamPress?: (teamId: number) => void;
+  waiverOrder?: number | null;
+  showWaiverOrder?: boolean;
 }
 
 function StandingsRow({
@@ -107,7 +126,10 @@ function StandingsRow({
   rank,
   isCurrentUser,
   onTeamPress,
+  waiverOrder,
+  showWaiverOrder,
 }: StandingsRowProps) {
+  const [hovered, setHovered] = useState(false);
   const teamId = standing.teamId != null ? Number(standing.teamId) : null;
   const pressable = onTeamPress != null && teamId != null;
   const diff = diffOf(standing);
@@ -119,6 +141,7 @@ function StandingsRow({
         : diff < 0
           ? '$red10'
           : undefined;
+  const badgeColor = rankBadgeColor(rank);
 
   return (
     <XStack
@@ -137,6 +160,8 @@ function StandingsRow({
       gap="$2"
       cursor={pressable ? 'pointer' : undefined}
       hoverStyle={pressable ? { backgroundColor: '$gray3' } : undefined}
+      onHoverIn={pressable ? () => setHovered(true) : undefined}
+      onHoverOut={pressable ? () => setHovered(false) : undefined}
       onPress={pressable ? () => onTeamPress(teamId) : undefined}
     >
       <YStack
@@ -146,9 +171,18 @@ function StandingsRow({
         alignItems="center"
         justifyContent="center"
       >
-        <Text fontSize="$3" fontWeight="bold" color="$gray11">
-          {rank}
-        </Text>
+        <YStack
+          width={28}
+          height={28}
+          borderRadius={14}
+          backgroundColor={withAlpha(badgeColor, 0.18)}
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Text fontSize="$2" fontWeight="bold" color={badgeColor}>
+            {rank}
+          </Text>
+        </YStack>
       </YStack>
       <YStack
         tag="td"
@@ -184,6 +218,7 @@ function StandingsRow({
               You
             </Text>
           ) : null}
+          {hovered && pressable ? <Eye size={14} color="$gray10" /> : null}
         </XStack>
       </YStack>
       <YStack tag="td" role="cell" width={44} alignItems="center">
@@ -250,6 +285,20 @@ function StandingsRow({
           {diff == null ? '—' : `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`}
         </Text>
       </YStack>
+      {showWaiverOrder ? (
+        <YStack
+          tag="td"
+          role="cell"
+          width={60}
+          alignItems="center"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
+          <Text fontSize="$3" color="$gray11">
+            {waiverOrder ?? '—'}
+          </Text>
+        </YStack>
+      ) : null}
     </XStack>
   );
 }
@@ -270,6 +319,8 @@ export function StandingsTable({
   onTeamPress,
   title = 'League Standings',
   subtitle,
+  showWaiverOrder = false,
+  waiverOrders,
 }: StandingsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('winPct');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -466,6 +517,21 @@ export function StandingsTable({
         >
           <SortButton label="Diff" sortKeyValue="diff" />
         </YStack>
+        {showWaiverOrder ? (
+          <YStack
+            tag="th"
+            {...{ scope: 'col' }}
+            role="columnheader"
+            width={60}
+            alignItems="center"
+            display="none"
+            $gtMd={{ display: 'flex' }}
+          >
+            <Text fontSize="$3" fontWeight="bold" color="$gray11">
+              Waiver
+            </Text>
+          </YStack>
+        ) : null}
       </XStack>
     </YStack>
   );
@@ -510,6 +576,12 @@ export function StandingsTable({
                       rank={index + 1}
                       isCurrentUser={isCurrentUser(standing)}
                       onTeamPress={onTeamPress}
+                      showWaiverOrder={showWaiverOrder}
+                      waiverOrder={
+                        standing.teamId != null
+                          ? waiverOrders?.[standing.teamId]
+                          : undefined
+                      }
                     />
                   ))}
                 </YStack>
@@ -529,6 +601,12 @@ export function StandingsTable({
                 rank={index + 1}
                 isCurrentUser={isCurrentUser(standing)}
                 onTeamPress={onTeamPress}
+                showWaiverOrder={showWaiverOrder}
+                waiverOrder={
+                  standing.teamId != null
+                    ? waiverOrders?.[standing.teamId]
+                    : undefined
+                }
               />
             ))}
           </YStack>

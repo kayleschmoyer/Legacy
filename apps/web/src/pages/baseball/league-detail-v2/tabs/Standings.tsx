@@ -71,6 +71,19 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
       }));
   }, [standings, teams]);
 
+  const showWaiverOrder = league.waiverEnabled === true;
+
+  const waiverOrders = useMemo(() => {
+    if (!showWaiverOrder) return undefined;
+    const map: Record<string, number> = {};
+    for (const team of teams) {
+      if (team.id != null && team.waiverOrder != null) {
+        map[String(team.id)] = team.waiverOrder;
+      }
+    }
+    return map;
+  }, [showWaiverOrder, teams]);
+
   const subtitle = standingsLoading
     ? 'Loading…'
     : isFootball
@@ -86,6 +99,8 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         onTeamPress={onTeam}
         title="League Standings"
         subtitle={subtitle}
+        showWaiverOrder={showWaiverOrder}
+        waiverOrders={waiverOrders}
       />
 
       {bracketData?.getPlayoffBracket ? (
