@@ -38,6 +38,28 @@ const BodyText = styled(Paragraph, {
   lineHeight: 24,
 });
 
+const tableStyle: React.CSSProperties = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  fontSize: 13,
+};
+
+const thStyle: React.CSSProperties = {
+  fontWeight: 600,
+  textAlign: 'left',
+  padding: '8px 12px 8px 0',
+  borderBottom: '2px solid #333',
+  color: '#e5e5e5',
+};
+
+const tdStyle: React.CSSProperties = {
+  color: '#a3a3a3',
+  padding: '8px 12px 8px 0',
+  borderBottom: '1px solid #333',
+  verticalAlign: 'top',
+  lineHeight: '20px',
+};
+
 export default function PrivacyPolicyPage() {
   const navigate = useNavigate();
 
@@ -108,11 +130,144 @@ export default function PrivacyPolicyPage() {
       <Section>
         <SectionTitle>6. Third-Party Services</SectionTitle>
         <BodyText>
-          The Service may integrate with third-party authentication providers
-          (such as Google or Discord). These services have their own privacy
-          policies, and we encourage you to review them. We are not responsible
-          for the privacy practices of third-party services.
+          We share data with the following third-party processors to operate the
+          Service. Each processor is bound by its own privacy policy; we
+          encourage you to review them. We are not responsible for the privacy
+          practices of third-party services.
         </BodyText>
+
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th scope="col" style={thStyle}>
+                Service
+              </th>
+              <th scope="col" style={thStyle}>
+                Purpose
+              </th>
+              <th scope="col" style={thStyle}>
+                Data Shared
+              </th>
+              <th scope="col" style={thStyle}>
+                Privacy Policy
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={tdStyle}>Google</td>
+              <td style={tdStyle}>Authentication (Sign in with Google)</td>
+              <td style={tdStyle}>Email address, name, profile picture</td>
+              <td style={tdStyle}>
+                <a
+                  href="https://policies.google.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  policies.google.com/privacy
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style={tdStyle}>Discord</td>
+              <td style={tdStyle}>Authentication (Sign in with Discord)</td>
+              <td style={tdStyle}>Discord username, email address</td>
+              <td style={tdStyle}>
+                <a
+                  href="https://discord.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  discord.com/privacy
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style={tdStyle}>Stripe</td>
+              <td style={tdStyle}>
+                Payment processing and subscription billing
+              </td>
+              <td style={tdStyle}>
+                Name, email address, payment card details, billing address
+              </td>
+              <td style={tdStyle}>
+                <a
+                  href="https://stripe.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  stripe.com/privacy
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style={tdStyle}>Rollbar</td>
+              <td style={tdStyle}>Error monitoring and crash reporting</td>
+              <td style={tdStyle}>
+                Stack traces, device info, may include user identifiers in error
+                context
+              </td>
+              <td style={tdStyle}>
+                <a
+                  href="https://rollbar.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  rollbar.com/privacy
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style={tdStyle}>Expo (expo-notifications)</td>
+              <td style={tdStyle}>Push notification delivery</td>
+              <td style={tdStyle}>Device push token</td>
+              <td style={tdStyle}>
+                <a
+                  href="https://expo.dev/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  expo.dev/privacy
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style={tdStyle}>Apple (App Store / IAP)</td>
+              <td style={tdStyle}>In-app purchase processing (iOS)</td>
+              <td style={tdStyle}>Purchase receipts, Apple customer ID</td>
+              <td style={tdStyle}>
+                <a
+                  href="https://www.apple.com/legal/privacy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  apple.com/legal/privacy
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style={tdStyle}>Google (Google Play Billing)</td>
+              <td style={tdStyle}>In-app purchase processing (Android)</td>
+              <td style={tdStyle}>Purchase receipts, Google customer ID</td>
+              <td style={tdStyle}>
+                <a
+                  href="https://policies.google.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: BRAND_GOLD }}
+                >
+                  policies.google.com/privacy
+                </a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </Section>
 
       <Section>
