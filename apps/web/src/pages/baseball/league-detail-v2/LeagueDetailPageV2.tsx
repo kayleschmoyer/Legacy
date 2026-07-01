@@ -48,7 +48,7 @@ function LeagueWSPageHandler({
   return null;
 }
 
-const ROLE_KEY = 'ls-v2-role';
+const roleKey = (leagueId: number) => `ls-v2-role:${leagueId}`;
 
 // Backward-compatible URL mapping. Legacy LeagueDetailPage accepted these tab
 // slugs in addition to V2's canonical IDs; preserved so old bookmarks and
@@ -175,30 +175,59 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const [storedRole, setStoredRole] = useState<string>(() => {
-    if (typeof window === 'undefined') return '';
+    if (typeof window === 'undefined' || !Number.isFinite(leagueId)) return '';
     try {
-      return window.localStorage.getItem(ROLE_KEY) ?? '';
+      return window.localStorage.getItem(roleKey(leagueId)) ?? '';
     } catch {
       return '';
     }
   });
+
+  // Re-read from localStorage when leagueId changes (navigation between leagues).
+  useEffect(() => {
+    if (!Number.isFinite(leagueId)) return;
+    try {
+      setStoredRole(window.localStorage.getItem(roleKey(leagueId)) ?? '');
+    } catch {
+      setStoredRole('');
+    }
+  }, [leagueId]);
+
+  // Clear the stored role preference when the user loses membership so stale
+  // role state cannot survive leaving a league or the commissioner deleting it.
+  useEffect(() => {
+    if (!userTeamIdSettled || !Number.isFinite(leagueId)) return;
+    if (!isMember && !isCommissioner) {
+      setStoredRole('');
+      try {
+        window.localStorage.removeItem(roleKey(leagueId));
+      } catch {
+        // storage unavailable — no-op
+      }
+    }
+  }, [isMember, isCommissioner, userTeamIdSettled, leagueId]);
+
   const role: LeagueRole = useMemo(() => {
     if (storedRole === 'commish' && isCommissioner) return 'commish';
     if (storedRole === 'member' && isMember) return 'member';
     if (storedRole === 'spectator') return 'spectator';
     return isCommissioner ? 'commish' : isMember ? 'member' : 'spectator';
   }, [isCommissioner, isMember, storedRole]);
-  const setRole = useCallback((r: LeagueRole) => {
-    setStoredRole(r);
-    try {
-      window.localStorage.setItem(ROLE_KEY, r);
-    } catch (err: unknown) {
-      // Pass the Error instance as a non-message arg so Rollbar / LogArgs
-      // can extract the stack trace; never wrap it in `{ err }`.
-      const errorArg = err instanceof Error ? err : new Error(String(err));
-      LOGGER.debug('LeagueDetailV2: localStorage unavailable', errorArg);
-    }
-  }, []);
+  const setRole = useCallback(
+    (r: LeagueRole) => {
+      setStoredRole(r);
+      if (!Number.isFinite(leagueId)) return;
+      try {
+        window.localStorage.setItem(roleKey(leagueId), r);
+      } catch (err: unknown) {
+        // Pass the Error instance as a non-message arg so Rollbar / LogArgs
+        // can extract the stack trace; never wrap it in `{ err }`.
+        const errorArg = err instanceof Error ? err : new Error(String(err));
+        LOGGER.debug('LeagueDetailV2: localStorage unavailable', errorArg);
+      }
+    },
+    [leagueId],
+  );
 
   const effIsCommish = role === 'commish' && isCommissioner;
   const effIsMember = effIsCommish || role === 'member';
