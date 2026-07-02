@@ -84,8 +84,6 @@ interface BatchThreadsResponse {
   };
 }
 
-const PENDING_STATUSES = new Set(['IN_PROGRESS', 'QUEUED', 'PENDING']);
-
 /**
  * Map CI check names to PR labels. Each entry is a regex tested against the
  * failed check name and the label to apply when it matches. Order matters —
@@ -467,9 +465,7 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         (c) => c.conclusion && FAILED_CONCLUSIONS.has(c.conclusion),
       );
       const pending = checks.filter(
-        (c) =>
-          (!c.conclusion || c.conclusion === '') &&
-          PENDING_STATUSES.has(c.status),
+        (c) => !c.conclusion || c.conclusion === '',
       );
 
       if (failed.length > 0) {

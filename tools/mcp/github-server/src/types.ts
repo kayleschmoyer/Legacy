@@ -20,11 +20,15 @@ export const FAILED_CONCLUSIONS = new Set([
   'TIMED_OUT',
 ]);
 
-const PENDING_STATUSES = new Set(['IN_PROGRESS', 'QUEUED', 'PENDING']);
+const PASS_CONCLUSIONS = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);
 
 /**
  * Summarize CI status from a list of checks.
- * Aligned with FAILED_CONCLUSIONS / PENDING_STATUSES sets.
+ * Aligned with FAILED_CONCLUSIONS / PASS_CONCLUSIONS sets.
+ *
+ * Any conclusion not in FAILED_CONCLUSIONS or PASS_CONCLUSIONS is treated as
+ * pending so that new GitHub statuses (e.g. AWAITING_COMMISSIONER_REVIEW) are
+ * never silently reported as passing.
  *
  * Returns: 'none' | 'pass' | 'fail' | 'pending'
  */
@@ -34,7 +38,6 @@ export function summarizeCIStatus(checks: CICheck[] | null): string {
   const conclusions = checks.map((c) => c.conclusion ?? c.status);
 
   if (conclusions.some((c) => FAILED_CONCLUSIONS.has(c))) return 'fail';
-  if (conclusions.some((c) => PENDING_STATUSES.has(c))) return 'pending';
-  // Everything remaining is SUCCESS, SKIPPED, NEUTRAL, or similar non-failing
+  if (conclusions.some((c) => !PASS_CONCLUSIONS.has(c))) return 'pending';
   return 'pass';
 }
