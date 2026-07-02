@@ -55,7 +55,7 @@ export const League = builder.objectRef<{
     | 'completed';
   /** Lifecycle phase: pre-draft, active, or offseason */
   leaguePhase: 'pre-draft' | 'active' | 'offseason';
-  inviteCode: string;
+  inviteCode: string | null;
   playerPool: 'all' | 'nl' | 'al' | 'nfl' | 'afc' | 'nfc';
   weekAdvanceStatus?: 'idle' | 'queued' | 'processing' | 'success' | 'failed';
   waiverType?: 'standard' | 'faab';
@@ -143,7 +143,17 @@ League.implement({
         'Lifecycle phase of the league: pre-draft (awaiting draft), ' +
         'active (season in play), offseason (post-renewal, before commissioner starts new season)',
     }),
-    inviteCode: t.exposeString('inviteCode'),
+    inviteCode: t.string({
+      nullable: true,
+      description:
+        'League invite code. Null for non-members — only league members and the owner receive this value.',
+      resolve: (parent, _args, context) => {
+        if (!context.user) return null;
+        // userMembership === null means getLeagueById explicitly found no membership for this user
+        if (parent.userMembership === null) return null;
+        return parent.inviteCode || null;
+      },
+    }),
     playerPool: t.exposeString('playerPool'),
     weekAdvanceStatus: t.exposeString('weekAdvanceStatus', { nullable: true }),
     waiverType: t.exposeString('waiverType', { nullable: true }),

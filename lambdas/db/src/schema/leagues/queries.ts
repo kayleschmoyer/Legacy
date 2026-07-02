@@ -156,8 +156,8 @@ builder.queryField('league', (t) =>
           );
         }
 
-        // Non-members (spectators) do not receive the invite code; use empty string since the field is non-nullable
-        const inviteCode = userMembership ? (league.inviteCode ?? '') : '';
+        // Non-members (spectators) do not receive the invite code.
+        const inviteCode = userMembership ? (league.inviteCode ?? null) : null;
 
         return {
           id: league.id,
