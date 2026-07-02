@@ -229,16 +229,39 @@ export const DuesCompact: React.FC<{ leagueId: number }> = ({ leagueId }) => {
 
 const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
   const [copied, setCopied] = useState<'link' | 'code' | null>(null);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const inviteUrl = league.inviteCode
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/baseball/league/join/${league.inviteCode}`
     : '';
-  const copy = (what: 'link' | 'code', text: string) => {
+  const copy = async (what: 'link' | 'code', text: string) => {
+    let success = false;
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(text).catch(() => undefined);
+      try {
+        await navigator.clipboard.writeText(text);
+        success = true;
+      } catch {
+        // fall through to execCommand fallback
+      }
     }
-    setCopied(what);
-    setTimeout(() => setCopied(null), 1500);
+    if (!success && typeof document !== 'undefined') {
+      const el = document.createElement('input');
+      el.value = text;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      success = document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+    if (success) {
+      setCopied(what);
+      setCopyFailed(false);
+      setTimeout(() => setCopied(null), 1500);
+    } else {
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 3000);
+    }
   };
   const inviteReady = Boolean(league.inviteCode);
   return (
@@ -264,7 +287,9 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
               type="button"
               aria-label="Copy invite link"
               className={`ls-copy-btn ${copied === 'link' ? 'ok' : ''}`}
-              onClick={() => copy('link', inviteUrl)}
+              onClick={() => {
+                void copy('link', inviteUrl);
+              }}
             >
               {copied === 'link' ? (
                 <>
@@ -298,7 +323,9 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
               type="button"
               aria-label="Copy invite code"
               className={`ls-copy-btn ${copied === 'code' ? 'ok' : ''}`}
-              onClick={() => copy('code', league.inviteCode ?? '')}
+              onClick={() => {
+                void copy('code', league.inviteCode ?? '');
+              }}
             >
               {copied === 'code' ? (
                 <>
@@ -318,6 +345,14 @@ const InviteCard: React.FC<{ league: LeagueFragment }> = ({ league }) => {
             style={{ fontSize: 12, color: 'var(--fg-ok, #6fd39a)' }}
           >
             {copied === 'link' ? 'Invite link copied' : 'Invite code copied'}
+          </div>
+        )}
+        {copyFailed && (
+          <div
+            role="alert"
+            style={{ fontSize: 12, color: 'var(--fg-error, #f87171)' }}
+          >
+            Copy failed — long-press to copy
           </div>
         )}
         <button
