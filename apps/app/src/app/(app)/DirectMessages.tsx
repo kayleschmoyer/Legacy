@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft, MessageSquare, Send, Users } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import { captureError } from '@legacy-sports/rollbar/native';
 import { Button } from '@legacy-sports/shared-components';
 
 import {
@@ -55,7 +56,8 @@ function ConversationThread({
       }, 100);
     },
     onError: (error) => {
-      LOGGER.error('Failed to send message:', error.message);
+      LOGGER.error('Failed to send message:', error);
+      captureError(error, { tag: 'dm-send-failed' });
     },
   });
 
