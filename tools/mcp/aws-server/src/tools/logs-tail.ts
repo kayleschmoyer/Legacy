@@ -58,6 +58,8 @@ const defaultRunner: CommandRunner = (cmd, args, cwd) =>
 
 interface CommonParams {
   since: string;
+  startTime?: string;
+  endTime?: string;
   filter?: string;
   environment: string;
   maxLines: number;
@@ -72,6 +74,8 @@ export interface LogsTailParams extends CommonParams {
 export interface LogsTailSingleSuccess {
   logGroup: string;
   since: string;
+  startTime?: string;
+  endTime?: string;
   filter: string | null;
   truncated: boolean;
   totalLines?: number;
@@ -129,6 +133,8 @@ export function extractErrorLines(lines: readonly string[]): string[] {
 interface MarkdownInput {
   logGroup: string;
   since: string;
+  startTime?: string;
+  endTime?: string;
   filter: string | null;
   rawText: string;
   totalLines: number;
@@ -146,9 +152,13 @@ export function renderLogsAsMarkdown(input: MarkdownInput): string {
   const errorLines = extractErrorLines(lines);
   const recent = lines.slice(-RECENT_LINES);
 
+  const timeLabel = input.startTime
+    ? `${input.startTime} → ${input.endTime ?? 'now'}`
+    : input.since;
+
   const header = [
     `**logGroup**: ${input.logGroup}`,
-    `**since**: ${input.since}`,
+    `**since**: ${timeLabel}`,
     `**filter**: ${input.filter ?? '(none)'}`,
     input.truncated
       ? `**lines**: ${input.shownLines} shown / ${input.totalLines} total (truncated)`
@@ -198,6 +208,8 @@ function renderSingleResultAsMarkdown(
   return renderLogsAsMarkdown({
     logGroup: result.logGroup,
     since,
+    startTime: result.startTime,
+    endTime: result.endTime,
     filter: result.filter,
     rawText: result.logs,
     totalLines: result.totalLines ?? lineCount,
@@ -214,14 +226,15 @@ async function fetchOne(
   const repoRoot = getRepoRoot();
   const logGroup = toLogGroup(fn, params.environment);
 
-  const args = [
-    'logs',
-    'tail',
-    logGroup,
-    '--since',
-    params.since,
-    '--no-cli-pager',
-  ];
+  const args = ['logs', 'tail', logGroup, '--no-cli-pager'];
+  if (params.startTime) {
+    args.push('--start-time', String(new Date(params.startTime).getTime()));
+    if (params.endTime) {
+      args.push('--end-time', String(new Date(params.endTime).getTime()));
+    }
+  } else {
+    args.push('--since', params.since);
+  }
   if (params.filter) {
     args.push('--filter-pattern', params.filter);
   }
@@ -236,6 +249,8 @@ async function fetchOne(
     return {
       logGroup,
       since: params.since,
+      ...(params.startTime ? { startTime: params.startTime } : {}),
+      ...(params.endTime ? { endTime: params.endTime } : {}),
       filter: params.filter ?? null,
       truncated,
       ...(truncated
@@ -261,10 +276,10 @@ async function fetchOne(
       remedy: isSsoError
         ? 'Run `aws sso login` to re-authenticate, then retry.'
         : isUnknownOptionsError
-          ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, functions, since, filter, environment, maxLines, format. Check that no unexpected fields were passed.'
+          ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, functions, since, startTime, endTime, filter, environment, maxLines, format. Check that no unexpected fields were passed.'
           : null,
       hint: isUnknownOptionsError
-        ? 'Retry with only the documented aws_logs_tail input fields (function | functions, since [default: 1h], filter [optional], environment [dev|prod, default: dev], maxLines [optional], format [markdown|json, default: markdown]). Remove any extra or misspelled fields.'
+        ? 'Retry with only the documented aws_logs_tail input fields (function | functions, since [default: 1h], startTime [ISO-8601, optional], endTime [ISO-8601, optional], filter [optional], environment [dev|prod, default: dev], maxLines [optional], format [markdown|json, default: markdown]). Remove any extra or misspelled fields.'
         : null,
     };
   }
