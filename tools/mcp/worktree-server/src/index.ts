@@ -966,7 +966,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_commit',
       description:
-        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Auto-appends Co-Authored-By.',
+        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Auto-appends Co-Authored-By.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1001,6 +1001,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'boolean',
             description:
               'Amend previous commit. If message is provided, replaces the commit message; otherwise uses --no-edit.',
+          },
+          resetAuthor: {
+            type: 'boolean',
+            description:
+              'When combined with amend: true, passes --reset-author to git commit. Use this in cloud sessions to fix the commit author (git config user.email + --reset-author). Has no effect without amend: true.',
           },
         },
         required: [],
@@ -1874,7 +1879,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           items: {
             type: 'array',
             description:
-              'Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend.',
+              'Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor.',
             items: {
               type: 'object',
               properties: {
@@ -1900,6 +1905,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
                   type: 'boolean',
                   description:
                     'Amend previous commit. Same semantics as worktree_commit.amend.',
+                },
+                resetAuthor: {
+                  type: 'boolean',
+                  description:
+                    'Reset commit author when amending. Same semantics as worktree_commit.resetAuthor.',
                 },
               },
               required: ['worktree'],
@@ -2638,6 +2648,7 @@ const handleCallTool = async (
         worktreeKey,
         worktreeId,
         amend,
+        resetAuthor,
       } = args as {
         message?: string;
         files?: unknown;
@@ -2645,6 +2656,7 @@ const handleCallTool = async (
         worktreeKey?: unknown;
         worktreeId?: unknown;
         amend?: boolean;
+        resetAuthor?: boolean;
       };
       // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
       // from older documentation or habit).
@@ -2933,6 +2945,19 @@ const handleCallTool = async (
         headExists = false;
       }
 
+      // resetAuthor only makes sense with amend — reject early to avoid confusion.
+      if (resetAuthor && !amend) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'resetAuthor: true requires amend: true. Pass both together to fix the commit author.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
       // Amend requires an existing commit — reject early with a clear message.
       if (amend && !headExists) {
         return {
@@ -3024,7 +3049,9 @@ const handleCallTool = async (
           );
           writeFileSync(msgPath, fullMessage, 'utf-8');
           try {
-            runGit(['commit', '--amend', '-F', msgPath], cwd, {
+            const amendArgs = ['commit', '--amend', '-F', msgPath];
+            if (resetAuthor) amendArgs.push('--reset-author');
+            runGit(amendArgs, cwd, {
               env: NON_INTERACTIVE_COMMIT_ENV,
             });
           } finally {
@@ -3035,7 +3062,9 @@ const handleCallTool = async (
             }
           }
         } else if (amend) {
-          runGit(['commit', '--amend', '--no-edit'], cwd, {
+          const amendArgs = ['commit', '--amend', '--no-edit'];
+          if (resetAuthor) amendArgs.push('--reset-author');
+          runGit(amendArgs, cwd, {
             env: NON_INTERACTIVE_COMMIT_ENV,
           });
         } else {
@@ -3075,6 +3104,7 @@ const handleCallTool = async (
           message: commitMessage,
           filesChanged: filesChanged.split('\n').filter(Boolean),
           ...(amend ? { amended: true } : {}),
+          ...(resetAuthor ? { resetAuthor: true } : {}),
         };
 
         return {
