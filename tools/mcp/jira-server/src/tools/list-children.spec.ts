@@ -80,4 +80,66 @@ describe('listChildren', () => {
     expect(text(result)).toContain('Invalid Jira issue key');
     expect(mockSearchJql).not.toHaveBeenCalled();
   });
+
+  describe('paginate: true', () => {
+    it('fetches all pages and returns compact JSON', async () => {
+      mockSearchJql
+        .mockResolvedValueOnce({ issues: children, nextPageToken: 'PAGE2' })
+        .mockResolvedValueOnce({ issues: [children[0]] });
+
+      const result = await listChildren({ key: 'LS-1', paginate: true });
+      const payload = JSON.parse(text(result));
+
+      expect(payload.parent).toBe('LS-1');
+      expect(payload.total).toBe(3);
+      expect(payload.children).toHaveLength(3);
+      expect(payload.children[0]).toEqual({
+        key: 'LS-100',
+        summary: 'Child one',
+        status: 'To Do',
+      });
+      expect(payload.truncated).toBeUndefined();
+      expect(mockSearchJql).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops at 500-item cap and sets truncated: true', async () => {
+      const bigPage = Array.from({ length: 100 }, (_, i) => ({
+        key: `LS-${200 + i}`,
+        fields: {
+          summary: `Child ${i}`,
+          status: { name: 'To Do' },
+          issuetype: { name: 'Task' },
+          priority: null,
+          created: '2026-06-01T00:00:00.000-0400',
+        },
+      }));
+
+      // 6 pages of 100 = 600 items, should cap at 500
+      mockSearchJql.mockResolvedValue({
+        issues: bigPage,
+        nextPageToken: 'NEXT',
+      });
+
+      const result = await listChildren({ key: 'LS-1', paginate: true });
+      const payload = JSON.parse(text(result));
+
+      expect(payload.total).toBe(500);
+      expect(payload.children).toHaveLength(500);
+      expect(payload.truncated).toBe(true);
+      // Should have stopped after 5 pages (500 items)
+      expect(mockSearchJql).toHaveBeenCalledTimes(5);
+    });
+
+    it('includes status filter in JQL when status is provided', async () => {
+      mockSearchJql.mockResolvedValueOnce({ issues: children });
+
+      await listChildren({ key: 'LS-1', paginate: true, status: 'To Do' });
+
+      expect(mockSearchJql).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jql: expect.stringContaining('"To Do"'),
+        }),
+      );
+    });
+  });
 });

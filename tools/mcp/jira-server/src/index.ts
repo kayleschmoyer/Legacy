@@ -379,7 +379,7 @@ server.tool(
 // --- jira_list_children ---
 server.tool(
   'jira_list_children',
-  'List child tickets of an epic or story. Returns paginated results (default 25 per page). Pass pageToken=<nextPageToken> from a previous response to fetch the next page.',
+  'List child tickets of an epic or story. Returns paginated results (default 25 per page). Pass pageToken=<nextPageToken> from a previous response to fetch the next page. Set paginate: true to fetch ALL children in one call (returns compact JSON with key + summary + status, capped at 500 items).',
   {
     key: z
       .string()
@@ -403,6 +403,12 @@ server.tool(
       .string()
       .optional()
       .describe('Cursor token from a previous response to fetch the next page'),
+    paginate: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, fetches all children across all pages automatically. Returns compact JSON { parent, total, children: [{key, summary, status}], truncated? }. Hard-capped at 500 children.',
+      ),
   },
   async (params) => listChildren(params),
 );
