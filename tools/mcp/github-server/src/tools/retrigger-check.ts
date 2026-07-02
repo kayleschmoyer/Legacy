@@ -16,6 +16,7 @@ interface CheckRun {
   name: string;
   status: string;
   conclusion: string | null;
+  app?: { slug: string };
 }
 
 interface CheckRunsResponse {
@@ -119,6 +120,7 @@ export async function retriggerCheck(
     id: number;
     retriggered: boolean;
     error?: string;
+    fallback?: string;
   }> = [];
 
   for (const run of toRetrigger) {
@@ -129,12 +131,32 @@ export async function retriggerCheck(
       });
       results.push({ name: run.name, id: run.id, retriggered: true });
     } catch (error) {
-      results.push({
-        name: run.name,
-        id: run.id,
-        retriggered: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      // GitHub's rerequest API returns 403 "Invalid check_run_id" for check runs
+      // owned by the github-actions app (e.g. workflow_dispatch checks). These
+      // cannot be re-requested via the Checks API and must be dispatched directly.
+      if (
+        /invalid check_run_id/i.test(message) &&
+        run.app?.slug === 'github-actions'
+      ) {
+        results.push({
+          name: run.name,
+          id: run.id,
+          retriggered: false,
+          error:
+            `This check run belongs to GitHub Actions and cannot be re-requested via the Checks API. ` +
+            `Dispatch the source workflow directly using: ` +
+            `ci_dispatch_workflow(workflow: '<workflow-file>', ref: '<branch>').`,
+          fallback: 'ci_dispatch_workflow',
+        });
+      } else {
+        results.push({
+          name: run.name,
+          id: run.id,
+          retriggered: false,
+          error: message,
+        });
+      }
     }
   }
 
