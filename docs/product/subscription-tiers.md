@@ -90,6 +90,7 @@ matrix becomes fully 🔒:
 | Feature                                                                             | Intended key             | Reference                                                                                                                                                               |
 | ----------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Expert injury analysis (practice log, analyst note, IR timeline, game-time tracker) | `expert_injury_analysis` | [`docs/architecture/injury-analysis-tiers.md`](../architecture/injury-analysis-tiers.md) (LS-6254 / FPD-026). Not yet in `ENTITLEMENTS` or Stripe — lands with FPD-026. |
+| Optimal Lineup (auto-set your best lineup before lock)                              | `optimal_lineup`         | LS-5959. Entitlement key + UI placeholder added; full implementation (resolver + optimizer) tracked separately. Enforcement: 🖥️ UI-gated only until resolver ships.     |
 
 ## Change log
 

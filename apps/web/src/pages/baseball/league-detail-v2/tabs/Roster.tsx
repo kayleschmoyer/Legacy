@@ -16,9 +16,13 @@ import {
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { Button, Text, YStack } from 'tamagui';
 import { PendingWaiverClaims } from '../../../../features/roster';
 import { Empty } from '../Shared';
 import { I } from '../Icons';
+import { PremiumGate } from '../../../../components/PremiumGate';
+import { useHasEntitlement } from '../../../../hooks/useIsPremium';
 
 export interface RosterTabProps {
   league: LeagueFragment;
@@ -27,6 +31,7 @@ export interface RosterTabProps {
 
 export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   const navigate = useNavigate();
+  const hasOptimalLineup = useHasEntitlement(ENTITLEMENTS.optimal_lineup);
   const { data: positionsData } = useGetPositionsForLeagueQuery({
     variables: { leagueId: league.id ?? 0 },
     skip: !league.id,
@@ -133,6 +138,23 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
 
       {(isCurrent || isFuture) && (
         <PendingWaiverClaims teamId={myTeamId} compact={!isCurrent} />
+      )}
+
+      {isCurrent && (
+        <PremiumGate
+          isPremium={hasOptimalLineup}
+          featureName="Optimal Lineup"
+          featureDescription="Automatically set your best lineup before lock based on projections and optimizer."
+        >
+          <YStack gap="$2">
+            <Text fontWeight="600" fontSize="$3">
+              Optimal Lineup
+            </Text>
+            <Button size="$3" alignSelf="flex-start" disabled>
+              Set Optimal Lineup
+            </Button>
+          </YStack>
+        </PremiumGate>
       )}
 
       <RosterBoard<TeamMemberFragment, LeaguePositionFragment>
