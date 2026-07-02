@@ -141,6 +141,9 @@ function paceColor(
   totalGames: number,
 ): string | undefined {
   if (proj == null || totalGames <= 0 || gamesPlayed <= 0) return undefined;
+  // Suppress tint for the first game — ratio is too volatile when only 1/N
+  // games have been played and would yield false red/green early in the matchup.
+  if (gamesPlayed < 2) return undefined;
   const target = proj * (gamesPlayed / totalGames);
   if (target <= 0) return undefined;
   const ratio = actual / target;

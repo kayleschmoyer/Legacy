@@ -128,6 +128,9 @@ const paceColorStyle = (p: PlayerRowVM): React.CSSProperties | undefined => {
       : 0;
   const frac = total > 0 ? p.gamesPlayed! / total : 1;
   if (frac === 0) return undefined;
+  // Suppress tint until at least 2 games have been played — avoids false red
+  // when the gamesPlayed/total ratio is tiny early in the matchup.
+  if (total > 0 && p.gamesPlayed != null && p.gamesPlayed < 2) return undefined;
   const target = p.proj * frac;
   if (target <= 0) return undefined;
   const ratio = (p.actual - target) / target;

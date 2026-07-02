@@ -65,6 +65,26 @@ describe('getPaceColor', () => {
     ).toBeUndefined();
   });
 
+  it('returns undefined when only 1 game played (too early — avoids false red)', () => {
+    // gamesPlayed=1 of 13: target=100*(1/13)≈7.69; actual=0 would show RED without the guard
+    expect(
+      getPaceColor(
+        baseData({ gamesPlayed: 1, totalGames: 13, score: 0, projection: 100 }),
+      ),
+    ).toBeUndefined();
+    // Also suppress green on a hot start with just 1 game
+    expect(
+      getPaceColor(
+        baseData({
+          gamesPlayed: 1,
+          totalGames: 13,
+          score: 50,
+          projection: 100,
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
   it('falls back to full projection as target when totalGames is 0', () => {
     // frac = 1 (full projection); ratio = (110 - 100) / 100 = +10% → green
     expect(

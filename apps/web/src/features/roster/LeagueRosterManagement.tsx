@@ -169,6 +169,9 @@ export const getPaceColor = (
   if (score == null || projection == null) return undefined;
   const frac = totalGames > 0 ? gamesPlayed / totalGames : 1;
   if (frac === 0) return undefined;
+  // Suppress tint until at least 2 games have been played — avoids false red
+  // when the gamesPlayed/totalGames ratio is tiny early in the matchup.
+  if (totalGames > 0 && gamesPlayed < 2) return undefined;
   const target = projection * frac;
   if (target <= 0) return undefined;
   const ratio = (score - target) / target;
