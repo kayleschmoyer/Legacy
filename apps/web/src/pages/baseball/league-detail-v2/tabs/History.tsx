@@ -436,10 +436,12 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
                     fontFamily: 'var(--font-display)',
                     fontWeight: 700,
                     fontSize: 15,
-                    color: 'var(--fg1-strong)',
+                    color: c.championTeamName
+                      ? 'var(--fg1-strong)'
+                      : 'var(--fg3)',
                   }}
                 >
-                  {c.championTeamName ?? 'Unknown'}
+                  {c.championTeamName ?? 'No champion crowned'}
                 </div>
                 {c.runnerUpTeamName ? (
                   <div
@@ -604,10 +606,12 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
                           fontFamily: 'var(--font-display)',
                           fontWeight: 700,
                           fontSize: 15,
-                          color: 'var(--fg1-strong)',
+                          color: c.championTeamName
+                            ? 'var(--fg1-strong)'
+                            : 'var(--fg3)',
                         }}
                       >
-                        {c.championTeamName ?? 'Unknown'}
+                        {c.championTeamName ?? 'No champion crowned'}
                       </span>
                     </div>
                     {c.runnerUpTeamName ? (

@@ -36,11 +36,12 @@ describe('filterChampions', () => {
     expect(result[0].seasonNumber).toBe(2);
   });
 
-  it('filters out seasons without a champion name', () => {
+  it('includes frozen seasons without a champion name', () => {
     const seasons = [season(1, null), season(2, 'Team B')];
     const result = filterChampions(seasons);
-    expect(result).toHaveLength(1);
-    expect(result[0].championTeamName).toBe('Team B');
+    expect(result).toHaveLength(2);
+    expect(result[0].championTeamName).toBeNull();
+    expect(result[1].championTeamName).toBe('Team B');
   });
 });
 

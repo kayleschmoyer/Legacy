@@ -21,7 +21,7 @@ export interface LeagueChampionsAnalytics {
 }
 
 export function filterChampions(seasons: SeasonWithChampion[]) {
-  return seasons.filter((s) => s.frozenAt && s.championTeamName);
+  return seasons.filter((s) => s.frozenAt);
 }
 
 export function buildLeaderboard(
