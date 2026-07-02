@@ -18,9 +18,13 @@ import {
 
 interface PendingWaiverClaimsProps {
   teamId: number;
+  compact?: boolean;
 }
 
-export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
+export function PendingWaiverClaims({
+  teamId,
+  compact = false,
+}: PendingWaiverClaimsProps) {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   const { data, loading, error, refetch } = useGetTeamWaiverClaimsQuery({
@@ -67,6 +71,27 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
       minute: '2-digit',
     });
   };
+
+  if (compact) {
+    return (
+      <XStack
+        alignItems="center"
+        gap="$2"
+        paddingHorizontal="$3"
+        paddingVertical="$2"
+        backgroundColor={withAlpha(AMBER, 0.08)}
+        borderWidth={1}
+        borderColor="$amber6"
+        borderRadius="$4"
+      >
+        <Clock size={14} color="$amber9" />
+        <Text fontSize="$2" fontWeight="600" color="$amber9" flex={1}>
+          {claims.length} pending waiver claim{claims.length !== 1 ? 's' : ''} —
+          processes before this week
+        </Text>
+      </XStack>
+    );
+  }
 
   return (
     <Card

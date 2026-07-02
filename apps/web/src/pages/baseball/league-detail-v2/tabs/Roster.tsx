@@ -131,7 +131,9 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         />
       )}
 
-      {isCurrent && <PendingWaiverClaims teamId={myTeamId} />}
+      {(isCurrent || isFuture) && (
+        <PendingWaiverClaims teamId={myTeamId} compact={!isCurrent} />
+      )}
 
       <RosterBoard<TeamMemberFragment, LeaguePositionFragment>
         positions={positions}
