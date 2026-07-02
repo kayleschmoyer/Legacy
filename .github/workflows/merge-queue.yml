@@ -1,6 +1,15 @@
 name: Enhanced Merge Queue
 
 on:
+  # NOTE (LS-8289): deliberately NO schedule trigger — a cron would spin a
+  # runner ~48×/day for a usually-empty queue. The deadlock the cron would
+  # have papered over (bot-review never registering on the head SHA of a
+  # queued PR, freezing 30+ PRs on 2026-07-01) is instead closed event-wise:
+  # review.yml fires Reviewer (W1) on labeled merge-when-ready and on pushes
+  # to queued PRs, and the processor's self-heal re-applies
+  # bot:ready-for-review on any queue run that finds a queued PR whose head
+  # SHA lacks a bot-review status. Residual corner (crashed reviewer run +
+  # totally idle repo) clears on the next repo event or a manual dispatch.
   # Manual trigger for on-demand queue processing
   workflow_dispatch:
     inputs:
@@ -28,7 +37,8 @@ on:
       # re-evaluation once CI finishes. Push-to-PR cleanup (label removal, review
       # dismissal, W1 re-trigger) is handled natively: dismiss_stale_reviews_on_push
       # in the branch ruleset auto-dismisses the bot APPROVE, and Reviewer W1 fires on
-      # synchronize when bot:ready-for-review is present (review.yml).
+      # synchronize when bot:ready-for-review or merge-when-ready is present
+      # (review.yml, LS-8289).
   # Trigger on PR review events
   pull_request_review:
     types: [submitted] # When someone approves/requests changes

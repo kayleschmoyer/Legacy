@@ -3,6 +3,7 @@ import {
   addLabel,
   removeLabel,
   setCommitStatus,
+  getCombinedStatusContexts,
   isRepoAdmin,
   findLatestLabelActor,
   dismissReview,
@@ -176,6 +177,28 @@ async function main() {
   const isBotAuthor = ctx.author?.is_bot ?? authorLogin.endsWith('[bot]');
   const authorType = isBotAuthor ? 'bot' : 'human';
   process.stdout.write(`[reviewer] Author: ${authorLogin} (${authorType})\n`);
+
+  // merge-when-ready trigger (LS-8289): the queue label fires W1 so a queued
+  // PR always ends up with a bot-review status on its head SHA. When the SHA
+  // already carries one, a cycle has run (or is running) for the current code
+  // — exit before spending an LLM review. Never-resolving 'pending' leftovers
+  // from a dead reviewer run are handled by the merge queue's self-heal, not
+  // here: distinguishing "running now" from "died" needs run-age context this
+  // process doesn't have.
+  if (process.env.TRIGGERED_BY_QUEUE_LABEL) {
+    const hasBotReview = getCombinedStatusContexts(sha).some(
+      (s) => s.context === 'bot-review',
+    );
+    if (hasBotReview) {
+      process.stdout.write(
+        '[reviewer] Skipping: merge-when-ready trigger, but bot-review is already registered on the head SHA\n',
+      );
+      return;
+    }
+    process.stdout.write(
+      '[reviewer] merge-when-ready applied with no bot-review on the head SHA — starting review cycle\n',
+    );
+  }
 
   // Set bot-review to pending — reviewer is starting
   try {

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { findLatestLabelActor } from '../github.mjs';
+import { findLatestLabelActor, getCombinedStatusContexts } from '../github.mjs';
 
 describe('findLatestLabelActor', () => {
   it('returns the actor login of the most recent labeled event for the given label', () => {
@@ -119,5 +119,44 @@ describe('findLatestLabelActor', () => {
       findLatestLabelActor(1, 'bot:reset-cycle-counter', exec),
       '',
     );
+  });
+});
+
+describe('getCombinedStatusContexts (LS-8289)', () => {
+  const SHA = 'abc123def456abc123def456abc123def456abc1';
+
+  it('returns {context, state} pairs from the combined status endpoint', () => {
+    const exec = (cmd, args) => {
+      assert.strictEqual(cmd, 'gh');
+      assert.ok(args.includes(`repos/{owner}/{repo}/commits/${SHA}/status`));
+      return JSON.stringify({
+        state: 'pending',
+        statuses: [
+          { context: 'bot-review', state: 'success', extra: 'ignored' },
+          { context: 'CI Gate', state: 'pending' },
+        ],
+      });
+    };
+    assert.deepStrictEqual(getCombinedStatusContexts(SHA, exec), [
+      { context: 'bot-review', state: 'success' },
+      { context: 'CI Gate', state: 'pending' },
+    ]);
+  });
+
+  it('returns [] when the SHA has no statuses', () => {
+    const exec = () => JSON.stringify({ state: 'pending', statuses: [] });
+    assert.deepStrictEqual(getCombinedStatusContexts(SHA, exec), []);
+  });
+
+  it('returns [] on API errors so callers run a review rather than skip one', () => {
+    const exec = () => {
+      throw new Error('gh: HTTP 500');
+    };
+    assert.deepStrictEqual(getCombinedStatusContexts(SHA, exec), []);
+  });
+
+  it('returns [] on malformed payloads', () => {
+    const exec = () => 'not json';
+    assert.deepStrictEqual(getCombinedStatusContexts(SHA, exec), []);
   });
 });

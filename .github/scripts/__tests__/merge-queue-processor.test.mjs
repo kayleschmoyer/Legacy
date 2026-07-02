@@ -83,7 +83,13 @@ function makeGithub({
   commitStatuses = [],
   branchRules = [],
 } = {}) {
-  const calls = { merges: [], comments: [], updateBranch: [] };
+  const calls = {
+    merges: [],
+    comments: [],
+    updateBranch: [],
+    labels: [],
+    dispatches: [],
+  };
 
   const github = {
     hook: { after: () => {} },
@@ -153,19 +159,25 @@ function makeGithub({
           return { data: { id: 1 } };
         },
         updateComment: async () => {},
-        addLabels: async () => {},
+        addLabels: async (args) => {
+          calls.labels.push(args);
+        },
         removeLabel: async () => {},
       },
       git: { deleteRef: async () => {} },
     },
 
     // Serves the ruleset endpoint (GET /repos/.../rules/branches/{branch}) so
-    // getRequiredChecks can resolve required-check names. Any other request
-    // (e.g. the self-retry workflow_dispatch) resolves to an empty object;
-    // self-retry never fires in tests anyway (eventName is workflow_run).
-    request: async (route) => {
+    // getRequiredChecks can resolve required-check names. Self-retry
+    // workflow_dispatch POSTs are recorded in calls.dispatches; any other
+    // request resolves to an empty object.
+    request: async (route, params) => {
       if (typeof route === 'string' && route.includes('/rules/branches/')) {
         return { data: branchRules ?? [] };
+      }
+      if (typeof route === 'string' && route.includes('/dispatches')) {
+        calls.dispatches.push(params);
+        return {};
       }
       return {};
     },
@@ -1300,6 +1312,252 @@ describe('merge-queue-processor — CI Gate aggregator ruleset (LS-7991)', () =>
     assert.ok(
       !/🚀 CI Pipeline \/ (lint|test).*cancelled/.test(all),
       'cancelled granular duplicates must not appear as failing checks',
+    );
+  });
+});
+
+// ── bot-review self-heal (LS-8289) ───────────────────────────────────────────
+
+describe('merge-queue-processor — bot-review self-heal (LS-8289)', () => {
+  // Ruleset requiring bot-review alongside the CI check, mirroring production.
+  const BOT_REVIEW_RULES = [
+    {
+      type: 'required_status_checks',
+      parameters: {
+        required_status_checks: [
+          { context: 'bot-review' },
+          { context: 'CI Pipeline' },
+        ],
+      },
+    },
+  ];
+
+  const APPROVED_BOT_REVIEW = [
+    { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+  ];
+
+  it('applies bot:ready-for-review when bot-review never registered on the head SHA', async () => {
+    const { github, calls } = makeGithub({
+      reviews: APPROVED_BOT_REVIEW,
+      branchRules: BOT_REVIEW_RULES,
+      // CI Pipeline registered and green; bot-review never registered.
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.merges.length, 0, 'must not merge');
+    assert.strictEqual(calls.labels.length, 1, 'should apply one label');
+    assert.deepStrictEqual(calls.labels[0].labels, ['bot:ready-for-review']);
+  });
+
+  it('does not re-apply the label when bot:ready-for-review is already present', async () => {
+    const { github, calls } = makeGithub({
+      reviews: APPROVED_BOT_REVIEW,
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [],
+      pr: makePR({
+        labels: [
+          { name: 'merge-when-ready' },
+          { name: 'bot:ready-for-review' },
+        ],
+      }),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.labels.length, 0, 'must not add labels');
+  });
+
+  it('re-triggers the reviewer when CHANGES_REQUESTED is stale (no bot-review status on head SHA)', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [],
+      reviewDecision: 'CHANGES_REQUESTED',
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.merges.length, 0, 'must not merge');
+    assert.strictEqual(calls.labels.length, 1, 'should apply one label');
+    assert.deepStrictEqual(calls.labels[0].labels, ['bot:ready-for-review']);
+  });
+
+  it('does not re-trigger when the reviewer adjudicated the current head SHA', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [],
+      reviewDecision: 'CHANGES_REQUESTED',
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [
+        {
+          context: 'bot-review',
+          state: 'failure',
+          created_at: new Date().toISOString(),
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.labels.length,
+      0,
+      'a bot-review verdict on the current SHA means agent action is needed, not a re-review',
+    );
+  });
+
+  it('treats a bot-review pending older than 45 minutes as a dead reviewer run and re-triggers', async () => {
+    const { github, calls } = makeGithub({
+      reviews: APPROVED_BOT_REVIEW,
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [
+        {
+          context: 'bot-review',
+          state: 'pending',
+          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.labels.length, 1, 'should apply one label');
+  });
+
+  it('leaves a fresh bot-review pending alone (reviewer may still be running)', async () => {
+    const { github, calls } = makeGithub({
+      reviews: APPROVED_BOT_REVIEW,
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [
+        {
+          context: 'bot-review',
+          state: 'pending',
+          created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.labels.length, 0, 'must not add labels');
+  });
+
+  it('dry-run mode logs the remediation without applying the label', async () => {
+    const { github, calls } = makeGithub({
+      reviews: APPROVED_BOT_REVIEW,
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: true,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.labels.length, 0, 'dry run must not add labels');
+  });
+
+  it('workflow_run-triggered runs remediate but do not self-dispatch a retry', async () => {
+    const { github, calls } = makeGithub({
+      reviews: APPROVED_BOT_REVIEW,
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [],
+    });
+
+    await processor({
+      github,
+      context, // default eventName: workflow_run
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.dispatches.length,
+      0,
+      'workflow_run triggers must not chain workflow_dispatch retries',
+    );
+    assert.strictEqual(
+      calls.labels.length,
+      1,
+      'remediation runs on every trigger type',
+    );
+  });
+
+  it('label/dispatch-triggered runs still self-dispatch a retry when checks are pending', async () => {
+    const { github, calls } = makeGithub({
+      reviews: APPROVED_BOT_REVIEW,
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [],
+      pr: makePR({
+        labels: [
+          { name: 'merge-when-ready' },
+          { name: 'bot:ready-for-review' },
+        ],
+      }),
+    });
+
+    await processor({
+      github,
+      context: { ...context, eventName: 'pull_request' },
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.dispatches.length,
+      1,
+      'event-triggered runs keep the single self-retry',
     );
   });
 });

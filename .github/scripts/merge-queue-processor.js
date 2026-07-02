@@ -84,6 +84,19 @@ const LIGHTWEIGHT_CHECK_NAMES = new Set(
 // the workflow-command escape.
 const sanitizeLog = (s) => String(s).replace(/##\[/g, '#\u200b#[');
 
+// The bot-review commit status is only ever posted by Reviewer (W1), and W1's
+// review job SKIPS on pull_request.synchronize when the PR lacks the
+// bot:ready-for-review label. A final push without that label therefore leaves
+// bot-review permanently unregistered on the head SHA \u2014 a check the queue
+// waits on forever. When the queue detects that state it re-applies the label,
+// whose `labeled` event fires W1 and registers the status (self-heal).
+const REVIEW_TRIGGER_LABEL = 'bot:ready-for-review';
+const BOT_REVIEW_STATUS_CONTEXT = 'bot-review';
+// Cap remediations per run so a backlog doesn't fire dozens of concurrent LLM
+// reviews at once; the next queue trigger (each remediated review's submission
+// wakes the queue via pull_request_review) picks up the remainder.
+const MAX_REVIEW_REMEDIATIONS_PER_RUN = 10;
+
 module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
@@ -158,6 +171,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   }
 
   let hasPendingPRs = false;
+  let reviewRemediationsThisRun = 0;
 
   for (const pr of mergeReadyPRs) {
     console.log(`\n🔍 Processing PR #${pr.number}: ${pr.title}`);
@@ -188,6 +202,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
           `❌ PR #${pr.number} cannot be merged: ${validationResult.reason}`,
         );
         await reportMergeBlocker(prDetails.data, validationResult);
+        await remediateStaleBotReview(prDetails.data, validationResult);
       }
     } catch (error) {
       console.error(
@@ -330,6 +345,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     if (reviewDecision !== null && reviewDecision !== 'APPROVED') {
       return {
         canMerge: false,
+        reviewDecision,
         reason:
           reviewDecision === 'REVIEW_REQUIRED'
             ? 'PR requires CODEOWNER approval for sensitive path(s)'
@@ -653,6 +669,104 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       inProgress: pendingChecks.length > 0,
       pendingChecks,
     };
+  }
+
+  // Self-heal the "bot-review never registers" deadlock (see
+  // REVIEW_TRIGGER_LABEL above). Fires in two blocked states:
+  //   1. bot-review is a required check but has no run/status on the head SHA
+  //      ("not yet registered") — W1 skipped the last push.
+  //   2. reviewDecision is CHANGES_REQUESTED but the head SHA carries no
+  //      bot-review status — the agent pushed fixes, W1 never re-reviewed, so
+  //      the stale REQUEST_CHANGES can never be superseded.
+  // Idempotency guards: skip when the label is already present (adding again
+  // fires no event) and when the head SHA already has ANY bot-review status
+  // (the reviewer has adjudicated — or is adjudicating — the current code).
+  async function remediateStaleBotReview(pr, validation) {
+    const waitingOnBotReview = (validation.pendingChecks ?? []).some((c) =>
+      c.startsWith(`${BOT_REVIEW_STATUS_CONTEXT} `),
+    );
+    const staleChangesRequested =
+      validation.reviewDecision === 'CHANGES_REQUESTED';
+    if (!waitingOnBotReview && !staleChangesRequested) return;
+
+    if (pr.labels.some((l) => l.name === REVIEW_TRIGGER_LABEL)) {
+      if (waitingOnBotReview) {
+        console.log(
+          `⚠️ PR #${pr.number}: ${BOT_REVIEW_STATUS_CONTEXT} not registered but ` +
+            `'${REVIEW_TRIGGER_LABEL}' is already present — re-adding fires no event. ` +
+            `Needs manual attention (re-apply the label or dispatch Reviewer W1).`,
+        );
+      }
+      return;
+    }
+
+    const headStatuses = await github.paginate(
+      github.rest.repos.listCommitStatusesForRef,
+      { owner, repo, ref: pr.head.sha, per_page: 100 },
+    );
+    let latestBotReview = null;
+    for (const s of headStatuses) {
+      if (s.context !== BOT_REVIEW_STATUS_CONTEXT) continue;
+      if (
+        !latestBotReview ||
+        new Date(s.created_at) > new Date(latestBotReview.created_at)
+      ) {
+        latestBotReview = s;
+      }
+    }
+    if (latestBotReview) {
+      // success/failure → the reviewer adjudicated this SHA; nothing to heal.
+      // pending → the reviewer set "in progress" and may still be running;
+      // W1's job timeout is 15 minutes, so a pending older than
+      // STALE_PENDING_MS means the reviewer died mid-run (its run step is
+      // continue-on-error) and the status will never resolve — fall through
+      // and re-trigger.
+      const STALE_PENDING_MS = 45 * 60 * 1000;
+      const isStalePending =
+        latestBotReview.state === 'pending' &&
+        Date.now() - new Date(latestBotReview.created_at).getTime() >
+          STALE_PENDING_MS;
+      if (!isStalePending) return;
+      console.log(
+        `⚠️ PR #${pr.number}: ${BOT_REVIEW_STATUS_CONTEXT} stuck in 'pending' since ` +
+          `${latestBotReview.created_at} — treating as a dead reviewer run`,
+      );
+    }
+
+    if (reviewRemediationsThisRun >= MAX_REVIEW_REMEDIATIONS_PER_RUN) {
+      console.log(
+        `⏭️ PR #${pr.number}: ${BOT_REVIEW_STATUS_CONTEXT} missing on head SHA but the ` +
+          `per-run remediation cap (${MAX_REVIEW_REMEDIATIONS_PER_RUN}) is reached — next cycle.`,
+      );
+      return;
+    }
+
+    if (isDryRun) {
+      console.log(
+        `🏃 DRY RUN: Would apply '${REVIEW_TRIGGER_LABEL}' to PR #${pr.number} ` +
+          `to re-trigger Reviewer (W1) — ${BOT_REVIEW_STATUS_CONTEXT} missing on head SHA`,
+      );
+      return;
+    }
+
+    reviewRemediationsThisRun++;
+    console.log(
+      `🩹 PR #${pr.number}: ${BOT_REVIEW_STATUS_CONTEXT} missing on head SHA ${pr.head.sha} — ` +
+        `applying '${REVIEW_TRIGGER_LABEL}' to re-trigger Reviewer (W1) ` +
+        `(${reviewRemediationsThisRun}/${MAX_REVIEW_REMEDIATIONS_PER_RUN} this run)`,
+    );
+    try {
+      await github.rest.issues.addLabels({
+        owner,
+        repo,
+        issue_number: pr.number,
+        labels: [REVIEW_TRIGGER_LABEL],
+      });
+    } catch (labelError) {
+      console.warn(
+        `⚠️ PR #${pr.number}: could not apply '${REVIEW_TRIGGER_LABEL}': ${labelError.message}`,
+      );
+    }
   }
 
   async function findOrCreateComment(pr, commentBody) {
