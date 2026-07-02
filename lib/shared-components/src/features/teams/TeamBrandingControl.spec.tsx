@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import { TeamBrandingControl } from './TeamBrandingControl';
+import { validateLogoUrl } from './useTeamBranding';
 import { act, fireEvent, render, screen } from '../../test-utils';
 
 const mockRenameTeam = jest.fn(() => Promise.resolve({ data: {} }));
@@ -149,6 +150,30 @@ describe('TeamBrandingControl (LS-7809)', () => {
     });
   });
 
+  it('shows a validation error and disables Save Branding for an invalid logo URL', async () => {
+    render(<TeamBrandingControl teamId={1} leagueId={2} team={TEAM} />);
+
+    fireEvent.change(screen.getByTestId('team-logo-input'), {
+      target: { value: 'javascript:alert(1)' },
+    });
+
+    expect(await screen.findByText(/must use https/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^(Save Branding|Saving…|Saved)$/ }),
+    ).toBeDisabled();
+    expect(mockUpdateBranding).not.toHaveBeenCalled();
+  });
+
+  it('shows a validation error for a non-image https URL', async () => {
+    render(<TeamBrandingControl teamId={1} leagueId={2} team={TEAM} />);
+
+    fireEvent.change(screen.getByTestId('team-logo-input'), {
+      target: { value: 'https://example.com/page' },
+    });
+
+    expect(await screen.findByText(/image file/i)).toBeInTheDocument();
+  });
+
   it('hides save buttons when canEdit is false', () => {
     render(
       <TeamBrandingControl
@@ -161,5 +186,37 @@ describe('TeamBrandingControl (LS-7809)', () => {
     expect(
       screen.queryByRole('button', { name: /^(Save Name|Saving…|Saved)$/ }),
     ).toBeNull();
+  });
+});
+
+describe('validateLogoUrl', () => {
+  it('returns null for empty string', () => {
+    expect(validateLogoUrl('')).toBeNull();
+  });
+
+  it('returns null for a valid https image URL', () => {
+    expect(validateLogoUrl('https://cdn.example.com/logo.png')).toBeNull();
+    expect(validateLogoUrl('https://cdn.example.com/logo.webp?v=2')).toBeNull();
+    expect(validateLogoUrl('https://cdn.example.com/logo.svg')).toBeNull();
+  });
+
+  it('rejects javascript: protocol', () => {
+    expect(validateLogoUrl('javascript:alert(1)')).toMatch(/https/i);
+  });
+
+  it('rejects data: URIs', () => {
+    expect(validateLogoUrl('data:image/png;base64,abc')).toMatch(/https/i);
+  });
+
+  it('rejects http: URLs', () => {
+    expect(validateLogoUrl('http://example.com/logo.png')).toMatch(/https/i);
+  });
+
+  it('rejects URLs without an image extension', () => {
+    expect(validateLogoUrl('https://example.com/page')).toMatch(/image file/i);
+  });
+
+  it('rejects malformed strings', () => {
+    expect(validateLogoUrl('not a url at all')).toMatch(/valid url/i);
   });
 });

@@ -55,6 +55,7 @@ export function TeamBrandingControl({
     setSecondaryColor,
     logoUrl,
     setLogoUrl,
+    logoUrlError,
     currentTeamName,
     trimmedName,
     nameDirty,
@@ -185,6 +186,11 @@ export function TeamBrandingControl({
               editable={canEdit}
             />
           </XStack>
+          {logoUrlError && (
+            <Text fontSize="$2" color="$red9">
+              {logoUrlError}
+            </Text>
+          )}
         </YStack>
 
         {/* ── Colors ────────────────────────────────────────────────────────── */}
@@ -211,7 +217,7 @@ export function TeamBrandingControl({
               <Button
                 theme={savedFlash === 'branding' ? 'green' : 'blue'}
                 size="$3"
-                disabled={savingBranding}
+                disabled={savingBranding || !!logoUrlError}
                 icon={savingBranding ? <Spinner size="small" /> : undefined}
                 onPress={() => void saveBranding()}
               >

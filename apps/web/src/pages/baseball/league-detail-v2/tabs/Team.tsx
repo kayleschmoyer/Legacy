@@ -40,6 +40,7 @@ export const TeamTab: React.FC<TeamTabProps> = ({
     setSecondaryColor,
     logoUrl,
     setLogoUrl,
+    logoUrlError,
     currentTeamName,
     trimmedName,
     nameDirty,
@@ -216,7 +217,13 @@ export const TeamTab: React.FC<TeamTabProps> = ({
                 onChange={(e) => setLogoUrl(e.target.value)}
                 placeholder="https://…"
               />
-              <span className="hint">Square image, served over HTTPS.</span>
+              {logoUrlError ? (
+                <span className="hint" style={{ color: 'var(--red-9)' }}>
+                  {logoUrlError}
+                </span>
+              ) : (
+                <span className="hint">Square image, served over HTTPS.</span>
+              )}
             </div>
           </div>
 
@@ -317,7 +324,7 @@ export const TeamTab: React.FC<TeamTabProps> = ({
                 onClick={() => {
                   void saveBranding();
                 }}
-                disabled={savingBranding}
+                disabled={savingBranding || !!logoUrlError}
               >
                 {savedFlash === 'branding' ? (
                   <>

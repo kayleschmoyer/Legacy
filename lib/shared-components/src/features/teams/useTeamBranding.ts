@@ -42,6 +42,32 @@ export const initialsFromTeamName = (name?: string | null): string => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
+/**
+ * Validates a team logo URL. Returns an error message string if invalid, or
+ * null if valid (including empty — no logo is allowed).
+ *
+ * Rules:
+ *  - Empty string is allowed (removes logo).
+ *  - Must use the https: protocol.
+ *  - Must end with a recognised image extension (.png .jpg .jpeg .gif .webp .svg .avif).
+ */
+export const validateLogoUrl = (url: string): string | null => {
+  if (!url) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return 'Must be a valid URL (e.g. https://example.com/logo.png).';
+  }
+  if (parsed.protocol !== 'https:') {
+    return 'Logo URL must use HTTPS.';
+  }
+  if (!/\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(parsed.pathname)) {
+    return 'URL must point to an image file (.png, .jpg, .gif, .webp, .svg, or .avif).';
+  }
+  return null;
+};
+
 /** Uppercase hex colors so preset comparisons are stable; pass through others.
  * Bare 3- or 6-char hex strings (e.g. "FF0000" or "F00") are coerced to
  * #-prefixed form so they render as valid CSS colors instead of being silently
@@ -90,6 +116,8 @@ export interface UseTeamBrandingResult {
   setSecondaryColor: (next: string) => void;
   logoUrl: string;
   setLogoUrl: (next: string) => void;
+  /** Validation error for logoUrl; null when the value is valid or empty. */
+  logoUrlError: string | null;
   /** The currently-persisted team name (used for dirty comparison / labels). */
   currentTeamName: string;
   /** `name` trimmed of surrounding whitespace. */
@@ -173,6 +201,7 @@ export function useTeamBranding({
   const currentTeamName = team?.name ?? '';
   const trimmedName = name.trim();
   const nameDirty = trimmedName.length > 0 && trimmedName !== currentTeamName;
+  const logoUrlError = validateLogoUrl(logoUrl);
 
   const savedPrimary = normalizeTeamColor(team?.primaryColor, DEFAULT_PRIMARY);
   const savedSecondary = normalizeTeamColor(
@@ -226,7 +255,7 @@ export function useTeamBranding({
   ]);
 
   const saveBranding = useCallback(async () => {
-    if (!teamId || !leagueId) return;
+    if (!teamId || !leagueId || logoUrlError) return;
     try {
       await updateBranding({
         variables: {
@@ -248,6 +277,7 @@ export function useTeamBranding({
     primaryColor,
     secondaryColor,
     logoUrl,
+    logoUrlError,
     updateBranding,
     flash,
     onSaved,
@@ -263,6 +293,7 @@ export function useTeamBranding({
     setSecondaryColor,
     logoUrl,
     setLogoUrl,
+    logoUrlError,
     currentTeamName,
     trimmedName,
     nameDirty,
