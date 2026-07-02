@@ -11,7 +11,17 @@ jest.mock('../github-api.js', () => ({
   getRepoRoot: jest.fn(() => '/repo'),
 }));
 
+jest.mock('node:child_process', () => ({
+  execFile: jest.fn(),
+  execFileSync: jest.fn(),
+}));
+
+import { execFileSync } from 'node:child_process';
 import { pythonInterpreterCandidates } from './audit-session-bash.js';
+
+const mockExecFileSync = execFileSync as jest.MockedFunction<
+  typeof execFileSync
+>;
 
 const ORIGINAL_PLATFORM = process.platform;
 const ORIGINAL_PYTHON = process.env.PYTHON;
@@ -26,6 +36,9 @@ function setPlatform(platform: NodeJS.Platform): void {
 describe('pythonInterpreterCandidates', () => {
   beforeEach(() => {
     delete process.env.PYTHON;
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error('which: not found');
+    });
   });
 
   afterEach(() => {
@@ -35,17 +48,41 @@ describe('pythonInterpreterCandidates', () => {
     } else {
       process.env.PYTHON = ORIGINAL_PYTHON;
     }
+    jest.resetAllMocks();
   });
 
-  it('returns python3, python, then common absolute paths on non-Windows platforms', () => {
+  it('includes python3, python, and common absolute paths on non-Windows platforms', () => {
     setPlatform('linux');
-    expect(pythonInterpreterCandidates()).toEqual([
-      'python3',
-      'python',
-      '/usr/local/bin/python3',
-      '/usr/bin/python3',
-      '/usr/bin/python',
-    ]);
+    const candidates = pythonInterpreterCandidates();
+    expect(candidates).toContain('python3');
+    expect(candidates).toContain('python');
+    expect(candidates).toContain('/usr/local/bin/python3');
+    expect(candidates).toContain('/usr/bin/python3');
+    expect(candidates).toContain('/usr/bin/python');
+  });
+
+  it('prepends shell-discovered path before fixed candidates on Linux', () => {
+    setPlatform('linux');
+    (mockExecFileSync as jest.Mock).mockImplementation((...args: unknown[]) => {
+      if ((args[1] as string[])[0] === 'python3')
+        return '/opt/homebrew/bin/python3';
+      throw new Error('not found');
+    });
+    const candidates = pythonInterpreterCandidates();
+    expect(candidates[0]).toBe('/opt/homebrew/bin/python3');
+    // fixed fallbacks still present
+    expect(candidates).toContain('python3');
+  });
+
+  it('deduplicates when shell-discovered path matches a fixed entry', () => {
+    setPlatform('linux');
+    (mockExecFileSync as jest.Mock).mockImplementation((...args: unknown[]) => {
+      if ((args[1] as string[])[0] === 'python3') return '/usr/bin/python3';
+      throw new Error('not found');
+    });
+    const candidates = pythonInterpreterCandidates();
+    // /usr/bin/python3 appears exactly once even though which resolved it
+    expect(candidates.filter((c) => c === '/usr/bin/python3')).toHaveLength(1);
   });
 
   it('puts py launcher first on win32 and adds absolute fallback paths', () => {

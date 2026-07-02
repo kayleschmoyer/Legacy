@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { basename, resolve as resolvePath } from 'node:path';
 import { getRepoRoot } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -42,8 +42,10 @@ export interface AuditSessionBashParams {
  * Python installer, present on system PATH even when the user PATH is stripped
  * in MCP server processes), then `python3`/`python` for non-launcher installs,
  * then common absolute paths for Program Files / AppData installs.
- * On Linux/macOS: `python3` → `python`, then common absolute paths for
- * environments where the MCP server process doesn't inherit the full shell PATH.
+ * On Linux/macOS: shell-discovered paths first (via `which`) so the MCP server
+ * finds the same interpreter the user shell sees even when the server process
+ * inherits a stripped PATH, followed by `python3`/`python` and common absolute
+ * paths as fallbacks.
  */
 export function pythonInterpreterCandidates(): string[] {
   if (process.env.PYTHON) return [process.env.PYTHON];
@@ -63,13 +65,43 @@ export function pythonInterpreterCandidates(): string[] {
       'C:\\Program Files\\Python310\\python.exe',
     ];
   }
-  return [
+  // Probe the shell's PATH via `which` first — resolves paths that the MCP
+  // server process can't see because it inherits a stripped PATH environment.
+  const shellDiscovered = discoverPythonViaShell();
+  const fixed = [
     'python3',
     'python',
     '/usr/local/bin/python3',
+    '/usr/local/bin/python',
     '/usr/bin/python3',
     '/usr/bin/python',
   ];
+  // Prepend shell-discovered paths; deduplicate against the fixed list.
+  const seen = new Set(fixed);
+  return [...shellDiscovered.filter((p) => !seen.has(p)), ...fixed];
+}
+
+/**
+ * Ask the user shell where Python lives. Returns absolute paths that `which`
+ * resolves from the shell's own PATH — the MCP server process may have a
+ * stripped PATH that omits directories the user shell includes.
+ * Never throws; returns an empty array if `which` is unavailable or finds nothing.
+ */
+function discoverPythonViaShell(): string[] {
+  const discovered: string[] = [];
+  for (const name of ['python3', 'python']) {
+    try {
+      const found = execFileSync('which', [name], {
+        encoding: 'utf8',
+        timeout: 2_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      if (found) discovered.push(found);
+    } catch {
+      // `which` not on PATH or interpreter not found — skip silently
+    }
+  }
+  return discovered;
 }
 
 /**
