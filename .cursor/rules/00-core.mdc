@@ -15,8 +15,11 @@ detail, this rule wins.
 - **No hooks.** Claude Code's `.claude/hooks/*` (worktree symlink setup, main-repo
   write-guard, MCP-first nudge, incomplete-work block) do **not** run here. Their
   intent is encoded as rules below — you must self-enforce; nothing blocks you.
-- **No Skills / slash commands.** Workflows like `/work-ticket`, `/review`,
-  `/create-pr` don't exist in Cursor. Do the equivalent steps manually.
+- **No Skills, but slash commands exist.** `.cursor/commands/` mirrors every repo
+  slash command (`/work-ticket`, `/review`, `/create-pr`, …) — type `/` in the Agent
+  input to run one. The mirrors are **generated** from `.claude/commands/` (the
+  single source of truth): to change a command, edit `.claude/commands/<name>.md`
+  and run `make sync-agent-prompts` — never edit `.cursor/commands/` directly.
 - **MCP servers must be enabled once** in Cursor Settings → MCP (and trust-approved),
   and the 3 hosted servers need bearer env vars exported before launch. See
   [docs/dev-process/cursor-setup.md](mdc:docs/dev-process/cursor-setup.md).

@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows lint-skills format fmt typecheck validate \
+	lint lint-fix lint-workflows lint-skills sync-agent-prompts lint-agent-prompts format fmt typecheck validate \
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
@@ -277,6 +277,14 @@ lint-workflows: ## Lint GitHub Actions workflow files
 lint-skills: ## Validate all agent skills conform to agentskills.io format
 	@$(call echo_blue,Validating agent skills...)
 	@node scripts/lint-skills.js
+
+sync-agent-prompts: ## Regenerate per-agent slash-command prompts from .claude/commands/
+	@$(call echo_blue,Syncing agent slash-command prompts...)
+	@node scripts/sync-agent-prompts.mjs
+
+lint-agent-prompts: ## Check generated agent prompts are in sync with .claude/commands/
+	@$(call echo_blue,Checking agent prompt sync...)
+	@node scripts/sync-agent-prompts.mjs --check
 
 diagrams: ## Generate SVG files from Mermaid (.mmd) sources under .agents/skills/**/diagrams/
 	@$(call echo_blue,Generating diagrams...)

@@ -5,7 +5,10 @@ and stops falling back to raw bash. Cursor reads `AGENTS.md` and `.cursor/rules/
 automatically, but MCP servers and credentials need a one-time setup.
 
 > **TL;DR of the differences from Claude Code:** Cursor has **no hooks** and **no
-> Skills/slash commands**. The worktree `node_modules` symlink, `.env.local`, and the
+> Skills**. Slash commands _are_ available — `.cursor/commands/` mirrors every repo
+> command (generated from `.claude/commands/`; see
+> [llm-environments.md § Slash commands](./llm-environments.md#slash-commands-single-source-of-truth)).
+> The worktree `node_modules` symlink, `.env.local`, and the
 > safety guardrails that Claude Code's hooks provide are not automatic here — see
 > [What Cursor does NOT do](#what-cursor-does-not-do).
 

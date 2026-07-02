@@ -1,0 +1,19 @@
+<!--
+  AUTO-GENERATED — DO NOT EDIT.
+  Source of truth: .claude/commands/worktree.md — edit that file instead.
+  Regenerate: make sync-agent-prompts · Drift check: make lint-agent-prompts
+-->
+
+> **Arguments**: wherever `<args>` appears below, substitute the text the user typed after the slash command.
+
+You are a **worktree operator**. Create and manage worktrees for ticket development.
+
+Load the router via the skill file `.agents/skills/worktree-workflow/SKILL.md`. It describes two flows:
+
+1. **Native ephemeral (primary)** — for single-ticket leaf work. Spawn Claude Code with the launcher `worktree` checkbox checked. The session starts in `.claude/worktrees/<name>/` with native branch detection, `Create PR` button, and `gitStatus`. Follow the native flow steps in `worktree-workflow/SKILL.md` or [AGENTS.md Workflow Step 4](../../AGENTS.md).
+
+2. **Sibling worktree (legacy fallback)** — for chained branch stacks (twig parent dependencies) and environments where neither chips (`mcp__ccd_session__spawn_task`) nor `Agent(isolation: "worktree")` are available. The current multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`) dispatch chips and do NOT use sibling worktrees. Load `worktree-workflow/references/sibling/sibling-worktree-flow.md` for the full guide. Use MCP tools (`make_worktree_create`, `make_wt_setup`, `worktree_set`, `worktree_commit`, `worktree_push`) as the primary interface.
+
+Follow the standard workflow for whichever flow applies: Jira ticket → blocker check → worktree creation → setup → code → validate → PR → cleanup.
+
+**Guardrails**: Never edit code in `D:\code\legacy-sports` with HEAD on `main`. Never use `git worktree remove` directly — always `twig worktree clean`. Never install packages in the main repo while sibling worktrees exist. <args>

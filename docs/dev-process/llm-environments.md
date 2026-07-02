@@ -123,6 +123,46 @@ gap. The local GitHub/Jira/CI servers authenticate with their own credentials
 from `.env.local`. Note Codex has no hooks or Skills either; AGENTS.md still
 applies as the behavior guide.
 
+## Slash commands (single source of truth)
+
+Every repo slash command (`/work-ticket`, `/review`, `/fix-pr`, …) is defined
+once in **`.claude/commands/*.md`** and mirrored into each environment's native
+prompt/command format by `scripts/sync-agent-prompts.mjs`
+(`make sync-agent-prompts`; drift check `make lint-agent-prompts`, enforced in
+CI by `.github/checks/agent-prompts-sync.sh`):
+
+| Environment                | Generated location              | Invocation                       |
+| -------------------------- | ------------------------------- | -------------------------------- |
+| **Claude Code**            | `.claude/commands/` (canonical) | `/name`                          |
+| **Copilot Chat (VS Code)** | `.github/prompts/*.prompt.md`   | `/name` in the Chat view         |
+| **Cursor**                 | `.cursor/commands/`             | `/name` in the Agent input       |
+| **OpenCode**               | `.opencode/commands/`           | `/name` in the TUI               |
+| **Codex CLI**              | `.codex/prompts/`               | `/prompts:name` (see note below) |
+
+How the generation works:
+
+- Generated files carry an `AUTO-GENERATED — DO NOT EDIT` banner. Edit the
+  canonical `.claude/commands/<name>.md` and regenerate — never the mirror.
+- Claude-specific idioms are translated per target: `Skill(skill: "x")` becomes
+  the skill's file path (or the target's own generated command file when the
+  "skill" is itself a command), `Read(file_path: "y")` becomes a plain path,
+  and `$ARGUMENTS` becomes `${input:args}` (Copilot) / `<args>` plus a
+  substitution note (Cursor) / stays `$ARGUMENTS` (OpenCode, Codex — native).
+- **Fenced code blocks are never rewritten** — chip prompt templates embedded
+  in orchestrator commands (e.g. `/sweep-prs`) are executed by Claude chips and
+  must keep Claude syntax.
+- A command can opt out of mirroring with the `agents:` frontmatter key in its
+  canonical file. Currently Claude-only: `/sync-designs` (needs
+  claude.ai-authenticated `WebFetch`) and `/recover-stall` (Claude cloud-agent
+  stall recovery).
+- **Codex caveat**: Codex only loads custom prompts from `~/.codex/prompts`
+  (global; the feature is deprecated upstream in favor of skills), so link the
+  generated directory once per machine —
+  `ln -s "$(pwd)/.codex/prompts" ~/.codex/prompts` (PowerShell:
+  `New-Item -ItemType SymbolicLink -Path $HOME\.codex\prompts -Target D:\code\legacy-sports\.codex\prompts`).
+  The workflows still reach Codex either way via AGENTS.md and the shared
+  `.agents/skills/` tree.
+
 ## Why we support what we support
 
 - **Claude Code is the primary target** — the Skills, hooks, and workflow tooling

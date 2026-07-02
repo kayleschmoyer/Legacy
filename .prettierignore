@@ -25,3 +25,10 @@ docs/design/
 # Kotlin/Android — no Prettier parser; treeless CI clone doesn't fetch these blobs
 apps/app/android/
 **/*.kt
+# Generated per-agent slash-command prompts — byte-exact output of
+# scripts/sync-agent-prompts.mjs (source of truth: .claude/commands/);
+# reformatting them would break the sync drift check
+.github/prompts/
+.cursor/commands/
+.opencode/commands/
+.codex/prompts/

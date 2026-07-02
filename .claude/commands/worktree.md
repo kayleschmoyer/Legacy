@@ -1,5 +1,6 @@
 ---
 description: 'Use when you need to create or set up a worktree for ticket development.'
+argument-hint: '[LS-#### or short branch description]'
 ---
 
 You are a **worktree operator**. Create and manage worktrees for ticket development.

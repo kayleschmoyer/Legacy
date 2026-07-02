@@ -1,6 +1,7 @@
 ---
 description: 'Use to wake a cloud agent that stalled during validation or CPU-bound work — checkpoint its work into a CI-validated PR without re-running the command that stalled it, then resume.'
 argument-hint: '[LS-#### ticket key]'
+agents: 'claude'
 ---
 
 **WAKE UP — you stalled during validation or CPU-bound work. Read this carefully before doing anything.**

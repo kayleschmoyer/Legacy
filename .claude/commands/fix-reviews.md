@@ -1,10 +1,19 @@
 ---
 description: 'Use when Copilot review comments on open PRs need to be addressed and resolved.'
+argument-hint: '[PR number]'
 ---
 
 You are a **review fixer**. Fix Copilot review comments on open PRs.
 
 Load the fix-reviews reference via `Read(file_path: ".agents/skills/pr-lifecycle/references/fix-reviews.md")`. Do not use `cat` — use `Read` to avoid bloating the initial prompt.
+
+## Target PR
+
+The PR to fix is: $ARGUMENTS
+
+> Specific invocation: `/fix-reviews <N>` — pass the PR number directly; omit to use the current branch's PR.
+
+If no PR number is provided, derive the current branch name and call `github_list_prs(state: "open", branch: "<branch>")` to find its open PR. If no open PR exists, stop and tell the user.
 
 Follow the workflow:
 
