@@ -219,14 +219,25 @@ describe('LeagueHistoryTab', () => {
   });
 
   describe('first-season empty state', () => {
-    it('shows first-season message when only one season is present', () => {
+    it('shows first-season message when no seasons are returned', () => {
       setupMocks({
-        history: { data: { getLeagueHistory: [SEASON_2] } },
+        history: { data: { getLeagueHistory: [] } },
         standings: { data: { getLeagueStandings: [] } },
         records: { data: { getAllTimeRecords: [] } },
       });
       render(<LeagueHistoryTab leagueId={20} />);
       expect(screen.getByText('First season in progress')).toBeTruthy();
+    });
+
+    it('shows standings for a single current (unfrozen) season', () => {
+      setupMocks({
+        history: { data: { getLeagueHistory: [SEASON_2] } },
+        standings: { data: { getLeagueStandings: STANDINGS } },
+        records: { data: { getAllTimeRecords: [] } },
+      });
+      render(<LeagueHistoryTab leagueId={20} />);
+      expect(screen.queryByText('First season in progress')).toBeNull();
+      expect(screen.getByText('Team Alpha')).toBeTruthy();
     });
   });
 

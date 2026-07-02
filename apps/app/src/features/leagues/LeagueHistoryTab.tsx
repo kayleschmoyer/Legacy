@@ -203,7 +203,7 @@ export function LeagueHistoryTab({
                 {historyError.message}
               </Text>
             </Card>
-          ) : seasons.length <= 1 ? (
+          ) : seasons.length === 0 ? (
             <Card padding="$4" bordered>
               <Text fontWeight="600" marginBottom="$1">
                 First season in progress

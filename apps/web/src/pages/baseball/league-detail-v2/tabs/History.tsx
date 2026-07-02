@@ -196,6 +196,12 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
             title="Couldn't load league history"
             sub={historyError.message}
           />
+        ) : seasons.length === 0 ? (
+          <Empty
+            icon={<I.Calendar size={28} />}
+            title="First season in progress"
+            sub="History will be available after season renewal."
+          />
         ) : (
           <div className="ls-table-wrap">
             {seasons.length <= 1 && !historyLoading ? (

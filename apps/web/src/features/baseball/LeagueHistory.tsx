@@ -172,7 +172,7 @@ export function LeagueHistory({
     );
   }
 
-  if (seasons.length <= 1) {
+  if (seasons.length === 0) {
     return (
       <SectionCard>
         <YStack alignItems="center" gap="$3" padding="$4">
