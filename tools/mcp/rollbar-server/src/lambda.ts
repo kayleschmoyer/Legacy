@@ -13,6 +13,7 @@ import {
 import { ROLLBAR_READ_TOKEN_ENV, tryGetRollbarToken } from './auth.js';
 import { listItems } from './tools/list-items.js';
 import { getItem } from './tools/get-item.js';
+import { getOccurrence } from './tools/get-occurrence.js';
 import { listOccurrences } from './tools/list-occurrences.js';
 import { setStatus } from './tools/set-status.js';
 import { topActiveItems } from './tools/top-active-items.js';
@@ -116,6 +117,30 @@ function createMcpServer(): McpServer {
         .describe('Results per page (Rollbar default 20, max 100)'),
     },
     async (params) => listOccurrences(params),
+  );
+
+  server.tool(
+    'rollbar_get_occurrence',
+    'Fetch the full payload of a Rollbar occurrence (instance) — returns the complete `data.body` (trace_chain, message, custom, logArgs) without truncation. Use `occurrenceId` for a specific occurrence or `itemId` to fetch the most recent occurrence of an item. READ-ONLY.',
+    {
+      occurrenceId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Specific occurrence (instance) id returned by rollbar_list_occurrences',
+        ),
+      itemId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Internal item id — fetches the most recent occurrence of this item',
+        ),
+    },
+    async (params) => getOccurrence(params),
   );
 
   server.tool(
