@@ -89,7 +89,7 @@ export interface UIIntegrationFixtures {
   apiCommissioner: APIRequestContext;
 }
 
-const WEB_BASE =
+export const WEB_BASE =
   process.env.INTEGRATION_WEB_URL ?? 'https://legacy-fantasy.com';
 const GQL_BASE = (
   process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/'
@@ -97,8 +97,10 @@ const GQL_BASE = (
 /**
  * Build a Playwright storageState for cookie-based auth (integration tests).
  * Sets ls_jwt cookie, ls_csrf cookie, and caches user profile in localStorage.
+ * Exported for the dual-mode fixtures (`fixtures/dual.ts`, LS-8290), which
+ * reuse it to authenticate the default `page` against the live web app.
  */
-function buildIntegrationStorageState(jwt: string) {
+export function buildIntegrationStorageState(jwt: string) {
   const payload = JSON.parse(
     Buffer.from(jwt.split('.')[1], 'base64url').toString(),
   ) as {
@@ -185,8 +187,10 @@ interface CliAuthData {
  *   3. `loginAs('premium', 2)` — the premium+admin COMMISSIONER identity
  *      (LS-8057). Premium clears the LS-5030 gates; admin preserves the
  *      `league(id)` isAdmin bypass the creator relies on (no league_members row).
+ *
+ * Exported for the dual-mode fixtures (`fixtures/dual.ts`, LS-8290).
  */
-async function getAuthJwt(): Promise<string> {
+export async function getAuthJwt(): Promise<string> {
   if (process.env.INTEGRATION_JWT) {
     const jwt = process.env.INTEGRATION_JWT;
     assertJwtNotExpired(jwt, 'INTEGRATION_JWT env var');

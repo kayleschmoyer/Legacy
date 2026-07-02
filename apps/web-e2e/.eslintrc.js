@@ -204,6 +204,7 @@ module.exports = {
         'player-detail-modal.spec.ts',
         'player-detail-season-pitching.spec.ts',
         'player-stats-mocked.spec.ts',
+        'player-stats-search.dual.spec.ts',
         'player-stats.spec.ts',
       ],
       rules: {

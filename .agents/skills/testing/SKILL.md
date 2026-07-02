@@ -332,6 +332,40 @@ export class PlayersPage extends BasePage {
 
 If a spec needs a one-off selector that does not yet belong on the page object, the right move is to add the verb to the page object — not to suppress the lint rule.
 
+## Test Dependency Injection (ADR-0016)
+
+Two DI seams sit on top of the semantic POM — both selected by **Playwright projects**, both documented in [`docs/decisions/0016-test-dependency-injection.md`](../../../docs/decisions/0016-test-dependency-injection.md):
+
+### Platform seam — `AppDriver`
+
+Migrated test objects are written against the platform-neutral `AppDriver`/`UIElement` interfaces (`apps/web-e2e/src/driver/`) instead of Playwright's `Page`/`Locator`. The two object kinds migrate differently: **page objects (screens)** extend `BaseScreen` and take an `AppDriver`; **component objects** take a `UIElement` root (instead of `BaseComponent`'s `Locator` root), so a migrated screen composes them by passing a driver element for the widget's region. On web the driver is `PlaywrightWebDriver` (injected by `fixtures/pages.ts` / `fixtures/dual.ts`); the interface is the seam where an Appium native driver plugs in later. Rules:
+
+- **New page objects take an `AppDriver`** (`BaseScreen`) and **new components take a `UIElement` root**, unless they genuinely need web-only surfaces (CSS assertions, `dispatchEvent` workarounds) — document that need in the object's doc comment and keep extending `BasePage` / `BaseComponent`.
+- The driver's `expect*` methods are the retrying assertion surface — never sample `isVisible()` where you mean `expectVisible()`. Runner-level `expect.poll` over driver reads is fine.
+- Capability-dependent behavior gates on `driver.capabilities.<cap>` (`networkMock`, `clock`, `trace`, `hover`, `multiWindow`) via `test.skip`, never by failing at runtime.
+- Reference migration: `pages/draft.page.ts` (screen) + `components/player-search-box.component.ts` (component).
+
+### Backend seam — dual-mode specs (`src/tests/shared/`)
+
+A spec whose flow deserves both hermetic PR coverage and a live check is written ONCE under `apps/web-e2e/src/tests/shared/` (named `*.dual.spec.ts`), importing `test` from `fixtures/dual.ts` and speaking only page-object verbs + the `TestData` seam (`fixtures/test-data.ts`):
+
+| Where it runs           | Config / project                                           | `backend` | Data preconditions                  |
+| ----------------------- | ---------------------------------------------------------- | --------- | ----------------------------------- |
+| PR CI + local           | `playwright.config.ts` (existing browser projects)         | `mock`    | `MockTestData` → `route.fulfill()`  |
+| Live (local / dispatch) | `playwright.integration.config.ts` → `shared-live` project | `live`    | `LiveTestData` → real backend state |
+
+```bash
+# mocked (hermetic — runs in PR CI automatically)
+pnpm exec playwright test --project=chromium --config=apps/web-e2e/playwright.config.ts src/tests/shared
+
+# live (needs integration credentials, like any integration run)
+pnpm exec playwright test --project=shared-live --config=apps/web-e2e/playwright.integration.config.ts
+```
+
+Rules for dual-mode specs: no `page.route()`, no mock payload imports, no identity setup — preconditions go through `TestData` (grow it verb-by-verb; a verb one backend cannot satisfy must throw, not no-op). Assert only on handles `TestData` returned, never on mock-specific incidentals. The nightly integration shard partition does not include `shared-live` yet — wiring it in is an ADR-0016 rollout follow-up.
+
+Reference dual-mode spec: `src/tests/shared/player-stats-search.dual.spec.ts`.
+
 ## Integration vs E2E Directory Distinction
 
 `apps/web-e2e/` contains two distinct test suites with different network contracts:

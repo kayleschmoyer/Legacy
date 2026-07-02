@@ -10,6 +10,7 @@ import {
 import { test as leagueDataBase } from './auth';
 import { DraftPage, LeaguePage, PlayersPage } from '../pages';
 import { NavHeader } from '../components';
+import { PlaywrightWebDriver } from '../driver';
 
 /**
  * Page-object injection layer (ADR-0015 §5).
@@ -50,7 +51,10 @@ const pageObjects = {
     { page }: { page: Page },
     use: (pageObject: DraftPage) => Promise<void>,
   ) => {
-    await use(new DraftPage(page));
+    // DraftPage is migrated to the platform-neutral driver (ADR-0016); on web
+    // it is constructed with the Playwright driver adapter. Unmigrated page
+    // objects below still take the raw `page`.
+    await use(new DraftPage(new PlaywrightWebDriver(page)));
   },
   leaguePage: async (
     { page }: { page: Page },

@@ -26,3 +26,4 @@ for authoring guidance and the immutability rule.
 | [0013](0013-runner-job-heartbeat.md)                     | Runner survival via a runner-level job heartbeat            | Accepted |
 | [0014](0014-integration-nightly-bisect.md)               | Integration regression detection via nightly + bisection    | Accepted |
 | [0015](0015-semantic-page-objects.md)                    | Semantic Page Object Model for Playwright e2e tests         | Proposed |
+| [0016](0016-test-dependency-injection.md)                | Test dependency injection: platform driver + backend seam   | Proposed |

@@ -525,7 +525,10 @@ jobs:
           # Build Playwright arguments as an array to avoid command injection
           PLAYWRIGHT_ARGS=( "--config=$CONFIG" )
 
-          # Browser / project (integration config has no named projects)
+          # Browser / project. Integration runs pass no --project: the
+          # explicit shard file lists below only ever name files under the
+          # `integration` project's testDir, so the config's `shared-live`
+          # project (dual-mode specs, ADR-0016) never matches here.
           if [ "$SUITE" != "integration" ]; then
             if [ "$IS_NIGHTLY_LIKE" = "true" ]; then
               PLAYWRIGHT_ARGS+=( "--project=chromium" )

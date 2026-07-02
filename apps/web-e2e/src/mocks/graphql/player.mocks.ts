@@ -289,6 +289,157 @@ export function mockSeasonFielding(
   };
 }
 
+// ── Player-stats grid (GetPlayersWithStats / GetCareerBattingStats) ─────────
+
+export interface MockCareerBattingLeader {
+  __typename: 'CareerBatting';
+  playerId: number;
+  primaryPosition: string;
+  positionsPlayed: string | null;
+  games: number;
+  plateAppearances: number;
+  atBats: number;
+  runs: number;
+  hits: number;
+  doubles: number;
+  triples: number;
+  homeRuns: number;
+  rbi: number;
+  stolenBases: number;
+  caughtStealing: number;
+  baseOnBalls: number;
+  strikeouts: number;
+  totalBases: number;
+  groundedIntoDoublePlays: number;
+  hitByPitch: number;
+  sacrificeHits: number;
+  intentionalBaseOnBalls: number;
+  battingAverage: number;
+  onBasePercentage: number;
+  sluggingPercentage: number;
+  offensiveWAR: number;
+  player: {
+    __typename: 'Player';
+    id: number;
+    firstName: string;
+    lastName: string;
+    brefId: string;
+  };
+}
+
+export function mockCareerBattingLeader(
+  overrides: Partial<MockCareerBattingLeader> = {},
+): MockCareerBattingLeader {
+  return {
+    __typename: 'CareerBatting',
+    playerId: 1,
+    primaryPosition: 'CF',
+    positionsPlayed: null,
+    games: 1131,
+    plateAppearances: 5101,
+    atBats: 4289,
+    runs: 894,
+    hits: 1559,
+    doubles: 315,
+    triples: 48,
+    homeRuns: 368,
+    rbi: 817,
+    stolenBases: 211,
+    caughtStealing: 57,
+    baseOnBalls: 774,
+    strikeouts: 1034,
+    totalBases: 2988,
+    groundedIntoDoublePlays: 76,
+    hitByPitch: 35,
+    sacrificeHits: 3,
+    intentionalBaseOnBalls: 231,
+    battingAverage: 0.304,
+    onBasePercentage: 0.41,
+    sluggingPercentage: 0.582,
+    offensiveWAR: 72.9,
+    player: {
+      __typename: 'Player',
+      id: 1,
+      firstName: 'Mike',
+      lastName: 'Trout',
+      brefId: 'troutmi01',
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * Build the connection-shaped response the `/players/stats` batting grid
+ * consumes (GetCareerBattingStats / GetPlayersWithStats / GetAllPlayers all
+ * read this shape — the page mocks all three with one payload). Defaults to a
+ * two-player pool (Mike Trout, Shohei Ohtani), mirroring the inline payload in
+ * player-stats.spec.ts.
+ */
+export function careerBattingConnectionResponse(
+  leaders?: MockCareerBattingLeader[],
+) {
+  const nodes = leaders ?? [
+    mockCareerBattingLeader(),
+    mockCareerBattingLeader({
+      playerId: 2,
+      primaryPosition: 'DH',
+      games: 1200,
+      plateAppearances: 4800,
+      atBats: 4100,
+      runs: 900,
+      hits: 1300,
+      doubles: 250,
+      triples: 20,
+      homeRuns: 250,
+      rbi: 700,
+      stolenBases: 100,
+      caughtStealing: 30,
+      baseOnBalls: 600,
+      strikeouts: 1100,
+      totalBases: 2500,
+      groundedIntoDoublePlays: 50,
+      hitByPitch: 20,
+      sacrificeHits: 5,
+      intentionalBaseOnBalls: 50,
+      battingAverage: 0.286,
+      onBasePercentage: 0.37,
+      sluggingPercentage: 0.55,
+      offensiveWAR: 55.0,
+      player: {
+        __typename: 'Player',
+        id: 2,
+        firstName: 'Shohei',
+        lastName: 'Ohtani',
+        brefId: 'ohtansh01',
+      },
+    }),
+  ];
+
+  return {
+    data: {
+      careerBattingStats: {
+        __typename: 'CareerBattingConnection',
+        totalCount: nodes.length,
+        edges: nodes.map((node) => ({
+          __typename: 'CareerBattingEdge',
+          node,
+        })),
+        pageInfo: {
+          __typename: 'PageInfo',
+          hasNextPage: false,
+          hasPreviousPage: false,
+          startCursor: null,
+          endCursor: null,
+        },
+      },
+      players: nodes.map(({ player }) => ({
+        ...player,
+        statsLastFetchedAt: null,
+      })),
+    },
+  };
+}
+
 /**
  * Build a GetAllPlayerSeasonStats response for a batter/fielder.
  * Pass empty arrays to omit batting or fielding sections.

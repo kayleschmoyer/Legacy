@@ -2,12 +2,14 @@ import { defineConfig } from '@playwright/test';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
+import type { BackendOptions } from './src/fixtures/dual';
+
 // Load root .env so JWT_SECRET and other vars are available to test helpers
 config({ path: resolve(__dirname, '../../.env') });
 // Load .env.e2e for local integration test credentials (gitignored)
 config({ path: resolve(__dirname, '../../.env.e2e'), override: false });
 
-export default defineConfig({
+export default defineConfig<BackendOptions>({
   testDir: './src/integration/tests',
   globalSetup: './src/integration/global-setup.ts',
   globalTeardown: './src/integration/global-teardown.ts',
@@ -39,4 +41,24 @@ export default defineConfig({
       process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/',
     trace: 'off',
   },
+
+  /* Projects select SCOPE, not test logic (ADR-0016):
+   *   • `integration`  — the live-backend suite as it has always run. The
+   *     nightly workflow passes explicit spec-file lists from the shard
+   *     partition, which only ever name files under src/integration/tests,
+   *     so its behavior is unchanged by the second project.
+   *   • `shared-live`  — the dual-mode specs (src/tests/shared/), the SAME
+   *     files the hermetic suite runs mocked, here flipped to the live
+   *     backend via the `backend` option fixture (fixtures/dual.ts). */
+  projects: [
+    {
+      name: 'integration',
+      testDir: './src/integration/tests',
+    },
+    {
+      name: 'shared-live',
+      testDir: './src/tests/shared',
+      use: { backend: 'live' },
+    },
+  ],
 });
