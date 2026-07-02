@@ -5,8 +5,12 @@
  * League Detail page at /baseball/league/:id/trades.
  *
  * All GraphQL queries are mocked so these tests run without a live backend.
+ * WebSocket events are intercepted via page.routeWebSocket() — no real WS
+ * server required (see BLD-033 / LS-5966).
  */
 
+import type { WebSocketRoute } from '@playwright/test';
+import { injectWebSocketUrl } from './helpers/websocket-test-utils';
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -519,6 +523,106 @@ test.describe('Trades tab — trade block with players @regression', () => {
 
   test('shows asking price when set', async ({ page }) => {
     await expect(page.getByText('Asking: 2nd round pick')).toBeVisible();
+  });
+});
+
+// ── WebSocket real-time refresh (BLD-033 / LS-5966) ─────────────────────────
+
+test.describe('Trades tab — WebSocket real-time refresh @critical', () => {
+  /**
+   * Wire up a routeWebSocket interceptor and return a helper that waits for
+   * the app's WS connection attempt (which only happens once the page loads
+   * and the LeagueWebSocketContext mounts).
+   */
+  async function setupWebSocket(
+    page: import('@playwright/test').Page,
+  ): Promise<{
+    waitForConnection: () => Promise<WebSocketRoute>;
+  }> {
+    await injectWebSocketUrl(page);
+    let wsRoute: WebSocketRoute | undefined;
+    await page.routeWebSocket(/wss?:\/\//, (ws) => {
+      wsRoute = ws;
+      ws.onMessage(() => {
+        /* absorb pings */
+      });
+    });
+    return {
+      waitForConnection: async () => {
+        await expect
+          .poll(() => wsRoute !== undefined, { timeout: 10_000 })
+          .toBe(true);
+        return wsRoute as WebSocketRoute;
+      },
+    };
+  }
+
+  test('TRADE_OFFER WebSocket event triggers a GetTeamTradeOffers refetch — outgoing pending trade disappears after remote GM accepts', async ({
+    page,
+  }) => {
+    // Stateful call counter: first response = pending, subsequent = empty
+    // (simulating the remote GM accepting the outgoing trade).
+    let teamTradeOffersCallCount = 0;
+
+    await mockTradesGraphQL(page, {
+      leagueTradeOffers: [MOCK_OUTGOING_PENDING],
+    });
+
+    // Override only GetTeamTradeOffers with stateful responses; fall through
+    // for everything else so mockTradesGraphQL handles it.
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (postData.includes('"getteamtradeoffers"')) {
+        teamTradeOffersCallCount++;
+        const offers =
+          teamTradeOffersCallCount <= 1 ? [MOCK_OUTGOING_PENDING] : [];
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { teamTradeOffers: offers } }),
+        });
+      } else {
+        await route.fallback();
+      }
+    });
+
+    const ws = await setupWebSocket(page);
+
+    await page.goto('/baseball/league/1/trades');
+    await page.waitForLoadState('load');
+
+    // Confirm initial state: outgoing pending trade is visible.
+    await expect(page.getByText('Mookie Betts')).toBeVisible();
+
+    // Wait for the WS connection before sending events.
+    const route = await ws.waitForConnection();
+
+    // Prepare to detect the refetch GraphQL request that fires after the WS event.
+    const refetchPromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/graphql') &&
+        !resp.url().includes('/@fs/') &&
+        (resp
+          .request()
+          .postData()
+          ?.toLowerCase()
+          .includes('"getteamtradeoffers"') ??
+          false),
+      { timeout: 10_000 },
+    );
+
+    // Send TRADE_OFFER notification — mirrors what the WS server sends when
+    // GM B accepts the outgoing trade from GM A.
+    route.send(
+      JSON.stringify({
+        type: 'notification',
+        data: { type: 'TRADE_OFFER', leagueId: 1 },
+      }),
+    );
+
+    // The TradingCenter web wrapper must refetch GetTeamTradeOffers in response.
+    await refetchPromise;
+    expect(teamTradeOffersCallCount).toBeGreaterThanOrEqual(2);
   });
 });
 
