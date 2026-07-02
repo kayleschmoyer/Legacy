@@ -1557,7 +1557,7 @@ export function createServer(): McpServer {
   // --- github_get_check_runs ---
   server.tool(
     'github_get_check_runs',
-    'List check runs for a PR or commit SHA. Returns the latest run per check name — includes name, status, conclusion, output (title + summary), and app slug. Use instead of `gh api repos/.../commits/$SHA/check-runs` to inspect required status checks (bot-review, Quality Gates, Build Validation, etc.). Pass the PR number as "number" (preferred) or "prNumber" (alias). For multi-commit/cross-branch inspection, pass "shas" (1-25) to fetch many commits in one call — returns { checkRuns: { [sha]: [...] }, missing: [{ sha, error }] }.',
+    'List check runs for a PR or commit SHA. Returns the latest run per check name — includes name, status, conclusion, output (title + summary), and app slug. Use instead of `gh api repos/.../commits/$SHA/check-runs` to inspect required status checks (bot-review, Quality Gates, Build Validation, etc.). Pass the PR number as "number" (preferred) or "prNumber" (alias). For multi-commit/cross-branch inspection, pass "shas" (1-25) to fetch many commits in one call — returns { checkRuns: { [sha]: [...] }, missing: [{ sha, error }] }. Pass resolveRunId: true to also extract workflowRunId and jobId from each check run\'s details URL — use these directly with ci_get_logs or ci_search_logs without falling back to gh api.',
     {
       number: z.coerce
         .number()
@@ -1595,6 +1595,12 @@ export function createServer(): McpServer {
         .describe(
           'Filter results to a specific check name (e.g. "bot-review")',
         ),
+      resolveRunId: z
+        .boolean()
+        .optional()
+        .describe(
+          'When true, parse details_url/html_url on each check run to extract workflowRunId and jobId (GitHub Actions run and job IDs). Included in response only when resolvable. Use to feed ci_get_logs / ci_search_logs without a gh api fallback.',
+        ),
     },
     async (params) => {
       const prNumber = params.number ?? params.prNumber;
@@ -1603,6 +1609,7 @@ export function createServer(): McpServer {
         sha: params.sha,
         shas: params.shas,
         checkName: params.checkName,
+        resolveRunId: params.resolveRunId,
       });
     },
   );

@@ -14,6 +14,7 @@ interface GetCheckRunsParams {
   sha?: string;
   shas?: string[];
   checkName?: string;
+  resolveRunId?: boolean;
 }
 
 interface CheckRunOutput {
@@ -33,6 +34,8 @@ interface CheckRun {
   conclusion: string | null;
   started_at: string | null;
   completed_at: string | null;
+  details_url: string | null;
+  html_url: string | null;
   output: CheckRunOutput;
   app: CheckRunApp | null;
 }
@@ -50,9 +53,29 @@ interface SerializedCheckRun {
   completedAt: string | null;
   output: CheckRunOutput;
   app: CheckRunApp | null;
+  workflowRunId?: number;
+  jobId?: number;
+  detailsUrl?: string;
 }
 
 const BATCH_CONCURRENCY = 5;
+
+// Parse workflowRunId and jobId from GitHub Actions URLs.
+// details_url pattern: .../actions/runs/<runId>/job/<jobId>
+// html_url pattern:    .../actions/runs/<runId>/job/<jobId>
+function parseRunIds(
+  run: CheckRun,
+): { workflowRunId: number; jobId: number; detailsUrl: string } | undefined {
+  const url = run.details_url ?? run.html_url;
+  if (!url) return undefined;
+  const m = /\/actions\/runs\/(\d+)\/job\/(\d+)/.exec(url);
+  if (!m) return undefined;
+  return {
+    workflowRunId: parseInt(m[1], 10),
+    jobId: parseInt(m[2], 10),
+    detailsUrl: url,
+  };
+}
 
 // Single-sha results are a flat, uniform list → Markdown table (LS-8021).
 // The nested `output` object is pruned to a truncated `summary` cell (the field
@@ -66,14 +89,32 @@ const CHECK_RUN_COLUMNS = [
   'summary',
 ] as const;
 
-function checkRunRow(run: SerializedCheckRun): Record<string, unknown> {
-  return {
+const CHECK_RUN_COLUMNS_WITH_IDS = [
+  'name',
+  'status',
+  'conclusion',
+  'completedAt',
+  'summary',
+  'workflowRunId',
+  'jobId',
+] as const;
+
+function checkRunRow(
+  run: SerializedCheckRun,
+  resolveRunId?: boolean,
+): Record<string, unknown> {
+  const row: Record<string, unknown> = {
     name: run.name,
     status: run.status,
     conclusion: run.conclusion ?? '',
     completedAt: run.completedAt ?? '',
     summary: truncate(run.output.summary ?? '', 200),
   };
+  if (resolveRunId) {
+    row.workflowRunId = run.workflowRunId ?? '';
+    row.jobId = run.jobId ?? '';
+  }
+  return row;
 }
 
 async function mapWithConcurrency<T, R>(
@@ -102,6 +143,7 @@ async function fetchCheckRunsForSha(
   repo: string,
   sha: string,
   checkName: string | undefined,
+  resolveRunId?: boolean,
 ): Promise<SerializedCheckRun[]> {
   const baseQuery: Record<string, string> = { per_page: '100' };
   if (checkName) {
@@ -133,7 +175,7 @@ async function fetchCheckRunsForSha(
   for (const run of allCheckRuns) {
     if (!seen.has(run.name)) {
       seen.add(run.name);
-      deduped.push({
+      const serialized: SerializedCheckRun = {
         name: run.name,
         status: run.status,
         conclusion: run.conclusion,
@@ -144,7 +186,16 @@ async function fetchCheckRunsForSha(
           summary: run.output.summary,
         },
         app: run.app ? { slug: run.app.slug, name: run.app.name } : null,
-      });
+      };
+      if (resolveRunId) {
+        const ids = parseRunIds(run);
+        if (ids) {
+          serialized.workflowRunId = ids.workflowRunId;
+          serialized.jobId = ids.jobId;
+          serialized.detailsUrl = ids.detailsUrl;
+        }
+      }
+      deduped.push(serialized);
     }
   }
   return deduped;
@@ -156,7 +207,12 @@ export async function getCheckRuns(
   const repo = await getRepoOwnerName();
 
   if (params.shas && params.shas.length > 0) {
-    return getCheckRunsBatch(repo, params.shas, params.checkName);
+    return getCheckRunsBatch(
+      repo,
+      params.shas,
+      params.checkName,
+      params.resolveRunId,
+    );
   }
 
   try {
@@ -193,15 +249,22 @@ export async function getCheckRuns(
       repo.name,
       sha,
       params.checkName,
+      params.resolveRunId,
     );
 
     const header = `_sha: ${sha.slice(0, 7)}${params.prNumber !== undefined ? `, PR #${params.prNumber}` : ''}, total: ${deduped.length}_`;
+    const columns = params.resolveRunId
+      ? CHECK_RUN_COLUMNS_WITH_IDS
+      : CHECK_RUN_COLUMNS;
     const text =
       deduped.length === 0
         ? `No check runs found for ${sha.slice(0, 7)}.`
-        : `${header}\n\n${markdownTable(deduped.map(checkRunRow), {
-            columns: CHECK_RUN_COLUMNS,
-          })}`;
+        : `${header}\n\n${markdownTable(
+            deduped.map((r) => checkRunRow(r, params.resolveRunId)),
+            {
+              columns,
+            },
+          )}`;
 
     return {
       content: [{ type: 'text', text }],
@@ -230,6 +293,7 @@ async function getCheckRunsBatch(
   repo: { owner: string; name: string },
   shas: string[],
   checkName: string | undefined,
+  resolveRunId?: boolean,
 ): Promise<ToolResult> {
   const checkRuns: Record<string, SerializedCheckRun[]> = {};
   const missing: { sha: string; error: string }[] = [];
@@ -241,6 +305,7 @@ async function getCheckRunsBatch(
         repo.name,
         sha,
         checkName,
+        resolveRunId,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
