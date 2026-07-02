@@ -58,16 +58,24 @@ For cloud agents and any session where the Bash tool's ~120s timeout is a concer
 `nx_run_pc_chunk` MCP tool instead of running `make pc-<chunk>` via Bash:
 
 ```
-nx_run_pc_chunk({ chunk: "pc-typecheck" })   // runs make pc-typecheck with a 5-min timeout
+nx_run_pc_chunk({ chunk: "pc-typecheck" })   // runs make pc-typecheck (5-min process timeout)
 nx_run_pc_chunk({ chunk: "pc-lint" })
 nx_run_pc_chunk({ chunk: "pc-build" })
 ```
 
 Chunks must run **in order**: `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`.
 
-Returns `{ chunk, passed, output }` on success; `isError: true` with failure output on failure.
+Returns `{ chunk, passed, output }` when the chunk finishes within the ~45s single-call budget; `isError: true` with failure output on failure. A chunk still running at the budget returns `{ chunk, status: "running", jobId, logTail }` while the chunk continues in the background — follow up with:
 
-**Why**: `pnpm exec nx affected` and `make pc-*` calls run longer than the Bash tool's ~120s hard timeout in cloud sessions. Running them inline produces `"Tool execution was interrupted"`, causing agents to poll output files and stall. The MCP tool wraps each chunk with a 5-minute timeout so the call completes cleanly. A `PreToolUse` hook on `Bash` blocks inline nx/make-pc calls that don't use `run_in_background: true`, steering agents to this tool.
+```
+nx_job_wait({ jobId })     // blocks ≤55s; re-invoke while it returns status: "running"
+nx_job_status({ jobId })   // non-blocking snapshot (status + log tail)
+nx_job_list()              // recover job handles after a session resume or lost result
+```
+
+Never re-run a chunk that handed back a jobId — re-invoking `nx_run_pc_chunk` for the same chunk while it runs joins the in-flight job instead of spawning a duplicate.
+
+**Why**: `pnpm exec nx affected` and `make pc-*` calls run longer than the Bash tool's ~120s hard timeout in cloud sessions, and any single MCP call is killed at ~60s by the cloud transport timeout. Running them inline produces `"Tool execution was interrupted"`, causing agents to poll output files and stall. The MCP tool runs each chunk as a background job with a bounded in-call wait, so every call returns cleanly — either with the result or with a pollable handle. A `PreToolUse` hook on `Bash` blocks inline nx/make-pc calls that don't use `run_in_background: true`, steering agents to this tool.
 
 ## PreToolUse Bash MCP-First Hook
 

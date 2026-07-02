@@ -1,10 +1,14 @@
 import { githubGet, githubPost } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+import { waitRunHint } from './wait-run.js';
 
-const MAX_TIMEOUT_SECONDS = 3600;
+// Hard per-call ceiling: cloud sessions kill any MCP call at ~60s (transport
+// timeout), losing the result. No single call may block longer than this —
+// longer waits are re-armed by the caller via ci_wait_run.
+const TRANSPORT_SAFE_WAIT_MS = 55_000;
 const FIND_RUN_POLL_INTERVAL_MS = 3000;
 const FIND_RUN_MAX_ATTEMPTS = 10;
-const COMPLETION_POLL_INTERVAL_MS = 10000;
+const COMPLETION_POLL_INTERVAL_MS = 5000;
 
 interface GitHubWorkflowRun {
   id: number;
@@ -169,11 +173,13 @@ export async function dispatchWorkflow(
       };
     }
 
+    // The per-call wait is transport-safe regardless of timeoutSeconds; the
+    // param is kept for backward compatibility but clamped to the ceiling.
     const timeoutSeconds = Math.min(
-      params.timeoutSeconds ?? 600,
-      MAX_TIMEOUT_SECONDS,
+      params.timeoutSeconds ?? TRANSPORT_SAFE_WAIT_MS / 1000,
+      TRANSPORT_SAFE_WAIT_MS / 1000,
     );
-    const deadlineMs = Date.now() + timeoutSeconds * 1000;
+    const deadlineMs = dispatchedAt.getTime() + timeoutSeconds * 1000;
 
     const newRun = await findNewRun(workflow, ref, dispatchedAt);
     if (!newRun) {
@@ -204,21 +210,27 @@ export async function dispatchWorkflow(
         {
           type: 'text',
           text: JSON.stringify(
-            {
-              workflow,
-              ref,
-              runId: newRun.id,
-              runNumber: result.runNumber,
-              url: result.url,
-              conclusion: result.conclusion,
-              durationSeconds: result.durationSeconds,
-              ...(result.timedOut
-                ? {
-                    timedOut: true,
-                    hint: `Run is still in progress after ${timeoutSeconds}s. Use ci_view_run({ runId: ${newRun.id} }) to check its current status.`,
-                  }
-                : {}),
-            },
+            result.timedOut
+              ? {
+                  workflow,
+                  ref,
+                  runId: newRun.id,
+                  runNumber: result.runNumber,
+                  url: result.url,
+                  status: 'in_progress',
+                  elapsedSeconds: result.durationSeconds,
+                  hint: waitRunHint(newRun.id),
+                }
+              : {
+                  workflow,
+                  ref,
+                  runId: newRun.id,
+                  runNumber: result.runNumber,
+                  url: result.url,
+                  status: 'completed',
+                  conclusion: result.conclusion,
+                  durationSeconds: result.durationSeconds,
+                },
             null,
             2,
           ),

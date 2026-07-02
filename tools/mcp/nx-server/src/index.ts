@@ -5,6 +5,7 @@ import { affected } from './tools/affected.js';
 import { checkPackageHealth } from './tools/check-package-health.js';
 import { depGraph } from './tools/dep-graph.js';
 import { installPackage } from './tools/install-package.js';
+import { jobList, jobStatus, jobWait } from './tools/job-tools.js';
 import { runAffected } from './tools/run-affected.js';
 import { runE2ESpecs } from './tools/run-e2e-specs.js';
 import { runPcChunk, PC_CHUNKS } from './tools/run-pc-chunk.js';
@@ -256,9 +257,12 @@ server.tool(
 server.tool(
   'nx_run_pc_chunk',
   'Prefer this over `make pc-<chunk>` via shell for cloud agents. Run a single pre-commit ' +
-    "validation chunk with a 5-minute timeout (avoids the Bash tool's ~120s inline limit). " +
-    'Chunks must run IN ORDER: pc-db-prep → pc-typecheck → pc-format → pc-lint → ' +
-    'pc-workflows → pc-test → pc-build. Returns structured pass/fail output.',
+    'validation chunk. Chunks must run IN ORDER: pc-db-prep → pc-typecheck → pc-format → ' +
+    'pc-lint → pc-workflows → pc-test → pc-build. Fast chunks return structured pass/fail ' +
+    'output in one call. A chunk still running after ~45s returns { status: "running", jobId } ' +
+    'instead of blocking into the ~60s MCP transport timeout — the chunk keeps running in the ' +
+    'background; call nx_job_wait({ jobId }) to continue waiting. Do NOT re-run the chunk: ' +
+    're-invoking while it runs joins the in-flight job.',
   {
     chunk: z
       .enum(PC_CHUNKS)
@@ -272,6 +276,52 @@ server.tool(
       .describe('Worktree path (default: repo root)'),
   },
   async (params) => runPcChunk(params),
+);
+
+// --- nx_job_status ---
+server.tool(
+  'nx_job_status',
+  'Cheap, instant snapshot of a background job started by nx_run_pc_chunk. Returns ' +
+    '{ status, elapsedSec, logTail } while running (never an error), or the final ' +
+    'pass/fail output once done. Use nx_job_wait to block until completion.',
+  {
+    jobId: z
+      .string()
+      .describe('Job ID returned by a { status: "running" } result'),
+  },
+  async (params) => jobStatus(params),
+);
+
+// --- nx_job_wait ---
+server.tool(
+  'nx_job_wait',
+  'Wait for a background job to finish, bounded at 55s per call (stays under the MCP ' +
+    'transport timeout). If the job is still running when the wait expires, returns a ' +
+    '{ status: "running" } snapshot with logTail — re-invoke to continue waiting. ' +
+    'Never re-run the underlying command while a job is in progress.',
+  {
+    jobId: z
+      .string()
+      .describe('Job ID returned by a { status: "running" } result'),
+    maxWaitMs: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(55_000)
+      .optional()
+      .describe('Max wait per call in ms (default and cap: 55000)'),
+  },
+  async (params) => jobWait(params),
+);
+
+// --- nx_job_list ---
+server.tool(
+  'nx_job_list',
+  'List recent background jobs (newest first), including jobs started by a previous ' +
+    'MCP server process. Use after a session resume or lost tool result to recover a ' +
+    'job handle instead of re-running validation.',
+  {},
+  async () => jobList(),
 );
 
 // Start the server

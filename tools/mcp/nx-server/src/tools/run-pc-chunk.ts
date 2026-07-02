@@ -1,10 +1,15 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { getRepoRoot, runCommand } from '../run-command.js';
+import { runJobWithBudget } from '../jobs.js';
+import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
-// 5-minute timeout — each pc-chunk can take longer than the Bash tool's ~120s limit.
+// 5-minute process timeout — each pc-chunk can take longer than the Bash tool's ~120s limit.
 const PC_CHUNK_TIMEOUT_MS = 5 * 60 * 1000;
+// Single-call sync budget — stays safely under the ~60s MCP transport timeout in cloud
+// sessions. Chunks that finish inside the budget return their result in one call; slower
+// chunks return a running snapshot with a jobId to poll via nx_job_wait.
+const SYNC_BUDGET_MS = 45_000;
 
 export const PC_CHUNKS = [
   'pc-db-prep',
@@ -27,40 +32,68 @@ export async function runPcChunk(
 ): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
 
-  try {
-    const output = await runCommand(
-      'make',
-      [params.chunk],
+  const snapshot = await runJobWithBudget(
+    {
+      command: 'make',
+      args: [params.chunk],
       cwd,
-      PC_CHUNK_TIMEOUT_MS,
-      undefined,
-      true,
-    );
+      label: params.chunk,
+      timeoutMs: PC_CHUNK_TIMEOUT_MS,
+      // Blind retries (e.g. after a lost transport) join the in-flight run
+      // instead of spawning a duplicate make process.
+      idempotencyKey: `pc-chunk:${cwd}:${params.chunk}`,
+    },
+    SYNC_BUDGET_MS,
+  );
 
+  if (snapshot.status === 'running') {
     return {
       content: [
         {
           type: 'text',
           text: minifiedJson({
             chunk: params.chunk,
-            passed: true,
-            output: truncateOutput(output, MAX_OUTPUT_CHARS),
+            status: 'running',
+            jobId: snapshot.jobId,
+            elapsedSec: snapshot.elapsedSec,
+            logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+            hint: snapshot.hint,
           }),
         },
       ],
     };
-  } catch (error) {
+  }
+
+  if (snapshot.status === 'orphaned') {
     return {
       content: [
         {
           type: 'text',
-          text: truncateOutput(
-            `${params.chunk} FAILED: ${error instanceof Error ? error.message : String(error)}`,
-            MAX_OUTPUT_CHARS,
-          ),
+          text: minifiedJson({
+            chunk: params.chunk,
+            status: 'orphaned',
+            jobId: snapshot.jobId,
+            logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+            hint: snapshot.hint,
+          }),
         },
       ],
-      isError: true,
     };
   }
+
+  const passed = snapshot.status === 'done';
+  return {
+    content: [
+      {
+        type: 'text',
+        text: minifiedJson({
+          chunk: params.chunk,
+          passed,
+          ...(snapshot.error ? { error: snapshot.error } : {}),
+          output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
+        }),
+      },
+    ],
+    ...(passed ? {} : { isError: true }),
+  };
 }

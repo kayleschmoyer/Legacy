@@ -660,7 +660,9 @@ server.tool(
     'Guarantees the AGENTS.md invariant order and short-circuits on migration failure (does not run pc on a broken DB). ' +
     'Returns { migrations: { applied, pending, needsMigration }, pc: { passed, steps, errors } }. ' +
     'Use runPcInBackground: true in cloud sessions to avoid the ~60s MCP transport timeout; poll with make_run_wait({ jobId }). ' +
-    'Use sanctionedChunks: true to run the seven pc steps individually (pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build).',
+    'Use sanctionedChunks: true to run the seven pc steps individually (pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build); ' +
+    'each call is budgeted to ~45s and may return { pc: { status: "in_progress", ... } } with resume instructions ' +
+    '(re-invoke with startAtChunk, or make_run_wait a still-running chunk job) — never restart validation from scratch.',
   {
     worktreePath: z
       .string()
@@ -672,7 +674,23 @@ server.tool(
       .optional()
       .describe(
         'Run the seven pc chunks individually instead of make pc (timeout-resilient for cloud sessions). ' +
+          'Runs as many chunks as fit in a ~45s budget, then returns an in_progress result with resume instructions. ' +
           'Ignored when runPcInBackground: true.',
+      ),
+    startAtChunk: z
+      .enum([
+        'pc-db-prep',
+        'pc-typecheck',
+        'pc-format',
+        'pc-lint',
+        'pc-workflows',
+        'pc-test',
+        'pc-build',
+      ])
+      .optional()
+      .describe(
+        'Resume sanctioned-chunk validation at this chunk (implies sanctionedChunks: true; skips the ' +
+          'migration check — it ran in the initial call). Use the value from a previous in_progress result.',
       ),
     runPcInBackground: z
       .boolean()

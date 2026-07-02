@@ -7,7 +7,11 @@ import {
   getRepoRoot,
   TimeoutError,
 } from '../run-command.js';
-import { startMakeInBackground } from './make-run-bg.js';
+import {
+  startMakeInBackground,
+  waitForJobDone,
+  readJobLog,
+} from './make-run-bg.js';
 import {
   parseSteps,
   extractErrors,
@@ -22,9 +26,17 @@ interface ValidatePRParams {
   /**
    * When true, runs the seven sanctioned pc chunks in order instead of `make pc`.
    * Required for cloud sessions where the MCP transport timeout (~60s) would kill
-   * a synchronous `make pc` call. Each chunk returns independently.
+   * a synchronous `make pc` call. The call is budgeted to stay under that timeout:
+   * it runs as many chunks as fit, then returns { status: "in_progress" } with
+   * resume instructions (startAtChunk, or a jobId for a chunk still running).
    */
   sanctionedChunks?: boolean;
+  /**
+   * Resume sanctioned-chunk validation at this chunk (skips migration checks —
+   * they ran in the initial call). Use the value from a previous in_progress
+   * result. Implies sanctionedChunks: true.
+   */
+  startAtChunk?: (typeof PC_CHUNKS)[number];
   /**
    * When true, spawn `make pc` in the background and return a jobId immediately.
    * Use make_run_wait({ jobId }) to poll for completion.
@@ -138,6 +150,12 @@ const PC_CHUNKS = [
   'pc-build',
 ] as const;
 
+// Single-call budget for sanctioned-chunk mode — stays safely under the ~60s
+// MCP transport timeout in cloud sessions. Chunks beyond the budget resume via
+// startAtChunk; a chunk still running at the deadline is handed back as a
+// background jobId.
+const CHUNK_SYNC_BUDGET_MS = 45_000;
+
 /**
  * Semantic one-shot for the mandatory migrate-before-pc gate.
  *
@@ -179,51 +197,62 @@ export async function validatePR(
     workDir = resolved;
   }
 
-  // ── Step 1: Migration status ─────────────────────────────────────────────────
-  const migrationStatus = await checkMigrationStatus(repoRoot, workDir);
-
-  const migrationResult: Record<string, unknown> = {
-    available: migrationStatus.available,
-    applied: migrationStatus.applied,
-    pending: migrationStatus.pending,
-    needsMigration: migrationStatus.needsMigration,
-  };
-  if (migrationStatus.reason) migrationResult.reason = migrationStatus.reason;
-  if (migrationStatus.pendingNames.length > 0) {
-    migrationResult.pendingNames = migrationStatus.pendingNames;
+  if (params.startAtChunk && !PC_CHUNKS.includes(params.startAtChunk)) {
+    return err(
+      `startAtChunk must be one of: ${PC_CHUNKS.join(', ')} — got "${params.startAtChunk}"`,
+    );
   }
 
-  // ── Step 2: Apply migrations if needed ──────────────────────────────────────
-  if (migrationStatus.needsMigration === true) {
-    let migrateOutput = '';
-    let migrateSuccess = false;
-    try {
-      migrateOutput = await applyMigrations(repoRoot, workDir);
-      migrateSuccess = true;
-      migrationResult.migrated = true;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: minifiedJson({
-              migrations: {
-                ...migrationResult,
-                migrateOutput: msg,
-                migrateSuccess: false,
-              },
-              pc: null,
-              error:
-                'Migration failed — aborting pc to avoid validating a broken DB state.',
-            }),
-          },
-        ],
-      };
+  // ── Step 1 + 2: Migration status / apply ────────────────────────────────────
+  // Skipped on startAtChunk resume — migrations were handled in the initial call.
+  const migrationResult: Record<string, unknown> = {};
+  if (params.startAtChunk) {
+    migrationResult.skipped = true;
+    migrationResult.reason =
+      'startAtChunk resume — migrations were checked in the initial call';
+  } else {
+    const migrationStatus = await checkMigrationStatus(repoRoot, workDir);
+
+    migrationResult.available = migrationStatus.available;
+    migrationResult.applied = migrationStatus.applied;
+    migrationResult.pending = migrationStatus.pending;
+    migrationResult.needsMigration = migrationStatus.needsMigration;
+    if (migrationStatus.reason) migrationResult.reason = migrationStatus.reason;
+    if (migrationStatus.pendingNames.length > 0) {
+      migrationResult.pendingNames = migrationStatus.pendingNames;
     }
-    migrationResult.migrateOutput = truncateOutput(migrateOutput, 2_000);
-    migrationResult.migrateSuccess = migrateSuccess;
+
+    if (migrationStatus.needsMigration === true) {
+      let migrateOutput = '';
+      let migrateSuccess = false;
+      try {
+        migrateOutput = await applyMigrations(repoRoot, workDir);
+        migrateSuccess = true;
+        migrationResult.migrated = true;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: minifiedJson({
+                migrations: {
+                  ...migrationResult,
+                  migrateOutput: msg,
+                  migrateSuccess: false,
+                },
+                pc: null,
+                error:
+                  'Migration failed — aborting pc to avoid validating a broken DB state.',
+              }),
+            },
+          ],
+        };
+      }
+      migrationResult.migrateOutput = truncateOutput(migrateOutput, 2_000);
+      migrationResult.migrateSuccess = migrateSuccess;
+    }
   }
 
   // ── Step 3: Run make pc ──────────────────────────────────────────────────────
@@ -255,28 +284,67 @@ export async function validatePR(
     };
   }
 
-  // Sanctioned chunks mode: run each pc step individually (timeout-resilient for cloud).
-  if (params.sanctionedChunks) {
+  // Sanctioned chunks mode: run pc steps individually, budgeted to stay under
+  // the ~60s MCP transport timeout. Runs as many chunks as fit in the budget,
+  // then returns an in_progress result with resume instructions instead of
+  // blocking into the transport deadline.
+  if (params.sanctionedChunks || params.startAtChunk) {
+    const budgetDeadline = Date.now() + CHUNK_SYNC_BUDGET_MS;
+    const startIndex = params.startAtChunk
+      ? PC_CHUNKS.indexOf(params.startAtChunk)
+      : 0;
     const chunkResults: Array<{
       target: string;
       passed: boolean;
       output: string;
     }> = [];
-    for (const chunk of PC_CHUNKS) {
-      try {
-        const output = await runMake([chunk], workDir, 300_000);
-        chunkResults.push({
-          target: chunk,
-          passed: true,
-          output: truncateOutput(output, 2_000),
+
+    const inProgress = (pc: Record<string, unknown>): ToolResult => ({
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            migrations: migrationResult,
+            pc: { status: 'in_progress', chunks: chunkResults, ...pc },
+          }),
+        },
+      ],
+    });
+
+    for (let i = startIndex; i < PC_CHUNKS.length; i++) {
+      const chunk = PC_CHUNKS[i];
+      const nextChunk = PC_CHUNKS[i + 1];
+
+      const { jobId } = startMakeInBackground([chunk], chunk, workDir, 300_000);
+      const record = await waitForJobDone(
+        jobId,
+        Math.max(budgetDeadline - Date.now(), 1_000),
+      );
+
+      if (record && !record.done) {
+        // Budget expired mid-chunk — the chunk keeps running in the background.
+        return inProgress({
+          currentChunk: chunk,
+          jobId,
+          hint:
+            `Chunk ${chunk} is still running as background job ${jobId}. ` +
+            `Call make_run_wait({ jobId: "${jobId}" }) until it completes. ` +
+            (nextChunk
+              ? `If it passed, re-invoke validate_pr({ sanctionedChunks: true, startAtChunk: "${nextChunk}" }) to run the remaining chunks. `
+              : 'If it passed, validation is complete. ') +
+            `If it failed, fix the errors and re-invoke validate_pr({ sanctionedChunks: true, startAtChunk: "${chunk}" }).`,
         });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        chunkResults.push({
-          target: chunk,
-          passed: false,
-          output: truncateOutput(msg, 2_000),
-        });
+      }
+
+      const log = record ? readJobLog(record) : '';
+      const failed = !record || record.exitCode !== 0 || record.error !== null;
+      chunkResults.push({
+        target: chunk,
+        passed: !failed,
+        output: truncateOutput(log, 2_000),
+      });
+
+      if (failed) {
         // Stop-on-first-failure — same semantics as make pc
         return {
           isError: true,
@@ -289,12 +357,23 @@ export async function validatePR(
                   passed: false,
                   failedTarget: chunk,
                   chunks: chunkResults,
-                  errors: extractErrors(msg),
+                  errors: extractErrors(log),
+                  ...(record?.error ? { error: record.error } : {}),
                 },
               }),
             },
           ],
         };
+      }
+
+      // Budget check before starting the next chunk.
+      if (nextChunk && Date.now() >= budgetDeadline) {
+        return inProgress({
+          nextChunk,
+          hint:
+            `Sync budget exhausted after ${chunkResults.length} chunk(s) — no chunk is currently running. ` +
+            `Re-invoke validate_pr({ sanctionedChunks: true, startAtChunk: "${nextChunk}" }) to continue.`,
+        });
       }
     }
     return {

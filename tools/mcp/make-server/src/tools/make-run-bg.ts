@@ -13,7 +13,7 @@ import {
   buildCompactOutput,
 } from './run-target-utils.js';
 
-interface JobRecord {
+export interface JobRecord {
   pid: number;
   logPath: string;
   startTime: number;
@@ -126,6 +126,10 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
             target: record.target,
             elapsedSec,
             logTail,
+            hint:
+              'Job still running. Re-invoke make_run_wait({ jobId }) to continue waiting ' +
+              '(each call waits up to 55s and returns a status snapshot — never an error ' +
+              'while the job is in progress). Do NOT re-run the target.',
           }),
         },
       ],
@@ -190,6 +194,35 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
     ],
     isError: !success,
   };
+}
+
+/**
+ * Internal helper for other tools (e.g. validate_pr): wait for a job to
+ * complete, bounded by maxWaitMs, and return its raw record (which may still
+ * be running when the budget expires). Returns null for an unknown jobId.
+ */
+export async function waitForJobDone(
+  jobId: string,
+  maxWaitMs: number,
+): Promise<JobRecord | null> {
+  const POLL_INTERVAL_MS = 1_000;
+  const record = jobRegistry.get(jobId);
+  if (!record) return null;
+  const deadline = Date.now() + maxWaitMs;
+  while (!record.done && Date.now() < deadline) {
+    await new Promise<void>((r) =>
+      setTimeout(
+        r,
+        Math.min(POLL_INTERVAL_MS, Math.max(deadline - Date.now(), 1)),
+      ),
+    );
+  }
+  return record;
+}
+
+/** Read the full log for a job record. Exported for internal tool reuse. */
+export function readJobLog(record: JobRecord): string {
+  return readLog(record.logPath);
 }
 
 // ---- make_run_status ----

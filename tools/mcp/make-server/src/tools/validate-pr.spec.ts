@@ -20,6 +20,8 @@ jest.mock('./make-run-bg.js', () => ({
     jobId: 'job-123',
     logPath: '/tmp/job.log',
   })),
+  waitForJobDone: jest.fn(),
+  readJobLog: jest.fn(() => 'chunk output'),
 }));
 
 jest.mock('./run-target-utils.js', () => ({
@@ -40,6 +42,28 @@ const { runCommand: mockRunCommand, runMake: mockRunMake } = jest.requireMock(
 const { existsSync: mockExistsSync } = jest.requireMock('node:fs') as {
   existsSync: jest.Mock<any>;
 };
+const {
+  startMakeInBackground: mockStartMakeInBackground,
+  waitForJobDone: mockWaitForJobDone,
+} = jest.requireMock('./make-run-bg.js') as {
+  startMakeInBackground: jest.Mock<any>;
+  waitForJobDone: jest.Mock<any>;
+};
+
+/** A completed job record as returned by waitForJobDone. */
+function doneRecord(exitCode = 0, error: string | null = null) {
+  return {
+    pid: 1234,
+    logPath: '/tmp/job.log',
+    startTime: Date.now(),
+    target: 'chunk',
+    workDir: '/tmp/test-repo-root',
+    exitCode,
+    done: true,
+    error,
+    verbose: false,
+  };
+}
 
 describe('validatePR', () => {
   beforeEach(() => {
@@ -47,6 +71,11 @@ describe('validatePR', () => {
     mockExistsSync.mockReturnValue(true);
     mockRunCommand.mockResolvedValue('0 pending migrations');
     mockRunMake.mockResolvedValue('All pre-commit checks passed');
+    mockStartMakeInBackground.mockReturnValue({
+      jobId: 'job-123',
+      logPath: '/tmp/job.log',
+    });
+    mockWaitForJobDone.mockResolvedValue(doneRecord());
   });
 
   describe('worktreePath validation', () => {
@@ -119,6 +148,88 @@ describe('validatePR', () => {
         pc: { passed: boolean };
       };
       expect(payload.pc.passed).toBe(true);
+    });
+  });
+
+  describe('sanctioned chunks mode', () => {
+    it('runs all seven chunks in order and returns passed:true', async () => {
+      const result = await validatePR({ sanctionedChunks: true });
+      expect(result.isError).toBeFalsy();
+      const payload = JSON.parse(result.content[0].text) as {
+        pc: { passed: boolean; chunks: Array<{ target: string }> };
+      };
+      expect(payload.pc.passed).toBe(true);
+      expect(payload.pc.chunks.map((c) => c.target)).toEqual([
+        'pc-db-prep',
+        'pc-typecheck',
+        'pc-format',
+        'pc-lint',
+        'pc-workflows',
+        'pc-test',
+        'pc-build',
+      ]);
+    });
+
+    it('stops on the first failing chunk', async () => {
+      mockWaitForJobDone
+        .mockResolvedValueOnce(doneRecord())
+        .mockResolvedValueOnce(
+          doneRecord(2, 'pc-typecheck exited with code 2'),
+        );
+      const result = await validatePR({ sanctionedChunks: true });
+      expect(result.isError).toBe(true);
+      const payload = JSON.parse(result.content[0].text) as {
+        pc: { passed: boolean; failedTarget: string };
+      };
+      expect(payload.pc.passed).toBe(false);
+      expect(payload.pc.failedTarget).toBe('pc-typecheck');
+      expect(mockStartMakeInBackground).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns in_progress with the jobId when a chunk outlives the budget', async () => {
+      mockWaitForJobDone.mockResolvedValueOnce({
+        ...doneRecord(),
+        done: false,
+        exitCode: null,
+      });
+      const result = await validatePR({ sanctionedChunks: true });
+      expect(result.isError).toBeFalsy();
+      const payload = JSON.parse(result.content[0].text) as {
+        pc: {
+          status: string;
+          currentChunk: string;
+          jobId: string;
+          hint: string;
+        };
+      };
+      expect(payload.pc.status).toBe('in_progress');
+      expect(payload.pc.currentChunk).toBe('pc-db-prep');
+      expect(payload.pc.jobId).toBe('job-123');
+      expect(payload.pc.hint).toContain('make_run_wait');
+      expect(payload.pc.hint).toContain('startAtChunk');
+    });
+
+    it('startAtChunk resumes mid-sequence and skips the migration check', async () => {
+      const result = await validatePR({ startAtChunk: 'pc-test' });
+      expect(result.isError).toBeFalsy();
+      const payload = JSON.parse(result.content[0].text) as {
+        migrations: { skipped: boolean };
+        pc: { passed: boolean; chunks: Array<{ target: string }> };
+      };
+      expect(payload.migrations.skipped).toBe(true);
+      expect(mockRunCommand).not.toHaveBeenCalled();
+      expect(payload.pc.chunks.map((c) => c.target)).toEqual([
+        'pc-test',
+        'pc-build',
+      ]);
+    });
+
+    it('rejects an invalid startAtChunk', async () => {
+      const result = await validatePR({
+        startAtChunk: 'pc-bogus' as never,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('startAtChunk');
     });
   });
 });
