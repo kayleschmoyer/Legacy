@@ -64,6 +64,59 @@ describe('PlayoffBracket', () => {
     expect(getAllByText('Final').length).toBeGreaterThan(0);
   });
 
+  it('renders rounds in canonical wildcard → semifinals → finals order regardless of input order', () => {
+    // Server returns matchups with finals listed before wildcard — bracket must
+    // still render left-to-right as wildcard → finals (non-determinism guard).
+    const outOfOrderBracket: PlayoffBracketData = {
+      season: 2024,
+      format: '4-team',
+      status: 'in_progress',
+      championTeam: null,
+      matchups: [
+        {
+          id: '10',
+          round: 'finals',
+          matchupNumber: 1,
+          weekNumber: 11,
+          status: 'scheduled',
+          highSeedTeam: { name: 'Finals Team A' },
+          lowSeedTeam: { name: 'Finals Team B' },
+        },
+        {
+          id: '11',
+          round: 'semifinals',
+          matchupNumber: 1,
+          weekNumber: 10,
+          status: 'scheduled',
+          highSeedTeam: { name: 'Semi Team A' },
+          lowSeedTeam: { name: 'Semi Team B' },
+        },
+        {
+          id: '12',
+          round: 'wildcard',
+          matchupNumber: 1,
+          weekNumber: 9,
+          status: 'scheduled',
+          highSeedTeam: { name: 'Wild Team A' },
+          lowSeedTeam: { name: 'Wild Team B' },
+        },
+      ],
+    };
+
+    const { container } = render(
+      <PlayoffBracket bracket={outOfOrderBracket} />,
+    );
+    const html = container.innerHTML;
+
+    const wildIdx = html.indexOf('Wild Card');
+    const semiIdx = html.indexOf('Semifinals');
+    const champIdx = html.indexOf('Championship');
+
+    expect(wildIdx).toBeGreaterThan(-1);
+    expect(wildIdx).toBeLessThan(semiIdx);
+    expect(semiIdx).toBeLessThan(champIdx);
+  });
+
   it('shows TBD placeholders when seeds are not yet assigned', () => {
     const scheduled: PlayoffBracketData = {
       season: 2024,
