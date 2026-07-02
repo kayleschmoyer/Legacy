@@ -358,6 +358,7 @@ export const TeamTab: React.FC<TeamTabProps> = ({
           aria-modal="true"
           aria-labelledby="rename-team-title"
           aria-describedby="rename-team-description"
+          aria-busy={renaming}
           data-testid="rename-team-confirm"
           style={{
             position: 'fixed',
@@ -388,6 +389,20 @@ export const TeamTab: React.FC<TeamTabProps> = ({
               gap: 16,
             }}
           >
+            <div
+              aria-live="polite"
+              aria-atomic="true"
+              style={{
+                position: 'absolute',
+                width: 1,
+                height: 1,
+                overflow: 'hidden',
+                clip: 'rect(0,0,0,0)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {renaming ? 'Renaming team…' : ''}
+            </div>
             <div
               id="rename-team-title"
               style={{
