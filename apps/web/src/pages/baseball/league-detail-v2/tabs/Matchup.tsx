@@ -112,7 +112,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
       if (stats) map.set(stats.playerId, stats);
     });
     return map;
-  }, [playersData]);
+  }, [playersData?.getMatchupPlayers]);
 
   const computed = useMemo(
     () =>
@@ -123,7 +123,13 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         scoringSettings,
         seasonStatsMap,
       }),
-    [matchup, playersData, playersError, scoringSettings, seasonStatsMap],
+    [
+      matchup,
+      playersData?.getMatchupPlayers,
+      playersError,
+      scoringSettings,
+      seasonStatsMap,
+    ],
   );
 
   const team1Side: MatchupScoreboardHeroTeam = matchup
