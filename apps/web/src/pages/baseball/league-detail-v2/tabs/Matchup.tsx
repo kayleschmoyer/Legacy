@@ -24,6 +24,18 @@ import { mapMatchupPlayerToSeasonStats } from '../../../../lib/scoring/mapGraphQ
 import { I } from '../Icons';
 import { Section } from '../Shared';
 
+/**
+ * Derives the weekly matchup-format label for football leagues.
+ * Currently all football leagues use head-to-head scoring; this helper
+ * is the single place to update when a scoringFormat/matchupFormat field
+ * is added to LeagueFragment.
+ */
+function footballMatchupFormatLabel(scoringFormat?: string | null): string {
+  if (scoringFormat === 'total_points') return 'Total Points';
+  if (scoringFormat === 'rotisserie') return 'Rotisserie';
+  return 'Head-to-Head';
+}
+
 export interface MatchupTabProps {
   league: LeagueFragment;
   myTeamId: number | null;
@@ -167,7 +179,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         </div>
         <span className="meta">
           {isFootball
-            ? `Matchup ${week}${league.totalMatchups ? `/${league.totalMatchups}` : ''} · Head-to-Head`
+            ? `Matchup ${week}${league.totalMatchups ? `/${league.totalMatchups}` : ''} · ${footballMatchupFormatLabel()}`
             : totalGames > 0
               ? `${gamesPlayed} of ${totalGames} games complete`
               : 'No games scheduled'}

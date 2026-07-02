@@ -111,4 +111,17 @@ describe('MatchupTab — football-awareness', () => {
       document.querySelector('.ls-games-remaining'),
     ).not.toBeInTheDocument();
   });
+
+  it('shows Head-to-Head label in meta for a default football league', () => {
+    const { container } = render(
+      <MatchupTab
+        league={{ ...baseLeague, sport: 'football' }}
+        myTeamId={10}
+        initialMatchupId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    const meta = container.querySelector('.meta');
+    expect(meta?.textContent).toContain('Head-to-Head');
+  });
 });
