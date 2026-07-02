@@ -366,6 +366,147 @@ const GroupToggle: React.FC<{
   </Text>
 );
 
+interface PlayerRowProps {
+  p: PlayerWithStats;
+  playerId: number;
+  cols: StatCol[];
+  group: Group;
+  gamesPerMatchup: number;
+  canClaim: boolean;
+  isMember: boolean;
+  renderClaimAction?: (player: FreeAgentClaimPlayer) => React.ReactNode;
+}
+
+const renderCell = (
+  p: PlayerWithStats,
+  col: StatCol,
+  group: Group,
+  gamesPerMatchup: number,
+): string => {
+  const b = p.careerBatting;
+  const pit = p.careerPitching;
+  const s = p.scoring;
+  switch (col.id) {
+    case 'PTS':
+      return fmtInt(group === 'pitchers' ? s?.pitchingScore : s?.hitterScore);
+    case 'PROJ': {
+      const perGame =
+        group === 'pitchers'
+          ? s?.pitchingAvgPointsPerGame
+          : s?.hitterAvgPointsPerGame;
+      return fmtF1(perGame != null ? perGame * gamesPerMatchup : null);
+    }
+    case 'AVG': {
+      const h = b?.hits ?? 0;
+      const ab = b?.atBats ?? 0;
+      return ab > 0 ? fmtAvg(h / ab) : '—';
+    }
+    case 'HR':
+      return fmtInt(b?.homeRuns);
+    case 'RBI':
+      return fmtInt(b?.rbi);
+    case 'SB':
+      return fmtInt(b?.stolenBases);
+    case 'oWAR':
+      return fmtF1(b?.offensiveWAR);
+    case 'ERA':
+      return pit?.era != null ? fmtF2(Number(pit.era)) : '—';
+    case 'W':
+      return fmtInt(pit?.wins);
+    case 'K':
+      return fmtInt(pit?.strikeouts);
+    case 'SV':
+      return fmtInt(pit?.saves);
+    case 'WHIP': {
+      const outs = pit?.outsRecorded ?? 0;
+      if (outs === 0) return '—';
+      const innings = outs / 3;
+      const bb = pit?.baseOnBalls ?? 0;
+      const h = pit?.hits ?? 0;
+      return ((bb + h) / innings).toFixed(2);
+    }
+    default:
+      return '—';
+  }
+};
+
+const PlayerRow = React.memo<PlayerRowProps>(function PlayerRow({
+  p,
+  playerId,
+  cols,
+  group,
+  gamesPerMatchup,
+  canClaim,
+  isMember,
+  renderClaimAction,
+}) {
+  const primaryPos = p.eligiblePositions?.[0] ?? null;
+  return (
+    <XStack
+      paddingVertical="$2"
+      alignItems="center"
+      borderBottomWidth={1}
+      borderBottomColor="$outlineSubtle"
+    >
+      <YStack width={PLAYER_COL_WIDTH} paddingRight="$2">
+        <Text fontWeight="600" fontSize={13} color="$color" numberOfLines={1}>
+          {playerName(p)}
+        </Text>
+        {p.primaryEra != null ? (
+          <Text fontFamily="$mono" fontSize={11} color="$textMuted">
+            {p.primaryEra}
+          </Text>
+        ) : null}
+      </YStack>
+      <YStack width={POS_COL_WIDTH}>
+        {primaryPos ? (
+          <Text fontSize={10} fontWeight="700" color={posColor(primaryPos)}>
+            {primaryPos}
+          </Text>
+        ) : (
+          <Text fontSize={12} color="$textMuted">
+            —
+          </Text>
+        )}
+      </YStack>
+      {cols.map((c) => (
+        <Text
+          key={c.id}
+          width={COL_WIDTH}
+          textAlign="right"
+          fontFamily="$mono"
+          fontSize={12}
+          fontWeight={c.bold ? '700' : '400'}
+          color={c.bold ? '$color' : '$color11'}
+          {...TABULAR_NUMS}
+        >
+          {renderCell(p, c, group, gamesPerMatchup)}
+        </Text>
+      ))}
+      <XStack width={ACTION_COL_WIDTH} justifyContent="flex-end">
+        {canClaim && renderClaimAction ? (
+          renderClaimAction({
+            id: playerId,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            eligiblePositions: p.eligiblePositions,
+          })
+        ) : (
+          <Text
+            fontSize={11}
+            fontWeight="600"
+            color="$textMuted"
+            paddingHorizontal="$2"
+            paddingVertical="$1"
+          >
+            {isMember ? 'Join Team' : 'Spectator'}
+          </Text>
+        )}
+      </XStack>
+    </XStack>
+  );
+});
+
 export const LeagueDetailFreeAgentsTab: React.FC<
   LeagueDetailFreeAgentsTabProps
 > = ({ league, isMember, myTeamId, renderClaimAction }) => {
@@ -457,54 +598,6 @@ export const LeagueDetailFreeAgentsTab: React.FC<
       />
     );
   }
-
-  const renderCell = (p: PlayerWithStats, col: StatCol): string => {
-    const b = p.careerBatting;
-    const pit = p.careerPitching;
-    const s = p.scoring;
-    switch (col.id) {
-      case 'PTS':
-        return fmtInt(group === 'pitchers' ? s?.pitchingScore : s?.hitterScore);
-      case 'PROJ': {
-        const perGame =
-          group === 'pitchers'
-            ? s?.pitchingAvgPointsPerGame
-            : s?.hitterAvgPointsPerGame;
-        return fmtF1(perGame != null ? perGame * gamesPerMatchup : null);
-      }
-      case 'AVG': {
-        const h = b?.hits ?? 0;
-        const ab = b?.atBats ?? 0;
-        return ab > 0 ? fmtAvg(h / ab) : '—';
-      }
-      case 'HR':
-        return fmtInt(b?.homeRuns);
-      case 'RBI':
-        return fmtInt(b?.rbi);
-      case 'SB':
-        return fmtInt(b?.stolenBases);
-      case 'oWAR':
-        return fmtF1(b?.offensiveWAR);
-      case 'ERA':
-        return pit?.era != null ? fmtF2(Number(pit.era)) : '—';
-      case 'W':
-        return fmtInt(pit?.wins);
-      case 'K':
-        return fmtInt(pit?.strikeouts);
-      case 'SV':
-        return fmtInt(pit?.saves);
-      case 'WHIP': {
-        const outs = pit?.outsRecorded ?? 0;
-        if (outs === 0) return '—';
-        const innings = outs / 3;
-        const bb = pit?.baseOnBalls ?? 0;
-        const h = pit?.hits ?? 0;
-        return ((bb + h) / innings).toFixed(2);
-      }
-      default:
-        return '—';
-    }
-  };
 
   const canClaim = isMember && myTeamId != null;
   const subTitle = league.waiverEnabled
@@ -683,90 +776,22 @@ export const LeagueDetailFreeAgentsTab: React.FC<
                 </HeaderCell>
               </XStack>
 
-              {/* Body rows */}
-              {players.map((p) => {
-                const playerId = p?.id;
-                if (playerId == null) return null;
-                const primaryPos = p.eligiblePositions?.[0] ?? null;
-                return (
-                  <XStack
-                    key={playerId}
-                    paddingVertical="$2"
-                    alignItems="center"
-                    borderBottomWidth={1}
-                    borderBottomColor="$outlineSubtle"
-                  >
-                    <YStack width={PLAYER_COL_WIDTH} paddingRight="$2">
-                      <Text
-                        fontWeight="600"
-                        fontSize={13}
-                        color="$color"
-                        numberOfLines={1}
-                      >
-                        {playerName(p)}
-                      </Text>
-                      {p.primaryEra != null ? (
-                        <Text
-                          fontFamily="$mono"
-                          fontSize={11}
-                          color="$textMuted"
-                        >
-                          {p.primaryEra}
-                        </Text>
-                      ) : null}
-                    </YStack>
-                    <YStack width={POS_COL_WIDTH}>
-                      {primaryPos ? (
-                        <Text
-                          fontSize={10}
-                          fontWeight="700"
-                          color={posColor(primaryPos)}
-                        >
-                          {primaryPos}
-                        </Text>
-                      ) : (
-                        <Text fontSize={12} color="$textMuted">
-                          —
-                        </Text>
-                      )}
-                    </YStack>
-                    {cols.map((c) => (
-                      <Text
-                        key={c.id}
-                        width={COL_WIDTH}
-                        textAlign="right"
-                        fontFamily="$mono"
-                        fontSize={12}
-                        fontWeight={c.bold ? '700' : '400'}
-                        color={c.bold ? '$color' : '$color11'}
-                        {...TABULAR_NUMS}
-                      >
-                        {renderCell(p, c)}
-                      </Text>
-                    ))}
-                    <XStack width={ACTION_COL_WIDTH} justifyContent="flex-end">
-                      {canClaim && renderClaimAction ? (
-                        renderClaimAction({
-                          id: playerId,
-                          firstName: p.firstName,
-                          lastName: p.lastName,
-                          eligiblePositions: p.eligiblePositions,
-                        })
-                      ) : (
-                        <Text
-                          fontSize={11}
-                          fontWeight="600"
-                          color="$textMuted"
-                          paddingHorizontal="$2"
-                          paddingVertical="$1"
-                        >
-                          {isMember ? 'Join Team' : 'Spectator'}
-                        </Text>
-                      )}
-                    </XStack>
-                  </XStack>
-                );
-              })}
+              {/* Body rows — memoized to avoid re-renders while search is debouncing */}
+              {players.map((p) =>
+                p?.id != null ? (
+                  <PlayerRow
+                    key={p.id}
+                    p={p}
+                    playerId={p.id}
+                    cols={cols}
+                    group={group}
+                    gamesPerMatchup={gamesPerMatchup}
+                    canClaim={canClaim}
+                    isMember={isMember}
+                    renderClaimAction={renderClaimAction}
+                  />
+                ) : null,
+              )}
 
               {!isLoading && players.length === 0 ? (
                 <YStack padding="$6" alignItems="center" gap="$1">
