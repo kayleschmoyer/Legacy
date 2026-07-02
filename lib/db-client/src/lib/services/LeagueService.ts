@@ -137,6 +137,7 @@ export interface CreateLeagueResult {
     waiverEnabled?: boolean;
     faabBudgetDefault?: number;
     isPublic: boolean;
+    playoffEnabled: boolean;
   };
   teams: {
     id: number;
@@ -321,6 +322,7 @@ export class LeagueService {
             waiverEnabled: PublicSchema.leagues.waiverEnabled,
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
+            playoffEnabled: PublicSchema.leagues.playoffEnabled,
           });
 
         // 2. Create teams — assign each team to a division (round-robin across divisions)

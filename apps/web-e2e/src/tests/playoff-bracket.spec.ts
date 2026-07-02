@@ -460,15 +460,12 @@ test.describe('Playoff Bracket — scheduled bracket @regression', () => {
   });
 });
 
-// LS-4326: regression guard — bracket section must render whenever a bracket
-// exists, even if `league.playoffEnabled` is null/false in the Apollo cache.
-// Reproduces the integration spec failure mode where
-// `createLeagueAndTeams` returns playoffEnabled=null (LeagueService.createLeague
-// omits playoff fields from .returning()), polluting the cache so the
-// subsequent league query reads playoffEnabled as null even though the DB has
-// it set to true.
-test.describe('Playoff Bracket — playoffEnabled flag stale @regression', () => {
-  test('renders bracket section when playoffEnabled is null but bracket exists', async ({
+// LS-5960: regression guard — now that LeagueService.createLeague includes
+// playoffEnabled in .returning(), the Apollo cache always has the real value.
+// The bracket query is skipped when playoffEnabled is false/null, and fires
+// only when playoffEnabled is true.
+test.describe('Playoff Bracket — playoffEnabled flag @regression', () => {
+  test('does not render bracket section when playoffEnabled is null', async ({
     page,
   }) => {
     const leagueWithNullFlag = {
@@ -479,15 +476,7 @@ test.describe('Playoff Bracket — playoffEnabled flag stale @regression', () =>
     };
     await page.route(isGraphQLEndpoint, async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('getplayoffbracket')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { getPlayoffBracket: MOCK_BRACKET_COMPLETED },
-          }),
-        });
-      } else if (postData.includes('getleagueteams')) {
+      if (postData.includes('getleagueteams')) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -540,10 +529,9 @@ test.describe('Playoff Bracket — playoffEnabled flag stale @regression', () =>
     await page.goto('/baseball/league/1/standings');
     await page.waitForLoadState('load');
 
+    // Bracket query is skipped when playoffEnabled is null — heading must not appear.
     await expect(
       page.getByRole('heading', { name: 'Playoff Bracket' }),
-    ).toBeVisible();
-    // Champion team from MOCK_BRACKET_COMPLETED also resolves through.
-    await expect(page.getByText('Alpha Squad').first()).toBeVisible();
+    ).not.toBeVisible();
   });
 });
