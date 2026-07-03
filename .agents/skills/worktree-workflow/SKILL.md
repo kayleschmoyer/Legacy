@@ -70,22 +70,25 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
    >
    > See also [workflow-recovery-procedures.md](references/shared/workflow-recovery-procedures.md).
 
-8. **Plan then implement** — run the [planning reference](../plan-ticket/references/planning.md) (Step 1b) to classify risk and read affected code before writing anything. Skip for trivial tasks (typos, doc-only, single-line changes). Then read the full ticket description, investigate, and write code + tests. See [work-ticket SKILL.md Step 5](../work-ticket/SKILL.md) for self-review + implementation notes.
-9. **Migrations** — `pnpm --prefix lib/db-client run db:status` then `db:up` (or `make db-migrate`).
-10. **Validate** — `make_run(target: "pc")`. Must pass before pushing. If it fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "nx" not found`, the `node_modules` symlink is broken — repair with `worktree_install_recover()` (MCP-first, **not** `node scripts/modules-pool/link.mjs` via Bash), then restart the session before retrying. **Known cause**: running `pnpm exec nx reset` directly destroys the pooled symlink (LS-5242). To clear the Nx cache safely, use `make_run(target: "clean-cache")` — it re-links the symlink automatically.
-11. **Self-review (mandatory gate)** — run `/review` and produce a Self-Review Summary before pushing. See `skills/pr-lifecycle/references/self-review.md`.
-12. **Ship** — `worktree_commit` → `worktree_push` → `github_create_pr(draft: true)` → `github_manage_labels([+"agent-in-progress"])` → `github_mark_pr_ready` → subscribe to PR activity → `jira_transition("In Review")`.
-    - **Precondition for any commit/push: use the worktree MCP tool.** `git add <files> && git commit -m "..."` → `worktree_commit({ files: ["<file>"], message: "..." })`; `git push -u origin <branch>` (or `HEAD`) → `worktree_push({ setUpstream: true })`. The MCP tools enforce secret-file guards and worktree safety checks that raw git bypasses. Raw `git` is a fallback only after the MCP tool returns an explicit error. See the MCP-first substitution table in `.agents/skills/mcp-first/SKILL.md`.
-    - **Pre-push hook fails with `nx` not found or `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`**: `node_modules/.bin` is empty or missing (where the pnpm shims live). Use `worktree_push({ skipLint: true })` — do **not** use `SKIP_PREPUSH_LINT=1 git push`. **Important:** `skipLint` bypasses the entire hook after the lockfile checks — conflict-marker and Terraform validations are also skipped, not just formatting. Only use as a last resort; manually run Prettier and check for conflict markers before pushing: `node node_modules/prettier/bin/prettier.cjs --write <files>`. Do not attempt `make install` from the worktree while symlinks exist — ask the user to repair the main repo instead.
-13. **Watch to merge** — monitor CI, fix failures, respond to review comments, rebase as needed.
-14. **After merge** — MCP gap audit, mark tracking tasks complete, cleanup.
+> **Ordering is owned by the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md)** — the steps below are the native-flow tool bindings for that sequence (spine step in parentheses). The load-bearing reorder: **the draft PR opens _before_ validation** as a durable checkpoint. If numbering here ever disagrees with the spine, the spine wins.
+
+8. **Plan then implement** (spine 1b, 6) — run the [planning reference](../plan-ticket/references/planning.md) (Step 1b) to classify risk and read affected code before writing anything. Skip for trivial tasks (typos, doc-only, single-line changes). Then read the full ticket description, investigate, and write code + tests. See [work-ticket SKILL.md](../work-ticket/SKILL.md) Steps 4 and 7 for implementation notes + self-review.
+9. **Commit → push → open draft PR (durable checkpoint)** (spine 7–9) — `worktree_commit({ message: "type(scope): LS-#### msg" })` → `worktree_push({ setUpstream: true })` → `github_create_pr(draft: true)` → `github_manage_labels([+"agent-in-progress"])` → post a continuation checkpoint. The draft PR is inert (CI/review gate on `draft == false`) and exists **before** the long validation run, so a session kill mid-validation loses nothing ([draft-PR-before-validation gate](../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions)).
+   - **Precondition for any commit/push: use the worktree MCP tool.** `git add <files> && git commit -m "..."` → `worktree_commit({ files: ["<file>"], message: "..." })`; `git push -u origin <branch>` (or `HEAD`) → `worktree_push({ setUpstream: true })`. The MCP tools enforce secret-file guards and worktree safety checks that raw git bypasses. Raw `git` is a fallback only after the MCP tool returns an explicit error. See the MCP-first substitution table in `.agents/skills/mcp-first/SKILL.md`.
+   - **Pre-push hook fails with `nx` not found or `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`**: `node_modules/.bin` is empty or missing (where the pnpm shims live). Use `worktree_push({ skipLint: true })` — do **not** use `SKIP_PREPUSH_LINT=1 git push`. **Important:** `skipLint` bypasses the entire hook after the lockfile checks — conflict-marker and Terraform validations are also skipped, not just formatting. Only use as a last resort; manually run Prettier and check for conflict markers before pushing: `node node_modules/prettier/bin/prettier.cjs --write <files>`. Do not attempt `make install` from the worktree while symlinks exist — ask the user to repair the main repo instead.
+10. **Migrations** (spine 11) — `pnpm --prefix lib/db-client run db:status` then `db:up` (or `make db-migrate`).
+11. **Validate** (spine 12) — `make_run(target: "pc")`. Must pass before the PR is marked ready (the draft PR from step 9 already exists and may stay draft until this is green). If it fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "nx" not found`, the `node_modules` symlink is broken — repair with `worktree_install_recover()` (MCP-first, **not** `node scripts/modules-pool/link.mjs` via Bash), then restart the session before retrying. **Known cause**: running `pnpm exec nx reset` directly destroys the pooled symlink (LS-5242). To clear the Nx cache safely, use `make_run(target: "clean-cache")` — it re-links the symlink automatically.
+12. **Self-review (mandatory gate)** (spine 13) — run `/review`, fix everything it raises, and produce a Self-Review Summary before marking the PR ready; push fix commits as needed (the draft PR absorbs them). See `skills/pr-lifecycle/references/self-review.md`.
+13. **Mark ready** (spine 14) — `github_mark_pr_ready` (applies the bot trigger label) → subscribe to PR activity → `jira_transition("In Review")`. Never end a turn with the PR still in draft.
+14. **Watch to merge** (spine 15) — monitor CI, fix failures, respond to review comments, rebase as needed.
+15. **After merge** (spine 16) — MCP gap audit, mark tracking tasks complete, cleanup.
 
 ### Native-flow specifics
 
 - **`make_wt_setup` is NOT used** — it's sibling-only. The symlink command above replaces it.
 - **`worktree_list` / `make_worktree_create` are NOT used** — you're already in a worktree, Claude Code created it for you.
 - **On exit**, `ExitWorktree(action: "remove")` cleans up the ephemeral worktree. Only call this when explicitly done — the worktree can survive across sessions if kept.
-- **All 9 MCP servers** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — all MCP servers use `pnpm exec tsx` and will time out immediately if the symlink is absent. Run `node scripts/modules-pool/link.mjs` (from the worktree root) to link `node_modules` to the worktree's content-addressable pool slot, then restart the session. Directory symlinks require Windows Developer Mode. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass path consistency checks. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
+- **All stdio MCP servers in `.mcp.json`** should connect in every session (`MCP_TIMEOUT=10000` in `.claude/settings.json` ensures startup headroom). If a server is unexpectedly missing or timing out, **first verify the `node_modules` symlink exists** — stdio servers launch via `node .github/copilot/hooks/mcp-bootstrap.mjs node --import tsx <server>` (see `.mcp.json`) and time out silently if `node_modules/.bin/tsx` is missing. Run `node scripts/modules-pool/link.mjs` (from the worktree root) to link `node_modules` to the worktree's content-addressable pool slot, then restart the session. Directory symlinks require Windows Developer Mode. **Never** use `New-Item -ItemType SymbolicLink`, `New-Item -ItemType Junction`, or raw `mklink /J` — they bypass path consistency checks. The `SessionStart` hook attempts this automatically but may not fire in all session types (e.g., Copilot CLI).
 
 ## Chip Dispatch (preferred for multi-ticket orchestrators)
 
@@ -98,7 +101,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 **Why subagents?**
 
 - Each subagent gets its own ephemeral worktree — no contamination between tickets
-- Subagents **inherit the parent's MCP connections** (all 9 servers)
+- Subagents **inherit the parent's MCP connections** (every stdio server in `.mcp.json`)
 - Automatic cleanup — ephemeral worktrees are discarded after the subagent returns
 - **Session-type-agnostic** — works identically whether the orchestrator was launched with the worktree checkbox, from the main repo, or from a cloud environment
 
@@ -118,11 +121,11 @@ for each ticket/PR needing code work:
       4. <do NOT rename branch — Jira links via PR title + commits containing LS-####>
       5. If you need to install new packages: powershell -NoProfile -Command "Remove-Item -Path node_modules -Force" first, then pnpm add -w <pkg>, then make install
 
-      Work:
+      Work (order per .agents/skills/workflow-overview/references/ticket-to-merge-spine.md — draft PR before validation):
       6. <specific instructions — implement ticket, fix review, rebase, etc.>
-      7. make_run(target: "pc")
-      8. worktree_commit + worktree_push
-      9. github_create_pr (if new) or push to existing PR branch
+      7. worktree_commit + worktree_push
+      8. github_create_pr(draft: true) (if new) or push to existing PR branch
+      9. make_run(target: "pc") — then self-review and github_mark_pr_ready when green
 
       Tool preferences:
       - Use worktree_commit/worktree_push for commits and pushes
@@ -204,9 +207,16 @@ These are loaded by `references/sibling/sibling-worktree-flow.md` and are not re
 
 ## Key Rules (both flows)
 
-| Precondition                                                                                                                               | Detail                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Before any commit: HEAD is on a feature branch, not `main`.**                                                                            | Work in either `.claude/worktrees/<name>/` (native) or `D:\code\legacy-sports-worktrees\<ticket>\` (sibling). `.claude/hooks/guard-main-repo.sh` blocks edits in main on `main`.                                                                      |
-| **Before any git operation: prefer the worktree MCP tool over raw `git`.**                                                                 | `worktree_commit`, `worktree_push`, `worktree_rebase` apply worktree-path resolution and safety guards that raw `git` bypasses. Use `worktree_rebase()` instead of `git fetch origin && git rebase origin/main` for initial branch rebases onto main. |
-| **Before removing a sibling worktree: use `twig worktree clean`.**                                                                         | `git worktree remove` and manual deletion destroy the symlinks that other worktrees depend on.                                                                                                                                                        |
-| **Before `make clean` / `make install` / `pnpm install` in the main repo: confirm no worktree symlinks point into `<main>/node_modules`.** | These commands rebuild or wipe the directory every worktree's symlink targets — running them while any worktree is symlinked breaks them all simultaneously.                                                                                          |
+| Precondition                                                                                                        | Detail                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Before any commit: HEAD is on a feature branch, not `main`.**                                                     | Work in either `.claude/worktrees/<name>/` (native) or `D:\code\legacy-sports-worktrees\<ticket>\` (sibling). `.claude/hooks/guard-main-repo.sh` blocks edits in main on `main`.                                                                                                                      |
+| **Before any git operation: prefer the worktree MCP tool over raw `git`.**                                          | `worktree_commit`, `worktree_push`, `worktree_rebase` apply worktree-path resolution and safety guards that raw `git` bypasses. Use `worktree_rebase()` instead of `git fetch origin && git rebase origin/main` for initial branch rebases onto main (LS-8007).                                       |
+| **Before removing a sibling worktree: use `twig worktree clean`.**                                                  | `git worktree remove` and manual deletion destroy the symlinks that other worktrees depend on.                                                                                                                                                                                                        |
+| **Before writing through a worktree's `node_modules`: don't — it is a symlink into a shared, immutable pool slot.** | `make install` in the main repo is **safe** while worktrees are active (each worktree points at its own pool slot, not `<main>/node_modules`); the danger is installing/writing _through_ a worktree symlink. Full rules: [concurrent-agent-safety.md](references/shared/concurrent-agent-safety.md). |
+
+## Provenance and maintenance
+
+- 2026-07-02: Native-flow steps re-sequenced to the ticket-to-merge spine (commit → push → draft PR before validation) during the skills audit; hardcoded MCP-server count and the stale main-repo-install rule replaced with pool-model truth.
+- Verify ordering: diff native-flow steps 8–15 against `.agents/skills/workflow-overview/references/ticket-to-merge-spine.md` — the spine wins.
+- Verify stdio server list: `node -e "console.log(Object.keys(require('./.mcp.json').mcpServers))"`
+- Verify pool-install safety rules: `Read .agents/skills/worktree-workflow/references/shared/concurrent-agent-safety.md`

@@ -46,12 +46,13 @@ The mandatory checklist between Phase 4 (Verify) and Phase 6 (Handoff). This is 
 
 ## Tier-specific checks
 
-### Medium and above
+### Medium
 
-- [ ] **RFC exists and is `Status: Accepted`** before the implementation PR opens.
+- [ ] **RFC or ADR/design reference linked in the ticket** — recommended, not required (2026-07-02 recalibration; see [risk-tiers.md](risk-tiers.md)).
 
 ### High and above
 
+- [ ] **RFC exists and is `Status: Accepted`** before the implementation PR opens (required for High/Critical design changes).
 - [ ] **ADR for any architectural decision** introduced.
 - [ ] **Two reviewers requested** (CODEOWNERS + one additional).
 - [ ] **Local integration test run** mandatory; not optional.

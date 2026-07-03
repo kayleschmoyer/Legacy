@@ -108,4 +108,4 @@ if [ -z "${GITHUB_REPO_OWNER:-}" ] && [ -z "${GITHUB_REPO_NAME:-}" ]; then
   fi
 fi
 
-echo "=== Cloud setup complete (gh, pnpm, git-lfs, GitHub repo identity) ==="
+echo "=== Cloud setup complete (merge-base, pnpm deps, GitHub repo identity) ==="

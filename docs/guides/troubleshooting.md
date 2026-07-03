@@ -22,8 +22,8 @@ pnpm install
 **Nx cache issues:**
 
 ```powershell
-# Clear Nx cache
-pnpm exec nx reset
+# Clear Nx cache (never `pnpm exec nx reset` — it destroys the modules-pool symlink, LS-5242)
+make clean-cache
 
 # Clean all build artifacts
 pnpm run clean

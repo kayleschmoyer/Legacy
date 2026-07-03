@@ -1,222 +1,130 @@
----
-name: docker-local
-description: 'Start, stop, rebuild, and debug the Legacy Sports local Docker Compose stack; use when spinning up the local dev environment, restarting services, viewing logs, or troubleshooting container issues.'
----
+# Local Docker Compose Stack
 
-# Skill: Local Docker Compose Stack
-
-## Overview
-
-The full local dev stack runs via Docker Compose and replaces all AWS services for local development. It includes PostgreSQL, all Lambda backends, and the web app.
+The full local dev stack runs via Docker Compose and replaces all AWS services. It includes PostgreSQL, all four Lambda backends, the Vite web app, and a run-and-exit CLI service. It is the only full-stack path in environments without AWS credentials (cloud agents).
 
 ## Services
 
-| Container           | Name           | Port | Purpose                                          |
-| ------------------- | -------------- | ---- | ------------------------------------------------ |
-| `ls-postgres`       | postgres       | 5432 | PostgreSQL database                              |
-| `ls-migrate`        | migrate        | —    | Runs Drizzle migrations on startup, exits 0      |
-| `ls-graphql`        | graphql        | 5000 | Apollo GraphQL API (`lambdas/db`)                |
-| `ls-oauth`          | oauth          | 5001 | OAuth proxy (`lambdas/oauth-proxy`)              |
-| `ls-stats`          | stats          | 5002 | Stats Lambda (`lambdas/stats-lambda`)            |
-| `ls-game-selection` | game-selection | 5003 | Game selection Lambda                            |
-| `ls-web`            | web            | 4200 | Next.js / Vite web app                           |
-| `ls-cli`            | cli            | —    | CLI tool (run-and-exit via `docker compose run`) |
+Ports are listed once in the [canonical port map](../SKILL.md#port-map-canonical--link-here-do-not-restate).
 
-## Quick Start
+| Container           | Compose service  | Purpose                                                  |
+| ------------------- | ---------------- | -------------------------------------------------------- |
+| `ls-postgres`       | `postgres`       | PostgreSQL 16 database (replaces AWS RDS)                |
+| `ls-migrate`        | `migrate`        | Runs Drizzle migrations on startup, exits 0              |
+| `ls-graphql`        | `graphql`        | Apollo GraphQL API (`lambdas/db`)                        |
+| `ls-oauth`          | `oauth`          | OAuth proxy (`lambdas/oauth-proxy`)                      |
+| `ls-stats`          | `stats`          | Stats Lambda (`lambdas/stats-lambda`)                    |
+| `ls-game-selection` | `game-selection` | Game selection Lambda (`lambdas/game-selection`)         |
+| `ls-web`            | `web`            | Vite web app (`apps/web`, `--host 0.0.0.0`)              |
+| `ls-cli`            | `cli`            | CLI (run-and-exit via `docker compose run --rm cli ...`) |
 
-### Prerequisites
+## Quick start
 
-1. Sync environment variables:
-   ```powershell
-   pnpm run sync-env
-   ```
-2. Start Docker Desktop
+Preconditions: Docker running, and a `.env` file present (compose refuses to start without it) — bootstrap per OS via the [environment bootstrap table](../SKILL.md#environment-bootstrap-per-os).
 
-### Start everything
-
-```powershell
+```bash
 make docker-up
-# or
-docker compose up -d --build
+# or: docker compose up -d --build
 ```
 
-This starts all services in detached mode, builds images if needed, and runs migrations automatically before backend services start.
-
-Wait ~30s for Vite/Tamagui cold start. Then visit:
+Starts everything detached, builds images if needed, and runs migrations before backend services start. Wait ~30s for the Vite/Tamagui cold start, then:
 
 - Web app: http://localhost:4200
 - GraphQL: http://localhost:5000/graphql
 - OAuth: http://localhost:5001/oauth
 
-### Start a subset of services
+Subset startup:
 
-```powershell
-# Backend only (no web)
-docker compose up -d postgres graphql oauth
-
-# Just the database
-docker compose up -d postgres
+```bash
+docker compose up -d postgres graphql oauth   # backend only
+docker compose up -d postgres                 # just the database
 ```
 
 ## Stopping
 
-```powershell
-# Stop all containers (preserves volumes/data)
-docker compose down
-
-# Stop and wipe the database volume (full reset)
-docker compose down -v
+```bash
+docker compose down      # stop containers, keep data
+docker compose down -v   # stop + wipe the database volume (full reset)
 ```
 
-## Viewing Logs
+## Logs, rebuilds, restarts
 
-```powershell
-# All services, follow
-docker compose logs -f
+```bash
+docker compose logs -f                     # all services, follow
+docker compose logs graphql --tail=50      # one service
+docker compose ps                          # container status
+docker inspect ls-postgres --format "{{.State.Health.Status}}"
 
-# Single service, last 50 lines
-docker compose logs graphql --tail=50
-docker compose logs web --tail=50
-docker compose logs migrate --tail=50
+# After package.json or Dockerfile.dev changes:
+docker compose build --no-cache [service]
+docker compose up -d --build graphql       # rebuild + restart one service
 
-# Follow a specific service
-docker compose logs -f oauth
+docker compose restart web                 # plain restart
 ```
 
-## Rebuilding
+Source directories are volume-mounted (`lambdas/*/src`, `apps/web/src`, `lib/`), so code edits hot-reload without a rebuild; dependency changes need a rebuild.
 
-Required after `package.json` changes or Dockerfile edits:
+## Migrations
 
-```powershell
-# Rebuild all images
-docker compose build --no-cache
+The `migrate` service applies migrations automatically on `docker compose up`. Manually:
 
-# Rebuild one service only
-docker compose build --no-cache graphql
-
-# Rebuild + restart a single service
-docker compose up -d --build graphql
-```
-
-## Restarting a Single Service
-
-```powershell
-docker compose restart graphql
-docker compose restart web
-```
-
-## Running Migrations
-
-Migrations run automatically via the `migrate` service on `docker compose up`. To run them manually:
-
-```powershell
-make db-migrate
-# or inside the stack:
+```bash
 docker compose run --rm migrate
+# or from the host: make db-migrate
 ```
 
-## Running CLI Commands
+If `migrate` exits non-zero, all backend services refuse to start — `docker compose logs migrate`, fix the migration, then `docker compose up -d`.
 
-```powershell
-# Seed player data
+## CLI against the stack
+
+```bash
 docker compose run --rm cli seed-dev-data --letters a,b
-
-# Get help
 docker compose run --rm cli help
 ```
 
-## Checking Service Health
+Full catalog: [cli-commands.md](cli-commands.md).
 
-```powershell
-# Status of all containers
-docker compose ps
+## Environment variables
 
-# Health of postgres specifically
-docker inspect ls-postgres --format "{{.State.Health.Status}}"
-```
-
-## Startup Dependency Order
-
-Services start in this order (enforced by `depends_on`):
-
-```
-postgres (healthy)
-    └── migrate (completed successfully)
-            ├── graphql
-            ├── oauth
-            ├── stats
-            ├── game-selection
-            └── web (also waits on graphql + oauth started)
-```
-
-If `migrate` fails (exit non-zero), all backend services will refuse to start.
-
-## Environment Variables
-
-Docker Compose loads two env files, with `.env.docker` overriding `.env`:
+Compose loads two env files, later wins:
 
 ```yaml
 env_file:
-  - .env # real secrets from AWS Parameter Store (gitignored)
-  - .env.docker # docker-specific overrides: local DB creds, service URLs
+  - .env # real synced secrets (gitignored) — or a copy of .env.example when AWS is unavailable
+  - .env.docker # committed docker overrides: local DB creds, service URLs, dev auth secrets
 ```
 
-Key `.env.docker` overrides:
+Key `.env.docker` overrides (read the file for the full set):
 
-- `USE_LOCAL_CREDENTIALS=true` — skips SSL/certificate auth for local Postgres
-- `DB_HOST=postgres:5432` — points to the Docker postgres container
-- `DATABASE_URL=postgresql://legacy_sports:legacy_sports_dev@postgres:5432/legacy_sports_dev`
-- `VITE_GRAPHQL_HOST=http://localhost:5000/graphql`
-- `VITE_OAUTH_PROXY_URL=http://localhost:5001/oauth`
-
-To refresh `.env` from AWS:
-
-```powershell
-pnpm run sync-env
-```
+- `USE_LOCAL_CREDENTIALS=true` — skip AWS Secrets Manager / SSL for local postgres
+- `DB_HOST=postgres:5432`, `DATABASE_URL=postgresql://legacy_sports:legacy_sports_dev@postgres:5432/legacy_sports_dev`
+- `VITE_GRAPHQL_HOST=http://localhost:5000/graphql`, `VITE_OAUTH_PROXY_URL=http://localhost:5001/oauth`
 
 ## Troubleshooting
 
-**Web app not loading at localhost:4200**
-Vite has an ~11s cold start due to Tamagui compilation. Wait and refresh.
+**Web not loading on 4200** — Vite has a ~11s+ cold start from Tamagui compilation. Wait and refresh.
 
-**`migrate` service fails / backend services won't start**
+**`Cannot connect to database` in graphql/oauth logs** — confirm `USE_LOCAL_CREDENTIALS=true` is in effect (i.e. `.env.docker` loaded) and that `migrate` completed: `docker compose ps -a`, `docker compose logs migrate`.
 
-```powershell
-docker compose logs migrate
+**Port already in use** — find the holder, then stop it or change the mapping in `docker-compose.yml`:
+
+```bash
+ss -ltnp | grep 5000            # Linux
+netstat -ano | findstr :5000    # Windows
 ```
 
-Fix the failing migration, then: `docker compose up -d`
+**Stale image after dependency changes** — `docker compose build --no-cache <service>` then `docker compose up -d <service>`.
 
-**`Cannot connect to database` errors in graphql/oauth logs**
-Ensure `USE_LOCAL_CREDENTIALS=true` is set in `.env.docker` and that the `migrate` service completed successfully.
+**Full reset (nuclear)**:
 
-**Port already in use**
-
-```powershell
-# Find what's using the port (e.g. 5000)
-netstat -ano | findstr :5000
+```bash
+docker compose down -v
+docker compose build --no-cache
+docker compose up -d
 ```
 
-Stop the conflicting process or change the port mapping in `docker-compose.yml`.
+(`make db-restore-dev` re-seeds from the scrubbed dev dump but is Windows-only — see the [OS support matrix](../SKILL.md#os-support-matrix-run-and-operate-targets). On Linux, re-seed with `docker compose run --rm cli seed-dev-data`.)
 
-**Stale image after code changes**
+## Related
 
-```powershell
-docker compose build --no-cache <service>
-docker compose up -d <service>
-```
-
-**Full reset (nuclear option)**
-
-```powershell
-docker compose down -v          # stop + delete volumes
-docker compose build --no-cache # rebuild all images
-make db-restore-dev             # restore database from seed
-docker compose up -d            # start fresh
-```
-
-## Related Skills
-
-- [database](../../database/SKILL.md) — restore database, run migrations, query data
-- [sync-env](../../sync-env/SKILL.md) — refresh `.env` from AWS Parameter Store
+- [database](../../database/SKILL.md) — migrations, queries, dev RDS
+- [../SKILL.md](../SKILL.md) — port map, per-OS setup, native (non-Docker) startup

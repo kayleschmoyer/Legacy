@@ -364,8 +364,8 @@ describe('stripe-webhook event handlers', () => {
       const result = await handler(makeEvent());
 
       expect(result.statusCode).toBe(200);
-      // upsertSubscription must not run — only isEventProcessed + recordEvent
-      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
+      // upsertSubscription must not run — only the idempotency claim
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(1);
       expect(mockClearLeagueTierFreezes).not.toHaveBeenCalled();
       expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
     });
@@ -1510,8 +1510,8 @@ describe('stripe-webhook event handlers', () => {
       expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
       expect(mockClearLeagueTierFreezes).not.toHaveBeenCalled();
       expect(mockPushPublish).not.toHaveBeenCalled();
-      // isEventProcessed + select-existing + recordEvent — no insert/update DB.
-      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(3);
+      // idempotency claim + select-existing — no insert/update DB.
+      expect(mockRunWithInternalClient).toHaveBeenCalledTimes(2);
     });
 
     it('ignores a stale subscription.deleted when last_event_timestamp is newer', async () => {

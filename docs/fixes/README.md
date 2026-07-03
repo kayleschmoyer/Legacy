@@ -30,6 +30,12 @@ Records of production issues, root-cause analyses, and the fixes applied. Use th
 - **[LS-102 Testing Protocol](LS-102-testing-protocol.md)** - Reproduction and verification steps
 - **[LS-102 Windows Console Flashing Fix](LS-102-windows-console-flashing-fix.md)** - Root cause and resolution
 
+## Open investigations
+
+Investigated but not resolved — read the deferral rationale before re-investigating.
+
+- **[LS-4697 Insert Long-Tail Investigation](LS-4697-insert-long-tail-investigation.md)** - 10–15s single-insert tail on `league_activity_log` / `matchup_players` (mean latency healthy); triggers and indexes ruled out; deferred 2026-05-21 with rationale. **OPEN.**
+
 ---
 
 [← Back to Documentation Hub](../README.md)

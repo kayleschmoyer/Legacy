@@ -35,9 +35,16 @@ Computation and the SHA-currency guard live in
 re-reads the PR's live head and **no-ops** (posts nothing) if the head advanced
 past the SHA this run evaluated, so a slow stale run never posts a verdict.
 
-`CI Gate` success ≡ the existing `overall-status` (same folded set + pass
-semantics as [`collect-results`](../../.github/actions/collect-results/action.yml)):
-`success`/`skipped` pass; `failure`/`cancelled`/`timed_out`/missing fail.
+`CI Gate` folds the same job set as `overall-status`
+([`collect-results`](../../.github/actions/collect-results/action.yml)):
+`success`/`skipped` pass; `failure`/`timed_out`/missing fail. One deliberate
+divergence (LS-8219): **`cancelled` is excluded from the gate verdict** — a
+cancelled granular job is a superseded/duplicate run (concurrency-cancel,
+post-merge SIGINT), and folding it as failure let a cancelled post-merge
+duplicate latch a fresh red `CI Gate` onto a SHA whose gating run was already
+green. `collect-results` still treats cancelled as failure for the in-run
+`overall-status`; see `GATE_INPUT_JOBS` and `isCancelled` in
+[`ci-gate.js`](../../.github/scripts/ci-gate.js).
 
 ## Staged ruleset migration (owner-gated)
 

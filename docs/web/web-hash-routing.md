@@ -1,5 +1,7 @@
 # Web App Hash Routing
 
+> **Status: historical (2026-07-02).** Superseded — `apps/web/src/main.tsx` uses `BrowserRouter`. Kept as a record of the hash-routing era only; do not follow.
+
 The web application now uses hash-based routing (`HashRouter`) instead of browser routing (`BrowserRouter`).
 
 ## What Changed

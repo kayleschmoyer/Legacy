@@ -17,15 +17,15 @@ GAP bugs into their own Feature Stories if they want to track future findings un
 
 Files examined during the code audit that produced this bucket:
 
-| File                                                                | Platform       | Notes                                                                                     |
-| ------------------------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------- |
-| `apps/web/src/pages/football/FootballPlayersPage.tsx`               | Web            | List page: search, position/team filters, pagination, card/table views, compare selection |
-| `apps/web/src/pages/football/FootballPlayersComparePage.tsx`        | Web            | Side-by-side 2-player comparison route                                                    |
-| `apps/web/src/components/football/FootballPositionFilter.tsx`       | Web            | Position pill filter                                                                      |
-| `apps/web/src/components/football/FootballTeamFilter.tsx`           | Web            | Team / conference dropdown filter                                                         |
-| `apps/web/src/api/db/football/FootballPlayers.graphql`              | Web            | Web players-list query                                                                    |
-| `apps/app/src/api/db/players/FootballPlayers.graphql`               | Android Native | Native players-list query                                                                 |
-| `lib/shared-components/src/api/db/getFootballPlayers.query.graphql` | Shared         | Shared players query fragment                                                             |
+| File                                                          | Platform       | Notes                                                                                     |
+| ------------------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------- |
+| `apps/web/src/pages/football/FootballPlayersPage.tsx`         | Web            | List page: search, position/team filters, pagination, card/table views, compare selection |
+| `apps/web/src/pages/football/FootballPlayersComparePage.tsx`  | Web            | Side-by-side 2-player comparison route                                                    |
+| `apps/web/src/components/football/FootballPositionFilter.tsx` | Web            | Position pill filter                                                                      |
+| `apps/web/src/components/football/FootballTeamFilter.tsx`     | Web            | Team / conference dropdown filter                                                         |
+| `apps/web/src/api/db/football/FootballPlayers.graphql`        | Web            | Web players-list query                                                                    |
+| `apps/app/src/api/db/players/FootballPlayers.graphql`         | Android Native | Native players-list query                                                                 |
+| `lib/graphql/src/getFootballPlayers.query.graphql`            | Shared         | Shared players query fragment                                                             |
 
 The list page is Web-first; the native (`apps/app`) counterpart shares the GraphQL
 query but has a distinct UI surface (see FPL-030..034, FPL-040).

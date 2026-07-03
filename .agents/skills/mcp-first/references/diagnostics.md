@@ -18,7 +18,7 @@ Run these checks in order. Stop at the first failure and apply the recovery step
 
 ### Check 1 — `node_modules/.bin/tsx`
 
-The stdio MCP servers launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, all stdio servers silently time out during startup — Claude Code surfaces no error. The three hosted servers (jira, github, ci) connect as OAuth custom remote connectors registered in claude.ai; they do not use `tsx` and are not entries in `.mcp.json`.
+The stdio MCP servers launch via `mcp-bootstrap.mjs` which runs `node --import tsx ...`. If `node_modules` is missing or broken, all stdio servers silently time out during startup — Claude Code surfaces no error. The hosted servers (github, jira, ci, db, rollbar) connect as OAuth custom remote connectors registered in claude.ai; they do not use `tsx` and are not entries in `.mcp.json` (see [SKILL.md — Tool Surfaces](../SKILL.md#tool-surfaces)).
 
 Use `-f` (not `-x`) — pnpm stores binaries as symlinks; `-f` follows symlinks and fails for both absent files and broken symlinks, while `-x` on a broken symlink returns false but doesn't distinguish from truly absent.
 
@@ -53,7 +53,7 @@ test -f .github/copilot/hooks/mcp-bootstrap.mjs && echo "bootstrap: OK" || echo 
 ### Check 4 — server source files present
 
 ```bash
-for srv in worktree-server github-server jira-server make-server nx-server ci-server aws-server browser-server; do
+for srv in local-git-server worktree-server make-server nx-server ci-server aws-server browser-server dev-process-server; do
   test -f "tools/mcp/${srv}/src/index.ts" \
     && echo "${srv}: OK" \
     || echo "${srv}: MISSING — tools/mcp/${srv}/src/index.ts"
@@ -78,7 +78,7 @@ echo "MCP_TIMEOUT: ${MCP_TIMEOUT:-unset (default applied by Claude Code)}"
 
 ### Check 5b — OAuth connectors for hosted servers
 
-The three hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) connect via OAuth custom remote connectors registered in claude.ai — they are **not** entries in `.mcp.json`. If they are absent from the deferred-tools list, do **not** run the `node_modules`/`.env.local` checklist (it does not apply). Either the Org Owner has not registered the connectors, the OAuth session needs (re-)consent, or the tools haven't loaded yet.
+The hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`, `legacy-sports-db` — registered repo-side under the alias `legacy-sports-db-admin`, see [SKILL.md — DB server name](../SKILL.md#db-server-name) — and `legacy-sports-rollbar`) connect via OAuth custom remote connectors registered in claude.ai — they are **not** entries in `.mcp.json`. If they are absent from the deferred-tools list, do **not** run the `node_modules`/`.env.local` checklist (it does not apply). Either the Org Owner has not registered the connectors, the OAuth session needs (re-)consent, or the tools haven't loaded yet.
 
 - **Tools absent** → surface to the user: prompt them to check Org settings → Connectors in claude.ai, or re-consent via `/mcp`.
 - **Mid-session 401** → OAuth access token expired; prompt the user to re-consent via `/mcp`. Do not retry or fall back.
@@ -121,7 +121,7 @@ environment variable was overridden. Restart the session from the correct worktr
 
 When MCP servers are confirmed missing and recovery is not possible in the current session:
 
-1. **State which servers are missing** — e.g. "all 10 custom MCP servers absent; deferred tools
+1. **State which servers are missing** — e.g. "all custom stdio MCP servers absent; deferred tools
    list is empty".
 2. **State which check failed** — e.g. "Check 1 failed: `node_modules/.bin/tsx` missing".
 3. **Do not silently fall back** — using `gh`/`git`/`make` Bash fallbacks without reporting
@@ -132,7 +132,7 @@ When MCP servers are confirmed missing and recovery is not possible in the curre
 
 ## Mid-Session 401 / Token Expiry (LS-4874)
 
-The three hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) connect via OAuth custom remote connectors. Claude Code does not auto-refresh MCP OAuth tokens mid-session ([claude-code#58607](https://github.com/anthropics/claude-code/issues/58607)). When the OAuth access token expires, the servers begin returning HTTP 401, which Claude Code's MCP transport may surface as a Zod validation error:
+The hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`, `legacy-sports-db`, `legacy-sports-rollbar`) connect via OAuth custom remote connectors. Claude Code does not auto-refresh MCP OAuth tokens mid-session ([claude-code#58607](https://github.com/anthropics/claude-code/issues/58607)). When the OAuth access token expires, the servers begin returning HTTP 401, which Claude Code's MCP transport may surface as a Zod validation error:
 
 ```
 HTTP 401 ... ZodError: expected string, received undefined
@@ -144,22 +144,23 @@ HTTP 401 ... ZodError: expected string, received undefined
 1. **Stop.** Do not retry, do not fall back to `gh` / `acli` / raw `curl` — that masks the failure and produces MCP gap audit entries.
 2. **Surface the recovery prompt verbatim to the user**:
 
-   > The OAuth token for the MCP connectors (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`) has expired mid-session. To recover: re-consent via `/mcp` in Claude Code, then resume the session.
+   > The OAuth token for the hosted MCP connectors (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`, `legacy-sports-db`, `legacy-sports-rollbar`) has expired mid-session. To recover: re-consent via `/mcp` in Claude Code, then resume the session.
 
-3. **Wait for the user.** Do not proceed with implementation. A session with these three servers down is not a valid environment for any workflow that touches GitHub, Jira, or CI.
+3. **Wait for the user.** Do not proceed with implementation. A session with these servers down is not a valid environment for any workflow that touches GitHub, Jira, CI, or the dev database. Re-consent via `/mcp` is the **only** recovery — running `node scripts/mcp-auth.mjs` is the retired pre-OAuth answer and does nothing for connector sessions (see [SKILL.md — Auth Model](../SKILL.md#auth-model)).
 
 ## Pre-flight Auth Check (Separate from Load Failures)
 
 Call `auth_check_all()` (worktree MCP server) at the start of any workflow requiring GitHub,
 Jira, AWS, or CI access. This checks credentials, not server availability — a server can be
 connected but unauthenticated. If `allAuthenticated: false`, surface the `hint` for each
-failing service and stop. See `.agents/skills/credentials/SKILL.md`.
+failing service and stop. When the worktree stdio server is absent (degraded CC-web),
+use the per-service checks instead: `github_auth_status`, `jira_auth_status`, `ci_auth_status`,
+`rollbar_auth_status`, `aws_sso_status`. See [SKILL.md — Pre-flight Auth Check](../SKILL.md#pre-flight-auth-check).
 
 ## See Also
 
 - `docs/dev-process/session-startup.md` — sequence diagram + orientation for the SessionStart hook chain that produces `[MCP WARNING]` output (LS-4505)
-- `.agents/skills/mcp-first/SKILL.md` — server load order and per-server tool substitution table
-- `.agents/skills/credentials/SKILL.md` — auth configuration for each service
+- [`../SKILL.md`](../SKILL.md) — tool surfaces, server load order, per-server tool substitution tables, and the auth model (absorbed the former `credentials` skill 2026-07-02)
 - `docs/authentication/mcp-machine-credential-lifecycle.md` — rotation, revocation, and blast-radius runbook for the long-lived Cognito `client_credentials` machine secret (epic LS-5089, Track A)
 - `.agents/skills/worktree-workflow/SKILL.md` — `scripts/modules-pool/link.mjs` details
 - `AGENTS.md` `## MCP Servers` section — `MCP_TIMEOUT` setting and symlink repair notes

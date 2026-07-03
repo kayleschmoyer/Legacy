@@ -39,14 +39,14 @@ Write-Host "Found $($reviewed.Count) PRs reviewed by Copilot"
 
 For each Copilot-reviewed PR, fetch the review threads and collect those with
 unresolved, non-outdated comments. PRs with no comments are skipped — the
-`copilot-auto-approve` workflow handles approval and labeling automatically.
+Reviewer Bot (W1) handles approval and `merge-when-ready` labeling automatically.
 
 ```powershell
 $toFix = @()   # collect { pr, threads } objects for Step 2
 
 foreach ($pr in $reviewed) {
   # MCP (preferred): fetch unresolved threads in one call
-  # github_get_review_threads(prNumber: $pr.number, unresolvedOnly: true)
+  # github_get_review_threads(prNumber: $pr.number)
   # Returns threads with id, isResolved, isOutdated, comments (author.login, body, path, line)
   # Filter to threads where any comment author.login matches 'copilot'
 
@@ -146,21 +146,15 @@ foreach ($entry in $toFix) {
    .\scripts\resolve-review-threads.ps1 -PRNumber $pr.number
    ```
 
-   The `copilot-auto-approve` workflow listens for `pull_request_review_thread`
-   resolved events and automatically re-evaluates `bot-review` when threads are
-   cleared via the GitHub UI or a user-OAuth API call. No manual dispatch needed
-   in the normal case.
+   Prefer `github_resolve_threads({ threadIds: [...], prNumber: <N> })` — the
+   `prNumber` parameter dispatches the `copilot-auto-approve.yml` recheck (W6),
+   which toggles `bot:ready-for-review` to re-run the Reviewer Bot without a new
+   push.
 
-   **Fallback** (App token resolution): GitHub's anti-recursion rule prevents
-   `pull_request_review_thread` from firing when threads are resolved using a
-   GitHub App installation token or `GITHUB_TOKEN`. If `bot-review` stays at
-   FAILURE after resolving threads, dispatch the recheck manually:
-
-   ```powershell
-   gh workflow run copilot-auto-approve.yml --field pr_number=$($pr.number)
-   ```
-
-   Or via MCP: `ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<N>" })`
+   **Fallback**: if `bot-review` stays at FAILURE after resolving threads (e.g.
+   the token lacked `actions: write` so the recheck dispatch was skipped),
+   dispatch it manually via MCP — never `gh workflow run` (see pr-lifecycle
+   Critical Rule 12): `ci_dispatch_workflow(workflow: "copilot-auto-approve.yml", inputs: { pr_number: "<N>" })`
 
 6. **End of loop** — the `foreach ($entry in $toFix)` block repeats
    steps 1–5 for every PR with unresolved comments.
@@ -245,5 +239,5 @@ After processing every PR, print a summary table:
 - If a review comment is unclear or requires a design decision, **skip it**
   and leave a reply on the thread explaining why: `gh api ... --method POST`.
 - **Do not manually add `merge-when-ready`** — the **Reviewer Bot** adds it
-  automatically on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`). See
-  [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership).
+  automatically on APPROVED verdict (label-add in `.github/scripts/reviewer/index.mjs`). See
+  [Label Ownership](../SKILL.md#label-ownership).

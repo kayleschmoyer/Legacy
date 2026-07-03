@@ -38,4 +38,4 @@ The two skills are complementary: `add-secret-or-env-var.md` references `secrets
 
 - [`secrets-handling`](../secrets-handling/SKILL.md) — Safely transit secret values through tool calls
 - [`infrastructure`](../infrastructure/SKILL.md) — AWS operations, Lambda deployment, post-failure recovery; IAM policy size budgets live in its [`references/iam-policies.md`](../infrastructure/references/iam-policies.md)
-- [`credentials`](../credentials/SKILL.md) — AWS/Jira/GitHub auth status checks before workflows
+- [mcp-first Auth Model](../mcp-first/SKILL.md#auth-model) — AWS/Jira/GitHub auth status checks before workflows

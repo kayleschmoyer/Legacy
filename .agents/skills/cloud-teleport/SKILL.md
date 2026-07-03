@@ -59,6 +59,8 @@ If validation has already passed (all seven `pc-*` chunks green), use a proper c
 git commit -m "feat(scope): description — awaiting local teleport for <blocked-step>"
 ```
 
+**Precondition: a draft PR exists for the branch.** Under the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md#the-sequence) the draft PR opens right after the first push (Step 9) — _before_ validation — so by the time a teleport boundary is hit one should already exist. If it does not, open it now (`draft: true`, `agent-in-progress` label) so the handoff has a durable, discoverable anchor. Leave it **draft**: mark-ready is gated on the blocked steps completing locally, and the handoff artifact records that state.
+
 ### Step 3: Write the handoff artifact
 
 Create `.claude/teleport-handoff.md` in the repo root with this structure:
@@ -79,14 +81,15 @@ Create `.claude/teleport-handoff.md` in the repo root with this structure:
 
 ## Completed Steps
 
-<!-- Check off what's done -->
+<!-- Check off what's done — order matches the ticket-to-merge spine (draft PR before validation) -->
 
 - [x] Jira ticket transitioned to In Progress
 - [x] Code implementation complete
 - [x] Unit tests written and passing
+- [x] Branch pushed + draft PR #<PR#> opened (`agent-in-progress` applied)
 - [x] Validation passes — seven `pc-*` chunks (lint, typecheck, test, build)
 - [ ] Real DB migration applied
-- [ ] PR created
+- [ ] PR marked ready
 
 ## Blocked Step
 
@@ -102,7 +105,7 @@ Create `.claude/teleport-handoff.md` in the repo root with this structure:
 
 1. <specific step, e.g., "Run `make db-migrate` against real database">
 2. <next step>
-3. Create PR and transition Jira to In Review
+3. Mark the draft PR ready (`github_mark_pr_ready`) and transition Jira to In Review
 
 ## Context for Local Agent
 
@@ -193,9 +196,7 @@ terraform -chdir=terraform/main apply   # Apply after review
 
 **Deployment teleport:**
 
-```bash
-make deploy-<lambda>     # Deploy the Lambda
-```
+There is no per-lambda `make deploy-<name>` target. Deploy via the `/deploy` skill, which loads [infrastructure/references/deploy-lambda.md](../infrastructure/references/deploy-lambda.md) — the reference mandates a `--skip-nx-cache` rebuild before deploying (stale-cache deploys have caused production incidents). `make deploy-lambdas` exists but deploys **all** lambdas.
 
 ### Step 4: Clean up the handoff
 
@@ -206,14 +207,14 @@ git rm .claude/teleport-handoff.md
 git commit -m "chore(teleport): remove handoff artifact — local steps complete"
 ```
 
-Then continue with the normal workflow (PR creation, Jira transition, etc.).
+Then resume the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md#the-sequence) from where the handoff's Completed Steps checklist stops — typically mark the draft PR ready (Step 14) and watch to merge (Step 15).
 
 ## Integration with work-ticket Skill
 
 When the `work-ticket` skill is running in cloud mode and hits a teleport boundary:
 
 1. The ticket stays in **In Progress** (do not transition to In Review)
-2. All completed code is committed and pushed
+2. All completed code is committed and pushed; the draft PR (spine Step 9) stays **draft** with `agent-in-progress` applied and its number recorded in the handoff
 3. The handoff artifact is written
 4. The agent alerts the user and **stops work on that ticket**
 5. If working in parent/batch mode, the agent can continue to the next child ticket that doesn't require local operations
@@ -227,3 +228,9 @@ When the `work-ticket` skill is running in cloud mode and hits a teleport bounda
 **Partial validation**: If code changes are complete but the `pc-*` validation chunks can't fully pass due to missing real DB state, note this explicitly. The local agent needs to know whether to re-run validation (`make pc`) from scratch.
 
 **PR already created**: If the PR was created before hitting the boundary (e.g., during a review-fix cycle), include the PR number in the handoff and note that the local session should push to the existing branch.
+
+## Provenance and maintenance
+
+- 2026-07-02: Handoff/pickup flow aligned to the ticket-to-merge spine (draft PR exists before validation and stays draft through teleport); nonexistent `make deploy-<lambda>` citation replaced with the `/deploy` skill path.
+- Verify deploy targets: `grep -nE '^deploy[a-z-]*:' Makefile` (expect `deploy-lambdas` only — no per-lambda target).
+- Verify ordering: `.agents/skills/workflow-overview/references/ticket-to-merge-spine.md` is the home for step order; this skill only records where in that order the teleport happened.

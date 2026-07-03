@@ -26,7 +26,7 @@ If `PR_NUMBER` is omitted, resolve it from the current branch via `github_pr_das
 
 ### Step 2 — Fetch open threads
 
-Call `github_get_review_threads({ number: PR#, unresolvedOnly: true })`.
+Call `github_get_review_threads({ number: PR# })`.
 
 If there are no unresolved threads, stop and report that the PR is clean — nothing to respond to.
 

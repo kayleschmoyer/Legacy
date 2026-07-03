@@ -29,4 +29,4 @@ Drive PR to merge: $ARGUMENTS
 8. Post-merge: transition Jira to "Done", clean up labels, clean up worktree
 9. **MCP gap audit** (mandatory): run `mcp-gap-audit` Phase 1 to identify and ticket any MCP tooling gaps from this session
 
-**Guardrails**: Always `make pc` before pushing. Cap review fix rounds at 2. Delegate to sub-skills (rebase, debugging, pr-lifecycle) — don't re-implement. Never stop after a single fix — the event loop is the core. Cloud agents report blockers instead of attempting code changes. Respect `agent-in-progress` labels set by other agents.
+**Guardrails**: Always validate before pushing — `make pc` locally; in cloud/timeout-prone sessions run the seven `pc-*` chunks per cloud-agent-mode (never monolithic `make pc`). Cap review fix rounds at 2. Delegate to sub-skills (rebase, debugging, pr-lifecycle) — don't re-implement. Never stop after a single fix — the event loop is the core. Cloud agents report blockers instead of attempting code changes. Respect `agent-in-progress` labels set by other agents.

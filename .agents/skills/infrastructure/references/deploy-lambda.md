@@ -22,10 +22,8 @@ Deploy AWS Lambda functions to cloud environment using deployment scripts.
 # Complete deployment workflow:
 pnpm exec nx run db:build --skip-nx-cache   # ALWAYS rebuild — cache may be stale
 node scripts/terraform-unlock.js             # Clear any locks
-cd terraform
-terraform plan                               # Check infrastructure changes
-terraform apply                              # Apply if needed
-cd ..
+terraform -chdir=terraform/main plan        # Check infrastructure changes
+terraform -chdir=terraform/main apply        # Apply if needed
 .\scripts\deploy-lambda.ps1 -FunctionName graphql  # Deploy code
 ```
 
@@ -59,8 +57,7 @@ cd ..
 
 ## Related Skills
 
-- [Building](../../build/SKILL.md) - Building Lambda before deploy
-- [Testing](../../test/SKILL.md) - Testing Lambda before deploy
+- [repo-tooling](../../repo-tooling/SKILL.md) - Building and testing before deploy
 - [Terraform Apply](terraform-apply.md) - Infrastructure changes
 
 ## Related Documentation

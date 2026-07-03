@@ -215,6 +215,8 @@ See [merge-queue-guide.md](merge-queue-guide.md) for the full merge queue refere
 
 ### Merge blocked: "N of 8 required status checks are expected" (405) despite all checks green
 
+> **Config-vs-live note (2026-07-02).** The counts in this runbook describe the pre-LS-8014 **live** ruleset (8 required checks, 5 of them granular `🚀 CI Pipeline / *` contexts). The committed post-LS-8014 config (`.github/ruleset.json`) requires only 4 contexts and drops the granular set; live apply is owner-gated via `scripts/apply-ruleset.sh`, so config and live can legitimately differ. Check what is actually live (`github_get_branch_protection`, or the `gh api` command below) before reasoning from either count — the staging model is homed in [ci-checks-reference.md](../../.agents/skills/pr-lifecycle/references/ci-checks-reference.md#config-vs-live-the-staged-cutover-model).
+
 **Symptom.** The merge queue logs `✅ PR #NNNN is ready for merge` → `🚀 Merging…` → `❌ GitHub merge API 405 — Repository rule violations found` / `N of 8 required status checks are expected`. Meanwhile `gh pr checks NNNN` shows **every required check passing**, no jobs are queued or running, and `mergeStateStatus` is `BLOCKED`. The PR sits forever; nothing re-triggers it because the SHA never changes.
 
 **Root cause — ruleset `integration_id` drift.** The live "Protect Main" ruleset (`id 1524440`) has `integration_id=15368` (the GitHub Actions app) pinned on the 5 `🚀 CI Pipeline / *` required contexts. GitHub's **merge-time** evaluator cannot reliably match an integration-bound context against the proposed merge commit, so it reports those contexts as `expected` (unsatisfied) and rejects `PUT /merge` with a 405 — even though the check runs are green. The **Checks API** (what `gh pr checks` and the merge queue's own validator read) matches by _name_ and ignores the binding, which is why everything _looks_ ready. The "`N of 8`" count equals exactly the number of integration-pinned contexts (5).
@@ -410,14 +412,14 @@ Update webhooks in GitHub **Settings → Secrets and variables → Actions**.
 The CI uses local GitHub Actions caching (`NX_NO_CLOUD=true`). If you suspect stale cache:
 
 ```bash
-# Clear local cache
-pnpm exec nx reset
+# Clear local cache (never `pnpm exec nx reset` — it destroys the modules-pool symlink, LS-5242)
+make clean-cache
 
 # Verify cache configuration
 echo $NX_NO_CLOUD  # should be: true
 ```
 
-See [nx-remote-caching-implementation.md](nx-remote-caching-implementation.md).
+Historical background only: [nx-remote-caching-implementation.md](nx-remote-caching-implementation.md) (Nx Cloud was removed in the LS-3857 CI rebuild — CI uses local Actions caching).
 
 ## Performance
 

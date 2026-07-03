@@ -11,7 +11,7 @@ This is the **local implementation** of the ticket-to-merge workflow. The orderi
 
 ## Start here
 
-1. Read **[references/ticket-to-merge-spine.md](references/ticket-to-merge-spine.md)** for the canonical Steps 0–16, the five critical gates (draft-PR-before-validate, `make pc`-before-mark-ready, migrations-before-`make pc`, self-review-before-push, PR-Ready-before-watch-to-merge), and the **mandatory tracking-task graph** (Step 1c) that makes the ordering survive context compaction.
+1. Read **[references/ticket-to-merge-spine.md](references/ticket-to-merge-spine.md)** for the canonical Steps 0–16, the five critical gates (draft-PR-before-validate, `make pc`-before-mark-ready, migrations-before-`make pc`, self-review-before-mark-ready, PR-Ready-before-watch-to-merge), and the **mandatory tracking-task graph** (Step 1c) that makes the ordering survive context compaction.
 2. Use the **[Local tool binding](#local-tool-binding)** below for the concrete call behind each spine step.
 3. Use **[Local worktree setup](#local-worktree-setup)** and **[Local validation gates](#local-validation-gates)** for the local-only mechanics.
 4. For everything after mark-ready, see the machinery references: [ci-and-merge-pipeline.md](references/ci-and-merge-pipeline.md), [post-merge-and-deploy.md](references/post-merge-and-deploy.md), [roles-checks-secrets.md](references/roles-and-required-checks.md).
@@ -41,8 +41,8 @@ Concrete local calls for each spine action. Always prefer the MCP tool over raw 
 - **Worktree-first; never edit code in `D:\code\legacy-sports` with HEAD on `main`.** All work happens in the active worktree.
 - **Resuming PR work** (new session / after a context switch): call `worktree_set` before any git op, then use `worktree_diff` / `worktree_commit` / `worktree_push` — not raw `git -C <path> ...`.
 - **Pre-push hook fails with `nx` not found / `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`**: `node_modules/.bin` is empty. Use `worktree_push({ skipLint: true })` as a temporary workaround — note `SKIP_PREPUSH_LINT=1` also skips the conflict-marker and Terraform checks, so run Prettier manually first (`node node_modules/prettier/bin/prettier.cjs --write <files>`) and check for conflict markers. Root cause: main-repo `node_modules/.bin` corruption; ask the user to repair it.
-- **Check Runs vs Commit Statuses**: `github_retrigger_check` only operates on Check Runs. `bot-review` and similar bot statuses use the Statuses API — find them with `github_list_commit_statuses({ number })`; clear a stale one by pushing a commit or dispatching the workflow, not `github_retrigger_check`.
-- **Stepwise validation (timeout-prone sessions)**: run the seven `pc-*` chunks (`pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`) **in order** — equivalent to `make pc` only if all seven run. Update the continuation checkpoint after each.
+- **Check Runs vs Commit Statuses**: `github_retrigger_check` only operates on Check Runs. `bot-review` and similar bot statuses use the Statuses API — find them with `github_list_commit_statuses({ prNumber })`; clear a stale one by pushing a commit or dispatching the workflow, not `github_retrigger_check`.
+- **Stepwise validation (timeout-prone sessions)**: run the seven `pc-*` chunks (`pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`) **in order** — equivalent to `make pc` only if all seven run. Update the continuation checkpoint after each. Locally each chunk is `make_run({ target: "pc-<chunk>" })`. Cloud sessions bind the same chunks differently (`nx_run_pc_chunk` when present — mandatory; degraded CC web falls back to background Bash chunks): see the [spine's binding table](references/ticket-to-merge-spine.md#tool-binding-by-environment) and [cloud-agent-mode](../cloud-agent-mode/SKILL.md) — monolithic `make pc` is never valid in cloud.
 
 ## Local worktree setup
 

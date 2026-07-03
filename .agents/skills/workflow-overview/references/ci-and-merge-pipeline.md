@@ -24,7 +24,7 @@ ci-pipeline   security-scanning (conditional)
 **Triggers:**
 
 - `pull_request` opened/synchronize/reopened — CI runs on every push so check runs land in a push-event check suite recognised by branch protection (LS-7707)
-- `pull_request_review` submitted — any APPROVED review; the `check-prior-success` idempotency guard skips re-running CI when the SHA already has passing checks from the synchronize run (LS-4182/LS-5223)
+- `pull_request_review` submitted — any APPROVED review; the `check-prior-success` idempotency guard skips re-running CI when the head SHA is already green or CI is already in flight (LS-4182/LS-7736). It reads the required contexts from `.github/ruleset.json` (config), evaluating check-run contexts against the Checks API and `_commitStatus` contexts (`bot-review`, `CI Gate`) against the latest commit status per context; on any read error it fail-safes to re-running CI
 - `workflow_dispatch` — two paths: (1) direct manual dispatch with configurable `security-scan-type` input; (2) triggered by `ci-run-label.yml` when the `ci:run` label is added — that workflow removes the label then dispatches the orchestrator. Keeping `labeled` out of the orchestrator's trigger list prevents non-`ci:run` label events from occupying the concurrency group and displacing queued `synchronize` runs (LS-7752)
 - `merge_group` — always runs CI + security
 
@@ -40,46 +40,41 @@ ci-pipeline   security-scanning (conditional)
 ### CI Pipeline Stages (`ci-pipeline.yml`)
 
 ```
-detect-changes (~30s)
+detect-changes (~30s, incl. affected-e2e spec selection)
        |
-  +----+----+
-  |         |
-quality   build         (PARALLEL - saves 5-15 min)
-gates     validation
-  |         |
-  +----+----+
+  +----+----+----+----+----+----+
+  |    |    |    |    |    |
+lint format test build custom- lockfile-   (6 granular jobs, PARALLEL)
+                       checks  check
+  +----+----+----+----+----+----+
        |
-     e2e              (sharded, after both pass)
+     e2e              (sharded matrix; gated on the six above)
        |
-   summarize          (always runs - PR comments, badges, labels)
+   summarize          (always() && !cancelled() — PR comment, labels, badges,
+                       posts the `CI Gate` commit status)
 ```
 
-**Stage 1 -- Detect Changes:** Uses `dorny/paths-filter` and Nx affected analysis to determine which components changed (web, mobile, lambdas, terraform, e2e).
+When invoked via `workflow_call` from the orchestrator's `🚀 CI Pipeline` job, each job posts a check run named `🚀 CI Pipeline / <job-id>` — **informational** since the LS-8014 cutover; the merge gate reads the aggregate `CI Gate` commit status instead (see [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md)).
 
-**Stage 2a -- Quality Gates:** Runs in parallel with build validation.
+**Stage 1 -- Detect Changes:** `dorny/paths-filter` + git to determine which surfaces changed (web, mobile, lambdas, terraform, e2e), plus hermetic affected-e2e spec selection (LS-7846) via `apps/web-e2e/src/e2e-surface-map.json` — emits the specs/grep/shard-matrix the e2e job consumes.
 
-- Agent skill lint (`node scripts/lint-skills.js`)
-- Migration immutability check
-- Touch-map documentation freshness (`node scripts/lint-touch-map.js`) — advisory; posts label `docs: touch-map gap` + PR comment on gap, never blocks
-- Prettier formatting check (`pnpm exec prettier --check --ignore-unknown ...`)
-- `nx affected -t lint`
-- `nx affected -t typecheck`
-- `nx affected -t test` (runs with `NODE_OPTIONS=--max_old_space_size=2048` — lower than the 4096 MB global default to prevent OOM when a lockfile change marks all projects affected)
+**Stage 2 -- Six granular jobs, in parallel:**
 
-**Stage 2b -- Build Validation:** Runs in parallel with quality gates.
+- `lint` — `nx affected -t lint`
+- `format` — Prettier check over the PR's changed files
+- `test` — `nx affected -t typecheck test` (with `NODE_OPTIONS=--max_old_space_size=2048` — lower than the 4096 MB global default to prevent OOM when a lockfile change marks all projects affected)
+- `build` — web/mobile/lambda builds + terraform validate as flagged by detect-changes; uploads the web artifact for e2e
+- `custom-checks` — agent-skill lint, migration immutability, workflow validation, touch-map freshness (advisory), repo-script unit suites
+- `lockfile-check` — `pnpm-lock.yaml` drift
 
-- Web build (if web/e2e changed)
-- Mobile build (if mobile changed)
-- Lambda build (if lambdas changed)
-- Terraform validate (if terraform changed)
-- Uploads web build artifact for e2e consumption
+Every one of these jobs (and `summarize`) skips when the PR carries the `skip-ci` label — a footgun once `CI Gate` is required; see [the skip-ci footgun](../../pr-lifecycle/references/ci-checks-reference.md#the-skip-ci-footgun-pr-stuck-at-expected).
 
-**Stage 3 -- E2E Tests:** Playwright, sharded (2 shards for PRs, 3 for nightly).
+**Stage 3 -- E2E Tests:** Playwright, sharded matrix from detect-changes.
 
-- PRs: `@critical` tests only, excludes `@slow`
-- Nightly: all tests, 3 shards
-- Downloads web build artifact from Stage 2b
-- Uploads blob reports for merged Playwright report
+- PRs: `@critical` (excluding `@slow`) **plus** the affected specs mapped from changed files; a broad-surface change escalates to the full hermetic suite, sharded
+- Downloads the web build artifact from the `build` job
+- Uploads blob reports for the merged Playwright report
+- The `e2e-affected` job summarizes the shard results as one informational check run
 
 **Stage 3b -- Deploy Playwright Report:** Merges shard reports and deploys to GitHub Pages (`bkrupa/legacy-sports-deploys`). The merge step emits both `index.html` (browsable SPA) and `summary.md` (compact agent-targeted Markdown, ~20–50× smaller). Both are copied to `playwright-report/<name>/` — agents should fetch `summary.md` first via `ci_get_playwright_report` (one GET, no zip inflation); the HTML SPA is the human-readable fallback. See [read-playwright-report skill](../../read-playwright-report/SKILL.md).
 
@@ -96,9 +91,10 @@ Separate from the CI Orchestrator. Triggered via `workflow_dispatch` or the nigh
 
 Reports are published to `playwright-report/manual-<run_number>/` on GitHub Pages — both `index.html` and `summary.md` (LS-7838). Always verify `stats.total > 0` after reading a report — Playwright exits 0 with `ok: true` even when 0 tests run, so a green CI run does not guarantee tests executed. See [read-playwright-report skill](../../read-playwright-report/SKILL.md).
 
-**Stage 4 -- Summarize & Report:** Always runs (unless cancelled).
+**Stage 4 -- Summarize & Report:** Always runs (unless cancelled or `skip-ci`).
 
 - Collects results from all stages
+- **Posts the `CI Gate` aggregate commit status** for the PR head SHA (`.github/scripts/ci-gate.js`) — the required CI context post-LS-8014; folded-job list, pass semantics, and the cancelled-exclusion rule (LS-8219) live in [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md#ci-gate)
 - Posts PR comment with status table
 - Updates CI status badges (on main)
 - Labels PR with failure reasons
@@ -122,59 +118,29 @@ These run independently from the orchestrator, triggered directly by PR events. 
 
 The CI pipeline automatically labels PRs with failure reasons. Labels are added on failure and removed when the check passes:
 
-| Label                        | Source                                                                      |
-| ---------------------------- | --------------------------------------------------------------------------- |
-| `CI: Migration Immutability` | Quality gates -- migration files modified                                   |
-| `CI: Formatting`             | Quality gates -- Prettier formatting check failed                           |
-| `CI: Lint Failure`           | Quality gates -- ESLint errors                                              |
-| `CI: Type Error`             | Quality gates -- TypeScript errors                                          |
-| `CI: Test Failure`           | Quality gates -- Jest test failures                                         |
-| `CI: Build Failure`          | Build validation failed                                                     |
-| `CI: E2E Failure`            | Playwright E2E tests failed                                                 |
-| `CI: Quality Gates`          | Fallback label when quality gates job fails but subsection outputs are lost |
-| `CI: Security`               | Security scanning failed                                                    |
-| `CI: Schema Drift`           | `schema.graphql` out of sync with Pothos implementation                     |
-| `CI: Migration`              | Migrations not applied to production DB                                     |
-| `docs: touch-map gap`        | Advisory: code changed without updating a linked required doc               |
+| Label                        | Source                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `CI: Migration Immutability` | `custom-checks` job -- a merged migration file was modified                   |
+| `CI: Formatting`             | `format` job -- Prettier check failed                                         |
+| `CI: Lint Failure`           | `lint` job -- ESLint errors                                                   |
+| `CI: Test Failure`           | `test` job -- typecheck or Jest failures                                      |
+| `CI: Build Failure`          | `build` job failed                                                            |
+| `CI: E2E Failure`            | `e2e` job -- Playwright failures                                              |
+| `CI: Security`               | Security scanning failed (applied by the orchestrator's `label-pr` job)       |
+| `CI: Schema Drift`           | `check-schema.yml` -- `schema.graphql` out of sync with Pothos implementation |
+| `CI: Migration`              | `check-migrations-applied.yml` -- migrations not applied to the shared RDS    |
+| `CI: Conflicts`              | `check-conflicts.yml` / base-push sweep -- merge conflicts with base          |
+| `docs: touch-map gap`        | Advisory: code changed without updating a linked required doc                 |
+
+Legacy labels (`CI: Type Error`, `CI: Quality Gates`, `CI: Lint & Format`) are no longer applied — the summarize job removes them if present.
 
 > **Per-check details** (what each check validates, why it fails, fix commands): see [pr-lifecycle/references/ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md).
 
-## Copilot Review (Phase 4)
+## Bot Review (Phase 4)
 
-### Flow
+The review gate is the **Reviewer Bot** — `review.yml` (W1) running `.github/scripts/reviewer/` as the `legacy-sports-review-bot` app. It posts a real PR review (APPROVE / REQUEST_CHANGES), manages the required `bot-review` commit status per HEAD SHA, and applies `merge-when-ready` on APPROVED. GitHub's Copilot reviewer also comments, but it is a lower-priority signal and not the gate. (The old Copilot auto-approve pipeline is retired; the `copilot-auto-approve.yml` file at HEAD is only the thread-resolution recheck dispatcher, LS-8121.)
 
-1. **PR opened/synchronized** -- `copilot-auto-approve.yml` `request-review` job sets `bot-review` commit status to **pending**.
-2. **Copilot reviews** -- the built-in "Copilot code review" workflow runs automatically (triggered by repository ruleset with `review_on_push: true`).
-3. **Review completes** -- `auto-approve` job fires via `workflow_run` trigger:
-   - If no unresolved threads: sets `bot-review` to **success**, approves PR, adds `merge-when-ready` label.
-   - If unresolved threads: sets `bot-review` to **failure**.
-4. **Threads resolved** -- `review-check` job fires on `pull_request_review` events, re-checks thread state, and approves + labels if all clean.
-
-### Carry-Forward on Rebase
-
-On `synchronize` (rebase/force-push), the `request-review` job checks if Copilot already has a clean review with no unresolved threads. If so, it:
-
-- Carries forward `bot-review` success status to the new SHA
-- Re-approves the PR (if not already approved)
-- Ensures `merge-when-ready` label is present
-
-This prevents `bot-review` from getting stuck at pending forever when the Copilot workflow does not re-trigger after a force-push.
-
-### Dependabot PRs
-
-Dependabot PRs automatically get `bot-review` set to **success** (Copilot review skipped).
-
-### 2-Round Fix Cap
-
-Agents follow a 2-round cap on fixing Copilot review comments:
-
-- **Round 1:** Fix security, bugs, and type safety issues.
-- **Round 2:** Fix remaining actionable comments.
-- **After round 2:** Resolve remaining threads as "acknowledged" and proceed.
-
-### Manual Recheck
-
-The `recheck` job can be triggered via `workflow_dispatch` with a `pr_number` input to re-evaluate Copilot thread state without pushing code. Useful after an agent resolves review threads without code changes.
+The actor table, Label Ownership, the Author Agent Contract (`FIX:`/`JUSTIFY:`/`CANNOT-COMPLY:` protocol), and the fix-round/cycle caps are all defined in **[pr-lifecycle/SKILL.md](../../pr-lifecycle/SKILL.md)** — the single home; do not restate them here. Per-context detail on `bot-review` (HEAD-SHA gating, overrides W5/W6, label guard W7): [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md#bot-review-commit-status).
 
 ## Jira Branch Sync (Phase 5) (`jira-branch-sync.yml`)
 
@@ -261,14 +227,16 @@ Epics with the Jira label `pinned-status` are excluded from automatic transition
 
 Before merging, each PR must pass all of these:
 
-| #   | Check                                      | Behavior                                                             |
-| --- | ------------------------------------------ | -------------------------------------------------------------------- |
-| 1   | Not draft                                  | Draft PRs are skipped                                                |
-| 2   | `merge-to-parent` label (non-main targets) | Required when PR targets a branch other than `main`                  |
-| 3   | Mergeable state                            | Polls up to 60s if `mergeable=null`; rejects if conflicts            |
-| 4   | No unresolved review threads               | Checks via GraphQL; outdated threads do not block                    |
-| 5   | Status checks passing                      | All check runs must be completed with success; skipped checks are OK |
-| 6   | No pending checks                          | Waits for in-progress checks silently (no blocker comment)           |
+| #   | Check                                      | Behavior                                                                                                                                           |
+| --- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Not draft                                  | Draft PRs are skipped                                                                                                                              |
+| 2   | `merge-to-parent` label (non-main targets) | Required when PR targets a branch other than `main`                                                                                                |
+| 3   | Mergeable state                            | Polls up to 60s if `mergeable=null`; rejects if conflicts                                                                                          |
+| 4   | No unresolved review threads               | Checks via GraphQL; outdated threads do not block                                                                                                  |
+| 5   | Status checks passing                      | Check runs and commit statuses must be green — deduplicated to the **latest per name/context** (mirrors GitHub's evaluator); skipped checks are OK |
+| 6   | No pending checks                          | Waits for in-progress checks silently (no blocker comment)                                                                                         |
+
+> **Config union (LS-7963):** `validateStatusChecks` unions the live required set with the config-tracked contexts in `.github/ruleset.json` (`loadConfigRequiredChecks` in `merge-queue-processor.js`), so the checked-in config can tighten the queue's gate ahead of the owner-gated live apply — never loosen it. Staging model: [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md#config-vs-live-the-staged-cutover-model).
 
 ### SHA Pinning
 

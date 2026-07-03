@@ -81,9 +81,12 @@
         "worktree_set",
         "worktree_run",
         "worktree_guard",
+        "worktree_commit",
         "worktree_rebase_continue",
         "worktree_stabilize",
-        "worktree_push"
+        "worktree_push",
+        "worktree_reset_to_remote",
+        "auth_check_all"
       ]
     },
     "legacy-sports-nx": {

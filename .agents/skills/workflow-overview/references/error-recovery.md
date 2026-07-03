@@ -70,7 +70,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 1. Get the run ID: `ci_list_runs({ branch: "<headRefName>", limit: 1 })`.
 2. Get the failure details: `ci_get_logs({ runId, errorSummary: true })`.
 3. Common failure patterns:
-   - **Same error as local `make pc` would catch**: you pushed before validating. Fix locally, push again.
+   - **Same error as local `make pc` would catch**: validation hadn't run yet (normal while the PR is still draft — the [spine gate](ticket-to-merge-spine.md#critical-gates-preconditions) is `make pc` before **mark-ready**, not before push) or was skipped. Fix locally, re-run the failing chunk, push again.
    - **E2E test failure**: check if it's flaky by looking at other recent runs first (`ci_list_runs` for the branch or relevant PRs, then inspect each run with `ci_get_logs` / `ci_search_logs` for the test name within that run/job). If it has failed intermittently across recent runs, `ci_rerun({ runId, failedOnly: true })`. If persistent after 2 reruns, investigate the test.
    - **Schema drift / migration check**: run `make codegen` or `pnpm --prefix lib/db-client run db:up`, push the results.
    - **Branch behind main**: rebase with `worktree_rebase`, stabilize, `make pc`, push.
@@ -82,11 +82,11 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 
 **Decision tree**:
 
-1. Cap at 2 fix rounds (this is a hard rule — see `pr-lifecycle/SKILL.md`).
+1. Cap at 2 fix rounds — the hard cap is **2** everywhere (see `pr-lifecycle/SKILL.md`; escalate to the user after round 2).
    - **Round 1**: fix security, bugs, and type safety issues.
    - **Round 2**: fix remaining actionable comments.
 2. After round 2, resolve any remaining threads as "acknowledged" via `github_resolve_threads`.
-3. Re-request review. If `bot-review` still fails, the merge queue's thread check may be seeing outdated threads. Push a no-op commit (add a comment or whitespace) to re-trigger the Copilot auto-approve workflow.
+3. Re-request review. If `bot-review` still fails, the thread recheck may be seeing outdated threads — push a new commit to refresh the `bot-review` status (see `pr-lifecycle/SKILL.md` for the current recheck mechanics).
 
 ## Scenario 7: Jira API Calls Fail
 
@@ -103,14 +103,15 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 
 **Symptom**: Work completed part-way through the workflow (e.g., code committed but PR not created, or PR created but Jira not transitioned).
 
-**Decision tree**:
+**Decision tree** — step numbers are the [ticket-to-merge spine](ticket-to-merge-spine.md#the-sequence)'s canonical Steps 0–16 (the ordering home; do not infer order from this table):
 
-1. Determine what state you're in:
-   - **Code committed, not pushed**: `worktree_push({ setUpstream: true })`, then continue from step 12 (Ship).
-   - **Pushed, no PR**: `github_create_pr({ title: "<pr title>", body: "<pr body>", draft: true })`, then continue from step 12a.
-   - **PR exists, not marked ready**: `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })`, then `github_mark_pr_ready({ number: <PR#> })`, then continue.
-   - **PR ready, Jira not transitioned**: `jira_transition({ key: "LS-####", status: "In Review" })`, then continue to step 13 (Watch).
-   - **PR merged, no gap audit**: run the gap audit (step 14), then complete tracking tasks (step 15).
+1. Determine what state you're in and resume at the matching spine step:
+   - **Code committed, not pushed**: `worktree_push({ setUpstream: true })`, then resume at spine Step 9 (open the **draft** PR — this comes _before_ validation).
+   - **Pushed, no PR**: `github_create_pr({ title: "<pr title>", body: "<pr body>", draft: true })` + `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` + continuation checkpoint — spine Step 9 — then resume at Step 10.
+   - **Draft PR exists, validation not run**: resume at spine Step 11 (migrations) then Step 12 (validate).
+   - **Validation green, PR not marked ready**: complete self-review (spine Step 13) if not done, then `github_mark_pr_ready({ number: <PR#> })` — spine Step 14.
+   - **PR ready, Jira not transitioned**: `jira_transition({ key: "LS-####", status: "In Review" })` (tail of spine Step 14), then resume at Step 15 (watch to merge).
+   - **PR merged, no gap audit**: resume at spine Step 16 (gap audit + complete tracking tasks).
 2. The workflow is designed to be resumable from any step — find where you stopped and pick up from there.
 
 ## Scenario 9: GitHub Rate Limiting

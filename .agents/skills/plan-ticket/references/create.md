@@ -16,7 +16,7 @@ If the user just says "make a ticket for X" and X is clear, you do not need a wo
 
 ## Critical preconditions
 
-- **Before any Jira write, verify auth.** Call `jira_auth_status()`. If `configured: true`, use the `jira_*` MCP tools. If not, follow AGENTS.md auth routing: on Claude Code web use the Atlassian plugin with `cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528"`; otherwise stop and ask the user before proceeding; if there is no Jira access at all, output the drafted ticket as plain text for the user to paste. (Cloud egress blocks `*.atlassian.net` — neither Jira MCP nor the Atlassian plugin work there; fall back to plain-text output.)
+- **Before any Jira write, verify auth.** Call `jira_auth_status()`. If `configured: true`, use the `jira_*` MCP tools. If not, follow AGENTS.md auth routing: on Claude Code web use the Atlassian plugin with `cloudId: "fb294606-6c8f-4b52-9a41-11fe45b77528"`; otherwise stop and ask the user before proceeding; if there is no Jira access at all, output the drafted ticket as plain text for the user to paste. (Cloud note: only the stdio jira server's egress is proxy-blocked — the Atlassian plugin routes through Anthropic's plugin infrastructure and is the primary CC-web Jira path; see [cloud-agent-mode Quirk 1](../../cloud-agent-mode/SKILL.md#quirk-1-legacy-sports-jira-stdio-server-fetch-failed-claude-code-on-the-web-only).)
 - **Before creating a ticket interactively, show the draft and get confirmation.** A hallucinated scope written to Jira is worse than no ticket. Exception: when another skill calls this one autonomously (e.g. `work-ticket` enriching an underspecified ticket), skip confirmation and announce in one line what you are filing.
 - **Before submitting, set `sprint: "current"`.** Tickets created without it land off-board and are invisible to the team. Always pass it unless the user names a specific sprint id.
 - **Before filing more than ~3 related tickets, reach for `jira_bulk_create_tickets`** (up to 50 in one call) instead of looping `jira_create_ticket` — it is one round-trip and avoids the per-call rate-limit pressure that one-at-a-time loops create.
@@ -36,7 +36,7 @@ Rules that fall out of this:
 
 - An `Epic` can parent a `Story`, `Task`, or `Bug` — this is the normal pattern (e.g. bucket epics like `LS-2981` parenting work tickets).
 - A `Story` **cannot** parent a `Task` or `Bug`. They sit at the same level. Trying it (via `parent: "<story-key>"`) returns HTTP 400 `"Please select valid parent issue"`.
-- An `Epic` **cannot** parent another `Epic`. Epics are top-level; nest Epics with the `is part of` / `Relates` link, not a parent.
+- Epic→Epic parent links **exist in this Jira project** (see [work-ticket Parent Dispatch Mode](../../work-ticket/SKILL.md), whose transcript recurses into child epics) — do not design ticket trees assuming epics are the top of the hierarchy.
 - Hierarchy levels themselves are only editable on **Jira Premium company-managed projects** (Settings → Issues → Issue type hierarchy). This workspace is team-managed, so the three levels above are fixed — work within them.
 
 ### Umbrella grouping pattern

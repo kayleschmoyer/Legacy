@@ -95,7 +95,7 @@ apps/web-e2e/
 Authentication is handled by `global-setup.ts` before any test runs:
 
 - **CI**: Signs a JWT using `JWT_SECRET` env var → writes `storageState` to `.auth/state.json`
-- **Local**: OAuth device flow with token caching in `.auth/token-cache.json`
+- **Local**: OAuth device flow (`make e2e-auth`, run by the user) with the token cached at `~/.legacy-sports/e2e-token.json`
 
 All tests inherit the authenticated state automatically via Playwright's `storageState` config.
 

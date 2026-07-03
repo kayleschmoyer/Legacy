@@ -101,7 +101,7 @@ Recovery: open a carrier PR per the section above.
 
 ## Prerequisites
 
-1. **AWS SSO authenticated**: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — only run `aws sso login` if credentials are expired
+1. **AWS SSO authenticated**: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — if expired, **stop and prompt the user** to run `aws sso login` (user-only, AGENTS.md Tier 1; see [aws-sso-login.md](aws-sso-login.md))
 2. **Packer installed and accessible** — see [Windows note](#windows-packer-location) below
 3. **VPC and subnet IDs**: the build instance needs a public subnet with an Internet Gateway route
 
@@ -127,7 +127,7 @@ packer --version   # verify
 Or invoke Packer directly via the full path (bypasses `make ami-build`):
 
 ```bash
-cd terraform/packer
+cd terraform/runners/packer
 /c/Users/<your-username>/<packer-dir>/packer init runner-ami.pkr.hcl
 /c/Users/<your-username>/<packer-dir>/packer build \
   -var "vpc_id=vpc-0e7e5def598aa06ff" \
@@ -168,7 +168,7 @@ make ami-build VPC_ID=vpc-0e7e5def598aa06ff SUBNET_ID=subnet-0addb75570c9fc76e
 ### Manual
 
 ```bash
-cd terraform/packer
+cd terraform/runners/packer
 packer init runner-ami.pkr.hcl
 packer build \
   -var "vpc_id=vpc-0e7e5def598aa06ff" \
@@ -237,7 +237,7 @@ aws ec2 deregister-image --image-id ami-0xxxxxxxxxxxx
 | Issue                                     | Cause                                                                                                       | Fix                                                                                                                                                                                     |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `VPCIdNotSpecified`                       | Missing VPC_ID variable                                                                                     | Pass `VPC_ID=vpc-xxx` to make target                                                                                                                                                    |
-| `AuthFailure` / `SSOProviderInvalidToken` | AWS SSO expired                                                                                             | Run `aws sso login`                                                                                                                                                                     |
+| `AuthFailure` / `SSOProviderInvalidToken` | AWS SSO expired                                                                                             | Prompt the **user** to run `aws sso login` (user-only, Tier 1) and wait for confirmation                                                                                                |
 | `packer: command not found`               | Packer not in PATH (Windows)                                                                                | Find packer with `where packer` or `Get-Command packer`, then `export PATH="/c/Users/<your-username>/<packer-dir>:$PATH"` — see [Windows Packer Location](#windows-packer-location)     |
 | `Timeout waiting for SSH`                 | Subnet has no IGW route                                                                                     | Use a public subnet                                                                                                                                                                     |
 | Build hangs at provisioner                | Package mirror slow                                                                                         | Retry — transient                                                                                                                                                                       |

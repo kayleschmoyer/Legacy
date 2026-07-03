@@ -1,6 +1,6 @@
 ---
 name: testing
-description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests (hermetic, mocked), Playwright integration tests (real services), and DB integration tests (Jest + real PostgreSQL). Covers test type selection, commands, tagging, API isolation, and CI pipeline.'
+description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests (hermetic, mocked), Playwright integration tests (real services), and DB integration tests (Jest + real PostgreSQL). Covers test type selection, which suites gate merge, surface-map registration, coverage reality, commands, tagging, API isolation, and CI pipeline.'
 ---
 
 # Skill: Testing
@@ -16,12 +16,12 @@ description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests
 
 There are **four** test layers. Three use Jest; two use Playwright.
 
-| Type             | Tool       | Layer | When to Use                                                                                                                                                                                                                                                                                                                                                               | Reference                                                              |
-| ---------------- | ---------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **Unit**         | Jest       | 1     | Isolated logic, utilities, components, resolvers with mocked deps                                                                                                                                                                                                                                                                                                         | [references/unit-testing.md](references/unit-testing.md)               |
-| **DB**           | Jest       | 2     | Schema constraints, FK cascade, query correctness against real PostgreSQL                                                                                                                                                                                                                                                                                                 | See [DB Integration Tests](#db-integration-tests) below                |
-| **E2E (mocked)** | Playwright | 3     | Full user flows against a static build; hermetic (no backend)                                                                                                                                                                                                                                                                                                             | [references/e2e-testing.md](references/e2e-testing.md)                 |
-| **Integration**  | Playwright | 4     | Cross-service validation against real APIs, multi-user flows, async backends. **Not run in CI for PRs** (too slow) — local execution is the only gate. **Runnable locally** — credentials are auto-linked from the main repo's `.env` by the worktree bootstrap script; see [Local credentials](references/integration-commands.md#integration-tests-can-be-run-locally). | [references/integration-testing.md](references/integration-testing.md) |
+| Type             | Tool       | Layer | When to Use                                                                                                                                                                                                                                                                                                                                                                                                                  | Reference                                                              |
+| ---------------- | ---------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Unit**         | Jest       | 1     | Isolated logic, utilities, components, resolvers with mocked deps                                                                                                                                                                                                                                                                                                                                                            | [references/unit-testing.md](references/unit-testing.md)               |
+| **DB**           | Jest       | 2     | Schema constraints, FK cascade, query correctness against real PostgreSQL                                                                                                                                                                                                                                                                                                                                                    | See [DB Integration Tests](#db-integration-tests) below                |
+| **E2E (mocked)** | Playwright | 3     | Full user flows against a static build; hermetic (no backend)                                                                                                                                                                                                                                                                                                                                                                | [references/e2e-testing.md](references/e2e-testing.md)                 |
+| **Integration**  | Playwright | 4     | Cross-service validation against real APIs, multi-user flows, async backends. Runs nightly and via the opt-in `run:integration` PR label; never blocks merge — see [What Gates Merge](#what-gates-merge). **Runnable locally** — credentials are auto-linked from the main repo's `.env` by the worktree bootstrap script; see [Local credentials](references/integration-commands.md#integration-tests-can-be-run-locally). | [references/integration-testing.md](references/integration-testing.md) |
 
 ### Quick Decision Table
 
@@ -38,6 +38,25 @@ There are **four** test layers. Three use Jest; two use Playwright.
 | Role-based access verified against real identity  |      |     |     | x           |
 | Multi-step workflow across multiple users         |      |     |     | x           |
 | Backend async processes complete correctly        |      |     |     | x           |
+
+## What Gates Merge
+
+Merge is blocked only by the four required contexts configured in `.github/ruleset.json` (`bot-review`, `No Merge Conflicts`, `Verify All Migrations Applied`, `CI Gate`). All test signal reaches the merge gate through **CI Gate** — a single aggregate commit status posted per head SHA by the CI Pipeline summarize job (`.github/scripts/ci-gate.js`); it folds in lint, format, build, unit tests, custom-checks, and affected hermetic e2e shards. Caveat: `ruleset.json` is **config, not necessarily live state** — a maintainer applies it via `bash scripts/apply-ruleset.sh`, and until then `check-ruleset.yml` reports (expected) drift. Check the live required set before asserting it (`gh api repos/{owner}/{repo}/rulesets`); the gate mechanics and staging model are documented in [pr-lifecycle](../pr-lifecycle/SKILL.md).
+
+| Suite                                      | Where it runs                                                                                                                                  | Blocks merge?                                                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Unit + typecheck (Jest, `*.spec.ts`)       | PR CI `test` job: `pnpm exec nx affected -t typecheck test` (`.github/workflows/ci-pipeline.yml`)                                              | **Yes** — folded into CI Gate                                                                           |
+| Lambda unit suites (`lambdas/*`)           | Same `nx affected -t test` path                                                                                                                | **Yes, as of 2026-07-02 — except `lambdas/db`** — see gate-hole note below                              |
+| DB (`*.db.spec.ts`, target `db:test:db`)   | `run-db-tests.yml`: on push touching `lib/db-client/migrations/**` or `lambdas/db/src/**`, plus manual dispatch (ephemeral PostgreSQL)         | **No** — not a required context; failures notify Discord only                                           |
+| Hermetic E2E (Playwright, `src/tests/`)    | PR CI `e2e` job: affected specs via the [surface map](#new-spec-registration-contract-surface-maps) + always-on `@critical` net (LS-7846)      | **Yes** — CI Gate fails if any affected e2e shard fails                                                 |
+| Live integration (`*.integration.spec.ts`) | Nightly 03:00 UTC (`run-playwright-tests.yml`) + opt-in `run:integration` PR label (`run-integration-tests.yml`); advisory comment on every PR | **No** — nightly backstop by design, see [ADR 0014](#integration-regression-detection-nightly-backstop) |
+| Storybook (`shared-components` stories)    | `deploy-storybook.yml` builds + deploys a preview on PRs touching `lib/shared-components/**` (sticky comment)                                  | **No**                                                                                                  |
+
+**Lambda unit gate hole — closed 2026-07-02 for every jest-bearing lambda except `lambdas/db`.** Before this date, ten lambdas defined `"test": "jest --onlyChanged"` in their `package.json`. On the clean tree CI checks out, `--onlyChanged` finds no modified files, runs **zero tests**, and still passes via `nx.json`'s `passWithNoTests: true` — which is how 9 red `lambdas/db` unit specs sat on `main` while a premium-breaking bug shipped (LS-8247, commit `8575ba9`). The fix (landed in the 2026-07-02 skills-overhaul PR): explicit `@nx/jest:jest` targets with `passWithNoTests: false` in each gated lambda's `project.json` (modeled on `lambdas/game-selection`), so `nx affected -t test` runs the full suites for apple-iap, game-selection, github-webhook, image-upload, jira-proxy, notifications, oauth-proxy, rollbar-discord, stats-lambda, stripe-webhook, and websocket; draft-processor gates via the `@nx/jest` plugin-inferred target (which inherits `passWithNoTests: true` from `nx.json` — it relies on its specs continuing to exist). **`lambdas/db` is deliberately not gated**: its unit suite carried pre-existing red debt at the 2026-07-02 probe (12 failing suites / 37 tests, distinct root causes), so its merged test target is still the `jest --onlyChanged` package.json script. Its `*.db.spec.ts` files run (non-blocking) via `run-db-tests.yml` and are excluded from the unit config (`lambdas/db/jest.config.ts` `testPathIgnorePatterns`), so once the red suites are fixed, gating db is a one-block `project.json` change. `lambdas/db` keeps `test:all-files` (`jest`, no flags) as a manual full-run command; `*.db.spec.ts` needs real PostgreSQL — see [DB Integration Tests](#db-integration-tests). Re-verify: `pnpm exec nx show project db --json` (merged `test` target) and `grep -l '"test": "jest --onlyChanged"' lambdas/*/package.json`.
+
+**Storybook story tests never run in CI (OPEN).** `shared-components:test:stories` exists (`lib/shared-components/project.json`) but is not in the `test` target's `dependsOn` (`test` = `test:web` + `test:mobile`) and no workflow invokes it.
+
+**`run:integration` label semantics:** it runs only the specs touched by the PR / selected by the surface map and posts `<integration-results>` evidence that the reviewer bot parses (LS-4617); the label is auto-removed when the run completes. The nightly run remains the full-suite backstop.
 
 ## Tiered Test-User Model (premium-default, free for gates)
 
@@ -147,6 +166,23 @@ nx_run(project: "scoring", target: "test", args: ["--testPathPatterns=lwar\\.spe
 
 > **Empty output?** If `nx_run` returns no test names or truncated output, re-run with `noCache: true` before falling back to Bash. Nx cache can replay stale summaries that omit verbose detail.
 
+### Playwright specs via MCP: `nx_run_e2e_specs`
+
+Prefer `nx_run_e2e_specs` over raw `playwright test` / `nx e2e` shell commands for running individual specs — it returns a compact pass/fail summary instead of a full reporter dump:
+
+```
+# Hermetic (default): runs against a local static build.
+# Precondition: dist/apps/web exists — run nx_run(project: "web", target: "build") first.
+nx_run_e2e_specs(specs: ["src/tests/roster-management.spec.ts"], grep: "@critical")
+
+# Live integration: runs against api.legacy-fantasy.com with workers=1 enforced.
+nx_run_e2e_specs(specs: ["src/integration/tests/league-creation.integration.spec.ts"], integration: true, withTracing: true)
+```
+
+- Spec paths are relative to `apps/web-e2e/` (absolute paths also accepted); `project` selects the browser (default `chromium`); `worktreePath` runs in a worktree.
+- Hermetic mode auto-selects a free `E2E_PORT` and forces `E2E_AUTH_MODE=ci` (no OAuth handshake needed).
+- Integration mode checks e2e JWT freshness (`~/.legacy-sports/e2e-token.json`, minted by `make e2e-auth`) and `E2E_POOL_PASSWORD` before launching, and returns `graphqlErrors` plus (with `withTracing: true`) `traceArtifacts` — the sanctioned way to get a Playwright trace, since CI traces are off (see [references/e2e-determinism.md](references/e2e-determinism.md), lever 10).
+
 ### Shell fallback
 
 Use these only when the `nx_run` MCP tool is unavailable:
@@ -174,7 +210,7 @@ make pc
 ## Critical Rules
 
 1. **Precondition for committing test code: the new/modified tests have run locally and passed.** For bulk test writing (>5 files), run tests per-file as you write rather than batching at the end — an untested test file is a guess about behavior, not a verification.
-2. **Seed GrowthBook flags in E2E tests for flag-gated routes** -- the CI runner has no `VITE_GROWTHBOOK_CLIENT_KEY`, so every flag defaults to off. Tests that navigate to routes behind a GrowthBook flag (e.g., `/football/**` behind `football_enabled`) **must** call `page.addInitScript()` to set `window.__gbSeededFeatures = { flagName: { defaultValue: true } }` before `page.goto()`. Asserting on elements that depend on an unseeded flag is the #1 source of `CI: E2E Failure` labels — 19 of the last 22 CI failures traced to this pattern. See [references/ci-failure-prevention.md](references/ci-failure-prevention.md).
+2. **Seed GrowthBook flags in E2E tests for flag-gated routes** -- the CI runner has no `VITE_GROWTHBOOK_CLIENT_KEY`, so every flag defaults to off. Tests that navigate to routes behind a GrowthBook flag (e.g., `/football/**` behind `football_enabled`) **must** call `page.addInitScript()` to set `window.__gbSeededFeatures = { flagName: { defaultValue: true } }` before `page.goto()`. Asserting on elements that depend on an unseeded flag is the #1 source of `CI: E2E Failure` labels — the dominant class in the failure table (19 of 22 failure-labeled PRs at the 2026-07-02 analysis; current tally: [references/ci-failure-prevention.md](references/ci-failure-prevention.md)).
 3. **Run E2E tests locally before pushing when you modify E2E files** -- `make pc` does NOT run Playwright tests. When you add or change any file under `apps/web-e2e/src/`, run the affected tests locally and confirm they pass before committing. Use `E2E_AUTH_MODE=ci` to skip the OAuth device flow (required for local runs -- without it global setup calls `api.legacysports.dev` and fails). Run the specific spec file you changed, or the full `@critical` suite if you touched shared fixtures/helpers. See [references/e2e-ci-and-validation.md](references/e2e-ci-and-validation.md) for the exact commands.
    - **Also run any spec named in the ticket as a verification gate**, even if you did not modify E2E files — e.g. "run the Phase 5 spec locally before submitting" is a mandatory gate, not a suggestion.
    - **Also run any `.integration.spec.ts` file you modified**, regardless of what the ticket description says. Touching an integration spec triggers the local spec gate automatically.
@@ -197,6 +233,23 @@ make pc
 | DB integration (Jest + PostgreSQL)  | `*.db.spec.ts` in `lambdas/db/src/schema/`                       | `leagues.db.spec.ts`                |
 | Mocked E2E (Playwright)             | `*.spec.ts` in `apps/web-e2e/src/tests/`                         | `league-overview.spec.ts`           |
 | Full-stack integration (Playwright) | `*.integration.spec.ts` in `apps/web-e2e/src/integration/tests/` | `live-draft-ui.integration.spec.ts` |
+
+## New-Spec Registration Contract (surface maps)
+
+Every Playwright spec must be registered in its suite's surface map — a JSON manifest mapping the spec file to the source globs it exercises:
+
+| Suite                                  | Map                                                         |
+| -------------------------------------- | ----------------------------------------------------------- |
+| Hermetic (`src/tests/`)                | `apps/web-e2e/src/e2e-surface-map.json`                     |
+| Integration (`src/integration/tests/`) | `apps/web-e2e/src/integration/integration-surface-map.json` |
+
+Both feed the shared selector (`.github/scripts/integration-select/select-specs.mjs`). On a PR: CI runs only the specs whose surface globs match the changed files, plus the always-on `@critical` net (LS-7846); `runAllWhenChanged` globs (backend schema, shared components, shared e2e harness) trigger the full suite. The integration map additionally drives the per-PR advisory comment and the `run:integration` label run.
+
+**Checklist item for every new, renamed, or rescoped spec: update its map entry in the same commit.**
+
+- Enforced: `.github/checks/integration-select-tests.sh` (runs in the PR CI `custom-checks` job, which folds into CI Gate) fails when a spec on disk has no map entry.
+- Lean broad with globs — over-selection costs a few CI minutes; under-selection means your spec silently stops running on exactly the PRs that break it. If the selector itself errors, PR CI degrades to `@critical`-only (a warning, not a failure), so a malformed map quietly weakens coverage for everyone.
+- When a spec starts covering a new surface, add the glob then; the nightly coverage auditor (LS-7850, istanbul-instrumented runs) detects drift but is a backstop, not the contract.
 
 ## DB Integration Tests
 
@@ -223,24 +276,20 @@ pnpm exec nx run db:test:db
 
 **Running against the dev RDS via SSM tunnel:**
 
-```bash
-# 1. Start SSM port-forward (NAT instance as proxy into VPC)
-aws ssm start-session --region us-east-1 --target <NAT_INSTANCE_ID> \
-  --document-name AWS-StartPortForwardingSessionToRemoteHost \
-  --parameters 'host=legacy-sports-dev-postgres.cep4b6aynyet.us-east-1.rds.amazonaws.com,portNumber=5432,localPortNumber=15432' &
+Tunnel setup — tag-based NAT-instance discovery (never hardcode an instance ID; it churns, LS-5247), RDS endpoint discovery, and `make db-tunnel` — is homed in [cloudwatch-archaeology Step 5](../cloudwatch-archaeology/SKILL.md#step-5--fall-back-to-the-database). With the tunnel up on `localhost:15432`:
 
-# 2. Fetch creds from Secrets Manager
+```bash
+# 1. Fetch creds from Secrets Manager (name prefix legacy-sports-dev-db-creds-;
+#    find the full suffixed name with: aws secretsmanager list-secrets)
 aws secretsmanager get-secret-value --region us-east-1 \
-  --secret-id legacy-sports-dev-db-creds-20250925194630368900000002 \
+  --secret-id "legacy-sports-dev-db-creds-<suffix>" \
   --query SecretString --output text > scratch/migcreds.json
 
-# 3. Run (NODE_TLS_REJECT_UNAUTHORIZED=0 bypasses self-signed cert over tunnel)
+# 2. Run (NODE_TLS_REJECT_UNAUTHORIZED=0 bypasses self-signed cert over tunnel)
 TEST_DATABASE_URL="postgresql://$(jq -r .username scratch/migcreds.json):$(jq -r .password scratch/migcreds.json)@127.0.0.1:15432/postgres" \
   NODE_TLS_REJECT_UNAUTHORIZED=0 \
   pnpm exec nx run db:test:db --skip-nx-cache
 ```
-
-See `.agents/skills/repo-tooling/references/db-dump-and-restore.md` for the full tunnel setup and the current NAT instance ID.
 
 **Environment variable:** tests read `TEST_DATABASE_URL` (preferred) or `DATABASE_URL`. Must point to a real PostgreSQL instance.
 
@@ -256,7 +305,7 @@ See `.agents/skills/repo-tooling/references/db-dump-and-restore.md` for the full
 
 ## 0/0 Nightly Playwright Maintenance Policy
 
-Once 3 consecutive nightly runs hit 0 failures / 0 flakies, the maintenance policy activates: any new failure or flake is P0, new tests require 5 consecutive local passes before merge, and each run must be tracked with a streak comment on LS-4401. See [references/zero-zero-maintenance-policy.md](references/zero-zero-maintenance-policy.md) for the full rules.
+Once 3 consecutive nightly runs hit 0 failures / 0 flakies, the maintenance policy activates: any new failure or flake is P0, new tests require 5 consecutive local passes before merge, and each run must be tracked with a streak comment on LS-4401. See [references/zero-zero-maintenance-policy.md](references/zero-zero-maintenance-policy.md) for the full rules. Operational triage of a red nightly (find run → classify → bisect → remediate) lives in [nightly-green-campaign](../nightly-green-campaign/SKILL.md).
 
 ## E2E Reference Files
 
@@ -391,6 +440,16 @@ Per [ADR 0014](../../../docs/decisions/0014-integration-nightly-bisect.md), ther
 - The **nightly full Playwright run on `main`** is the backstop; it catches any integration regression that merged that day (accepted residual window: up to ~24h).
 - **Agent guidance:** when a `run:integration` result matters to a merge decision, confirm the run **completed** before merging, or re-validate on `main` afterward. On a nightly failure, bisect the day's merges — see the runbook in the ADR.
 
+## Coverage Truth
+
+State as of 2026-07-02 — what coverage tooling exists and, more importantly, what does not:
+
+- **No coverage gate exists.** No `coverageThreshold` is configured anywhere in the repo. Nothing in CI collects or aggregates unit-test coverage. The shared `test` target's `ci` configuration (`nx.json` targetDefaults — `coverageReporters: ['text']`) is invoked by no workflow: the PR CI test job runs `nx affected -t typecheck test` with no `--configuration` flag.
+- **Local coverage is informational only:** `pnpm exec nx run <project>:test --coverage` writes to `coverage/<project-root>/` (per-project `coverageDirectory`). Nothing consumes these files.
+- **The only automated coverage machinery is for E2E, not units:** the `collect-coverage` input on `run-playwright-tests.yml` (LS-7849) runs an istanbul-instrumented build to repopulate the per-spec coverage data behind the [surface maps](#new-spec-registration-contract-surface-maps). It maintains spec→surface mappings; it is not a quality gate.
+- `make check-skipped-tests` reports skipped tests; the script is PowerShell (`scripts/check-skipped-tests.ps1`), so it needs `pwsh` on Linux/macOS.
+- **OPEN — zero-spec surfaces** (no `*.spec.ts` files at all, verified 2026-07-02): `lib/api`, `lib/graphql`, `lib/codegen`, `apps/video`, `lambdas/layers`, `tools/mcp/browser-server`, `tools/mcp/local-git-server`. If your change lands in one of these, there is no existing suite to extend — budget for creating one or state explicitly in the PR why not.
+
 ## Integration with Workflow
 
 Testing is part of the pre-commit sequence: typecheck -> lint -> test -> build. Run the full suite with `make pc`. See [repo-tooling](../repo-tooling/SKILL.md) for all targets.
@@ -405,3 +464,16 @@ make e2e-scope
 ```
 
 This classifies changes and recommends: **targeted** (specific test files changed), **critical** (@critical suite for fixture/helper changes), or **none** (no E2E-relevant changes). Use `--run` to execute the recommended tests directly.
+
+## Provenance and maintenance
+
+Sections _What Gates Merge_, _New-Spec Registration Contract_, _Coverage Truth_, and the `nx_run_e2e_specs` commands were added 2026-07-02 from the skills audit (`scratch/skills-audit/synthesis.json`, gaps 1, 11, 12). Re-verify volatile facts before trusting them:
+
+- Required merge contexts: `grep -n '"context"' .github/ruleset.json` (config) vs live: `gh api repos/{owner}/{repo}/rulesets`
+- PR CI test command: `grep -n "nx affected -t typecheck test" .github/workflows/ci-pipeline.yml`
+- Lambda test targets: `pnpm exec nx show project db --json` (look for an explicit `test` target, not the package.json script)
+- DB-suite trigger paths: `grep -n -A4 "paths:" .github/workflows/run-db-tests.yml`
+- Surface-map enforcement: `head .github/checks/integration-select-tests.sh`
+- Coverage absence: `grep -rn coverageThreshold --include='jest*' . ` (expect zero hits) and `grep -n -A6 '"test":' nx.json`
+- Zero-spec surfaces: `Glob('<dir>/**/*.spec.ts')` per listed directory
+- Test-user pool seats: `grep -n "TIER_SEATS" apps/web-e2e/src/utils/test-user-auth.ts`

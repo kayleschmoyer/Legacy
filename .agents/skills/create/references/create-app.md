@@ -2,7 +2,7 @@
 
 ## Overview
 
-Create a new application under `apps/` with standardized configuration. This skill covers **Node/CLI apps**. For React Native or Next.js apps, see the variant sections below.
+Create a new application under `apps/` with standardized configuration. This skill covers **Node/CLI apps**. For React Native or React web apps, see the variant sections below.
 
 ## When to Use
 
@@ -161,9 +161,9 @@ pnpm exec nx run <name>:test
 
 ---
 
-## React / Next.js Web App
+## React Web App
 
-Use the same structure above but with these differences:
+In-repo precedent is **Vite** (`apps/web`, `apps/graphql-explorer` — both `@nx/vite` executors); there is no Next.js app in this monorepo. Use the same structure above but with these differences:
 
 ### `.eslintrc.json` — extend React plugin
 

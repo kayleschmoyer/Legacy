@@ -160,7 +160,10 @@ describe('load-football-game handler', () => {
   });
 
   it('adds to batchItemFailures and emits failure metric when processing throws', async () => {
-    mockUpdateMatchupStatus.mockRejectedValue(new Error('DB error'));
+    // Reject only the first call: the catch block itself calls
+    // updateMatchupStatus(db, matchupId, 'failed'), and a persistent rejection
+    // there would escape the per-record error handling entirely.
+    mockUpdateMatchupStatus.mockRejectedValueOnce(new Error('DB error'));
 
     const result = await handler(makeSqsEvent([validBody]));
 

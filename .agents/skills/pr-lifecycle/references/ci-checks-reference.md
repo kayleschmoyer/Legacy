@@ -1,379 +1,155 @@
-# CI Checks Reference
+# CI Checks Reference — What Actually Blocks Merge
 
-Quick lookup for every check agents encounter on a PR — what it validates, why it fails, and exactly how to fix it locally.
+The single home for the merge-gate truth: which contexts block merge, who writes each one, why each fails, and how to recover. Other docs (workflow-overview, debugging, unblock flows) link here — if you find a restated required-check list elsewhere, treat this file as authoritative and fix the other one.
 
-> **When a check fails:** read the PR comment posted by the `summarize` job first — it shows a per-sub-check status table that usually narrows the problem immediately. Then use `ci_get_logs(runId: RUN_ID, failedOnly: true)` to pull the actual error lines. **Never guess; extract the error text first.** See [ci-failure.md](../../debugging/references/ci-failure.md) for the full evidence-first triage workflow.
-
----
-
-## Master Lookup Table
-
-| What you see in GitHub                          | CI Label (if any)            | Blocking?                | Source workflow                           | Fix command                                                                  |
-| ----------------------------------------------- | ---------------------------- | ------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------- |
-| `CI Pipeline` check run fails                   | See sub-labels below         | **Yes**                  | `ci-orchestrator.yml` → `ci-pipeline.yml` | `make pc`                                                                    |
-| `CI: Formatting` label                          | `CI: Formatting`             | Blocks CI Pipeline       | `ci-pipeline.yml` quality-gates           | `pnpm exec nx format:write`                                                  |
-| `CI: Lint Failure` label                        | `CI: Lint Failure`           | Blocks CI Pipeline       | `ci-pipeline.yml` quality-gates           | `pnpm exec nx affected -t lint --fix`                                        |
-| `CI: Type Error` label                          | `CI: Type Error`             | Blocks CI Pipeline       | `ci-pipeline.yml` quality-gates           | `pnpm exec nx affected -t typecheck`                                         |
-| `CI: Test Failure` label                        | `CI: Test Failure`           | Blocks CI Pipeline       | `ci-pipeline.yml` quality-gates           | `pnpm exec nx affected -t test`                                              |
-| `CI: Build Failure` label                       | `CI: Build Failure`          | Blocks CI Pipeline       | `ci-pipeline.yml` build-validation        | `pnpm exec nx affected -t build`                                             |
-| `CI: E2E Failure` label                         | `CI: E2E Failure`            | Blocks CI Pipeline       | `ci-pipeline.yml` e2e                     | `pnpm exec nx e2e web-e2e -- --grep='@critical'`                             |
-| `CI: Quality Gates` label                       | `CI: Quality Gates`          | Blocks CI Pipeline       | `ci-pipeline.yml` quality-gates           | `make pc` (fallback — see below)                                             |
-| `CI: Migration Immutability` label              | `CI: Migration Immutability` | Blocks CI Pipeline       | `ci-pipeline.yml` quality-gates           | Revert the modified migration file                                           |
-| `GraphQL Schema & Codegen` check run fails      | `CI: Schema Drift`           | **Yes** (when triggered) | `check-schema.yml`                        | `pnpm exec nx run db:print-schema && pnpm run codegen`                       |
-| `Verify All Migrations Applied` check run fails | `CI: Migration`              | **Yes** (when triggered) | `check-migrations-applied.yml`            | `pnpm --prefix lib/db-client run db:up` (or hosted `db_migrate` MCP)         |
-| `No Merge Conflicts` check run fails            | `CI: Conflicts`              | **Yes**                  | `check-conflicts.yml`                     | `worktree_rebase()` or `git rebase origin/main`                              |
-| `bot-review` commit status = failure            | _(none)_                     | **Yes**                  | `copilot-auto-approve.yml`                | Fix unresolved Copilot review threads — see [fix-reviews.md](fix-reviews.md) |
-| Security Scanning check run fails               | `CI: Security`               | No (advisory)            | `security-scanning.yml`                   | See [Security Scanning](#security-scanning-ci-security) below                |
-| `Deploy PR Preview` fails                       | _(none)_                     | No (advisory)            | `deploy-pr-preview.yml`                   | Check for missing `VITE_*` secrets; re-run if transient                      |
-| `Jira Branch Sync` fails                        | _(none)_                     | No (advisory)            | `jira-branch-sync.yml`                    | Best-effort; rerun or transition Jira manually                               |
+> **When a check fails:** read the PR comment posted by the `summarize` job first — it shows a per-job status table that usually narrows the problem immediately. Then `ci_get_logs(runId: RUN_ID, failedOnly: true)` for the actual error lines. **Never guess; extract the error text first.** Full evidence-first triage: [ci-failure.md](../../debugging/references/ci-failure.md).
 
 ---
 
-## CI Pipeline Checks (Inside `ci-pipeline.yml`)
+## The Four Required Contexts (post-LS-8014 config)
 
-The main `CI Pipeline` check run wraps four sequential stages. When it fails, one or more of the auto-applied `CI: *` labels tells you which stage failed without reading logs.
+`.github/ruleset.json` requires exactly **four** contexts on `main` (see its `required_status_checks` rule). Everything else — including the granular `🚀 CI Pipeline / *` check runs — is informational.
 
-### Stage sequence
+| Context                         | Kind              | Written by                                                                                                               | Debug entry point                                                            |
+| ------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `bot-review`                    | **commit status** | Reviewer Bot — `review.yml` (W1) → `.github/scripts/reviewer/index.mjs` (`setCommitStatus` in `reviewer/lib/github.mjs`) | `github_list_commit_statuses({ prNumber })` + `github_get_review_threads`    |
+| `No Merge Conflicts`            | check run         | `check-conflicts.yml` job `check-conflicts` (and `check-conflicts-sweep.yml` on main pushes)                             | `github_pr_why_blocked(prNumber)`; sticky `<!-- conflict-notice -->` comment |
+| `Verify All Migrations Applied` | check run         | `check-migrations-applied.yml` job `check`                                                                               | `db_migration_status` (hosted DB MCP)                                        |
+| `CI Gate`                       | **commit status** | `ci-pipeline.yml` `summarize` job → `.github/scripts/ci-gate.js` (`postCiGate`)                                          | `ci_get_logs(runId, failedOnly: true)` on the CI Pipeline run                |
 
-```
-detect-changes (~30 s)
-       │
-  ┌────┴────┐
-quality   build-        ← run PARALLEL; both must pass
-gates     validation
-  └────┬────┘
-     e2e  (sharded Playwright, @critical only on PRs)
-       │
-  summarize (always runs — posts PR comment + applies labels)
-```
+Two of the four are **commit statuses**, not check runs. Practical consequences:
 
----
+- `github_retrigger_check` cannot find them — inspect with `github_list_commit_statuses({ prNumber: PR# })` (or `sha`).
+- GitHub evaluates the **latest** status per context; there is no `cancelled` status state, so duplicate-run ambiguity (the LS-7988 405 class) cannot recur for them.
+- They only exist once their writer runs. If the writer never runs, the PR sits at **"Expected — Waiting for status to be reported"** (see [skip-ci footgun](#the-skip-ci-footgun-pr-stuck-at-expected)).
 
-### `CI: Formatting`
-
-**What:** Prettier formatting check. CI runs `pnpm exec prettier --check` across all changed files.
-
-**Why it fails:** A file was committed without running the formatter. This is the most common CI failure for new contributors and can happen after a rebase that touched formatting-sensitive files.
-
-**Fix locally:**
-
-```bash
-pnpm exec nx format:write
-# Then commit the reformatted files
-```
-
-`make pc` runs this automatically and auto-amends the last commit with any formatter changes, so it rarely reaches CI when `make pc` is used before push.
+The `pull_request` rule additionally enforces: squash-merge only, `require_code_owner_review: true` (`.github/CODEOWNERS` → @bkrupa on sensitive paths), approvals dismissed on every push (LS-3977), and `required_approving_review_count: 0` — the review gate is `bot-review`, not GitHub's approval count.
 
 ---
 
-### `CI: Lint Failure`
+## Config vs Live: the Staged-Cutover Model
 
-**What:** ESLint on all affected projects. Covers TypeScript-aware rules, import order, `no-console`, and project-specific rules from `.eslintrc` files.
+**`.github/ruleset.json` is config, not live state.** Never assume the live GitHub ruleset matches it.
 
-**Why it fails:** New code violates an ESLint rule. Common culprits: `@typescript-eslint/no-floating-promises`, `@typescript-eslint/no-unused-vars`, `no-console` (use `LOGGER` from `@legacy-sports/logging` instead).
+| Layer                      | What it is                                                                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/ruleset.json`     | Checked-in **target** config. Merging a PR that edits it changes nothing live.                                                                                                  |
+| `scripts/apply-ruleset.sh` | The only path from config to live: `bash scripts/apply-ruleset.sh` PUTs the config to GitHub. **Owner-gated** — requires gh admin auth (@bkrupa runs it).                       |
+| `check-ruleset.yml`        | "Check Ruleset Drift" — non-required drift detector (fires on PRs touching `ruleset.json`, or via `workflow_dispatch`). Drift warnings **mid-cutover are expected**, not a bug. |
 
-**Fix locally:**
+The LS-8014 cutover (granular `🚀 CI Pipeline / *` required check-run names → the single `CI Gate` aggregate; rollout/rollback in [docs/ci-cd/ci-gate-aggregator.md](../../../../docs/ci-cd/ci-gate-aggregator.md)) follows this model: the 4-context set above is the **config**; whether it is live is knowable only by checking.
 
-```bash
-pnpm exec nx affected -t lint --fix
-# Review any errors that --fix cannot auto-resolve, then fix manually
-```
+**Before reasoning about why a PR won't merge, check the live required set** — one of:
 
-**Never use `eslint-disable` / `eslint-disable-next-line` suppression comments (including ones targeting `@typescript-eslint/*` rules)** — fix the root cause. See [standards/SKILL.md](../../standards/SKILL.md).
+1. `github_get_branch_protection()` — reads the **live** rulesets via the API and returns `requiredStatusChecks`.
+2. `ci_dispatch_workflow({ workflow: "check-ruleset.yml", waitForCompletion: true })` — in-sync vs a drift diff in the run log.
 
----
+Two consumers already bridge the config/live gap — useful when debugging:
 
-### `CI: Type Error`
-
-**What:** TypeScript type checking (`nx affected -t typecheck`) across every affected project's strict `tsconfig`.
-
-**Why it fails:** A type mismatch, missing import, incorrect generic, or use of `any` where a concrete type is required. Also fires if a shared library's types changed incompatibly.
-
-**Fix locally:**
-
-```bash
-pnpm exec nx affected -t typecheck
-# Read the error: file(path,line): error TSxxxx: message
-```
-
-Never use `@ts-ignore` or `@ts-expect-error` to silence errors — fix the underlying type issue.
+- **Merge queue** (`merge-queue-processor.js`, `loadConfigRequiredChecks`, LS-7963): unions config-tracked contexts with the live required set — config can _tighten_ the queue's gate ahead of live apply, never loosen it. GitHub's own merge API still enforces only the **live** set (that is what 405s).
+- **Orchestrator idempotency guard** (`ci-orchestrator.yml` `check-prior-success`, LS-4182/LS-7736): reads the config contexts (splitting `_commitStatus` entries from check-run entries) to decide whether an approval event needs a CI re-run. Fail-safe: any read problem → re-run CI.
 
 ---
 
-### `CI: Test Failure`
-
-**What:** Jest unit and integration tests (`nx affected -t test`).
-
-**Why it fails (in order of frequency):**
-
-1. **Node/module-loading warning above the failure** — the test framework itself failed to initialize (misconfigured `jest.config`, bad `tsconfig` path alias, missing `@legacy-sports/*` workspace reference). Look for `(node:XXXX) Warning: Failed to load the ES module` _above_ the `FAIL` line. Fix the config, not the test.
-2. **Actual assertion failure** — the implementation doesn't match what the test expects. Read `Expected:` / `Received:` lines.
-3. **Flaky infrastructure** — runner timeout, network hiccup. Rerun with `ci_rerun(runId: RUN_ID, failedOnly: true)`.
-
-**Fix locally:**
-
-```bash
-# Run all affected tests
-pnpm exec nx affected -t test
-
-# Run a single spec
-pnpm exec nx run <project>:test --testPathPattern="SpecName"
-```
-
----
-
-### `CI: Build Failure`
-
-**What:** Build validation for all affected targets: web (`apps/web`), mobile (`apps/mobile`), Lambda functions (`lambdas/*`), Terraform validate.
-
-**Why it fails:** A missing import, module resolution failure, environment variable expected at build time, or a type error that only surfaces during bundling (Vite/esbuild). Lambda builds also fail when a file is referenced but not present in the bundle entry point.
-
-**Fix locally:**
-
-```bash
-pnpm exec nx affected -t build
-# Read the error: "Module not found", "Cannot find", or "BUILD FAILED"
-```
-
----
-
-### `CI: E2E Failure`
-
-**What:** Playwright end-to-end tests, 1 shard on PRs (`@critical` tag only, excludes `@slow`). The test suite downloads the web build artifact from the build-validation stage and runs against it.
-
-**Why it fails:**
-
-- A UI change broke a critical user flow.
-- The web build artifact was not produced (build-validation also failed — fix that first).
-- A new E2E test was added without the `@critical` tag, so it was skipped in PR CI; this is a coverage gap that will surface in broader E2E runs, not a cause of this PR check failing.
-- Flaky test (race condition, selector timeout). Check whether the failure is consistent across reruns.
-
-**Fix locally:**
-
-```bash
-# Build web first (E2E needs the build artifact)
-pnpm exec nx build web
-
-# Run a single test
-pnpm exec nx e2e web-e2e -- --grep='test name' --config=apps/web-e2e/playwright.config.ts
-```
-
-For flaky failures, rerun first: `ci_rerun(runId: RUN_ID, failedOnly: true)`. If consistently failing, read the Playwright report: `ci_get_playwright_report({ reportName: "pr-<PR#>" })`.
-
----
-
-### `CI: Quality Gates` (fallback label)
-
-**What:** Applied when the `quality-gates` job fails but the individual sub-step outputs (formatting/lint/type/test) are not available — e.g. the job was cancelled, the runner died, or a setup step failed before any checks ran.
-
-**Why it fails:** Usually a runner/infrastructure issue (OOM, timeout, self-hosted runner unavailable) rather than a code issue.
-
-**Fix:** Rerun the failed job first: `ci_rerun(runId: RUN_ID, failedOnly: true)`. If it fails again with the same infra error, check `ci_get_logs` for setup-step failures like `Nx CLI not available` or `node_modules.*not found`.
-
----
-
-### `CI: Migration Immutability`
-
-**What:** Ensures that previously-applied migration files in `lib/db-client/migrations/` are not modified or deleted. This check runs both in the pre-commit hook and in CI quality-gates.
-
-**Why it fails:** A committed migration file was edited after it was merged to `main`. Migration files are immutable once applied — they represent a permanent record of schema history.
-
-**Fix:** Revert the modification to the migration file. If you need to change schema behavior, add a **new** migration file instead. Never amend, rename, or delete a migration that has already landed on `main`.
-
----
-
-## Standalone Checks (Separate Workflows)
-
-These run as independent workflows triggered by PR events. They appear as separate check runs alongside `CI Pipeline`.
-
----
-
-### `GraphQL Schema & Codegen` (`CI: Schema Drift`)
-
-**Source:** `check-schema.yml` — triggers when any file under `lambdas/db/src/schema/**`, `**/*.graphql`, `lib/codegen/**`, or `lib/api/**` changes.
-
-**What it does:**
-
-1. Regenerates `lambdas/db/schema.graphql` from the Pothos implementation.
-2. Diffs the committed SDL against the generated one — fails if they differ.
-3. Runs all codegen targets against the generated schema.
-
-**Why it fails:**
-
-- You added/changed a Pothos resolver/type but didn't regenerate `schema.graphql`.
-- You edited `schema.graphql` directly instead of editing the Pothos source.
-- A codegen target (e.g. `graphql.generated.ts`) is out of sync.
-
-**Fix locally:**
-
-```bash
-pnpm exec nx run db:print-schema        # regenerates schema.graphql
-pnpm run codegen                        # regenerates all codegen outputs
-git add lambdas/db/schema.graphql       # commit the updated SDL
-git add lib/**/graphql.generated.ts     # commit any updated generated files
-```
-
----
-
-### `Verify All Migrations Applied` (`CI: Migration`)
-
-**Source:** `check-migrations-applied.yml` — triggers on PRs to `main` when files under `lib/db-client/migrations/*.ts` change.
-
-**What it does:** Connects to the production database as `ci_readonly` and verifies that every migration file on disk has a corresponding applied entry in `drizzle.__drizzle_migrations`. Requires a self-hosted runner with direct VPC access to RDS.
-
-**Why it fails:**
-
-- A new migration was added to the PR but has not been applied to production yet.
-- A migration was applied under a different hash (file was modified after applying).
-
-**Fix:**
-
-```bash
-pnpm --prefix lib/db-client run db:up
-```
-
-The hosted `legacy-sports-db-admin` MCP server's `db_migrate` tool applies UNMERGED local migrations to the dev RDS over HTTPS (no SSM tunnel). After applying, verify with `pnpm --prefix lib/db-client run db:status`. The check will re-run on the next push.
-
-> **Note:** This check requires a self-hosted runner. If the check fails with `"This workflow requires a self-hosted runner"`, the PR author does not have write permission or the runner is offline — contact the repo owner.
-
----
-
-### `No Merge Conflicts` (`CI: Conflicts`)
-
-**Source:** `check-conflicts.yml` — triggers on every PR (opened/synchronize/reopened).
-
-**What it does:** Polls GitHub's merge-ability API up to 10 times (~50 s) to confirm the PR branch has no conflicts with the base branch.
-
-**Why it fails:**
-
-- The base branch (`main`) has moved ahead with commits that conflict with changes on this branch.
-- GitHub could not compute mergeability within the polling window (transient — rerun the check).
-
-**Fix:**
-
-```bash
-# MCP (preferred)
-worktree_rebase()
-
-# Shell fallback
-git fetch origin
-GIT_EDITOR=true twig rebase    # or: git rebase origin/main
-```
-
-Resolve any conflicts, then push. The check re-runs automatically on the next `synchronize` event.
-
----
+## Per-Context Details
 
 ### `bot-review` Commit Status
 
-**Source:** `.github/workflows/review.yml` (W1) — a commit status (not a check run) set by the Review Bot (GitHub App ID 3142924) via `setCommitStatus` in `.github/scripts/reviewer/lib/github.mjs`.
+**Writer:** the Reviewer Bot (GitHub App ID 3142924). `review.yml` (W1) fires on `opened` / `ready_for_review` / specific labels / `synchronize`-with-`bot:ready-for-review`, runs `.github/scripts/reviewer/index.mjs`, and sets `bot-review` to `pending` (review starting) → `success` (APPROVE / override) or `failure` (blocking findings, needs-human-arbitration).
 
-**What it does:** Tracks the reviewer bot's verdict. Set to `pending` when a review starts, `success` when no blocking findings remain, `failure` when blocking findings require changes.
+**Why it fails:** the reviewer found blocking (critical/high) findings, or the cycle cap forced arbitration.
 
-**Why it fails:** The reviewer bot found one or more blocking findings (critical or high severity) that require changes.
+**HEAD-SHA gating (LS-4678):** the ruleset evaluates `bot-review` against the PR's HEAD SHA — a `success` on an older SHA never carries forward; every push needs a fresh cycle on the new tip. The bot keeps `bot:ready-for-review` on the PR through merge so post-approval pushes auto-fire a new cycle; if the label is externally stripped, Review Label Guard (`review-label-guard.yml`, W7) re-applies it on the next push when a prior bot APPROVED exists.
 
-**Important:** `bot-review` is a **commit status**, not a check run. `github_retrigger_check` will NOT find it — use `github_list_commit_statuses({ number: PR# })` to see it.
+**Fix (normal path):** the [Review Thread Workflow](../SKILL.md#review-thread-workflow-bot-review-failures) — get unresolved threads, fix, push, `github_resolve_threads`. Thread resolution without a push re-triggers the reviewer via `copilot-auto-approve.yml` ("Copilot Auto-Approve Recheck", dispatched by the `github_resolve_threads` tool — LS-8121).
 
-**HEAD-SHA gating (LS-4678):** the ruleset evaluates `bot-review` against the PR's HEAD SHA. A `success` on an older SHA does NOT carry forward to a new HEAD; every push needs a fresh cycle on the new tip. The reviewer keeps `bot:ready-for-review` on the PR through merge (including on APPROVED) so post-approval pushes auto-fire a new cycle. If the label is externally stripped between cycles, Review Label Guard (W7, `.github/workflows/review-label-guard.yml`) re-applies it on the next push when a prior bot APPROVED exists.
+**Fix (override):** a maintainer applies `review-bot-override` — `review-bot-override.yml` (W5) sets `bot-review` to `success`, posts an audit comment, and suppresses W1 while present; removing the label restores `pending`. This is the formal escape hatch when the bot persistently misapplies a rule (after `CANNOT-COMPLY` at Cycle 3 — see the Author Agent Contract in [pr-lifecycle/SKILL.md](../SKILL.md)). As Author Agent you never apply it yourself.
 
-**Fix (normal path):** Follow the [Review Thread Workflow](../SKILL.md#review-thread-workflow-bot-review-failures):
+### `No Merge Conflicts`
 
-1. `github_get_review_threads({ number: PR#, unresolvedOnly: true })`
-2. Fix the flagged code
-3. Commit and push
-4. `github_resolve_threads({ threadIds: [...], prNumber: PR# })`
+**Writer:** `check-conflicts.yml` job `check-conflicts` on PR events (`opened`/`synchronize`/`reopened`/`edited`). It runs a real local `git merge --no-commit --no-ff` test against the base — deterministic, no dependency on GitHub's lazy mergeability API (which caused stuck "Mergeability could not be determined" states, LS-4479). `check-conflicts-sweep.yml` re-evaluates **all open PRs** whenever `main` advances, reusing the existing check-run id per head SHA so terminal duplicates never stack (LS-7992).
 
-**Fix (override — bot misapplied a rule):** If the bot persistently flags code that is correct (e.g. after filing `CANNOT-COMPLY` responses across Cycle 3), a maintainer can apply the `review-bot-override` label:
+**Why it fails:** `main` moved ahead with commits that textually conflict with this branch. Side effects: `CI: Conflicts` label + one sticky comment keyed on the `<!-- conflict-notice -->` marker (LS-8229).
 
-```
-github_manage_labels(prs: [PR#], add: ["review-bot-override"])
-```
+**Fix:** `worktree_rebase()` (MCP) or `git fetch origin && git rebase origin/main`, resolve, push. The check re-runs on the `synchronize` event.
 
-This triggers `.github/workflows/review-bot-override.yml` (W5), which:
+### `Verify All Migrations Applied`
 
-1. Sets `bot-review` to `success` with description "Bot review overridden via review-bot-override label"
-2. Posts an audit comment on the PR identifying the applier
-3. Prevents W1 from running again while the label is present
-
-Removing the label sets `bot-review` back to `pending` and re-enables the normal review gate. The `review-bot-override` label is the **formal escape hatch** for persistent bot disagreement — prefer it over GitHub's admin "Merge without waiting for requirements" button, which leaves no audit trail.
-
----
-
-### `needs-human-security-review` Label (CODEOWNER gate)
-
-**Applied by:** `.github/scripts/reviewer/index.mjs` when the reviewer detects a critical security finding (`hasCriticalBlockingFinding(...)` returns true). The label itself is informational — the actual merge gate is the **CODEOWNER review requirement** on the Protect Main ruleset (`require_code_owner_review: true`). When the reviewer flags a critical finding, the bot's review verdict is typically `CHANGES_REQUESTED` rather than `APPROVED`, so the PR cannot satisfy CODEOWNER review without a human.
-
-**Why this gets stuck:** the PR author cannot satisfy CODEOWNER review on their own PR. For agent-authored PRs (where the human operator is also the author), there is no second human in the loop to approve.
-
-**Fix (override — finding has been reviewed by a human):** A maintainer applies the `security-review-override` label:
-
-```
-github_manage_labels(prs: [PR#], add: ["security-review-override"])
-```
-
-This triggers `.github/workflows/security-review-override.yml` (W6), which:
-
-1. Submits an `APPROVE` review on the PR as the Code Reviewer Bot App, satisfying the CODEOWNER requirement with a non-author identity
-2. Removes the `needs-human-security-review` label
-3. Posts an audit comment on the PR identifying the applier and recording the override
-
-Removing the label dismisses the override APPROVE review and re-applies `needs-human-security-review`, restoring the security gate. The `security-review-override` label is the **formal escape hatch** for the CODEOWNER deadlock on bot-flagged security findings — apply only after a human security reviewer has examined the finding and confirmed it inapplicable, mitigated, or accepted.
-
-> **Difference from `review-bot-override`:** `review-bot-override` (W5) flips the `bot-review` commit status when the bot has applied a rule incorrectly. `security-review-override` (W6) provides an APPROVE review when the bot has correctly identified a critical finding that has since been resolved or accepted by a human. The two are not interchangeable: use W5 to reject a finding, W6 to ratify one.
-
-> **Maintenance contract:** the `unlabeled` path identifies the prior override approval to dismiss by matching the string `Security Review Override Applied` (the `OVERRIDE_MARKER` constant in W6) in the review body. GitHub does not share state between separate `labeled` and `unlabeled` workflow runs, so a `review_id` cannot be persisted — the marker string is the most robust available identification. **If you change the marker text in the workflow, the matcher constant in the same file must be updated in lockstep**, or the dismiss step will silently miss the prior approval and leave a stale APPROVE on the PR.
-
----
-
-## Advisory Checks (Not Blocking Merge)
-
-These produce GitHub check runs or commit statuses but are **not** required by branch protection. Failures add labels and delay the merge queue but do not permanently block merge.
-
----
-
-### Security Scanning (`CI: Security`)
-
-**Source:** `security-scanning.yml` — dispatched by the orchestrator when dependencies change (`package.json`, `pnpm-lock.yaml`) or code changes (`.ts`/`.tsx`/`.js`). Always runs on `merge_group` and weekly schedule.
-
-**Scan types:**
-
-- `dependencies-only` — pnpm audit + Snyk + Trivy (when deps change)
-- `secrets-only` — secret detection (when code changes, no dep changes)
-- `comprehensive` — all of the above + SAST (merge_group, manual, weekly)
+**Writer:** `check-migrations-applied.yml` job `check`. Runs on **every** PR targeting `main` — the paths filter is deliberately omitted because a path-filtered required check would leave non-migration PRs stuck at "Expected". Connects as the SELECT-only `ci_readonly` role and compares every file in `lib/db-client/migrations/` against applied entries in `drizzle.__drizzle_migrations` (LS-4843). Requires a self-hosted runner with VPC access to RDS — the target is the shared **dev-stage RDS** (`AWS_STAGE: dev`; the workflow header calls it "production" because that instance serves the production-branded product).
 
 **Why it fails:**
 
-- A known CVE in a newly added or updated dependency.
-- A secret pattern (API key, token) detected in code.
-- SAST rule violation.
+- The PR adds a migration file that has not been applied to the RDS yet (the usual case).
+- A migration was applied under a different hash (file edited after applying).
+- `"This workflow requires a self-hosted runner"` — the author lacks write permission or the runner is offline; contact the repo owner.
 
-**Fix:** Read the security scan logs for the specific finding. For CVEs: update the affected package or add a structured audit exception with justification. For secrets: rotate the credential immediately and remove it from git history. Never suppress security findings with `eslint-disable` or similar.
+**Fix:** apply the PR's migrations before merge — `db_migration_status` then `db_migrate` (hosted DB MCP, tunnel-free), shell fallback `pnpm --prefix lib/db-client run db:status` / `db:up`. Multi-PR situations: the [apply-pr-migrations skill](../../apply-pr-migrations/SKILL.md). The check re-runs on the next push, or re-dispatch it via `workflow_dispatch`.
+
+### `CI Gate`
+
+**Writer:** the CI Pipeline `summarize` job ("Post CI Gate aggregate status" step) via `.github/scripts/ci-gate.js`, exactly once per head SHA, on PR-scoped events only.
+
+**What it folds:** the seven granular job results — `lint`, `format`, `test` (which runs `nx affected -t typecheck test`), `build`, `custom-checks`, `lockfile-check`, `e2e` (`GATE_INPUT_JOBS` in ci-gate.js). `success`/`skipped` pass; `failure`/`timed_out`/missing fail; **`cancelled` is ignored** (LS-8219 — a cancelled granular job is a superseded duplicate, not a failure). E2E merge-gate semantics (formerly the separate required `e2e-affected` check, LS-7846) are folded in: CI Gate fails if any affected e2e shard fails.
+
+**Guards worth knowing:** a SHA-currency guard no-ops if the PR head advanced mid-run (stale runs post nothing), and `summarize` runs under `always() && !cancelled()` so a killed run posts nothing rather than a terminal `cancelled` row — both are why a commit status was chosen over a check run (LS-7988 root cause).
+
+**Why it fails:** one of the seven granular jobs failed — the status description lists which (`Failing: test (failure)` …). Debug the granular job, not the gate:
+
+| Failing input    | Local reproduction                                     | Failure label                                |
+| ---------------- | ------------------------------------------------------ | -------------------------------------------- |
+| `lint`           | `pnpm exec nx affected -t lint --fix`                  | `CI: Lint Failure`                           |
+| `format`         | `pnpm exec nx format:write` then commit                | `CI: Formatting`                             |
+| `test`           | `pnpm exec nx affected -t typecheck test`              | `CI: Test Failure`                           |
+| `build`          | `pnpm exec nx affected -t build`                       | `CI: Build Failure`                          |
+| `custom-checks`  | see below                                              | `CI: Migration Immutability` (for that step) |
+| `lockfile-check` | `pnpm install --lockfile-only` and commit the lockfile | —                                            |
+| `e2e`            | `pnpm exec nx e2e web-e2e -- --grep='@critical'`       | `CI: E2E Failure`                            |
+
+`custom-checks` bundles: `node scripts/lint-skills.js` (agent-skill lint), `node scripts/check-migration-immutability.js --branch` (a merged migration file was edited — revert it and add a **new** migration instead), `node scripts/validate-workflows.js`, touch-map freshness (advisory), and the repo-script unit suites `pnpm run test:scripts` / `test:scripts:ps`.
+
+Root-cause discipline for lint/type failures: fix the cause — `eslint-disable` and `@ts-ignore` are banned ([standards](../../standards/SKILL.md)). For flaky infra failures rerun first: `ci_rerun(runId: RUN_ID, failedOnly: true)`.
 
 ---
 
-### Deploy PR Preview
+## The skip-ci Footgun (PR stuck at "Expected")
 
-**Source:** `deploy-pr-preview.yml` — runs after CI passes; deploys the web build to `https://bkrupa.github.io/legacy-sports-deploys/pr-<N>/`.
+Every job in `ci-pipeline.yml` — **including `summarize`** — carries `!contains(github.event.pull_request.labels.*.name, 'skip-ci')`. With the `skip-ci` label on a PR:
 
-**Why it fails:** Missing `VITE_*` build secrets, web build artifact absent (build-validation failed), or GitHub Pages deployment rate limit.
+1. All CI jobs skip, so `summarize` never runs and **`CI Gate` is never posted** for that SHA.
+2. A required commit status that is never posted shows as **"Expected — Waiting for status to be reported"** — permanently. Nothing retries it.
 
-**Fix:** Fix the underlying build failure first. Preview failures are typically transient infrastructure issues — rerun with `ci_rerun`. The preview URL only exists if `apps/web`, `lib/shared-components`, or `lib/ui-abstractions` changed.
+**Recovery — the event type matters:**
 
----
+1. Remove the label: `github_manage_labels(prs: [PR#], remove: ["skip-ci"])`.
+2. Trigger a **`pull_request`-scoped** run: push a commit (`git commit --allow-empty -m "chore: retrigger ci"` and push) or close/reopen the PR.
 
-### Jira Branch Sync
-
-**Source:** `jira-branch-sync.yml` — best-effort Jira transitions on PR open/close/merge.
-
-**Why it fails:** Jira credentials expired, Atlassian API rate limit, or Jira ticket key not found in the PR title/branch.
-
-**Fix:** Transition Jira manually via `jira_transition(key: "LS-####", status: "In Review")`. Do not block a PR merge waiting for this check.
+The `ci:run` label is **not** sufficient for a missing `CI Gate`: `ci-run-label.yml` translates it into a `workflow_dispatch` of the orchestrator, and on `workflow_dispatch` there is no `pull_request` payload — the granular jobs run and post check runs, but the "Post CI Gate aggregate status" step (`if: github.event.pull_request.number`) skips and `postCiGate` no-ops (`no-pr`). Use `ci:run` when the missing pieces are **check runs**; use a new push when the missing piece is a **commit status**.
 
 ---
 
-## Enabling Debug Mode
+## Not Required (but still visible on PRs)
 
-Add the `ci-debug` label to a PR to enable `NX_VERBOSE_LOGGING` and extended error context for the `quality-gates` and `build-validation` jobs in `ci-pipeline.yml`:
+The merge queue waits for _all_ checks to finish and blocks on failing ones, so non-required checks can still delay a queued merge — they just cannot 405 it at the GitHub layer.
+
+| Check / status                           | Source                                            | Notes                                                                                                |
+| ---------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `🚀 CI Pipeline / *` granular check runs | `ci-orchestrator.yml` → `ci-pipeline.yml`         | Informational since the LS-8014 config cutover; results reach the gate via `CI Gate`                 |
+| `GraphQL Schema & Codegen`               | `check-schema.yml` (GraphQL-touching paths)       | Fails on SDL drift: `pnpm exec nx run db:print-schema && pnpm run codegen`, commit regenerated files |
+| Security Scanning                        | `security-scanning.yml` (orchestrator-dispatched) | `CI: Security` label on failure; CVE → update dep; secret → rotate immediately                       |
+| `jira-link-check`                        | `jira-link-check.yml`                             | Validates the `<!-- jira-link -->` PR-body marker                                                    |
+| Deploy PR Preview                        | `deploy-pr-preview.yml`                           | Fix the underlying build first; preview failures are usually transient                               |
+| Jira Branch Sync                         | `jira-branch-sync.yml`                            | Best-effort; never block a merge on it — `jira_transition` manually if needed                        |
+| Check Ruleset Drift                      | `check-ruleset.yml`                               | Expected to warn mid-cutover (see [staging model](#config-vs-live-the-staged-cutover-model))         |
+
+### `needs-human-security-review` Label (CODEOWNER gate)
+
+Applied by the reviewer on critical security findings. The actual gate is `require_code_owner_review: true` — the author cannot satisfy it on their own PR. A maintainer resolves the deadlock with the `security-review-override` label → `security-review-override.yml` submits an APPROVE as the Reviewer Bot App (a non-author identity), removes the label, and posts an audit comment; removing the override label dismisses that approval again. Contrast with `review-bot-override` (W5): W5 **rejects** a wrong finding by flipping `bot-review`; the security override **ratifies** a correct finding after human review. Maintenance contract: the unlabeled path finds the approval to dismiss by matching the `Security Review Override Applied` marker string — if you change the marker in the workflow, update the matcher constant in the same file in lockstep.
+
+---
+
+## Debug Mode
+
+Add the `ci-debug` label to enable `NX_VERBOSE_LOGGING` in the granular jobs:
 
 ```
 github_manage_labels(prs: [PR#], add: ["ci-debug"])
@@ -383,10 +159,22 @@ github_manage_labels(prs: [PR#], add: ["ci-debug"])
 
 ## Related References
 
-| Document                                                                                    | When to use it                                                                     |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [ci-failure.md](../../debugging/references/ci-failure.md)                                   | Step-by-step triage: fetch logs, identify root cause, reproduce locally, fix       |
-| [ci-pipeline-architecture.md](../../debugging/references/ci-pipeline-architecture.md)       | Pipeline diagram, job timeouts, env vars, deployment pipeline debugging            |
-| [ci-troubleshooting-advanced.md](../../debugging/references/ci-troubleshooting-advanced.md) | Concurrency cancellations, skills lint, E2E failures, Terraform locks, merge queue |
-| [fix-reviews.md](fix-reviews.md)                                                            | Fix Copilot review threads (clears `bot-review` failure)                           |
-| [workflow-overview Phase 3](../../workflow-overview/SKILL.md#phase-3-ci-pipeline)           | Full pipeline architecture and CI failure label table                              |
+| Document                                                                                | When to use it                                                   |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [ci-failure.md](../../debugging/references/ci-failure.md)                               | Evidence-first triage: fetch logs, root-cause, reproduce locally |
+| [unblock.md](./unblock.md)                                                              | Bulk triage of stuck PRs, Expected-state detection               |
+| [fix-reviews.md](fix-reviews.md)                                                        | Clearing `bot-review` failures thread by thread                  |
+| [ci-and-merge-pipeline.md](../../workflow-overview/references/ci-and-merge-pipeline.md) | Pipeline/orchestrator/merge-queue architecture                   |
+| [docs/ci-cd/ci-gate-aggregator.md](../../../../docs/ci-cd/ci-gate-aggregator.md)        | CI Gate rollout stages and rollback                              |
+
+## Provenance and maintenance
+
+Rewritten 2026-07-02 from the Phase-1 skills audit (merge-gates-and-ci workstream) after the LS-8014 required-set cutover landed in config. Re-verify volatile facts:
+
+- Required contexts: `grep -n '"context"' .github/ruleset.json`
+- Commit-status vs check-run markers: `grep -n '_commitStatus' .github/ruleset.json`
+- CI Gate folded jobs + cancelled semantics: `grep -n 'GATE_INPUT_JOBS' -A 10 .github/scripts/ci-gate.js`
+- skip-ci job guards: `grep -n "skip-ci" .github/workflows/ci-pipeline.yml`
+- CI Gate step's PR-event gate: `grep -n "Post CI Gate" -A 2 .github/workflows/ci-pipeline.yml`
+- bot-review writer: `grep -n "context: 'bot-review'" .github/scripts/reviewer/lib/github.mjs`
+- Live-state check tooling: `grep -n 'requiredStatusChecks' tools/mcp/github-server/src/tools/get-branch-protection.ts`

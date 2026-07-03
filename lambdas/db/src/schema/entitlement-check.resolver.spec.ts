@@ -176,7 +176,7 @@ describe('hasEntitlement query', () => {
     await expect(
       resolve(
         {},
-        { key: 'advanced_football_stats' },
+        { key: 'advanced_search_filters' },
         { user: null, db: mockDb },
         undefined as never,
       ),
@@ -188,7 +188,7 @@ describe('hasEntitlement query', () => {
     const adminContext = { user: { id: 1, isAdmin: true }, db: mockDb };
     const result = await resolve(
       {},
-      { key: 'advanced_football_stats' },
+      { key: 'advanced_search_filters' },
       adminContext,
       undefined as never,
     );
@@ -206,7 +206,7 @@ describe('hasEntitlement query', () => {
     const premiumContext = { user: { id: 2, isAdmin: false }, db: mockDb };
     const result = await resolve(
       {},
-      { key: 'advanced_football_stats' },
+      { key: 'advanced_search_filters' },
       premiumContext,
       undefined as never,
     );
@@ -223,7 +223,7 @@ describe('hasEntitlement query', () => {
     const freeContext = { user: { id: 3, isAdmin: false }, db: mockDb };
     const result = await resolve(
       {},
-      { key: 'advanced_football_stats' },
+      { key: 'advanced_search_filters' },
       freeContext,
       undefined as never,
     );

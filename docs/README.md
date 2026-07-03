@@ -1,331 +1,87 @@
 # Legacy Sports Documentation Hub
 
-Welcome to the comprehensive documentation for the Legacy Sports platform - a modern cross-platform sports data management system built with React Native, Next.js, and AWS serverless architecture.
-
-> 📘 **Documentation recently reorganized!** All docs are now categorized into clear sections for easier navigation. See [DOCUMENTATION_STRUCTURE.md](DOCUMENTATION_STRUCTURE.md) for a visual guide.
-
-## 🚀 Quick Navigation
-
-### 🎯 **Getting Started** → [`/guides/`](guides/)
-
-_Start here if you're new to the project_
-
-- [📖 Development Setup](guides/development-setup.md) - Complete environment setup guide
-- [🌳 Branch Tree Management](guides/branch-tree-management.md) - Twig tree management for clean dependent branches
-- [🔐 Authentication Guide](guides/authentication-guide.md) - OAuth and user management
-- [🛠️ Troubleshooting](guides/troubleshooting.md) - Common issues and solutions
-- [⚡ WebSocket Notifications](guides/websocket-notifications.md) - Real-time notification system
-- [🐛 Debugging with Database Timestamps](guides/debugging-with-database-timestamps.md) - Correlating logs with DB events
-- [⚾ Baseball-Reference Scraping](guides/baseball-reference-scraping.md) - Data scraping patterns
-- [🔒 Security & Secrets](guides/security-and-secrets.md) - Security best practices
-- [📟 CLI Player Stats Commands](guides/cli-player-stats-commands.md) - Player statistics CLI reference
-- [🏆 League Flow Complete Guide](guides/league-flow-complete-guide.md) - End-to-end league lifecycle
-- [⚔️ Matchup System Guide](guides/matchup-system-guide.md) - Head-to-head matchups for league members
-- [🛠️ Commissioner Matchup Management](guides/commissioner-matchup-management.md) - Commissioner controls for matchups, scoring, playoffs
-- [🎯 Live Draft Frontend Integration](guides/live-draft-frontend-integration.md) - Real-time draft UI
-- [🗄️ Database Role Separation](guides/database-role-separation.md) - PostgreSQL role setup
-- [🔐 Database Schema Protection](guides/database-schema-protection-setup.md) - Schema change safeguards
-- [⚡ Lambda DB Connection Best Practices](guides/lambda-database-connection-best-practices.md) - Connection pooling
-- [📊 Player Projections](guides/PLAYER_PROJECTIONS_IMPLEMENTATION.md) - Projection system design
-
-### 🏗️ **Architecture & Design** → [`/architecture/`](architecture/)
-
-_Understanding how the system works_
-
-- [🏗️ Build System](architecture/build-system.md) - Dependency order and build workflows
-- [📱 Cross-Platform System](architecture/cross-platform-system.md) - Magic strings and native resolution
-- [💾 Database Schema](architecture/database-schema.md) - Complete database documentation
-- [🔗 GraphQL Integration](architecture/graphql-integration.md) - API design and implementation
-- [✅ Schema Validation](architecture/schema-validation.md) - Drizzle schema patterns
-- [🎯 Season Selection Architecture](architecture/season-selection-architecture.md) - Per-player season assignment
-- [⚔️ Matchup System Architecture](architecture/matchup-system.md) - End-to-end matchup, scoring, playoffs, and tiebreaker design
-
-### 🔐 **Authentication** → [`/authentication/`](authentication/)
-
-_OAuth, user management, and access control_
-
-- [🔑 CLI OAuth Authentication](authentication/CLI_OAUTH_AUTHENTICATION.md) - Command-line OAuth flow
-- [� OAuth Auto-Provisioning](authentication/oauth-auto-provisioning.md) - Automatic user creation
-- [🎫 Invite Code System](authentication/INVITE_CODE_IMPLEMENTATION.md) - Invite-based registration
-- [⚡ Two-Lambda Authentication](authentication/two-lambda-authentication.md) - Architecture pattern
-- [🌐 Google OAuth Domain Setup](authentication/google-oauth-domain-setup.md) - Google workspace config
-
-### ⚙️ **CI/CD & Pipelines** → [`/ci-cd/`](ci-cd/)
-
-_Continuous integration and deployment automation_
-
-- [📋 CI System Documentation](ci-cd/ci-system-documentation.md) - Complete CI/CD overview
-- [� CI Troubleshooting](ci-cd/ci-troubleshooting-guide.md) - Debugging pipeline issues
-- [🎯 Intelligent DTE Detection](ci-cd/intelligent-dte-detection.md) - Smart task distribution
-- [🏷️ Badge Setup](ci-cd/CI_BADGES_SETUP.md) - Status badges configuration
-- [🔀 Merge Queue Guide](ci-cd/merge-queue-guide.md) - GitHub merge queue setup
-
-### 🔧 **Build & Tooling** → [`/build-and-tooling/`](build-and-tooling/)
-
-_Nx, Jest, and development tools_
-
-- [☁️ Nx Cloud Optimization](build-and-tooling/nx-cloud-optimization-strategy.md) - Performance tuning
-- [⚡ Nx Cloud CI Strategy](build-and-tooling/nx-cloud-ci-strategy.md) - CI integration
-- [🧪 Jest Configuration](build-and-tooling/jest-changed-files-config.md) - Test setup
-- [📦 Package.json Standards](build-and-tooling/package-json-standards.md) - Package conventions
-- [🎯 E2E Testing](build-and-tooling/e2e-testing-migration.md) - End-to-end tests
-
-### ☁️ **Deployment** → [`/deployment/`](deployment/)
-
-_AWS infrastructure and deployment processes_
-
-- [☁️ AWS Infrastructure](deployment/aws-infrastructure.md) - Complete AWS setup
-- [� Cost Optimization](deployment/cost-optimization.md) - Cost management strategies
-- [⚡ Lambda Build Strategy](deployment/lambda-build-strategy.md) - Serverless deployment
-- [🔒 Deployment Security](deployment/deployment-security.md) - Security best practices
-- [🌐 HTTPS Certificate Setup](deployment/https-certificate-setup.md) - SSL/TLS configuration
-- [📦 **Terraform** →](deployment/terraform/) Infrastructure as Code
-  - [� Lambda Deployment](deployment/terraform/terraform-lambda-deployment.md)
-  - [💾 State Management](deployment/terraform/terraform-state-solution.md)
-  - [📖 Quick Reference](deployment/terraform/terraform-quick-reference.md)
-
-### 🛡️ **Security** → [`/security/`](security/)
-
-_Security scanning, secrets management, and audits_
-
-- [� Security Audit Status](security/security-audit-status.md) - Current security posture
-- [🔐 Secrets Management](security/GITHUB_SECRETS_GUIDE.md) - GitHub secrets guide
-- [🛡️ Security Scanning](security/security-scanning-implementation.md) - Automated scanning
-- [⚡ Scanning Optimization](security/security-scanning-optimization.md) - Performance tuning
-
-### 📱 **Mobile Development** → [`/mobile/`](mobile/)
-
-_React Native and Android-specific documentation_
-
-- [🤖 Android Build Setup](mobile/android-build-setup.md) - Android development environment
-- [📊 Android Version Matrix](mobile/android-version-matrix.md) - Version compatibility
-- [🔨 Mobile Build Automation](mobile/mobile-build-automation.md) - CI/CD for mobile
-
-### 🌐 **Web Development** → [`/web/`](web/)
-
-_Next.js and web application documentation_
-
-- [⚙️ Web Build Configurations](web/web-build-configurations.md) - Build setup
-- [🔗 Hash Routing](web/web-hash-routing.md) - Client-side routing
-- [📱 Navigation Menu](web/navigation-menu-reorganization.md) - Menu structure
-- [♿ Accessibility Guide](web/ACCESSIBILITY_GUIDE.md) - A11y standards
-- [🎨 Theme & A11y Notes](web/THEME_AND_A11Y_NOTES.md) - Theme system and accessibility
-- [📈 Google Analytics Integration](web/google-analytics-integration.md) - Analytics setup
-
-### 💾 **Database** → [`/database/`](database/)
-
-_Database migrations, schema changes, and ORM_
-
-- [📦 Drizzle Upgrade Analysis](database/drizzle-upgrade-analysis.md) - Upgrade planning
-- [✅ Drizzle Upgrade Complete](database/drizzle-upgrade-completed.md) - Migration summary
-- [🔄 Drizzle Rollback Migrations](database/drizzle-rollback-migrations.md) - Rollback procedures
-- [📋 Rollback Demo Complete](database/rollback-demo-complete.md) - Rollback demo walkthrough
-- [📐 Migration Policy](database/migration-policy.md) - Schema change rules
-- [⏰ Automatic Timestamps](database/automatic-timestamps.md) - Timestamp column conventions
-- [🗑️ Cascade Delete Implementation](database/cascade-delete-implementation.md) - FK cascade behavior
-
-### 📚 **Additional Resources**
-
-- [📄 API Documentation](api/) - GraphQL schema and endpoints
-- [⚔️ Matchup API Reference](api/matchup-api.md) - Matchup queries, mutations, and types
-- [🤖 AI Agent Instructions](agents/) - Structured CSV files for AI assistance
-- [🐛 Bug Fixes & Incidents](fixes/) - Root-cause analyses and applied fixes
-- [🌟 Feature Documentation](features/) - Major feature designs
-- [📋 Migration History](migration-history/) - Historical implementation records
-- [🗺️ Development Plans](development-plans/) - Future planning documents
-
-## 📋 Documentation by Role
-
-### 🤖 **For AI Agents**
-
-1. [AI Agent Instructions (CSV)](agents/) - Structured guidelines in CSV format
-2. [Development Workflow CSV](agents/development-workflow.csv) - Workflow patterns
-3. [Common Pitfalls CSV](agents/common-pitfalls.csv) - Mistakes to avoid
-4. [Contribution Workflow CSV](agents/contribution-workflow.csv) - Contribution process
-
-### 👨‍💻 **For Software Developers**
-
-1. [Development Setup](guides/development-setup.md) - Get your environment ready
-2. [Cross-Platform Architecture](architecture/cross-platform-system.md) - Understand the system
-3. [Authentication Guide](guides/authentication-guide.md) - Implement auth features
-4. [Database Schema](architecture/database-schema.md) - Work with data
-5. [Troubleshooting](guides/troubleshooting.md) - Fix common issues
-
-### ☁️ **For DevOps Engineers**
-
-1. [AWS Infrastructure](deployment/aws-infrastructure.md) - Understand cloud setup
-2. [Terraform Deployment](deployment/terraform/) - Infrastructure as code
-3. [CI/CD System](ci-cd/ci-system-documentation.md) - Pipeline management
-4. [Security Scanning](security/) - Security automation
-5. [Cost Optimization](deployment/cost-optimization.md) - Manage AWS costs
-
-### 📱 **For Mobile Developers**
-
-1. [Android Build Setup](mobile/android-build-setup.md) - Mobile development environment
-2. [Cross-Platform System](architecture/cross-platform-system.md) - Shared code patterns
-3. [Authentication](authentication/) - Mobile auth implementation
-4. [Mobile Build Automation](mobile/mobile-build-automation.md) - CI/CD for mobile
-
-### 🌐 **For Web Developers**
-
-1. [Web Build Configurations](web/web-build-configurations.md) - Next.js setup
-2. [Cross-Platform System](architecture/cross-platform-system.md) - Shared components
-3. [Authentication](authentication/) - Web auth implementation
-4. [Navigation Menu](web/navigation-menu-reorganization.md) - UI structure
-
-### 🧪 **For QA Engineers**
-
-1. [E2E Testing](build-and-tooling/e2e-testing-migration.md) - Automated testing
-2. [Jest Configuration](build-and-tooling/jest-changed-files-config.md) - Unit test setup
-3. [CI System](ci-cd/ci-system-documentation.md) - Test automation
-4. [Troubleshooting](guides/troubleshooting.md) - Debug test issues
-
-### 🏗️ **For Platform Engineers**
-
-1. [Build System](architecture/build-system.md) - Understanding the monorepo
-2. [Nx Cloud Optimization](build-and-tooling/nx-cloud-optimization-strategy.md) - Build performance
-3. [CI/CD Pipeline](ci-cd/) - Automation infrastructure
-4. [Infrastructure](deployment/) - Cloud architecture
-
-## 🏗️ Project Architecture Overview
-
-```
-Legacy Sports Platform
-├── 📱 Mobile App (React Native)
-│   └── iOS + Android native builds
-├── 🌐 Web App (Next.js + Vite)
-│   └── Server-side rendering + Static generation
-├── 🔧 CLI Tools (Node.js)
-│   └── Development and deployment utilities
-├── 🎨 Shared Components (Cross-platform)
-│   └── Tamagui UI + Magic string resolution
-├── ⚡ AWS Lambda Functions (Serverless)
-│   └── GraphQL API + Authentication
-└── 🗄️ Database (PostgreSQL + Drizzle ORM)
-    └── Type-safe schema and migrations
-```
-
-### **Key Technologies**
-
-- **Frontend**: React Native, Next.js, Tamagui UI
-- **Backend**: AWS Lambda, API Gateway, PostgreSQL
-- **Build System**: Nx Monorepo, TypeScript, Vite
-- **Infrastructure**: Terraform, AWS (Lambda, S3, RDS, Route53)
-- **CI/CD**: GitHub Actions, Nx Cloud DTE
-- **Cross-Platform**: Magic String System + Metro Native Resolution
-
-### **Documentation Organization**
-
-```
-docs/
-├── guides/              # Getting started tutorials
-├── architecture/        # System design documentation
-├── authentication/      # OAuth and auth systems
-├── ci-cd/              # Pipeline and automation
-├── build-and-tooling/  # Nx, Jest, build tools
-├── deployment/         # AWS and infrastructure
-│   └── terraform/      # Infrastructure as code
-├── security/           # Security and secrets
-├── mobile/             # React Native/Android
-├── web/                # Next.js/Web app
-├── database/           # Schema and migrations
-├── api/                # API documentation
-├── agents/             # AI assistant data
-├── migration-history/  # Historical records
-└── development-plans/  # Future planning
-```
-
-## 🔍 Finding Information
-
-### **Common Tasks Quick Links**
-
-| Task                   | Documentation                                                                                                                                      |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🚀 **Deploy Lambda**   | [Lambda Build Strategy](deployment/lambda-build-strategy.md) → [Terraform Deploy](deployment/terraform/terraform-lambda-deployment.md)             |
-| 🔐 **Setup OAuth**     | [OAuth Auto-Provisioning](authentication/oauth-auto-provisioning.md) → [CLI OAuth](authentication/CLI_OAUTH_AUTHENTICATION.md)                     |
-| ❌ **CI Failing**      | [CI Troubleshooting](ci-cd/ci-troubleshooting-guide.md) → [Nx Cloud Quota](build-and-tooling/nx-cloud-quota-fix.md)                                |
-| ⚡ **Optimize Builds** | [Nx Cloud Optimization](build-and-tooling/nx-cloud-optimization-strategy.md) → [DTE Detection](ci-cd/intelligent-dte-detection.md)                 |
-| 👤 **New Developer**   | [Development Setup](guides/development-setup.md) → [Authentication](guides/authentication-guide.md) → [Troubleshooting](guides/troubleshooting.md) |
-| 📱 **Build Mobile**    | [Android Setup](mobile/android-build-setup.md) → [Build Automation](mobile/mobile-build-automation.md)                                             |
-| 🗄️ **Database Change** | [Database Schema](architecture/database-schema.md) → [Schema Validation](architecture/schema-validation.md)                                        |
-
-### **Search Tips**
-
-- 📂 Browse by category in the folders above
-- 🔍 Use VS Code search (`Ctrl+Shift+F`) to find specific topics
-- 📋 Check [DOCUMENTATION_STRUCTURE.md](DOCUMENTATION_STRUCTURE.md) for detailed guide
-- 🤖 Review [agents/](agents/) for structured AI instructions
-- 📚 Look in [migration-history/](migration-history/) for historical context
-
-## 📊 Documentation Status
-
-### ✅ **Complete & Well-Organized**
-
-- ✨ Development guides and troubleshooting
-- ✨ Cross-platform architecture
-- ✨ Authentication and OAuth systems
-- ✨ CI/CD pipelines and automation
-- ✨ Build system and Nx Cloud
-- ✨ AWS infrastructure and deployment
-- ✨ Security scanning and secrets
-
-### 🚧 **In Progress**
-
-- 🔨 Performance optimization guides
-- 🔨 Component library documentation
-
-### 📝 **Planned**
-
-- 📋 Architecture Decision Records (ADRs)
-- 📋 Disaster recovery procedures
-- 📋 Monitoring and observability guides
-- � Advanced troubleshooting playbooks
-
-## 🤝 Contributing to Documentation
-
-### **When to Update Documentation**
-
-- ✏️ **Feature Implementation**: Document new features with examples
-- 🏗️ **Architecture Changes**: Update relevant architecture docs
-- ☁️ **Infrastructure Changes**: Update deployment and terraform docs
-- 🔐 **Security Changes**: Update security documentation
-- 🐛 **Bug Fixes**: Update troubleshooting guides if applicable
-
-### **Documentation Standards**
-
-1. **Clear Structure**: Use consistent heading hierarchy (H1 → H2 → H3)
-2. **Code Examples**: Include practical, working code samples
-3. **Cross-References**: Link to related documentation
-4. **Keep Current**: Update docs alongside code changes
-5. **Platform Awareness**: Note cross-platform considerations
-6. **Visual Aids**: Use diagrams, tables, and emojis for clarity
-
-### **File Naming Conventions**
-
-- Use `kebab-case.md` for new files
-- Prefix with topic for clarity (`ci-*.md`, `nx-*.md`, `oauth-*.md`)
-- Add to appropriate category folder
-- Update category README.md if needed
-
-## 📞 Getting Help
-
-### **Documentation Issues**
-
-- 📖 Can't find something? Check [DOCUMENTATION_STRUCTURE.md](DOCUMENTATION_STRUCTURE.md)
-- 🔗 Broken link? Please report it or submit a PR
-- ❓ Documentation unclear? Open an issue with suggestions
-
-### **Technical Support**
-
-- 🛠️ **Setup Issues**: [Development Setup](guides/development-setup.md)
-- 🐛 **Common Problems**: [Troubleshooting Guide](guides/troubleshooting.md)
-- 🏗️ **Architecture Questions**: [Architecture Docs](architecture/)
-- ☁️ **Deployment Issues**: [Deployment Guides](deployment/)
-- 🔐 **Auth Problems**: [Authentication Docs](authentication/)
-- ⚙️ **CI/CD Issues**: [CI/CD Troubleshooting](ci-cd/ci-troubleshooting-guide.md)
-
----
-
-**📌 Remember**: This documentation is your guide to the Legacy Sports platform. Start with the [Getting Started](#-quick-navigation) section and explore from there. Each category folder contains a README.md for quick orientation.
-
-_Documentation last reorganized: October 15, 2025 · Last reviewed: February 28, 2026_
+Legacy Sports is a fantasy-sports product where users draft **historical players** into leagues and score them against randomly-selected real seasons and games. Product source of truth: [product/subscription-tiers.md](product/subscription-tiers.md) (tiers and entitlements) and [games/season-draft-game.md](games/season-draft-game.md) (core game design). Domain ground truth for agents: [`.agents/skills/domain-reference/SKILL.md`](../.agents/skills/domain-reference/SKILL.md).
+
+**Two documentation layers exist:**
+
+1. **`docs/`** (this tree) — human-facing reference: architecture, product, decisions, runbooks, incident records.
+2. **[`.agents/skills/`](../.agents/skills/)** — agent-facing operational skills (how to build, test, ship, and operate). Start from [AGENTS.md](../AGENTS.md). When the two layers overlap, the skill is the operational authority and the doc is orientation.
+
+Placement rules, status markers, and the archive policy live in [DOCUMENTATION_STRUCTURE.md](DOCUMENTATION_STRUCTURE.md).
+
+## Directory map
+
+| Directory                                | What it holds                                                                                       | Status                                                                                                    |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [agents/](agents/)                       | Older CSV-based agent instructions                                                                  | Legacy — superseded by [`.agents/skills/`](../.agents/skills/) for agent guidance                         |
+| [api/](api/)                             | GraphQL schema notes, matchup API reference                                                         | Current                                                                                                   |
+| [architecture/](architecture/)           | System design: multi-sport model, league state machine, matchups, shared components, premium gating | Current core; verify schema claims against the Drizzle models in `lib/db-client`                          |
+| [authentication/](authentication/)       | OAuth flows, auto-provisioning, invite codes, machine credentials                                   | Current                                                                                                   |
+| [build-and-tooling/](build-and-tooling/) | Nx/Jest/package conventions                                                                         | Mixed — all `nx-cloud-*` / DTE docs are historical (Nx Cloud removed by the LS-3857 CI rebuild)           |
+| [ci-cd/](ci-cd/)                         | CI pipeline design (post-LS-3857 greenfield), CI Gate aggregator, merge queue, troubleshooting      | Current; superseded material in [ci-cd/archive/](ci-cd/archive/)                                          |
+| [database/](database/)                   | Migration policy, Drizzle ORM practices                                                             | Current                                                                                                   |
+| [decisions/](decisions/)                 | Architecture Decision Records (ADRs) — see [decisions/README.md](decisions/README.md) for the index | Current, append-only                                                                                      |
+| [deployment/](deployment/)               | AWS infrastructure, Lambda deployment, [deployment/terraform/](deployment/terraform/)               | Mixed — check per-doc dates                                                                               |
+| [design/](design/)                       | Design bundles synced from Claude Design + [brand.md](design/brand.md)                              | Machine-owned — do not hand-edit; see [design/README.md](design/README.md)                                |
+| [dev-process/](dev-process/)             | Human-facing process overview, LLM environment notes, design-sync process                           | Current; operational authority is [`.agents/skills/dev-process/`](../.agents/skills/dev-process/SKILL.md) |
+| [development-plans/](development-plans/) | Forward-looking design sketches                                                                     | Aspirational — not commitments                                                                            |
+| [features/](features/)                   | Major feature designs (draft picks, timers, WAR methodology)                                        | Mixed — check per-doc dates                                                                               |
+| [fixes/](fixes/)                         | Root-cause analyses and applied fixes (incident library)                                            | Current — indexed in [fixes/README.md](fixes/README.md)                                                   |
+| [games/](games/)                         | Game-mode design docs                                                                               | Current                                                                                                   |
+| [guides/](guides/)                       | Setup, troubleshooting, and feature how-tos                                                         | Mixed — setup/tooling guides may lag the skills layer                                                     |
+| [migration-history/](migration-history/) | Completed-work summaries from past migrations                                                       | Historical by definition                                                                                  |
+| [mobile/](mobile/)                       | React Native / Android build docs                                                                   | Current                                                                                                   |
+| [operations/](operations/)               | Oncall runbooks (DB/infra procedures with rollback steps)                                           | Current                                                                                                   |
+| [postmortems/](postmortems/)             | Blameless postmortems — see [postmortems/README.md](postmortems/README.md)                          | Current (directory established 2026-07-02)                                                                |
+| [product/](product/)                     | Product source-of-truth docs (subscription tiers)                                                   | Current, human-owned                                                                                      |
+| [rfcs/](rfcs/)                           | RFCs (accepted and draft), e.g. the modules-pool RFC                                                | Current                                                                                                   |
+| [runners/](runners/)                     | Self-hosted CI runner AMI claim-vs-observed ledger                                                  | Current                                                                                                   |
+| [security/](security/)                   | Security scanning, GitHub secrets guide                                                             | Mixed — check per-doc dates                                                                               |
+| [test-plans/](test-plans/)               | Standalone/multi-PR test plans — see [test-plans/README.md](test-plans/README.md)                   | Current (directory established 2026-07-02)                                                                |
+| [web/](web/)                             | Web app docs                                                                                        | Mixed — see stack corrections below                                                                       |
+
+Top-level file: [feature-flags.md](feature-flags.md) (GrowthBook). The full env-var/flag reference for agents is [`.agents/skills/config-and-flags/SKILL.md`](../.agents/skills/config-and-flags/SKILL.md).
+
+## Stack corrections (2026-07-02)
+
+Older docs in this tree claim a stack that no longer exists. Ground truth:
+
+- **Web app**: Vite + React + `react-router-dom` with `BrowserRouter`, dev server on port **4200** (`apps/web/vite.config.mts`, `apps/web/project.json`). It is **not** Next.js, and [web/web-hash-routing.md](web/web-hash-routing.md) is historical — `apps/web/src/main.tsx` uses `BrowserRouter`.
+- **CI**: GitHub Actions with local-only Nx (no Nx Cloud, no DTE) since the LS-3857 CI rebuild — see [ci-cd/ci-rebuild-retrospective.md](ci-cd/ci-rebuild-retrospective.md). Ignore any doc that routes CI problems to Nx Cloud quota or DTE tuning.
+- **Error tracking**: Rollbar (the repo migrated off Sentry; treat Sentry references as historical).
+
+## Routing by task
+
+| Task                           | Start here                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Understand the product/domain  | [product/subscription-tiers.md](product/subscription-tiers.md) → [architecture/league-state-machine.md](architecture/league-state-machine.md)          |
+| Set up a dev environment       | [guides/development-setup.md](guides/development-setup.md); agents use [`.agents/skills/dev-environment/`](../.agents/skills/dev-environment/SKILL.md) |
+| Make an architectural decision | [decisions/README.md](decisions/README.md) (ADR index + format)                                                                                        |
+| Propose a significant design   | [rfcs/](rfcs/) via the [dev-process RFC artifact](../.agents/skills/dev-process/artifacts/rfc.md)                                                      |
+| Debug a production incident    | [fixes/README.md](fixes/README.md) (has this failed before?) → [operations/](operations/) runbooks → write a [postmortem](postmortems/README.md)       |
+| Change the database schema     | [database/migration-policy.md](database/migration-policy.md)                                                                                           |
+| Deploy / change infrastructure | [deployment/terraform/](deployment/terraform/); agents use [`.agents/skills/terraform/`](../.agents/skills/terraform/SKILL.md)                         |
+| Fix failing CI                 | [ci-cd/ci-troubleshooting-guide.md](ci-cd/ci-troubleshooting-guide.md)                                                                                 |
+| Implement a synced design      | [design/README.md](design/README.md)                                                                                                                   |
+
+## Routing by role
+
+- **AI agents**: [AGENTS.md](../AGENTS.md) → the skills table in it → [`.agents/skills/`](../.agents/skills/). This `docs/` tree is your reference library, not your runbook. The CSVs in [agents/](agents/) are a legacy stratum — prefer skills.
+- **New engineers**: [guides/development-setup.md](guides/development-setup.md) → [dev-process/README.md](dev-process/README.md) → [architecture/](architecture/).
+- **Backend/API**: [architecture/graphql-integration.md](architecture/graphql-integration.md), [api/](api/), [database/](database/).
+- **Web**: [web/](web/) (mind the stack corrections above), [architecture/shared-components.md](architecture/shared-components.md).
+- **Mobile**: [mobile/](mobile/), [architecture/cross-platform-system.md](architecture/cross-platform-system.md).
+- **DevOps/Platform**: [deployment/](deployment/), [ci-cd/](ci-cd/), [runners/](runners/), [security/](security/).
+- **QA**: the testing authority is [`.agents/skills/testing/SKILL.md`](../.agents/skills/testing/SKILL.md); human-facing context in [build-and-tooling/](build-and-tooling/) (skip the `nx-cloud-*` docs).
+
+## Contributing to documentation
+
+Where a new doc goes, how to mark a doc stale, and when to archive: [DOCUMENTATION_STRUCTURE.md](DOCUMENTATION_STRUCTURE.md). Documentation ships **in the same PR** as the code it describes ([dev-process freshness gate](../.agents/skills/dev-process/gates/documentation-freshness.md)).
+
+## Provenance and maintenance
+
+- 2026-07-02: rewritten from the skills/docs audit (`scratch/skills-audit/`); replaced the 2025-10 hub that routed to Nx Cloud/Next.js-era docs.
+- Verify web port: `grep -n '"port"' apps/web/project.json`
+- Verify router: `grep -n 'Router' apps/web/src/main.tsx`
+- Verify Nx Cloud absence: `grep -rn NX_NO_CLOUD .github/workflows | head -3`
+- Verify directory list: `ls docs/`

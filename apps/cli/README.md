@@ -14,5 +14,5 @@ pnpm exec nx run cli:<command>
 
 ## Related
 
-- [CLI Usage Skill](../../.agents/skills/cli-usage/SKILL.md) — full command reference
+- [dev-environment skill — CLI command catalog](../../.agents/skills/dev-environment/references/cli-commands.md) — full command reference
 - [CLI Player Stats Commands](../../docs/guides/cli-player-stats-commands.md)

@@ -23,8 +23,8 @@ Identifies and removes AWS resources that exist in the account but are not track
 ```powershell
 # Ensure AWS SSO is active
 aws sts get-caller-identity
-# If expired, re-authenticate:
-aws sso login
+# If expired: STOP and prompt the user to run `aws sso login` in their own
+# terminal (user-only, AGENTS.md Tier 1 — see aws-sso-login.md), then retry.
 ```
 
 ## Step 1 Get Terraform State Baseline

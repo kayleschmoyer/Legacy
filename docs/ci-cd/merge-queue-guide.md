@@ -64,7 +64,7 @@ Every PR requires a passing code review from the Code Reviewer Bot, enforced via
 
 See `AGENTS.md §8` (Author Agent Contract) and [ci-greenfield-copilot-evaluation.md](ci-greenfield-copilot-evaluation.md) for the full cycle protocol.
 
-**`bot-review` is a commit status** (not a check run). Use `github_list_commit_statuses({ number: PR# })` to inspect it — `github_retrigger_check` will not find it.
+**`bot-review` is a commit status** (not a check run). Use `github_list_commit_statuses({ prNumber: PR# })` to inspect it — `github_retrigger_check` will not find it.
 
 Since `bot-review` is a commit status, the merge queue's status check validation (see below) treats it like any other check — `success` passes, `failure` blocks, `pending` waits.
 

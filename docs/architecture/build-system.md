@@ -256,7 +256,7 @@ Error: Cannot find type definitions
 pnpm run build:libs
 
 # 2. Clean and rebuild specific project
-pnpm exec nx reset
+make clean-cache  # never `pnpm exec nx reset` — destroys the modules-pool symlink (LS-5242)
 pnpm exec nx build <project-name>
 
 # 3. Check for circular dependencies
@@ -294,7 +294,7 @@ Error: Lambda packaging failed
 pnpm run build:libs
 
 # 2. Clean lambda build cache
-pnpm exec nx reset
+make clean-cache  # never `pnpm exec nx reset` — destroys the modules-pool symlink (LS-5242)
 
 # 3. Build lambda individually
 pnpm exec nx build <lambda-name>
@@ -315,7 +315,7 @@ pnpm exec nx build ui-abstractions
 pnpm exec nx build shared-components
 
 # 2. Clear Metro cache
-pnpm exec nx reset
+make clean-cache  # never `pnpm exec nx reset` — destroys the modules-pool symlink (LS-5242)
 pnpm exec react-native start --reset-cache
 
 # 3. Rebuild native modules (if needed)
@@ -343,7 +343,7 @@ pnpm exec nx run-many --target=build --parallel=3
 
 ```bash
 # Clear Nx cache only
-pnpm exec nx reset
+make clean-cache  # never `pnpm exec nx reset` — destroys the modules-pool symlink (LS-5242)
 
 # Full clean (nuclear option - rebuilds everything)
 pnpm run clean:deps

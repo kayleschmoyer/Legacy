@@ -1,13 +1,10 @@
----
-name: debug-distributed
-description: 'Debug distributed process failures by finding the root cause in code before patching database state. Use when debugging draft failures, stuck matchups, stats loading errors, dead-letter messages, or any cross-Lambda issue.'
----
+# Debug Distributed Processes
 
-# Skill: Debug Distributed Processes
+Reference for the [debugging skill](../SKILL.md). Load when debugging draft failures, stuck matchups, stats loading errors, dead-letter messages, or any cross-Lambda issue.
 
 ## Overview
 
-Legacy Sports uses **5 Lambda functions** communicating via **4 SQS FIFO queues** and **EventBridge cron rules**. When a distributed flow fails, the visible symptom is almost always bad database state — but **fixing the data without fixing the code guarantees the failure will repeat**.
+The draft/stats pipeline spans the DB (GraphQL), draft-processor, game-selection, stats and websocket Lambdas, communicating via **4 SQS FIFO queues** and **EventBridge cron rules**. When a distributed flow fails, the visible symptom is almost always bad database state — but **fixing the data without fixing the code guarantees the failure will repeat**.
 
 This skill enforces a **root-cause-first** debugging methodology.
 
@@ -34,7 +31,7 @@ If you're about to write `UPDATE leagues SET draft_status = ...` or `UPDATE matc
 ```
 
 EventBridge (cron)
-│ rate(1 min): autoProcessDraftPicks, autoStartScheduledDrafts
+│ rate(1 min): autoProcessDraftPicks
 │ midnight EST: autoSelectGames
 │ Sunday 3am EST: autoAdvanceMatchups
 │ 2am EST: processWaiverClaims
@@ -64,15 +61,16 @@ All lambdas ──► WebSocket Notifications ──► lambdas/websocket/ ─�
 
 ### EventBridge Rules
 
-| Rule                          | Schedule              | Target Mutation            |
-| ----------------------------- | --------------------- | -------------------------- |
-| `auto-process-draft-picks`    | `rate(1 minute)`      | `autoProcessDraftPicks`    |
-| `auto-start-scheduled-drafts` | `rate(1 minute)`      | `autoStartScheduledDrafts` |
-| `auto-select-games`           | `cron(0 5 * * ? *)`   | `autoSelectGames`          |
-| `auto-advance-matchups`       | `cron(0 8 ? * SUN *)` | `autoAdvanceMatchups`      |
-| `process-waiver-claims`       | `cron(0 7 * * ? *)`   | `processWaiverClaims`      |
+| Rule (prefix `legacy-sports-dev-`) | Schedule              | Target Mutation         |
+| ---------------------------------- | --------------------- | ----------------------- |
+| `auto-process-draft-picks`         | `rate(1 minute)`      | `autoProcessDraftPicks` |
+| `auto-select-games`                | `cron(0 5 * * ? *)`   | `autoSelectGames`       |
+| `auto-advance-matchups`            | `cron(0 8 ? * SUN *)` | `autoAdvanceMatchups`   |
+| `process-waiver-claims`            | `cron(0 7 * * ? *)`   | `processWaiverClaims`   |
 
-EventBridge rules invoke the GraphQL Lambda **directly** (not via API Gateway), authenticated with `x-system-api-key`.
+Rule names and schedules live in `terraform/main/eventbridge.tf` (there are more rules than this table — Discord alerts, dues reminders, etc.; read the file for the full set). EventBridge rules invoke the GraphQL Lambda **directly** (not via API Gateway), authenticated with `x-system-api-key`.
+
+> **OPEN — dangling schedule**: the `autoStartScheduledDrafts` mutation (`lambdas/db/src/schema/drafts/auto-start-mutation.ts`) says "triggered every minute by EventBridge", but no rule in `terraform/main/eventbridge.tf` invokes it. Before assuming it fires, check the live rules: `aws events list-rules --name-prefix legacy-sports-dev` (MCP: none yet — shell only). If a scheduled draft never auto-started, this gap is the first suspect.
 
 ---
 
@@ -96,6 +94,10 @@ Every distributed failure has a **boundary** — the point where one system hand
 ### Step 2: Read the Logs (Not the Database)
 
 **Start with CloudWatch logs, not DB state.** The database shows _what_ is wrong; logs show _why_.
+
+**MCP (preferred):** `aws_logs_tail(function: "draft-processor")` for a quick recent-errors view, `aws_logs_filter(logGroup: "/aws/lambda/legacy-sports-dev-graphql", filterPattern: "\"autoSelectGames\"", startTime: <ms>, endTime: <ms>)` for scoped searches. Full query-chain methodology: [cloudwatch-archaeology](../../cloudwatch-archaeology/SKILL.md).
+
+**Shell fallback (local Windows):**
 
 ```powershell
 # Draft processor failures
@@ -169,7 +171,7 @@ Once you know which Lambda and which code path failed, **read the source code** 
 
 | Lambda                | Entry Point                                                      | Key Logic                                           |
 | --------------------- | ---------------------------------------------------------------- | --------------------------------------------------- |
-| Draft Processor       | `lambdas/draft-processor/src/index.ts`                           | `processDraftMessage()` ~line 1130                  |
+| Draft Processor       | `lambdas/draft-processor/src/index.ts`                           | `processDraftMessage()`                             |
 | Game Selection        | `lambdas/game-selection/src/handlers/select-game.ts`             | `selectGamesForMatchup()`                           |
 | Stats Lambda (game)   | `lambdas/stats-lambda/src/load-game.ts`                          | `loadPlayerGameStats()`                             |
 | Stats Lambda (career) | `lambdas/stats-lambda/src/load-career.ts`                        | `loadCareerStats()`                                 |
@@ -241,6 +243,6 @@ Use this checklist for any distributed failure:
 
 ## Related Skills
 
-- `cloudwatch-logs` — Detailed CloudWatch querying
-- `database` — SQL queries, schema reference, migrations
-- `architecture` — System architecture overview
+- [cloudwatch-archaeology](../../cloudwatch-archaeology/SKILL.md) — detailed CloudWatch querying and the DB fallback
+- [database](../../database/SKILL.md) — SQL queries, schema reference, migrations
+- [architecture](../../architecture/SKILL.md) — system architecture overview

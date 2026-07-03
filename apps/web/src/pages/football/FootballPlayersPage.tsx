@@ -735,11 +735,16 @@ export function FootballPlayersPage({
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
   const isPremium = useIsPremium();
-  const hasAdvancedFootballStats = useHasEntitlement('advanced_football_stats');
+  // Bye-week + SoS badges in the team filter (LS-8045) ride on
+  // `advanced_search_filters` — the entitlement that gates the other premium
+  // search surfaces on this page. (Originally keyed on
+  // `advanced_football_stats`, which was removed as undeliverable — LS-6475;
+  // see docs/product/subscription-tiers.md changelog 2026-07-02.)
+  const hasAdvancedSearchFilters = useHasEntitlement('advanced_search_filters');
   const [showProjectionsModal, setShowProjectionsModal] = useState(false);
 
   const { data: nflTeamMetadataData } = useGetNflTeamSeasonMetadataQuery({
-    skip: !hasAdvancedFootballStats,
+    skip: !hasAdvancedSearchFilters,
     fetchPolicy: 'cache-first',
   });
 
@@ -1188,7 +1193,7 @@ export function FootballPlayersPage({
             selected={teamFilter}
             onChange={setTeamFilter}
             teamMetadata={
-              hasAdvancedFootballStats
+              hasAdvancedSearchFilters
                 ? (nflTeamMetadataData?.nflTeamSeasonMetadata ?? undefined)
                 : undefined
             }

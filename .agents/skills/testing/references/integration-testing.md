@@ -67,25 +67,21 @@ apps/web-e2e/
 
 ## Playwright Integration Config
 
-Create a separate config so integration tests don't run with normal E2E tests:
+A separate config keeps integration tests out of normal E2E runs:
 
 ```typescript
-// apps/web-e2e/playwright.integration.config.ts
+// apps/web-e2e/playwright.integration.config.ts (abridged — read the real file
+// for the full reporter list and rationale comments)
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './src/integration/tests',
-  timeout: 120_000, // 2 min per test (async flows are slow)
-  retries: 1,
-  workers: 1, // Sequential — tests may share state
-  fullyParallel: false,
-  reporter: [['html', { open: 'never' }], ['list']],
+  retries: 0, // flake against the live backend is a P1 bug, never papered over
+  workers: 1, // live backend throttles concurrent league creation (LS-2824)
   use: {
-    baseURL: process.env.INTEGRATION_BASE_URL ?? 'http://localhost:5000',
-    extraHTTPHeaders: {
-      Authorization: `Bearer ${process.env.INTEGRATION_JWT ?? ''}`,
-    },
-    trace: 'on-first-retry',
+    baseURL:
+      process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/',
+    trace: 'off', // LS-4537 — see e2e-determinism.md lever 10
   },
 });
 ```
@@ -304,7 +300,7 @@ test('draft completion delivers WS notification', async ({ api }) => {
 
 Each `*.integration.spec.ts` runs against the **live backend**. League-level state (the league row, draft state, roster, matchups) does not vanish at the end of a test process — it sits in `api.legacy-fantasy.com`'s database until something deletes it. Under nightly's three-shard execution that database accumulates leagues from every spec in every shard, and read paths see all of them.
 
-The current model uses `globalTeardown` to sweep leftover leagues at the _end_ of a run — but in sharded runs `globalTeardown` is **skipped** ([LS-4318](https://legacysports.atlassian.net/browse/LS-4318)) because the fastest shard would finish first, call `userLeagues`, see leagues created by slower shards still mid-test, and `deleteLeague` them — yanking rows out from in-flight tests on other shards. The result is that under sharded runs, leagues accumulate across the whole nightly window and `globalSetup` cleans them up _at the start of the next run_ instead.
+The current model uses `globalTeardown` to sweep leftover leagues at the _end_ of a run — but in sharded runs `globalTeardown` is **skipped** ([LS-4318](https://bkrupa.atlassian.net/browse/LS-4318)) because the fastest shard would finish first, call `userLeagues`, see leagues created by slower shards still mid-test, and `deleteLeague` them — yanking rows out from in-flight tests on other shards. The result is that under sharded runs, leagues accumulate across the whole nightly window and `globalSetup` cleans them up _at the start of the next run_ instead.
 
 The model going forward is **per-spec setup/teardown**: each spec owns its data lifecycle and deletes its own league(s) at the end of its describe block. `globalTeardown` is retained as a safety net for orphans (a test crashing mid-run), not as the primary cleanup.
 
@@ -321,12 +317,12 @@ Global cleanup (the LS-4318 model) cannot run safely in sharded mode because one
 
 #### Caveat — shared users are not isolated by per-spec teardown
 
-The 4 hardcoded users (`E2E_COMMISSIONER`, `E2E_MANAGER_1/2/3` in `apps/web-e2e/src/utils/test-user-auth.ts`) are still mutated concurrently by all shards. Per-spec teardown solves _league-level_ cross-contamination, not _user-level_ contention. Until the **per-spec user pool** (JIT-registered ephemeral users per spec — tracked as [LS-4357](https://legacysports.atlassian.net/browse/LS-4357)) lands, the LS-4350 / LS-4353 class of failures requires the write→read visibility pattern from [`e2e-determinism.md` antipattern #3](e2e-determinism.md#3-phase-proceeds-before-a-state-changing-mutation-is-visible-to-the-read-path).
+The shared test users (the 14-seat tiered pool in `apps/web-e2e/src/utils/test-user-auth.ts` — see [SKILL.md](../SKILL.md#tiered-test-user-model-premium-default-free-for-gates)) are still mutated concurrently by all shards, because specs default to the same low-numbered seats. Per-spec teardown solves _league-level_ cross-contamination, not _user-level_ contention. Until the **per-spec user pool** (JIT-registered ephemeral users per spec — tracked as [LS-4357](https://bkrupa.atlassian.net/browse/LS-4357)) lands, the LS-4350 / LS-4353 class of failures requires the write→read visibility pattern from [`e2e-determinism.md` antipattern #3](e2e-determinism.md#3-phase-proceeds-before-a-state-changing-mutation-is-visible-to-the-read-path).
 
 #### Cross-references
 
-- The per-spec teardown migration is tracked as [LS-4356](https://legacysports.atlassian.net/browse/LS-4356).
-- The per-spec user pool refactor (the only fix that fully eliminates shared-user contention) is tracked as [LS-4357](https://legacysports.atlassian.net/browse/LS-4357).
+- The per-spec teardown migration is tracked as [LS-4356](https://bkrupa.atlassian.net/browse/LS-4356).
+- The per-spec user pool refactor (the only fix that fully eliminates shared-user contention) is tracked as [LS-4357](https://bkrupa.atlassian.net/browse/LS-4357).
 - Until both ship, treat any "Nth regression guard" ticket as a signal to apply [antipattern #4 — Per-phase deadline extension](e2e-determinism.md#4-per-phase-deadline-extension-as-a-substitute-for-fixing-backend-state-contention): identify which contention axis is at play, fix the mechanism, escalate if it's genuine sharded backend load.
 
 ### 8. Test Steps for Readability

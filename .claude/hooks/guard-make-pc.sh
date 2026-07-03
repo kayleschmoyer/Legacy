@@ -29,14 +29,21 @@ emit_warning() {
 [VALIDATION WARNING] $context runs the full pre-commit suite as a monolith (~3-10 min).
 In cloud sessions this exceeds the ~60s MCP transport timeout — the container is reaped mid-run.
 
-Use the 7 pc-* chunks IN ORDER instead (each finishes inside the transport window):
+Use the 7 pc-* chunks IN ORDER instead, one per call:
   Sequence: pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build
 
-  Bash (one per call, never chained):  make pc-db-prep   make pc-typecheck  ...  make pc-build
-  MCP:  make_run({ target: "pc-db-prep" })  ...  make_run({ target: "pc-build" })
+  Preferred (whenever the nx MCP server is loaded):
+    nx_run_pc_chunk({ chunk: "pc-db-prep" })  ...  nx_run_pc_chunk({ chunk: "pc-build" })
+  Degraded CC web (no custom MCP servers):
+    Bash make pc-<chunk> with run_in_background: true — foreground make pc-* is
+    blocked by .agents/hooks/enforce-background.mjs; wait for each background
+    completion before starting the next chunk.
 
-Before pc-format: commit all staged changes so the working tree is clean.
-The formatter auto-amends ambient drift into your last commit rather than exiting 1.
+Before pc-format: commit all your changes so the working tree is clean.
+With a clean tree the formatter auto-amends its rewrites into your last commit;
+with a dirty tree it exits 1.
+
+See .agents/skills/cloud-agent-mode/SKILL.md → "Validation binding".
 
 $suppress_hint
 EOF
@@ -46,7 +53,7 @@ case "$TOOL_NAME" in
   mcp__legacy-sports-make__make_run)
     TARGET=$(echo "$INPUT" | jq -r '.tool_input.target // empty' 2>/dev/null || true)
     if [ "$TARGET" = "pc" ]; then
-      emit_warning 'make_run({ target: "pc" })' 'Use make_run({ target: "pc-db-prep" }) ... make_run({ target: "pc-build" }) in cloud sessions.'
+      emit_warning 'make_run({ target: "pc" })' 'Prefer nx_run_pc_chunk({ chunk: "pc-db-prep" }) ... nx_run_pc_chunk({ chunk: "pc-build" }); make_run({ target: "pc-<chunk>" }) per chunk is the fallback when the nx server is not loaded.'
     fi
     ;;
   Bash)

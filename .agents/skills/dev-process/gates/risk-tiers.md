@@ -38,18 +38,21 @@ Is production currently broken or actively at risk?
 
 ## What each tier requires
 
-| Requirement                       | Low        | Medium     | High        | Critical                        |
-| --------------------------------- | ---------- | ---------- | ----------- | ------------------------------- |
-| RFC                               | No         | Yes        | Yes         | After-the-fact OK               |
-| ADR for architectural decisions   | No         | Yes        | Yes         | After-the-fact OK               |
-| Test plan                         | Yes        | Yes        | Yes         | Yes (regression case mandatory) |
-| Manual UI verification            | If UI      | If UI      | Always      | Always                          |
-| Local integration test run        | If touched | If touched | Always      | Always                          |
-| Postmortem                        | No         | No         | If incident | Yes                             |
-| Self-review                       | Yes        | Yes        | Yes         | Yes                             |
-| Two-reviewer rule                 | No         | No         | Yes         | Yes                             |
-| Bot-PR cycle limit                | 3          | 3          | 3           | 1 (escalate fast)               |
-| Time spent before asking for help | 30 min     | 60 min     | 30 min      | 10 min                          |
+| Requirement                       | Low        | Medium                                 | High        | Critical                        |
+| --------------------------------- | ---------- | -------------------------------------- | ----------- | ------------------------------- |
+| RFC or ADR reference              | No         | Recommended (2026-07-02 recalibration) | Required    | After-the-fact OK               |
+| ADR for architectural decisions   | No         | Yes                                    | Yes         | After-the-fact OK               |
+| Test plan                         | Yes        | Yes                                    | Yes         | Yes (regression case mandatory) |
+| Manual UI verification            | If UI      | If UI                                  | Always      | Always                          |
+| Local integration test run        | If touched | If touched                             | Always      | Always                          |
+| Postmortem                        | No         | No                                     | If incident | Yes                             |
+| Self-review                       | Yes        | Yes                                    | Yes         | Yes                             |
+| Two-reviewer rule                 | No         | No                                     | Yes         | Yes                             |
+| Time spent before asking for help | 30 min     | 60 min                                 | 30 min      | 10 min                          |
+
+**Bot-PR review cycles are not tier-dependent.** The Reviewer Bot enforces the cap mechanically — `MAX_CYCLE` in `.github/scripts/reviewer/lib/cycle-counter.mjs` (3 review cycles, i.e. at most 2 fix-push rounds, then `needs-human-arbitration`). The cycle protocol's single home is [pr-lifecycle](../../pr-lifecycle/SKILL.md); do not restate cycle numbers here. For Critical work, escalate to a human after the first unresolved cycle rather than grinding cycles.
+
+**RFC gate recalibration (2026-07-02):** the original "RFC required for Medium" gate did not match observed practice (one accepted RFC against thousands of merged PRs). For Medium work, an RFC **or** a linked ADR/design reference in the ticket is recommended, not required. RFCs remain required for High/Critical design changes and all spikes.
 
 ## Tier-up triggers
 

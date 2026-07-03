@@ -10,11 +10,11 @@ Always regenerate them from source instead.
 
 ## Files This Applies To
 
-| Pattern          | Example paths                                           |
-| ---------------- | ------------------------------------------------------- |
-| `schema.graphql` | `lambdas/db/schema.graphql`                             |
-| `*.generated.ts` | `apps/app/src/api/db/graphql.generated.ts`              |
-| `*.generated.ts` | `lib/shared-components/src/api/db/graphql.generated.ts` |
+| Pattern          | Example paths                                      |
+| ---------------- | -------------------------------------------------- |
+| `schema.graphql` | `lambdas/db/schema.graphql`                        |
+| `*.generated.ts` | `lib/graphql/src/graphql.generated.ts`             |
+| `*.generated.ts` | `lib/data-loaders/src/api/db/graphql.generated.ts` |
 
 If you see one of these paths in a diff, a task, or a conflict -- **stop and regenerate** instead of editing.
 

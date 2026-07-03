@@ -14,7 +14,7 @@ For secrets, add to `.env.local` (gitignored — never commit):
 MY_API_KEY=actual-value-here
 ```
 
-> `.env.local` is loaded by the db Lambda dev server (via `lambdas/db/src/env.ts`) and by Next.js automatically.
+> `.env.local` is loaded by the db Lambda dev server (via `lambdas/db/src/env.ts`) and by Vite automatically (`VITE_`-prefixed keys only reach client code).
 
 ## Step 2 — Terraform Variable Declaration (`terraform/secrets.tf` or `terraform/variables.tf`)
 

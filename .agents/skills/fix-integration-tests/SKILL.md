@@ -31,13 +31,21 @@ Do **not** use this skill for:
 
 Before touching any code, verify:
 
-1. **Worktree `.env` symlink exists** — integration tests require credentials from the main repo `.env`. The worktree setup script creates this:
+1. **Worktree root `.env` resolves** — `playwright.integration.config.ts` loads `<worktree>/.env` (and optionally `<worktree>/.env.e2e`) for test-user credentials. In a worktree these are symlinks to the main repo's files, created by the setup script:
 
    ```
    node scripts/modules-pool/link.mjs
    ```
 
-   Confirm: `test -L apps/web-e2e/.env && echo "symlink ok" || echo "MISSING"`
+   Confirm from the worktree root: `test -e .env && echo "env ok" || echo "MISSING"`
+
+   Credential/cache landscape (know which is which before debugging auth):
+
+   | Artifact                                                             | Used by                                 | Notes                                                                                 |
+   | -------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------- |
+   | `E2E_POOL_PASSWORD` + `E2E_COMMISSIONER_*`/`E2E_MANAGER_*` in `.env` | Integration suite (`loginAs`)           | Password-login per test-user seat via oauth-proxy                                     |
+   | `$TMPDIR/legacy-sports-integration-jwts.json`                        | Integration suite (cross-process cache) | LS-5149 — avoids 429s from re-auth per worker; safe to delete if JWTs seem stale      |
+   | `~/.legacy-sports/e2e-token.json`                                    | **Hermetic** e2e only (`make e2e-auth`) | Not consumed by the integration suite — do not chase it for integration auth failures |
 
 2. **Parse the ticket completely** before starting. Extract:
    - Failing test file (e.g. `apps/web-e2e/src/integration/tests/roster-management-ui.integration.spec.ts`)
@@ -59,22 +67,22 @@ Integration tests **do not run on PRs**. They run only:
 
 A local `--grep` reproduction differs materially from the nightly profile. Even a fully green local single-spec run cannot prove that a fix holds under nightly conditions.
 
-| Property              | Local `--grep` (agent default) | Nightly                                           |
-| --------------------- | ------------------------------ | ------------------------------------------------- |
-| Specs                 | 1                              | All ~22 `*.integration.spec.ts`                   |
-| Shards                | 1                              | 3 (`1/3`, `2/3`, `3/3`)                           |
-| Workers/shard         | 1 (`workers: 1`)               | 1                                                 |
-| Effective parallelism | 1 Playwright proc              | 3 procs hammering the same live backend           |
-| Retries               | 2                              | 2                                                 |
-| Backend               | `api.legacy-fantasy.com`       | Same                                              |
-| Test users            | 4 shared accounts              | **Same 4 accounts, used by all 3 shards at once** |
-| `globalTeardown`      | Runs                           | **Skipped in sharded runs** (LS-4318)             |
+| Property              | Local `--grep` (agent default) | Nightly                                                                                 |
+| --------------------- | ------------------------------ | --------------------------------------------------------------------------------------- |
+| Specs                 | 1                              | Every `*.integration.spec.ts` (see `apps/web-e2e/src/integration/tests/`)               |
+| Shards                | 1                              | `INTEGRATION_SHARD_CEILING` (currently 3 — LS-7867; do not raise without re-validation) |
+| Workers/shard         | 1 (`workers: 1`)               | 1 (workflow forces `--workers=1` — LS-2824)                                             |
+| Effective parallelism | 1 Playwright proc              | 3 procs hammering the same live backend                                                 |
+| Retries               | 0 (config `retries: 0`)        | 0 (workflow adds no `--retries` for integration; flake fails the run)                   |
+| Backend               | `api.legacy-fantasy.com`       | Same                                                                                    |
+| Test users            | 14-seat tiered pool            | **Same pool, all 3 shards at once — default seats overlap**                             |
+| `globalTeardown`      | Runs                           | **League sweep skipped in sharded runs** (LS-4318)                                      |
 
 ### Three failure modes the local profile cannot exercise
 
-1. **Cumulative backend load** ([LS-4353](https://legacysports.atlassian.net/browse/LS-4353)). By the 6th–7th spec in a shard, Lambda / SQS / RDS are under contention and Apollo round-trips slow 5–10×. Deadlines tuned to an isolated 30s draft blow past 200s under load. Symptom: the local single-spec run is green at 30s, nightly times out at 180s on the same phase.
-2. **Shared-user state contention** ([LS-4350](https://legacysports.atlassian.net/browse/LS-4350)). Only **4 hardcoded users exist** (`E2E_COMMISSIONER`, `E2E_MANAGER_1/2/3` in `apps/web-e2e/src/utils/test-user-auth.ts`). All 22 specs across all 3 shards mutate `leagueMembers`, `userLeagues`, JWT cache, and OAuth state for these 4 accounts concurrently. Symptom: phase 2 (manager joins league) succeeds, phase 10 (manager re-enters the same league) sees `ForbiddenError` / `League not found` because the `leagueMembers` row isn't queryable yet from the other shard's read path.
-3. **Cross-shard write→read lag** ([LS-4318](https://legacysports.atlassian.net/browse/LS-4318)). Nightly skips `globalTeardown` so leagues from earlier specs and other shards sit in the DB throughout the run. Read paths see more rows than local runs ever observe; pagination, ordering, and filter assertions tuned to a single-spec database fail under nightly's accumulated state.
+1. **Cumulative backend load** ([LS-4353](https://bkrupa.atlassian.net/browse/LS-4353)). By the 6th–7th spec in a shard, Lambda / SQS / RDS are under contention and Apollo round-trips slow 5–10×. Deadlines tuned to an isolated 30s draft blow past 200s under load. Symptom: the local single-spec run is green at 30s, nightly times out at 180s on the same phase.
+2. **Shared-user state contention** ([LS-4350](https://bkrupa.atlassian.net/browse/LS-4350)). Test users come from the **14-seat tiered pool** (6 premium / 6 free / 2 admin, `loginAs(tier, seat)` in `apps/web-e2e/src/utils/test-user-auth.ts` — LS-8055; the legacy `E2E_COMMISSIONER`/`E2E_MANAGER_*` accounts are folded in as seats). Contention persists because specs default to the same low-numbered seats (`loginAs()` defaults to `('premium', 1)`, and the `api`/`api2` fixtures map to fixed premium seats), so all shards still mutate `leagueMembers`, `userLeagues`, and JWT state for overlapping identities concurrently. A per-spec user pool is still OPEN (LS-4357). Symptom: phase 2 (manager joins league) succeeds, phase 10 (manager re-enters the same league) sees `ForbiddenError` / `League not found` because the `leagueMembers` row isn't queryable yet from the other shard's read path. Tier selection rules: [testing/SKILL.md Tiered Test-User Model](../testing/SKILL.md#tiered-test-user-model-premium-default-free-for-gates).
+3. **Cross-shard write→read lag** ([LS-4318](https://bkrupa.atlassian.net/browse/LS-4318)). Sharded runs skip `globalTeardown`'s league sweep (the fastest shard was deleting leagues still in use by slower shards; the next run's `globalSetup` sweeps instead), so leagues from earlier specs and other shards sit in the DB throughout the run. Read paths see more rows than local runs ever observe; pagination, ordering, and filter assertions tuned to a single-spec database fail under nightly's accumulated state.
 
 ### Implications for this skill
 
@@ -167,11 +175,11 @@ If the test is asserting correct behavior and the application is returning wrong
 
 #### Fixture / Auth
 
-The `getTestUserJwt()` helper in `apps/web-e2e/src/integration/fixtures/api.ts` authenticates test users. If it fails, check:
+Test users authenticate via `loginAs(tier, seat)` / `getTestUserJwt()` in `apps/web-e2e/src/utils/test-user-auth.ts`, consumed by the fixtures in `apps/web-e2e/src/integration/fixtures/api.ts` (`premiumJwt`, `freeJwt`, `adminJwt`, …). If auth fails, check:
 
 - `INTEGRATION_BASE_URL` is set (defaults to `https://api.legacy-fantasy.com/`)
-- The `.env` symlink resolves correctly
-- The test user credentials in `.env` are current
+- The worktree root `.env` resolves and `E2E_POOL_PASSWORD` (plus legacy `E2E_COMMISSIONER_*` / `E2E_MANAGER_*`) values are current
+- The cross-process JWT disk cache is not stale — delete `$TMPDIR/legacy-sports-integration-jwts.json` and retry (expired JWTs normally fall through, but a corrupt file won't)
 
 ### Class-of-bug check — fix the pattern, not the phase
 
@@ -185,10 +193,10 @@ When the root cause matches one of the documented class-of-bug antipatterns (cat
 
 Triggers that require the class-of-bug check (current ticket refs):
 
-- **`expect.poll` callback that throws on null/undefined** instead of returning a sentinel ([LS-4353](https://legacysports.atlassian.net/browse/LS-4353)).
-- **UI-polling loop** where a backend `expect.poll` would be deterministic ([LS-4321](https://legacysports.atlassian.net/browse/LS-4321), [LS-4344](https://legacysports.atlassian.net/browse/LS-4344)).
-- **Phase that proceeds before a state-changing mutation is visible to the read path** ([LS-4350](https://legacysports.atlassian.net/browse/LS-4350)).
-- **Per-phase deadline extension** as a substitute for fixing backend-state contention ([LS-4278](https://legacysports.atlassian.net/browse/LS-4278), [LS-4282](https://legacysports.atlassian.net/browse/LS-4282), [LS-4287](https://legacysports.atlassian.net/browse/LS-4287)).
+- **`expect.poll` callback that throws on null/undefined** instead of returning a sentinel ([LS-4353](https://bkrupa.atlassian.net/browse/LS-4353)).
+- **UI-polling loop** where a backend `expect.poll` would be deterministic ([LS-4321](https://bkrupa.atlassian.net/browse/LS-4321), [LS-4344](https://bkrupa.atlassian.net/browse/LS-4344)).
+- **Phase that proceeds before a state-changing mutation is visible to the read path** ([LS-4350](https://bkrupa.atlassian.net/browse/LS-4350)).
+- **Per-phase deadline extension** as a substitute for fixing backend-state contention ([LS-4278](https://bkrupa.atlassian.net/browse/LS-4278), [LS-4282](https://bkrupa.atlassian.net/browse/LS-4282), [LS-4287](https://bkrupa.atlassian.net/browse/LS-4287)).
 
 **Do not refactor _unrelated_ test code on the way by.** Fixing all instances of the _same_ class-of-bug _is_ part of this fix — that's not refactoring, it's completing the fix. Unrelated cleanup still belongs in a separate ticket.
 
@@ -222,16 +230,25 @@ If any sibling tests in the same file now fail that were not failing before your
 
 A green Phase 4a is not sufficient. Before push, produce a green run under conditions that approximate nightly: the full integration suite, sharded, against the live backend.
 
-**Primary path — dispatch the nightly workflow on this branch:**
+**Primary path — dispatch the nightly workflow on this branch (MCP):**
 
 ```
-gh workflow run run-playwright-tests.yml --ref <branch> \
-  -f test-suite=integration \
-  -f shard-total=3 \
-  -f retries=2
+ci_dispatch_workflow(
+  workflow: "run-playwright-tests.yml",
+  ref: "<branch>",
+  inputs: { "test-suite": "integration", "shard-total": "3" },
+  waitForCompletion: true,
+  timeoutSeconds: 3600
+)
 ```
 
-Do **not** pass a `test-file` filter — the whole integration suite must run. Wait for the run to deploy its HTML report (use `/read-playwright-report` once the run completes), then:
+`waitForCompletion: true` is correct here — this is a non-PR `workflow_dispatch` run with no push notification. Shell fallback only if the CI MCP server is unavailable: `gh workflow run run-playwright-tests.yml --ref <branch> -f test-suite=integration -f shard-total=3`. Notes:
+
+- Do **not** pass a `test-file` filter — the whole integration suite must run.
+- The `retries` input is ignored for the integration suite (it always runs at the config's `retries: 0`); `shard-total` above 3 is clamped to `INTEGRATION_SHARD_CEILING`.
+- If a PR is already open, adding the **`run:integration` label** instead runs the specs the surface map selects for the PR and posts `<integration-results>` evidence the reviewer bot parses — good for evidence, but it is _not_ the full-suite nightly-shaped gate this phase requires.
+
+Once the run completes, read the report (use [read-playwright-report](../read-playwright-report/SKILL.md) / `ci_get_playwright_report`), then:
 
 - Confirm **all** touched specs are green across all 3 shards.
 - Confirm sibling specs in the same file are green.
@@ -345,8 +362,22 @@ make_run({ target: "pc" })
 ## Related Skills
 
 - [testing](./../testing/SKILL.md) — full test strategy, layer selection, and all run commands
+- [nightly-green-campaign](./../nightly-green-campaign/SKILL.md) — the campaign layer that dispatches into this skill after triaging a red nightly (bisect duty, 0/0 streak accounting, suite-config change protocol)
 - `/e2e` (`.claude/commands/e2e.md`) — use for hermetic mocked E2E failures under `apps/web-e2e/src/tests/`
 - [read-playwright-report](./../read-playwright-report/SKILL.md) — parse Playwright HTML reports linked in the ticket
 - [debugging](./../debugging/SKILL.md) — general debugging approach for non-obvious failures
 - [pr-lifecycle (fix reference)](./../pr-lifecycle/references/fix.md) — if the PR is already open and CI is failing
 - [pr-lifecycle](./../pr-lifecycle/SKILL.md) — PR creation, thread resolution, and merge protocol
+
+---
+
+## Provenance and maintenance
+
+Facts refreshed 2026-07-02 from the skills audit (`scratch/skills-audit/synthesis.json`, inconsistency 10: this file previously claimed 4 hardcoded users, retries=2, a wrong auth-helper location, and a `gh`-first dispatch). Re-verify volatile facts:
+
+- Pool seats/tiers: `grep -n "TIER_SEATS" -A 20 apps/web-e2e/src/utils/test-user-auth.ts`
+- Retries/workers: `grep -n "retries\|workers" apps/web-e2e/playwright.integration.config.ts` and the workers/retries branch in `.github/workflows/run-playwright-tests.yml` (search `IS_NIGHTLY_LIKE`)
+- Shard ceiling: `grep -n "INTEGRATION_SHARD_CEILING=" .github/workflows/run-playwright-tests.yml`
+- Env loading: `head -10 apps/web-e2e/playwright.integration.config.ts`
+- JWT disk cache path: `grep -n "JWT_DISK_CACHE_PATH" -A 3 apps/web-e2e/src/utils/test-user-auth.ts`
+- Teardown skip: `grep -n "LS-4318" apps/web-e2e/src/integration/global-teardown.ts`

@@ -167,6 +167,11 @@ describe('load-game score calculation trigger (LS-1762)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    // Re-establish the default implementation: clearAllMocks clears recorded
+    // calls but NOT implementations, so the all-players-fail test's
+    // mockRejectedValue would otherwise leak into every later test.
+    mockLoadPlayerGameStats.mockResolvedValue(undefined);
+
     // Default: runWithPublicClient passes the mock db to the callback
     mockRunWithPublicClient.mockImplementation(
       async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => {

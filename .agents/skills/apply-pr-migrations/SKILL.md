@@ -5,7 +5,7 @@ description: 'Find open PRs that add an unapplied database migration and apply t
 
 # Skill: Apply PR Migrations
 
-Open PRs that add a migration leave it **unapplied to the shared dev RDS** until an operator applies it. The `Verify All Migrations Applied` CI check fails until the migration is journaled on the dev RDS. This skill applies those migrations in one pass via the hosted `legacy-sports-db-admin` MCP server and reports per-PR results.
+Open PRs that add a migration leave it **unapplied to the shared dev RDS** until an operator applies it. The `Verify All Migrations Applied` CI check fails until the migration is journaled on the dev RDS. This skill applies those migrations in one pass via the hosted DB MCP server (exposed as `legacy-sports-db` in connector sessions; repo-side alias `legacy-sports-db-admin` — see [mcp-first](../mcp-first/SKILL.md#db-server-name)) and reports per-PR results.
 
 The migration files live on each PR's branch, not on `main`. The flow is: discover candidate PRs → confirm each truly adds a migration → stage the new file(s) into the active worktree → `db_migrate` (hosted MCP — reaches dev RDS over HTTPS) → clean the worktree → report.
 
@@ -57,5 +57,5 @@ When invoked with a PR number, skip the dashboard scan: resolve that PR's branch
 ## Related skills
 
 - [database](../database/SKILL.md) — local migration tooling and migration authoring.
-- [credentials](../credentials/SKILL.md) — auth-check / re-auth rules.
+- [mcp-first Auth Model](../mcp-first/SKILL.md#auth-model) — auth-check / re-auth rules.
 - [pr-lifecycle (unblock reference)](../pr-lifecycle/references/unblock.md) — broader stuck-PR triage; a stale `CI: Migration` label usually means the PR needs a rebase, which that workflow dispatches.

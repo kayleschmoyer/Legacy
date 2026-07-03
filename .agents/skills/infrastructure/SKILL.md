@@ -1,43 +1,44 @@
 ---
 name: infrastructure
-description: 'AWS authentication, Terraform infrastructure management, Lambda deployment, orphaned resource cleanup, Sentry sourcemap configuration, CloudWatch log querying, and GitHub Actions CI log parsing. Use for any AWS operations, cloud infrastructure changes, deployment tasks, production log debugging, or CI failure diagnosis.'
+description: 'AWS authentication, Terraform infrastructure management (two-state split: main/ + runners/), Lambda deployment, orphaned resource cleanup, Rollbar error monitoring and sourcemaps, CloudWatch log querying, and GitHub Actions CI log parsing. Load when: any AWS operation, cloud infrastructure change, deployment task, production error/log debugging, or CI failure diagnosis.'
 ---
 
 # Skill: Infrastructure
 
 ## Overview
 
-Covers all infrastructure operations: AWS authentication, Terraform changes, Lambda deployment, resource cleanup, Sentry sourcemap setup, CloudWatch log querying, and GitHub Actions CI log parsing.
+Covers all infrastructure operations: AWS authentication, Terraform changes, Lambda deployment, resource cleanup, Rollbar error monitoring and sourcemap setup, CloudWatch log querying, and GitHub Actions CI log parsing.
 
 > **Local only** — most infrastructure operations require AWS credentials and Terraform state access, both unavailable in cloud agent environments. Cloud agents should inform the user that these tasks must be performed from a local session.
 
 ## Task-Driven Guide
 
-| Task                                                                                      | Reference                                                                              |
-| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| AWS credentials expired                                                                   | [references/aws-sso-login.md](references/aws-sso-login.md)                             |
-| Deploy Lambda code                                                                        | [references/deploy-lambda.md](references/deploy-lambda.md)                             |
-| Terraform infrastructure changes                                                          | [references/terraform-apply.md](references/terraform-apply.md)                         |
-| **Plan IAM perms BEFORE editing terraform (predict → diff → patch → local-plan-as-role)** | [terraform → permission-planning](../terraform/references/permission-planning.md)      |
-| Add IAM permissions to the github-actions deploy role (size limits, gotchas)              | [references/iam-policies.md](references/iam-policies.md)                               |
-| Clean up orphaned AWS resources                                                           | [references/aws-orphan-cleanup.md](references/aws-orphan-cleanup.md)                   |
-| Configure Sentry sourcemaps                                                               | [references/configure-sentry-sourcemaps.md](references/configure-sentry-sourcemaps.md) |
-| Read CloudWatch Lambda logs                                                               | [references/cloudwatch-logs.md](references/cloudwatch-logs.md)                         |
-| Parse GitHub Actions CI logs                                                              | [references/github-actions-logs.md](references/github-actions-logs.md)                 |
-| Sync environment variables from AWS                                                       | [references/sync-env.md](references/sync-env.md)                                       |
-| Rebuild self-hosted runner AMI                                                            | [references/ami-build.md](references/ami-build.md)                                     |
-| Diagnose offline runners / rotate GitHub App key                                          | [references/runner-operations.md](references/runner-operations.md)                     |
-| Run CLI / Nx targets against dev RDS via SSM port-forward                                 | [references/ssm-db-access.md](references/ssm-db-access.md)                             |
+| Task                                                                                      | Reference                                                                         |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| AWS credentials expired                                                                   | [references/aws-sso-login.md](references/aws-sso-login.md)                        |
+| Deploy Lambda code                                                                        | [references/deploy-lambda.md](references/deploy-lambda.md)                        |
+| Terraform infrastructure changes                                                          | [references/terraform-apply.md](references/terraform-apply.md)                    |
+| **Plan IAM perms BEFORE editing terraform (predict → diff → patch → local-plan-as-role)** | [terraform → permission-planning](../terraform/references/permission-planning.md) |
+| Add IAM permissions to the github-actions deploy role (size limits, gotchas)              | [references/iam-policies.md](references/iam-policies.md)                          |
+| Clean up orphaned AWS resources                                                           | [references/aws-orphan-cleanup.md](references/aws-orphan-cleanup.md)              |
+| Investigate production errors / add Rollbar monitoring or sourcemaps                      | [references/rollbar-monitoring.md](references/rollbar-monitoring.md)              |
+| Read CloudWatch Lambda logs                                                               | [references/cloudwatch-logs.md](references/cloudwatch-logs.md)                    |
+| Parse GitHub Actions CI logs                                                              | [references/github-actions-logs.md](references/github-actions-logs.md)            |
+| Sync environment variables from AWS                                                       | [references/sync-env.md](references/sync-env.md)                                  |
+| Rebuild self-hosted runner AMI                                                            | [references/ami-build.md](references/ami-build.md)                                |
+| Diagnose offline runners / rotate GitHub App key                                          | [references/runner-operations.md](references/runner-operations.md)                |
+| Run CLI / Nx targets against dev RDS via SSM port-forward                                 | [references/ssm-db-access.md](references/ssm-db-access.md)                        |
 
 ## Critical Rules
 
 1. **Check AWS auth before any operation** — run `aws_sso_status()` (MCP) or `aws sts get-caller-identity` (shell) first. If credentials are expired, **stop immediately and prompt the user**: Your AWS SSO session has expired. Please run: aws sso login — let me know when you're done and I'll retry. Do not retry the failing command — SSO errors do not self-resolve.
 2. **Always clear Terraform locks first** — run `node scripts/terraform-unlock.js` before any `terraform plan` or `terraform apply`
-3. **Always rebuild with `--skip-nx-cache` before deploy** — stale Nx cache has caused production incidents where new code was missing from the bundle
-4. **Plan before apply** — always `terraform plan` first, review changes, then `terraform apply`
-5. **Deploy infrastructure before code** — Terraform changes must be applied before Lambda code deployment
-6. **Never pipe `terraform apply` output** — truncating filters (e.g., `Select-Object -Last`) kill Terraform mid-operation, orphaning state locks
-7. **Never commit AWS credentials** — use SSO, IAM roles, or environment variables
+3. **Terraform is a two-state split (LS-2425)** — `terraform/main/` (app infra) and `terraform/runners/` (self-hosted runner fleet) are independent states with independent `secrets.auto.tfvars`. Address the state with `terraform -chdir=terraform/main …` or `-chdir=terraform/runners …` — the repo-wide no-`cd` rule (AGENTS.md Command Patterns) applies to every terraform command.
+4. **Always rebuild with `--skip-nx-cache` before deploy** — stale Nx cache has caused production incidents where new code was missing from the bundle
+5. **Plan before apply** — always `terraform plan` first, review changes, then `terraform apply`
+6. **Deploy infrastructure before code** — Terraform changes must be applied before Lambda code deployment
+7. **Never pipe `terraform apply` output** — truncating filters (e.g., `Select-Object -Last`) kill Terraform mid-operation, orphaning state locks
+8. **Never commit AWS credentials** — use SSO, IAM roles, or environment variables
 
 ## Quick Reference
 
@@ -88,7 +89,7 @@ See [references/terraform-common-issues.md](references/terraform-common-issues.m
 - [references/terraform-common-issues.md](references/terraform-common-issues.md) — State locks, credentials, drift, S3 path issues
 - [references/terraform-state-and-operations.md](references/terraform-state-and-operations.md) — State management, file structure, sensitive resources
 - [references/aws-orphan-cleanup.md](references/aws-orphan-cleanup.md) — Audit and clean up untracked AWS resources
-- [references/configure-sentry-sourcemaps.md](references/configure-sentry-sourcemaps.md) — Sentry sourcemap upload for Vite/esbuild projects
+- [references/rollbar-monitoring.md](references/rollbar-monitoring.md) — Rollbar error monitoring stack, `rollbar_*` MCP triage tools, sourcemap upload for Vite deployables
 - [references/cloudwatch-logs.md](references/cloudwatch-logs.md) — Query and stream CloudWatch logs for Lambda debugging
 - [references/github-actions-logs.md](references/github-actions-logs.md) — Parse GitHub Actions logs to diagnose CI failures
 - [references/cloud-github-auth.md](references/cloud-github-auth.md) — GitHub authentication setup and troubleshooting for cloud agent environments
@@ -104,4 +105,3 @@ See [references/terraform-common-issues.md](references/terraform-common-issues.m
 - [Terraform State Management](../../../docs/deployment/terraform/terraform-state-solution.md)
 - [Lambda Build Strategy](../../../docs/deployment/lambda-build-strategy.md)
 - [Deployment Security](../../../docs/deployment/deployment-security.md)
-- [Sentry Sourcemap Upload](../../../docs/deployment/sentry-sourcemap-upload.md)

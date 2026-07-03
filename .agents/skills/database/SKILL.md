@@ -16,11 +16,11 @@ description: 'All local database operations: running migrations, ad-hoc queries,
 
 ## Tools
 
-The hosted `legacy-sports-db-admin` MCP server is the only DB MCP server. It reaches the dev RDS over HTTPS with no SSM tunnel. Everything else is a shell command.
+The hosted DB MCP server is the only DB MCP server. It reaches the dev RDS over HTTPS with no SSM tunnel. **Naming**: live connector sessions expose it as `legacy-sports-db` (tool prefix `mcp__legacy-sports-db__*`); the repo-side alias in Copilot/VS Code configs and `tools/mcp/db-admin-server/` is `legacy-sports-db-admin` — same server, see [mcp-first](../mcp-first/SKILL.md). Everything else is a shell command.
 
 | Operation                      | Command                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| Ad-hoc SQL (read-only)         | `db_query` (hosted MCP, `mcp__legacy-sports-db-admin__db_query`)                                |
+| Ad-hoc SQL (read-only)         | `db_query` (hosted MCP; connector prefix `mcp__legacy-sports-db__db_query`)                     |
 | Check pending migrations       | `pnpm --prefix lib/db-client run db:status`                                                     |
 | Apply pending migrations       | `pnpm --prefix lib/db-client run db:up`                                                         |
 | Apply migrations to dev RDS    | `db_migrate` (hosted MCP, transpiles local `.ts` and POSTs to the server — no tunnel)           |
@@ -54,5 +54,6 @@ The hosted `db_query` / `db_migrate` MCP tools additionally need `MCP_DB_ADMIN_U
 
 ## Related Skills
 
+- [domain-reference](../domain-reference/SKILL.md) — what the tables mean (product + data-model ground truth); this skill is how to change them
 - [repo-tooling](../repo-tooling/SKILL.md) — `make pc`, lint, typecheck, build
 - [dev-process/entrypoints/08-migration.md](../dev-process/entrypoints/08-migration.md) — migration entrypoint (RFC, rollback plan, staging for high-risk changes)

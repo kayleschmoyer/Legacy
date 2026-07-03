@@ -61,15 +61,13 @@ aws sts get-caller-identity
 
 If either returns a valid identity / `authenticated: true`, **skip login entirely** — the session is still valid.
 
-## Login Command (only when status check shows expired)
+## Login Command (USER-ONLY, when status check shows expired)
+
+`aws sso login` is a **user-only** action (AGENTS.md Tier 1: agents never run auth-generation commands). When the status check shows expired credentials, surface this command for the **user** to run in their own terminal, then wait for confirmation:
 
 ```powershell
 aws sso login
-```
-
-### Login with specific profile
-
-```powershell
+# or with a specific profile:
 aws sso login --profile legacy-sports-dev
 ```
 
@@ -126,8 +124,7 @@ aws_sso_status();
 ```powershell
 # 1. Check first — shell fallback
 aws sts get-caller-identity
-# 2. Only if expired:
-aws sso login
+# 2. Only if expired: prompt the USER to run `aws sso login` and wait for confirmation
 # 3. Run the operation
 <command>
 ```
@@ -181,10 +178,10 @@ aws sso login --profile legacy-sports-dev
 
 This skill should be checked before:
 
-- [Sync Environment Variables](../../sync-env/SKILL.md)
-- [CLI Usage](../../cli-usage/SKILL.md) - Database operations
-- [Deploy Lambda](../deploy-lambda.md)
-- [Terraform Apply](../terraform-apply.md)
+- [Sync Environment Variables](sync-env.md)
+- [dev-environment](../../dev-environment/SKILL.md) - CLI and database operations
+- [Deploy Lambda](deploy-lambda.md)
+- [Terraform Apply](terraform-apply.md)
 
 ## Best Practices
 
@@ -237,5 +234,5 @@ Agent: Retrying query...
 ## Related Documentation
 
 - [AWS SSO Documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html)
-- [Troubleshooting Guide](../../docs/guides/troubleshooting.md#aws-authentication)
-- [Development Setup](../../docs/guides/development-setup.md#aws-configuration)
+- [Troubleshooting Guide](../../../../docs/guides/troubleshooting.md#authentication-issues)
+- [Development Setup](../../../../docs/guides/development-setup.md)

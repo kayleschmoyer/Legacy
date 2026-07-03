@@ -1,13 +1,8 @@
----
-name: debug-ci-failure
-description: 'Debug failed CI runs end-to-end: identify the failed stage, fetch logs, locate the root cause, reproduce locally, fix, and re-verify. Use when a GitHub Actions run fails on a PR or branch.'
----
-
-# Skill: Debug a Failed GitHub Actions Run
+# Debug a Failed GitHub Actions Run
 
 ## Overview
 
-Step-by-step playbook for triaging and fixing a failed CI run in the Legacy Sports monorepo. The CI pipeline has six stages that run in order — a failure in any stage blocks later ones. This skill walks through identifying which stage failed, pulling the right logs, finding the root cause, and driving to a fix.
+Step-by-step playbook for triaging and fixing a failed CI run in the Legacy Sports monorepo. This reference walks through identifying which job failed, pulling the right logs, finding the root cause, and driving to a fix. For which checks are _required to merge_ and how they're wired, the home is [pr-lifecycle/references/ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md).
 
 ## When to Use
 
@@ -36,17 +31,20 @@ Those are **review-fix** workflows, not CI-log debugging. Fetch unresolved threa
 
 If a search pattern returns no results, widen your search or save the full logs. **Do not skip the evidence step.**
 
-## CI Pipeline Stages (in order)
+## CI Pipeline Jobs
 
-| Stage | Job              | What It Does                               |
-| ----- | ---------------- | ------------------------------------------ |
-| 1     | detect-changes   | Determines affected projects (~30 s)       |
-| 2     | quality-gates    | Formatting → Lint → Typecheck → Unit tests |
-| 2b    | build-validation | Web, mobile, and Lambda builds             |
-| 3     | e2e              | End-to-end Playwright tests                |
-| 4     | summarize        | Posts PR comment and badges (always runs)  |
+`ci-pipeline.yml` (invoked by `ci-orchestrator.yml`) fans out into per-target jobs — get the failing job's name from `ci_view_run_jobs(runId: RUN_ID)` rather than guessing:
 
-Failures most commonly occur in **quality-gates** or **build-validation**.
+| Job                                  | What It Does                                  |
+| ------------------------------------ | --------------------------------------------- |
+| `detect-changes`                     | Determines affected projects                  |
+| `format` / `lint` / `test` / `build` | One quality gate each                         |
+| `custom-checks`                      | Skills lint, workflow validation, misc guards |
+| `lockfile-check`                     | pnpm lockfile integrity                       |
+| `e2e`                                | Playwright E2E tests                          |
+| `summarize`                          | Posts the PR comment and badges (always runs) |
+
+Failures most commonly occur in **lint**, **test**, or **build**. The authoritative list of which of these gate merge lives in [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md).
 
 ## `ci_get_logs` Parameter Reference
 
@@ -56,7 +54,7 @@ Failures most commonly occur in **quality-gates** or **build-validation**.
 | `jobId`      | number  | Single-job logs — use when you know exactly which job failed |
 | `failedOnly` | boolean | `true` = only failed steps (fastest); `false` = all steps    |
 
-Use `runId` first. Switch to `jobId` when you need to isolate output from a single job (e.g. `quality-gates`). Never pass both.
+Use `runId` first. Switch to `jobId` when you need to isolate output from a single job (e.g. `test`). Never pass both.
 
 ## Steps
 
@@ -458,7 +456,7 @@ After identifying the exact error, run the full local validation to confirm your
 make pre-commit
 ```
 
-This runs the same checks as CI in order: typecheck → lint → test → build. All must pass.
+This runs the same checks as CI. All must pass. (Environment binding: in cloud or timeout-prone sessions run the seven `pc-*` chunks instead of the monolith — the binding table in the [ticket-to-merge spine](../../workflow-overview/references/ticket-to-merge-spine.md) is the home for which form each environment uses.)
 
 For faster iteration, run only the failing target:
 
@@ -474,7 +472,7 @@ pnpm exec nx test shared-components
 pnpm exec nx lint web
 ```
 
-### 6. Rebase on the parent branch, then push and verify
+### 7. Rebase on the parent branch, then push and verify
 
 Before pushing the fix, always rebase onto the parent branch so the new CI run is based on the latest tip. Skipping this wastes a CI run if the parent has moved ahead.
 
@@ -520,7 +518,7 @@ Then push the validated fix:
 git push origin HEAD --force-with-lease
 ```
 
-### 7. If the failure is flaky / transient
+### 8. If the failure is flaky / transient
 
 Some CI failures are not caused by your code:
 
@@ -647,12 +645,12 @@ foreach ($p in $patterns) {
 - **No run found**: `ci_list_runs` returns empty — run may be in-progress or the branch name is wrong.
 - **Logs empty**: `ci_get_logs(failedOnly: true)` returned nothing — try `failedOnly: false`. Shell: `gh run view RUN_ID --log`.
 - **detect-changes failure**: usually infrastructure — rerun with `ci_rerun_failed_jobs(runId: RUN_ID)`.
-- **Merge-queue rejection**: find the merge-queue run with `ci_list_runs(workflow: "merge-queue.yml", limit: 5)`, then debug normally.
+- **Merge-queue rejection**: find the merge-queue run with `ci_list_runs(workflow: "merge-queue.yml", limit: 5)`, then debug normally. If the PR looks green but won't merge, load [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md) and run `github_pr_why_blocked(prNumber: PR_NUMBER)`.
 
-> **Advanced troubleshooting** (concurrency cancellations, skills lint, E2E failures, setup detection, Terraform locks, merge queue, build artifacts): see [ci-troubleshooting-advanced.md](ci-troubleshooting-advanced.md)
+> **Advanced troubleshooting** (A1–A8: concurrency cancellations, skills lint, E2E failures, setup detection, Terraform locks, merge queue, build artifacts): see [ci-troubleshooting-advanced.md](ci-troubleshooting-advanced.md)
 
 > **Pipeline architecture** (two-layer design diagram, env vars, timeouts, deployment debugging): see [ci-pipeline-architecture.md](ci-pipeline-architecture.md)
 
 ## Related Skills
 
-`fix-lint` · `fix-types` · `test` · `build` · `deploy-lambda`
+[repo-tooling](../../repo-tooling/SKILL.md) (lint/type/build fixes) · [testing](../../testing/SKILL.md) · [pr-lifecycle](../../pr-lifecycle/SKILL.md) (merge gates, review fixes) · [infrastructure](../../infrastructure/SKILL.md) (Lambda deploys)

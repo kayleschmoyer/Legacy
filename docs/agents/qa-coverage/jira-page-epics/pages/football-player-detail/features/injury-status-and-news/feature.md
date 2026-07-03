@@ -54,7 +54,7 @@ news: String
 ```
 
 These fields are included in the `FootballPlayer` fragment
-(`lib/shared-components/src/api/db/footballPlayer.fragment.graphql`) and
+(`lib/graphql/src/footballPlayer.fragment.graphql`) and
 therefore flow through `useGetFootballPlayerQuery` to both the web page
 (`apps/web/src/pages/football/FootballPlayerDetailPage.tsx`) and the mobile
 screen (`apps/app/src/app/(app)/football/players/[playerId].tsx`) without
@@ -79,4 +79,4 @@ File: `lib/shared-components/src/features/football/FootballPlayerDetail.spec.tsx
 
 - **Epic:** LS-5270 — QA — Page: Football Player Detail
 - **Schema change:** `lambdas/db/schema.graphql` — `FootballPlayer` type
-- **Fragment:** `lib/shared-components/src/api/db/footballPlayer.fragment.graphql`
+- **Fragment:** `lib/graphql/src/footballPlayer.fragment.graphql`

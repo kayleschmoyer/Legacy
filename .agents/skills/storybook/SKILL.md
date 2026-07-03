@@ -21,7 +21,7 @@ The `shared-components` library ships its own Storybook hosted at port **6009**.
 | `lib/shared-components/.storybook/main.ts`        | Storybook configuration (glob pattern, addons, Vite config) |
 | `lib/shared-components/.storybook/preview.ts`     | Global decorators (TamaguiProvider) and parameters          |
 | `lib/shared-components/.storybook/test-runner.ts` | Playwright-based test runner config                         |
-| `lib/shared-components/src/**/*.stories.tsx`      | Story files â€” auto-discovered via glob                    |
+| `lib/shared-components/src/**/*.stories.tsx`      | Story files — auto-discovered via glob                      |
 
 ## Running Storybook
 
@@ -32,7 +32,7 @@ pnpm run storybook
 # Or from the library directory
 cd lib/shared-components
 pnpm run storybook          # dev server on http://localhost:6009
-pnpm run build-storybook    # static build â†’ dist/storybook/
+pnpm run build-storybook    # static build → dist/storybook/
 
 # Via Nx
 pnpm exec nx run shared-components:storybook
@@ -49,14 +49,14 @@ Place stories **co-located** with the component:
 src/
   components/
     MyButton.tsx
-    MyButton.stories.tsx   â† same directory
+    MyButton.stories.tsx   ← same directory
   features/
     draft/
       PlayerCard.tsx
       PlayerCard.stories.tsx
 ```
 
-Files matching `src/**/*.stories.{ts,tsx,mdx}` are **auto-discovered** â€” no need to add them to `main.ts`.
+Files matching `src/**/*.stories.{ts,tsx,mdx}` are **auto-discovered** — no need to add them to `main.ts`.
 
 ### 2. Required imports
 
@@ -71,7 +71,7 @@ import { MyComponent } from './MyComponent';
 
 ```tsx
 const meta: Meta<typeof MyComponent> = {
-  // Category/ComponentName â€” drives sidebar grouping
+  // Category/ComponentName — drives sidebar grouping
   // Standard categories: Layout, Components, Features/Draft, Features/Players,
   //   Features/Stats, Features/Teams, Navigation, Introduction
   title: 'Components/MyButton',
@@ -199,11 +199,11 @@ export const LightVariant: Story = {
 
 `project.json` exposes three storybook-related Nx targets:
 
-| Target            | Command                                              | What it does                       |
-| ----------------- | ---------------------------------------------------- | ---------------------------------- |
-| `storybook`       | `pnpm exec nx run shared-components:storybook`       | Dev server on port 6009            |
-| `build-storybook` | `pnpm exec nx run shared-components:build-storybook` | Static build â†’ `dist/storybook/` |
-| `test:stories`    | `pnpm exec nx run shared-components:test:stories`    | Jest-based story unit tests        |
+| Target            | Command                                              | What it does                     |
+| ----------------- | ---------------------------------------------------- | -------------------------------- |
+| `storybook`       | `pnpm exec nx run shared-components:storybook`       | Dev server on port 6009          |
+| `build-storybook` | `pnpm exec nx run shared-components:build-storybook` | Static build → `dist/storybook/` |
+| `test:stories`    | `pnpm exec nx run shared-components:test:stories`    | Jest-based story unit tests      |
 
 ## Title Naming Convention
 

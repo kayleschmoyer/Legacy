@@ -54,7 +54,7 @@ const MyComponent = styled(YStack, {
 
 ### Step 3: Move GraphQL operations
 
-- Move any `.graphql` files to `lib/shared-components/src/api/db/`.
+- Move any `.graphql` files to `lib/graphql/src/` (the canonical operations home — see [architecture/FILE-MAP.md](../architecture/FILE-MAP.md)).
 - Run `make codegen` to regenerate typed hooks in the new location.
 - Update the component to import from the new `graphql.generated.ts`.
 

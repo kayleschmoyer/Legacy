@@ -37,7 +37,7 @@ batting table and, when applicable, the pitching table). Receives:
 `useGetAllPlayerSeasonStatsQuery` once per slot (four fixed hook calls, skipped
 when the slot is empty). Results are threaded down as `slotStats[idx].data`.
 
-**Query:** `lib/shared-components/src/api/db/getAllPlayerSeasonStats.query.graphql`
+**Query:** `lib/graphql/src/getAllPlayerSeasonStats.query.graphql`
 — variables: `{ playerId: Int! }`
 
 **Batting table** — shown when `playerSeasonBatting` has rows with `atBats > 0`.
@@ -109,4 +109,4 @@ per-season row assertions.
 - **Epic:** LS-5286 — QA — Page: Player Comparison
 - **Implementation ref:** `docs/agents/pages/players/compare.md`
 - **Shared component:** `lib/shared-components/src/features/players/PlayerComparison.tsx`
-- **GraphQL query:** `lib/shared-components/src/api/db/getAllPlayerSeasonStats.query.graphql`
+- **GraphQL query:** `lib/graphql/src/getAllPlayerSeasonStats.query.graphql`

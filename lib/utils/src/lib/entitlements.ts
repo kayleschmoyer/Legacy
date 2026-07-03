@@ -46,7 +46,6 @@ export const ENTITLEMENTS = {
   trade_analyzer: 'trade_analyzer',
   football_projections: 'football_projections',
   advanced_search_filters: 'advanced_search_filters',
-  advanced_football_stats: 'advanced_football_stats',
   advanced_pitching_stats: 'advanced_pitching_stats',
   defensive_sabermetrics: 'defensive_sabermetrics',
   advanced_batting_stats: 'advanced_batting_stats',
@@ -90,7 +89,6 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.trade_analyzer,
     ENTITLEMENTS.football_projections,
     ENTITLEMENTS.advanced_search_filters,
-    ENTITLEMENTS.advanced_football_stats,
     ENTITLEMENTS.advanced_pitching_stats,
     ENTITLEMENTS.defensive_sabermetrics,
     ENTITLEMENTS.advanced_batting_stats,
@@ -119,7 +117,6 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   football_projections: 'Fantasy scoring projections (football)',
   advanced_search_filters:
     'Advanced search filters (projected fantasy points, ADP rank, injury status)',
-  advanced_football_stats: 'Advanced football stats',
   advanced_pitching_stats: 'Advanced pitching analytics (FIP, WHIP, K/9, BB/9)',
   defensive_sabermetrics: 'Advanced defensive sabermetrics (DRS, UZR, OAA)',
   advanced_batting_stats: 'Advanced batting sabermetrics (OPS, OPS+, BABIP)',

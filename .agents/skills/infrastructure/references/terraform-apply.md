@@ -9,6 +9,8 @@ description: 'Apply Terraform infrastructure changes to manage AWS resources; us
 
 Apply infrastructure changes using Terraform to manage AWS resources.
 
+Terraform is a **two-state split** (LS-2425): app infra lives in `terraform/main/`, the self-hosted runner fleet in `terraform/runners/` — each with its own state and `secrets.auto.tfvars`. All commands below target `terraform/main/` via `-chdir`; for runner changes see [Runner Infrastructure](#runner-infrastructure-separate-state-ls-2425). Never `cd` into the terraform directories (AGENTS.md Command Patterns).
+
 ## When to Use
 
 - Creating new AWS resources
@@ -26,9 +28,8 @@ Apply infrastructure changes using Terraform to manage AWS resources.
 # STEP 1: Check and clear any state locks
 node scripts/terraform-unlock.js
 
-# STEP 2: Then proceed with terraform commands
-cd terraform
-terraform plan
+# STEP 2: Then proceed with terraform commands (no cd — use -chdir)
+terraform -chdir=terraform/main plan
 ```
 
 ## Standard Command
@@ -36,8 +37,7 @@ terraform plan
 ```powershell
 # Apply Terraform changes (from project root)
 node scripts/terraform-unlock.js  # Clear any locks first
-cd terraform
-terraform apply
+terraform -chdir=terraform/main apply
 ```
 
 ## Alternative Commands
@@ -46,24 +46,23 @@ terraform apply
 
 ```powershell
 # See what will change without applying
-cd terraform
-terraform plan
+terraform -chdir=terraform/main plan
 
 # Save plan to file
-terraform plan -out=tfplan
+terraform -chdir=terraform/main plan -out=tfplan
 
 # Apply saved plan
-terraform apply tfplan
+terraform -chdir=terraform/main apply tfplan
 ```
 
 ### Apply Specific Resource
 
 ```powershell
 # Apply changes to specific resource only
-terraform apply -target=aws_lambda_function.db
+terraform -chdir=terraform/main apply -target=aws_lambda_function.db
 
 # Apply multiple specific resources
-terraform apply -target=aws_lambda_function.db -target=aws_lambda_function.oauth_proxy
+terraform -chdir=terraform/main apply -target=aws_lambda_function.db -target=aws_lambda_function.oauth_proxy
 ```
 
 ### Runner Infrastructure (Separate State, LS-2425)
@@ -89,7 +88,7 @@ terraform -chdir=terraform/runners apply -target=module.github_runners.module.ru
 > The resource name is the second label in `resource "aws_lambda_function" "<name>"` in the .tf file.
 > Example: `aws_lambda_function.stats` (NOT `aws_lambda_function.stats_lambda`).
 >
-> **Lambda resource names** (look up in `terraform/lambda-*.tf` if unsure):
+> **Lambda resource names** (look up in `terraform/main/lambda-*.tf` if unsure):
 > | Deploy name | Terraform resource | Target |
 > |---|---|---|
 > | `stats` | `aws_lambda_function.stats` | `-target=aws_lambda_function.stats` |
@@ -104,24 +103,23 @@ terraform -chdir=terraform/runners apply -target=module.github_runners.module.ru
 
 ```powershell
 # Initialize Terraform (first time or after config changes)
-cd terraform
-terraform init
+terraform -chdir=terraform/main init
 
 # Upgrade providers
-terraform init -upgrade
+terraform -chdir=terraform/main init -upgrade
 ```
 
 ### Check State
 
 ```powershell
 # View current state
-terraform show
+terraform -chdir=terraform/main show
 
 # List resources in state
-terraform state list
+terraform -chdir=terraform/main state list
 
 # View specific resource
-terraform state show aws_lambda_function.db
+terraform -chdir=terraform/main state show aws_lambda_function.db
 ```
 
 ## Complete Deployment Workflow
@@ -133,14 +131,12 @@ When deploying infrastructure AND Lambda code:
 node scripts/terraform-unlock.js
 
 # 2. Plan infrastructure changes
-cd terraform
-terraform plan
+terraform -chdir=terraform/main plan
 
 # 3. Apply infrastructure (if changes look good)
-terraform apply
+terraform -chdir=terraform/main apply
 
-# 4. Deploy Lambda code (return to project root first)
-cd ..
+# 4. Deploy Lambda code
 .\scripts\deploy-lambda.ps1 -FunctionName graphql
 
 # 5. Verify deployment
@@ -172,7 +168,7 @@ pnpm exec nx run web:build
 
 When Terraform changes introduce a **new AWS resource type** (e.g., ACM certificates, API Gateway custom domains), the GitHub Actions IAM role may lack permissions for it.
 
-**File**: `terraform/github-actions-oidc.tf` — inline policy `github_actions_additional`
+**File**: `terraform/main/github-actions-oidc.tf` — inline policy `github_actions_additional`
 
 **Checklist when adding resources**:
 
@@ -192,8 +188,8 @@ When Terraform changes introduce a **new AWS resource type** (e.g., ACM certific
 ## Pre-apply Checklist
 
 - [ ] AWS credentials configured
-- [ ] Terraform initialized (`terraform init`)
-- [ ] Plan reviewed (`terraform plan`)
+- [ ] Terraform initialized (`terraform -chdir=terraform/main init`)
+- [ ] Plan reviewed (`terraform -chdir=terraform/main plan`)
 - [ ] Changes expected and understood
 - [ ] Backup of state (if critical changes)
 - [ ] Correct workspace selected (if using workspaces)
@@ -203,24 +199,20 @@ When Terraform changes introduce a **new AWS resource type** (e.g., ACM certific
 ### Making Infrastructure Changes
 
 ```powershell
-# 1. Navigate to terraform directory
-cd terraform
+# 1. Edit .tf files under terraform/main/ (or terraform/runners/)
 
-# 2. Edit .tf files
-# Make your infrastructure changes
+# 2. Format and validate
+terraform -chdir=terraform/main fmt
+terraform -chdir=terraform/main validate
 
-# 3. Format and validate
-terraform fmt
-terraform validate
+# 3. Plan changes
+terraform -chdir=terraform/main plan
 
-# 4. Plan changes
-terraform plan
-
-# 5. Review plan carefully
+# 4. Review plan carefully
 # Ensure changes are expected
 
-# 6. Apply if plan looks good
-terraform apply
+# 5. Apply if plan looks good
+terraform -chdir=terraform/main apply
 
 # 7. Commit changes
 git add .
@@ -231,13 +223,13 @@ git commit -m "infra: add new Lambda function"
 
 ```powershell
 # 1. Modify terraform configuration
-# Edit terraform/*.tf files
+# Edit terraform/main/*.tf files
 
 # 2. Plan to see what will change
-terraform plan
+terraform -chdir=terraform/main plan
 
 # 3. If only updating one resource
-terraform apply -target=aws_lambda_function.db
+terraform -chdir=terraform/main apply -target=aws_lambda_function.db
 
 # 4. Verify in AWS Console
 # Check resource is updated correctly
@@ -247,13 +239,13 @@ terraform apply -target=aws_lambda_function.db
 
 ```powershell
 # Plan destruction
-terraform plan -destroy
+terraform -chdir=terraform/main plan -destroy
 
 # Destroy specific resource
-terraform destroy -target=aws_lambda_function.old_function
+terraform -chdir=terraform/main destroy -target=aws_lambda_function.old_function
 
 # Destroy everything (VERY CAREFUL!)
-terraform destroy
+terraform -chdir=terraform/main destroy
 ```
 
 ## Integration with Workflow
@@ -266,14 +258,13 @@ git checkout main
 git pull
 
 # 2. Initialize (if provider changes)
-cd terraform
-terraform init
+terraform -chdir=terraform/main init
 
 # 3. Plan changes
-terraform plan
+terraform -chdir=terraform/main plan
 
 # 4. Apply if plan looks good
-terraform apply
+terraform -chdir=terraform/main apply
 
 # 5. Verify resources in AWS Console
 ```
@@ -282,16 +273,16 @@ terraform apply
 
 ```powershell
 # 1. Create Lambda .tf file
-# New file: terraform/lambda-new-function.tf
+# New file: terraform/main/lambda-new-function.tf
 
 # 2. Define resource
 # Write terraform configuration
 
 # 3. Plan
-terraform plan
+terraform -chdir=terraform/main plan
 
 # 4. Apply
-terraform apply
+terraform -chdir=terraform/main apply
 
 # 5. Deploy Lambda code
 .\scripts\deploy-lambda.ps1 -FunctionName new-function
@@ -307,8 +298,8 @@ terraform apply
 ## Related Skills
 
 - [Lambda Deployment](deploy-lambda.md) - Deploying Lambda code
-- [Database Connection](../../db-connect/SKILL.md) - Testing infrastructure
-- [Validate Workspace](../../validate-workspace/SKILL.md) - Pre-deployment checks
+- [terraform](../../terraform/SKILL.md) - Terraform change workflow, permission planning, add-secret checklist
+- [database](../../database/SKILL.md) - Database connectivity checks
 
 ## Related Documentation
 

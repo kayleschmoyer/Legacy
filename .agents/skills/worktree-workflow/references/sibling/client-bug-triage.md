@@ -154,5 +154,5 @@ Follow the standard workflow:
 
 - **Don't assume the user is wrong** — client bug reports describe real user experiences. Even if you can't reproduce, the bug may be environment-specific.
 - **Check for related bugs** — similar symptoms may have a shared root cause. Search the epic for related tickets before creating a narrow fix.
-- **Platform differences** — the app runs on React Native (iOS/Android) and Next.js (web). A bug on one platform may not exist on others. Check `lib/shared-components/src/platform-components/` for platform-specific code.
+- **Platform differences** — the app runs on React Native (iOS/Android) and the Vite web app (`apps/web`). A bug on one platform may not exist on others. Check `lib/shared-components/src/platform-components/` for platform-specific code.
 - **Don't fix unrelated code** — stick to the bug. If you find other issues, create separate tickets.

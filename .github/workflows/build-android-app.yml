@@ -93,6 +93,12 @@ jobs:
       # secret the web build prefixes as VITE_GIPHY_API_KEY — one Giphy app, both
       # platforms. Unset → the picker silently renders no results.
       EXPO_PUBLIC_GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+      # GrowthBook SDK client key (feature flags — docs/feature-flags.md). Same
+      # neutral secret the web build prefixes as VITE_GROWTHBOOK_CLIENT_KEY
+      # (deploy-web.yml). The native root layout (apps/app/src/app/_layout.tsx)
+      # skips loadFeatures when the key is empty, so an unset secret leaves flags
+      # at their in-code fallbacks without breaking the build.
+      EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY: ${{ secrets.GROWTHBOOK_CLIENT_KEY }}
       # League invite/share deep-link base. Without this the app falls back to the
       # hard-coded https://legacysports.app default (app/.../league/[leagueId].tsx),
       # which is NOT the production web domain — invite links would 404. Pin it to

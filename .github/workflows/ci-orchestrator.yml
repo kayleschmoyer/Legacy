@@ -254,10 +254,17 @@ jobs:
           runner-label: ${{ vars.CI_RUNNER_LABEL }}
           github-token: ${{ steps.app-token.outputs.token || github.token }}
 
-      # LS-4182: Idempotency guard — if all 5 required CI checks already
-      # succeeded for this exact SHA, skip the CI Pipeline re-run. A second
-      # pull_request_review event (e.g. from a review dismissal) for an
-      # unchanged SHA must not overwrite successful check_runs with IN_PROGRESS.
+      # LS-4182: Idempotency guard — if every required context is already green
+      # for this exact SHA, skip the CI Pipeline re-run. A second approved-review
+      # submission for an unchanged SHA (a human approval after the bot's, or a
+      # bot re-approval — the only events that reach this guard, since the
+      # workflow fires on `submitted` + `state == approved`) must not spawn a
+      # duplicate pipeline or let a flaky re-run flip a green CI Gate status.
+      # Post-LS-8014 the required set mixes check-RUN contexts (No Merge
+      # Conflicts, Verify All Migrations Applied) and commit-STATUS contexts
+      # (bot-review, CI Gate — marked _commitStatus in ruleset.json), so the
+      # guard evaluates each kind against its own API. Fail-safe direction: on
+      # any read error or doubt, re-run CI.
       - name: "🔍 Check for prior CI success"
         id: check-prior-success
         if: github.event_name == 'pull_request_review'
@@ -276,22 +283,34 @@ jobs:
             const sha = context.payload.pull_request?.head?.sha ?? context.sha;
             const { owner, repo } = context.repo;
 
-            // Load required CI check names dynamically from .github/ruleset.json so
-            // this list stays automatically in sync with branch protection rules.
-            // If the file cannot be read or parsed, CI always runs (fail-safe).
-            let requiredChecks;
+            // Load required contexts dynamically from .github/ruleset.json so this
+            // guard stays automatically in sync with branch protection config.
+            // Post-LS-8014 the required set mixes check-RUN contexts and
+            // commit-STATUS contexts (marked _commitStatus); each kind is
+            // evaluated against its own API below. An empty set is tolerated
+            // without throwing (fail-safe: run CI). If the file cannot be read
+            // or parsed, CI always runs (fail-safe).
+            let checkRunContexts = [];
+            let statusContexts = [];
             try {
               const rulesetPath = path.join(process.env.GITHUB_WORKSPACE, '.github', 'ruleset.json');
               const ruleset = JSON.parse(fs.readFileSync(rulesetPath, 'utf8'));
               const statusRule = (ruleset.rules ?? []).find(
                 r => r.type === 'required_status_checks' && !r._staged
               );
-              const checks = (statusRule?.parameters?.required_status_checks ?? [])
-                .filter(c => c._calledWorkflow && !c._staged)
-                .map(c => c.context);
-              if (checks.length === 0) throw new Error('No _calledWorkflow contexts found in ruleset.json');
-              requiredChecks = checks;
-              core.info(`Loaded ${requiredChecks.length} required CI checks from ruleset.json: ${requiredChecks.join(', ')}`);
+              const entries = (statusRule?.parameters?.required_status_checks ?? [])
+                .filter(c => c.context && !c._staged);
+              checkRunContexts = entries.filter(c => !c._commitStatus).map(c => c.context);
+              statusContexts = entries.filter(c => c._commitStatus).map(c => c.context);
+              if (entries.length === 0) {
+                core.warning('check-prior-success: ruleset.json lists no required contexts — running CI (fail-safe).');
+                core.setOutput('ci-already-passed', 'false');
+                return;
+              }
+              core.info(
+                `Required contexts from ruleset.json — check runs: [${checkRunContexts.join(', ')}]; ` +
+                `commit statuses: [${statusContexts.join(', ')}]`
+              );
             } catch (rulesetErr) {
               core.error(`check-prior-success: Cannot read required checks from ruleset.json (${rulesetErr.message}) — running CI.`);
               core.setOutput('ci-already-passed', 'false');
@@ -299,6 +318,8 @@ jobs:
             }
 
             try {
+              // --- Check runs on the head SHA (required check-run contexts +
+              // in-flight CI detection).
               let allCheckRuns = [];
               let page = 1;
               while (true) {
@@ -322,32 +343,68 @@ jobs:
 
               // Also treat in_progress/queued checks as "already running" — if the
               // synchronize-triggered CI run is still executing when the bot approval
-              // event fires, starting a second run causes ci-pipeline's concurrency
-              // group to cancel the first run's long-running jobs (e.g. E2E), which
-              // fails Summarize & Report and removes merge-when-ready. Skip instead.
+              // event fires, starting a second run wastes a full pipeline (the
+              // orchestrator concurrency group queues it and replays it after the
+              // first run completes). Skip instead.
               const activeNames = new Set(
                 allCheckRuns
                   .filter(cr => cr.status === 'in_progress' || cr.status === 'queued')
                   .map(cr => cr.name)
               );
 
-              const allPassed = requiredChecks.every(name => passedNames.has(name));
-              const anyActive = requiredChecks.some(name => activeNames.has(name));
+              // --- Commit statuses on the head SHA (bot-review, CI Gate).
+              // GitHub returns statuses newest-first; keep the latest state per
+              // context — the same rule GitHub's ruleset evaluator and the
+              // merge-queue processor apply.
+              const latestStatusByContext = new Map();
+              let statusPage = 1;
+              while (true) {
+                const { data } = await github.rest.repos.listCommitStatusesForRef({
+                  owner,
+                  repo,
+                  ref: sha,
+                  per_page: 100,
+                  page: statusPage,
+                });
+                for (const s of data) {
+                  if (!latestStatusByContext.has(s.context)) latestStatusByContext.set(s.context, s.state);
+                }
+                if (data.length < 100) break;
+                statusPage++;
+              }
+
+              const allPassed =
+                checkRunContexts.every(name => passedNames.has(name)) &&
+                statusContexts.every(ctx => latestStatusByContext.get(ctx) === 'success');
+
+              // In-flight CI detection: post-LS-8014 the granular CI jobs
+              // ("🚀 CI Pipeline / lint" etc.) are informational check runs and
+              // `CI Gate` is only posted when the run finishes, so a
+              // still-executing CI run is visible ONLY through the granular
+              // check runs — never through a required context. The prefix must
+              // match the orchestrator's ci-pipeline job name ("🚀 CI Pipeline").
+              const CI_PIPELINE_PREFIX = '🚀 CI Pipeline /';
+              const anyActive =
+                checkRunContexts.some(name => activeNames.has(name)) ||
+                [...activeNames].some(name => name.startsWith(CI_PIPELINE_PREFIX));
 
               if (allPassed) {
-                core.info(`All required CI checks already succeeded for SHA ${sha} — skipping CI re-run.`);
+                core.info(`All required contexts already green for SHA ${sha} — skipping CI re-run.`);
                 core.setOutput('ci-already-passed', 'true');
               } else if (anyActive) {
-                const active = requiredChecks.filter(name => activeNames.has(name));
-                core.info(`CI already running for SHA ${sha} (${active.join(', ')}) — skipping re-run to avoid concurrent cancellation.`);
+                const active = [...activeNames].filter(
+                  name => checkRunContexts.includes(name) || name.startsWith(CI_PIPELINE_PREFIX)
+                );
+                core.info(`CI already running for SHA ${sha} (${active.join(', ')}) — skipping re-run to avoid a duplicate pipeline.`);
                 core.setOutput('ci-already-passed', 'true');
               } else {
-                const pending = requiredChecks.filter(name => !passedNames.has(name) && !activeNames.has(name));
-                core.info(`CI not yet started for SHA ${sha}. Missing: ${pending.join(', ')}`);
+                const pendingRuns = checkRunContexts.filter(name => !passedNames.has(name) && !activeNames.has(name));
+                const pendingStatuses = statusContexts.filter(ctx => latestStatusByContext.get(ctx) !== 'success');
+                core.info(`CI not yet started for SHA ${sha}. Missing: ${[...pendingRuns, ...pendingStatuses].join(', ')}`);
                 core.setOutput('ci-already-passed', 'false');
               }
             } catch (err) {
-              core.error(`check-prior-success: Checks API error — ${err.message}. Falling back to running CI.`);
+              core.error(`check-prior-success: Checks/Statuses API error — ${err.message}. Falling back to running CI.`);
               core.setOutput('ci-already-passed', 'false');
             }
 

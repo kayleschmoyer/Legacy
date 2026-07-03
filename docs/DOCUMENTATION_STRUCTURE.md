@@ -1,378 +1,67 @@
-# Documentation Structure Guide
+# Documentation Structure & Lifecycle Policy
 
-## 📚 Quick Reference
+How `docs/` is organized, where a new document goes, and how documents are marked stale or archived. The directory inventory itself lives in one place — the table in [README.md](README.md) — and is not repeated here.
 
-This document provides a bird's-eye view of the entire documentation structure and helps you quickly find what you need.
+## The two layers
 
----
+| Layer                                   | Audience                                   | Authority for                                                       |
+| --------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------- |
+| `docs/`                                 | Humans (and agents as a reference library) | Architecture, product intent, decisions, incident history, runbooks |
+| [`.agents/skills/`](../.agents/skills/) | Agents (entry: [AGENTS.md](../AGENTS.md))  | Operational procedure: how to build, validate, ship, operate        |
 
-## 🗂️ Main Categories
+When both cover a topic, the skill is operationally authoritative and the doc provides orientation and rationale. Do not restate a skill's procedure in `docs/` (or vice versa) — link to it. The anti-drift rules in [skill-authoring](../.agents/skills/skill-authoring/SKILL.md) (one home per fact, anchors not line numbers, no unmaintained counts, date-stamped volatile facts) apply to `docs/` prose as much as to skills.
 
-### 🚀 **Getting Started** → `/guides/`
+## Where a new document goes
 
-_Start here if you're new to the project_
+| You are writing…                                         | Put it in…                            | Format/authority                                                                                             |
+| -------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| An architectural decision (chosen, not proposed)         | `docs/decisions/NNNN-slug.md`         | [ADR artifact spec](../.agents/skills/dev-process/artifacts/adr.md); append-only, supersede rather than edit |
+| A design proposal needing review                         | `docs/rfcs/LS-####-slug.md`           | [RFC artifact spec](../.agents/skills/dev-process/artifacts/rfc.md)                                          |
+| A postmortem (incident, CVE, revert, Critical-tier work) | `docs/postmortems/YYYY-MM-DD-slug.md` | [postmortems/README.md](postmortems/README.md)                                                               |
+| A test plan too large for one PR body                    | `docs/test-plans/`                    | [test-plans/README.md](test-plans/README.md) — default home is still the PR body                             |
+| A root-cause analysis of a fixed bug                     | `docs/fixes/`                         | Index it in [fixes/README.md](fixes/README.md)                                                               |
+| An oncall/admin procedure                                | `docs/operations/`                    | Runbook format per [operations/README.md](operations/README.md)                                              |
+| System design reference                                  | `docs/architecture/`                  | —                                                                                                            |
+| Product intent (tiers, pricing, feature promises)        | `docs/product/`                       | Human-owned; agents treat as source of truth                                                                 |
+| A how-to for humans                                      | `docs/guides/`                        | If agents need it operationally, it belongs in a skill instead                                               |
+| Agent operating procedure                                | `.agents/skills/<name>/`              | [skill-authoring](../.agents/skills/skill-authoring/SKILL.md); lint with `node scripts/lint-skills.js`       |
 
-- Setting up your development environment
-- Authentication and security basics
-- Common troubleshooting steps
-- Agent commands reference
+Never hand-edit `docs/design/` (machine-owned by `/sync-designs` — see [design/README.md](design/README.md)).
 
-**Best for**: New developers, onboarding, quick setup
+## Status markers
 
----
+Every directory carries a status in the [README.md directory map](README.md#directory-map): **Current**, **Mixed** (check per-doc dates), **Historical**, **Legacy** (superseded, replacement named), **Machine-owned**, or **Aspirational**.
 
-### 🏗️ **Architecture** → `/architecture/`
+For an individual stale document, add a banner directly under the H1 rather than deleting it:
 
-_Understanding how the system works_
-
-- Build system and dependency management
-- Cross-platform architecture
-- Database schema and design
-- GraphQL API structure
-- Schema validation patterns
-
-**Best for**: Understanding system design, making architectural decisions
-
----
-
-### 🔐 **Authentication** → `/authentication/`
-
-_OAuth, user management, and security_
-
-- OAuth 2.0 implementation
-- CLI authentication
-- Auto-provisioning users
-- Invite code system
-- Two-lambda authentication pattern
-- Google OAuth domain setup
-
-**Best for**: Auth-related features, user onboarding, security implementation
-
----
-
-### ⚙️ **CI/CD** → `/ci-cd/`
-
-_Continuous integration and deployment pipelines_
-
-- GitHub Actions workflows
-- CI system architecture
-- Badge implementation
-- Merge queue configuration
-- PR automation
-- Troubleshooting CI issues
-- Intelligent DTE detection
-
-**Best for**: DevOps, pipeline maintenance, CI optimization
-
----
-
-### 🔧 **Build & Tooling** → `/build-and-tooling/`
-
-_Nx, Jest, and development tools_
-
-- Nx Cloud configuration and optimization
-- Jest testing setup
-- E2E testing
-- Package.json standards
-- Build performance optimization
-- DTE (Distributed Task Execution)
-
-**Best for**: Build optimization, test configuration, Nx Cloud usage
-
----
-
-### ☁️ **Deployment** → `/deployment/`
-
-_AWS infrastructure and deployment_
-
-#### Main Deployment Docs:
-
-- AWS infrastructure overview
-- Cost optimization strategies
-- Lambda deployment
-- Route53 and DNS setup
-- HTTPS certificates
-- Infrastructure changelog
-
-#### Terraform Subdirectory: `/deployment/terraform/`
-
-- Terraform setup and configuration
-- State management
-- Lambda infrastructure as code
-- Lock management
-- Quick reference guide
-
-**Best for**: Infrastructure changes, AWS deployment, Terraform operations
-
----
-
-### 🛡️ **Security** → `/security/`
-
-_Security scanning, secrets, and audits_
-
-- Security audit status
-- Scanning implementation
-- Security optimization
-- GitHub secrets management
-
-**Best for**: Security reviews, secret management, compliance
-
----
-
-### 📱 **Mobile** → `/mobile/`
-
-_React Native and Android development_
-
-- Android build setup
-- Version matrix and compatibility
-- Mobile build automation
-- Platform-specific considerations
-
-**Best for**: Mobile developers, Android builds, native features
-
----
-
-### 🌐 **Web** → `/web/`
-
-_Next.js and web application_
-
-- Web build configurations
-- Hash routing setup
-- Navigation menu structure
-- Web-specific optimizations
-
-**Best for**: Web developers, Next.js configuration, frontend features
-
----
-
-### 💾 **Database** → `/database/`
-
-_Database migrations and schema changes_
-
-- Drizzle ORM upgrades
-- Migration analysis
-- Database optimization
-
-**Best for**: Database changes, ORM upgrades, schema migrations
-
----
-
-### 📋 **Migration History** → `/migration-history/`
-
-_Historical records of completed work_
-
-- Feature implementation summaries
-- System migrations
-- Refactoring records
-- Completed improvements
-
-**Best for**: Understanding past decisions, historical context
-
----
-
-### 🤖 **AI Agents** → `/agents/`
-
-_Structured instructions for AI assistance_
-
-- Platform component rules (CSV)
-- Build system guidelines (CSV)
-- Security guidelines (CSV)
-- Testing strategies (CSV)
-- Type safety rules (CSV)
-
-**Best for**: AI-assisted development, automated tooling
-
----
-
-## 📊 Documentation by Role
-
-### 👨‍💻 **Software Developer**
-
-```
-1. /guides/development-setup.md
-2. /architecture/cross-platform-system.md
-3. /guides/authentication-guide.md
-4. /architecture/database-schema.md
-5. /guides/troubleshooting.md
+```markdown
+> **Status: historical (YYYY-MM-DD).** Superseded by [link]. Kept for context.
 ```
 
-### ☁️ **DevOps Engineer**
+Rules:
 
-```
-1. /deployment/aws-infrastructure.md
-2. /ci-cd/ci-system-documentation.md
-3. /deployment/terraform/
-4. /security/
-5. /deployment/cost-optimization.md
-```
+- A doc that states point-in-time facts (a launch state, a staged rollout, an open bug) must date-stamp them inline ("as of YYYY-MM-DD"). Undated snapshots become silent lies.
+- Do not silently rewrite history in `decisions/` or `postmortems/` — ADRs are superseded by new ADRs; postmortems are immutable records.
 
-### 📱 **Mobile Developer**
+## Archive policy
 
-```
-1. /mobile/android-build-setup.md
-2. /architecture/cross-platform-system.md
-3. /authentication/
-4. /guides/troubleshooting.md
-5. /mobile/mobile-build-automation.md
-```
+- When a directory accumulates superseded material, move it to `<dir>/archive/` and list it in the directory's README. Precedent: [ci-cd/archive/](ci-cd/archive/).
+- Completed-migration summaries live in [migration-history/](migration-history/) — that whole directory is the archive for "how we got here" records.
+- Prefer **banner + archive** over deletion when the doc explains a decision or incident; prefer **deletion** when the doc is simply wrong about the current system and teaches nothing (broken runbooks are worse than no runbooks).
 
-### 🌐 **Web Developer**
+## Freshness
 
-```
-1. /web/web-build-configurations.md
-2. /architecture/cross-platform-system.md
-3. /authentication/
-4. /web/navigation-menu-reorganization.md
-5. /guides/troubleshooting.md
-```
+- Documentation ships **in the same PR** as the change it describes — enforced as a process gate: [documentation-freshness](../.agents/skills/dev-process/gates/documentation-freshness.md).
+- Cite stable anchors and symbols, not line numbers; never write counts of growable sets ("N skills", "N packages") — link the directory instead.
+- Every category directory should keep a `README.md` index so status is visible without opening each file.
 
-### 🧪 **QA Engineer**
+## Naming conventions
 
-```
-1. /build-and-tooling/e2e-testing-migration.md
-2. /build-and-tooling/jest-changed-files-config.md
-3. /ci-cd/ci-system-documentation.md
-4. /guides/troubleshooting.md
-```
+- `kebab-case.md` for new files; prefix by topic when it aids sorting (`ci-*`, `terraform-*`).
+- ADRs: `NNNN-slug.md` (zero-padded, sequential). RFCs: `LS-####-slug.md` (ticket-keyed) or `draft-slug.md` before a ticket exists. Postmortems: `YYYY-MM-DD-slug.md`.
 
-### 🏗️ **Platform Engineer**
+## Provenance and maintenance
 
-```
-1. /build-and-tooling/nx-cloud-optimization-strategy.md
-2. /ci-cd/
-3. /architecture/build-system.md
-4. /deployment/
-```
-
----
-
-## 🔍 Finding Documentation
-
-### By Topic
-
-| Topic             | Location                                               |
-| ----------------- | ------------------------------------------------------ |
-| AWS Setup         | `/deployment/aws-infrastructure.md`                    |
-| Authentication    | `/authentication/`                                     |
-| Build Performance | `/build-and-tooling/nx-cloud-optimization-strategy.md` |
-| CI/CD Pipeline    | `/ci-cd/ci-system-documentation.md`                    |
-| Cross-Platform    | `/architecture/cross-platform-system.md`               |
-| Database Schema   | `/architecture/database-schema.md`                     |
-| Deployment        | `/deployment/`                                         |
-| Development Setup | `/guides/development-setup.md`                         |
-| Docker            | `/deployment/aws-infrastructure.md`                    |
-| GitHub Actions    | `/ci-cd/`                                              |
-| GraphQL           | `/architecture/graphql-integration.md`                 |
-| Jest Testing      | `/build-and-tooling/jest-changed-files-config.md`      |
-| Lambda Functions  | `/deployment/lambda-build-strategy.md`                 |
-| Mobile Builds     | `/mobile/`                                             |
-| Nx Cloud          | `/build-and-tooling/` (all nx-\* files)                |
-| OAuth             | `/authentication/`                                     |
-| React Native      | `/mobile/`                                             |
-| Security          | `/security/`                                           |
-| Terraform         | `/deployment/terraform/`                               |
-| Troubleshooting   | `/guides/troubleshooting.md`                           |
-| TypeScript        | `/architecture/`                                       |
-| Web App           | `/web/`                                                |
-
----
-
-## 📈 Documentation Maturity
-
-### ✅ **Mature & Complete**
-
-- Development guides (`/guides/`)
-- Architecture documentation (`/architecture/`)
-- CI/CD system (`/ci-cd/`)
-- Authentication system (`/authentication/`)
-
-### 🚧 **In Progress**
-
-- API documentation (`/api/`)
-- Deployment runbooks (`/deployment/`)
-- Security scanning (`/security/`)
-
-### 📝 **Planned**
-
-- Architecture Decision Records (ADRs)
-- Component library documentation
-- Performance optimization guides
-- Disaster recovery procedures
-
----
-
-## 🎯 Common Tasks
-
-### "I need to deploy a Lambda function"
-
-```
-1. /deployment/lambda-build-strategy.md
-2. /deployment/terraform/terraform-lambda-deployment.md
-3. /deployment/s3-lambda-deployment.md
-```
-
-### "I need to set up OAuth"
-
-```
-1. /authentication/oauth-auto-provisioning.md
-2. /authentication/CLI_OAUTH_AUTHENTICATION.md
-3. /guides/authentication-guide.md
-```
-
-### "CI is failing"
-
-```
-1. /ci-cd/ci-troubleshooting-guide.md
-2. /ci-cd/ci-system-documentation.md
-3. /build-and-tooling/nx-cloud-quota-fix.md
-```
-
-### "I need to optimize build times"
-
-```
-1. /build-and-tooling/nx-cloud-optimization-strategy.md
-2. /build-and-tooling/intelligent-dte-detection.md
-3. /architecture/build-system.md
-```
-
-### "Setting up a new developer"
-
-```
-1. /guides/development-setup.md
-2. /guides/authentication-guide.md
-3. /guides/troubleshooting.md
-4. /architecture/cross-platform-system.md
-```
-
----
-
-## 🔄 Keeping Documentation Current
-
-### When to Update Documentation
-
-1. **Feature Implementation**: Add to migration-history, update relevant guides
-2. **Architecture Changes**: Update architecture/ docs
-3. **Deployment Changes**: Update deployment/ docs
-4. **CI/CD Changes**: Update ci-cd/ docs
-5. **Security Changes**: Update security/ docs
-
-### Documentation Standards
-
-- Use clear, descriptive titles
-- Include table of contents for long documents
-- Add code examples where applicable
-- Link to related documentation
-- Include troubleshooting sections
-- Date significant changes
-
----
-
-## 📞 Questions or Issues?
-
-- Can't find documentation? Check `/guides/troubleshooting.md`
-- Documentation outdated? Create an issue or PR
-- New feature needs docs? Add to appropriate category
-
----
-
-_Last updated: February 28, 2026_
+- 2026-07-02: rewritten from the skills/docs audit (`scratch/skills-audit/`); replaced the 2026-02 version that omitted eight directories and listed shipped ADRs as "planned".
+- Verify placement table targets exist: `ls docs/decisions docs/rfcs docs/postmortems docs/test-plans docs/fixes docs/operations docs/product`
+- Verify archive precedent: `ls docs/ci-cd/archive`

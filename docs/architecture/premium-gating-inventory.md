@@ -60,16 +60,22 @@ for these is **guaranteed** (the seed derives from the same map).
 | `auction_draft`             | Auction draft mode                  | ✅                | `leagues/mutations.ts`                                           |
 | `extended_trade_expiration` | Extended trade expiration           | ✅                | `trades/mutations.ts`                                            |
 
-### ✅ Gap A (resolved, LS-6475) — `advanced_football_stats` removed
+### ✅ Gap A (resolved, LS-6475 — code removal completed 2026-07-02) — `advanced_football_stats` removed
 
 Previously the entitlement was seeded into Stripe and attached to the premium
-product, but **no resolver or UI gate referenced it**, and the underlying stats
-(snap %, target share, air yards, EPA, red-zone touches) exist nowhere in the
-schema, resolver, GraphQL, UI, or any data source — Pro Football Reference does
-not publish them. Rather than bill for a feature that could not be delivered, the
-entitlement was **removed** from `ENTITLEMENTS` (LS-6475 / FPL-028). If these
-stats are ever sourced (e.g. an nflverse / Next Gen Stats ingestion pipeline),
-re-add the key and gate it then.
+product, but (at audit time, 2026-06-13) **no resolver or UI gate referenced
+it**, and the underlying stats (snap %, target share, air yards, EPA, red-zone
+touches) exist nowhere in the schema, resolver, GraphQL, UI, or any data
+source — Pro Football Reference does not publish them. Rather than bill for a
+feature that could not be delivered, the entitlement was **removed** from
+`ENTITLEMENTS` (LS-6475 / FPL-028). If these stats are ever sourced (e.g. an
+nflverse / Next Gen Stats ingestion pipeline), re-add the key and gate it then.
+
+**Note the decision-to-code lag:** the removal was decided 2026-06-14 but the
+key stayed live until **2026-07-02**, and LS-8045 (2026-06-28) shipped a UI
+gate keyed on it in the interim (since re-keyed to `advanced_search_filters`).
+Full record: the 2026-07-02 entry in the
+[`subscription-tiers.md` change log](../product/subscription-tiers.md#change-log).
 
 ---
 
@@ -94,6 +100,7 @@ entitlement?" column is the crux of your concern.
 | **Live Draft**                                        | `EliteDraftBoard` (web)                                                              | n/a — **now FREE** (this PR)                                                                      | n/a — premium gate removed (this PR)                                                            |
 | **Trade Analyzer**                                    | `TradeCenterPage`                                                                    | ❌ **none** (distinct from `extended_trade_expiration`)                                           | ❌ no backend gate                                                                              |
 | **Projections teaser** (`PROJECTIONS_FEATURE_NAME`)   | `FootballPlayerDetailPage`                                                           | ❌ **none**                                                                                       | ❌ no backend gate                                                                              |
+| Logo Upload                                           | Team tab (`league-detail-v2/tabs/Team.tsx`, web) — LS-5946                           | ✅ `logo_upload`                                                                                  | 🖥️ UI-gated only — the `image-upload` Lambda enforces team **ownership**, not premium           |
 
 ### ⚠️ Gap B — UI-gated "premium" features (status updated by this PR)
 
@@ -158,9 +165,11 @@ Recommendations). Worth aligning the three lists.
 ## Summary of action items
 
 1. ~~**Gap A:** `advanced_football_stats` is in Stripe but enforced nowhere~~ —
-   **resolved (LS-6475):** the stats have no data source, so the entitlement was
-   removed from `ENTITLEMENTS` rather than left billed-but-dead. Re-add when/if
-   the stats are sourced.
+   **resolved (LS-6475, code removal completed 2026-07-02):** the stats have no
+   data source, so the entitlement was removed from `ENTITLEMENTS` rather than
+   left billed-but-dead. Re-add when/if the stats are sourced. Manual owner
+   step outstanding: detach/archive the orphaned Feature in any live Stripe
+   account (`seed-stripe` never deletes).
 2. ~~**Gap B:** … no Stripe entitlement and no backend enforcement~~ —
    **addressed by this PR:** all listed features now carry an `ENTITLEMENTS` key;
    Live Draft is Free; AI Matchup Recap + Draft Recommendations are
@@ -175,5 +184,5 @@ Recommendations). Worth aligning the three lists.
 **Bottom line:** Your instinct is correct. Of the features the product treats as
 premium, only the 8 league/draft/trade-configuration entitlements are fully
 covered end-to-end. The dead `advanced_football_stats` entitlement has since been
-removed (LS-6475), and at least seven UI-gated "premium" features have no Stripe
-entitlement behind them at all.
+removed (LS-6475; code removal completed 2026-07-02), and at least seven UI-gated
+"premium" features have no Stripe entitlement behind them at all.

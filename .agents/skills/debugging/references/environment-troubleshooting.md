@@ -1,86 +1,86 @@
----
-name: troubleshoot
-description: 'Fix common dev environment and production problems: module-not-found errors, DB connectivity, port conflicts, Nx cache corruption, EPERM file locks, AWS auth failures, Terraform state locks, and Rollbar noise. Use when the dev environment breaks, CI shows environment-related errors, or production error reporting is degraded.'
----
+# Environment Troubleshooting
 
-# Skill: Troubleshooting
-
-## Overview
-
-Quick-reference fixes for common development environment issues in the Legacy Sports monorepo.
+Quick-reference fixes for common dev-environment issues. Commands are shown for bash (the Bash tool, CI, cloud agents); PowerShell variants are noted only where they differ. Full port map and service startup live in [dev-environment](../../dev-environment/SKILL.md); Make/Nx tooling detail lives in [repo-tooling](../../repo-tooling/SKILL.md).
 
 ## Common Fixes by Symptom
 
 ### Module Not Found
 
-```powershell
-# Build library dependencies first
+```bash
 pnpm run build:libs
 ```
 
 ### DB Connection Fails / Credentials Stale
 
-```powershell
-pnpm run sync-env
+```bash
+pnpm run sync-env      # PowerShell-backed on Windows; see dev-environment for the cloud story
+pnpm run db:test       # verify the connection afterwards
+pnpm run db:credentials  # inspect what credentials are in use
 ```
 
 ### Port Already in Use
 
-```powershell
-pnpm dlx kill-port 3000
-pnpm dlx kill-port 4000
+The web dev server runs on **4200** (`apps/web/vite.config.mts`); see [dev-environment](../../dev-environment/SKILL.md) for the full port map (lambdas 5000-5003, Postgres 5432, Storybook 6009).
+
+```bash
+pnpm dlx kill-port 4200
 ```
 
 ### Nx Cache Issues (Unexpected Build Results)
 
-```powershell
-pnpm exec nx reset
+Before clearing the cache, use `make clean-cache` — in a pooled-symlink worktree it re-links `node_modules` afterwards. Running `pnpm exec nx reset` directly destroys the pool symlink (LS-5242, AGENTS.md Tier 2) and takes every stdio MCP server down with it.
+
+```bash
+make clean-cache       # alias: make reset
 ```
 
-### AWS CLI Encoding Errors (Unicode/emoji)
+### AWS CLI Encoding Errors (Unicode/emoji, Windows)
 
 ```powershell
 $env:PYTHONIOENCODING = "utf-8"
 $env:AWS_PAGER = ""
 ```
 
-### `acli` or `twig` Not Found
+### `acli` or `twig` Not Found (Windows)
 
 ```powershell
-# Refresh PATH
+# Refresh PATH in the current session
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 ```
 
-### EPERM / Native Addon File Lock (`bufferutil.node`)
+### EPERM / Native Addon File Lock (`bufferutil.node`, Windows)
 
 Symptom: `ERR_PNPM_EPERM ... unlink ... node_modules\bufferutil\...\bufferutil.node` during `make install` or `make clean`.
 
 A background node process (usually the VS Code Playwright extension's `test-server` or a manually started dev server) is holding a native `.node` addon open.
 
-```powershell
-# Identify the lock-holding process (preview without killing)
-make kill-stale DRYRUN=1
-
-# Kill stale node processes holding native addon locks
-make kill-stale
-
-# Then retry
-make clean install
+```bash
+make kill-stale DRYRUN=1   # preview which processes hold locks
+make kill-stale            # kill them
+make clean install         # then retry
 ```
 
-If `make kill-stale` reports no processes but the error persists, a non-node process may hold the lock. Use Process Explorer or `handle.exe` from Sysinternals to find it.
+If `make kill-stale` reports no processes but the error persists, a non-node process may hold the lock — use Process Explorer or Sysinternals `handle.exe`.
+
+### Stdio MCP Servers Missing or Timing Out
+
+Verify `node_modules/.bin/tsx` exists — servers start with `pnpm exec tsx ...` and time out silently when the install is broken. Recover with `node scripts/modules-pool/link.mjs`, then restart the servers (see AGENTS.md "MCP Servers").
 
 ### Terraform State Locked
 
-```powershell
-node scripts/terraform-unlock.js
+```bash
+node scripts/terraform-unlock.js          # check for locks
+node scripts/terraform-unlock.js --latest # release the most recent lock
 ```
+
+For the incident history and CI auto-clearing behavior, see the [terraform skill](../../terraform/SKILL.md).
 
 ### Complete Reset (Nuclear Option)
 
-```powershell
-Remove-Item -Recurse -Force node_modules
-pnpm install
+Precondition: never delete `node_modules` or run `pnpm install` directly in a pooled-symlink worktree — `node_modules` there is a symlink into the shared pool (see `docs/rfcs/modules-pool/`). Use the Make targets, which route through the pool correctly:
+
+```bash
+make clean install
 pnpm run build:libs
 ```
 
@@ -90,153 +90,101 @@ pnpm run build:libs
 
 ### TypeScript Errors
 
-1. Run `pnpm run build:libs` — resolves most "module not found" type errors
-2. If generated types are stale: `pnpm exec nx run <project>:codegen`
-3. For other errors: see [fix-types.md](../../repo-tooling/SKILL.md)
+1. `pnpm run build:libs` — resolves most "module not found" type errors
+2. Stale generated types: `pnpm exec nx run <project>:codegen` (or `make codegen` after schema changes)
+3. Other errors: see [repo-tooling](../../repo-tooling/SKILL.md)
 
 ### Linting Errors
 
-1. `pnpm exec nx affected -t lint --fix` — auto-fixes ~80%
-2. For remaining errors: see [fix-lint.md](../../repo-tooling/SKILL.md)
+1. `pnpm exec nx affected -t lint --fix` — auto-fixes most
+2. Remaining errors: see [fix-lint](../../repo-tooling/references/fix-lint.md)
 
 ### Test Failures
 
 1. Read the failure message carefully
 2. Snapshot mismatch: `pnpm exec nx test <project> --updateSnapshot`
 3. DB connection issue: `pnpm run sync-env`
-4. If implementation changed intentionally, update the test
+4. If implementation changed intentionally, update the test — see [testing](../../testing/SKILL.md)
 
 ### Build Failures
 
-1. Ensure dependencies installed: `pnpm install`
+1. Dependencies installed the pool-safe way: `make install`
 2. Build libs first: `pnpm run build:libs`
-3. Check for circular dependencies: `pnpm exec nx graph`
-
-### Database Issues
-
-```powershell
-# Test connection
-pnpm run db:test
-
-# Sync credentials
-pnpm run sync-env
-
-# Check credentials
-pnpm run db:credentials
-```
+3. Circular dependencies: `pnpm exec nx graph`
 
 ### CI Failures
 
-```powershell
-# Always verify locally first (preferred over waiting on GitHub CI)
-make pc
-```
-
-If a remote-only failure occurs, view CI logs:
-
-**MCP (preferred):**
+Reproduce locally with the chunked validation pipeline (see AGENTS.md "Validate with seven pc-\* chunks" and [workflow-overview](../../workflow-overview/SKILL.md) for the environment binding), then debug remote-only failures from logs:
 
 ```
-# List recent runs on the branch
 ci_list_runs(branch: "BRANCH_NAME", limit: 5)
-
-# Fetch failed logs
 ci_get_logs(runId: RUN_ID, failedOnly: true)
-
-# Re-run failed jobs (only for flaky / transient failures)
-ci_rerun_failed_jobs(runId: RUN_ID)
+ci_rerun_failed_jobs(runId: RUN_ID)   # only for flaky/transient failures
 ```
 
-**Shell fallback:**
-
-```powershell
-gh run list --branch <branch> --limit 5
-gh run view <run-id> --log-failed
-
-# Re-run failed jobs (only for flaky / transient failures)
-gh run rerun <run-id> --failed
-```
+Full playbook: [ci-failure.md](ci-failure.md).
 
 ### Production Client Errors (Rollbar)
 
-When investigating browser console errors from production:
-
-1. **Check Rollbar rate limits first** — `maxItems` (50/session) and `itemsPerMinute` (25) in `lib/rollbar/src/lib/rollbar.web.ts`. Noisy browser warnings from third-party scripts (e.g. Google Identity Services COOP warnings) can exhaust these limits and **silently drop real errors**.
-2. **Check `checkIgnore` filter** — if a new class of browser noise appears, add it to the `checkIgnore` callback in `rollbar.web.ts`. Existing filters: AbortError, Failed to fetch, WebSocket error/closed, ResizeObserver loop. (COOP/COEP warnings are **not** filtered today — if they become noisy, add a filter.)
-3. **Rollbar 429 = symptom, not cause** — a `POST api.rollbar.com 429` means the Rollbar API is rejecting requests due to server-side rate limiting (account plan limits). This is distinct from the client-side `maxItems`/`itemsPerMinute` caps. Find what's flooding Rollbar before assuming a transient service issue.
-4. **Third-party script errors are not actionable** — errors from Google's GIS `client` script, browser extensions, or ad blockers should be filtered, not fixed. Verify the error originates from our code before investigating.
+Moved to [prod-errors.md](prod-errors.md) — Rollbar MCP tools, the error-classification convention, and the client-side noise/rate-limit checklist.
 
 ### Git / Branch Issues
 
-```powershell
-# Check current state
+```bash
 git status
 git branch
-
-# View branch tree
-twig tree
-
-# Rebase dependent branches
-make rebase-tree
+twig tree            # view branch tree (local Windows sessions; twig is not installed on cloud agents)
+make rebase-tree     # rebase dependent branches
 ```
 
 ---
 
 ## Quick Issue → Fix Lookup
 
-| Problem                | Fix                                             |
-| ---------------------- | ----------------------------------------------- |
-| `acli not found`       | Refresh PATH (see above)                        |
-| Module not found       | `pnpm run build:libs`                           |
-| Type errors            | See [fix-types.md](../../repo-tooling/SKILL.md) |
-| DB connection fails    | `pnpm run sync-env`                             |
-| Port in use            | `pnpm dlx kill-port 3000`                       |
-| Nx cache issues        | `pnpm exec nx reset`                            |
-| AWS CLI encoding error | `$env:PYTHONIOENCODING = "utf-8"`               |
-| Terraform state locked | `node scripts/terraform-unlock.js`              |
-| Rollbar 429 / errors   | Check `checkIgnore` in `rollbar.web.ts`         |
-
-## Related Skills
-
-- [fix-types](../../repo-tooling/SKILL.md) — TypeScript error fixes
-- [fix-lint](../../repo-tooling/SKILL.md) — ESLint error fixes
-- [sync-env](../../sync-env/SKILL.md) — Environment sync
-- [aws-sso-login](../../aws-sso-login/SKILL.md) — AWS authentication
+| Problem                | Fix                                                            |
+| ---------------------- | -------------------------------------------------------------- |
+| `acli not found`       | Refresh PATH (see above)                                       |
+| Module not found       | `pnpm run build:libs`                                          |
+| Type errors            | [repo-tooling](../../repo-tooling/SKILL.md)                    |
+| DB connection fails    | `pnpm run sync-env`                                            |
+| Port in use            | `pnpm dlx kill-port 4200`                                      |
+| Nx cache issues        | `make clean-cache`                                             |
+| Stdio MCP servers dead | `node scripts/modules-pool/link.mjs`                           |
+| AWS CLI encoding error | `$env:PYTHONIOENCODING = "utf-8"`                              |
+| Terraform state locked | `node scripts/terraform-unlock.js`                             |
+| Rollbar noise / 429    | [prod-errors.md](prod-errors.md#client-side-web-rollbar-noise) |
 
 ## Nx Cache Reset (Detailed)
 
-When `make reset` isn't enough:
+Escalate one level at a time — the Nx cache makes builds much faster, so only reset when actually needed.
 
 ### Level 1: Cache Only (Fastest)
 
-```powershell
-make reset                   # Clears .nx/cache/ and stops daemon
-# or: pnpm exec nx reset
+```bash
+make clean-cache     # clears .nx cache, stops daemon, re-links pooled node_modules
 ```
 
 ### Level 2: Full Clean (Slower)
 
-```powershell
-make clean:all               # Cache + node_modules
-pnpm install
+```bash
+make clean install
 pnpm run build:libs
 ```
 
-### Level 3: Nuclear (Slowest)
+### Level 3: Daemon Won't Stop
 
-```powershell
-Remove-Item -Recurse -Force node_modules, .nx, dist, coverage
-pnpm install
-pnpm run build:libs
-pnpm run validate
-```
-
-### Daemon Won't Stop
-
-```powershell
+```bash
 pnpm exec nx daemon --stop
-Start-Sleep -Seconds 2
-pnpm exec nx reset
+make clean-cache
 ```
 
-**Don't overuse cache clearing!** Nx cache makes builds much faster. Only reset when actually needed.
+(Note: the Nx daemon is disabled on Windows — `NX_DAEMON=false` — so this level applies to Linux/cloud only.)
+
+## Provenance and maintenance
+
+Rewritten 2026-07-02 by the skills audit (debugging-playbook refresh): removed banned `pnpm exec nx reset` advice (3x), nonexistent `make clean:all`, stale ports 3000/4000, dead `sync-env`/`aws-sso-login` skill links, and the raw `Remove-Item node_modules; pnpm install` reset that breaks the modules pool. Re-verify volatile facts:
+
+- Make targets: `grep -n "^clean-cache:\|^kill-stale:\|^install:\|^rebase-tree:" Makefile`
+- Root scripts: `node -e "console.log(Object.keys(require('./package.json').scripts))"`
+- Web port: `grep -n "port" apps/web/vite.config.mts`
+- Unlock script: `ls scripts/terraform-unlock.js`

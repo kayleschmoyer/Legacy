@@ -10,7 +10,8 @@
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "cache": true,
       "options": {
-        "jestConfig": "lambdas/image-upload/jest.config.ts"
+        "jestConfig": "lambdas/image-upload/jest.config.ts",
+        "passWithNoTests": false
       }
     },
     "typecheck": {

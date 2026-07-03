@@ -229,7 +229,7 @@ jobs:
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
               echo '**Suite:** Integration (real server, sharded) + E2E (3 shards)'
-              echo '**Browser:** chromium · **Workers:** 4 · **Retries:** 2'
+              echo '**Browser:** chromium · **Workers:** e2e 4 / integration 1 · **Retries:** e2e 2 / integration 0'
               echo '**Filters:** none — all tests including @slow'
               echo 'EOF_PLAYWRIGHT_NOTIFY'
             } >> "$GITHUB_OUTPUT"
@@ -239,7 +239,7 @@ jobs:
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
               echo '**Suite:** Integration (real server, sharded) + E2E (3 shards)'
-              echo '**Browser:** chromium · **Workers:** 4 · **Retries:** 2'
+              echo '**Browser:** chromium · **Workers:** e2e 4 / integration 1 · **Retries:** e2e 2 / integration 0'
               echo '**Filters:** none — all tests including @slow'
               echo 'EOF_PLAYWRIGHT_NOTIFY'
             } >> "$GITHUB_OUTPUT"
@@ -1159,7 +1159,7 @@ jobs:
           # Build test run summary
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
             SUMMARY_LINE1="**Suite:** Integration (real server, sharded) + E2E (3 shards)"
-            SUMMARY_LINE2="**Browser:** chromium · **Workers:** 4 · **Retries:** 2"
+            SUMMARY_LINE2="**Browser:** chromium · **Workers:** e2e 4 / integration 1 · **Retries:** e2e 2 / integration 0"
             SUMMARY_LINE3="**Filters:** none — all tests including @slow"
           else
             SUITE="${{ inputs['test-suite'] || 'e2e' }}"

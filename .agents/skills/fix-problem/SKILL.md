@@ -1,6 +1,6 @@
 ---
 name: fix-problem
-description: 'End-to-end problem resolution: elicit a problem description from the user through structured dialogue, investigate the root cause in the codebase, create a Jira ticket with findings, and implement the fix — all in one session. Use when the user reports a bug, describes unexpected behavior, or says something is broken and wants it fixed.'
+description: 'End-to-end problem resolution: elicit a problem description from the user through structured dialogue, investigate the root cause, create a Jira ticket with findings, and implement the fix — all in one session. Load when: the user reports a bug, describes unexpected behavior, pastes an error/screenshot/stack trace, or says something is broken and wants it fixed without an existing ticket.'
 ---
 
 # Skill: Fix Problem
@@ -136,33 +136,19 @@ After creation, announce the ticket key:
 
 **Goal:** fix the defect, validate, and ship a PR.
 
-Follow the [work-ticket](../work-ticket/SKILL.md) leaf mode workflow from Step 2 onward, with these bug-specific requirements:
+Run the [work-ticket](../work-ticket/SKILL.md) leaf-mode workflow from Step 2 onward. Step ordering — commit → push → **draft PR before validation** → migrations → validate → self-review → mark ready → watch to merge — is owned by the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md) and bound per environment there; do not reorder it here. Layer these bug-specific requirements on top:
 
-1. **Environment setup** — use the environment-appropriate setup from `work-ticket`: in native/local flow, verify you're in an ephemeral worktree and run `node scripts/modules-pool/link.mjs` if not already done; in cloud/non-worktree flow, work directly in the repo root and do not require an ephemeral worktree.
+1. **Reproduce before fixing** — follow the [verification-by-bug-type table](../debugging/SKILL.md#verification-by-bug-type). Capture before-state evidence (screenshot, failing test, query result). This is not optional — you cannot prove a fix works without showing the broken state first.
 
-2. **Reproduce before fixing** — follow the [verification-by-bug-type table](../debugging/SKILL.md#verification-by-bug-type). Capture before-state evidence (screenshot, failing test, query result). This is not optional — you cannot prove a fix works without showing the broken state first.
+2. **Fix the root cause** — **precondition for committing the fix: the change targets the root cause identified in Phase 2, not a symptom**; a symptom patch leaves the defect free to recur in adjacent flows. **Precondition for any `@ts-ignore` / `eslint-disable`: a separate ticket documents why the types or code cannot be fixed.** Use `LOGGER` instead of `console.*`.
 
-3. **Write the fix** — address the root cause identified in Phase 2. **Precondition for committing the fix: the change targets the root cause, not a symptom**; a symptom patch leaves the defect free to recur in adjacent flows. **Precondition for any `@ts-ignore` / `eslint-disable`: a separate ticket documents why the types or code cannot be fixed.** Use `LOGGER` instead of `console.*`.
+3. **Write a regression test** — every bug fix must include a test that would have caught the defect. The test must fail against the old code and pass against the fix.
 
-4. **Write a regression test** — every bug fix must include a test that would have caught the defect. The test must fail against the old code and pass against the fix.
+4. **Verify after fixing** — re-run the exact reproduction from step 1 and confirm the broken behavior is gone. Capture after-state evidence. Include both under a `## Verification` section in the PR body (appended after the standard template — see [debugging](../debugging/SKILL.md#verification-by-bug-type)).
 
-5. **Verify after fixing** — re-run the exact reproduction from step 2. Confirm the broken behavior is gone. Capture after-state evidence.
+5. **Keep the Jira path selected in Phase 3a** — ticket transitions and the `## Implementation Notes` comment (work-ticket Step 4; AC verification is Step 7a) use the same path for the rest of the session: custom Jira MCP tools (`jira_transition`, `jira_edit_ticket`) when available, otherwise the Atlassian-plugin equivalents from `cloud-agent-mode`.
 
-6. **Write implementation notes to Jira** — append `## Implementation Notes` to the ticket description per work-ticket step 5a, using the same Jira path selected in Phase 3a. If Phase 3a switched to the Atlassian plugin, use the plugin edit/update equivalent from `cloud-agent-mode` instead of custom Jira MCP tools such as `jira_edit_ticket`.
-
-7. **Self-review** — run the [self-review phase](../pr-lifecycle/references/self-review.md).
-
-8. **Validate** — `pnpm --prefix lib/db-client run db:status` + `db:up`, then `make_run(target: "pc")`. Must pass.
-
-9. **Ship** — `worktree_commit` -> `worktree_push` -> `github_create_pr` (draft, title includes `LS-####`) and save the returned PR as `pr` -> `github_manage_labels(prs: [pr.number], add: ["agent-in-progress"])` -> `github_mark_pr_ready(number: pr.number)` -> `github_request_review(prs: [pr.number])` -> transition the Jira ticket to **In Review** using the same Jira path selected in Phase 3a (`jira_transition` when custom Jira MCP is available; otherwise use the Atlassian plugin equivalent from `cloud-agent-mode`).
-
-10. **Watch to merge** — Claude Code surfaces CI failures, review comments, and conflicts natively. Handle each event as it arrives until the PR merges. Use the actual Jira ticket key created earlier in the workflow in place of `LS-####`. Do not stop at PR creation.
-
-11. **MCP gap audit** — after merge, run the [mcp-first gaps reference](../mcp-first/references/gaps.md) Phase 1.
-
-12. **Complete tracking** — mark tasks completed only after merge + gap audit.
-
-Include before/after evidence in the PR body under a `## Verification` section.
+6. **Drive to merge** — the flow ends only at PR merged → Jira "Done" → MCP gap audit ([gaps reference](../mcp-first/references/gaps.md) Phase 1) → tracking tasks completed. work-ticket owns the step-by-step mechanics; do not stop at PR creation.
 
 ## Gotchas
 
@@ -172,3 +158,10 @@ Include before/after evidence in the PR body under a `## Verification` section.
 - **One problem = one ticket = one PR.** If investigation reveals multiple distinct issues, create separate tickets for each. Fix only the reported problem in this session.
 - **Bug tickets require before/after proof.** `make pc` passing is necessary but not sufficient. You must demonstrate the specific broken behavior is resolved. See [verification-by-bug-type](../debugging/SKILL.md#verification-by-bug-type).
 - **Evidence before action** — if you cannot cite the specific error, file, and line, go back and gather more evidence. Guessing wastes time.
+
+## Provenance and maintenance
+
+Revised 2026-07-02 by the skills audit (debugging-playbook refresh): Phase 4 no longer restates workflow step ordering — the pre-spine "validate, then ship" sequence it carried was the exact drift the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md) was created to kill; ordering is now deferred to work-ticket/spine and only bug-specific requirements remain here. Re-verify volatile facts:
+
+- Link targets resolve: `ls .agents/skills/plan-ticket/references/define.md .agents/skills/debugging/SKILL.md .agents/skills/work-ticket/SKILL.md .agents/skills/mcp-first/references/gaps.md .agents/skills/workflow-overview/references/ticket-to-merge-spine.md`
+- Ordering still matches the spine: read `ticket-to-merge-spine.md` "The Sequence"

@@ -191,7 +191,5 @@ All three must pass before committing.
 
 ## Related Skills
 
-- [Typecheck](../../typecheck/SKILL.md) — Validate types
-- [Lint](../../lint/SKILL.md) — Run ESLint
-- [Test](../../test/SKILL.md) — Run Jest tests
+- [repo-tooling](../../repo-tooling/SKILL.md) — typecheck / lint / test commands and the `make pc` pipeline
 - [Standards](../../standards/SKILL.md) — Coding standards and config conventions

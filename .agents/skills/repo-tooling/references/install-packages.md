@@ -164,11 +164,13 @@ pnpm install
 ### Module Not Found After Install
 
 ```powershell
-# Reset Nx cache and rebuild
-pnpm exec nx reset
+# Reset Nx cache (re-links the pool symlink afterward) and re-verify
+make clean-cache
 pnpm install
 pnpm exec nx affected -t typecheck
 ```
+
+> Never run `pnpm exec nx reset` directly — it destroys the pooled `node_modules` symlink in worktrees (LS-5242). If you already did, recover with `node scripts/modules-pool/link.mjs`.
 
 ### Peer Dependency Warnings
 

@@ -82,7 +82,7 @@ test('test B', async () => {
 });
 ```
 
-This applies to **integration tests** especially — see [integration-testing.md](integration-testing.md#test-isolation--per-spec-setupteardown-required) for the per-spec setup/teardown doctrine ([LS-4356](https://legacysports.atlassian.net/browse/LS-4356) tracks the spec migration). A full **per-spec user pool** (JIT-registered ephemeral users that would also isolate user-level state across shards) is tracked as [LS-4357](https://legacysports.atlassian.net/browse/LS-4357) and not yet implemented — until it lands, shared-user contention is the dominant nightly failure mode, mitigated only by the write→read visibility pattern in [antipattern #3](#antipatterns-from-past-regressions--class-of-bug-catalog) below.
+This applies to **integration tests** especially — see [integration-testing.md](integration-testing.md#test-isolation--per-spec-setupteardown-required) for the per-spec setup/teardown doctrine ([LS-4356](https://bkrupa.atlassian.net/browse/LS-4356) tracks the spec migration). A full **per-spec user pool** (JIT-registered ephemeral users that would also isolate user-level state across shards) is tracked as [LS-4357](https://bkrupa.atlassian.net/browse/LS-4357) and not yet implemented — until it lands, shared-user contention is the dominant nightly failure mode, mitigated only by the write→read visibility pattern in [antipattern #3](#antipatterns-from-past-regressions--class-of-bug-catalog) below.
 
 ### 5. Idempotent setup
 
@@ -170,17 +170,15 @@ await pollUntil(
 await expect(page.getByText('Draft complete')).toBeVisible();
 ```
 
-### 10. Failure forensics built in
+### 10. Failure forensics on demand, not retained in CI
 
-Every test must capture trace, video, network log, console, and (for integration tests) server logs **on failure**. Re-running to diagnose is a sign of insufficient instrumentation.
+A failure must be diagnosable from the run's own output — re-running to diagnose is a sign of insufficient instrumentation. But note what CI does and does not retain:
 
-Configured in `playwright.config.ts` and `playwright.integration.config.ts`:
+- **`trace: 'off'` in BOTH configs** (`playwright.config.ts` and `playwright.integration.config.ts`). Traces were disabled under LS-4537: a single trace zip can exceed GitHub's 100 MB per-file limit on the `legacy-sports-deploys` gh-pages branch, failing the report deploy. Retention returns only if report hosting moves to S3/CloudFront. No `video`/`screenshot` retention is configured either.
+- What CI **does** give you: the merged HTML/`summary.md` report with per-failure error + snippet ([read-playwright-report](../../read-playwright-report/SKILL.md)), the `list`/`json` reporter output, and — integration suite — the agent-md reporter (`test-results/summary.md`) plus captured GraphQL errors.
+- To get a trace, reproduce locally with tracing on: `nx_run_e2e_specs(specs: [...], integration: true, withTracing: true)` returns `traceArtifacts` paths (see [SKILL.md Commands](../SKILL.md#playwright-specs-via-mcp-nx_run_e2e_specs)). For opaque backend failures, go to CloudWatch — [cloudwatch-archaeology](../../cloudwatch-archaeology/SKILL.md).
 
-- `trace: 'retain-on-failure'`
-- `video: 'retain-on-failure'`
-- `screenshot: 'only-on-failure'`
-
-For new test files: ensure failure artifacts are uploaded by the CI workflow. See [run-e2e-headless.md](run-e2e-headless.md).
+**Retries policy (same LS-4537/LS-4401 era, same rationale):** `retries: 0` in both configs — the integration config's own comment records that 2 retries hid 67% of CI-run flake. The nightly workflow passes `--retries=2` on the CLI **for the hermetic e2e suite only**, so genuine flake surfaces as `flaky` in the nightly report (the 0/0 policy counts flakies, not just failures); the integration suite gets no `--retries` flag anywhere and always runs at 0. Do not add retries to a config or workflow to "fix" flake — that is anti-pattern territory below.
 
 ### 11. Quarantine, don't disable
 
@@ -239,7 +237,7 @@ These five patterns account for the bulk of nightly-only integration failures in
 
 ### 1. `expect.poll` callback throws instead of returning
 
-**Ticket history:** [LS-4353](https://legacysports.atlassian.net/browse/LS-4353) (and the broader `waitForSeasonActive` regression chain LS-4237 → 4261 → 4278 → 4282 → 4287 → 4296 → 4306 → 4321 → 4344 → 4353).
+**Ticket history:** [LS-4353](https://bkrupa.atlassian.net/browse/LS-4353) (and the broader `waitForSeasonActive` regression chain LS-4237 → 4261 → 4278 → 4282 → 4287 → 4296 → 4306 → 4321 → 4344 → 4353).
 
 **Symptom:** `expect.poll(...).toBe('completed')` fails with the callback's TypeError (`Cannot read property 'draftStatus' of null`) rather than retrying. Local single-spec runs are green; nightly trips on the same poll under load.
 
@@ -272,7 +270,7 @@ Update the callback's return type to include `null` so the type system catches f
 
 ### 2. UI-polling loops racing Apollo cache hydration
 
-**Ticket history:** [LS-4321](https://legacysports.atlassian.net/browse/LS-4321), [LS-4344](https://legacysports.atlassian.net/browse/LS-4344). LS-4344 had to come along after LS-4321 to migrate the remaining callers of `waitForSeasonActive` to the backend-poll path.
+**Ticket history:** [LS-4321](https://bkrupa.atlassian.net/browse/LS-4321), [LS-4344](https://bkrupa.atlassian.net/browse/LS-4344). LS-4344 had to come along after LS-4321 to migrate the remaining callers of `waitForSeasonActive` to the backend-poll path.
 
 **Symptom:** A loop of `page.goto(...)` + `waitForLoadState('networkidle')` + element check that flakes — sometimes the element is visible, sometimes not, even after the backend has clearly transitioned state.
 
@@ -310,7 +308,7 @@ Reference pattern: `apps/web-e2e/src/integration/helpers/wait-for-season-active.
 
 ### 3. Phase proceeds before a state-changing mutation is visible to the read path
 
-**Ticket history:** [LS-4350](https://legacysports.atlassian.net/browse/LS-4350).
+**Ticket history:** [LS-4350](https://bkrupa.atlassian.net/browse/LS-4350).
 
 **Symptom:** Phase 2 (e.g. `joinLeague` mutation) returns success. Phase 10 (a later phase that re-reads the same league as the same user) fails with `ForbiddenError` or `League not found`. The mutation's response is correct; the read path simply hasn't seen the write yet under nightly load.
 
@@ -338,7 +336,7 @@ Now phase 10 can re-read without race. The mutation phase has paid the visibilit
 
 ### 4. Per-phase deadline extension as a substitute for fixing backend-state contention
 
-**Ticket history:** [LS-4278](https://legacysports.atlassian.net/browse/LS-4278), [LS-4282](https://legacysports.atlassian.net/browse/LS-4282), [LS-4287](https://legacysports.atlassian.net/browse/LS-4287) — the canonical "Nth regression guard" chain.
+**Ticket history:** [LS-4278](https://bkrupa.atlassian.net/browse/LS-4278), [LS-4282](https://bkrupa.atlassian.net/browse/LS-4282), [LS-4287](https://bkrupa.atlassian.net/browse/LS-4287) — the canonical "Nth regression guard" chain.
 
 **Symptom:** A phase times out. Agent doubles its `setTimeout`. Two weeks later, a different phase times out. Agent doubles that one. Repeat indefinitely. Total test deadline creeps from 2 min to 5 min to 10 min while nightly stays red.
 
@@ -348,7 +346,7 @@ Now phase 10 can re-read without race. The mutation phase has paid the visibilit
 
 - **Shared helper** (e.g. `waitForSeasonActive` doing 20 navigation loops) → fix the helper (see antipattern #2).
 - **Mutation→read lag** → apply antipattern #3 (the visibility tax belongs to the mutation).
-- **Genuine backend load under sharding** → this is not a test fix. Escalate. The right answer is the per-spec teardown ([LS-4356](https://legacysports.atlassian.net/browse/LS-4356)) / per-spec user pool ([LS-4357](https://legacysports.atlassian.net/browse/LS-4357)) refactor, or rebalancing the shards themselves (see [Shard balancing](#shard-balancing-integration-suite) below — [LS-7845](https://legacysports.atlassian.net/browse/LS-7845)), not another per-phase timeout bump.
+- **Genuine backend load under sharding** → this is not a test fix. Escalate. The right answer is the per-spec teardown ([LS-4356](https://bkrupa.atlassian.net/browse/LS-4356)) / per-spec user pool ([LS-4357](https://bkrupa.atlassian.net/browse/LS-4357)) refactor, or rebalancing the shards themselves (see [Shard balancing](#shard-balancing-integration-suite) below — [LS-7845](https://bkrupa.atlassian.net/browse/LS-7845)), not another per-phase timeout bump.
 
 The "Nth regression guard" framing in a ticket title is a tell that this antipattern is in play. If you're about to bump `timeout` and you can't articulate which of the three mechanisms above the contention sits on, **stop and escalate** — the ticket is misclassified.
 
@@ -364,7 +362,7 @@ Cross-referenced from [`integration-commands.md` — `expect.poll()` passes but 
 
 ### 6. HTTP 429 from the shared live backend masquerading as spec failures
 
-**Ticket history:** [LS-7866](https://legacysports.atlassian.net/browse/LS-7866), [LS-7867](https://legacysports.atlassian.net/browse/LS-7867) (prior 429 work: LS-5149 / LS-4940 / LS-4796).
+**Ticket history:** [LS-7866](https://bkrupa.atlassian.net/browse/LS-7866), [LS-7867](https://bkrupa.atlassian.net/browse/LS-7867) (prior 429 work: LS-5149 / LS-4940 / LS-4796).
 
 **Symptom:** A shifting set of integration specs fail with "Failed to fetch", "null teamId", or opaque `Received: null`, and the run-level error log is dominated by `HTTP 429`. The failing specs correlate with _whichever_ specs were running when the live backend's rate budget was exhausted — not with any one spec's logic.
 
@@ -372,7 +370,7 @@ Cross-referenced from [`integration-commands.md` — `expect.poll()` passes but 
 
 **Right fix:** Two levers, applied together (see [Integration concurrency ceiling & 429 backoff](#integration-concurrency-ceiling--429-backoff-ls-7866--ls-7867)): (1) bound concurrency to a small shard count (the documented ceiling) so the shared backend sees only a few in-flight flows at a time, and (2) route every live call through `fetchWithBackoff` / `retryWithBackoff` so a residual 429 is retried with Retry-After backoff instead of failing the spec. Never add a one-off `try/catch + sleep` to a single spec — that papers over the pattern in one place and lets it resurface elsewhere.
 
-## Integration concurrency ceiling & 429 backoff ([LS-7866](https://legacysports.atlassian.net/browse/LS-7866) / [LS-7867](https://legacysports.atlassian.net/browse/LS-7867))
+## Integration concurrency ceiling & 429 backoff ([LS-7866](https://bkrupa.atlassian.net/browse/LS-7866) / [LS-7867](https://bkrupa.atlassian.net/browse/LS-7867))
 
 **The integration suite runs at a bounded shard count — `INTEGRATION_SHARD_CEILING` in `run-playwright-tests.yml` (currently `3`) — with `workers = 1` per shard.** This is the documented live-backend concurrency ceiling. Every concurrent shard runs its own league-creation / draft / season flow against the **one shared backend** (`api.legacy-fantasy.com`), so N shards = N× the API-Gateway/Lambda load. Run [27186006949](https://github.com/bkrupa/legacy-sports/actions/runs/27186006949) (3 shards, **before** the universal backoff) produced a **39× HTTP 429** cascade that surfaced as "Failed to fetch" / "null teamId" failures across ~9 specs — 429 victims, not discrete bugs.
 
@@ -380,12 +378,12 @@ LS-7866 first collapsed this to a single serial shard (`1/1`), which removed the
 
 `run-playwright-tests.yml` enforces this: the nightly/`all` matrix emits `INTEGRATION_SHARD_CEILING` integration shards, and manual `test-suite=integration` dispatch honors the `shard-total` input **clamped to the ceiling**. Workers are pinned to 1 per shard in the "Run Playwright Tests" step, and each shard's startup is **staggered** (`INTEGRATION_SHARD_STAGGER_SECONDS × (index − 1)`) so the shards don't stampede the oauth-proxy login route (5/60s per IP) at second 0. The integration job keeps `timeout-minutes: 120` as headroom above the observed per-shard wall-clock (e2e stays at 60). E2E is hermetic (no shared backend) and keeps its 3 shards.
 
-Bounding concurrency keeps 429s rare; **comprehensive Retry-After backoff makes any residual 429 non-fatal.** Every live call goes through [`apps/web-e2e/src/utils/retry-with-backoff.ts`](../../../../apps/web-e2e/src/utils/retry-with-backoff.ts) — the GraphQL `gqlFetch` helper, the Playwright `graphql` helper, the oauth-proxy auth/token-mint path (`test-user-auth.ts`), the global setup/teardown cleanup, and the google-oauth smoke tests. It honours the server `Retry-After` header (the oauth-proxy rate limiter sets it) and falls back to exponential backoff with full jitter when absent. **When you add a new live call site, route it through `fetchWithBackoff` / `retryWithBackoff` — never raw `fetch` / `api.post` without retry.** Per-test JWTs are cached on disk across workers ([LS-5149](https://legacysports.atlassian.net/browse/LS-5149)) so auth is not re-minted per spec. To make raising `workers` (intra-runner concurrency) safe, `global-setup.ts` **pre-warms** every spec's per-spec fixture identities (`MANAGER_1` / `MANAGER_2` / `COMMISSIONER`) into that disk cache before any spec runs — but only when `config.workers > 1`, so the serial `workers=1` ceiling pays nothing. Pre-warming moves all logins into one sequential, backoff-paced startup phase, so concurrent workers only ever read the cache instead of stampeding the oauth-proxy login route (5/60s per IP). JWTs live 24h, far longer than a full suite, so a warmed token never expires mid-run.
+Bounding concurrency keeps 429s rare; **comprehensive Retry-After backoff makes any residual 429 non-fatal.** Every live call goes through [`apps/web-e2e/src/utils/retry-with-backoff.ts`](../../../../apps/web-e2e/src/utils/retry-with-backoff.ts) — the GraphQL `gqlFetch` helper, the Playwright `graphql` helper, the oauth-proxy auth/token-mint path (`test-user-auth.ts`), the global setup/teardown cleanup, and the google-oauth smoke tests. It honours the server `Retry-After` header (the oauth-proxy rate limiter sets it) and falls back to exponential backoff with full jitter when absent. **When you add a new live call site, route it through `fetchWithBackoff` / `retryWithBackoff` — never raw `fetch` / `api.post` without retry.** Per-test JWTs are cached on disk across workers ([LS-5149](https://bkrupa.atlassian.net/browse/LS-5149)) so auth is not re-minted per spec. To make raising `workers` (intra-runner concurrency) safe, `global-setup.ts` **pre-warms** every spec's per-spec fixture identities (`MANAGER_1` / `MANAGER_2` / `COMMISSIONER`) into that disk cache before any spec runs — but only when `config.workers > 1`, so the serial `workers=1` ceiling pays nothing. Pre-warming moves all logins into one sequential, backoff-paced startup phase, so concurrent workers only ever read the cache instead of stampeding the oauth-proxy login route (5/60s per IP). JWTs live 24h, far longer than a full suite, so a warmed token never expires mid-run.
 
 **Weight-balanced sharding** (below) governs how specs split across the ceiling's shards; at a 1-shard fallback the partition simply returns every spec to shard `1/1`. The weights manifest and its guard test are essential — an imbalanced partition would concentrate the heavy draft/season specs on one shard and re-create localized backend saturation:
 
 - **Weights manifest:** [`apps/web-e2e/src/integration/integration-shard-weights.json`](../../../../apps/web-e2e/src/integration/integration-shard-weights.json) — approximate worst-case runtime (seconds) per spec. **Add an entry whenever you add a heavy spec.** A unit test (`shard-partition.test.ts`) fails CI if a spec is missing a weight or an entry is stale.
-- **Partition:** [`apps/web-e2e/src/integration/shard-partition.ts`](../../../../apps/web-e2e/src/integration/shard-partition.ts) distributes specs across shards by weight using the Longest-Processing-Time greedy heuristic (deterministic; bin spread bounded by the single heaviest spec). The workflow runs its CLI to pass each shard an explicit file list instead of `--shard`; shard identity for the cleanup guards travels via `INTEGRATION_SHARD_CURRENT` / `INTEGRATION_SHARD_TOTAL`. The 3-shard fan-out ([LS-7845](https://legacysports.atlassian.net/browse/LS-7845)) balances load _across_ the shards the LS-7867 ceiling now permits, keeping each shard's wall-clock within one max-weight of optimal.
+- **Partition:** [`apps/web-e2e/src/integration/shard-partition.ts`](../../../../apps/web-e2e/src/integration/shard-partition.ts) distributes specs across shards by weight using the Longest-Processing-Time greedy heuristic (deterministic; bin spread bounded by the single heaviest spec). The workflow runs its CLI to pass each shard an explicit file list instead of `--shard`; shard identity for the cleanup guards travels via `INTEGRATION_SHARD_CURRENT` / `INTEGRATION_SHARD_TOTAL`. The 3-shard fan-out ([LS-7845](https://bkrupa.atlassian.net/browse/LS-7845)) balances load _across_ the shards the LS-7867 ceiling now permits, keeping each shard's wall-clock within one max-weight of optimal.
 
 ## Related
 
@@ -393,5 +391,6 @@ Bounding concurrency keeps 429s rare; **comprehensive Retry-After backoff makes 
 - [playwright-best-practices.md](playwright-best-practices.md) — the broader Playwright reference
 - [test-tagging-guide.md](test-tagging-guide.md) — `@flaky`, `@critical`, etc.
 - [ui-serial-phases.md](ui-serial-phases.md) — patterns for multi-phase UI flows
-- [integration-testing.md](integration-testing.md) — per-spec setup/teardown doctrine (per-spec user pool is tracked as [LS-4357](https://legacysports.atlassian.net/browse/LS-4357))
+- [integration-testing.md](integration-testing.md) — per-spec setup/teardown doctrine (per-spec user pool is tracked as [LS-4357](https://bkrupa.atlassian.net/browse/LS-4357))
 - [04-ci-flaky-triage entrypoint](../../dev-process/entrypoints/04-ci-flaky-triage.md) — process for fixing flake when discovered
+- [nightly-green-campaign](../../nightly-green-campaign/SKILL.md) — nightly triage/bisect playbook that routes failures into this catalog

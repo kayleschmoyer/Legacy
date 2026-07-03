@@ -182,8 +182,8 @@ Once setup is complete, you can start development servers:
 pnpm run dev
 
 # This will start:
-# - Web app at http://localhost:3000
-# - GraphQL API at http://localhost:4000
+# - Web app at http://localhost:4200
+# - GraphQL API at http://localhost:5000
 # - Lambda functions in dev mode
 ```
 
@@ -209,13 +209,12 @@ pnpm exec nx serve graphql-explorer
 
 ### **Development URLs**
 
-After starting development servers:
+After starting development servers (full table + collision notes: [canonical port map](../../.agents/skills/dev-environment/SKILL.md#port-map-canonical--link-here-do-not-restate)):
 
-- **Web App**: [http://localhost:3000](http://localhost:3000)
-- **GraphQL API**: [http://localhost:4000](http://localhost:4000)
-- **GraphQL Playground**: [http://localhost:4000/graphql](http://localhost:4000/graphql)
-- **GraphiQL**: [http://localhost:3001](http://localhost:3001)
-- **Storybook**: (if configured) [http://localhost:6006](http://localhost:6006)
+- **Web App**: [http://localhost:4200](http://localhost:4200)
+- **GraphQL API**: [http://localhost:5000](http://localhost:5000) (Apollo serves the query UI at the root)
+- **GraphiQL explorer**: also port 4200 — collides with the web app; start the web server first and the explorer moves to 4201+
+- **Storybook**: [http://localhost:6009](http://localhost:6009)
 
 ---
 
@@ -366,15 +365,15 @@ docker compose up -d postgres
 #### **Port Already in Use**
 
 ```
-Error: Port 3000 is already in use
+Error: Port 4200 is already in use
 ```
 
 **Solutions**:
 
 ```bash
 # 1. Kill processes using the port
-pnpm dlx kill-port 3000
-pnpm dlx kill-port 4000
+pnpm dlx kill-port 4200
+pnpm dlx kill-port 5000
 
 # 2. Or change ports in project configuration
 # Edit apps/web/project.json or use different port
@@ -389,8 +388,8 @@ Builds taking longer than expected
 **Solutions**:
 
 ```powershell
-# 1. Clear Nx cache
-pnpm exec nx reset
+# 1. Clear Nx cache (never `pnpm exec nx reset` — it destroys the modules-pool symlink, LS-5242)
+make clean-cache
 
 # 2. Use affected builds instead of full builds
 pnpm exec nx affected -t build

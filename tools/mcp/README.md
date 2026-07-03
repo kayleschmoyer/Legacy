@@ -148,7 +148,7 @@ Makefile target execution with whitelisted targets, appropriate timeouts, and wo
 
 Agent-driven browser debugging and screenshot capture:
 
-- **browser_dev_start** — Start a Next.js dev server in a worktree (port 4300-4399 auto-allocation)
+- **browser_dev_start** — Start the Vite dev server in a worktree (port 4300-4399 auto-allocation)
 - **browser_dev_stop** — Stop a tracked dev server by port, worktree path, or all
 - **browser_dev_status** — List running dev servers and browser state
 - **browser_navigate** — Open a URL in headless Chromium with snapshot-prep CSS injection
@@ -170,11 +170,13 @@ Read-only access to Rollbar error tracking data (the read complement to `lib/rol
 - **rollbar_list_occurrences** — List recent occurrences of an item, each with a truncated message summary
 - **rollbar_top_active_items** — The "top active items" view with summed recent occurrence counts
 
-Requires `ROLLBAR_READ_ACCESS_TOKEN` (a Rollbar `read`-scope project access token) in `.env.local`. See `tools/mcp/rollbar-server/README.md`.
+Requires `ROLLBAR_READ_ACCESS_TOKEN` (a Rollbar `read`-scope project access token) in `.env.local` for the stdio form. Also available as a **hosted OAuth connector** (`legacy-sports-rollbar`, LS-8142) with the token held server-side — see `.agents/skills/mcp-first/SKILL.md` and `docs/dev-process/mcp-connector-access.md`. See `tools/mcp/rollbar-server/README.md`.
 
 ## Cloud vs Local Availability
 
 Some servers depend on infrastructure that is unavailable in the GitHub Copilot cloud agent environment. Use this table when deciding which servers you can call:
+
+> **Note (2026-07-02):** this table describes the Copilot Coding Agent environment. Claude Code sessions (local and web) get the hosted servers as claude.ai OAuth connectors instead — the current environment × tool-surface routing map is homed in `.agents/skills/mcp-first/SKILL.md`.
 
 | Server ID                | Local (Windows dev) | Cloud agent (Copilot) | Notes                                                                                                                                                                        |
 | ------------------------ | :-----------------: | :-------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

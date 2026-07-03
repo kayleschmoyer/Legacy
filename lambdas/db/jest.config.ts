@@ -6,6 +6,9 @@ const config: Config = {
   testEnvironment: 'node',
   coverageDirectory: '../../coverage/lambdas/db',
   setupFiles: ['<rootDir>/test-setup.ts'],
+  // Unit suite only: *.db.spec.ts files need a live PostgreSQL instance and run
+  // via the `db:test:db` target (jest.db.config.ts) in run-db-tests.yml.
+  testPathIgnorePatterns: ['/node_modules/', '\\.db\\.spec\\.ts$'],
   // Explicitly transform workspace packages and jose (ESM-only build at jose@6,
   // hoisted to root node_modules; the schema imports it via apple-jws.ts).
   transformIgnorePatterns: ['node_modules/(?!(@legacy-sports|jose)/)'],

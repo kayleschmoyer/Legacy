@@ -1,9 +1,4 @@
-import {
-  linkDiscordAccount,
-  linkIdentity,
-  unlinkDiscordAccount,
-  unlinkIdentity,
-} from '@legacy-sports/db-client';
+import { linkIdentity, unlinkIdentity } from '@legacy-sports/db-client';
 import { linkProviderIdentity, unlinkProviderIdentity } from './IdentityLink';
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -18,14 +13,10 @@ jest.mock('@legacy-sports/logging', () => ({
 jest.mock('@legacy-sports/db-client', () => ({
   linkIdentity: jest.fn(),
   unlinkIdentity: jest.fn(),
-  linkDiscordAccount: jest.fn(),
-  unlinkDiscordAccount: jest.fn(),
 }));
 
 const mockLinkIdentity = linkIdentity as jest.Mock;
 const mockUnlinkIdentity = unlinkIdentity as jest.Mock;
-const mockLinkDiscord = linkDiscordAccount as jest.Mock;
-const mockUnlinkDiscord = unlinkDiscordAccount as jest.Mock;
 
 const db = {} as never;
 
@@ -69,7 +60,7 @@ describe('linkProviderIdentity', () => {
     }
   });
 
-  it('dual-writes the legacy discord columns on a Discord link', async () => {
+  it('maps the identity tuple onto linkIdentity and succeeds', async () => {
     mockLinkIdentity.mockResolvedValue({ ok: true, identity: {} });
 
     const result = await linkProviderIdentity(db, 7, {
@@ -82,26 +73,15 @@ describe('linkProviderIdentity', () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(mockLinkDiscord).toHaveBeenCalledWith(
-      db,
-      7,
-      'snowflake',
-      'duser',
-      'hash',
-    );
-  });
-
-  it('does not dual-write for non-Discord providers', async () => {
-    mockLinkIdentity.mockResolvedValue({ ok: true, identity: {} });
-
-    await linkProviderIdentity(db, 7, {
-      provider: 'google',
-      providerAccountId: 'sub',
-      providerEmail: 'g@example.com',
-      emailVerified: true,
+    expect(mockLinkIdentity).toHaveBeenCalledWith(db, {
+      userId: 7,
+      provider: 'discord',
+      providerAccountId: 'snowflake',
+      providerEmail: 'd@example.com',
+      providerEmailVerified: true,
+      providerUsername: 'duser',
+      providerAvatar: 'hash',
     });
-
-    expect(mockLinkDiscord).not.toHaveBeenCalled();
   });
 });
 
@@ -130,20 +110,12 @@ describe('unlinkProviderIdentity', () => {
     }
   });
 
-  it('clears the legacy discord columns on a Discord unlink', async () => {
+  it('succeeds when the identity is unlinked', async () => {
     mockUnlinkIdentity.mockResolvedValue({ ok: true, rederived: false });
 
     const result = await unlinkProviderIdentity(db, 9, 'discord');
 
     expect(result).toEqual({ ok: true });
-    expect(mockUnlinkDiscord).toHaveBeenCalledWith(db, 9);
-  });
-
-  it('does not touch discord columns when unlinking another provider', async () => {
-    mockUnlinkIdentity.mockResolvedValue({ ok: true, rederived: true });
-
-    await unlinkProviderIdentity(db, 9, 'apple');
-
-    expect(mockUnlinkDiscord).not.toHaveBeenCalled();
+    expect(mockUnlinkIdentity).toHaveBeenCalledWith(db, 9, 'discord');
   });
 });

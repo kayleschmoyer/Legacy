@@ -32,8 +32,8 @@ If no PR number is provided, first discover the current branch's PR number via `
 1. **Assess**: gather PR state (mergeable, unresolved threads, CI status) — see skill Step 0
 2. **Rebase** (if conflicting): fetch, rebase, resolve conflicts, stabilize — see skill Step 1
 3. **Fix reviews** (if unresolved threads): fetch ticket context, batch-fix all threads, validate, commit+push once, resolve threads — see skill Step 2
-4. **Fix CI** (if checks failing): read logs, fix root cause, validate locally with `make pc`, push — see skill Step 3
+4. **Fix CI** (if checks failing): read logs, fix root cause, validate (`make pc` locally; in cloud run the seven `pc-*` chunks per cloud-agent-mode — never monolithic `make pc`), push — see skill Step 3
 5. **Verify**: confirm mergeable, no unresolved threads, CI green — see skill Step 4
-6. **Label**: add `merge-when-ready` when all clear
+6. **Re-arm review**: (re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD. The bot applies `merge-when-ready` itself on APPROVED — never add it manually (see Label Ownership in the pr-lifecycle skill).
 
-**Guardrails**: Always `make pc` before pushing. Never suppress lint/TS errors to satisfy a review comment. Cap review fix rounds at 2. Cap full fix loop at 3 iterations. After resolving all threads, add `merge-when-ready` label.
+**Guardrails**: Always validate before pushing — `make pc` locally; in cloud/timeout-prone sessions run the seven `pc-*` chunks in order (`nx_run_pc_chunk` where present, background `make pc-<chunk>` otherwise — never monolithic `make pc`; see `.agents/skills/cloud-agent-mode/SKILL.md`). Never suppress lint/TS errors to satisfy a review comment. Cap review fix rounds at 2. Cap full fix loop at 3 iterations.

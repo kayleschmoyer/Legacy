@@ -5,7 +5,7 @@
 **Likely causes:**
 
 1. Draft processor threw an unhandled exception after setting status to `in-progress`
-2. Status recovery (`catch` block) also failed (logged as `severity=critical` in Sentry)
+2. Status recovery (`catch` block) also failed (logged at `error`/`fatal`, forwarded to Rollbar)
 3. SQS retries exhausted → message went to DLQ
 
 **Debug steps:**
@@ -64,7 +64,7 @@
 **Key files:**
 
 - `lambdas/db/src/schema/matchups/scheduled-mutations.ts` — `autoSelectGames`
-- `terraform/` — EventBridge rule definitions
+- `terraform/main/eventbridge.tf` — EventBridge rule definitions
 
 ## WebSocket Notifications Not Arriving
 

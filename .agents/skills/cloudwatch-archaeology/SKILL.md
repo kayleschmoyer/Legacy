@@ -1,6 +1,6 @@
 ---
 name: cloudwatch-archaeology
-description: 'Use CloudWatch logs and the live RDS database as the authoritative source of truth when E2E test stdout is misleading or opaque. Covers when to invoke, the concrete query chain (log groups → filter → cross-reference IDs → DB fallback), Windows Git Bash quirks, and a worked example from LS-4295 (stuck-at-pick-10 turned out to be picks-1-13-succeeded + ForbiddenError).'
+description: 'Recover the server-side truth from CloudWatch logs and the dev RDS when client-side narratives lie. Load when: E2E stdout is opaque (n/a, stuck, timeout, silent count mismatch), a Rollbar payload lacks the server story, a fix keeps shifting the symptom, or you need what a Lambda/cron actually did during a test window. Covers the query chain (log groups → filter → cross-reference IDs → DB fallback) and a worked example from LS-4295.'
 ---
 
 # Skill: CloudWatch Log Archaeology
@@ -11,7 +11,9 @@ E2E test stdout lies. A draft "stuck at pick 10" may actually mean the server ad
 
 This skill documents when to reach for CloudWatch (and the live RDS) instead of trusting the test reporter, and gives the concrete query chain to do it efficiently.
 
-This is the second-most common debugging gotcha in this repo (after "make pc passes but live behavior is broken" — see the `debugging` skill). Reach for it early on any distributed system failure where the test narrative is opaque.
+This is the second-most common debugging gotcha in this repo (after "make pc passes but live behavior is broken" — see the `debugging` skill). Reach for it early on any distributed system failure where the test narrative is opaque. Production-error triage (Rollbar tool surface + error-classification convention) is homed in [debugging/references/prod-errors.md](../debugging/references/prod-errors.md) — pivot here from there when the Rollbar payload lacks the server-side story.
+
+**Access precondition:** every step needs AWS read access. Prefer the MCP tools (`aws_logs_filter`, `aws_logs_tail`, `aws_secretsmanager_*` from the aws server; `db_query` from the hosted DB server) over raw `aws` CLI — see [mcp-first](../mcp-first/SKILL.md). If any call returns an auth/expired-token error, stop and surface the hint verbatim; auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../mcp-first/SKILL.md#auth-model)). Cloud agents have no AWS — route through [cloud-teleport](../cloud-teleport/SKILL.md).
 
 ## When to Invoke
 
@@ -42,32 +44,47 @@ print(r['stats']['startTime'], r['stats']['duration'])
 
 This gives you `--start-time` / `--end-time` values in milliseconds for `aws logs filter-log-events`.
 
-### Step 2 — List Relevant Log Groups
+### Step 2 — Pick the Log Group
+
+Deployed Lambda log groups follow `/aws/lambda/legacy-sports-dev-<name>` (Terraform `function_name = "${local.name_prefix}-<name>"` with `name_prefix = legacy-sports-dev`). Quick recent-errors view by short name: `aws_logs_tail(function: "graphql")` (short names: `graphql`, `db`, `oauth-proxy`, `game-selection`, `stats-lambda`, `draft-processor`, `websocket`, ...).
+
+Common log groups for draft/league flows:
+
+| Group                                          | What it captures                                 |
+| ---------------------------------------------- | ------------------------------------------------ |
+| `/aws/lambda/legacy-sports-dev-graphql`        | All resolver calls, inline JSON with IDs, errors |
+| `/aws/lambda/legacy-sports-dev-game-selection` | Cron job firings (`autoProcessDraftPicks`)       |
+| `/aws/lambda/legacy-sports-dev-oauth-proxy`    | JWT issuance — confirms which userId is active   |
+| EventBridge / SQS DLQ logs                     | Async flow failures, cron mis-fires              |
+
+Shell fallback for listing groups (note the Windows quirk below):
 
 ```bash
 MSYS_NO_PATHCONV=1 aws logs describe-log-groups \
   --log-group-name-prefix "/aws/lambda/legacy-sports"
 ```
 
-> **Windows Git Bash**: `MSYS_NO_PATHCONV=1` is **required** for any AWS CLI argument starting with `/`. Without it, MSYS path conversion mangles the leading slash (e.g. `/aws/lambda/...` becomes `C:/aws/lambda/...`).
-
-Common log groups for draft/league flows:
-
-| Group                                      | What it captures                                 |
-| ------------------------------------------ | ------------------------------------------------ |
-| `/aws/lambda/legacy-sports-graphql`        | All resolver calls, inline JSON with IDs, errors |
-| `/aws/lambda/legacy-sports-game-selection` | Cron job firings (`autoProcessDraftPicks`)       |
-| `/aws/lambda/legacy-sports-oauth-proxy`    | JWT issuance — confirms which userId is active   |
-| EventBridge / SQS DLQ logs                 | Async flow failures, cron mis-fires              |
+> **Windows Git Bash**: `MSYS_NO_PATHCONV=1` is **required** for any AWS CLI argument starting with `/`. Without it, MSYS path conversion mangles the leading slash (e.g. `/aws/lambda/...` becomes `C:/aws/lambda/...`). The `aws_logs_filter` MCP tool has no such problem — another reason to prefer it.
 
 ### Step 3 — Filter Narrowly First
 
-Double-quoted patterns inside single quotes are **required** for `filter-log-events`:
+**MCP (preferred):**
+
+```
+aws_logs_filter(
+  logGroup: "/aws/lambda/legacy-sports-dev-graphql",
+  filterPattern: "\"autoProcessDraftPicks\"",
+  startTime: 1714000000000,   # epoch ms
+  endTime:   1714003600000
+)
+```
+
+**Shell fallback** — double-quoted phrases inside single quotes are **required** for `filter-log-events`:
 
 ```bash
 # Correct — phrase in double quotes inside single quotes
 MSYS_NO_PATHCONV=1 aws logs filter-log-events \
-  --log-group-name "/aws/lambda/legacy-sports-graphql" \
+  --log-group-name "/aws/lambda/legacy-sports-dev-graphql" \
   --start-time 1714000000000 \
   --end-time   1714003600000 \
   --filter-pattern '"autoProcessDraftPicks"'
@@ -105,20 +122,43 @@ Use the RDS database when:
 - You need to inspect schema or state not surfaced in logs (e.g. team membership rows, pick table state)
 - You want to confirm whether the server actually committed a mutation
 
-**Setup**: SSM port-forward — see memory entry `reference_dev_rds_tunnel.md` (NAT instance `i-0823762e35dd87563`, postgres superuser secret, **must clear `DB_CERT_PATH`**).
+**Primary path — no tunnel:** the hosted DB MCP server reaches the dev RDS over HTTPS and serves read-only `db_query` (plus `db_migration_status`) in every session type. Tool table and setup live in [database](../database/SKILL.md). Use this first.
 
-Key connection parameters:
+**Fallback — SSM port-forward tunnel** (only when the hosted DB server is unavailable or you need an interactive `psql`; requires AWS credentials and bash — the Make target is stubbed on Windows cmd):
 
-| Parameter | Value                                   |
-| --------- | --------------------------------------- |
-| Host      | `localhost:15432` (after tunnel)        |
-| Database  | `postgres` (NOT `legacy_sports`)        |
-| SSL       | required (`rejectUnauthorized: false`)  |
-| User      | postgres superuser from Secrets Manager |
+```bash
+# 1. Discover the SSM target: the NAT instance. Its ID changes when the
+#    instance is replaced (see terraform/main/nat-instance.tf, LS-5247) —
+#    discover it by tag, never hardcode an instance ID.
+DB_TUNNEL_TARGET=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=legacy-sports-dev-nat-instance" \
+            "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' --output text)
+
+# 2. Discover the RDS endpoint
+DB_TUNNEL_HOST=$(aws rds describe-db-instances \
+  --db-instance-identifier legacy-sports-dev-postgres \
+  --query 'DBInstances[0].Endpoint.Address' --output text)
+
+# 3. Open the tunnel (leave running; connect from a second shell)
+DB_TUNNEL_TARGET="$DB_TUNNEL_TARGET" DB_TUNNEL_HOST="$DB_TUNNEL_HOST" \
+  LOCAL_PORT=15432 make db-tunnel
+```
+
+**Credentials**: the superuser secret lives in Secrets Manager under the `legacy-sports-dev-db-creds-` name prefix (Terraform appends a random suffix) — find it with `aws_secretsmanager_list_secrets`, read it with `aws_secretsmanager_get_secret_value`.
+
+Key connection parameters (through the tunnel):
+
+| Parameter | Value                                                                                                                                                                             |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host      | `localhost:15432` (whatever `LOCAL_PORT` you chose)                                                                                                                               |
+| Database  | `postgres` (NOT `legacy_sports` — Terraform `database_name` default)                                                                                                              |
+| SSL       | required; the RDS cert can't match `localhost`, so use `rejectUnauthorized: false` (psql: `sslmode=require`) and **clear `DB_CERT_PATH`** so `lib/db-client` doesn't pin the cert |
+| User      | superuser from the `legacy-sports-dev-db-creds-*` secret                                                                                                                          |
 
 > **Easy mistake**: the database name is `postgres`, not `legacy_sports`. Always double-check this when adapting tunnel commands.
 
-**Pre-test snapshot warning**: the global test setup/teardown (`apps/web-e2e/src/integration/globalSetup.ts` / `globalTeardown.ts`) deletes test leagues after each run. If your investigation requires the actual rows, snapshot the relevant tables _before_ re-running tests.
+**Pre-run sweep warning**: the integration global teardown (`apps/web-e2e/src/integration/global-teardown.ts` — gated by `INTEGRATION_TEARDOWN=true`, skipped in sharded runs) deletes test leagues, and the next run's `global-setup.ts` sweeps stale test leagues left behind. If your investigation requires the actual rows, snapshot the relevant tables _before_ re-running tests.
 
 ## Tool Quirks
 
@@ -152,7 +192,7 @@ The test's local `pickCount` read 10 for the entire observation window. The obvi
 
 ### What CloudWatch revealed
 
-Filtering `/aws/lambda/legacy-sports-game-selection` for `'"autoProcessDraftPicks"'` over the test window:
+Filtering `/aws/lambda/legacy-sports-dev-game-selection` for `'"autoProcessDraftPicks"'` over the test window:
 
 ```json
 { "message": "Draft pick made", "draftId": "...", "pickNumber": 1,  "teamId": "..." }
@@ -166,7 +206,7 @@ The server had **actually advanced picks 1–13** over 3.5 minutes. The test's `
 
 ### What the opaque `n/a` actually meant
 
-Filtering `/aws/lambda/legacy-sports-graphql` for `'"member of this league"'`:
+Filtering `/aws/lambda/legacy-sports-dev-graphql` for `'"member of this league"'`:
 
 ```json
 {
@@ -192,21 +232,21 @@ MSYS_NO_PATHCONV=1 aws logs describe-log-groups \
 
 # Step 3a — find cron activity
 MSYS_NO_PATHCONV=1 aws logs filter-log-events \
-  --log-group-name "/aws/lambda/legacy-sports-game-selection" \
+  --log-group-name "/aws/lambda/legacy-sports-dev-game-selection" \
   --start-time 1714054330000 \
   --end-time   1714054640000 \
   --filter-pattern '"autoProcessDraftPicks"'
 
 # Step 3b — find the actual error behind picksAutoMade=n/a
 MSYS_NO_PATHCONV=1 aws logs filter-log-events \
-  --log-group-name "/aws/lambda/legacy-sports-graphql" \
+  --log-group-name "/aws/lambda/legacy-sports-dev-graphql" \
   --start-time 1714054330000 \
   --end-time   1714054640000 \
   --filter-pattern '"member of this league"'
 
 # Step 4 — cross-reference: was the right userId in the JWT?
 MSYS_NO_PATHCONV=1 aws logs filter-log-events \
-  --log-group-name "/aws/lambda/legacy-sports-oauth-proxy" \
+  --log-group-name "/aws/lambda/legacy-sports-dev-oauth-proxy" \
   --start-time 1714054330000 \
   --end-time   1714054640000 \
   --filter-pattern '"leagueId\":\"<uuid>\""'
@@ -232,14 +272,25 @@ When proposing fixes from a `pg_stat_statements` report, **explicitly skip allow
 
 ## Related Skills
 
-`debugging` · `database` · `testing` · `read-playwright-report` · `distributed-debugging`
+[debugging](../debugging/SKILL.md) · [database](../database/SKILL.md) · [testing](../testing/SKILL.md) · [read-playwright-report](../read-playwright-report/SKILL.md) · [cloud-teleport](../cloud-teleport/SKILL.md)
 
 ## See Also
 
-- `.agents/skills/debugging/SKILL.md` — core debugging methodology and verification-by-bug-type table
-- `.agents/skills/debugging/references/distributed-debugging.md` — Lambda / SQS / EventBridge failure patterns
-- Memory entry `reference_dev_rds_tunnel.md` — SSM port-forward setup for the dev RDS instance
+- [debugging/SKILL.md](../debugging/SKILL.md) — core debugging methodology and verification-by-bug-type table
+- [debugging/references/distributed-debugging.md](../debugging/references/distributed-debugging.md) — Lambda / SQS / EventBridge failure patterns
+- [debugging/references/prod-errors.md](../debugging/references/prod-errors.md) — Rollbar triage; pivots here when the payload lacks the server story
 - PR [#3772](https://github.com/bkrupa/legacy-sports/pull/3772) — diagnostic surfacing fix that made `picksAutoMade=n/a` → `ForbiddenError` visible
 - LS-4295 — the investigation that prompted this skill
 - LS-4299 — follow-up root-cause work from the same investigation
 - LS-4699 — RDS Proxy session-pinning probe allowlist entry (the noisy `current_setting … pg_postmaster_start_time()` row)
+
+## Provenance and maintenance
+
+Revised 2026-07-02 by the skills audit (debugging-playbook refresh): MCP-first log tools (`aws_logs_filter` / `aws_logs_tail`) made primary, log-group names corrected to the `legacy-sports-dev-*` prefix, the unresolvable "memory entry" tunnel reference replaced with the checked-in `db_query`-first + `make db-tunnel` recipe, and global setup/teardown filenames corrected (`global-setup.ts` / `global-teardown.ts`). Re-verify volatile facts:
+
+- Log-group prefix: `grep -n "function_name" terraform/main/lambda-graphql.tf` (with `name_prefix` in `terraform/main/main.tf`)
+- AWS log tool surface + short names: `grep -n "LAMBDA_FUNCTIONS" -A 25 tools/mcp/aws-server/src/tools/logs-tail.ts`
+- Tunnel target/env vars: `grep -n "db-tunnel:" -A 8 Makefile`
+- DB name default: `grep -n -A 4 'variable "database_name"' terraform/main/variables.tf`
+- Credentials secret prefix: `grep -n -A 2 'resource "aws_secretsmanager_secret" "database_credentials"' terraform/main/secrets.tf`
+- Setup/teardown filenames: `grep -n "globalSetup\|globalTeardown" apps/web-e2e/playwright.integration.config.ts`

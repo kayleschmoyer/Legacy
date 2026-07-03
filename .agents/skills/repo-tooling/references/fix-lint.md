@@ -172,5 +172,4 @@ pnpm exec nx affected -t test
 
 ## Related Skills
 
-- [lint.md](lint.md) — running the linter
-- [fix-types.md](fix-types.md) — fixing TypeScript errors
+- [repo-tooling SKILL.md](../SKILL.md) — running the linter, the pc pipeline, and lint/typecheck ordering

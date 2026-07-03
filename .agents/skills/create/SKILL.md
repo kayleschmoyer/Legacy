@@ -15,7 +15,7 @@ Scaffold a new project in the monorepo with standardized configuration. Pick the
 | ------------------ | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------ |
 | **Shared library** | `lib/<name>/`            | Reusable code consumed by apps and lambdas at build time        | [references/create-lib.md](references/create-lib.md)               |
 | **AWS Lambda**     | `lambdas/<name>/`        | Serverless API endpoint, background processor, or event handler | [references/create-lambda.md](references/create-lambda.md)         |
-| **Application**    | `apps/<name>/`           | CLI tool, Next.js web app, or React Native mobile app           | [references/create-app.md](references/create-app.md)               |
+| **Application**    | `apps/<name>/`           | CLI tool, Vite web app, or React Native mobile app              | [references/create-app.md](references/create-app.md)               |
 | **MCP server**     | `tools/mcp/<name>/`      | AI agent tooling via Model Context Protocol                     | [references/create-mcp-server.md](references/create-mcp-server.md) |
 | **Agent skill**    | `.agents/skills/<name>/` | AI agent skill following agentskills.io format                  | [references/create-skill.md](references/create-skill.md)           |
 
@@ -58,6 +58,4 @@ Scaffold a new project in the monorepo with standardized configuration. Pick the
 ## Related Skills
 
 - [Standards](../standards/SKILL.md) — Coding standards and config conventions
-- [Typecheck](../typecheck/SKILL.md) — Validate types
-- [Lint](../lint/SKILL.md) — Run ESLint
-- [Test](../test/SKILL.md) — Run Jest tests
+- [repo-tooling](../repo-tooling/SKILL.md) — typecheck / lint / test / build commands and the `make pc` pipeline

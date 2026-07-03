@@ -128,7 +128,7 @@ else:
 
 **Why this matters**: Playwright exits 0 and sets `ok: true` even when 0 tests run (no failures = success). A `manual-<N>` or `pr-<N>` report with `total: 0` looks like a successful CI run but provides **zero test coverage**. Posting it as integration test evidence will cause the review bot to flag missing evidence.
 
-**Most common cause**: passing multiple space-separated filenames in the `test-file` workflow input. The workflow script passes `$TEST_FILE` as a **single quoted argument** to Playwright — `pnpm exec playwright test ... -- "$TEST_FILE"`. When `$TEST_FILE` is `"file1.spec.ts file2.spec.ts"`, Playwright receives it as one string and finds no file matching that literal name, so 0 tests run. See [Triggering Runs](#triggering-runs) for the correct approach.
+**Common causes**: a `test-file` value that matches no spec (typo, or a path not relative to the suite's test directory) or a `test-grep` regex that matches no titles — Playwright finds nothing to run and exits 0. (Historical note: space-separated multi-file `test-file` values used to be passed as one quoted string and produced 0-test runs; the workflow now word-splits the input — see the `read -ra TEST_FILE_ARGS` step in `run-playwright-tests.yml` — so multiple filenames are supported.) See [Triggering Runs](#triggering-runs).
 
 ## Useful Queries
 
@@ -164,26 +164,32 @@ The integration suite is **only included** when:
 
 ## Triggering Runs
 
-```bash
+MCP-first — `ci_dispatch_workflow`. These are non-PR `workflow_dispatch` runs (no push notification), so pass `waitForCompletion: true` when you need the result:
+
+```
 # E2E only (mocked)
-gh workflow run run-playwright-tests.yml -f test-suite=e2e -f shard-total=3
+ci_dispatch_workflow(workflow: "run-playwright-tests.yml", inputs: { "test-suite": "e2e", "shard-total": "3" })
 
-# Integration only (live server) — all integration specs
-gh workflow run run-playwright-tests.yml -f test-suite=integration -f shard-total=2
+# Integration only (live server) — all integration specs; wait for the verdict
+ci_dispatch_workflow(workflow: "run-playwright-tests.yml", ref: "<branch>",
+  inputs: { "test-suite": "integration", "shard-total": "3" },
+  waitForCompletion: true, timeoutSeconds: 3600)
 
-# Integration only — targeting specific specs via grep pattern
-gh workflow run run-playwright-tests.yml -f test-suite=integration -f shard-total=1 \
-  -f test-grep="roster-management|matchup-detail|trade-flow"
+# Integration only — specific specs via grep pattern
+ci_dispatch_workflow(workflow: "run-playwright-tests.yml",
+  inputs: { "test-suite": "integration", "shard-total": "1", "test-grep": "roster-management|matchup-detail|trade-flow" })
 
-# Both suites (mirrors nightly — requires test-suite: all, added in LS-2281)
-gh workflow run run-playwright-tests.yml -f test-suite=all
+# Both suites (mirrors nightly)
+ci_dispatch_workflow(workflow: "run-playwright-tests.yml", inputs: { "test-suite": "all" })
 ```
 
-Via MCP:
+Shell fallback (only when the CI MCP server is unavailable):
 
+```bash
+gh workflow run run-playwright-tests.yml -f test-suite=integration -f shard-total=3
 ```
-ci_dispatch_workflow(workflow: "run-playwright-tests.yml", inputs: { "test-suite": "integration", "shard-total": "2" })
-```
+
+Integration `shard-total` above 3 is clamped to the live-backend ceiling, and the `retries` input is ignored for the integration suite (always `retries: 0`) — see [fix-integration-tests](../fix-integration-tests/SKILL.md#nightly-execution-profile--why-local-single-spec-runs-mislead).
 
 ### `test-file` vs `test-grep`
 

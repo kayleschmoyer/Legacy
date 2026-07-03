@@ -19,32 +19,31 @@ node scripts/terraform-unlock.js
 # 4. Confirm state is available
 
 # Then retry your terraform command:
-cd terraform
-terraform plan
+terraform -chdir=terraform/main plan
 # or
-terraform apply
+terraform -chdir=terraform/main apply
 ```
 
 **Manual unlock (if script fails)**:
 
 ```powershell
 # Get lock info from error message, then:
-cd terraform
-terraform force-unlock <lock-id-from-error>
+terraform -chdir=terraform/main force-unlock <lock-id-from-error>
 ```
 
 ### Issue: AWS credentials not configured
 
 **Symptom**: "No valid credential sources found"
-**Solution**: Configure AWS credentials
+**Solution**: credential generation is **user-only** (AGENTS.md Tier 1). Check status first (`aws_sso_status()` / `aws sts get-caller-identity`); if missing or expired, stop and prompt the **user** to run in their own terminal:
 
 ```powershell
-# Use AWS CLI (preferred — avoids credentials in shell history)
+# User's terminal (agents never run auth-generation commands):
 aws configure
-
-# Or use AWS SSO
+# Or with AWS SSO:
 aws sso login --profile your-profile
 ```
+
+See [aws-sso-login.md](aws-sso-login.md) for the full stop-and-surface protocol.
 
 ### Issue: Terraform state drift
 

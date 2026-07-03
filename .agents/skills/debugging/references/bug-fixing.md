@@ -1,9 +1,6 @@
----
-name: fix-bugs
-description: 'Fix bugs by addressing the root cause rather than suppressing error reporting. Distinguishes legitimate error-swallowing (user-input and transient errors) from masking real bugs. Load this skill before fixing any bug that involves catching exceptions, silencing errors, or removing log output.'
----
+# Fix Bugs at the Root Cause
 
-# Skill: Fix Bugs at the Root Cause
+Reference for the [debugging skill](../SKILL.md). Load before fixing any bug that involves catching exceptions, silencing errors, or removing log output. The Rollbar tool surface and the typed-error classification convention live in [prod-errors.md](prod-errors.md) — this file covers the fix methodology.
 
 ## Overview
 
@@ -11,7 +8,7 @@ When fixing a bug, the instinct to silence an error log or swallow an exception 
 
 ## CRITICAL RULE
 
-> **Never fix a bug by silencing the error that reports it.** If you find yourself removing a `LOGGER.error(...)`, wrapping code in a bare `catch` that does nothing, or filtering an error out of Rollbar/Sentry — **STOP**. That hides the symptom. The underlying defect still runs; it just becomes invisible.
+> **Never fix a bug by silencing the error that reports it.** If you find yourself removing a `LOGGER.error(...)`, wrapping code in a bare `catch` that does nothing, or filtering an error out of Rollbar — **STOP**. That hides the symptom. The underlying defect still runs; it just becomes invisible.
 
 Silencing error reporting without fixing the cause:
 
@@ -36,7 +33,7 @@ try {
 // Removing the log instead of fixing the code
 // LOGGER.error('Failed to load player stats', { err }); // <-- deleted
 
-// Filtering a real error from Sentry so the alert goes away
+// Filtering a real error from Rollbar so the alert goes away
 if (err.message.includes('Cannot read properties of undefined')) {
   return; // don't report
 }
@@ -76,12 +73,12 @@ Only two categories justify suppressing or downgrading error reporting without a
 
 ### 1. User-Input Errors
 
-Errors caused by bad, invalid, or unexpected input from the end user are **not bugs**. They are expected outcomes of operating at a system boundary. Report them at an appropriate level (validation message, `warn`, or structured response) — do not fire Rollbar/Sentry alerts that page on-call.
+Errors caused by bad, invalid, or unexpected input from the end user are **not bugs**. They are expected outcomes of operating at a system boundary. Report them at an appropriate level (validation message, `warn`, or structured response) — do not fire Rollbar alerts that page on-call.
 
 **Criteria**: The error would have been prevented by the user providing valid input. The code behaved correctly.
 
 ```typescript
-// User submitted an invalid promo code — not a bug; don't alert Sentry
+// User submitted an invalid promo code — not a bug; don't alert Rollbar
 try {
   await applyPromoCode(userId, promoCode);
 } catch (err) {
@@ -129,12 +126,12 @@ try {
 
 ```
 Is the error caused by the user providing bad input?
-  ├── YES → Return a validation error / user message. Do NOT alert Sentry/Rollbar.
+  ├── YES → Return a validation error / user message. Do NOT alert Rollbar.
   │          Keep the error out of error-rate dashboards.
   └── NO ↓
 
 Is the error caused by a temporary external condition (network, infra)?
-  ├── YES → Log at WARN. Retry if appropriate. Do NOT alert Sentry/Rollbar.
+  ├── YES → Log at WARN. Retry if appropriate. Do NOT alert Rollbar.
   │          Rely on DLQ / retry exhaustion for escalation.
   └── NO ↓
 
@@ -149,12 +146,12 @@ This is a BUG. Find and fix the root cause.
 
 ## LOGGER.error() — Pass Error Objects Directly
 
-A common mistake when fixing bugs is wrapping the caught error in an object:
+A common mistake when fixing bugs is passing a message string instead of the Error:
 
 ```typescript
-// WRONG — Error nested inside { error }, Rollbar can't extract the stack trace
+// WRONG — string only: stack lost, unrelated failures group under one message
 catch (error) {
-  LOGGER.error('Operation failed', { error });
+  LOGGER.error('Operation failed: ' + String(error));
 }
 
 // CORRECT — Error as a direct argument, Rollbar extracts the stack trace
@@ -168,9 +165,7 @@ catch (error) {
 }
 ```
 
-**Why**: `RollbarOutputDestination` scans `LOGGER.error()` args with `arg instanceof Error`. When the Error is wrapped in `{ error }`, `instanceof` returns false and Rollbar synthesizes a generic error — **losing the original stack trace**. This makes production debugging impossible.
-
-See the full explanation in the [fix-lint skill](../../repo-tooling/SKILL.md#loggererror--error-objects-must-be-direct-arguments).
+Mechanics (which arguments the destination extracts, and the LS-8222 incident behind this rule) are homed in [prod-errors.md — rule 2](prod-errors.md#2-pass-error-objects-to-loggererror-never-strings).
 
 ---
 
@@ -184,10 +179,10 @@ import { CLIENT_FACING_CODES } from './graphql-error-codes';
 // In error handling (e.g. Apollo formatError):
 const code = err.extensions?.code;
 if (CLIENT_FACING_CODES.has(code)) {
-  // Expected client error — don't report to Rollbar/Sentry
+  // Expected client error — don't report to Rollbar
   LOGGER.warn('Client error', { code, message: err.message });
 } else {
-  // Unexpected server error — report to Rollbar/Sentry
+  // Unexpected server error — report to Rollbar
   LOGGER.error('Unexpected server error', err.originalError ?? err);
 }
 ```
@@ -198,14 +193,14 @@ This pattern prevents noise in error tracking while ensuring genuine bugs are ne
 
 ## Log Level Guide
 
-| Situation                              | Level   | Report to Sentry/Rollbar? |
-| -------------------------------------- | ------- | ------------------------- |
-| Unexpected exception / unhandled state | `error` | Yes                       |
-| Client-facing code (auth, validation)  | `warn`  | No                        |
-| Transient failure, will retry          | `warn`  | No                        |
-| User input validation failure          | `warn`  | No                        |
-| Expected no-op (e.g. nothing to do)    | `info`  | No                        |
-| Diagnostic breadcrumb                  | `debug` | No                        |
+| Situation                              | Level   | Report to Rollbar? |
+| -------------------------------------- | ------- | ------------------ |
+| Unexpected exception / unhandled state | `error` | Yes                |
+| Client-facing code (auth, validation)  | `warn`  | No                 |
+| Transient failure, will retry          | `warn`  | No                 |
+| User input validation failure          | `warn`  | No                 |
+| Expected no-op (e.g. nothing to do)    | `info`  | No                 |
+| Diagnostic breadcrumb                  | `debug` | No                 |
 
 ---
 

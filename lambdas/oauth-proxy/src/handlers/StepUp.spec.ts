@@ -62,9 +62,7 @@ const mockUser = {
   email: 'user@example.com',
   passwordHash: 'hashed-password',
   mfaEnabled: false,
-} as Parameters<typeof getUserById>[1] extends never
-  ? never
-  : Awaited<ReturnType<typeof getUserById>>;
+} as unknown as Awaited<ReturnType<typeof getUserById>>;
 
 beforeEach(() => {
   jest.clearAllMocks();

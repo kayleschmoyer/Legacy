@@ -1,50 +1,38 @@
-# Cloud Agent Sweep
+# Cloud PR Sweep — API-Only Playbook
 
-> This file contains the full cloud agent workflow for PR sweeps.
-> For the overview, decision table, critical rules, and environment compatibility, see [sweep.md](./sweep.md) and the parent [pr-lifecycle SKILL.md](../SKILL.md).
-> For local agent pass playbooks, see [sweep-passes.md](./sweep-passes.md).
+Single-pass sweep for sessions that cannot commit, push, or spawn chips (Claude Code on the web without chip dispatch, Copilot Coding Agent, headless API sessions). Everything here is a GitHub/CI API action plus a report; anything needing a worktree is deferred to a local sweep via the report. Local counterpart: [sweep.md](sweep.md).
 
-Cloud agents (Copilot Coding Agent) cannot commit or push code. This workflow covers: scan, triage, all API-only actions, and producing an actionable report for items that need a local agent.
+**Run the steps below exactly once, in order, then produce the report. Do not sleep, poll, or loop** — a cloud agent that sleeps looks indistinguishable from a hang and burns session wall-clock. If any older instruction says "wait and re-scan", interpret it as: record the pending item in the report and exit; the next sweep picks it up.
 
-**Available MCP servers:** `legacy-sports-github`, `legacy-sports-ci`
-
----
-
-## Cloud Step 1: Scan All Open PRs
-
-Use the `github_pr_dashboard` MCP tool to get a full snapshot of all open PRs in a single call. It returns mergeable status, CI status, unresolved review threads, labels, and review decision for each PR.
+Required MCP servers: `legacy-sports-github`, `legacy-sports-ci` (hosted connectors). Verify first:
 
 ```
-github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true)
+github_auth_status()
 ```
 
-The response includes a `summary` object with counts (`total`, `conflicting`, `ciFailing`, `ciPending`, `ciPassing`, `withUnresolvedThreads`, `approved`) and a `prs` array with per-PR details. When drafts were skipped, the response also includes a top-level `draftsExcluded` field (omitted when 0) reflecting how many draft PRs were skipped — log this in the sweep report.
+If `configured: false`, stop and prompt the user.
 
-For detailed inspection of specific PRs, use `github_pr_batch_status` with an array of PR numbers.
+## Step 1: Scan all open PRs
 
-> **Workflow triage (read-only) — strong fit in cloud.** A cloud sweep is entirely read-only/API, so the scan + per-PR classification maps cleanly onto the deterministic `pipeline()` in [SKILL.md → Read-Only Triage via the Workflow Primitive](SKILL.md#read-only-triage-via-the-workflow-primitive). It returns a `verdicts[]` triage report the cloud agent drives Cloud Steps 2–6 against. Use it for large/ambiguous PR sets; the single `github_pr_dashboard` call above is the simple path for trivial scans.
+```
+github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true, format: "json")
+```
 
-> For a **scan-only** request, stop here and report the results.
+Returns `summary` counts, a `prs[]` array (`mergeable`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`), and a top-level `draftsExcluded` count (omitted when 0) — log it in the report. Post-filter out PRs labeled `agent-in-progress` or `sweep-claimed` (owned by other agents; the dashboard does not filter these server-side). For job-level detail on specific PRs use `github_pr_batch_status(numbers: [...])` (≤50 numbers per call) — dashboard `ciStatus` can be stale on old SHAs.
 
-## Cloud Step 2: Verify Reviewer Bot Labeling
+> For a **scan-only** request, stop here and report.
 
-The **Reviewer Bot** applies `merge-when-ready` itself on APPROVED verdict (`.github/scripts/reviewer/index.mjs:914`). Do **not** apply this label manually — see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership). Manual application bypasses the gate that holds back PRs the Reviewer Bot has rejected.
+## Step 2: Verify Reviewer Bot labeling on clean PRs
 
-For PRs where Reviewer Bot has not yet labeled despite a clean state, the upstream cause is one of:
+`merge-when-ready` is applied by the Reviewer Bot only — on all PRs, including Dependabot's. See the [Label Ownership table and boxed Dependabot ruling](../SKILL.md#label-ownership); never apply it manually. For a clean PR (MERGEABLE, CI green, 0 threads) missing the label, fix the upstream cause:
 
-- `bot:ready-for-review` was not (re-)applied after the last push → re-apply it: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`.
-- Reviewer Bot is rate-limited (`review-bot-degraded` label present) → remove and re-add `bot:ready-for-review` to retry.
-- Reviewer Bot verdict is still CHANGES_REQUESTED → review threads and push fixes (subsequent passes).
+- `bot:ready-for-review` missing on current HEAD → `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`
+- `review-bot-degraded` present (rate-limited cycle) → remove then re-add `bot:ready-for-review`
+- Verdict still CHANGES_REQUESTED → the PR needs code work; defer to a local sweep in the report.
 
-**Dependabot exception**: Dependabot PRs are not reviewed by the Reviewer Bot. For those PRs only, applying `merge-when-ready` manually is the documented comment-command flow — see the Dependabot pass.
+## Step 3: Re-run transient CI failures
 
-## Cloud Step 3: Re-run Flaky / Failed CI
-
-For each PR where `ciStatus` is `fail`, inspect the failed checks to determine if the failure looks transient (flaky test, timeout, infrastructure error) vs. a real code issue.
-
-### 3a. Diagnose the failure
-
-Use the CI MCP tools to read logs:
+Do this early so re-runs complete while the rest of the pass proceeds. For each PR with `ciStatus: "fail"`, diagnose then decide:
 
 ```
 ci_list_runs(branch: "<branch>", status: "failure", limit: 1)
@@ -52,93 +40,43 @@ ci_get_logs(runId: <runId>, failedOnly: true)
 ci_search_logs(runId: <runId>, pattern: "error|FAIL|Error:", isRegex: true, contextBefore: 5, contextAfter: 5)
 ```
 
-### 3b. Decide: re-run or escalate
+| Log evidence                                     | Action                                                                                                   |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Flaky test / timeout / infrastructure error      | `ci_rerun(runId: <id>, failedOnly: true)` — record run ID as pending                                     |
+| Consistent lint/type/build/test/formatting error | `github_comment_pr(number: <PR#>, body: "<diagnosed root cause>")` — needs a local agent; list in report |
 
-| Log Evidence                                     | Action                                                                |
-| ------------------------------------------------ | --------------------------------------------------------------------- |
-| Flaky test (different test fails each run)       | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`                     |
-| Timeout / infrastructure error                   | Re-run: `ci_rerun(runId: <id>, failedOnly: true)`                     |
-| Consistent lint/type/build/test error            | Comment diagnosed root cause on PR — requires code fix by local agent |
-| Formatting failure (`nx format:write` would fix) | Comment diagnosed root cause on PR — requires code fix by local agent |
+## Step 4: Resolve process/meta review threads
 
-```
-ci_rerun(runId: <runId>, failedOnly: true)
-```
-
-After re-running, the PR moves to `ciPending`. Track these for the final report.
-
-## Cloud Step 4: Resolve Process / Meta Review Threads
-
-Some review threads suggest no code change — they are process comments, "nice to have" suggestions, or scope observations (pattern #10 in the common Copilot review patterns). These can be resolved directly without code changes.
-
-For each PR with unresolved threads, fetch the thread details:
+For each PR with unresolved threads:
 
 ```
-github_get_review_threads({ number: <PR#>, unresolvedOnly: true })
+github_get_review_threads({ number: <PR#> })
 ```
 
-For each thread, read the comment body. If the thread is a **process/meta comment** that does not require a code change (e.g., "Consider extracting this into a utility in a future PR", "Nice improvement", suggestions about documentation outside the PR scope), resolve it:
+Default output is unresolved threads only, each with a `PRRT_` node `id`. Threads that request **no code change** (process comments, "nice to have" observations, out-of-scope suggestions) may be resolved directly, batched per PR:
 
 ```
-github_resolve_threads({ threadIds: ["<threadId1>", "<threadId2>", ...], prNumber: <PR#> })
+github_resolve_threads({ threadIds: ["PRRT_...", ...], prNumber: <PR#> })
 ```
 
-Batch all resolvable threads for a PR into one call. The `prNumber` parameter triggers a bot-review recheck after resolution; if the app token lacks `actions: write` permission, the recheck dispatch is skipped/non-fatal and reported in the tool output (for example via `recheckNote`), but threads are still resolved — the recheck fires automatically on the next push.
+The `prNumber` parameter triggers a bot-review recheck; if the token lacks `actions: write` the dispatch is skipped non-fatally (`recheckNote` in the output) — the recheck fires on the next push. Threads requesting code changes stay open: comment the summary on the PR and defer to a local sweep. That PR is settled for this pass (needs-local, not `requires-human-review`).
 
-**Do NOT resolve threads that request actual code changes** — those require a local agent. If a PR has unresolved threads that all require code changes, comment on the PR listing the unresolved threads. The PR is now **settled** (needs local agent — do not label `requires-human-review` since a local agent can fix code).
+## Step 5: Comment blockers; label only true human blockers
 
-## Cloud Step 6: Final Report
+For each PR this pass could not settle via API actions, post one `github_comment_pr` stating the blocker. Apply `requires-human-review` **only** when the blocker is outside any agent's reach (missing credentials, product/design decision, external dependency) — never for code fixes, conflicts, or review comments a local sweep can handle.
 
-After completing all API-only actions, produce a summary report. This is the primary deliverable of a cloud sweep.
+## Step 6: Final report
 
-### Summary Table
+The report is the primary deliverable. Every scanned PR appears in exactly one category:
 
-```
-| PR    | Title                        | Mergeable   | CI        | Threads | Label                  | Cloud Action         | Settled | Reason                        |
-|-------|------------------------------|-------------|-----------|---------|------------------------|----------------------|---------|-------------------------------|
-| #101  | feat(scoring): new algo      | MERGEABLE   | pass      | 0       | merge-when-ready       | Verified clean       | ✅      | Clean                         |
-| #102  | fix(ui): button color        | CONFLICTING | —         | 0       | —                      | Diagnosed            | ⏳      | Needs local rebase            |
-| #103  | feat(db): add index          | MERGEABLE   | fail      | 2       | —                      | Re-ran CI            | ⏳      | CI re-running                 |
-| #104  | chore(deps): bump lodash     | MERGEABLE   | pass      | 1       | —                      | Resolved 1 thread    | ✅      | Clean                         |
-| #105  | feat(ws): reconnect logic    | MERGEABLE   | fail      | 0       | —                      | Diagnosed            | ⏳      | Type error needs local fix    |
-| #106  | fix(auth): token refresh     | MERGEABLE   | pass      | 3       | requires-human-review  | Resolved 1 meta      | ✅      | Needs prod DB creds (no env)  |
-```
+1. **Actions taken** — drafts/owned PRs skipped (counts); `bot:ready-for-review` (re-)applied (PR numbers); CI re-runs triggered (PR numbers + run IDs); threads resolved (counts per PR); `requires-human-review` applied (PR numbers + blocker each).
+2. **Needs local agent** — conflicts to rebase, CI failures needing code fixes (with diagnosed root cause), code-change review threads (with thread summaries), Dependabot PRs needing the [sweep-dependabot](../../sweep-dependabot/SKILL.md) flow.
+3. **Needs human** — `requires-human-review` PRs with cited blockers.
+4. **Pending** — CI re-runs in flight (recorded, not awaited).
 
-### Report Sections
+## Provenance and maintenance
 
-1. **Actions Taken** — list every API action performed:
-   - **Draft PRs skipped** (count — excluded at scan; owned by their creating agent)
-   - PRs labeled `merge-when-ready` (count + PR numbers)
-   - PRs labeled `requires-human-review` (count + PR numbers + reasons — must each cite a blocker outside agent reach)
-   - CI runs re-triggered (count + PR numbers + run IDs)
-   - Review threads resolved (count + PR numbers)
-   - Copilot reviews requested (count + PR numbers)
-
-2. **Needs local agent** — PRs that need code changes a cloud agent cannot make (blocker commented on each):
-   - PRs with merge conflicts (need local rebase)
-   - PRs with CI failures requiring code fixes (include the diagnosed root cause)
-   - PRs with unresolved review threads requiring code changes (include thread summaries)
-
-3. **Needs human** — PRs labeled `requires-human-review` (blockers outside any agent's reach):
-   - Missing credentials, product/design decisions, external dependencies
-
-4. **Pending** — items where status is not yet final:
-   - PRs with CI still running or re-running
-   - PRs where Copilot review was just requested (no results yet)
-
-All PRs should appear in exactly one settled category. No PR should be left unaccounted for.
-
----
-
-## Cloud Full Sweep Algorithm
-
-For a full cloud sweep, run steps 1–8 in order. Unlike the local sweep, there is no outer loop because the cloud agent cannot fix code issues that cascade. The cloud agent settles every PR by confirming it is clean, commenting the blocker for issues a local agent can fix, or labeling `requires-human-review` only for blockers outside any agent's reach.
-
-1. Scan all open PRs (Cloud Step 1)
-2. Re-run flaky CI (Cloud Step 3) — do this early so CI has time to complete
-3. Request Copilot reviews on unreviewed PRs (Cloud Step 4) — triggers auto-approve for clean PRs
-4. Resolve process/meta review threads (Cloud Step 5)
-5. Comment on PRs with issues the cloud agent cannot fix — explain the blocker on each. Only label `requires-human-review` if the blocker is outside any agent's reach (not just "needs code changes")
-6. If any CI re-runs were triggered, record the run IDs in the report as **pending** and continue — do **not** `sleep` or poll waiting for them. A cloud agent that sleeps 3 minutes looks indistinguishable from a hang and burns wall-clock time the session may not have. The next sweep (or a manual re-run) will pick up the results.
-7. Verify clean PRs are labeled (Cloud Step 2)
-8. Produce final report (Cloud Step 6) — every PR must appear in a settled category
+- Rewritten 2026-07-02 from the Phase-1 skills audit (`scratch/skills-audit/synthesis.json`, inconsistency #14): replaces the cloud sections of `pr-maintenance-workflow.md` and the previous `sweep-cloud.md`. Removed: the `Workflow`/`pipeline()` triage primitive (not in the harness), the misnumbered step sequence, `github_resolve_thread` (singular — nonexistent; the real tool is `github_resolve_threads`), and stale `copilot-auto-approve` pipeline claims (that pipeline is retired; `copilot-auto-approve.yml` at HEAD is only the W6 thread-resolution recheck).
+- Verify tool names: `grep -rEho "'github_[a-z_]+'" tools/mcp/github-server/src/*.ts | sort -u`
+- Verify W6 recheck workflow purpose: `sed -n 1,12p .github/workflows/copilot-auto-approve.yml`
+- Verify who applies `merge-when-ready`: `grep -n "merge-when-ready" .github/scripts/reviewer/index.mjs`

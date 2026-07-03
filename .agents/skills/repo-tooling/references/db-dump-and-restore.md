@@ -1,5 +1,7 @@
 # Database Dump & Restore
 
+> SSM tunnel setup (tag-based NAT discovery + `make db-tunnel`) lives in [cloudwatch-archaeology Step 5](../../cloudwatch-archaeology/SKILL.md#step-5--fall-back-to-the-database) — this doc covers dump/restore only.
+
 ## Dump Production Data to S3
 
 ### Overview
@@ -14,7 +16,7 @@ Dumps the live `legacy-sports-dev-postgres` RDS instance to a compressed custom-
 
 ### Prerequisites
 
-- AWS SSO authenticated: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — only run `aws sso login` if expired
+- AWS SSO authenticated: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — if expired, stop and prompt the user to re-authenticate (`aws sso login` is user-only, Tier 1)
 - Docker Desktop running
 - `.env` present with `DB_USER` and `DB_PASSWORD` (run `pnpm run sync-env` if missing)
 
@@ -76,10 +78,11 @@ aws_sso_status();
 ```
 
 ```powershell
-# Shell fallback — confirm expired, then login
+# Shell fallback — confirm auth state only
 aws sts get-caller-identity
-aws sso login
 ```
+
+If expired: **stop** and prompt the user to run `aws sso login` in their terminal — auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../../mcp-first/SKILL.md#auth-model)).
 
 **Docker not running**
 Start Docker Desktop, then retry.
@@ -101,7 +104,7 @@ Downloads `latest.dump` from S3 and restores it into the `ls-postgres` Docker co
 
 ### Prerequisites
 
-- AWS SSO authenticated: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — only run `aws sso login` if expired
+- AWS SSO authenticated: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — if expired, stop and prompt the user to re-authenticate (`aws sso login` is user-only, Tier 1)
 - Docker Desktop running
 - Postgres container running: `docker compose up -d postgres`
 
@@ -161,10 +164,11 @@ aws_sso_status();
 ```
 
 ```powershell
-# Shell fallback — confirm expired, then login
+# Shell fallback — confirm auth state only
 aws sts get-caller-identity
-aws sso login
 ```
+
+If expired: **stop** and prompt the user to run `aws sso login` in their terminal — auth-generation commands are user-only (Tier 1, see [mcp-first Auth Model](../../mcp-first/SKILL.md#auth-model)).
 
 **Postgres container not running**
 

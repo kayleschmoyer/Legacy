@@ -24,6 +24,7 @@ Replace `<name>` with the kebab-case lambda name (e.g. `player-sync`).
 lambdas/<name>/
 ├── src/
 │   ├── index.ts          # Lambda handler entry point
+│   ├── index.spec.ts     # Unit tests (required — the test target fails with zero tests)
 │   ├── dev.ts            # Local development server (optional)
 │   └── setup-tests.ts    # Jest setup (if env vars needed)
 ├── .eslintrc.json
@@ -48,6 +49,15 @@ lambdas/<name>/
   "projectType": "application",
   "tags": ["lambda", "platform:node", "scope:lambda", "type:api"],
   "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "cache": true,
+      "options": {
+        "jestConfig": "lambdas/<name>/jest.config.ts",
+        "passWithNoTests": false
+      }
+    },
     "build": {
       "extends": "build:lambda",
       "options": {
@@ -69,15 +79,10 @@ lambdas/<name>/
     },
     "deploy": {
       "executor": "nx:run-commands",
-      "dependsOn": ["package"],
+      "dependsOn": ["build"],
       "options": {
-        "commands": [
-          "cd terraform/main",
-          "terraform apply -target=aws_lambda_function.<name_underscore> -auto-approve",
-          "terraform apply -target=aws_api_gateway_deployment.main -auto-approve"
-        ],
-        "parallel": false,
-        "cwd": "."
+        "command": "../../scripts/deploy-lambda.ps1 -FunctionName <name>",
+        "cwd": "lambdas/<name>"
       }
     },
     "serve": {
@@ -101,7 +106,9 @@ lambdas/<name>/
 }
 ```
 
-> Replace `<name_underscore>` with the snake_case version for Terraform resource names (e.g. `player_sync`).
+> The explicit `test` target with `"passWithNoTests": false` is mandatory. A package.json `"test": "jest --onlyChanged"` script with no `project.json` test target becomes the merged Nx target, runs **zero tests** on CI's clean tree, and passes via `nx.json`'s `passWithNoTests: true` — the suite never gates merge (LS-8247). See [testing → What Gates Merge](../../testing/SKILL.md#what-gates-merge).
+>
+> The `deploy` target uses the house deploy script (`scripts/deploy-lambda.ps1`, the majority pattern — `stats-lambda`/`db` use the `deploy-lambda.sh` variant). Full deployment sequence and prerequisites: [Deploy Lambda](../../infrastructure/references/deploy-lambda.md). Terraform resource names use the snake_case version of `<name>` (e.g. `player_sync`) — see Step 5.
 
 **Note**: `typecheck` is NOT listed in targets — the `nx.json` target default applies automatically and defaults to `tsc --noEmit -p tsconfig.lib.json`. Since lambdas use `tsconfig.app.json`, you must add a typecheck override:
 
@@ -127,7 +134,6 @@ Or rely on the existing `build:lambda` extends pattern if the default `tsconfig.
     "dev": "tsx watch src/dev.ts",
     "dev:no-watch": "tsx src/dev.ts",
     "build": "vite build",
-    "test": "jest --onlyChanged",
     "test:watch": "jest --watch --onlyChanged",
     "test:all-files": "jest"
   },
@@ -264,6 +270,21 @@ export const handler = async (
 };
 ```
 
+#### `src/index.spec.ts` (starter test)
+
+The `test` target has `"passWithNoTests": false`, so `nx run <name>:test` **fails until the first spec exists**. Ship at least this starter and grow it with the handler:
+
+```typescript
+import { handler } from './index';
+
+describe('<name> handler', () => {
+  it('returns 200', async () => {
+    const result = await handler({} as never);
+    expect(result.statusCode).toBe(200);
+  });
+});
+```
+
 #### `vite.config.ts`
 
 Copy from an existing lambda (e.g. `lambdas/game-selection/vite.config.ts`) and adjust the entry point.
@@ -284,33 +305,34 @@ pnpm exec nx run <name>:build
 
 ### 5. Add Terraform resource
 
-Define the Lambda's AWS infrastructure in `terraform/`. See [Terraform Apply](../../terraform-apply/SKILL.md) and [Deploy Lambda](../../deploy-lambda/SKILL.md) for guidance.
+Define the Lambda's AWS infrastructure in `terraform/`. See [terraform](../../terraform/SKILL.md) and [Deploy Lambda](../../infrastructure/references/deploy-lambda.md) for guidance.
 
 ## Differences from Library
 
-| Aspect                      | Library (`lib/`)    | Lambda (`lambdas/`)          |
-| --------------------------- | ------------------- | ---------------------------- |
-| `projectType`               | `"library"`         | `"application"`              |
-| tsconfig reference          | `tsconfig.lib.json` | `tsconfig.app.json`          |
-| Has `build` target          | No                  | Yes (`build:lambda` extends) |
-| Has `deploy` target         | No                  | Yes                          |
-| ESLint ignorePatterns       | No `dist`           | Includes `dist`              |
-| package.json `main`         | `./src/index.ts`    | `dist/index.js`              |
-| package.json `scripts`      | None                | `dev`, `build`, `test`       |
-| Path alias in tsconfig.base | Required            | Not needed                   |
+| Aspect                      | Library (`lib/`)    | Lambda (`lambdas/`)                                                                                 |
+| --------------------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `projectType`               | `"library"`         | `"application"`                                                                                     |
+| tsconfig reference          | `tsconfig.lib.json` | `tsconfig.app.json`                                                                                 |
+| Has `build` target          | No                  | Yes (`build:lambda` extends)                                                                        |
+| Has `deploy` target         | No                  | Yes                                                                                                 |
+| ESLint ignorePatterns       | No `dist`           | Includes `dist`                                                                                     |
+| package.json `main`         | `./src/index.ts`    | `dist/index.js`                                                                                     |
+| package.json `scripts`      | None                | `dev`, `build`, `test:watch`, `test:all-files` (no bare `test` — the `project.json` target owns it) |
+| Path alias in tsconfig.base | Required            | Not needed                                                                                          |
 
 ## Common Mistakes
 
-| Mistake                                              | Why it fails                                                                                                                                                                                                                                     |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Missing `vite.config.ts`                             | `build` target fails                                                                                                                                                                                                                             |
-| Using `tsconfig.lib.json` in typecheck command       | Lambda uses `tsconfig.app.json`                                                                                                                                                                                                                  |
-| Forgetting `"dist"` in eslintrc ignorePatterns       | Lint tries to check build output                                                                                                                                                                                                                 |
-| Not running `pnpm install` after adding package.json | Missing workspace link                                                                                                                                                                                                                           |
-| Adding `"type": "module"` to package.json            | Breaks `require()` in jest config                                                                                                                                                                                                                |
-| Fire-and-forget notification calls (no `await`)      | Lambda freezes execution context after returning; unawaited `postToConnection` calls are silently killed, causing intermittent notification loss. See [WebSocket Notifications](../../../docs/guides/websocket-notifications.md#critical-rules). |
+| Mistake                                                                        | Why it fails                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing `vite.config.ts`                                                       | `build` target fails                                                                                                                                                                                                                                                                                                                                                    |
+| Using `tsconfig.lib.json` in typecheck command                                 | Lambda uses `tsconfig.app.json`                                                                                                                                                                                                                                                                                                                                         |
+| Forgetting `"dist"` in eslintrc ignorePatterns                                 | Lint tries to check build output                                                                                                                                                                                                                                                                                                                                        |
+| Not running `pnpm install` after adding package.json                           | Missing workspace link                                                                                                                                                                                                                                                                                                                                                  |
+| Adding `"type": "module"` to package.json                                      | Breaks `require()` in jest config                                                                                                                                                                                                                                                                                                                                       |
+| package.json `"test": "jest --onlyChanged"` with no `project.json` test target | The package.json script becomes the merged Nx target; on CI's clean tree `--onlyChanged` runs **zero tests** and passes via `passWithNoTests: true` — the unit suite never gates merge (LS-8247). Use the explicit `@nx/jest:jest` target with `"passWithNoTests": false` from the template. See [testing → What Gates Merge](../../testing/SKILL.md#what-gates-merge). |
+| Fire-and-forget notification calls (no `await`)                                | Lambda freezes execution context after returning; unawaited `postToConnection` calls are silently killed, causing intermittent notification loss. See [WebSocket Notifications](../../../../docs/guides/websocket-notifications.md#critical-rules).                                                                                                                     |
 
 ## Related Skills
 
-- [Deploy Lambda](../../deploy-lambda/SKILL.md) — Deploy to AWS
+- [Deploy Lambda](../../infrastructure/references/deploy-lambda.md) — Deploy to AWS
 - [Standards](../../standards/SKILL.md) — Coding standards and config conventions

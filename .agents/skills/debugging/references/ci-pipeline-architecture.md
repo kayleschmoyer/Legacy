@@ -8,13 +8,17 @@ Understanding the CI architecture helps with debugging. The pipeline uses a two-
 ci-orchestrator.yml  (triggered by PR / push / merge_group / schedule)
 ├── determine-scope        ← decides which sub-workflows to run
 ├── ci-pipeline.yml        ← main quality + build pipeline (reusable workflow)
-│   ├── detect-changes     ← dorny/paths-filter + git diff
-│   ├── quality-gates      ← format → lint → typecheck → test
-│   ├── build-validation   ← web / mobile / lambda builds
-│   ├── e2e                ← Playwright tests
-│   └── summarize          ← PR comment + badges
+│   ├── detect-changes     ← affected-project detection
+│   ├── lint / format / test / build   ← one quality gate each, in parallel
+│   ├── custom-checks      ← skills lint, workflow validation, misc guards
+│   ├── lockfile-check     ← pnpm lockfile integrity
+│   ├── e2e (+ e2e-affected)           ← Playwright shards + aggregate verdict
+│   ├── deploy-playwright-report       ← gh-pages report upload
+│   └── summarize          ← PR comment + badges (always runs)
 └── security-scanning.yml  ← conditional
 ```
+
+(Job ids drift — confirm with `ci_view_run_jobs(runId: ...)` or `grep -nE "^  [a-z-]+:$" .github/workflows/ci-pipeline.yml` before citing one.)
 
 **Key environment variables in CI:**
 
@@ -29,13 +33,13 @@ ci-orchestrator.yml  (triggered by PR / push / merge_group / schedule)
 
 **Timeouts per job:**
 
-| Job              | Timeout |
-| ---------------- | ------- |
-| detect-changes   | 5 min   |
-| quality-gates    | 30 min  |
-| build-validation | 30 min  |
-| e2e              | 30 min  |
-| summarize        | 10 min  |
+| Job                                          | Timeout |
+| -------------------------------------------- | ------- |
+| detect-changes                               | 5 min   |
+| lint / format / test / build / custom-checks | 30 min  |
+| lockfile-check                               | 5 min   |
+| e2e                                          | 30 min  |
+| summarize                                    | 10 min  |
 
 ## Deployment Pipeline Debugging
 
@@ -65,7 +69,7 @@ gh run list --workflow deploy-web.yml --limit 5
 gh run view RUN_ID --log-failed | Select-String "build failed|deploy.*failed|Pages.*error" -Context 5
 ```
 
-Common issues: missing `VITE_*` secrets, Sentry sourcemap upload failure, Pages deployment timeout.
+Common issues: missing `VITE_*` secrets, Rollbar sourcemap upload failure, Pages deployment timeout.
 
 ### Lambda deployment (`upload-lambdas.yml` → `lambda-terraform-apply.yml`)
 

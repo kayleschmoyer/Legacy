@@ -254,7 +254,7 @@ Benefits with Nx Cloud:
 1. Check Nx cache: `pnpm exec nx show project app --web` and verify cache is enabled
 2. Verify GitHub Actions cache: Look for "Cache hit" or "Cache miss" in workflow logs
 3. Check cache keys match: Ensure `build.gradle` hasn't changed
-4. Clear and rebuild: `pnpm exec nx reset` then rebuild
+4. Clear and rebuild: `make clean-cache` (never `pnpm exec nx reset` — LS-5242) then rebuild
 
 ### Cache Size Growing Too Large
 
@@ -273,7 +273,7 @@ Benefits with Nx Cloud:
 **Solutions**:
 
 1. Force rebuild: `pnpm exec nx build-android app --skip-nx-cache`
-2. Clear Nx cache: `pnpm exec nx reset`
+2. Clear Nx cache: `make clean-cache` (never `pnpm exec nx reset` — LS-5242)
 3. Clear Gradle cache: `cd apps/app/android && ./gradlew clean`
 4. Clear all caches: Delete GitHub Actions cache keys
 
@@ -283,7 +283,7 @@ Benefits with Nx Cloud:
 
 1. **Use Nx commands**: `pnpm exec nx build-android app` (benefits from local cache)
 2. **Avoid manual Gradle commands**: Bypass Nx caching
-3. **Clear caches when switching branches**: `pnpm exec nx reset` after major changes
+3. **Clear caches when switching branches**: `make clean-cache` after major changes (never `pnpm exec nx reset` — LS-5242)
 
 ### CI/CD
 

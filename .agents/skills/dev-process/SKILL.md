@@ -21,14 +21,14 @@ This skill is the design layer. The operational runbook for the dominant path (p
 
 Every entrypoint, regardless of trigger, flows through these phases. See [spine.md](spine.md) for the full description.
 
-| Phase            | Purpose                                                            | Exit gate                                        |
-| ---------------- | ------------------------------------------------------------------ | ------------------------------------------------ |
-| 1. **Frame**     | Restate the problem in your own words; identify scope and risk     | Risk tier assigned, ticket exists                |
-| 2. **Design**    | Lightweight RFC for Medium+; test plan for all                     | RFC accepted (if required), test plan written    |
-| 3. **Implement** | Vertical slices, green tree per commit, docs alongside code        | All planned changes coded                        |
-| 4. **Verify**    | `make pc` + manual exercise + edge cases + determinism check       | All gates green                                  |
-| 5. **Document**  | Update touched docs, archive RFC/ADR if produced, write postmortem | All affected docs current                        |
-| 6. **Handoff**   | PR opened, reviewed, merged; tracking tasks closed                 | PR merged, Jira Done, audit run, tasks completed |
+| Phase            | Purpose                                                                                       | Exit gate                                        |
+| ---------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| 1. **Frame**     | Restate the problem in your own words; identify scope and risk                                | Risk tier assigned, ticket exists                |
+| 2. **Design**    | Design gate per risk tier (see [gates/risk-tiers.md](gates/risk-tiers.md)); test plan for all | RFC accepted (if required), test plan written    |
+| 3. **Implement** | Vertical slices, green tree per commit, docs alongside code                                   | All planned changes coded                        |
+| 4. **Verify**    | `make pc` + manual exercise + edge cases + determinism check                                  | All gates green                                  |
+| 5. **Document**  | Update touched docs, archive RFC/ADR if produced, write postmortem                            | All affected docs current                        |
+| 6. **Handoff**   | PR opened, reviewed, merged; tracking tasks closed                                            | PR merged, Jira Done, audit run, tasks completed |
 
 ## Master Flow Diagram
 
@@ -80,14 +80,14 @@ See [entrypoints/README.md](entrypoints/README.md) for the entrypoint decision t
 
 Every artifact has a stable schema and a known path so MCP tools and CI can consume them.
 
-| Artifact          | Path pattern                                   | Required by                                    | Schema doc                                                       |
-| ----------------- | ---------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
-| RFC               | `docs/rfcs/LS-####-slug.md`                    | Medium+ entrypoints (5, 6, 8, 12), all spikes  | [artifacts/rfc.md](artifacts/rfc.md)                             |
-| ADR               | `docs/decisions/NNNN-slug.md`                  | Any architectural decision                     | [artifacts/adr.md](artifacts/adr.md)                             |
-| Test plan         | PR body section OR `docs/test-plans/`          | All entrypoints except 9 (docs-only)           | [artifacts/test-plan.md](artifacts/test-plan.md)                 |
-| Repro report      | Jira ticket field                              | Entrypoint 2 (bug-investigation), 4 (CI flake) | [artifacts/repro-report.md](artifacts/repro-report.md)           |
-| Continuation plan | PR comment with `<!-- continuation -->` marker | Entrypoint 10 (inherited PR)                   | [artifacts/continuation-plan.md](artifacts/continuation-plan.md) |
-| Postmortem        | `docs/postmortems/YYYY-MM-DD-slug.md`          | Entrypoints 1, 3, 13 + any Critical tier       | [artifacts/postmortem.md](artifacts/postmortem.md)               |
+| Artifact          | Path pattern                                                                                                                                          | Required by                                                                                                                                  | Schema doc                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| RFC               | `docs/rfcs/LS-####-slug.md`                                                                                                                           | High/Critical design changes; recommended for Medium (2026-07-02 recalibration — see [gates/risk-tiers.md](gates/risk-tiers.md)); all spikes | [artifacts/rfc.md](artifacts/rfc.md)                             |
+| ADR               | `docs/decisions/NNNN-slug.md`                                                                                                                         | Any architectural decision                                                                                                                   | [artifacts/adr.md](artifacts/adr.md)                             |
+| Test plan         | PR body section OR `docs/test-plans/`                                                                                                                 | All entrypoints except 9 (docs-only)                                                                                                         | [artifacts/test-plan.md](artifacts/test-plan.md)                 |
+| Repro report      | Jira ticket field                                                                                                                                     | Entrypoint 2 (bug-investigation), 4 (CI flake)                                                                                               | [artifacts/repro-report.md](artifacts/repro-report.md)           |
+| Continuation plan | PR comment with `<!-- continuation-plan -->` marker (the string `continuation_status` searches for — see `tools/mcp/dev-process-server/src/index.ts`) | Entrypoint 10 (inherited PR)                                                                                                                 | [artifacts/continuation-plan.md](artifacts/continuation-plan.md) |
+| Postmortem        | `docs/postmortems/YYYY-MM-DD-slug.md`                                                                                                                 | Entrypoints 1, 3, 13 + any Critical tier                                                                                                     | [artifacts/postmortem.md](artifacts/postmortem.md)               |
 
 Templates for each live in [templates/](templates/).
 
@@ -108,18 +108,24 @@ Templates for each live in [templates/](templates/).
 - [testing](../testing/SKILL.md) — test type selection and the determinism reference used by Phase 4 (Verify).
 - [worktree-workflow](../worktree-workflow/SKILL.md) — the substrate for code changes. Every entrypoint that produces code uses this.
 
-## Tooling spec (planned, not yet implemented)
+## Tooling (implemented)
 
-Each artifact has a planned MCP tool surface. These are documented in the artifact docs themselves so future tooling work has a fixed spec. Tools are **not implemented** in this round — only the contract is fixed.
+The artifact tool surface is **implemented** (verified 2026-07-02) in the `legacy-sports-dev-process` stdio MCP server — source `tools/mcp/dev-process-server/src/index.ts`, registered in `.mcp.json`. Per-tool schemas live in the artifact docs' `#tool-surface` sections.
 
-| Tool                      | Purpose                                                              | Spec                                                                          |
-| ------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `rfc_create`              | Scaffold a new RFC with required sections                            | [artifacts/rfc.md](artifacts/rfc.md#tool-surface)                             |
-| `rfc_validate`            | Check an RFC has all required sections and links resolve             | [artifacts/rfc.md](artifacts/rfc.md#tool-surface)                             |
-| `adr_create`              | Scaffold a new ADR with auto-incremented number                      | [artifacts/adr.md](artifacts/adr.md#tool-surface)                             |
-| `adr_supersede`           | Mark an ADR superseded by another                                    | [artifacts/adr.md](artifacts/adr.md#tool-surface)                             |
-| `testplan_extract`        | Pull the test plan section from a PR body                            | [artifacts/test-plan.md](artifacts/test-plan.md#tool-surface)                 |
-| `testplan_coverage_check` | Verify each test-plan case has a corresponding test                  | [artifacts/test-plan.md](artifacts/test-plan.md#tool-surface)                 |
-| `repro_capture`           | Save a repro report (steps, env, observed, expected) to a Jira field | [artifacts/repro-report.md](artifacts/repro-report.md#tool-surface)           |
-| `continuation_post`       | Post a structured continuation plan as a PR comment                  | [artifacts/continuation-plan.md](artifacts/continuation-plan.md#tool-surface) |
-| `postmortem_create`       | Scaffold a postmortem with required sections                         | [artifacts/postmortem.md](artifacts/postmortem.md#tool-surface)               |
+| Artifact          | Tools                                                               | Spec                                                                          |
+| ----------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| RFC               | `rfc_create`, `rfc_validate`, `rfc_list_open`, `rfc_accept`         | [artifacts/rfc.md](artifacts/rfc.md#tool-surface)                             |
+| ADR               | `adr_create`, `adr_supersede`, `adr_list`                           | [artifacts/adr.md](artifacts/adr.md#tool-surface)                             |
+| Test plan         | `testplan_extract`, `testplan_coverage_check`, `testplan_diff`      | [artifacts/test-plan.md](artifacts/test-plan.md#tool-surface)                 |
+| Repro report      | `repro_capture`, `repro_replay`, `repro_close_no_repro`             | [artifacts/repro-report.md](artifacts/repro-report.md#tool-surface)           |
+| Continuation plan | `continuation_post`, `continuation_status`                          | [artifacts/continuation-plan.md](artifacts/continuation-plan.md#tool-surface) |
+| Postmortem        | `postmortem_create`, `postmortem_action_items`, `postmortem_recent` | [artifacts/postmortem.md](artifacts/postmortem.md#tool-surface)               |
+
+If the server is missing from a session (stdio servers require a working `node_modules/.bin/tsx` — see the MCP note in [AGENTS.md](../../../AGENTS.md)), fall back to scaffolding from [templates/](templates/) by hand at the same paths.
+
+## Provenance and maintenance
+
+- 2026-07-02: tooling section, continuation marker, and RFC-gate recalibration updated from the skills audit (`scratch/skills-audit/`).
+- Verify tool list: `grep -A1 "^server.tool(" tools/mcp/dev-process-server/src/index.ts`
+- Verify continuation marker: `grep -n "continuation-plan -->" tools/mcp/dev-process-server/src/index.ts`
+- Verify artifact dirs exist: `ls docs/rfcs docs/decisions docs/postmortems docs/test-plans`

@@ -6,12 +6,12 @@ Reference tables for the PR/CI machinery: the GitHub App separation of duties, w
 
 Three GitHub Apps handle distinct roles to ensure no single identity both authors and approves code:
 
-| App                                   | ID / Client ID                                      | Role                                                                                         | Permissions                                                              |
-| ------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Agent Author                          | 3158619                                             | Pushes code, creates PRs, reads CI check state (backs the `legacy-sports-github` MCP server) | Contents (rw), Pull requests (rw), Checks (r), Statuses (r)              |
-| Review Bot (legacy-sports-review-bot) | 3142924                                             | Approves PRs after Copilot review passes, manages `bot-review` status, adds labels           | Pull requests (rw), Statuses (rw), Checks (rw), Issues (rw)              |
-| Merge Queue Bot                       | via `MERGE_QUEUE_APP_ID` secret                     | Processes merge queue, merges PRs, retargets dependents, deletes branches                    | Contents (rw), Pull requests (rw), Issues (rw), Checks (r), Statuses (r) |
-| Preview / Deploy App                  | 3027681 / `Iv23liHm7Fumhyh2KIAb` (`PREVIEW_APP_ID`) | Deploys Storybook, PR previews, and Playwright reports to `legacy-sports-deploys`            | Contents (rw) on `legacy-sports-deploys`                                 |
+| App                                   | ID / Client ID                                      | Role                                                                                                                   | Permissions                                                              |
+| ------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Agent Author                          | 3158619                                             | Pushes code, creates PRs, reads CI check state (backs the `legacy-sports-github` MCP server)                           | Contents (rw), Pull requests (rw), Checks (r), Statuses (r)              |
+| Review Bot (legacy-sports-review-bot) | 3142924                                             | Identity of the Reviewer Bot (`review.yml`, W1): posts PR reviews, manages the `bot-review` commit status, adds labels | Pull requests (rw), Statuses (rw), Checks (rw), Issues (rw)              |
+| Merge Queue Bot                       | via `MERGE_QUEUE_APP_ID` secret                     | Processes merge queue, merges PRs, retargets dependents, deletes branches                                              | Contents (rw), Pull requests (rw), Issues (rw), Checks (r), Statuses (r) |
+| Preview / Deploy App                  | 3027681 / `Iv23liHm7Fumhyh2KIAb` (`PREVIEW_APP_ID`) | Deploys Storybook, PR previews, and Playwright reports to `legacy-sports-deploys`                                      | Contents (rw) on `legacy-sports-deploys`                                 |
 
 **Key constraint:** The Agent Author app never approves PRs. The Review Bot never pushes code. This ensures separation between code authoring and code approval.
 
@@ -19,33 +19,13 @@ Three GitHub Apps handle distinct roles to ensure no single identity both author
 
 ## Required vs Advisory Checks
 
-### Required (Blocking) Checks
+**The single home for the merge-gate truth — the four required contexts, per-context writers, fail modes, and recovery — is [pr-lifecycle/references/ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md).** Summary only:
 
-These must pass for the merge queue to process a PR:
-
-| Check                                     | Source Workflow                                              |
-| ----------------------------------------- | ------------------------------------------------------------ |
-| CI Pipeline (quality-gates + build + e2e) | `ci-pipeline.yml` via `ci-orchestrator.yml`                  |
-| `bot-review` commit status                | `copilot-auto-approve.yml`                                   |
-| GraphQL Schema & Codegen                  | `check-schema.yml` (when GraphQL files change)               |
-| Verify All Migrations Applied             | `check-migrations-applied.yml` (when migration files change) |
+- `.github/ruleset.json` (config) requires exactly four contexts: `bot-review`, `No Merge Conflicts`, `Verify All Migrations Applied`, and `CI Gate` (the LS-8014 cutover). The granular `🚀 CI Pipeline / *` check runs still execute but are informational.
+- **Config is not live state.** The cutover is staged: a maintainer must run `bash scripts/apply-ruleset.sh` to push the config live; `check-ruleset.yml` reports drift until then (expected). Check the live set with `github_get_branch_protection()` before reasoning about a blocked merge — details in the [config-vs-live section](../../pr-lifecycle/references/ci-checks-reference.md#config-vs-live-the-staged-cutover-model).
+- Non-required checks (GraphQL Schema & Codegen, Security Scanning, Deploy PR Preview, jira-link-check, Jira Branch Sync, Touch-Map freshness, Update Migration Badge) still post check runs, and the merge queue waits for all checks to complete — so a failing advisory check can delay a queued merge even though it cannot 405 it.
 
 > The CI Pipeline `custom-checks` job also runs the repo-script unit suites — `pnpm test:scripts` (node `--test` over `scripts/__tests__/*.test.mjs`) and `pnpm test:scripts:ps` (the dependency-free PowerShell assertions). `pwsh` is baked into the runner AMI with an install-if-missing fallback in the job (LS-7770).
-
-> **Aggregate `CI Gate` (LS-7991, in staged rollout):** the CI Pipeline `summarize` job posts a single `CI Gate` **commit status** per head SHA (via `.github/scripts/ci-gate.js`) folding the granular `lint/format/test/build/custom-checks/lockfile-check/e2e` results. It exists to collapse the 5 granular `🚀 CI Pipeline / *` required check-RUN names — whose cancelled duplicates 405 genuinely-green PRs (LS-7988) — into one unambiguous required context. It is added to `.github/ruleset.json` **ahead-of-live** and is **informational** until the owner runs `scripts/apply-ruleset.sh`; until then `Check Ruleset Drift` reports expected drift. Full rollout + rollback: [`docs/ci-cd/ci-gate-aggregator.md`](../../../../docs/ci-cd/ci-gate-aggregator.md).
-
-### Advisory Checks (Not Required by Branch Protection)
-
-These checks are not configured as _required_ branch protection rules, but they still produce GitHub check runs/commit statuses. The merge queue (`merge-queue.yml`) waits for all checks to complete and will block on any failing or pending check unless explicitly configured to ignore it, so failures here can still delay a queued merge.
-
-| Check                    | Source Workflow                        | Notes                                                        |
-| ------------------------ | -------------------------------------- | ------------------------------------------------------------ |
-| Touch-Map Freshness      | `ci-pipeline.yml` (custom-checks step) | Advisory; posts `docs: touch-map gap` label + comment on gap |
-| Security Scanning        | `security-scanning.yml`                | Labels PR on failure but does not block merge                |
-| Deploy PR Preview        | `deploy-pr-preview.yml`                | Preview deployment for UI review                             |
-| Deploy Playwright Report | `ci-pipeline.yml` (sub-job)            | Report published to GitHub Pages                             |
-| Jira Branch Sync         | `jira-branch-sync.yml`                 | Best-effort Jira transitions                                 |
-| Update Migration Badge   | `update-migration-badge.yml`           | Badge cosmetics only                                         |
 
 ## Secrets Reference
 
@@ -62,14 +42,14 @@ These checks are not configured as _required_ branch protection rules, but they 
 
 ### GitHub Apps
 
-| Secret                         | Purpose                                              |
-| ------------------------------ | ---------------------------------------------------- |
-| `BOT_APP_PRIVATE_KEY`          | Review Bot (ID 3142924) -- Copilot auto-approve      |
-| `MERGE_QUEUE_APP_ID`           | Merge Queue Bot app ID                               |
-| `MERGE_QUEUE_APP_PRIVATE_KEY`  | Merge Queue Bot private key                          |
-| `PREVIEW_APP_ID`               | PR preview/Playwright report deploy app ID           |
-| `PREVIEW_APP_PRIVATE_KEY`      | PR preview/Playwright report deploy private key      |
-| `AGENT_AUTHOR_APP_PRIVATE_KEY` | Agent Author (ID 3158619) -- code push + PR creation |
+| Secret                         | Purpose                                                |
+| ------------------------------ | ------------------------------------------------------ |
+| `BOT_APP_PRIVATE_KEY`          | Review Bot (ID 3142924) -- Reviewer (W1) + label guard |
+| `MERGE_QUEUE_APP_ID`           | Merge Queue Bot app ID                                 |
+| `MERGE_QUEUE_APP_PRIVATE_KEY`  | Merge Queue Bot private key                            |
+| `PREVIEW_APP_ID`               | PR preview/Playwright report deploy app ID             |
+| `PREVIEW_APP_PRIVATE_KEY`      | PR preview/Playwright report deploy private key        |
+| `AGENT_AUTHOR_APP_PRIVATE_KEY` | Agent Author (ID 3158619) -- code push + PR creation   |
 
 ### Web App (Vite Build) and Mobile App (Expo)
 

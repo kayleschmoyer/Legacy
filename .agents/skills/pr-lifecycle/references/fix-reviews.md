@@ -24,7 +24,7 @@ This aims to keep most PRs to ≤ 2 review rounds by avoiding unnecessary re-rev
 ## Workflow (single PR)
 
 1. **Activate worktree context (FIRST)**: call `worktree_set({ key: "LS-####" })` (sibling worktrees) or `worktree_set({ key: "<absolute .claude/worktrees/... path>" })` (ephemeral worktrees). Do this before any git operations — it ensures `worktree_diff`, `worktree_commit`, and `worktree_push` target the correct worktree path. Never use raw `git -C <path> diff/commit/push` when a worktree MCP tool is available.
-2. **Fetch threads**: `github_get_review_threads(number: <PR#>, unresolvedOnly: true)`
+2. **Fetch threads**: `github_get_review_threads(number: <PR#>)`
 3. **Fix ALL threads before modifying files**: read every thread's `path`, `line`, and `body` first, then apply all fixes in one pass. Do not commit or push until all threads are addressed.
    - **Re-ground in ticket scope before applying any fix**: extract the Jira ticket key from the PR title (`LS-\d+` pattern), then call `jira_view(key: "LS-####")` and re-read the ticket's **Acceptance Criteria** and **Out of Scope** sections. Use them as a guardrail when triaging suggestions:
      - Reviewer suggestions that **support** an AC → apply.
@@ -78,14 +78,14 @@ On Claude Code on the web, use the **custom `legacy-sports-github` MCP server** 
 
 | Step               | Custom MCP tool (preferred)                                                                                                                                      | Built-in fallback (only if custom unavailable)                                                                                                   |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Fetch threads      | `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` ✅ returns GraphQL `id`                                                                     | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` ⚠️ no thread node IDs — resolve step will fail      |
+| Fetch threads      | `github_get_review_threads({ number: <PR#> })` ✅ returns GraphQL `id`                                                                                           | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` ⚠️ no thread node IDs — resolve step will fail      |
 | Reply to thread    | `github_reply_to_review({ threadId: "PRRT_...", body })` ✅ works local + cloud; pass `commentId` + `number` instead of `threadId` if you only have a databaseId | `mcp__github__add_reply_to_pull_request_comment({ owner, repo, pullNumber, commentId, body })` ✅ bot identity                                   |
 | Resolve threads    | `github_resolve_threads({ threadIds, prNumber: <PR#> })` ✅ batch                                                                                                | `mcp__github__resolve_review_thread({ threadId })` per thread ⚠️ requires node IDs — only viable if threads were fetched via custom server above |
 | Re-request Copilot | ⚠️ app tokens silently fail for Copilot                                                                                                                          | `mcp__github__request_copilot_review({ owner, repo, pullNumber })` ✅ platform auth                                                              |
 
 ### Cloud workflow steps
 
-1. **Fetch threads**: `github_get_review_threads({ number: <PR#>, unresolvedOnly: true })` — the custom server returns GraphQL thread `id` values needed for step 7. If the first call fails with a connection error, wait 10s and retry (server may still be starting). Only fall back to `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` if the custom server is confirmed unavailable — but note: the built-in does **not** return thread node IDs, so step 7 cannot use `mcp__github__resolve_review_thread` without them.
+1. **Fetch threads**: `github_get_review_threads({ number: <PR#> })` — the custom server returns GraphQL thread `id` values needed for step 7. If the first call fails with a connection error, wait 10s and retry (server may still be starting). Only fall back to `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })` if the custom server is confirmed unavailable — but note: the built-in does **not** return thread node IDs, so step 7 cannot use `mcp__github__resolve_review_thread` without them.
 2. **Fix code & validate**: same as local workflow (`make pc`)
 3. **Self-review fix code**: same as local workflow step 5 — re-read changed files in full, check fixes against common-review-patterns.md before pushing.
 4. **Commit & push**: `worktree_commit({ message: "..." })` + `worktree_push()` (preferred). If using shell: `git commit -m "$(cat <<'EOF'\n...\nEOF\n)"` + `git push` — **never `git commit` without `-m`**
@@ -102,4 +102,4 @@ On Claude Code on the web, use the **custom `legacy-sports-github` MCP server** 
 - **Never** suppress a lint/type error to satisfy a review comment — fix the root cause
 - **Never** resolve a thread without either fixing it or explaining why it's not applicable
 - **Never** enter more than 2 fix-review rounds on the same PR
-- After resolving all threads and pushing fixes, (re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle. The Reviewer Bot adds `merge-when-ready` itself on APPROVED — **never apply it manually** (see [Label Ownership in AGENTS.md](../../../../AGENTS.md#label-ownership))
+- After resolving all threads and pushing fixes, (re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle. The Reviewer Bot adds `merge-when-ready` itself on APPROVED — **never apply it manually** (see [Label Ownership](../SKILL.md#label-ownership))

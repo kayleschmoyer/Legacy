@@ -1,5 +1,7 @@
 # Legacy Sports Database Tables Documentation
 
+> **Status: stale — verify before trusting (2026-07-02).** This doc is known wrong in places: it documents the dropped `draft_type` enum and pre-rename `owner` permission values, describes a superseded eligibility rule, links a nonexistent "Database Query Guide", and is baseball-only. Ground truth is the Drizzle models (`lib/db-client/src/drizzle/`) and `lambdas/db/schema.graphql`; the known-wrong-claims table lives in [domain-reference](../../.agents/skills/domain-reference/SKILL.md).
+
 **Last Updated**: April 7, 2026
 
 **Total Tables**: 36+ tables + views

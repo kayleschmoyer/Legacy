@@ -185,6 +185,11 @@ jobs:
           VITE_WEBSOCKET_URL: ${{ secrets.WEBSOCKET_URL }}
           VITE_GA_MEASUREMENT_ID: ""
           VITE_GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+          # Feature flags in previews: only this fallback build carries the key.
+          # The primary artifact-rewrite path above reuses the CI build (no key
+          # baked in), so previews served from it run with flag fallbacks only —
+          # see docs/feature-flags.md. Empty secret → SDK skipped, build unaffected.
+          VITE_GROWTHBOOK_CLIENT_KEY: ${{ secrets.GROWTHBOOK_CLIENT_KEY }}
           VITE_ROLLBAR_ACCESS_TOKEN: ""
           VITE_VERSION: "0.0.0-pr.${{ steps.pr.outputs.number }}"
           VITE_APP_VERSION: "0.0.0-pr.${{ steps.pr.outputs.number }}"

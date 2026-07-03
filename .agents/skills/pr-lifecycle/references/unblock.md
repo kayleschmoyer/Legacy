@@ -48,7 +48,9 @@ For each PR where `why_blocked` returned READY, call:
 github_get_check_runs(prNumber: <N>, checkName: "🚀 CI Pipeline / build")
 ```
 
-Run all calls in parallel. If the result is empty or contains no check runs on the current HEAD SHA, the PR is in **Expected CI** state (see Root Cause below). Fix: add `ci:run` label.
+Run all calls in parallel. (The granular `🚀 CI Pipeline / *` runs are informational post-LS-8014, but their presence on the HEAD SHA is still the cheapest signal that CI executed for that SHA.) If the result is empty or contains no check runs on the current HEAD SHA, the PR is in **Expected CI** state (see Root Cause below).
+
+Before dispatching the fix, check for the `skip-ci` label (`github_view_pr`) and pick the recovery event type — a `ci:run` label re-runs CI but **cannot post the `CI Gate` / `bot-review` commit statuses** (label dispatch has no `pull_request` payload). Decision table: [ci-checks-reference.md — skip-ci footgun](./ci-checks-reference.md#the-skip-ci-footgun-pr-stuck-at-expected). Summary: missing **check runs** → `ci:run` label; missing **commit status** (`CI Gate`) → remove `skip-ci` if present, then push an empty commit or close/reopen the PR.
 
 ### Step 4 — Dispatch minimal actions
 
@@ -56,13 +58,13 @@ Apply the pattern table below. Run label additions and `spawn_task` calls in par
 
 ## Pattern Table
 
-| Pattern                                     | Detection                                                                              | Action                                               |
-| ------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| False positive — `process-merge-queue` only | `why_blocked` returns READY, `github_get_check_runs` finds runs on HEAD                | None — `merge-when-ready` will handle it             |
-| Expected CI — no check runs on HEAD SHA     | `why_blocked` returns READY, `github_get_check_runs` returns empty / no runs on HEAD   | `github_manage_labels(prs: [<N>], add: ["ci:run"])`  |
-| Merge conflict                              | `why_blocked` returns MERGE_CONFLICT                                                   | Spawn rebase chip via `mcp__ccd_session__spawn_task` |
-| bot-review threads only                     | `why_blocked` returns CI_FAILING with `bot-review` the only entry in `failingChecks`   | Spawn `fix-pr` chip                                  |
-| Real CI failures                            | `why_blocked` returns CI_FAILING with lint/format/test/build checks in `failingChecks` | Spawn `fix-pr` chip                                  |
+| Pattern                                     | Detection                                                                              | Action                                                                                                                                                 |
+| ------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| False positive — `process-merge-queue` only | `why_blocked` returns READY, `github_get_check_runs` finds runs on HEAD                | None — `merge-when-ready` will handle it                                                                                                               |
+| Expected CI — no check runs on HEAD SHA     | `why_blocked` returns READY, `github_get_check_runs` returns empty / no runs on HEAD   | `github_manage_labels(prs: [<N>], add: ["ci:run"])` — but see Step 3: a missing **commit status** (`CI Gate`) needs a new `pull_request` event instead |
+| Merge conflict                              | `why_blocked` returns MERGE_CONFLICT                                                   | Spawn rebase chip via `mcp__ccd_session__spawn_task`                                                                                                   |
+| bot-review threads only                     | `why_blocked` returns CI_FAILING with `bot-review` the only entry in `failingChecks`   | Spawn `fix-pr` chip                                                                                                                                    |
+| Real CI failures                            | `why_blocked` returns CI_FAILING with lint/format/test/build checks in `failingChecks` | Spawn `fix-pr` chip                                                                                                                                    |
 
 ### Input validation (apply before substituting into any chip prompt)
 
@@ -82,7 +84,7 @@ mcp__ccd_session__spawn_task({
   tldr: "Rebase PR #<N> onto main and resolve any conflicts.",
   prompt: `PR #<N> on branch <branch> has a merge conflict with main. Rebase it and push.
 
-Load Skill(skill: "rebase") and follow it: enter/create the PR's worktree, worktree_rebase, worktree_stabilize, resolve conflicts (Skill(skill: "resolve-merge-conflicts") if needed), make pc, push.
+Load Skill(skill: "rebase") and follow it: enter/create the PR's worktree, worktree_rebase, worktree_stabilize, resolve conflicts per the rebase reference's conflict decision tree, make pc, push.
 
 Stop after a clean push — the next sweep will handle any remaining problems.`
 })
@@ -102,16 +104,21 @@ Failing checks (snapshot): <check names + runId from github_pr_why_blocked>. Fet
 })
 ```
 
-## Root Cause: CI Orchestrator Concurrency-Displacement Bug
+## Root Cause: Why Expected CI Happens (current architecture)
 
-**Why Expected CI happens**: the CI orchestrator workflow (`ci-orchestrator.yml`) has an `on: pull_request: types: [labeled]` trigger. When `check-conflicts-sweep.yml` adds the `CI: Conflicts` label (or any non-`ci:run` label event fires), the orchestrator starts, occupies the concurrency group (`orchestrator-<PR#>`, `cancel-in-progress: false`), then exits immediately after its own guard check (`if: contains(github.event.label.name, 'ci:run')`). A queued `synchronize` run that was pending in the same slot is **displaced** — it is evicted from the pending slot and never executes. The result: no CI check runs on the current HEAD SHA, shown as "Expected" in the GitHub UI.
+The historical cause — label events entering the orchestrator's concurrency group and displacing pending `synchronize` runs — was **fixed in LS-7752**. The orchestrator (`ci-orchestrator.yml`) no longer has a `labeled` trigger at all; its triggers are `pull_request: [opened, synchronize, reopened]`, `pull_request_review: [submitted]`, `merge_group`, and `workflow_dispatch`. The `ci:run` label is handled by a separate lean dispatcher, `ci-run-label.yml`, which removes the label and fires `workflow_dispatch` on the orchestrator — so non-`ci:run` label events (e.g. `CI: Conflicts` from `check-conflicts-sweep.yml`) never touch the orchestrator's concurrency group (`orchestrator-<PR#>`, `cancel-in-progress: false`).
 
-**Fix**: adding the `ci:run` label directly fires the orchestrator's label trigger with the correct label, which passes the guard and runs all CI jobs.
+Remaining causes of a HEAD SHA with no CI results, in observed order of likelihood:
+
+1. **`skip-ci` label** — every ci-pipeline job (including `summarize`, which posts `CI Gate`) skips; the required commit status is never posted. Recovery requires removing the label AND a `pull_request` event (see Step 3 and [ci-checks-reference.md](./ci-checks-reference.md#the-skip-ci-footgun-pr-stuck-at-expected)).
+2. **Run never started or died before posting** — runner reaps/shutdowns (see `CI: Runner Flake` handling in the orchestrator), or the SHA-race guard exited cleanly because a newer push landed while an older event was in flight.
+3. **A required context whose writer didn't fire** — e.g. `bot-review` pending because the reviewer never ran on this SHA (check `bot:ready-for-review` label state). Identify with `github_list_commit_statuses(prNumber: <N>)` + `github_get_check_runs`; per-context writers are tabled in [ci-checks-reference.md](./ci-checks-reference.md#the-four-required-contexts-post-ls-8014-config).
 
 **Relevant files**:
 
-- `.github/workflows/ci-orchestrator.yml` — `on: pull_request: types: [labeled]` + `ci:run` label guard
-- `.github/workflows/check-conflicts-sweep.yml` — emits `CI: Conflicts` label events that displace pending synchronize runs
+- `.github/workflows/ci-orchestrator.yml` — triggers `[opened, synchronize, reopened]` + `pull_request_review`; no `labeled` trigger (LS-7752)
+- `.github/workflows/ci-run-label.yml` — `ci:run` label → `workflow_dispatch` dispatcher
+- `.github/workflows/check-conflicts-sweep.yml` — base-push conflict sweep (label events from it are now harmless to CI)
 
 ## Idempotency
 

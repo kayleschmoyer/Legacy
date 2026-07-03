@@ -64,13 +64,12 @@ Typically: `/legacy-sports/{environment}/{parameter-name}`
 
 ### Issue: AWS credentials not configured
 
-**Solution**:
+**Solution**: credential generation is **user-only** (AGENTS.md Tier 1) — stop and prompt the **user** to run in their own terminal (see [aws-sso-login.md](aws-sso-login.md)):
 
 ```powershell
-# Configure AWS CLI credentials (preferred — avoids credentials in shell history)
+# User's terminal (agents never run auth-generation commands):
 aws configure
-
-# Or use AWS SSO
+# Or with AWS SSO:
 aws sso login --profile your-profile
 ```
 
@@ -134,7 +133,7 @@ aws configure
 Get-Content .env.local
 
 # 4. Start development servers
-npm start  # Web server
+make dev-web  # Web server (port 4200 — see the dev-environment port map)
 ```
 
 ### Daily Development
@@ -144,18 +143,16 @@ npm start  # Web server
 .\scripts\sync-env.ps1
 
 # Then start services
-npm start
+make dev-web
 ```
 
 ### After Infrastructure Changes
 
 ```powershell
 # 1. Apply Terraform changes (if you made them)
-cd terraform
-terraform apply
+terraform -chdir=terraform/main apply
 
 # 2. Sync new environment variables
-cd ..
 .\scripts\sync-env.ps1
 
 # 3. Restart services to pick up changes
@@ -317,7 +314,7 @@ aws ssm put-parameter --name "/legacy-sports/dev/my-param" --value "new-value" -
 
 ### VS Code
 
-Environment variables automatically loaded by Next.js and Lambda runtimes.
+Environment variables are loaded automatically by the Vite dev server (`VITE_`-prefixed keys from `.env`/`.env.local`) and by the local Lambda dev servers.
 
 ### CI/CD
 
