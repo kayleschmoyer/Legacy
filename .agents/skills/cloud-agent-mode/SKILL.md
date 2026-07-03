@@ -143,6 +143,7 @@ This is the **degraded tool binding for the [ticket-to-merge spine](../workflow-
    git commit -m "<type>(<scope>): <msg> (LS-####)"
    git push -u origin HEAD                               # sets upstream on first push
    ```
+   **If `git push` is blocked by git-lfs** (LS-7773): fall back to `mcp__github__push_files` to push via the GitHub API. After any API-based push, the local branch is behind the remote — **re-sync with `worktree_reset_to_remote()`** (MCP tool) instead of `git fetch origin <branch> && git reset --hard origin/<branch>`. See the [mcp-first substitution table](../mcp-first/SKILL.md) for the full mapping.
 6. **Open draft PR** (durable checkpoint — do this BEFORE validation so a container reap is non-fatal):
    ```
    mcp__github__create_pull_request({ owner: "bkrupa", repo: "legacy-sports", head: "<branch>", base: "main", title: "LS-#### <type>(<scope>): <msg>", body: "<markdown body>", draft: true })
