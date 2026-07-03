@@ -163,6 +163,38 @@ class PlayerStatsSurface {
     await this.#page.getByText(label, { exact: true }).first().click();
   }
 
+  /** Open the "Advanced" filters panel (range sliders — LS-3825). */
+  async openAdvancedFilters(): Promise<void> {
+    const advancedButton = this.#page.getByRole('button', {
+      name: /Advanced/i,
+    });
+    await expect(advancedButton).toBeVisible({ timeout: 10_000 });
+    await advancedButton.click();
+  }
+
+  /**
+   * Drive the "Min Home Runs" range slider to (approximately) `target` career
+   * HR via the keyboard: Home zeroes it, each ArrowUp advances one `step` and
+   * fires onKeyUp → the debounced onCommit → applyFilters refetch. The press
+   * count derives from the live `step` attribute so a cap/step change cannot
+   * silently break the verb, and the settled value is asserted as
+   * presses × step (mirrors the LS-8248 fix in the live integration spec).
+   */
+  async setMinHomeRuns(target: number): Promise<void> {
+    const slider = this.#page.getByLabel('Min Home Runs');
+    await expect(slider).toBeVisible({ timeout: 10_000 });
+
+    const step = Number(await slider.getAttribute('step')) || 1;
+    const presses = Math.round(target / step);
+
+    await slider.press('Home');
+    await expect(slider).toHaveValue('0');
+    for (let i = 0; i < presses; i++) {
+      await slider.press('ArrowUp');
+    }
+    await expect(slider).toHaveValue(String(presses * step));
+  }
+
   /** Open a player's detail modal by clicking their row (matched by name). */
   async openPlayerByName(name: string): Promise<void> {
     await this.#page.getByText(name).first().click();
@@ -250,6 +282,13 @@ class PlayerStatsSurface {
   /** Assert a value is rendered inside a specific player row. */
   async expectRowValue(playerId: number, value: string): Promise<void> {
     await expect(this.row(playerId).getByText(value)).toBeVisible();
+  }
+
+  /** Assert at least one player row is rendered (any `player-row-*`). */
+  async expectAnyRowVisible(timeout = 15_000): Promise<void> {
+    await expect(
+      this.#page.locator('[data-testid^="player-row-"]').first(),
+    ).toBeVisible({ timeout });
   }
 
   /** Assert a data-grid column header is visible. */

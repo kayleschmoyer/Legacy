@@ -440,6 +440,196 @@ export function careerBattingConnectionResponse(
   };
 }
 
+// ── Player-stats grid, pitching view (GetCareerPitchingStats[Count]) ────────
+
+export interface MockCareerPitchingLeader {
+  __typename: 'CareerPitching';
+  playerId: number;
+  wins: number;
+  losses: number;
+  games: number;
+  gamesStarted: number;
+  gamesFinished: number;
+  completeGames: number;
+  shutouts: number;
+  saves: number;
+  hits: number;
+  runs: number;
+  earnedRuns: number;
+  homeRuns: number;
+  baseOnBalls: number;
+  intentionalBaseOnBalls: number;
+  strikeouts: number;
+  hitByPitch: number;
+  balks: number;
+  wildPitches: number;
+  battersFaced: number;
+  outsRecorded: number;
+  outRate: number | null;
+  era: string;
+  winPercentage: number;
+  player: {
+    __typename: 'Player';
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export function mockCareerPitchingLeader(
+  overrides: Partial<MockCareerPitchingLeader> = {},
+): MockCareerPitchingLeader {
+  // Roger Clemens' career line — mirrors the proven payload in
+  // player-stats-search-and-filters.spec.ts.
+  return {
+    __typename: 'CareerPitching',
+    playerId: 201,
+    wins: 354,
+    losses: 184,
+    games: 709,
+    gamesStarted: 707,
+    gamesFinished: 1,
+    completeGames: 100,
+    shutouts: 46,
+    saves: 0,
+    hits: 4672,
+    runs: 1940,
+    earnedRuns: 1770,
+    homeRuns: 363,
+    baseOnBalls: 1580,
+    intentionalBaseOnBalls: 79,
+    strikeouts: 4672,
+    hitByPitch: 158,
+    balks: 8,
+    wildPitches: 153,
+    battersFaced: 20016,
+    outsRecorded: 13095,
+    outRate: null,
+    era: '3.19',
+    winPercentage: 0.658,
+    player: {
+      __typename: 'Player',
+      id: 201,
+      firstName: 'Roger',
+      lastName: 'Clemens',
+    },
+    ...overrides,
+  };
+}
+
+/** Response for GetCareerPitchingStats — the pitching grid's array shape. */
+export function careerPitchingLeadersResponse(
+  stats?: MockCareerPitchingLeader[],
+) {
+  return {
+    data: { careerPitchingStats: stats ?? [mockCareerPitchingLeader()] },
+  };
+}
+
+/** Response for GetCareerPitchingStatsCount. */
+export function careerPitchingLeadersCountResponse(count: number) {
+  return { data: { careerPitchingStatsCount: count } };
+}
+
+// ── Player comparison (GetPlayersWithStats — compare search + table) ────────
+
+/**
+ * The rich player shape the comparison surface consumes from
+ * GetPlayersWithStats — mirrors the proven inline payload in
+ * player-comparison.spec.ts.
+ */
+export interface MockComparablePlayer {
+  __typename: 'Player';
+  id: number;
+  firstName: string;
+  lastName: string;
+  eligiblePositions: string[];
+  scoring: {
+    __typename: 'PlayerScoring';
+    totalScore: number;
+    avgPointsPerGame: number;
+    hitterScore: number;
+    pitchingScore: number;
+    fieldingScore: number;
+  };
+  careerBatting: {
+    games: number;
+    hits: number;
+    homeRuns: number;
+    rbi: number;
+    runs: number;
+    stolenBases: number;
+    baseOnBalls: number;
+    totalBases: number;
+    offensiveWAR: number;
+  };
+  averageSeasonBatting: {
+    battingAverage: number;
+    onBasePercentage: number;
+    sluggingPercentage: number;
+  };
+  careerPitching: null;
+  careerAchievements: {
+    allStarSelections: number;
+    mvpAwards: number;
+    cyYoungAwards: number;
+    goldGloves: number;
+    silverSluggers: number;
+    worldSeriesRings: number;
+  };
+}
+
+export function mockComparablePlayer(
+  overrides: Partial<MockComparablePlayer> = {},
+): MockComparablePlayer {
+  return {
+    __typename: 'Player',
+    id: 1,
+    firstName: 'Mike',
+    lastName: 'Trout',
+    eligiblePositions: ['CF', 'OF'],
+    scoring: {
+      __typename: 'PlayerScoring',
+      totalScore: 920,
+      avgPointsPerGame: 2.1,
+      hitterScore: 88,
+      pitchingScore: 0,
+      fieldingScore: 7,
+    },
+    careerBatting: {
+      games: 1131,
+      hits: 1559,
+      homeRuns: 368,
+      rbi: 817,
+      runs: 894,
+      stolenBases: 211,
+      baseOnBalls: 774,
+      totalBases: 2988,
+      offensiveWAR: 72.9,
+    },
+    averageSeasonBatting: {
+      battingAverage: 0.304,
+      onBasePercentage: 0.41,
+      sluggingPercentage: 0.582,
+    },
+    careerPitching: null,
+    careerAchievements: {
+      allStarSelections: 11,
+      mvpAwards: 3,
+      cyYoungAwards: 0,
+      goldGloves: 0,
+      silverSluggers: 9,
+      worldSeriesRings: 0,
+    },
+    ...overrides,
+  };
+}
+
+/** Response for GetPlayersWithStats as the comparison surface consumes it. */
+export function comparablePlayersResponse(players?: MockComparablePlayer[]) {
+  return { data: { players: players ?? [mockComparablePlayer()] } };
+}
+
 /**
  * Build a GetAllPlayerSeasonStats response for a batter/fielder.
  * Pass empty arrays to omit batting or fielding sections.

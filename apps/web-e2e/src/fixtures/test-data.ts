@@ -6,7 +6,12 @@ import {
   publicLeaguesEmptyResponse,
   publicLeaguesResponse,
 } from '../mocks/graphql/league.mocks';
-import { careerBattingConnectionResponse } from '../mocks/graphql/player.mocks';
+import {
+  careerBattingConnectionResponse,
+  careerPitchingLeadersCountResponse,
+  careerPitchingLeadersResponse,
+  comparablePlayersResponse,
+} from '../mocks/graphql/player.mocks';
 
 /**
  * TestData — the backend-agnostic data-precondition seam (ADR-0016).
@@ -58,6 +63,22 @@ export interface TestData {
    * public league can plausibly carry.
    */
   discoverySearch(): Promise<SeededDiscoverySearch>;
+
+  /**
+   * Ensure the pitching view of the stats grid has data. Mock: installs the
+   * career-pitching array + count payloads (Clemens). Live: the MLB history
+   * dataset always has pitching leaders — nothing to seed.
+   */
+  pitchingLeaders(): Promise<void>;
+
+  /**
+   * Ensure the premium comparison search returns a player. Mock: answers
+   * GetPlayersWithStats (the rich compare shape) with the default pool
+   * player. Live: the all-time greats are always searchable (premium
+   * identity required server-side — the dual fixtures' commissioner is
+   * premium).
+   */
+  comparablePlayer(): Promise<SeededPlayerPool>;
 }
 
 /** Hermetic implementation — preconditions become `route.fulfill()` mocks. */
@@ -134,6 +155,47 @@ export class MockTestData implements TestData {
 
     return { unmatchedTerm };
   }
+
+  async pitchingLeaders(): Promise<void> {
+    const stats = JSON.stringify(careerPitchingLeadersResponse());
+    const count = JSON.stringify(careerPitchingLeadersCountResponse(1));
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      const opName = extractOperationName(route).toLowerCase();
+      if (opName === 'getcareerpitchingstats') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: stats,
+        });
+      } else if (opName === 'getcareerpitchingstatscount') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: count,
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+  }
+
+  async comparablePlayer(): Promise<SeededPlayerPool> {
+    // The comparison surface's search consumes GetPlayersWithStats (the rich
+    // compare shape), NOT SearchPlayers — mirrors player-comparison.spec.ts.
+    const payload = JSON.stringify(comparablePlayersResponse());
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      if (extractOperationName(route).toLowerCase() === 'getplayerswithstats') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: payload,
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+    return { fullName: 'Mike Trout', searchTerm: 'Trout' };
+  }
 }
 
 /**
@@ -156,5 +218,15 @@ export class LiveTestData implements TestData {
     // Same shape the cleanup helpers treat as test-owned noise — no plausible
     // real league name collides with it.
     return Promise.resolve({ unmatchedTerm: 'zz-no-such-league-zz' });
+  }
+
+  pitchingLeaders(): Promise<void> {
+    // The live MLB history dataset always has pitching leaders.
+    return Promise.resolve();
+  }
+
+  comparablePlayer(): Promise<SeededPlayerPool> {
+    // Precedent live search target (player-search-stats-ui Phase 4, LS-754).
+    return Promise.resolve({ fullName: 'Barry Bonds', searchTerm: 'Bonds' });
   }
 }

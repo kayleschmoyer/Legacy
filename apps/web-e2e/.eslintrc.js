@@ -194,6 +194,7 @@ module.exports = {
         'mobile-responsive-nav.spec.ts',
         'navigation.spec.ts',
         'player-brefid-route.spec.ts',
+        'player-compare-search.dual.spec.ts',
         'player-comparison-best-indicator.spec.ts',
         'player-comparison-career-achievements.spec.ts',
         'player-comparison-color-chips.spec.ts',
