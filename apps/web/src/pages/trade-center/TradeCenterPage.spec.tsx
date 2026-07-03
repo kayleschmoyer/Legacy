@@ -831,6 +831,110 @@ describe('TradeCenterPage', () => {
       expect(screen.getByTestId('football-icon')).toBeInTheDocument();
     });
   });
+
+  // TC-001-P: useGetUserLeaguesQuery returns ALL user leagues (no server-side
+  // phase filter); TradeCenterPage must filter client-side to leaguePhase===
+  // 'active' so premium users cannot tap into leagues where trading is
+  // impossible (draft/offseason) and hit a server-side proposeTrade rejection.
+  describe('premium variant — active-phase filter (TC-001-P)', () => {
+    beforeEach(() => {
+      mockIsPremium = true;
+    });
+
+    it('shows only active leagues when premium user belongs to leagues across all phases', () => {
+      mockUserLeagues = {
+        userLeagues: [
+          {
+            id: 1,
+            name: 'Active League',
+            sport: 'baseball',
+            leaguePhase: 'active',
+          },
+          {
+            id: 2,
+            name: 'Pre-Draft League',
+            sport: 'baseball',
+            leaguePhase: 'pre-draft',
+          },
+          {
+            id: 3,
+            name: 'Offseason League',
+            sport: 'football',
+            leaguePhase: 'offseason',
+          },
+        ],
+      };
+      renderPage();
+      expect(
+        screen.getByRole('button', { name: /View trades for Active League/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', {
+          name: /View trades for Pre-Draft League/i,
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', {
+          name: /View trades for Offseason League/i,
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows empty-state message when premium user has no active-phase leagues', () => {
+      mockUserLeagues = {
+        userLeagues: [
+          {
+            id: 1,
+            name: 'Pre-Draft League',
+            sport: 'baseball',
+            leaguePhase: 'pre-draft',
+          },
+          {
+            id: 2,
+            name: 'Offseason League',
+            sport: 'football',
+            leaguePhase: 'offseason',
+          },
+        ],
+      };
+      renderPage();
+      expect(
+        screen.getByText(/Trading is only available during the active season/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /View trades for/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows a live-draft league as filtered out (pre-draft phase, draftStatus in-progress)', () => {
+      mockUserLeagues = {
+        userLeagues: [
+          {
+            id: 1,
+            name: 'Live Draft League',
+            sport: 'football',
+            leaguePhase: 'pre-draft',
+            draftStatus: 'in-progress',
+          },
+          {
+            id: 2,
+            name: 'Active League',
+            sport: 'baseball',
+            leaguePhase: 'active',
+          },
+        ],
+      };
+      renderPage();
+      expect(
+        screen.getByRole('button', { name: /View trades for Active League/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', {
+          name: /View trades for Live Draft League/i,
+        }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });
 
 // ── Premium gating parity (LS-7516 — TC-019-P) ───────────────────────────────
