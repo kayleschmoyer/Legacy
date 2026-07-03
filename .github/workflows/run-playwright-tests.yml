@@ -23,6 +23,7 @@ on:
         options:
           - e2e
           - integration
+          - shared-live
           - all
       test-grep:
         description: "Filter tests by tag (Playwright --grep)"
@@ -193,6 +194,12 @@ jobs:
               # ceiling — concurrency past the ceiling re-opens the 429 cascade.
               echo "Requested $TOTAL integration shards exceeds the live-backend ceiling ($INTEGRATION_SHARD_CEILING) — clamping to $INTEGRATION_SHARD_CEILING."
               TOTAL="$INTEGRATION_SHARD_CEILING"
+            fi
+            if [ "$SUITE" = "shared-live" ]; then
+              # Dual-mode specs (ADR-0016, src/tests/shared/) run LIVE against
+              # the shared backend using the integration identity pool — a
+              # handful of quick specs, so always one shard / one worker.
+              TOTAL=1
             fi
             MATRIX=$(emit_shards "$SUITE" "$TOTAL" | jq -sc '.')
             echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -489,21 +496,21 @@ jobs:
           # E2E_* credentials are only needed by the integration suite (real
           # OAuth login). Hermetic e2e tests mock the network and don't need
           # them.
-          E2E_COMMISSIONER_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_COMMISSIONER_EMAIL || '' }}
-          E2E_COMMISSIONER_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_COMMISSIONER_PASSWORD || '' }}
-          E2E_MANAGER_1_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_1_EMAIL || '' }}
-          E2E_MANAGER_1_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_1_PASSWORD || '' }}
-          E2E_MANAGER_2_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_2_EMAIL || '' }}
-          E2E_MANAGER_2_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_2_PASSWORD || '' }}
-          E2E_MANAGER_3_EMAIL: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_3_EMAIL || '' }}
-          E2E_MANAGER_3_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_MANAGER_3_PASSWORD || '' }}
+          E2E_COMMISSIONER_EMAIL: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_COMMISSIONER_EMAIL || '' }}
+          E2E_COMMISSIONER_PASSWORD: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_COMMISSIONER_PASSWORD || '' }}
+          E2E_MANAGER_1_EMAIL: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_MANAGER_1_EMAIL || '' }}
+          E2E_MANAGER_1_PASSWORD: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_MANAGER_1_PASSWORD || '' }}
+          E2E_MANAGER_2_EMAIL: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_MANAGER_2_EMAIL || '' }}
+          E2E_MANAGER_2_PASSWORD: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_MANAGER_2_PASSWORD || '' }}
+          E2E_MANAGER_3_EMAIL: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_MANAGER_3_EMAIL || '' }}
+          E2E_MANAGER_3_PASSWORD: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_MANAGER_3_PASSWORD || '' }}
           # Shared password for the 10 new tiered pool identities — premium
           # seats 3-6, free seats 3-6, admin-1/2 (LS-8055). Their @test.legacysports.dev
           # emails are deterministic (hardcoded in test-user-auth.ts); only the
           # password is a secret. premium seats 1-2 (E2E_COMMISSIONER_*,
           # E2E_MANAGER_2_*) and free seats 1-2 (E2E_MANAGER_1_*, E2E_MANAGER_3_*)
           # reuse the persona secrets already wired above.
-          E2E_POOL_PASSWORD: ${{ matrix.suite == 'integration' && secrets.E2E_POOL_PASSWORD || '' }}
+          E2E_POOL_PASSWORD: ${{ (matrix.suite == 'integration' || matrix.suite == 'shared-live') && secrets.E2E_POOL_PASSWORD || '' }}
           # Google test credentials for google-oauth.integration.spec.ts
           # The API smoke tests always run; the UI popup test is skipped when absent.
           GOOGLE_TEST_EMAIL: ${{ matrix.suite == 'integration' && secrets.GOOGLE_TEST_EMAIL || '' }}
@@ -516,7 +523,7 @@ jobs:
             IS_NIGHTLY_LIKE="true"
           fi
 
-          if [ "$SUITE" = "integration" ]; then
+          if [ "$SUITE" = "integration" ] || [ "$SUITE" = "shared-live" ]; then
             CONFIG="apps/web-e2e/playwright.integration.config.ts"
           else
             CONFIG="apps/web-e2e/playwright.config.ts"
@@ -528,8 +535,11 @@ jobs:
           # Browser / project. Integration runs pass no --project: the
           # explicit shard file lists below only ever name files under the
           # `integration` project's testDir, so the config's `shared-live`
-          # project (dual-mode specs, ADR-0016) never matches here.
-          if [ "$SUITE" != "integration" ]; then
+          # project (dual-mode specs, ADR-0016) never matches there. The
+          # shared-live suite selects that project explicitly instead.
+          if [ "$SUITE" = "shared-live" ]; then
+            PLAYWRIGHT_ARGS+=( "--project=shared-live" )
+          elif [ "$SUITE" != "integration" ]; then
             if [ "$IS_NIGHTLY_LIKE" = "true" ]; then
               PLAYWRIGHT_ARGS+=( "--project=chromium" )
             else
@@ -614,7 +624,7 @@ jobs:
           # (1 integration shard) is enforced in the `prepare` job — together
           # they bound live-backend concurrency to a single in-flight flow
           # (LS-7866).
-          if [ "$SUITE" = "integration" ]; then
+          if [ "$SUITE" = "integration" ] || [ "$SUITE" = "shared-live" ]; then
             PLAYWRIGHT_ARGS+=( "--workers=1" )
           elif [ "$IS_NIGHTLY_LIKE" = "true" ]; then
             PLAYWRIGHT_ARGS+=( "--workers=4" "--retries=2" )
