@@ -53,6 +53,7 @@ export const ENTITLEMENTS = {
   large_player_stats_page_size: 'large_player_stats_page_size',
   league_history_analytics: 'league_history_analytics',
   optimal_lineup: 'optimal_lineup',
+  logo_upload: 'logo_upload',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -96,6 +97,7 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.large_player_stats_page_size,
     ENTITLEMENTS.league_history_analytics,
     ENTITLEMENTS.optimal_lineup,
+    ENTITLEMENTS.logo_upload,
   ],
 };
 
@@ -126,6 +128,7 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   league_history_analytics:
     'Premium league history analytics (championship leaderboard, manager awards)',
   optimal_lineup: 'Optimal Lineup (auto-set)',
+  logo_upload: 'Team logo upload (direct file upload)',
 };
 
 export function tierHasEntitlement(

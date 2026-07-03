@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useTeamBranding } from '@legacy-sports/shared-components';
 import {
   type LeagueFragment,
   type TeamFragment,
   useGetTeamMembersQuery,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { colorFromString, Empty, initialsFromName, Section } from '../Shared';
 import { I } from '../Icons';
+import { PremiumGate } from '../../../../components/PremiumGate';
+import { useHasEntitlement } from '../../../../hooks/useIsPremium';
+import { env } from '../../../../config/environment';
+import { getCsrfToken } from '../../../../lib/csrf';
+import { BRAND_SEAM_RED } from '../../../../constants/colors';
+
+const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
 export interface TeamTabProps {
   league: LeagueFragment;
@@ -27,6 +36,10 @@ export const TeamTab: React.FC<TeamTabProps> = ({
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const canUploadLogo = useHasEntitlement(ENTITLEMENTS.logo_upload);
 
   // Save wiring (form state, dirty tracking, rename/branding mutations, saved
   // flash) is shared cross-platform via useTeamBranding (LS-7809); this tab
@@ -59,6 +72,63 @@ export const TeamTab: React.FC<TeamTabProps> = ({
     onSaved: () => setSaveError(null),
     onError: (err) => setSaveError(err.message),
   });
+
+  const handleLogoFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !myTeamId || !league.id) return;
+
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      setLogoUploadError(
+        `Unsupported file type. Please upload a PNG, JPEG, or WebP image.`,
+      );
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+      setLogoUploadError(
+        `Image is too large (${sizeMb} MB). Maximum allowed size is 2 MB.`,
+      );
+      return;
+    }
+
+    setLogoUploadError(null);
+    setLogoUploading(true);
+    try {
+      if (!env.imageUploadUrl) {
+        throw new Error(
+          'Image uploads are not configured (VITE_IMAGE_UPLOAD_URL missing).',
+        );
+      }
+      const uploadUrl = `${env.imageUploadUrl}/images/upload?teamId=${myTeamId}&imageType=avatar`;
+      const csrfToken = getCsrfToken();
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': file.type,
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        },
+        body: file,
+        credentials: 'include',
+      });
+      const json = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok) {
+        throw new Error(json.error ?? `Upload failed (${response.status})`);
+      }
+      if (!json.url) {
+        throw new Error('Upload succeeded but no URL was returned.');
+      }
+      setLogoUrl(json.url);
+    } catch (err: unknown) {
+      setLogoUploadError(
+        err instanceof Error ? err.message : 'Upload failed. Please try again.',
+      );
+    } finally {
+      setLogoUploading(false);
+      if (logoFileInputRef.current) logoFileInputRef.current.value = '';
+    }
+  };
 
   const requestRename = () => {
     if (!myTeamId || !nameDirty || !league.id) return;
@@ -225,6 +295,48 @@ export const TeamTab: React.FC<TeamTabProps> = ({
                 <span className="hint">Square image, served over HTTPS.</span>
               )}
             </div>
+
+            <PremiumGate
+              isPremium={canUploadLogo}
+              featureName="Logo Upload"
+              featureDescription="Upload a logo image directly from your device — available on the Premium plan."
+            >
+              <div style={{ marginTop: 12 }}>
+                {logoUploadError ? (
+                  <div
+                    role="alert"
+                    style={{
+                      color: BRAND_SEAM_RED,
+                      fontSize: 12,
+                      marginBottom: 6,
+                    }}
+                  >
+                    {logoUploadError}
+                  </div>
+                ) : null}
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    void handleLogoFileChange(e);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="ls-btn ls-btn-ghost"
+                  disabled={logoUploading}
+                  onClick={() => logoFileInputRef.current?.click()}
+                >
+                  <I.Upload size={12} />{' '}
+                  {logoUploading ? 'Uploading…' : 'Upload Logo'}
+                </button>
+                <span className="hint" style={{ marginLeft: 8 }}>
+                  PNG, JPEG, or WebP · max 2 MB
+                </span>
+              </div>
+            </PremiumGate>
           </div>
 
           <div>
@@ -358,7 +470,6 @@ export const TeamTab: React.FC<TeamTabProps> = ({
           aria-modal="true"
           aria-labelledby="rename-team-title"
           aria-describedby="rename-team-description"
-          aria-busy={renaming}
           data-testid="rename-team-confirm"
           style={{
             position: 'fixed',
@@ -389,20 +500,6 @@ export const TeamTab: React.FC<TeamTabProps> = ({
               gap: 16,
             }}
           >
-            <div
-              aria-live="polite"
-              aria-atomic="true"
-              style={{
-                position: 'absolute',
-                width: 1,
-                height: 1,
-                overflow: 'hidden',
-                clip: 'rect(0,0,0,0)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {renaming ? 'Renaming team…' : ''}
-            </div>
             <div
               id="rename-team-title"
               style={{

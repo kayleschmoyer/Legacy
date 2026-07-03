@@ -61,6 +61,7 @@ Legend for **Enforcement**: 🔒 server-enforced (resolver gate) · 🖥️ UI-g
 | Advanced batting sabermetrics (OPS, OPS+, BABIP)                            | Premium | `advanced_batting_stats`       | 🔒 🖥️       | `statistics.ts` (`playerSeasonBatting` — nulls `onbasePlusSluggingPlus` for non-premium)            | `PlayerDetailModal` career batting card |
 | Larger page sizes (250/500 rows) in Player Stats                            | Premium | `large_player_stats_page_size` | 🔒 🖥️       | `statistics.ts` (`careerBattingStats` — caps `first` at 100 for non-premium)                        | `PlayerStatsPage` rows-per-page select  |
 | Premium league history analytics (championship leaderboard, manager awards) | Premium | `league_history_analytics`     | 🖥️          | _none — computed client-side from `getLeagueHistory` data_                                          | League History tabs (v1 & v2)           |
+| Team logo upload (S3 direct upload)                                         | Premium | `logo_upload`                  | 🖥️          | _UI-gated only — image-upload Lambda validates ownership; no resolver gate needed_                  | Team tab `PremiumGate` upload button    |
 
 ### Free features (explicit decisions)
 
