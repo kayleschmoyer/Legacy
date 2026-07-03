@@ -39,7 +39,7 @@ class PlaywrightElement implements UIElement {
 
   byRole(
     role: UIRole,
-    options?: { name?: string | RegExp; exact?: boolean },
+    options?: { name?: string | RegExp; exact?: boolean; level?: number },
   ): UIElement {
     return new PlaywrightElement(this.#locator.getByRole(role, options));
   }
@@ -52,8 +52,16 @@ class PlaywrightElement implements UIElement {
     return new PlaywrightElement(this.#locator.getByPlaceholder(text));
   }
 
+  byLabel(text: string | RegExp, options?: TextOptions): UIElement {
+    return new PlaywrightElement(this.#locator.getByLabel(text, options));
+  }
+
   first(): UIElement {
     return new PlaywrightElement(this.#locator.first());
+  }
+
+  last(): UIElement {
+    return new PlaywrightElement(this.#locator.last());
   }
 
   filterByText(text: string | RegExp): UIElement {
@@ -67,6 +75,14 @@ class PlaywrightElement implements UIElement {
 
   async fill(value: string): Promise<void> {
     await this.#locator.fill(value);
+  }
+
+  async clear(): Promise<void> {
+    await this.#locator.clear();
+  }
+
+  async press(key: string): Promise<void> {
+    await this.#locator.press(key);
   }
 
   // ── Reads ─────────────────────────────────────────────────────────
@@ -90,6 +106,23 @@ class PlaywrightElement implements UIElement {
     return this.#locator.allInnerTexts();
   }
 
+  value(): Promise<string> {
+    return this.#locator.inputValue();
+  }
+
+  attribute(name: string): Promise<string | null> {
+    return this.#locator.getAttribute(name);
+  }
+
+  boundingBox(): Promise<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null> {
+    return this.#locator.boundingBox();
+  }
+
   // ── Retrying assertions ───────────────────────────────────────────
   async expectVisible(options?: ExpectOptions): Promise<void> {
     await expect(this.#locator).toBeVisible(options);
@@ -99,12 +132,36 @@ class PlaywrightElement implements UIElement {
     await expect(this.#locator).not.toBeVisible(options);
   }
 
+  async expectEnabled(options?: ExpectOptions): Promise<void> {
+    await expect(this.#locator).toBeEnabled(options);
+  }
+
+  async expectDisabled(options?: ExpectOptions): Promise<void> {
+    await expect(this.#locator).toBeDisabled(options);
+  }
+
+  async expectAttached(options?: ExpectOptions): Promise<void> {
+    await expect(this.#locator).toBeAttached(options);
+  }
+
+  async expectNotAttached(options?: ExpectOptions): Promise<void> {
+    await expect(this.#locator).not.toBeAttached(options);
+  }
+
   async expectCount(count: number, options?: ExpectOptions): Promise<void> {
     await expect(this.#locator).toHaveCount(count, options);
   }
 
   async expectValue(value: string, options?: ExpectOptions): Promise<void> {
     await expect(this.#locator).toHaveValue(value, options);
+  }
+
+  async expectAttribute(
+    name: string,
+    value: string | RegExp,
+    options?: ExpectOptions,
+  ): Promise<void> {
+    await expect(this.#locator).toHaveAttribute(name, value, options);
   }
 
   async expectContainsText(
@@ -155,7 +212,7 @@ export class PlaywrightWebDriver implements AppDriver {
 
   byRole(
     role: UIRole,
-    options?: { name?: string | RegExp; exact?: boolean },
+    options?: { name?: string | RegExp; exact?: boolean; level?: number },
   ): UIElement {
     return new PlaywrightElement(this.page.getByRole(role, options));
   }
@@ -166,5 +223,9 @@ export class PlaywrightWebDriver implements AppDriver {
 
   byPlaceholder(text: string | RegExp): UIElement {
     return new PlaywrightElement(this.page.getByPlaceholder(text));
+  }
+
+  byLabel(text: string | RegExp, options?: TextOptions): UIElement {
+    return new PlaywrightElement(this.page.getByLabel(text, options));
   }
 }

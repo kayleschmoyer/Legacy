@@ -19,6 +19,14 @@ import { PremiumGate } from '../components/premium-gate.component';
  * Page objects carry no mocking or data setup — the same object drives both the
  * hermetic and integration suites (ADR-0015 §6). Specs keep their `page.route`
  * mocks; navigation and element access live here.
+ *
+ * NOT migrated to the ADR-0016 driver interface (stays on `BasePage`): this
+ * object's surfaces lean on web-only mechanics with no portable expression in
+ * the driver vocabulary — CSS assertions (`toHaveCSS` for chip slot colors),
+ * `dispatchEvent`/`force: true` workarounds for Tamagui overlay interception,
+ * `page.keyboard`, and bfcache-aware `waitForURL(…, { waitUntil: 'commit' })`.
+ * Migrate it if/when those mechanics gain portable equivalents; new surfaces
+ * added here should prefer the portable subset so the gap shrinks over time.
  */
 export class PlayersPage extends BasePage {
   /** The blurred premium-gate overlay shared across premium-gated pages. */

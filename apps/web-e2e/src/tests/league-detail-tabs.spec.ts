@@ -458,9 +458,7 @@ test.describe('Overview Tab — navigation @smoke', () => {
     await leaguePage.gotoDetail(1, 'overview');
 
     // V2: league name is in an <h1> element (no data-testid="league-title")
-    await expect(
-      leaguePage.leagueNameHeading('Playoff Push League'),
-    ).toBeVisible();
+    await leaguePage.leagueNameHeading('Playoff Push League').expectVisible();
   });
 
   test('overview tab button is active when on the overview route', async ({
@@ -471,7 +469,7 @@ test.describe('Overview Tab — navigation @smoke', () => {
     await leaguePage.gotoDetail(1, 'overview');
 
     // The tab bar should contain an "Overview" label
-    await expect(leaguePage.text('Overview').first()).toBeVisible();
+    await leaguePage.text('Overview').first().expectVisible();
   });
 });
 
@@ -484,21 +482,22 @@ test.describe('Activity Feed – section rendering @regression', () => {
   });
 
   test('shows "League Activity" section heading', async ({ leaguePage }) => {
-    await expect(leaguePage.text('League Activity')).toBeVisible();
+    await leaguePage.text('League Activity').expectVisible();
   });
 
   test('shows a "Trade accepted" event from mocked activity data', async ({
     leaguePage,
   }) => {
-    await expect(leaguePage.text('Trade accepted')).toBeVisible();
+    await leaguePage.text('Trade accepted').expectVisible();
   });
 
   test('shows actor usernames from mocked activity events', async ({
     leaguePage,
   }) => {
-    await expect(
-      leaguePage.text('Alpha Squad', { exact: false }).first(),
-    ).toBeVisible();
+    await leaguePage
+      .text('Alpha Squad', { exact: false })
+      .first()
+      .expectVisible();
   });
 });
 
@@ -510,9 +509,7 @@ test.describe('Activity Feed — empty state @regression', () => {
     await mockLeagueDetailGraphQL(page, { activityEvents: [] });
     await leaguePage.gotoDetail(1, 'overview');
 
-    await expect(
-      leaguePage.text('No activity yet', { exact: false }),
-    ).toBeVisible();
+    await leaguePage.text('No activity yet', { exact: false }).expectVisible();
   });
 });
 
@@ -525,23 +522,21 @@ test.describe('League Chat – section rendering @regression', () => {
   });
 
   test('shows "League Chat" section heading', async ({ leaguePage }) => {
-    await expect(leaguePage.text('Chat', { exact: true })).toBeVisible();
+    await leaguePage.text('Chat', { exact: true }).expectVisible();
   });
 
   test('shows chat messages from mocked data', async ({ leaguePage }) => {
     // Switch to the Chat sub-tab (Activity is selected by default)
     await leaguePage.openTab('Chat', { exact: true });
-    await expect(
-      leaguePage.text('Good luck this week everyone!'),
-    ).toBeVisible();
-    await expect(leaguePage.text('May the best roster win!')).toBeVisible();
+    await leaguePage.text('Good luck this week everyone!').expectVisible();
+    await leaguePage.text('May the best roster win!').expectVisible();
   });
 
   test('shows message send input field', async ({ leaguePage }) => {
     // Switch to the Chat sub-tab first
     await leaguePage.openTab('Chat', { exact: true });
     // Chat input should be rendered (textarea or input)
-    await expect(leaguePage.chatInput).toBeVisible();
+    await leaguePage.chatInput.expectVisible();
   });
 });
 
@@ -608,15 +603,13 @@ test.describe('Roster Tab – data rendering @regression', () => {
   test('shows a roster player from mocked team members', async ({
     leaguePage,
   }) => {
-    await expect(
-      leaguePage.text('Mike Johnson', { exact: false }),
-    ).toBeVisible();
+    await leaguePage.text('Mike Johnson', { exact: false }).expectVisible();
   });
 
   test('shows roster position slots for the league', async ({ leaguePage }) => {
     // RosterBoardV2 groups the league's roster positions under a
     // "Starting Hitters" section (mock positions C and 1B are both hitters).
-    await expect(leaguePage.heading('Starting Hitters')).toBeVisible();
+    await leaguePage.heading('Starting Hitters').expectVisible();
   });
 });
 
@@ -634,9 +627,7 @@ test.describe('Pending Waivers — with claims @regression', () => {
     await leaguePage.gotoDetail(1, 'roster');
 
     // PendingWaiverClaims renders when there are pending claims
-    await expect(
-      leaguePage.text('Waiver Target', { exact: false }),
-    ).toBeVisible();
+    await leaguePage.text('Waiver Target', { exact: false }).expectVisible();
   });
 });
 
@@ -652,9 +643,9 @@ test.describe('Pending Waivers — no claims @regression', () => {
     await leaguePage.gotoDetail(1, 'roster');
 
     // The waiver claims component renders null when empty — no card should appear
-    await expect(
-      leaguePage.text('Pending Waiver Claims', { exact: false }),
-    ).not.toBeVisible();
+    await leaguePage
+      .text('Pending Waiver Claims', { exact: false })
+      .expectHidden();
   });
 });
 
@@ -675,7 +666,7 @@ test.describe('my-team URL alias — LS-2940 regression @regression', () => {
     await leaguePage.expectNoAppError();
     // V2: The team settings panel is identified by the team name input
     // (no #panel-team-settings ID in V2 — that was the legacy page)
-    await expect(leaguePage.teamNameSettingInput).toBeAttached();
+    await leaguePage.teamNameSettingInput.expectAttached();
   });
 });
 
@@ -738,17 +729,15 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
     await leaguePage.gotoDetail(1, 'team-settings');
 
     const input = leaguePage.teamNameSettingInput;
-    await expect(input).toBeVisible();
+    await input.expectVisible();
     await input.fill('Brand New Name');
 
     await leaguePage.saveTeamName();
 
     const dialog = leaguePage.renameConfirmDialog;
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toHaveAttribute('role', 'alertdialog');
-    await expect(
-      leaguePage.text(/rename team\?/i, { exact: false }),
-    ).toBeVisible();
+    await dialog.expectVisible();
+    await dialog.expectAttribute('role', 'alertdialog');
+    await leaguePage.text(/rename team\?/i, { exact: false }).expectVisible();
     expect(renameCalled).toBe(false);
   });
 
@@ -768,10 +757,10 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
     await leaguePage.saveTeamName();
 
     const dialog = leaguePage.renameConfirmDialog;
-    await expect(dialog).toBeVisible();
+    await dialog.expectVisible();
 
     await leaguePage.cancelRename();
-    await expect(dialog).toHaveCount(0);
+    await dialog.expectCount(0);
     expect(renameCalled).toBe(false);
   });
 
@@ -814,7 +803,7 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
     await input.fill('Enter Submitted Name');
     await input.press('Enter');
 
-    await expect(leaguePage.renameConfirmDialog).toBeVisible();
+    await leaguePage.renameConfirmDialog.expectVisible();
     expect(renameCalled).toBe(false);
   });
 });
@@ -832,10 +821,10 @@ test.describe('QR code loading skeleton — LS-4018 @regression', () => {
     await leaguePage.showQrCode();
 
     const skeleton = leaguePage.qrCodeSkeleton;
-    await expect(skeleton).toBeVisible();
-    await expect(skeleton).toHaveAttribute('role', 'status');
-    await expect(skeleton).toHaveAttribute('aria-label', 'Loading QR code');
-    await expect(leaguePage.qrCodeSvg).toHaveCount(0);
+    await skeleton.expectVisible();
+    await skeleton.expectAttribute('role', 'status');
+    await skeleton.expectAttribute('aria-label', 'Loading QR code');
+    await leaguePage.qrCodeSvg.expectCount(0);
   });
 
   test('renders the QR code (no skeleton) once inviteCode is present', async ({
@@ -847,8 +836,8 @@ test.describe('QR code loading skeleton — LS-4018 @regression', () => {
 
     await leaguePage.showQrCode();
 
-    await expect(leaguePage.qrCodeSvg).toBeVisible();
-    await expect(leaguePage.qrCodeSkeleton).toHaveCount(0);
+    await leaguePage.qrCodeSvg.expectVisible();
+    await leaguePage.qrCodeSkeleton.expectCount(0);
   });
 });
 
@@ -887,7 +876,7 @@ test.describe('Trades Tab — member view @regression', () => {
     await mockLeagueDetailGraphQL(page);
     await leaguePage.gotoDetail(1, 'trades');
 
-    await expect(leaguePage.testId('trade-center-heading')).toBeVisible();
+    await leaguePage.testId('trade-center-heading').expectVisible();
     await leaguePage.expectNoAppError();
   });
 
@@ -898,7 +887,7 @@ test.describe('Trades Tab — member view @regression', () => {
     await mockLeagueDetailGraphQL(page);
     await leaguePage.gotoDetail(1, 'trades');
 
-    await expect(leaguePage.text('Spectator Mode')).not.toBeVisible();
+    await leaguePage.text('Spectator Mode').expectHidden();
   });
 });
 
@@ -910,9 +899,9 @@ test.describe('Trades Tab — spectator guard @regression', () => {
     await mockLeagueDetailGraphQL(page, { userTeamId: null, leagueOwner: 999 });
     await leaguePage.gotoDetail(1, 'trades');
 
-    await expect(leaguePage.text('Spectator Mode')).toBeVisible();
-    await expect(leaguePage.testId('trade-center-heading')).toBeVisible();
-    await expect(leaguePage.text('Join this league to trade')).toBeVisible();
+    await leaguePage.text('Spectator Mode').expectVisible();
+    await leaguePage.testId('trade-center-heading').expectVisible();
+    await leaguePage.text('Join this league to trade').expectVisible();
     await leaguePage.expectNoAppError();
   });
 });

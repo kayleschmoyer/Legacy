@@ -60,7 +60,7 @@ const pageObjects = {
     { page }: { page: Page },
     use: (pageObject: LeaguePage) => Promise<void>,
   ) => {
-    await use(new LeaguePage(page));
+    await use(new LeaguePage(new PlaywrightWebDriver(page)));
   },
   playersPage: async (
     { page }: { page: Page },

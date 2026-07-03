@@ -63,18 +63,18 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Roster & Schedule section
     await leaguePage.expandSection('roster-schedule');
 
     // All preset roster sizes should be visible
     for (const size of ['20', '22', '24', '26', '28', '30', '35', '40']) {
-      await expect(leaguePage.button(size, { exact: true })).toBeVisible();
+      await leaguePage.button(size, { exact: true }).expectVisible();
     }
 
     // Hint text is visible
-    await expect(leaguePage.text('Active + bench.')).toBeVisible();
+    await leaguePage.text('Active + bench.').expectVisible();
   });
 
   test('should select a roster size when clicked', async ({
@@ -83,7 +83,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await mockCreateLeagueSuccess(page);
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Roster & Schedule section
     await leaguePage.expandSection('roster-schedule');
@@ -101,18 +101,18 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   test('should display all player pool options', async ({ leaguePage }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Roster & Schedule section
     await leaguePage.expandSection('roster-schedule');
 
-    await expect(leaguePage.button('All MLB')).toBeVisible();
-    await expect(leaguePage.button('National League')).toBeVisible();
-    await expect(leaguePage.button('American League')).toBeVisible();
+    await leaguePage.button('All MLB').expectVisible();
+    await leaguePage.button('National League').expectVisible();
+    await leaguePage.button('American League').expectVisible();
 
-    await expect(
-      leaguePage.text("Narrow the league to a single league's talent"),
-    ).toBeVisible();
+    await leaguePage
+      .text("Narrow the league to a single league's talent")
+      .expectVisible();
   });
 
   test('should allow selecting National League player pool', async ({
@@ -121,7 +121,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     await mockCreateLeagueSuccess(page);
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Roster & Schedule section
     await leaguePage.expandSection('roster-schedule');
@@ -138,18 +138,18 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Roster & Schedule section
     await leaguePage.expandSection('roster-schedule');
 
-    await expect(leaguePage.button('Divisional')).toBeVisible();
-    await expect(leaguePage.button('Round Robin')).toBeVisible();
-    await expect(leaguePage.button('Random').first()).toBeVisible();
+    await leaguePage.button('Divisional').expectVisible();
+    await leaguePage.button('Round Robin').expectVisible();
+    await leaguePage.button('Random').first().expectVisible();
 
-    await expect(
-      leaguePage.text('Divisional schedules prioritize in-division matchups'),
-    ).toBeVisible();
+    await leaguePage
+      .text('Divisional schedules prioritize in-division matchups')
+      .expectVisible();
   });
 
   // ─── Number of Divisions ──────────────────────────────────────────────────
@@ -158,10 +158,10 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
-    await expect(leaguePage.text('Number of Divisions')).toBeVisible();
-    await expect(leaguePage.text('How many divisions to split')).toBeVisible();
+    await leaguePage.text('Number of Divisions').expectVisible();
+    await leaguePage.text('How many divisions to split').expectVisible();
   });
 
   // ─── Draft Mode ───────────────────────────────────────────────────────────
@@ -170,24 +170,24 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Draft Settings section
     await leaguePage.expandSection('draft');
 
-    await expect(leaguePage.button('Live Draft')).toBeVisible();
-    await expect(leaguePage.button('Automated Draft')).toBeVisible();
+    await leaguePage.button('Live Draft').expectVisible();
+    await leaguePage.button('Automated Draft').expectVisible();
 
-    await expect(
-      leaguePage.text('Live drafts require all managers online'),
-    ).toBeVisible();
+    await leaguePage
+      .text('Live drafts require all managers online')
+      .expectVisible();
   });
 
   test('should disable selection method buttons when Automated Draft is selected', async ({
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Draft Settings section
     await leaguePage.expandSection('draft');
@@ -196,20 +196,20 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.clickButton('Automated Draft');
 
     // Selection method buttons should be disabled
-    await expect(leaguePage.button('Standard').first()).toBeDisabled();
-    await expect(leaguePage.button('Auction')).toBeDisabled();
+    await leaguePage.button('Standard').first().expectDisabled();
+    await leaguePage.button('Auction').expectDisabled();
 
     // Explanatory note should mention automated
-    await expect(
-      leaguePage.text(/Automated drafts use random player assignment/),
-    ).toBeVisible();
+    await leaguePage
+      .text(/Automated drafts use random player assignment/)
+      .expectVisible();
   });
 
   test('should re-enable selection method when switching back to Live Draft', async ({
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Draft Settings section
     await leaguePage.expandSection('draft');
@@ -218,8 +218,8 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.clickButton('Live Draft');
 
     // Selection method buttons should be enabled again
-    await expect(leaguePage.button('Standard').first()).toBeEnabled();
-    await expect(leaguePage.button('Auction')).toBeEnabled();
+    await leaguePage.button('Standard').first().expectEnabled();
+    await leaguePage.button('Auction').expectEnabled();
   });
 
   // ─── Selection Method ─────────────────────────────────────────────────────
@@ -228,23 +228,23 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Draft Settings section
     await leaguePage.expandSection('draft');
 
-    await expect(leaguePage.button('Standard').first()).toBeVisible();
-    await expect(leaguePage.button('Auction')).toBeVisible();
-    await expect(
-      leaguePage.text('Standard picks in order, auction bidding'),
-    ).toBeVisible();
+    await leaguePage.button('Standard').first().expectVisible();
+    await leaguePage.button('Auction').expectVisible();
+    await leaguePage
+      .text('Standard picks in order, auction bidding')
+      .expectVisible();
   });
 
   test('should show auction budget and min bid inputs when Auction is selected', async ({
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Draft Settings section
     await leaguePage.expandSection('draft');
@@ -254,10 +254,10 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.clickButton('Auction');
 
     // Auction budget and min bid inputs should now appear
-    await expect(leaguePage.text('Auction Budget per Team')).toBeVisible();
-    await expect(leaguePage.text('Minimum Bid')).toBeVisible();
-    await expect(leaguePage.placeholder('200')).toBeVisible();
-    await expect(leaguePage.placeholder('1')).toBeVisible();
+    await leaguePage.text('Auction Budget per Team').expectVisible();
+    await leaguePage.text('Minimum Bid').expectVisible();
+    await leaguePage.placeholder('200').expectVisible();
+    await leaguePage.placeholder('1').expectVisible();
   });
 
   // ─── Draft Order ──────────────────────────────────────────────────────────
@@ -266,16 +266,14 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Draft Settings section
     await leaguePage.expandSection('draft');
 
-    await expect(leaguePage.button('Snake', { exact: true })).toBeVisible();
-    await expect(leaguePage.button('Linear', { exact: true })).toBeVisible();
-    await expect(
-      leaguePage.text('Snake order reverses each round'),
-    ).toBeVisible();
+    await leaguePage.button('Snake', { exact: true }).expectVisible();
+    await leaguePage.button('Linear', { exact: true }).expectVisible();
+    await leaguePage.text('Snake order reverses each round').expectVisible();
   });
 
   // ─── Waiver System ────────────────────────────────────────────────────────
@@ -284,13 +282,13 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Waivers, Budget & Salary Cap section
     await leaguePage.expandSection('waiver-budget');
 
-    await expect(leaguePage.text('Waiver System')).toBeVisible();
-    await expect(leaguePage.text('Teams have a priority order')).toBeVisible();
+    await leaguePage.text('Waiver System').expectVisible();
+    await leaguePage.text('Teams have a priority order').expectVisible();
   });
 
   freeUserTest(
@@ -301,7 +299,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       // the FAAB PremiumGate actually fires for this gate-verification test.
       await useTier(page, 'free');
       await leaguePage.gotoCreate();
-      await expect(leaguePage.leagueNameInput).toBeVisible();
+      await leaguePage.leagueNameInput.expectVisible();
 
       // Expand the Waivers, Budget & Salary Cap section
       await leaguePage.expandSection('waiver-budget');
@@ -309,11 +307,11 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       // Click the FAAB waiver option — for a free user this triggers the
       // upgrade gate (PremiumGate wraps the option and intercepts the click).
       const faabButton = leaguePage.button(/FAAB/i).first();
-      await expect(faabButton).toBeVisible({ timeout: 10000 });
-      await faabButton.click();
+      await faabButton.expectVisible({ timeout: 10000 });
+      await faabButton.tap();
 
       // Free user should see the premium gate overlay.
-      await expect(leaguePage.premiumGate).toBeVisible({ timeout: 10000 });
+      await leaguePage.premiumGate.expectVisible({ timeout: 10000 });
     },
   );
 
@@ -321,22 +319,22 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
   test('should toggle Hall of Fame Only mode text', async ({ leaguePage }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Era & History section
     await leaguePage.expandSection('era-history');
 
     // Default state
-    await expect(leaguePage.text('🏆 Off')).toBeVisible();
-    await expect(leaguePage.text('Hall of Fame Draft Mode')).toBeVisible();
+    await leaguePage.text('🏆 Off').expectVisible();
+    await leaguePage.text('Hall of Fame Draft Mode').expectVisible();
 
     // Toggle ON
     await leaguePage.clickText('🏆 Off');
-    await expect(leaguePage.text('🏆 On')).toBeVisible();
+    await leaguePage.text('🏆 On').expectVisible();
 
     // Toggle OFF again
     await leaguePage.clickText('🏆 On');
-    await expect(leaguePage.text('🏆 Off')).toBeVisible();
+    await leaguePage.text('🏆 Off').expectVisible();
   });
 
   // ─── Era Filter ───────────────────────────────────────────────────────────
@@ -345,20 +343,20 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Era & History section
     await leaguePage.expandSection('era-history');
 
-    await expect(leaguePage.text('Historical Era Filter')).toBeVisible();
+    await leaguePage.text('Historical Era Filter').expectVisible();
     // EraFilterGrid (LS-5174) renders each era as a Tamagui card whose
     // accessible name is the era name only (`aria-label={era.name}`); the year
     // range is separate muted text. Match the option by its accessible name and
     // assert the year range via its own text node.
-    await expect(leaguePage.button('All Eras')).toBeVisible();
-    await expect(leaguePage.text(/1871\s*[–-]\s*Now/)).toBeVisible();
-    await expect(leaguePage.text('Dead Ball (pre-1920)')).toBeVisible();
-    await expect(leaguePage.text('Modern (2006+)')).toBeVisible();
+    await leaguePage.button('All Eras').expectVisible();
+    await leaguePage.text(/1871\s*[–-]\s*Now/).expectVisible();
+    await leaguePage.text('Dead Ball (pre-1920)').expectVisible();
+    await leaguePage.text('Modern (2006+)').expectVisible();
   });
 
   test('should show custom era year inputs when Custom Era is selected', async ({
@@ -368,23 +366,23 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Custom Era is a premium-gated control — establish premium before nav.
     await useTier(page, 'premium');
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Era & History section
     await leaguePage.expandSection('era-history');
 
     // Custom Era year inputs should not be visible initially
-    await expect(leaguePage.placeholder('e.g. 1940')).not.toBeVisible();
-    await expect(leaguePage.placeholder('e.g. 1960')).not.toBeVisible();
+    await leaguePage.placeholder('e.g. 1940').expectHidden();
+    await leaguePage.placeholder('e.g. 1960').expectHidden();
 
     // Click Custom Era
     await leaguePage.clickText('Custom Era');
 
     // Year range inputs should now appear
-    await expect(leaguePage.placeholder('e.g. 1940')).toBeVisible();
-    await expect(leaguePage.placeholder('e.g. 1960')).toBeVisible();
-    await expect(leaguePage.text('Start Year')).toBeVisible();
-    await expect(leaguePage.text('End Year')).toBeVisible();
+    await leaguePage.placeholder('e.g. 1940').expectVisible();
+    await leaguePage.placeholder('e.g. 1960').expectVisible();
+    await leaguePage.text('Start Year').expectVisible();
+    await leaguePage.text('End Year').expectVisible();
   });
 
   test('should hide custom era inputs when switching away from Custom Era', async ({
@@ -394,17 +392,17 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Custom Era is a premium-gated control — establish premium before nav.
     await useTier(page, 'premium');
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Era & History section
     await leaguePage.expandSection('era-history');
 
     await leaguePage.clickText('Custom Era');
-    await expect(leaguePage.placeholder('e.g. 1940')).toBeVisible();
+    await leaguePage.placeholder('e.g. 1940').expectVisible();
 
     // Switch back to All Eras
     await leaguePage.clickText('All Eras');
-    await expect(leaguePage.placeholder('e.g. 1940')).not.toBeVisible();
+    await leaguePage.placeholder('e.g. 1940').expectHidden();
   });
 
   // ─── League Visibility ────────────────────────────────────────────────────
@@ -413,46 +411,44 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
-    await expect(leaguePage.text('League Visibility')).toBeVisible();
-    await expect(leaguePage.text('🔒 Private')).toBeVisible();
-    await expect(leaguePage.text('🌐 Public')).toBeVisible();
+    await leaguePage.text('League Visibility').expectVisible();
+    await leaguePage.text('🔒 Private').expectVisible();
+    await leaguePage.text('🌐 Public').expectVisible();
 
     // Default description for private
-    await expect(
-      leaguePage.text('Only people with your invite code can join'),
-    ).toBeVisible();
+    await leaguePage
+      .text('Only people with your invite code can join')
+      .expectVisible();
   });
 
   test('should change visibility description when switching to Public', async ({
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     await leaguePage.clickText('🌐 Public');
 
-    await expect(
-      leaguePage.text('Anyone can browse and join this league'),
-    ).toBeVisible();
+    await leaguePage
+      .text('Anyone can browse and join this league')
+      .expectVisible();
   });
 
   // ─── Salary Cap ───────────────────────────────────────────────────────────
 
   test('should display Salary Cap toggle', async ({ leaguePage }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand the Waivers, Budget & Salary Cap section
     await leaguePage.expandSection('waiver-budget');
 
-    await expect(leaguePage.text('Enable Salary Cap')).toBeVisible();
-    await expect(
-      leaguePage.text(
-        'Track player salaries and enforce roster spending limits',
-      ),
-    ).toBeVisible();
+    await leaguePage.text('Enable Salary Cap').expectVisible();
+    await leaguePage
+      .text('Track player salaries and enforce roster spending limits')
+      .expectVisible();
   });
 
   adminTest(
@@ -462,23 +458,23 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       // so the gate overlay does not intercept the toggle click.
       await useTier(page, 'premium');
       await leaguePage.gotoCreate();
-      await expect(leaguePage.leagueNameInput).toBeVisible();
+      await leaguePage.leagueNameInput.expectVisible();
 
       // Expand the Waivers, Budget & Salary Cap section
       await leaguePage.expandSection('waiver-budget');
 
       // Cap limit input should not be visible initially
-      await expect(leaguePage.placeholder('e.g. 50000000')).not.toBeVisible();
+      await leaguePage.placeholder('e.g. 50000000').expectHidden();
 
       // Click the "On" button in the Enable Salary Cap PillToggle
       await leaguePage.clickButton('On', { exact: true });
 
       // Cap limit input should now be visible
-      await expect(leaguePage.placeholder('e.g. 50000000')).toBeVisible();
-      await expect(leaguePage.text('Salary Cap Limit')).toBeVisible();
-      await expect(
-        leaguePage.text('Maximum total salary each team can spend'),
-      ).toBeVisible();
+      await leaguePage.placeholder('e.g. 50000000').expectVisible();
+      await leaguePage.text('Salary Cap Limit').expectVisible();
+      await leaguePage
+        .text('Maximum total salary each team can spend')
+        .expectVisible();
     },
   );
 
@@ -489,14 +485,14 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     // The button is always enabled — validation fires on submit (LS-2953).
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     await leaguePage.fillLeagueName('Ab');
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
 
     // Clicking shows a validation error without crashing the page
     await leaguePage.submitCreate();
-    await expect(leaguePage.alert).toBeVisible();
+    await leaguePage.alert.expectVisible();
     await leaguePage.expectNoAppError();
   });
 
@@ -504,12 +500,12 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     await leaguePage.fillLeagueName('A'.repeat(51));
     await leaguePage.submitCreate();
 
-    await expect(leaguePage.alert).toContainText(
+    await leaguePage.alert.expectContainsText(
       'League name must be less than 50 characters',
     );
   });
@@ -519,15 +515,15 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     // The button is always enabled — validation fires on submit (LS-2953).
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Short name — button is still enabled (validation fires on submit)
     await leaguePage.fillLeagueName('Ab');
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
 
     // Valid name — button remains enabled
     await leaguePage.fillLeagueName('Fixed League Name');
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
   });
 
   test('should display GraphQL network error in inline error card', async ({
@@ -556,17 +552,13 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     });
 
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
     await leaguePage.fillLeagueName('My League');
     await leaguePage.submitCreate();
 
     // The app should show an error state — either an inline error card,
     // an apollo toast, or a role="alert" element
-    await expect(
-      leaguePage.alert
-        .or(leaguePage.text(/error|failed|server error/i).first())
-        .first(),
-    ).toBeVisible();
+    await leaguePage.expectCreateErrorSurfaced();
     await expect(page).toHaveURL('/baseball/league/create');
   });
 
@@ -580,9 +572,9 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       unmockedGraphQLFallback(route),
     );
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
-    await leaguePage.button(/^cancel$/i).click();
+    await leaguePage.button(/^cancel$/i).tap();
     await expect(page).toHaveURL('/baseball');
   });
 
@@ -592,14 +584,14 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
-    await expect(leaguePage.text('What happens next?')).toBeVisible();
-    await expect(
-      leaguePage.text("Your league is created and you're set as Commissioner"),
-    ).toBeVisible();
-    await expect(leaguePage.text('Send invite links')).toBeVisible();
-    await expect(leaguePage.text('Draft opens')).toBeVisible();
+    await leaguePage.text('What happens next?').expectVisible();
+    await leaguePage
+      .text("Your league is created and you're set as Commissioner")
+      .expectVisible();
+    await leaguePage.text('Send invite links').expectVisible();
+    await leaguePage.text('Draft opens').expectVisible();
   });
 
   // ─── Loading State ────────────────────────────────────────────────────────
@@ -645,11 +637,11 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     });
 
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
     await leaguePage.fillLeagueName('My Fast League');
     await leaguePage.submitCreate();
 
     // During submission the button text should change
-    await expect(leaguePage.creatingButton).toBeVisible();
+    await leaguePage.creatingButton.expectVisible();
   });
 });

@@ -91,20 +91,18 @@ test.describe('League Creation — Sport-aware @regression', () => {
     await enableFootball(page);
     await leaguePage.gotoCreate('baseball');
 
-    await expect(leaguePage.sportTab('baseball')).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-    await expect(leaguePage.sportTab('football')).toHaveAttribute(
-      'aria-selected',
-      'false',
-    );
-    await expect(leaguePage.createTitle('baseball')).toBeVisible();
+    await leaguePage
+      .sportTab('baseball')
+      .expectAttribute('aria-selected', 'true');
+    await leaguePage
+      .sportTab('football')
+      .expectAttribute('aria-selected', 'false');
+    await leaguePage.createTitle('baseball').expectVisible();
     // Baseball-specific era card — expand the era section first.
     await leaguePage.expandSection('era-history');
-    await expect(leaguePage.text(/Dead Ball/i)).toBeVisible();
+    await leaguePage.text(/Dead Ball/i).expectVisible();
     // Football beta banner is hidden in baseball mode.
-    await expect(leaguePage.footballBetaBanner).toHaveCount(0);
+    await leaguePage.footballBetaBanner.expectCount(0);
   });
 
   test('renders the football form at /football/league/create', async ({
@@ -114,23 +112,21 @@ test.describe('League Creation — Sport-aware @regression', () => {
     await enableFootball(page);
     await leaguePage.gotoCreate('football');
 
-    await expect(leaguePage.sportTab('football')).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-    await expect(leaguePage.sportTab('baseball')).toHaveAttribute(
-      'aria-selected',
-      'false',
-    );
-    await expect(leaguePage.createTitle('football')).toBeVisible();
+    await leaguePage
+      .sportTab('football')
+      .expectAttribute('aria-selected', 'true');
+    await leaguePage
+      .sportTab('baseball')
+      .expectAttribute('aria-selected', 'false');
+    await leaguePage.createTitle('football').expectVisible();
     // Football-specific era card — expand the era section first.
     await leaguePage.expandSection('era-history');
-    await expect(leaguePage.text(/Super Bowl Era/i)).toBeVisible();
+    await leaguePage.text(/Super Bowl Era/i).expectVisible();
     // Football conference pool button — expand roster section first.
     await leaguePage.expandSection('roster-schedule');
-    await expect(leaguePage.button('NFC', { exact: true })).toBeVisible();
+    await leaguePage.button('NFC', { exact: true }).expectVisible();
     // The Beta banner is rendered as a polite status region.
-    await expect(leaguePage.footballBetaBanner).toBeVisible();
+    await leaguePage.footballBetaBanner.expectVisible();
   });
 
   // ─── Switching sport via the SportSwitcher ──────────────────────────────
@@ -144,10 +140,10 @@ test.describe('League Creation — Sport-aware @regression', () => {
 
     await leaguePage.switchSport('football');
     await expect(page).toHaveURL(/\/football\/league\/create/);
-    await expect(leaguePage.createTitle('football')).toBeVisible();
+    await leaguePage.createTitle('football').expectVisible();
     // Football-specific era card — expand the era section first.
     await leaguePage.expandSection('era-history');
-    await expect(leaguePage.text(/Super Bowl Era/i)).toBeVisible();
+    await leaguePage.text(/Super Bowl Era/i).expectVisible();
   });
 
   test('clicking the Baseball tab navigates back to /baseball/league/create', async ({
@@ -158,10 +154,10 @@ test.describe('League Creation — Sport-aware @regression', () => {
 
     await leaguePage.switchSport('baseball');
     await expect(page).toHaveURL(/\/baseball\/league\/create/);
-    await expect(leaguePage.createTitle('baseball')).toBeVisible();
+    await leaguePage.createTitle('baseball').expectVisible();
     // Baseball-specific era card — expand the era section first.
     await leaguePage.expandSection('era-history');
-    await expect(leaguePage.text(/Dead Ball/i)).toBeVisible();
+    await leaguePage.text(/Dead Ball/i).expectVisible();
   });
 
   // ─── Submission persists `sport` ────────────────────────────────────────
@@ -176,7 +172,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
     await mockCreateLeague(page, captured);
 
     await leaguePage.gotoCreate('baseball');
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     await leaguePage.fillLeagueName('Hermetic Baseball League');
     await leaguePage.submitCreate();
@@ -195,7 +191,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
     await mockCreateLeague(page, captured);
 
     await leaguePage.gotoCreate('football');
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     await leaguePage.fillLeagueName('Hermetic Football League');
     await leaguePage.submitCreate();
@@ -221,18 +217,17 @@ test.describe('League Creation — Sport-aware @regression', () => {
       await enableFootball(page);
       await leaguePage.gotoCreate('football');
 
-      await expect(leaguePage.sportTab('football')).toHaveAttribute(
-        'aria-selected',
-        'true',
-      );
+      await leaguePage
+        .sportTab('football')
+        .expectAttribute('aria-selected', 'true');
 
       await leaguePage.expandSection('waiver-budget');
 
       const faabButton = leaguePage.button(/FAAB/i).first();
-      await expect(faabButton).toBeVisible({ timeout: 10000 });
-      await faabButton.click();
+      await faabButton.expectVisible({ timeout: 10000 });
+      await faabButton.tap();
 
-      await expect(leaguePage.premiumGate).toBeVisible({
+      await leaguePage.premiumGate.expectVisible({
         timeout: 10000,
       });
     },
@@ -248,11 +243,9 @@ test.describe('League Creation — Sport-aware @regression', () => {
 
       // The salary cap row sits inside a PremiumGate overlay for free users —
       // the gate itself is visible without further interaction.
-      await expect(
-        leaguePage.premiumGate.filter({
-          hasText: /Salary Cap/i,
-        }),
-      ).toBeVisible({ timeout: 10000 });
+      await leaguePage.premiumGate
+        .filterByText(/Salary Cap/i)
+        .expectVisible({ timeout: 10000 });
     },
   );
 
@@ -268,9 +261,10 @@ test.describe('League Creation — Sport-aware @regression', () => {
       // should open the era upgrade modal rather than selecting the era.
       await leaguePage.clickText(/Super Bowl Era/i);
 
-      await expect(
-        leaguePage.text(/Historical Era Selection/i).first(),
-      ).toBeVisible({ timeout: 10000 });
+      await leaguePage
+        .text(/Historical Era Selection/i)
+        .first()
+        .expectVisible({ timeout: 10000 });
     },
   );
 });

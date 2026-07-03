@@ -2,6 +2,10 @@ import type { Page } from '@playwright/test';
 
 import { extractOperationName, unmockedGraphQLFallback } from './shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import {
+  publicLeaguesEmptyResponse,
+  publicLeaguesResponse,
+} from '../mocks/graphql/league.mocks';
 import { careerBattingConnectionResponse } from '../mocks/graphql/player.mocks';
 
 /**
@@ -30,6 +34,12 @@ export interface SeededPlayerPool {
   searchTerm: string;
 }
 
+/** A league-discovery search precondition. */
+export interface SeededDiscoverySearch {
+  /** A term guaranteed to match no public league on this backend. */
+  unmatchedTerm: string;
+}
+
 export interface TestData {
   readonly mode: 'mock' | 'live';
 
@@ -39,6 +49,15 @@ export interface TestData {
    * the MLB history dataset is always present — returns an all-time great.
    */
   playerPool(): Promise<SeededPlayerPool>;
+
+  /**
+   * Ensure the discovery page behaves deterministically for a no-match
+   * search. Mock: serves a two-league list for unsearched loads and an empty
+   * list for the unmatched term (the search is server-side — the component
+   * passes `search` as a query variable). Live: returns a term no real
+   * public league can plausibly carry.
+   */
+  discoverySearch(): Promise<SeededDiscoverySearch>;
 }
 
 /** Hermetic implementation — preconditions become `route.fulfill()` mocks. */
@@ -78,6 +97,43 @@ export class MockTestData implements TestData {
 
     return { fullName: 'Mike Trout', searchTerm: 'Trout' };
   }
+
+  async discoverySearch(): Promise<SeededDiscoverySearch> {
+    const unmatchedTerm = 'zz-no-such-league-zz';
+    // The discovery search is SERVER-side (LeagueDiscoveryPage passes the
+    // debounced term as the `search` query variable), so the mock must answer
+    // the searched query itself: two leagues for unsearched loads, an empty
+    // list once the unmatched term is submitted.
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      if (extractOperationName(route).toLowerCase() !== 'getpublicleagues') {
+        await unmockedGraphQLFallback(route);
+        return;
+      }
+      let search: unknown;
+      try {
+        const body = JSON.parse(route.request().postData() ?? '{}') as {
+          variables?: { search?: unknown };
+        };
+        search = body.variables?.search;
+      } catch {
+        search = undefined;
+      }
+      const payload =
+        search === unmatchedTerm
+          ? publicLeaguesEmptyResponse()
+          : publicLeaguesResponse([
+              { id: 1, name: 'Sunday Sluggers' },
+              { id: 2, name: 'Midnight Marlins' },
+            ]);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(payload),
+      });
+    });
+
+    return { unmatchedTerm };
+  }
 }
 
 /**
@@ -93,5 +149,12 @@ export class LiveTestData implements TestData {
     // The live MLB history dataset always contains the all-time greats; Barry
     // Bonds is the precedent search target (player-search-stats-ui, LS-754).
     return Promise.resolve({ fullName: 'Barry Bonds', searchTerm: 'Bonds' });
+  }
+
+  discoverySearch(): Promise<SeededDiscoverySearch> {
+    // No seeding needed: the term just has to miss every real public league.
+    // Same shape the cleanup helpers treat as test-owned noise — no plausible
+    // real league name collides with it.
+    return Promise.resolve({ unmatchedTerm: 'zz-no-such-league-zz' });
   }
 }

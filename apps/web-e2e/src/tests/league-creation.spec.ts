@@ -25,10 +25,10 @@ test.describe('League Creation @critical', () => {
     await leaguePage.gotoCreate();
 
     // Verify the page rendered with the correct heading
-    await expect(leaguePage.createTitle('baseball')).toBeVisible();
+    await leaguePage.createTitle('baseball').expectVisible();
 
     // Verify the form is present
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Verify we're on the correct URL
     await expect(page).toHaveURL('/baseball/league/create');
@@ -41,11 +41,11 @@ test.describe('League Creation @critical', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await leaguePage.gotoCreate();
 
-    await expect(leaguePage.createHeading).toBeVisible();
+    await leaguePage.createHeading.expectVisible();
     const intro = leaguePage.text(
       /Configure your league settings and draft rules\. You can adjust everything except team count after the draft\./,
     );
-    await expect(intro).toBeVisible();
+    await intro.expectVisible();
 
     // The paragraph's bounding box must fit within the viewport — otherwise
     // text overflows horizontally and wraps off-screen (LS-4847 repro).
@@ -63,15 +63,15 @@ test.describe('League Creation @critical', () => {
 
     // The submit button is always enabled so the user can click to receive
     // validation feedback instead of silently disabled UI (LS-2953).
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
 
     // Short name (2 characters) — button is still enabled
     await leaguePage.fillLeagueName('Ab');
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
 
     // Clicking submit with a short name shows a validation error
     await leaguePage.submitCreate();
-    await expect(leaguePage.alert).toBeVisible();
+    await leaguePage.alert.expectVisible();
     await leaguePage.expectNoAppError();
   });
 
@@ -118,7 +118,7 @@ test.describe('League Creation @critical', () => {
 
     // Navigate to league creation page
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Fill in valid league data
     // Fixed name — this is a fully-mocked hermetic test, no need to make
@@ -180,7 +180,7 @@ test.describe('League Creation @critical', () => {
     await leaguePage.submitCreate();
 
     // The error message is displayed inline in a red error card (without "Error:" prefix)
-    await expect(leaguePage.text(/League name already exists/i)).toBeVisible();
+    await leaguePage.text(/League name already exists/i).expectVisible();
 
     // Verify form stays on same page
     await expect(page).toHaveURL('/baseball/league/create');
@@ -192,42 +192,43 @@ test.describe('League Creation @critical', () => {
     // The submit button is always enabled — validation fires on submit (LS-2953).
     // Verify button is enabled regardless of the current league name value.
     await leaguePage.fillLeagueName('');
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
 
     await leaguePage.fillLeagueName('A');
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
 
     await leaguePage.fillLeagueName('Ab');
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
 
     // Test maximum length (over 50 characters) — shows inline error on submit
     await leaguePage.fillLeagueName('A'.repeat(51));
     await leaguePage.submitCreate();
-    await expect(leaguePage.alert).toContainText(
+    await leaguePage.alert.expectContainsText(
       'League name must be less than 50 characters',
     );
 
     // Test valid name — button remains enabled
     await leaguePage.fillLeagueName('Valid League Name');
-    await expect(leaguePage.createButton).toBeEnabled();
+    await leaguePage.createButton.expectEnabled();
 
     // Test team count options (6, 8, 10, 12, 14, 16)
     for (const count of ['6', '8', '10', '12', '14', '16']) {
-      await expect(leaguePage.button(count, { exact: true })).toBeVisible();
+      await leaguePage.button(count, { exact: true }).expectVisible();
     }
 
     // Expand Draft Settings to test draft mode options
     await leaguePage.expandSection('draft');
 
     // Test draft mode options
-    await expect(leaguePage.button(/live draft/i)).toBeVisible();
-    await expect(leaguePage.button(/automated draft/i)).toBeVisible();
+    await leaguePage.button(/live draft/i).expectVisible();
+    await leaguePage.button(/automated draft/i).expectVisible();
 
     // Test selection method options
-    await expect(
-      leaguePage.button('Standard', { exact: true }).first(),
-    ).toBeVisible();
-    await expect(leaguePage.button('Auction', { exact: true })).toBeVisible();
+    await leaguePage
+      .button('Standard', { exact: true })
+      .first()
+      .expectVisible();
+    await leaguePage.button('Auction', { exact: true }).expectVisible();
   });
 
   test('should show informational content about league creation', async ({
@@ -236,15 +237,15 @@ test.describe('League Creation @critical', () => {
     await leaguePage.gotoCreate();
 
     // Verify informational card is present
-    await expect(leaguePage.text('What happens next')).toBeVisible();
+    await leaguePage.text('What happens next').expectVisible();
 
     // Check for key information points
-    await expect(
-      leaguePage.text("Your league is created and you're set as Commissioner"),
-    ).toBeVisible();
-    await expect(leaguePage.text('Send invite links')).toBeVisible();
-    await expect(leaguePage.text('Draft opens')).toBeVisible();
-    await expect(leaguePage.text('Tune lineups')).toBeVisible();
+    await leaguePage
+      .text("Your league is created and you're set as Commissioner")
+      .expectVisible();
+    await leaguePage.text('Send invite links').expectVisible();
+    await leaguePage.text('Draft opens').expectVisible();
+    await leaguePage.text('Tune lineups').expectVisible();
   });
 
   test('should allow canceling league creation', async ({
@@ -252,13 +253,13 @@ test.describe('League Creation @critical', () => {
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Fill in some form data
     await leaguePage.fillLeagueName('Test League');
 
     // Click cancel button
-    await leaguePage.cancelButton.click();
+    await leaguePage.cancelButton.tap();
 
     // Should navigate back to baseball homepage
     await expect(page).toHaveURL('/baseball');
@@ -281,30 +282,30 @@ test.describe('League Creation @critical', () => {
     await leaguePage.clickButton(/automated draft/i);
 
     // Verify league name is still there
-    await expect(leaguePage.leagueNameInput).toHaveValue(testName);
+    await leaguePage.leagueNameInput.expectValue(testName);
 
     // Verify selections are visually applied (Tamagui uses style props, not CSS classes)
-    await expect(leaguePage.button('8', { exact: true })).toBeVisible();
-    await expect(leaguePage.button(/automated draft/i)).toBeVisible();
+    await leaguePage.button('8', { exact: true }).expectVisible();
+    await leaguePage.button(/automated draft/i).expectVisible();
   });
 
   test('should handle date picker interactions', async ({ leaguePage }) => {
     await leaguePage.gotoCreate();
 
     // Wait for page to render
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Expand Draft Settings to access the date picker
     await leaguePage.expandSection('draft');
 
     // Verify the Draft Date & Time label is visible
-    await expect(leaguePage.text('Draft Date & Time')).toBeVisible();
+    await leaguePage.text('Draft Date & Time').expectVisible();
 
     // DateTimePicker (useNativeInput=false) renders two side-by-side trigger
     // sub-fields. When no value is set, they show the "Date…" and "Time…"
     // placeholders alongside Calendar/Clock icons.
-    await expect(leaguePage.text('Date…')).toBeVisible();
-    await expect(leaguePage.text('Time…')).toBeVisible();
+    await leaguePage.text('Date…').expectVisible();
+    await leaguePage.text('Time…').expectVisible();
   });
 
   test('timezone label is shown when no draft date is selected @regression', async ({
@@ -313,12 +314,12 @@ test.describe('League Creation @critical', () => {
     await leaguePage.gotoCreate();
 
     await leaguePage.expandSection('draft');
-    await expect(leaguePage.text('Draft Date & Time')).toBeVisible();
+    await leaguePage.text('Draft Date & Time').expectVisible();
 
     // Before a date is selected the page shows "Times shown in <timezone>"
-    await expect(leaguePage.text(/times shown in/i)).toBeVisible();
+    await leaguePage.text(/times shown in/i).expectVisible();
     // The timezone label contains a UTC offset in the expected format
-    await expect(leaguePage.text(/utc[+-]\d{2}:\d{2}/i)).toBeVisible();
+    await leaguePage.text(/utc[+-]\d{2}:\d{2}/i).expectVisible();
   });
 
   test('should display loading state during submission', async ({
@@ -360,7 +361,7 @@ test.describe('League Creation @critical', () => {
     });
 
     await leaguePage.gotoCreate();
-    await expect(leaguePage.leagueNameInput).toBeVisible();
+    await leaguePage.leagueNameInput.expectVisible();
 
     // Fill in form
     await leaguePage.fillLeagueName('Loading Test League');
@@ -369,10 +370,10 @@ test.describe('League Creation @critical', () => {
     await leaguePage.submitCreate();
 
     // Verify loading state
-    await expect(leaguePage.text('Creating...')).toBeVisible();
+    await leaguePage.text('Creating...').expectVisible();
 
     // Verify button is disabled during loading
-    await expect(leaguePage.creatingButton).toBeDisabled();
+    await leaguePage.creatingButton.expectDisabled();
 
     // Wait for completion
     await expect(page).toHaveURL('/baseball/league/999');
@@ -414,7 +415,7 @@ unauthTest.describe(
     unauthTest(
       'shows marketing headline on /baseball/league/create when unauthenticated (LS-3475)',
       async ({ leaguePage }) => {
-        await expect(leaguePage.heading(/claim your dynasty/i)).toBeVisible({
+        await leaguePage.heading(/claim your dynasty/i).expectVisible({
           timeout: 15_000,
         });
       },
@@ -423,7 +424,7 @@ unauthTest.describe(
     unauthTest(
       'shows "Members Clubhouse" eyebrow on /baseball/league/create when unauthenticated (LS-3475)',
       async ({ leaguePage }) => {
-        await expect(leaguePage.text(/members clubhouse/i)).toBeVisible({
+        await leaguePage.text(/members clubhouse/i).expectVisible({
           timeout: 15_000,
         });
       },
@@ -432,7 +433,7 @@ unauthTest.describe(
     unauthTest(
       '"Continue with Google" button is visible on /baseball/league/create when unauthenticated (LS-3475)',
       async ({ leaguePage }) => {
-        await expect(leaguePage.button(/continue with google/i)).toBeVisible({
+        await leaguePage.button(/continue with google/i).expectVisible({
           timeout: 15_000,
         });
       },
@@ -442,16 +443,16 @@ unauthTest.describe(
       '"Continue with Google" button on /baseball/league/create is clickable via getByRole (LS-3475)',
       async ({ leaguePage }) => {
         const googleBtn = leaguePage.button(/continue with google/i);
-        await expect(googleBtn).toBeVisible({ timeout: 15_000 });
-        await expect(googleBtn).toBeEnabled();
-        await googleBtn.click({ noWaitAfter: true });
+        await googleBtn.expectVisible({ timeout: 15_000 });
+        await googleBtn.expectEnabled();
+        await googleBtn.tap();
       },
     );
 
     unauthTest(
       '"Continue with Discord" button is visible on /baseball/league/create when unauthenticated (LS-3475)',
       async ({ leaguePage }) => {
-        await expect(leaguePage.button(/continue with discord/i)).toBeVisible({
+        await leaguePage.button(/continue with discord/i).expectVisible({
           timeout: 15_000,
         });
       },
@@ -461,9 +462,9 @@ unauthTest.describe(
       '"Continue with Discord" button on /baseball/league/create is clickable via getByRole (LS-3475)',
       async ({ leaguePage }) => {
         const discordBtn = leaguePage.button(/continue with discord/i);
-        await expect(discordBtn).toBeVisible({ timeout: 15_000 });
-        await expect(discordBtn).toBeEnabled();
-        await discordBtn.click({ noWaitAfter: true });
+        await discordBtn.expectVisible({ timeout: 15_000 });
+        await discordBtn.expectEnabled();
+        await discordBtn.tap();
       },
     );
   },

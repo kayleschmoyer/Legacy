@@ -1,6 +1,7 @@
-import { expect, type Locator } from '@playwright/test';
+import { expect } from '@playwright/test';
 
-import { BasePage } from '../base/base.page';
+import type { AppDriver, UIElement } from '../driver';
+import { BaseScreen } from '../base/base.screen';
 import { LeagueCard } from '../components/league-card.component';
 
 /** The two sports the league surfaces are mounted under. */
@@ -13,15 +14,22 @@ export type Sport = 'baseball' | 'football';
  *   • /:sport/leagues               — public discovery list
  *   • /:sport/league/join[/:code]   — join by invite code
  *
- * Locators are PRIVATE — specs never reach a raw `page.getByX` selector. The
- * object exposes the three semantic surfaces:
+ * Migrated to the platform-neutral driver interface (ADR-0016): the object is
+ * a screen (extends {@link BaseScreen}, holds an {@link AppDriver}) and every
+ * read getter returns a {@link UIElement} instead of a Playwright `Locator`.
+ * Getter names are unchanged from the pre-migration object, so specs keep the
+ * same vocabulary — they assert via the element's retrying `expect*` surface
+ * (`leaguePage.createButton.expectVisible()`) rather than wrapping a locator
+ * in `expect()`.
+ *
+ * The object exposes the three semantic surfaces:
  *   • actions  — navigation + form/control verbs (`gotoCreate`, `expandSection`,
  *                `submitCreate`, `openTab`, `saveTeamName`, …)
- *   • reads    — locator getters specs assert against (`leagueNameInput`,
+ *   • reads    — element getters specs assert against (`leagueNameInput`,
  *                `createButton`, plus the parameterised `button` / `text` /
- *                `heading` / `testId` getters that centralise locator
+ *                `heading` / `testId` getters that centralise element
  *                construction so specs stay selector-free)
- *   • asserts  — retrying web-first wrappers (`expectCreateFormVisible`,
+ *   • asserts  — retrying wrappers (`expectCreateFormVisible`,
  *                `expectDiscoveryLoaded`, `expectNoAppError`, …)
  *
  * The discovery card's filter/join mechanism lives in the `LeagueCard`
@@ -29,55 +37,55 @@ export type Sport = 'baseball' | 'football';
  * carries no mocking or seed data — that stays in the specs (ADR-0015 §6), so
  * the same object drives both the hermetic and integration suites.
  */
-export class LeaguePage extends BasePage {
-  // ── Reads: parameterised locator getters ─────────────────────────
-  // These centralise locator construction so specs never build a raw selector.
+export class LeaguePage extends BaseScreen {
+  // ── Reads: parameterised element getters ─────────────────────────
+  // These centralise element construction so specs never build a raw selector.
   // Mechanism-level interactions have dedicated actions below; these cover the
   // long tail of content/control assertions (helper copy, option buttons, …).
 
   /** A button anywhere on the page, by accessible name. */
-  button(name: string | RegExp, opts?: { exact?: boolean }): Locator {
-    return this.page.getByRole('button', { name, ...opts });
+  button(name: string | RegExp, opts?: { exact?: boolean }): UIElement {
+    return this.driver.byRole('button', { name, ...opts });
   }
 
   /** A heading, by accessible name (optionally pinned to a level). */
   heading(
     name: string | RegExp,
     opts?: { level?: number; exact?: boolean },
-  ): Locator {
-    return this.page.getByRole('heading', { name, ...opts });
+  ): UIElement {
+    return this.driver.byRole('heading', { name, ...opts });
   }
 
   /** A visible text node, by string or pattern. */
-  text(value: string | RegExp, opts?: { exact?: boolean }): Locator {
-    return this.page.getByText(value, opts);
+  text(value: string | RegExp, opts?: { exact?: boolean }): UIElement {
+    return this.driver.byText(value, opts);
   }
 
   /** An input/textarea, by its placeholder. */
-  placeholder(value: string | RegExp): Locator {
-    return this.page.getByPlaceholder(value);
+  placeholder(value: string | RegExp): UIElement {
+    return this.driver.byPlaceholder(value);
   }
 
   /** An element by its stable `data-testid`. */
-  testId(id: string | RegExp): Locator {
-    return this.page.getByTestId(id);
+  testId(id: string): UIElement {
+    return this.driver.byTestId(id);
   }
 
   /** The current `role="alert"` (validation / error surface). */
-  get alert(): Locator {
-    return this.page.getByRole('alert');
+  get alert(): UIElement {
+    return this.driver.byRole('alert');
   }
 
   // ── Reads: named create-form getters ─────────────────────────────
 
   /** The create-form readiness testid (`create-league-heading`). */
-  get createHeading(): Locator {
-    return this.page.getByTestId('create-league-heading');
+  get createHeading(): UIElement {
+    return this.driver.byTestId('create-league-heading');
   }
 
   /** The sport-specific "Create {Sport} League" page heading. */
-  createTitle(sport: Sport = 'baseball'): Locator {
-    return this.page.getByRole('heading', {
+  createTitle(sport: Sport = 'baseball'): UIElement {
+    return this.driver.byRole('heading', {
       name:
         sport === 'football'
           ? /Create Football League/i
@@ -86,155 +94,156 @@ export class LeaguePage extends BasePage {
   }
 
   /** The league-name text input. */
-  get leagueNameInput(): Locator {
-    return this.page.getByPlaceholder('Enter your league name');
+  get leagueNameInput(): UIElement {
+    return this.driver.byPlaceholder('Enter your league name');
   }
 
   /** The "Create League" submit button. */
-  get createButton(): Locator {
-    return this.page.getByRole('button', { name: /create league/i });
+  get createButton(): UIElement {
+    return this.driver.byRole('button', { name: /create league/i });
   }
 
   /** The submit button while it shows its in-flight "Creating…" label. */
-  get creatingButton(): Locator {
-    return this.page.getByRole('button', { name: /creating/i });
+  get creatingButton(): UIElement {
+    return this.driver.byRole('button', { name: /creating/i });
   }
 
   /** A sport tab in the SportSwitcher (`sport-tab-baseball` / `-football`). */
-  sportTab(sport: Sport): Locator {
-    return this.page.getByTestId(`sport-tab-${sport}`);
+  sportTab(sport: Sport): UIElement {
+    return this.driver.byTestId(`sport-tab-${sport}`);
   }
 
   /** The football "beta" status banner (only rendered in football mode). */
-  get footballBetaBanner(): Locator {
-    return this.page.getByTestId('football-beta-banner');
+  get footballBetaBanner(): UIElement {
+    return this.driver.byTestId('football-beta-banner');
   }
 
   /** The premium-feature gate overlay (free-tier gated controls). */
-  get premiumGate(): Locator {
-    return this.page.getByTestId('premium-feature-gate');
+  get premiumGate(): UIElement {
+    return this.driver.byTestId('premium-feature-gate');
   }
 
   // ── Reads: named detail getters ──────────────────────────────────
 
   /** The league name rendered as the detail page `<h1>`. */
-  leagueNameHeading(name: string): Locator {
-    return this.page.getByRole('heading', { name, level: 1 });
+  leagueNameHeading(name: string): UIElement {
+    return this.driver.byRole('heading', { name, level: 1 });
   }
 
-  /** The team-settings name input (stable `#team-name-input`). */
-  get teamNameSettingInput(): Locator {
-    return this.page.locator('#team-name-input');
+  /**
+   * The team-settings name input. Resolved by its form label ("Team Name",
+   * `<label for="team-name-input">` in Team.tsx) — the platform-neutral
+   * selector for a labelled input that carries no test id (ADR-0016).
+   */
+  get teamNameSettingInput(): UIElement {
+    return this.driver.byLabel('Team Name', { exact: true });
   }
 
   /** The "Rename team?" confirmation dialog. */
-  get renameConfirmDialog(): Locator {
-    return this.page.getByTestId('rename-team-confirm');
+  get renameConfirmDialog(): UIElement {
+    return this.driver.byTestId('rename-team-confirm');
   }
 
   /** The QR-code loading skeleton (shown until the invite code resolves). */
-  get qrCodeSkeleton(): Locator {
-    return this.page.getByTestId('qr-code-skeleton');
+  get qrCodeSkeleton(): UIElement {
+    return this.driver.byTestId('qr-code-skeleton');
   }
 
   /** The rendered QR-code SVG. */
-  get qrCodeSvg(): Locator {
-    return this.page.getByTestId('qr-code-svg');
+  get qrCodeSvg(): UIElement {
+    return this.driver.byTestId('qr-code-svg');
   }
 
   /** The league-chat message composer input. */
-  get chatInput(): Locator {
-    return this.page.getByPlaceholder(/message/i).first();
+  get chatInput(): UIElement {
+    return this.driver.byPlaceholder(/message/i).first();
   }
 
   // ── Reads: named discovery getters ───────────────────────────────
 
   /** The discovery page `<h1>` ("Browse Public Leagues"). */
-  get discoveryHeading(): Locator {
-    return this.page.getByRole('heading', {
+  get discoveryHeading(): UIElement {
+    return this.driver.byRole('heading', {
       name: /Browse Public Leagues/i,
       level: 1,
     });
   }
 
   /** The discovery search input. */
-  get discoverySearch(): Locator {
-    return this.page.getByPlaceholder('Search leagues by name…');
+  get discoverySearch(): UIElement {
+    return this.driver.byPlaceholder('Search leagues by name…');
   }
 
   /** The discovery results-count badge. */
-  get discoveryResultsCount(): Locator {
-    return this.page.getByTestId('discovery-results-count');
+  get discoveryResultsCount(): UIElement {
+    return this.driver.byTestId('discovery-results-count');
   }
 
   /** The discovery "Refresh" button. */
-  get discoveryRefreshButton(): Locator {
-    return this.page.getByRole('button', { name: /Refresh/i });
+  get discoveryRefreshButton(): UIElement {
+    return this.driver.byRole('button', { name: /Refresh/i });
   }
 
   /** The discovery "No public leagues found" empty-state heading. */
-  get discoveryEmptyHeading(): Locator {
-    return this.page.getByRole('heading', {
+  get discoveryEmptyHeading(): UIElement {
+    return this.driver.byRole('heading', {
       name: /No public leagues found/i,
     });
   }
 
   /** The discovery footer CTA ("Can't find the right league?"). */
-  get discoveryFooterCta(): Locator {
-    return this.page.getByText(/Can't find the right league\?/i);
+  get discoveryFooterCta(): UIElement {
+    return this.driver.byText(/Can't find the right league\?/i);
   }
 
   // ── Reads: named join getters ────────────────────────────────────
 
   /** The join page `<h1>` ("Join League"). */
-  get joinHeading(): Locator {
-    return this.page.getByRole('heading', { name: /Join League/i, level: 1 });
+  get joinHeading(): UIElement {
+    return this.driver.byRole('heading', { name: /Join League/i, level: 1 });
   }
 
   /** The invite-code text input. */
-  get inviteCodeInput(): Locator {
-    return this.page.getByPlaceholder('Enter 8-character code');
+  get inviteCodeInput(): UIElement {
+    return this.driver.byPlaceholder('Enter 8-character code');
   }
 
   /** The join-form team-name input. */
-  get teamNameInput(): Locator {
-    return this.page.getByPlaceholder('Enter your team name');
+  get teamNameInput(): UIElement {
+    return this.driver.byPlaceholder('Enter your team name');
   }
 
   /** The "Join League" submit button on the join-by-code form. */
-  get joinButton(): Locator {
-    return this.page.getByRole('button', { name: /join league/i });
+  get joinButton(): UIElement {
+    return this.driver.byRole('button', { name: /join league/i });
   }
 
   /** The "Cancel" button (join + create forms share the label). */
-  get cancelButton(): Locator {
-    return this.page.getByRole('button', { name: /cancel/i });
+  get cancelButton(): UIElement {
+    return this.driver.byRole('button', { name: /cancel/i });
   }
 
   /** The deep-link "Invite code loaded from link" confirmation banner. */
-  get deepLinkBanner(): Locator {
-    return this.page.getByText(/Invite code loaded from link/i);
+  get deepLinkBanner(): UIElement {
+    return this.driver.byText(/Invite code loaded from link/i);
   }
 
   /** The inline join-form error card. */
-  get formErrorCard(): Locator {
-    return this.page.getByTestId('join-form-error');
+  get formErrorCard(): UIElement {
+    return this.driver.byTestId('join-form-error');
   }
 
   // ── Reads: discovery card composition ────────────────────────────
 
   /** Scope a {@link LeagueCard} by its league id (`league-card-<id>`). */
   cardById(id: number): LeagueCard {
-    return new LeagueCard(this.page.getByTestId(`league-card-${id}`));
+    return new LeagueCard(this.driver.byTestId(`league-card-${id}`));
   }
 
   /** Scope a {@link LeagueCard} by the league name it displays. */
   cardByName(name: string): LeagueCard {
     return new LeagueCard(
-      this.page
-        .locator('[data-testid^="league-card-"]')
-        .filter({ hasText: name })
-        .first(),
+      this.driver.byTestIdPrefix('league-card-').filterByText(name).first(),
     );
   }
 
@@ -248,28 +257,26 @@ export class LeaguePage extends BasePage {
    * (ADR-0015 Context: never `networkidle`).
    */
   async gotoCreate(sport: Sport = 'baseball'): Promise<void> {
-    await this.page.goto(`/${sport}/league/create`);
-    await expect(this.leagueNameInput).toBeVisible({ timeout: 30000 });
+    await this.driver.open(`/${sport}/league/create`);
+    await this.leagueNameInput.expectVisible({ timeout: 30000 });
   }
 
   /**
-   * Navigate to a league detail tab and wait for the document to load.
-   *
-   * `networkidle` is defeated by the league activity/chat long-poll; gate on
-   * the `load` event instead (ADR-0015 Context).
+   * Navigate to a league detail tab. The driver's `open` resolves once the
+   * document has loaded (`networkidle` is defeated by the league activity/chat
+   * long-poll — ADR-0015 Context); specs gate on the element they need next.
    */
   async gotoDetail(leagueId: number, tab?: string): Promise<void> {
     const path = tab
       ? `/baseball/league/${leagueId}/${tab}`
       : `/baseball/league/${leagueId}`;
-    await this.page.goto(path);
-    await this.page.waitForLoadState('load');
+    await this.driver.open(path);
   }
 
   /** Navigate to the league discovery page and wait for its heading. */
   async gotoDiscovery(): Promise<void> {
-    await this.page.goto('/baseball/leagues');
-    await expect(this.discoveryHeading).toBeVisible({ timeout: 30000 });
+    await this.driver.open('/baseball/leagues');
+    await this.discoveryHeading.expectVisible({ timeout: 30000 });
   }
 
   /** Navigate to the join-by-code page (optionally with a deep-link code). */
@@ -277,8 +284,7 @@ export class LeaguePage extends BasePage {
     const path = inviteCode
       ? `/baseball/league/join/${inviteCode}`
       : '/baseball/league/join';
-    await this.page.goto(path);
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.driver.open(path);
   }
 
   // ── Actions: create form ─────────────────────────────────────────
@@ -288,11 +294,11 @@ export class LeaguePage extends BasePage {
    * `roster-schedule`, `era-history`, `waiver-budget`). No-op if already open.
    */
   async expandSection(sectionId: string): Promise<void> {
-    const toggle = this.page.getByTestId(`section-toggle-${sectionId}`);
-    await expect(toggle).toBeVisible();
-    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
-      await toggle.click();
-      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const toggle = this.driver.byTestId(`section-toggle-${sectionId}`);
+    await toggle.expectVisible();
+    if ((await toggle.attribute('aria-expanded')) !== 'true') {
+      await toggle.tap();
+      await toggle.expectAttribute('aria-expanded', 'true');
     }
   }
 
@@ -303,12 +309,12 @@ export class LeaguePage extends BasePage {
 
   /** Submit the create-league form. */
   async submitCreate(): Promise<void> {
-    await this.createButton.click();
+    await this.createButton.tap();
   }
 
   /** Switch the active sport via the SportSwitcher tab. */
   async switchSport(sport: Sport): Promise<void> {
-    await this.sportTab(sport).click();
+    await this.sportTab(sport).tap();
   }
 
   /** Click a labelled choice button (team count, roster size, pool, …). */
@@ -316,7 +322,7 @@ export class LeaguePage extends BasePage {
     name: string | RegExp,
     opts?: { exact?: boolean },
   ): Promise<void> {
-    await this.button(name, opts).click();
+    await this.button(name, opts).tap();
   }
 
   /** Click a text affordance (toggle, era card, visibility pill, …). */
@@ -325,40 +331,38 @@ export class LeaguePage extends BasePage {
     opts?: { exact?: boolean; first?: boolean },
   ): Promise<void> {
     const target = this.text(value, { exact: opts?.exact });
-    await (opts?.first ? target.first() : target).click();
+    await (opts?.first ? target.first() : target).tap();
   }
 
   // ── Actions: detail tabs ─────────────────────────────────────────
 
   /** Click a detail-page tab/sub-tab by its visible label. */
   async openTab(label: string, opts?: { exact?: boolean }): Promise<void> {
-    await this.page.getByText(label, { exact: opts?.exact }).first().click();
+    await this.driver.byText(label, { exact: opts?.exact }).first().tap();
   }
 
   /** Click "Save Name" on the team-settings panel. */
   async saveTeamName(): Promise<void> {
-    await this.page.getByRole('button', { name: /save name/i }).click();
+    await this.driver.byRole('button', { name: /save name/i }).tap();
   }
 
   /** Open the invite QR-code dialog. */
   async showQrCode(): Promise<void> {
-    await this.page
-      .getByRole('button', { name: /show qr code to invite/i })
-      .click();
+    await this.driver
+      .byRole('button', { name: /show qr code to invite/i })
+      .tap();
   }
 
   /** Confirm the "Rename team?" dialog (clicks its "Rename" button). */
   async confirmRename(): Promise<void> {
     await this.renameConfirmDialog
-      .getByRole('button', { name: /^rename$/i })
-      .click();
+      .byRole('button', { name: /^rename$/i })
+      .tap();
   }
 
   /** Cancel the "Rename team?" dialog (clicks its "Cancel" button). */
   async cancelRename(): Promise<void> {
-    await this.renameConfirmDialog
-      .getByRole('button', { name: /cancel/i })
-      .click();
+    await this.renameConfirmDialog.byRole('button', { name: /cancel/i }).tap();
   }
 
   // ── Actions: join form ───────────────────────────────────────────
@@ -370,39 +374,55 @@ export class LeaguePage extends BasePage {
   ): Promise<void> {
     await this.inviteCodeInput.fill(inviteCode);
     await this.teamNameInput.fill(teamName);
-    await this.joinButton.click();
+    await this.joinButton.tap();
   }
 
   // ── Assertions ───────────────────────────────────────────────────
 
   /** Assert the creation form is loaded (heading + name input visible). */
   async expectCreateFormVisible(sport: Sport = 'baseball'): Promise<void> {
-    await expect(this.createTitle(sport)).toBeVisible({ timeout: 30000 });
-    await expect(this.leagueNameInput).toBeVisible();
+    await this.createTitle(sport).expectVisible({ timeout: 30000 });
+    await this.leagueNameInput.expectVisible();
   }
 
   /** Assert the detail page is loaded (V2 renders the league name as `<h1>`). */
   async expectDetailLoaded(name: string): Promise<void> {
-    await expect(this.leagueNameHeading(name)).toBeVisible({ timeout: 15000 });
+    await this.leagueNameHeading(name).expectVisible({ timeout: 15000 });
   }
 
   /** Assert the discovery page is loaded (heading + search visible). */
   async expectDiscoveryLoaded(): Promise<void> {
-    await expect(this.discoveryHeading).toBeVisible({ timeout: 15000 });
-    await expect(this.discoverySearch).toBeVisible();
+    await this.discoveryHeading.expectVisible({ timeout: 15000 });
+    await this.discoverySearch.expectVisible();
   }
 
   /** Assert the join form is fully rendered. */
   async expectJoinFormVisible(): Promise<void> {
-    await expect(this.joinHeading).toBeVisible({ timeout: 15000 });
-    await expect(this.inviteCodeInput).toBeVisible();
-    await expect(this.teamNameInput).toBeVisible();
+    await this.joinHeading.expectVisible({ timeout: 15000 });
+    await this.inviteCodeInput.expectVisible();
+    await this.teamNameInput.expectVisible();
   }
 
   /** Assert the page did not crash into the global error boundary. */
   async expectNoAppError(): Promise<void> {
-    await expect(this.page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await this.driver.byText('Unexpected Application Error').expectCount(0);
+  }
+
+  /**
+   * Assert the create flow surfaced an error to the user — an ARIA alert, an
+   * inline error card, or error copy all satisfy the contract. Poll both
+   * shapes rather than pinning one implementation (`expect.poll` is
+   * runner-level, so it stays valid over driver reads on every platform —
+   * mirrors DraftPage.expectCannotDraft).
+   */
+  async expectCreateErrorSurfaced(): Promise<void> {
+    const alert = this.alert.first();
+    const errorText = this.text(/error|failed|server error/i).first();
+    await expect
+      .poll(
+        async () => (await alert.isVisible()) || (await errorText.isVisible()),
+        { timeout: 5000 },
+      )
+      .toBe(true);
   }
 }

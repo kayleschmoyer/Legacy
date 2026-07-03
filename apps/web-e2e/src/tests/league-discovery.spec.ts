@@ -64,8 +64,8 @@ test.describe('League Discovery — page load @critical', () => {
     await leaguePage.gotoDiscovery();
     await leaguePage.expectDiscoveryLoaded();
 
-    await expect(leaguePage.discoverySearch).toBeVisible();
-    await expect(leaguePage.discoveryRefreshButton).toBeVisible();
+    await leaguePage.discoverySearch.expectVisible();
+    await leaguePage.discoveryRefreshButton.expectVisible();
   });
 
   test('shows draft-status and player-pool filter buttons', async ({
@@ -80,21 +80,17 @@ test.describe('League Discovery — page load @critical', () => {
     await leaguePage.expectDiscoveryLoaded();
 
     // Draft status filters
-    await expect(leaguePage.button('All', { exact: true })).toBeVisible();
-    await expect(
-      leaguePage.button('Open (Not Started)', { exact: true }),
-    ).toBeVisible();
-    await expect(leaguePage.button('Queued', { exact: true })).toBeVisible();
-    await expect(
-      leaguePage.button('In Progress', { exact: true }),
-    ).toBeVisible();
+    await leaguePage.button('All', { exact: true }).expectVisible();
+    await leaguePage
+      .button('Open (Not Started)', { exact: true })
+      .expectVisible();
+    await leaguePage.button('Queued', { exact: true }).expectVisible();
+    await leaguePage.button('In Progress', { exact: true }).expectVisible();
 
     // Player pool filters
-    await expect(
-      leaguePage.button('All Leagues', { exact: true }),
-    ).toBeVisible();
-    await expect(leaguePage.button('NL Only', { exact: true })).toBeVisible();
-    await expect(leaguePage.button('AL Only', { exact: true })).toBeVisible();
+    await leaguePage.button('All Leagues', { exact: true }).expectVisible();
+    await leaguePage.button('NL Only', { exact: true }).expectVisible();
+    await leaguePage.button('AL Only', { exact: true }).expectVisible();
   });
 });
 
@@ -122,13 +118,13 @@ test.describe('League Discovery — league cards @critical', () => {
     await leaguePage.expectDiscoveryLoaded();
 
     const card = leaguePage.cardById(10);
-    await expect(card.text('Rocket League Fantasy')).toBeVisible();
-    await expect(card.text('Open', { exact: true })).toBeVisible();
+    await card.text('Rocket League Fantasy').expectVisible();
+    await card.text('Open', { exact: true }).expectVisible();
     // "NL Only" renders twice in the card (badge + filter chip); the assertion
     // verifies the value is present without pinning a specific position.
-    await expect(card.text('NL Only').first()).toBeVisible();
+    await card.text('NL Only').first().expectVisible();
     // spots available column: "5 / 12" or similar
-    await expect(card.text('5 / 12')).toBeVisible();
+    await card.text('5 / 12').expectVisible();
   });
 
   test('shows results count', async ({ page, leaguePage }) => {
@@ -142,7 +138,7 @@ test.describe('League Discovery — league cards @critical', () => {
     await leaguePage.gotoDiscovery();
     await leaguePage.expectDiscoveryLoaded();
 
-    await expect(leaguePage.discoveryResultsCount).toBeVisible();
+    await leaguePage.discoveryResultsCount.expectVisible();
   });
 
   test('shows footer CTA when leagues are present', async ({
@@ -156,7 +152,7 @@ test.describe('League Discovery — league cards @critical', () => {
     await leaguePage.gotoDiscovery();
     await leaguePage.expectDiscoveryLoaded();
 
-    await expect(leaguePage.discoveryFooterCta).toBeVisible();
+    await leaguePage.discoveryFooterCta.expectVisible();
   });
 });
 
@@ -174,7 +170,7 @@ test.describe('League Discovery — search @smoke', () => {
     await leaguePage.discoverySearch.fill('Alpha League');
 
     // Verify the input accepted the typed value
-    await expect(leaguePage.discoverySearch).toHaveValue('Alpha League');
+    await leaguePage.discoverySearch.expectValue('Alpha League');
   });
 
   test('clearing search restores results', async ({ page, leaguePage }) => {
@@ -188,8 +184,8 @@ test.describe('League Discovery — search @smoke', () => {
     await leaguePage.discoverySearch.fill('something');
     await leaguePage.discoverySearch.clear();
 
-    await expect(leaguePage.discoverySearch).toHaveValue('');
-    await expect(leaguePage.discoveryHeading).toBeVisible();
+    await leaguePage.discoverySearch.expectValue('');
+    await leaguePage.discoveryHeading.expectVisible();
   });
 });
 
@@ -207,9 +203,9 @@ test.describe('League Discovery — empty state @regression', () => {
     await leaguePage.gotoDiscovery();
     await leaguePage.expectDiscoveryLoaded();
 
-    await expect(leaguePage.discoveryEmptyHeading).toBeVisible();
+    await leaguePage.discoveryEmptyHeading.expectVisible();
     // Footer CTA should not appear when there are no leagues
-    await expect(leaguePage.discoveryFooterCta).not.toBeVisible();
+    await leaguePage.discoveryFooterCta.expectHidden();
   });
 
   test('empty state without search shows generic message', async ({
@@ -223,9 +219,9 @@ test.describe('League Discovery — empty state @regression', () => {
     await leaguePage.gotoDiscovery();
     await leaguePage.expectDiscoveryLoaded();
 
-    await expect(
-      leaguePage.text(/No public leagues are currently open/i),
-    ).toBeVisible();
+    await leaguePage
+      .text(/No public leagues are currently open/i)
+      .expectVisible();
   });
 });
 
@@ -249,9 +245,9 @@ test.describe('League Discovery — member & full badges @regression', () => {
     await leaguePage.gotoDiscovery();
     await leaguePage.expectDiscoveryLoaded();
 
-    await expect(leaguePage.testId('already-member-banner')).toBeVisible();
+    await leaguePage.testId('already-member-banner').expectVisible();
     // "View League →" button should appear instead of "Join League →"
-    await expect(leaguePage.button(/View League/i)).toBeVisible();
+    await leaguePage.button(/View League/i).expectVisible();
   });
 
   test('shows full banner for leagues with no available spots', async ({
@@ -272,9 +268,9 @@ test.describe('League Discovery — member & full badges @regression', () => {
     await leaguePage.gotoDiscovery();
     await leaguePage.expectDiscoveryLoaded();
 
-    await expect(leaguePage.text(/This league is full/i)).toBeVisible();
+    await leaguePage.text(/This league is full/i).expectVisible();
     // Join League button should NOT appear for a full league
-    await expect(leaguePage.button(/Join League →/i)).not.toBeVisible();
+    await leaguePage.button(/Join League →/i).expectHidden();
   });
 });
 
@@ -343,7 +339,7 @@ test.describe('League Discovery — join flow @critical', () => {
 
     // Form collapses — team name prompt gone, "Join League →" restored
     await card.expectTeamNamePromptHidden();
-    await expect(card.button(/Join League →/i)).toBeVisible();
+    await card.button(/Join League →/i).expectVisible();
   });
 
   test('successful join shows success banner', async ({ page, leaguePage }) => {
@@ -363,7 +359,7 @@ test.describe('League Discovery — join flow @critical', () => {
 
     await card.joinWithTeamName('Home Run Heroes');
 
-    await expect(leaguePage.text(/Successfully joined/i)).toBeVisible();
+    await leaguePage.text(/Successfully joined/i).expectVisible();
   });
 });
 
@@ -386,7 +382,7 @@ test.describe('League Discovery — filters @regression', () => {
     // After click the button should visually indicate it's selected.
     // We can't easily assert CSS colors, so assert the click didn't error
     // and the page is still functional.
-    await expect(leaguePage.discoveryHeading).toBeVisible();
+    await leaguePage.discoveryHeading.expectVisible();
   });
 
   test('clicking a player-pool filter changes its selected state', async ({
@@ -402,7 +398,7 @@ test.describe('League Discovery — filters @regression', () => {
 
     await leaguePage.clickButton('NL Only', { exact: true });
 
-    await expect(leaguePage.discoveryHeading).toBeVisible();
+    await leaguePage.discoveryHeading.expectVisible();
   });
 
   test('refresh button triggers a new query', async ({ page, leaguePage }) => {
@@ -426,7 +422,7 @@ test.describe('League Discovery — filters @regression', () => {
     await leaguePage.expectDiscoveryLoaded();
 
     const initialCount = callCount;
-    await leaguePage.discoveryRefreshButton.click();
+    await leaguePage.discoveryRefreshButton.tap();
 
     // A new network call should have been made
     await expect.poll(() => callCount).toBeGreaterThan(initialCount);

@@ -240,7 +240,7 @@ test.describe('Overview Tab — Layout (LS-5345) @regression', () => {
     await mockOverviewTab(page);
     await leaguePage.gotoDetail(42, 'overview');
 
-    await expect(leaguePage.leagueNameHeading('Diamond Dynasty')).toBeVisible();
+    await leaguePage.leagueNameHeading('Diamond Dynasty').expectVisible();
   });
 
   test('League Snapshot Bar displays team count and roster size', async ({

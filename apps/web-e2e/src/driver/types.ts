@@ -64,15 +64,21 @@ export interface ElementScope {
    * `player-row-<id>` rows).
    */
   byTestIdPrefix(prefix: string): UIElement;
-  /** By accessibility role and (optionally) accessible name. */
+  /** By accessibility role and (optionally) accessible name / heading level. */
   byRole(
     role: UIRole,
-    options?: { name?: string | RegExp; exact?: boolean },
+    options?: { name?: string | RegExp; exact?: boolean; level?: number },
   ): UIElement;
   /** By rendered text. */
   byText(text: string | RegExp, options?: TextOptions): UIElement;
   /** By input placeholder. */
   byPlaceholder(text: string | RegExp): UIElement;
+  /**
+   * By associated form label (`<label for=…>` on web, accessibility label on
+   * native) — the platform-neutral selector for labelled inputs that carry no
+   * test id.
+   */
+  byLabel(text: string | RegExp, options?: TextOptions): UIElement;
 }
 
 /**
@@ -88,6 +94,8 @@ export interface ElementScope {
 export interface UIElement extends ElementScope {
   /** The first match of this query. */
   first(): UIElement;
+  /** The last match of this query. */
+  last(): UIElement;
   /** Matches narrowed to those containing `text`. */
   filterByText(text: string | RegExp): UIElement;
 
@@ -96,6 +104,14 @@ export interface UIElement extends ElementScope {
   tap(): Promise<void>;
   /** Replace the element's value with `value`. */
   fill(value: string): Promise<void>;
+  /** Clear the element's value. */
+  clear(): Promise<void>;
+  /**
+   * Press a key while the element is focused (e.g. `'Enter'` to submit).
+   * Portable subset only — stick to keys with a native keyboard equivalent
+   * (Enter, Escape, Tab, arrows); web-only chords stay in unmigrated objects.
+   */
+  press(key: string): Promise<void>;
 
   // ── Reads (point-in-time snapshots — for branching/logging) ──────
   count(): Promise<number>;
@@ -104,12 +120,45 @@ export interface UIElement extends ElementScope {
   text(): Promise<string>;
   /** Inner text of every match (collection queries). */
   allTexts(): Promise<string[]>;
+  /** Current input value. */
+  value(): Promise<string>;
+  /**
+   * Current attribute value, or null when absent (`aria-*`/DOM attribute on
+   * web, the equivalent accessibility property on native).
+   */
+  attribute(name: string): Promise<string | null>;
+  /**
+   * The element's viewport rectangle, or null when not rendered (Playwright
+   * `boundingBox` on web, `getElementRect` on native) — for layout/overflow
+   * assertions.
+   */
+  boundingBox(): Promise<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>;
 
   // ── Retrying assertions ("wait until" semantics) ─────────────────
   expectVisible(options?: ExpectOptions): Promise<void>;
   expectHidden(options?: ExpectOptions): Promise<void>;
+  expectEnabled(options?: ExpectOptions): Promise<void>;
+  expectDisabled(options?: ExpectOptions): Promise<void>;
+  /** Assert the element is present in the tree (visible or not). */
+  expectAttached(options?: ExpectOptions): Promise<void>;
+  /** Assert the element is absent from the tree. */
+  expectNotAttached(options?: ExpectOptions): Promise<void>;
   expectCount(count: number, options?: ExpectOptions): Promise<void>;
   expectValue(value: string, options?: ExpectOptions): Promise<void>;
+  /**
+   * Assert an attribute value (`aria-*`/DOM attribute on web, the equivalent
+   * accessibility property a native driver can resolve).
+   */
+  expectAttribute(
+    name: string,
+    value: string | RegExp,
+    options?: ExpectOptions,
+  ): Promise<void>;
   expectContainsText(
     text: string | RegExp,
     options?: ExpectOptions,

@@ -189,6 +189,7 @@ module.exports = {
         'league-creation-advanced.spec.ts',
         'league-creation-football.spec.ts',
         'league-detail-tabs.spec.ts',
+        'league-discovery-search.dual.spec.ts',
         'league-discovery.spec.ts',
         'mobile-responsive-nav.spec.ts',
         'navigation.spec.ts',
