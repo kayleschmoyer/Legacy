@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTeamBranding } from '@legacy-sports/shared-components';
 import {
   type LeagueFragment,
@@ -16,6 +16,86 @@ import { BRAND_SEAM_RED } from '../../../../constants/colors';
 
 const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+
+interface ColorInputGroupProps {
+  label: string;
+  value: string;
+  presetColors: readonly string[];
+  onChange: (color: string) => void;
+}
+
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+
+const ColorInputGroup: React.FC<ColorInputGroupProps> = ({
+  label,
+  value,
+  presetColors,
+  onChange,
+}) => {
+  const [hexInput, setHexInput] = useState(value);
+
+  useEffect(() => {
+    setHexInput(value);
+  }, [value]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.startsWith('#')
+      ? e.target.value
+      : `#${e.target.value}`;
+    setHexInput(v);
+    if (HEX_RE.test(v)) onChange(v);
+  };
+
+  return (
+    <div className="ls-field">
+      <label>{label}</label>
+      <div className="ls-color-row">
+        {presetColors.map((c) => (
+          <button
+            key={c}
+            type="button"
+            aria-label={`Pick ${label.toLowerCase()} ${c}`}
+            className={`ls-color-swatch ${value === c ? 'on' : ''}`}
+            style={{ background: c }}
+            onClick={() => onChange(c)}
+          />
+        ))}
+      </div>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}
+      >
+        <input
+          type="color"
+          aria-label={`${label} color picker`}
+          value={HEX_RE.test(value) ? value : '#000000'}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setHexInput(e.target.value);
+          }}
+          style={{
+            width: 32,
+            height: 32,
+            padding: 0,
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer',
+            background: 'none',
+          }}
+        />
+        <input
+          type="text"
+          aria-label={`${label} hex`}
+          className="ls-input"
+          value={hexInput}
+          onChange={handleTextChange}
+          placeholder="#000000"
+          maxLength={7}
+          style={{ width: 100, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+        />
+      </div>
+    </div>
+  );
+};
 
 export interface TeamTabProps {
   league: LeagueFragment;
@@ -346,36 +426,18 @@ export const TeamTab: React.FC<TeamTabProps> = ({
             >
               Colors
             </label>
-            <div className="ls-field">
-              <label>Primary Color</label>
-              <div className="ls-color-row">
-                {presetColors.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={`Pick primary color ${c}`}
-                    className={`ls-color-swatch ${primaryColor === c ? 'on' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => setPrimaryColor(c)}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="ls-field">
-              <label>Secondary Color</label>
-              <div className="ls-color-row">
-                {presetColors.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={`Pick secondary color ${c}`}
-                    className={`ls-color-swatch ${secondaryColor === c ? 'on' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => setSecondaryColor(c)}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorInputGroup
+              label="Primary Color"
+              value={primaryColor}
+              presetColors={presetColors}
+              onChange={setPrimaryColor}
+            />
+            <ColorInputGroup
+              label="Secondary Color"
+              value={secondaryColor}
+              presetColors={presetColors}
+              onChange={setSecondaryColor}
+            />
 
             <div
               aria-label="Branding preview"
