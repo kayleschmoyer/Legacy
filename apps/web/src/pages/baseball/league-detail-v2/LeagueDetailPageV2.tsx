@@ -504,7 +504,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
               />
             </div>
           )}
-          {tab === 'commish' && settingsError ? (
+          {settingsError ? (
             <div
               role="alert"
               aria-live="assertive"
@@ -520,7 +520,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
               Error saving settings: {settingsError}
             </div>
           ) : null}
-          {tab === 'commish' && settingsSuccess ? (
+          {settingsSuccess ? (
             <div
               role="status"
               aria-live="polite"

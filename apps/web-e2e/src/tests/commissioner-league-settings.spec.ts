@@ -326,4 +326,39 @@ test.describe('Commissioner League Settings @critical', () => {
 
     await expect.poll(() => mutationCalled, { timeout: 5000 }).toBe(true);
   });
+
+  test('settings success banner remains visible after navigating away from the Commissioner tab (LS-5917) @regression', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, {
+      league: makeLeague({ draftStatus: 'not-started' }),
+    });
+    await page.goto('/baseball/league/1/commissioner');
+    await expandLeagueSettings(page);
+
+    // Change a setting and save
+    await page
+      .getByRole('button', { name: /Games per matchup: 7 games/ })
+      .click();
+    await page.getByRole('button', { name: 'Save Settings' }).click();
+
+    // Wait for the success banner to appear on the commissioner tab
+    await expect(
+      page
+        .getByRole('status')
+        .filter({ hasText: /League settings saved successfully/i }),
+    ).toBeVisible();
+
+    // Navigate away to the overview tab via client-side tab click (not page.goto,
+    // which would hard-reload and reset React state).
+    await page.getByRole('tab', { name: 'Overview' }).click();
+
+    // Banner must still be visible — the fix in LS-5917 ensures the banner is
+    // rendered unconditionally at the page level, not only when tab === 'commish'.
+    await expect(
+      page
+        .getByRole('status')
+        .filter({ hasText: /League settings saved successfully/i }),
+    ).toBeVisible();
+  });
 });
