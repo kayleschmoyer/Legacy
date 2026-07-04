@@ -105,7 +105,8 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   advanced_playoff_formats: 'Advanced playoff formats (6-team, 8-team)',
   unlimited_mock_drafts: 'Unlimited mock drafts',
   unlimited_leagues: 'Unlimited active leagues',
-  faab_waiver_type: 'FAAB waivers',
+  faab_waiver_type:
+    'FAAB waiver type (commissioner league-creation only; members of FAAB leagues may participate regardless of tier)',
   historical_era_filters: 'Historical era filters',
   auction_draft: 'Auction draft mode',
   extended_trade_expiration: 'Extended trade expiration',
