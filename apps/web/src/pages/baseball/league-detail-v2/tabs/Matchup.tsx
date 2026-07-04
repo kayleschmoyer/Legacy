@@ -41,6 +41,8 @@ export interface MatchupTabProps {
   myTeamId: number | null;
   initialMatchupId: string | null;
   onTeam: (teamId: number) => void;
+  isCommissioner?: boolean;
+  onCommish?: () => void;
 }
 
 export const MatchupTab: React.FC<MatchupTabProps> = ({
@@ -48,6 +50,8 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   myTeamId,
   initialMatchupId,
   onTeam,
+  isCommissioner,
+  onCommish,
 }) => {
   const isFootball = league.sport === Sport.Football;
   const { currentWeek } = useCurrentWeek(league.id ?? null);
@@ -81,7 +85,12 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
       ? Number(myMatchup.id)
       : null;
 
-  const { matchup, refetch: refetchMatchup } = useMatchupById(matchupId);
+  const {
+    matchup,
+    loading: matchupLoading,
+    error: matchupError,
+    refetch: refetchMatchup,
+  } = useMatchupById(matchupId);
 
   // Refetch scores when the server signals stats have been recalculated.
   const refetchMatchupsRef = useRef(refetchMatchups);
@@ -154,6 +163,94 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   const gamesRemaining = Math.max(0, totalGames - gamesPlayed);
   const percentComplete =
     totalGames > 0 ? Math.round((gamesPlayed / totalGames) * 100) : 0;
+
+  const hasNoMatchup = !matchupLoading && !matchupError && matchupId == null;
+
+  if (matchupLoading && !matchup) {
+    return (
+      <div
+        data-testid="matchup-loading"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          padding: '64px 16px',
+          color: 'var(--fg3)',
+        }}
+      >
+        <I.Loader size={28} style={{ animation: 'spin 1s linear infinite' }} />
+        <span>Loading matchup…</span>
+      </div>
+    );
+  }
+
+  if (matchupError) {
+    return (
+      <div
+        data-testid="matchup-error"
+        style={{
+          padding: 24,
+          borderRadius: 8,
+          background: 'var(--red-subtle)',
+          border: '1px solid var(--red)',
+          color: 'var(--red)',
+        }}
+      >
+        <strong>Failed to load matchup.</strong>
+        <div style={{ fontSize: 13, marginTop: 4, color: 'var(--fg2)' }}>
+          {matchupError.message}
+        </div>
+      </div>
+    );
+  }
+
+  if (hasNoMatchup) {
+    return (
+      <div
+        data-testid="matchup-empty"
+        style={{
+          padding: 32,
+          borderRadius: 8,
+          background: 'var(--surface2)',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg1)' }}>
+          No Active Matchup
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--fg3)', maxWidth: 320 }}>
+          There is no matchup scheduled for Week {week}. Matchups are created by
+          the league commissioner before each period begins.
+        </div>
+        {isCommissioner && onCommish && (
+          <button
+            type="button"
+            data-testid="go-to-commish"
+            onClick={onCommish}
+            style={{
+              marginTop: 8,
+              padding: '8px 20px',
+              borderRadius: 6,
+              background: 'var(--brand-gold)',
+              color: 'var(--fg-on-gold)',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            Go to Commissioner tab
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -282,6 +379,66 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
           </div>
         )}
       </Section>
+
+      {matchup && (matchup.startTime || matchup.endTime) ? (
+        <Section title="Schedule" sub="Matchup period">
+          <div
+            data-testid="matchup-schedule-card"
+            style={{
+              display: 'flex',
+              gap: 32,
+              padding: '12px 0',
+              fontSize: 13,
+              color: 'var(--fg2)',
+            }}
+          >
+            {matchup.startTime ? (
+              <div>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 11,
+                    textTransform: 'uppercase',
+                    letterSpacing: '.06em',
+                    color: 'var(--fg3)',
+                    marginBottom: 2,
+                  }}
+                >
+                  Starts
+                </div>
+                <div style={{ color: 'var(--fg1)' }}>
+                  {new Date(matchup.startTime).toLocaleString(undefined, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                </div>
+              </div>
+            ) : null}
+            {matchup.endTime ? (
+              <div>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 11,
+                    textTransform: 'uppercase',
+                    letterSpacing: '.06em',
+                    color: 'var(--fg3)',
+                    marginBottom: 2,
+                  }}
+                >
+                  Ends
+                </div>
+                <div style={{ color: 'var(--fg1)' }}>
+                  {new Date(matchup.endTime).toLocaleString(undefined, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </Section>
+      ) : null}
     </div>
   );
 };

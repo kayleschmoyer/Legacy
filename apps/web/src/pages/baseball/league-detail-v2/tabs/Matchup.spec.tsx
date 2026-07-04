@@ -1,32 +1,36 @@
 /**
- * Tests for MatchupTab football-awareness (LS-4152).
+ * Tests for MatchupTab (LS-5343).
  *
  * Covers:
  *   1. Football league: games-progress bar is not rendered regardless of totalGames.
  *   2. Baseball league: games-progress bar IS rendered when totalGames > 0.
+ *   3. Loading state: spinner shown while matchup is loading.
+ *   4. Error state: red error card shown on matchup query failure.
+ *   5. No-active-matchup empty state: shown when no matchupId is resolvable.
+ *   6. Commissioner shortcut: "Go to Commissioner tab" button shown to commissioners.
+ *   7. Schedule card: rendered when matchup has startTime / endTime.
+ *   8. Schedule card: NOT rendered when matchup has no startTime / endTime.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 import React from 'react';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { MatchupTab } from './Matchup';
 
 // --- hooks -----------------------------------------------------------------
+const mockUseMatchupById = jest.fn<
+  {
+    matchup: object | null;
+    loading: boolean;
+    error: Error | null;
+    refetch: jest.Mock;
+  },
+  [number | null]
+>();
+
 jest.mock('../../../../hooks/useMatchup', () => ({
   useCurrentWeek: () => ({ currentWeek: 1 }),
   useMatchupsByWeek: () => ({ matchups: [], refetch: jest.fn() }),
-  useMatchupById: () => ({
-    matchup: {
-      id: 1,
-      weekNumber: 1,
-      team1Id: 10,
-      team2Id: 20,
-      status: 'scheduled',
-      totalGames: 5,
-      selectedGamesCount: 5,
-    },
-    refetch: jest.fn(),
-  }),
+  useMatchupById: (matchupId: number | null) => mockUseMatchupById(matchupId),
 }));
 jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
   useLeagueWebSocket: () => undefined,
@@ -73,8 +77,25 @@ jest.mock('../../../../features/matchup/MatchupScoreboard', () => ({
     totalGames: 5,
   }),
 }));
+jest.mock('@legacy-sports/shared-components/matchup', () => ({
+  MatchupScoreboardHero: () => <div data-testid="scoreboard-hero" />,
+}));
 
 // ---------------------------------------------------------------------------
+
+const baseMatchup = {
+  id: 1,
+  weekNumber: 1,
+  team1Id: 10,
+  team2Id: 20,
+  status: 'scheduled',
+  gamesPerMatchup: 5,
+  selectedGamesCount: 5,
+  startTime: null,
+  endTime: null,
+  team1: { id: 10, name: 'Alpha' },
+  team2: { id: 20, name: 'Beta' },
+};
 
 const baseLeague = {
   id: 1,
@@ -83,30 +104,48 @@ const baseLeague = {
   currentWeekNumber: 1,
   totalMatchups: 10,
   gamesPerMatchup: 5,
-} as any;
+};
+
+function renderTab(
+  leagueOverrides: Partial<typeof baseLeague> = {},
+  extra: {
+    isCommissioner?: boolean;
+    onCommish?: jest.Mock;
+    /** Pass null to test the no-matchup state (matchupId=null path). */
+    initialMatchupId?: string | null;
+  } = {},
+) {
+  const initialMatchupId =
+    'initialMatchupId' in extra ? extra.initialMatchupId : '1';
+  return render(
+    <MatchupTab
+      league={{ ...baseLeague, ...leagueOverrides }}
+      myTeamId={10}
+      initialMatchupId={initialMatchupId ?? null}
+      onTeam={jest.fn()}
+      isCommissioner={extra.isCommissioner}
+      onCommish={extra.onCommish}
+    />,
+  );
+}
+
+beforeEach(() => {
+  mockUseMatchupById.mockReturnValue({
+    matchup: baseMatchup,
+    loading: false,
+    error: null,
+    refetch: jest.fn(),
+  });
+});
 
 describe('MatchupTab — football-awareness', () => {
   it('renders the games-progress bar for a baseball league when games are scheduled', () => {
-    render(
-      <MatchupTab
-        league={{ ...baseLeague, sport: 'baseball' }}
-        myTeamId={10}
-        initialMatchupId={null}
-        onTeam={jest.fn()}
-      />,
-    );
+    renderTab({ sport: 'baseball' });
     expect(document.querySelector('.ls-games-remaining')).toBeInTheDocument();
   });
 
   it('does not render the games-progress bar for a football league', () => {
-    render(
-      <MatchupTab
-        league={{ ...baseLeague, sport: 'football' }}
-        myTeamId={10}
-        initialMatchupId={null}
-        onTeam={jest.fn()}
-      />,
-    );
+    renderTab({ sport: 'football' });
     expect(
       document.querySelector('.ls-games-remaining'),
     ).not.toBeInTheDocument();
@@ -117,11 +156,106 @@ describe('MatchupTab — football-awareness', () => {
       <MatchupTab
         league={{ ...baseLeague, sport: 'football' }}
         myTeamId={10}
-        initialMatchupId={null}
+        initialMatchupId="1"
         onTeam={jest.fn()}
       />,
     );
     const meta = container.querySelector('.meta');
     expect(meta?.textContent).toContain('Head-to-Head');
+  });
+});
+
+describe('MatchupTab — loading state', () => {
+  it('shows loading indicator while matchup is being fetched', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: null,
+      loading: true,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab({}, { initialMatchupId: '1' });
+    expect(screen.getByTestId('matchup-loading')).toBeInTheDocument();
+    expect(screen.getByText('Loading matchup…')).toBeInTheDocument();
+  });
+
+  it('does not show main content while loading', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: null,
+      loading: true,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab({}, { initialMatchupId: '1' });
+    expect(document.querySelector('.ls-week-nav')).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchupTab — error state', () => {
+  it('shows error card when matchup query fails', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: null,
+      loading: false,
+      error: new Error('Network error'),
+      refetch: jest.fn(),
+    });
+    renderTab({}, { initialMatchupId: '1' });
+    expect(screen.getByTestId('matchup-error')).toBeInTheDocument();
+    expect(screen.getByText('Failed to load matchup.')).toBeInTheDocument();
+    expect(screen.getByText('Network error')).toBeInTheDocument();
+  });
+});
+
+describe('MatchupTab — no active matchup empty state', () => {
+  beforeEach(() => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: null,
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+  });
+
+  it('shows empty state when no matchupId can be resolved', () => {
+    renderTab({}, { initialMatchupId: null });
+    expect(screen.getByTestId('matchup-empty')).toBeInTheDocument();
+    expect(screen.getByText('No Active Matchup')).toBeInTheDocument();
+  });
+
+  it('shows commissioner button to commissioners', () => {
+    const onCommish = jest.fn();
+    renderTab({}, { isCommissioner: true, onCommish, initialMatchupId: null });
+    const btn = screen.getByTestId('go-to-commish');
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onCommish).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show commissioner button to non-commissioners', () => {
+    renderTab({}, { isCommissioner: false, initialMatchupId: null });
+    expect(screen.queryByTestId('go-to-commish')).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchupTab — schedule card', () => {
+  it('renders schedule card when matchup has startTime and endTime', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: {
+        ...baseMatchup,
+        startTime: '2025-04-07T00:00:00.000Z',
+        endTime: '2025-04-13T23:59:59.000Z',
+      },
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab();
+    expect(screen.getByTestId('matchup-schedule-card')).toBeInTheDocument();
+  });
+
+  it('does not render schedule card when matchup has no startTime or endTime', () => {
+    renderTab();
+    expect(
+      screen.queryByTestId('matchup-schedule-card'),
+    ).not.toBeInTheDocument();
   });
 });

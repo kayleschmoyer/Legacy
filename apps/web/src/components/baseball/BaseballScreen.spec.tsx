@@ -20,7 +20,7 @@ interface MLBHomeHarnessProps {
   onCreateLeague: (input: Record<string, unknown>) => Promise<void>;
 }
 interface LeaguesQueryResult {
-  data?: { myLeagues: HarnessLeague[] };
+  data?: { userLeagues: HarnessLeague[] };
   loading: boolean;
   error?: Error;
   refetch: () => void;
@@ -112,24 +112,29 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
 
 const mockCreateLeague = jest.fn();
 const mockRefetch = jest.fn();
-const mockUseGetMyLeaguesQuery: jest.MockedFunction<
-  (opts: {
-    variables?: { sport?: string };
-    skip?: boolean;
-  }) => LeaguesQueryResult
+const mockUseGetUserLeaguesQuery: jest.MockedFunction<
+  (opts: { skip?: boolean; fetchPolicy?: string }) => LeaguesQueryResult
 > = jest.fn();
+
+type CacheUpdateFn = (
+  cache: { readQuery: jest.Mock; writeQuery: jest.Mock },
+  result: { data: unknown },
+) => void;
+let capturedCacheUpdate: CacheUpdateFn | undefined;
+
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetMyLeaguesQuery: (opts: {
-    variables?: { sport?: string };
-    skip?: boolean;
-  }) => mockUseGetMyLeaguesQuery(opts),
-  useCreateLeagueAndTeamsMutation: () => [mockCreateLeague, { loading: false }],
+  useGetUserLeaguesQuery: (opts: { skip?: boolean; fetchPolicy?: string }) =>
+    mockUseGetUserLeaguesQuery(opts),
+  useCreateLeagueAndTeamsMutation: (opts?: { update?: CacheUpdateFn }) => {
+    capturedCacheUpdate = opts?.update;
+    return [mockCreateLeague, { loading: false }];
+  },
   useGetStripePricesQuery: () => ({
     data: undefined,
     loading: false,
     error: undefined,
   }),
-  GetMyLeagues: {},
+  GetUserLeagues: {},
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
@@ -148,13 +153,14 @@ jest.mock('../../context/GrowthBookProvider', () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  capturedCacheUpdate = undefined;
   mockUseAuth.mockReturnValue({
     isLoading: false,
     user: { username: 'schmoyer21@gmail.com' },
   });
-  mockUseGetMyLeaguesQuery.mockReturnValue({
+  mockUseGetUserLeaguesQuery.mockReturnValue({
     data: {
-      myLeagues: [{ id: 1, name: 'Saturday Sluggers', sport: 'baseball' }],
+      userLeagues: [{ id: 1, name: 'Saturday Sluggers', sport: 'baseball' }],
     },
     loading: false,
     error: undefined,
@@ -179,7 +185,7 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
   });
 
   it('passes the loading guard while data is undefined and no error', () => {
-    mockUseGetMyLeaguesQuery.mockReturnValue({
+    mockUseGetUserLeaguesQuery.mockReturnValue({
       data: undefined,
       loading: false,
       error: undefined,
@@ -190,7 +196,7 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
   });
 
   it('surfaces the error flag when the query fails', () => {
-    mockUseGetMyLeaguesQuery.mockReturnValue({
+    mockUseGetUserLeaguesQuery.mockReturnValue({
       data: undefined,
       loading: false,
       error: new Error('boom'),
@@ -218,6 +224,42 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/123'),
     );
+  });
+
+  it('cache update appends new league to GetUserLeagues after creation', () => {
+    render(<BaseballScreen />);
+
+    const existingLeague = { id: 1, name: 'Existing League' };
+    const newLeague = { id: 999, name: 'New League' };
+    const mockReadQuery = jest
+      .fn()
+      .mockReturnValue({ userLeagues: [existingLeague] });
+    const mockWriteQuery = jest.fn();
+    const cache = { readQuery: mockReadQuery, writeQuery: mockWriteQuery };
+
+    capturedCacheUpdate?.(cache, {
+      data: { createLeagueAndTeams: { league: newLeague } },
+    });
+
+    expect(mockWriteQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { userLeagues: [existingLeague, newLeague] },
+      }),
+    );
+  });
+
+  it('cache update is a no-op when readQuery returns nothing', () => {
+    render(<BaseballScreen />);
+
+    const mockReadQuery = jest.fn().mockReturnValue(null);
+    const mockWriteQuery = jest.fn();
+    const cache = { readQuery: mockReadQuery, writeQuery: mockWriteQuery };
+
+    capturedCacheUpdate?.(cache, {
+      data: { createLeagueAndTeams: { league: { id: 5, name: 'L' } } },
+    });
+
+    expect(mockWriteQuery).not.toHaveBeenCalled();
   });
 
   it('wires navigation callbacks', () => {
@@ -268,8 +310,8 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
   }
 
   it('does not set atLimit when user is below the cap', () => {
-    mockUseGetMyLeaguesQuery.mockReturnValue({
-      data: { myLeagues: leaguesOfCount(2) },
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(2) },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -279,8 +321,8 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
   });
 
   it('never sets atLimit on web (web does not hard-gate creation) but upgrade CTA navigates to /pricing', () => {
-    mockUseGetMyLeaguesQuery.mockReturnValue({
-      data: { myLeagues: leaguesOfCount(3) },
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(3) },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -298,8 +340,8 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
       isPremium: true,
       isLoading: false,
     });
-    mockUseGetMyLeaguesQuery.mockReturnValue({
-      data: { myLeagues: leaguesOfCount(5) },
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(5) },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -313,8 +355,8 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
       isPremium: false,
       isLoading: true,
     });
-    mockUseGetMyLeaguesQuery.mockReturnValue({
-      data: { myLeagues: leaguesOfCount(4) },
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(4) },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -324,9 +366,9 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
   });
 
   it('counts baseball leagues from myLeagues toward the cap count display (LS-5795)', () => {
-    mockUseGetMyLeaguesQuery.mockReturnValue({
+    mockUseGetUserLeaguesQuery.mockReturnValue({
       data: {
-        myLeagues: [
+        userLeagues: [
           { id: 1, name: 'Baseball A' },
           { id: 2, name: 'Baseball B' },
           { id: 3, name: 'Baseball C' },

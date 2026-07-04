@@ -1008,7 +1008,7 @@ export function MLBHome({
                     pressStyle={{ scale: 0.995 }}
                     onPress={() => onViewLeague(league.id)}
                     accessibilityLabel={`View ${league.name || 'league'}`}
-                    role="link"
+                    role="button"
                     // League rows stack their name/badges/action vertically on
                     // phones and lay out in a single centered row on desktop
                     // (LS-7799).
@@ -1146,7 +1146,7 @@ export function MLBHome({
               ) : (
                 <>
                   <H2 fontSize="$8" fontWeight="700" color="$color">
-                    No baseball leagues yet
+                    No leagues yet
                   </H2>
                   <Paragraph
                     fontSize="$4"

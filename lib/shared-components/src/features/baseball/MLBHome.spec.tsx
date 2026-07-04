@@ -157,7 +157,7 @@ describe('MLBHome', () => {
   it('shows the full hero and empty state when the user has no leagues', () => {
     render(<MLBHome {...baseProps} leagues={[]} />);
     expect(screen.getByText(/Season Hub/)).toBeInTheDocument();
-    expect(screen.getByText('No baseball leagues yet')).toBeInTheDocument();
+    expect(screen.getByText('No leagues yet')).toBeInTheDocument();
     expect(screen.queryByText('+ Create')).not.toBeInTheDocument();
   });
 

@@ -56,8 +56,8 @@ async function mockUserLeagues(
   leagues: typeof MOCK_LEAGUES | [],
 ) {
   await createGraphQLRouter(page, {
-    getmyleagues: (route) =>
-      fulfillJson(route, { data: { myLeagues: leagues } }),
+    getuserleagues: (route) =>
+      fulfillJson(route, { data: { userLeagues: leagues } }),
   });
 }
 
@@ -80,6 +80,9 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await mockUserLeagues(page, MOCK_LEAGUES);
     await page.goto('/baseball');
     await page.waitForLoadState('load');
+    await expect(
+      page.getByRole('heading', { name: /your leagues/i }),
+    ).toBeVisible();
 
     const grid = page.getByTestId('leagues-grid');
     await expect(grid.getByText('Pre-Draft Warriors')).toBeVisible();
@@ -127,12 +130,16 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
 
     const search = page.getByPlaceholder(/search leagues/i);
     await expect(search).toBeVisible();
-    await search.fill('Sluggers');
+    // Use pressSequentially so Tamagui's onChangeText fires on each keystroke
+    await search.click();
+    await search.pressSequentially('Sluggers');
 
-    const grid = page.getByTestId('leagues-grid');
-    await expect(grid.getByText('Active Sluggers')).toBeVisible();
-    await expect(grid.getByText('Pre-Draft Warriors')).not.toBeVisible();
-    await expect(grid.getByText('Mid-Draft Rockets')).not.toBeVisible();
+    const leaguesGrid = page.getByTestId('leagues-grid');
+    await expect(
+      leaguesGrid.getByText('Active Sluggers').first(),
+    ).toBeVisible();
+    await expect(leaguesGrid.getByText('Pre-Draft Warriors')).not.toBeVisible();
+    await expect(leaguesGrid.getByText('Mid-Draft Rockets')).not.toBeVisible();
   });
 
   test('clicking "View" on a league card navigates to the league detail page', async ({
@@ -143,21 +150,21 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.waitForLoadState('load');
 
     await page
-      .getByRole('link', { name: /view active sluggers/i })
+      .getByRole('button', { name: /view active sluggers/i })
       .first()
       .click();
 
     await expect(page).toHaveURL(/\/baseball\/league\/103/);
   });
 
-  test('empty state "No baseball leagues yet" is shown when the user has no leagues', async ({
+  test('empty state "No leagues yet" is shown when the user has no leagues', async ({
     page,
   }) => {
     await mockUserLeagues(page, []);
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('No baseball leagues yet')).toBeVisible();
+    await expect(page.getByText('No leagues yet')).toBeVisible();
   });
 
   test('"In Season" badge appears for a completed league with no week number', async ({
@@ -257,10 +264,10 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     page,
   }) => {
     await createGraphQLRouter(page, {
-      getmyleagues: (route) =>
+      getuserleagues: (route) =>
         fulfillJson(route, {
           errors: [{ message: 'Internal server error' }],
-          data: { myLeagues: null },
+          data: { userLeagues: null },
         }),
     });
     await page.goto('/baseball');

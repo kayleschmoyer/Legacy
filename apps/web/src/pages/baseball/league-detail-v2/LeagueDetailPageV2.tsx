@@ -441,6 +441,8 @@ export function LeagueDetailPageV2(): React.JSX.Element {
                 myTeamId={userTeamId ?? null}
                 initialMatchupId={routeMatchupId ?? null}
                 onTeam={onTeamNav}
+                isCommissioner={isCommissioner}
+                onCommish={() => setTab('commish')}
               />
             </div>
           )}
