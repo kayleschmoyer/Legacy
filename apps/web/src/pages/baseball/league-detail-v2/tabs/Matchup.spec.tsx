@@ -236,6 +236,32 @@ describe('MatchupTab — no active matchup empty state', () => {
   });
 });
 
+describe('MatchupTab — games-remaining dots clamping (LS-5882)', () => {
+  it('renders one dot per game when totalGames is within bounds', () => {
+    renderTab();
+    expect(document.querySelectorAll('.ls-game-dot')).toHaveLength(5);
+    expect(screen.queryByTestId('games-dots-overflow')).not.toBeInTheDocument();
+  });
+
+  it('falls back to numeric X/Y text instead of rendering dots when totalGames exceeds the cap', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: {
+        ...baseMatchup,
+        gamesPerMatchup: 100000,
+        selectedGamesCount: 3,
+      },
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab();
+    expect(document.querySelectorAll('.ls-game-dot')).toHaveLength(0);
+    const overflow = screen.getByTestId('games-dots-overflow');
+    expect(overflow).toBeInTheDocument();
+    expect(overflow.textContent).toBe('3/100000');
+  });
+});
+
 describe('MatchupTab — schedule card', () => {
   it('renders schedule card when matchup has startTime and endTime', () => {
     mockUseMatchupById.mockReturnValue({

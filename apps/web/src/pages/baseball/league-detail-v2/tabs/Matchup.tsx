@@ -24,6 +24,12 @@ import { mapMatchupPlayerToSeasonStats } from '../../../../lib/scoring/mapGraphQ
 import { I } from '../Icons';
 import { Section } from '../Shared';
 
+// Upper bound on individually-rendered game dots. gamesPerMatchup normally
+// tops out in the single digits; this guards against a corrupt/huge value
+// forcing an excessive Array.from allocation (negative values are already
+// excluded by the enclosing `totalGames > 0` render guard).
+const MAX_GAME_DOTS = 30;
+
 /**
  * Derives the weekly matchup-format label for football leagues.
  * Currently all football leagues use head-to-head scoring; this helper
@@ -350,18 +356,27 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
               style={{ width: `${percentComplete}%` }}
             />
           </div>
-          <div className="ls-games-dots">
-            {Array.from({ length: totalGames }).map((_, idx) => {
-              const cls =
-                idx < gamesPlayed
-                  ? 'done'
-                  : idx === gamesPlayed &&
-                      matchup?.status === MatchupStatus.InProgress
-                    ? 'live'
-                    : 'pending';
-              return <div key={idx} className={`ls-game-dot ${cls}`} />;
-            })}
-          </div>
+          {totalGames <= MAX_GAME_DOTS ? (
+            <div className="ls-games-dots">
+              {Array.from({ length: totalGames }).map((_, idx) => {
+                const cls =
+                  idx < gamesPlayed
+                    ? 'done'
+                    : idx === gamesPlayed &&
+                        matchup?.status === MatchupStatus.InProgress
+                      ? 'live'
+                      : 'pending';
+                return <div key={idx} className={`ls-game-dot ${cls}`} />;
+              })}
+            </div>
+          ) : (
+            <div
+              className="ls-games-dots-overflow"
+              data-testid="games-dots-overflow"
+            >
+              {gamesPlayed}/{totalGames}
+            </div>
+          )}
         </div>
       ) : null}
 
