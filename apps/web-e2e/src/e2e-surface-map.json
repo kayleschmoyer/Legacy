@@ -2157,6 +2157,14 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/matchup-information-card.spec.ts": [
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/components/matchup/**",
+      "lib/shared-components/src/features/matchup/**",
+      "lib/graphql/src/**",
+      "lib/test-fixtures/src/lib/**"
+    ],
     "apps/web-e2e/src/tests/matchup-week-navigation.spec.ts": [
       "apps/web/src/pages/matchup/**",
       "apps/web/src/features/matchup/**",
