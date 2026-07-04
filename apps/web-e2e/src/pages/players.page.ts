@@ -23,13 +23,16 @@ import { PremiumGate } from '../components/premium-gate.component';
  * ADR-0016 migration status (LS-8304 stage 1; remaining stages LS-8305):
  *   • The container and the `stats` surface are driver-typed (platform
  *     neutral). Navigation to stats/compare goes through `driver.open()`.
- *   • `detail` and `compare` remain WEB-ONLY: they lean on `dispatchEvent`/
- *     `force: true` workarounds for Tamagui overlay interception (fix tracked
- *     as LS-8305 stage 2), CSS assertions (`toHaveCSS` chip colors — stage 5
- *     relocates these to Storybook), `page.keyboard`, and bfcache-aware
- *     `waitForURL(…, { waitUntil: 'commit' })`. They reach the Playwright
+ *   • `detail` and `compare` remain WEB-ONLY. They reach the Playwright
  *     `Page` through the web driver's escape hatch below, so constructing
- *     this object currently REQUIRES the web driver.
+ *     this object currently REQUIRES the web driver. What keeps them on the
+ *     raw `Page` is web-only *behaviour*, not test workarounds:
+ *     - `detail` uses `page.keyboard` (Escape-to-close) and bfcache-aware
+ *       `waitForURL(…, { waitUntil: 'commit' })` for the back/deep-link flows;
+ *       the surface migrates in LS-8305 stage 4.
+ *     - `compare` still leans on `force: true` (premium-gate overlay) and CSS
+ *       assertions (`toHaveCSS` chip colors — stage 5 relocates these to
+ *       Storybook).
  */
 export class PlayersPage {
   /** The blurred premium-gate overlay shared across premium-gated pages. */
@@ -442,21 +445,21 @@ class PlayerDetailSurface {
 
   /**
    * Switch the modal's stat tab (Career Arc / Batting / Pitching / Fielding).
-   * Uses `force` because the open dialog overlay can intercept pointer events.
+   * Plain click: the tab controls sit inside the dialog content, above the
+   * overlay, so nothing intercepts the pointer — the old `force: true` bypass
+   * was cargo-culted from the compare surface and is not needed here.
    */
   async switchTab(
     name: 'Career Arc' | 'Batting' | 'Pitching' | 'Fielding',
   ): Promise<void> {
-    await this.#dialog.getByText(name, { exact: true }).first().click({
-      force: true,
-    });
+    await this.#dialog.getByText(name, { exact: true }).first().click();
   }
 
   /** Click the modal's Close (X) button. */
   async close(): Promise<void> {
     const btn = this.#dialog.getByRole('button', { name: 'Close' });
     await btn.waitFor({ state: 'visible', timeout: 5000 });
-    await btn.click({ force: true });
+    await btn.click();
   }
 
   /** Press Escape to close the modal. */
@@ -466,16 +469,18 @@ class PlayerDetailSurface {
 
   /** Click the "Open full page" external-link button to navigate to /players/:id. */
   async openFullPage(): Promise<void> {
-    await this.#dialog
-      .getByRole('button', { name: /open full page/i })
-      .click({ force: true });
+    await this.#dialog.getByRole('button', { name: /open full page/i }).click();
   }
 
-  /** Click the "← Back" button (dispatchEvent bypasses overlay interception). */
+  /**
+   * Click the in-modal "← Back" button. Scoped to the dialog: on the standalone
+   * `/players/:id` route the page also renders its own `.player-back-btn` under
+   * the modal overlay, so a page-wide match would be strict-mode-ambiguous (and
+   * would resolve the covered, unclickable button). The reachable control is the
+   * in-masthead Back button, which lives inside the dialog (LS-5578 / LS-8311).
+   */
   async back(): Promise<void> {
-    await this.#page
-      .getByRole('button', { name: /← back/i })
-      .dispatchEvent('click');
+    await this.#dialog.getByRole('button', { name: /← back/i }).click();
   }
 
   /** Wait for navigation back to the stats list. */
@@ -527,10 +532,11 @@ class PlayerDetailSurface {
     await expect(this.#loading).toHaveCount(0);
   }
 
-  /** Assert the "← Back" button is visible. */
+  /** Assert the in-modal "← Back" button is visible (scoped to the dialog to
+   * avoid the page-level `.player-back-btn` on the standalone route). */
   async expectBackButton(): Promise<void> {
     await expect(
-      this.#page.getByRole('button', { name: /← back|back/i }),
+      this.#dialog.getByRole('button', { name: /← back/i }),
     ).toBeVisible({ timeout: 15000 });
   }
 

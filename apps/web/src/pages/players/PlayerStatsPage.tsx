@@ -2135,6 +2135,7 @@ export function PlayerDetailPage() {
             onOpenChange={(open) => {
               if (!open) handleBack();
             }}
+            onBack={handleBack}
             playerId={resolvedId}
             playerName={resolvedName}
           />
