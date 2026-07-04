@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import {
   Button,
   Card,
+  Dialog,
   H4,
   Input,
+  Paragraph,
   Separator,
   Spinner,
   Text,
@@ -42,6 +44,10 @@ export function TeamAssistantManagerSettings({
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<{
+    userId: number;
+    username: string;
+  } | null>(null);
 
   const {
     data: membersData,
@@ -156,7 +162,12 @@ export function TeamAssistantManagerSettings({
                     color={BRAND_SEAM_RED}
                     borderColor={withAlpha(BRAND_SEAM_RED, 0.4)}
                     borderWidth={1}
-                    onPress={() => void handleRemove(userId)}
+                    onPress={() =>
+                      setPendingRemove({
+                        userId,
+                        username: member?.username ?? `user ${userId}`,
+                      })
+                    }
                     disabled={removing}
                     aria-label={`Remove assistant manager ${member?.username ?? `user ${userId}`}`}
                   >
@@ -226,6 +237,72 @@ export function TeamAssistantManagerSettings({
           </YStack>
         </form>
       </YStack>
+
+      {/* Confirmation dialog for removing an assistant manager (LS-6027) */}
+      <Dialog
+        modal
+        open={pendingRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemove(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay
+            key="overlay"
+            animation="quick"
+            opacity={0.5}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            bordered
+            elevate
+            key="content"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="remove-assistant-manager-title"
+            aria-describedby="remove-assistant-manager-description"
+            animateOnly={['transform', 'opacity']}
+            animation={['quick', { opacity: { overshootClamping: true } }]}
+            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+            gap="$4"
+            padding="$4"
+            width={500}
+          >
+            <Dialog.Title id="remove-assistant-manager-title" color="$red11">
+              Remove assistant manager?
+            </Dialog.Title>
+            <Dialog.Description id="remove-assistant-manager-description">
+              <Paragraph>
+                {pendingRemove?.username} will lose access to manage this
+                team&apos;s roster and lineup. They will need to be re-invited
+                to regain access.
+              </Paragraph>
+            </Dialog.Description>
+            <XStack gap="$3" justifyContent="flex-end">
+              <Button
+                onPress={() => setPendingRemove(null)}
+                disabled={removing}
+              >
+                Cancel
+              </Button>
+              <Button
+                theme="red"
+                onPress={() => {
+                  const target = pendingRemove;
+                  setPendingRemove(null);
+                  if (target) void handleRemove(target.userId);
+                }}
+                disabled={removing}
+                icon={removing ? <Spinner /> : undefined}
+              >
+                Remove
+              </Button>
+            </XStack>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
     </Card>
   );
 }
