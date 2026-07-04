@@ -225,6 +225,56 @@ describe('createPR jira-link marker emission (LS-7895)', () => {
     expect(sentBody()).not.toContain('**Jira:**');
   });
 
+  it('applies the no-jira label when primary falls back to none (LS-8298)', async () => {
+    const result = await createPR({
+      title: 'chore(deps): bump lodash',
+      body: 'body',
+      head: 'dependabot/npm_and_yarn/lodash-4.17.21',
+    });
+
+    const labelCall = mockGithubRest.mock.calls.find(([req]) =>
+      String(req.path).includes('/labels'),
+    );
+    expect(labelCall).toBeDefined();
+    expect(labelCall?.[0]).toMatchObject({
+      method: 'POST',
+      path: '/repos/bkrupa/legacy-sports/issues/42/labels',
+      body: { labels: ['no-jira'] },
+    });
+    expect(result.content[0].text).toContain('"noJiraLabelApplied":true');
+  });
+
+  it('does not apply no-jira when a primary key is present', async () => {
+    await createPR({
+      title: 'LS-7895 feat(mcp): emit jira-link marker',
+      body: 'body',
+      head: 'claude/some-branch',
+    });
+
+    const labelCall = mockGithubRest.mock.calls.find(([req]) =>
+      String(req.path).includes('/labels'),
+    );
+    expect(labelCall).toBeUndefined();
+  });
+
+  it('reports noJiraLabelApplied:false when the label call fails, without failing PR creation (LS-8298)', async () => {
+    mockGithubRest.mockImplementation(async (req: { path: string }) => {
+      if (String(req.path).includes('/labels')) {
+        throw new Error('label API down');
+      }
+      return { number: 42, html_url: 'https://example/pr/42' };
+    });
+
+    const result = await createPR({
+      title: 'chore(deps): bump lodash',
+      body: 'body',
+      head: 'dependabot/npm_and_yarn/lodash-4.17.21',
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0].text).toContain('"noJiraLabelApplied":false');
+  });
+
   it('includes related keys without transition semantics', async () => {
     await createPR({
       title: 'LS-1 feat: something',

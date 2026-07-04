@@ -250,6 +250,24 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
       },
     });
 
+    // Jira Link Check requires the visible `no-jira` label whenever the
+    // marker declares `primary: none` — without it every keyless PR is born
+    // with a guaranteed-failing check (LS-8298). Best-effort: a label failure
+    // must not fail PR creation; it is surfaced via noJiraLabelApplied.
+    let noJiraLabelApplied: boolean | undefined;
+    if (primary === 'none') {
+      try {
+        await githubRest({
+          method: 'POST',
+          path: `/repos/${repo.owner}/${repo.name}/issues/${pr.number}/labels`,
+          body: { labels: ['no-jira'] },
+        });
+        noJiraLabelApplied = true;
+      } catch {
+        noJiraLabelApplied = false;
+      }
+    }
+
     return {
       content: [
         {
@@ -258,6 +276,7 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
             success: true,
             number: pr.number,
             url: pr.html_url,
+            ...(noJiraLabelApplied === undefined ? {} : { noJiraLabelApplied }),
           }),
         },
       ],
