@@ -28,10 +28,11 @@ import {
  * intentional future-week edits made by the user and should not be
  * overwritten.
  *
- * Best-effort: logs a warning on failure rather than throwing, so a sync
- * error never rolls back the already-committed team_members update.
+ * Callers must invoke this with the same transaction (`tx`) used for the
+ * `team_members` update it mirrors (LS-6034). A thrown error here rolls back
+ * that transaction, so the two stay consistent instead of silently diverging.
  */
-async function syncCurrentMatchupPositions(
+export async function syncCurrentMatchupPositions(
   db: PublicDb,
   leagueId: number,
   changes: Array<{
@@ -152,7 +153,7 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
           // incumbent benched without the new player taking the slot. The web
           // UI routes occupied-slot moves through `swapTeamMemberPositions`, so
           // this path is exercised mainly by direct API callers (LS-7871).
-          const { member, displaced } = await db.transaction(async (tx) => {
+          const { member } = await db.transaction(async (tx) => {
             // Resolve the member's team so slot-clearing is scoped to it.
             const [existing] = await tx
               .select({ teamId: PublicSchema.teamMembers.teamId })
@@ -204,46 +205,37 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
               throw UserInputError('Team member not found');
             }
 
-            return { member: updated[0], displaced };
-          });
+            const member = updated[0];
 
-          // Mirror the position change(s) onto matchup_players for the active
-          // week. The assigned member moves to `positionId`; any displaced
-          // incumbent is benched (null) so the lineup stays consistent.
-          if (member.teamId) {
-            const changes = [
-              {
-                teamId: member.teamId,
-                playerId: member.playerId,
-                positionId: positionId ?? null,
-              },
-              ...displaced
-                .filter(
-                  (d): d is { teamId: number; playerId: number } =>
-                    d.teamId != null,
-                )
-                .map((d) => ({
-                  teamId: d.teamId,
-                  playerId: d.playerId,
-                  positionId: null,
-                })),
-            ];
-            try {
-              await syncCurrentMatchupPositions(db, member.leagueId, changes);
-            } catch (syncError) {
-              LOGGER.warn(
-                'Failed to sync matchup player position after roster update',
+            // Mirror the position change(s) onto matchup_players for the
+            // active week, in the SAME transaction as the team_members update
+            // above. The assigned member moves to `positionId`; any displaced
+            // incumbent is benched (null) so the lineup stays consistent. A
+            // sync failure now rolls back the whole mutation instead of
+            // silently diverging team_members from matchup_players (LS-6034).
+            if (member.teamId) {
+              const changes = [
                 {
-                  teamMemberId,
-                  positionId,
-                  error:
-                    syncError instanceof Error
-                      ? syncError.message
-                      : String(syncError),
+                  teamId: member.teamId,
+                  playerId: member.playerId,
+                  positionId: positionId ?? null,
                 },
-              );
+                ...displaced
+                  .filter(
+                    (d): d is { teamId: number; playerId: number } =>
+                      d.teamId != null,
+                  )
+                  .map((d) => ({
+                    teamId: d.teamId,
+                    playerId: d.playerId,
+                    positionId: null,
+                  })),
+              ];
+              await syncCurrentMatchupPositions(tx, member.leagueId, changes);
             }
-          }
+
+            return { member };
+          });
 
           return member;
         } catch (error) {
@@ -327,15 +319,15 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
               );
             }
 
-            return [updatedA[0], updatedB[0]];
-          });
-
-          // Mirror both position changes onto matchup_players for the active week.
-          // Uses memberA's leagueId — both members belong to the same league.
-          const [memberA, memberB] = results;
-          if (memberA.teamId && memberB.teamId) {
-            try {
-              await syncCurrentMatchupPositions(db, memberA.leagueId, [
+            // Mirror both position changes onto matchup_players for the
+            // active week, in the SAME transaction as the team_members
+            // update above. Uses memberA's leagueId — both members belong to
+            // the same league. A sync failure now rolls back the whole
+            // mutation instead of silently diverging team_members from
+            // matchup_players (LS-6034).
+            const [memberA, memberB] = [updatedA[0], updatedB[0]];
+            if (memberA.teamId && memberB.teamId) {
+              await syncCurrentMatchupPositions(tx, memberA.leagueId, [
                 {
                   teamId: memberA.teamId,
                   playerId: memberA.playerId,
@@ -347,20 +339,10 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
                   positionId: positionIdB ?? null,
                 },
               ]);
-            } catch (syncError) {
-              LOGGER.warn(
-                'Failed to sync matchup player positions after roster swap',
-                {
-                  teamMemberIdA,
-                  teamMemberIdB,
-                  error:
-                    syncError instanceof Error
-                      ? syncError.message
-                      : String(syncError),
-                },
-              );
             }
-          }
+
+            return [updatedA[0], updatedB[0]];
+          });
 
           return results;
         } catch (error) {
