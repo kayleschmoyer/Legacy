@@ -40,7 +40,11 @@ interface MatchupRecapPanelProps {
 export function MatchupRecapPanel({ matchupId }: MatchupRecapPanelProps) {
   const { data, loading, error } = useGetMatchupRecapQuery({
     variables: { id: matchupId },
-    fetchPolicy: 'cache-first',
+    // cache-and-network (not cache-first) so a stale cached recap is never
+    // served on its own — a subscription-status flip always re-asks the
+    // server rather than trusting an entry cached before entitlement changed
+    // (LS-5875).
+    fetchPolicy: 'cache-and-network',
   });
 
   if (loading) {

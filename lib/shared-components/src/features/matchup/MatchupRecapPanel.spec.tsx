@@ -97,4 +97,12 @@ describe('MatchupRecapPanel', () => {
     const { getByText } = render(<MatchupRecapPanel matchupId={1} />);
     expect(getByText('MATCHUP RECAP')).toBeTruthy();
   });
+
+  it('always re-asks the server instead of trusting a stale cache entry (LS-5875)', () => {
+    setupMock();
+    render(<MatchupRecapPanel matchupId={1} />);
+    expect(useGetMatchupRecapQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ fetchPolicy: 'cache-and-network' }),
+    );
+  });
 });
