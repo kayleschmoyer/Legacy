@@ -368,6 +368,14 @@ export function MLBHome({
     setShowCreateDialog(true);
   };
 
+  const handleJoinPress = () => {
+    if (atCap) {
+      leagueCap?.onUpgrade();
+      return;
+    }
+    onJoinLeague();
+  };
+
   if (loading) {
     return (
       <YStack
@@ -440,9 +448,17 @@ export function MLBHome({
                 borderColor={withAlpha(BRAND_NAVY, 0.42)}
                 borderWidth={1}
                 borderRadius="$5"
-                onPress={onJoinLeague}
-                accessibilityLabel="Join an existing baseball league"
-                aria-label="Join an existing baseball league"
+                onPress={handleJoinPress}
+                accessibilityLabel={
+                  atCap
+                    ? "You're at your 3-league limit. Upgrade to join more leagues."
+                    : 'Join an existing baseball league'
+                }
+                aria-label={
+                  atCap
+                    ? "You're at your 3-league limit. Upgrade to join more leagues."
+                    : 'Join an existing baseball league'
+                }
               >
                 <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                   Join
@@ -575,9 +591,17 @@ export function MLBHome({
                   borderColor={withAlpha(BRAND_NAVY, 0.42)}
                   borderWidth={1}
                   borderRadius="$6"
-                  onPress={onJoinLeague}
-                  accessibilityLabel="Join an existing baseball league"
-                  aria-label="Join an existing baseball league"
+                  onPress={handleJoinPress}
+                  accessibilityLabel={
+                    atCap
+                      ? "You're at your 3-league limit. Upgrade to join more leagues."
+                      : 'Join an existing baseball league'
+                  }
+                  aria-label={
+                    atCap
+                      ? "You're at your 3-league limit. Upgrade to join more leagues."
+                      : 'Join an existing baseball league'
+                  }
                 >
                   <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                     Join League
@@ -1191,9 +1215,17 @@ export function MLBHome({
                       borderColor={withAlpha(BRAND_NAVY, 0.42)}
                       borderWidth={1}
                       borderRadius="$6"
-                      onPress={onJoinLeague}
-                      accessibilityLabel="Join a baseball league with a code"
-                      aria-label="Join a baseball league with a code"
+                      onPress={handleJoinPress}
+                      accessibilityLabel={
+                        atCap
+                          ? "You're at your 3-league limit. Upgrade to join more leagues."
+                          : 'Join a baseball league with a code'
+                      }
+                      aria-label={
+                        atCap
+                          ? "You're at your 3-league limit. Upgrade to join more leagues."
+                          : 'Join a baseball league with a code'
+                      }
                     >
                       <Text color={BRAND_GOLD_LIGHT} fontWeight="700">
                         Join with a code

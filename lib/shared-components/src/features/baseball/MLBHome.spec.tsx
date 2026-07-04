@@ -301,6 +301,71 @@ describe('MLBHome', () => {
     expect(baseProps.onViewLeague).toHaveBeenCalledWith(1);
   });
 
+  it('triggers upgrade flow when Join is clicked at cap (LS-5863)', () => {
+    const onUpgrade = jest.fn();
+    const onJoinLeague = jest.fn();
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        onJoinLeague={onJoinLeague}
+        leagueCap={{ count: 3, limit: 3, atLimit: true, onUpgrade }}
+      />,
+    );
+    const joinBtn = screen.getByRole('button', {
+      name: "You're at your 3-league limit. Upgrade to join more leagues.",
+    });
+    fireEvent.click(joinBtn);
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
+    expect(onJoinLeague).not.toHaveBeenCalled();
+  });
+
+  it('navigates to join page when Join is clicked under cap (LS-5863)', () => {
+    const onUpgrade = jest.fn();
+    const onJoinLeague = jest.fn();
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        onJoinLeague={onJoinLeague}
+        leagueCap={{ count: 2, limit: 3, atLimit: false, onUpgrade }}
+      />,
+    );
+    const joinBtn = screen.getByRole('button', {
+      name: 'Join an existing baseball league',
+    });
+    fireEvent.click(joinBtn);
+    expect(onJoinLeague).toHaveBeenCalledTimes(1);
+    expect(onUpgrade).not.toHaveBeenCalled();
+  });
+
+  it('accessibilityLabel reflects cap state on Join button (LS-5863)', () => {
+    const onUpgrade = jest.fn();
+    const { rerender } = render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        leagueCap={{ count: 2, limit: 3, atLimit: false, onUpgrade }}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Join an existing baseball league' }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        leagueCap={{ count: 3, limit: 3, atLimit: true, onUpgrade }}
+      />,
+    );
+    expect(
+      screen.getByRole('button', {
+        name: "You're at your 3-league limit. Upgrade to join more leagues.",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('renders the league-cap indicator and triggers upgrade flow when Create is clicked at cap', () => {
     const onUpgrade = jest.fn();
     render(
