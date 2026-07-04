@@ -2074,7 +2074,7 @@ type Mutation {
   ): AutoSelectGamesResult
 
   """
-  System-only: start all live drafts whose scheduled_at has arrived. Triggered by EventBridge every minute.
+  System-only: start all live drafts whose scheduled_at has arrived.
   """
   autoStartScheduledDrafts: AutoStartScheduledDraftsResult
   awardChampionship(bracketId: Int!): ChampionTrophy

@@ -1,15 +1,21 @@
 /**
  * Draft domain — scheduled mutation for auto-starting drafts at their scheduled time.
  *
- * Triggered every minute by EventBridge. Finds all live drafts with
- * `scheduled_at <= now` and `draft_status = 'not-started'`, then initializes
- * them exactly as `initializeDraft` would for live mode:
+ * ⚠ No EventBridge rule invokes this mutation: terraform/main/eventbridge.tf
+ * defines a rule/target only for `autoProcessDraftPicks` (LS-8309 tracks the
+ * wire-or-retire decision — adding a rule would immediately auto-start any
+ * draft whose scheduled_at is already in the past). Live check:
+ * `aws events list-rules --name-prefix legacy-sports-dev`.
+ *
+ * When invoked, finds all live drafts with `scheduled_at <= now` and
+ * `draft_status = 'not-started'`, then initializes them exactly as
+ * `initializeDraft` would for live mode:
  *  1. Shuffle & insert draft_teams rows
  *  2. Set draftStartedAt, initial pick deadline
  *  3. Update league draft_status → 'in-progress'
  *  4. Send DRAFT_STARTED WebSocket notification
  *
- * Authorization: system-only (EventBridge API key required).
+ * Authorization: system-only (system request or admin).
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
@@ -49,14 +55,16 @@ builder.objectType(AutoStartScheduledDraftsResult, {
  * whose associated league has `draft_status = 'not-started'`, then starts each
  * one as a live draft.
  *
- * Called by EventBridge every minute alongside `autoProcessDraftPicks`.
+ * Designed for an every-minute EventBridge schedule alongside
+ * `autoProcessDraftPicks`, but no such rule is wired as of 2026-07-03 —
+ * see the header comment and LS-8309.
  */
 builder.mutationField('autoStartScheduledDrafts', (t) =>
   t.field({
     type: AutoStartScheduledDraftsResult,
     args: {},
     description:
-      'System-only: start all live drafts whose scheduled_at has arrived. Triggered by EventBridge every minute.',
+      'System-only: start all live drafts whose scheduled_at has arrived.',
     resolve: async (_parent, _args, context) => {
       // Only EventBridge system requests or admins may invoke this
       if (!context.isSystemRequest && !context.user?.isAdmin) {

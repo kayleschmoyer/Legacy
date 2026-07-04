@@ -160,10 +160,20 @@ describe('load-football-game handler', () => {
   });
 
   it('adds to batchItemFailures and emits failure metric when processing throws', async () => {
-    // Reject only the first call: the catch block itself calls
-    // updateMatchupStatus(db, matchupId, 'failed'), and a persistent rejection
-    // there would escape the per-record error handling entirely.
     mockUpdateMatchupStatus.mockRejectedValueOnce(new Error('DB error'));
+
+    const result = await handler(makeSqsEvent([validBody]));
+
+    expect(result.batchItemFailures).toEqual([{ itemIdentifier: 'msg-0' }]);
+    expect(mockEmitFailure).toHaveBeenCalledWith('game_load');
+    expect(mockEmitSuccess).not.toHaveBeenCalled();
+  });
+
+  it('still returns batchItemFailures when the DB is persistently down (LS-8308)', async () => {
+    // Every call rejects — including the catch-path status update. The
+    // handler must not throw: a thrown invocation drops batchItemFailures
+    // and makes SQS re-drive the entire batch, succeeded records included.
+    mockUpdateMatchupStatus.mockRejectedValue(new Error('DB down'));
 
     const result = await handler(makeSqsEvent([validBody]));
 

@@ -69,14 +69,17 @@ jobs:
               | head -c 1500)
           fi
 
+          # jq var is "lbl", not "label": `label` is a reserved word in the
+          # runner's jq 1.6 and fails to compile (LS-8307); jq 1.7 accepts it,
+          # so local testing won't catch a rename back.
           if [ -n "$DETAILS" ]; then
             curl -fsS -X POST "$WEBHOOK" \
               -H 'Content-Type: application/json' \
-              -d "$(jq -nc --arg pr_url "$PR_URL" --arg label "$LABEL" --arg title "$PR_TITLE" --arg details "$DETAILS" \
-                    '{ content: ("Escalation: \($label) on \($pr_url) — \($title)\n\n\($details)") }')"
+              -d "$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" --arg details "$DETAILS" \
+                    '{ content: ("Escalation: \($lbl) on \($pr_url) — \($title)\n\n\($details)") }')"
           else
             curl -fsS -X POST "$WEBHOOK" \
               -H 'Content-Type: application/json' \
-              -d "$(jq -nc --arg pr_url "$PR_URL" --arg label "$LABEL" --arg title "$PR_TITLE" \
-                    '{ content: ("Escalation: \($label) on \($pr_url) — \($title)") }')"
+              -d "$(jq -nc --arg pr_url "$PR_URL" --arg lbl "$LABEL" --arg title "$PR_TITLE" \
+                    '{ content: ("Escalation: \($lbl) on \($pr_url) — \($title)") }')"
           fi

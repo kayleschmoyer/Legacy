@@ -26,6 +26,30 @@ import { emitFootballFailure, emitFootballSuccess } from './football-metrics';
 
 const MAX_RETRIES = 3;
 
+/**
+ * Catch-path status updates must be best-effort: the DB is often the failing
+ * dependency that landed us in the catch, and a second rejection there would
+ * escape the record loop, drop the accumulated batchItemFailures, and make
+ * SQS re-drive every record in the batch — including ones that succeeded
+ * (LS-8308). Happy-path callers await updateMatchupStatus strictly.
+ */
+async function updateMatchupStatusBestEffort(
+  ...args: Parameters<typeof updateMatchupStatus>
+): Promise<void> {
+  try {
+    await updateMatchupStatus(...args);
+  } catch (statusError) {
+    const [, matchupId, statsLoadingStatus] = args;
+    LOGGER.error(
+      `Best-effort matchup status update to '${statsLoadingStatus}' failed in error path`,
+      statusError instanceof Error
+        ? statusError
+        : new Error(String(statusError)),
+      { matchupId },
+    );
+  }
+}
+
 export function isFootballGameMessage(
   value: unknown,
 ): value is LoadFootballMatchupStatsMessage {
@@ -590,13 +614,21 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
         if (isRetryableError(error) && retryCount < MAX_RETRIES) {
           batchItemFailures.push({ itemIdentifier: record.messageId });
           if (parsedMessage?.matchupId) {
-            await updateMatchupStatus(db, parsedMessage.matchupId, 'retry');
+            await updateMatchupStatusBestEffort(
+              db,
+              parsedMessage.matchupId,
+              'retry',
+            );
           }
           continue;
         }
 
         if (parsedMessage?.matchupId) {
-          await updateMatchupStatus(db, parsedMessage.matchupId, 'failed');
+          await updateMatchupStatusBestEffort(
+            db,
+            parsedMessage.matchupId,
+            'failed',
+          );
         }
 
         captureError(err, {

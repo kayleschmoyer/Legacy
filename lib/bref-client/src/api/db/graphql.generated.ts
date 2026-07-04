@@ -1343,6 +1343,7 @@ export type League = {
   frozenAt?: Maybe<Scalars['String']['output']>;
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  /** League invite code. Null for non-members — only league members and the owner receive this value. */
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
@@ -1778,7 +1779,7 @@ export type Mutation = {
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;
   /** Automatically select the next game for active leagues. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at midnight EST by EventBridge. */
   autoSelectGames?: Maybe<AutoSelectGamesResult>;
-  /** System-only: start all live drafts whose scheduled_at has arrived. Triggered by EventBridge every minute. */
+  /** System-only: start all live drafts whose scheduled_at has arrived. */
   autoStartScheduledDrafts?: Maybe<AutoStartScheduledDraftsResult>;
   awardChampionship?: Maybe<ChampionTrophy>;
   /** Award the League Champion badge to the winning team owner. Requires commissioner / system access. */
