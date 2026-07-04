@@ -497,6 +497,72 @@ premiumTest.describe(
         ).not.toBeVisible();
       },
     );
+
+    // LS-5358: Win Probability Panel (Premium) feature story — the panel also
+    // shows projected final scores, a batting/pitching/fielding category
+    // breakdown, and a simulation-count footnote. Win % values are produced
+    // by a Monte Carlo simulation (calculateMatchupWinProbability uses
+    // Math.random), so only structural/deterministic text is asserted here —
+    // never exact win-probability percentages.
+    premiumTest(
+      'shows projected final scores for both teams',
+      async ({ page }) => {
+        const panel = page.getByTestId('win-probability-panel');
+        await expect(panel).toBeVisible({ timeout: 10000 });
+        await expect(panel.getByText('PROJECTED FINAL SCORES')).toBeVisible();
+        await expect(panel.getByText('vs')).toBeVisible();
+      },
+    );
+
+    premiumTest(
+      'shows the batting/pitching/fielding category breakdown',
+      async ({ page }) => {
+        const panel = page.getByTestId('win-probability-panel');
+        await expect(panel).toBeVisible({ timeout: 10000 });
+        await expect(
+          panel.getByText('CATEGORY BREAKDOWN (PROJECTED)'),
+        ).toBeVisible();
+        await expect(panel.getByText('BATTING')).toBeVisible();
+        await expect(panel.getByText('PITCHING')).toBeVisible();
+        await expect(panel.getByText('FIELDING')).toBeVisible();
+      },
+    );
+
+    premiumTest('shows the simulation-count footnote', async ({ page }) => {
+      const panel = page.getByTestId('win-probability-panel');
+      await expect(panel).toBeVisible({ timeout: 10000 });
+      await expect(
+        panel.getByText(/based on [\d,]+ simulations/i),
+      ).toBeVisible();
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tests – win probability hidden for completed matchups (LS-5358)
+// ---------------------------------------------------------------------------
+
+premiumTest.describe(
+  'Matchup Week Navigation – win probability hidden for completed matchups @regression',
+  () => {
+    premiumTest(
+      'does not render the win probability panel for a completed matchup',
+      async ({ page }) => {
+        await mockMatchupGraphQL(page, {
+          isPremium: true,
+          // Real MatchupStatus enum value (lib/graphql) is lowercase
+          // 'completed' — the panel's hide-on-completed check compares
+          // against that exact string.
+          currentMatchup: makeMatchup({ status: 'completed' }),
+        });
+        await page.goto(MATCHUP_URL);
+        await page.waitForLoadState('load');
+
+        await expect(
+          page.getByTestId('win-probability-panel'),
+        ).not.toBeVisible();
+      },
+    );
   },
 );
 
