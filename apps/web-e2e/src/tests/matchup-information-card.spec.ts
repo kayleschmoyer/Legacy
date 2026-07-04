@@ -179,6 +179,27 @@ test.describe('Matchup Information card – timestamps @regression', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Tests – card falls back gracefully on an invalid timestamp (LS-5886)
+// ---------------------------------------------------------------------------
+
+test.describe('Matchup Information card – invalid timestamps @regression', () => {
+  test('shows a fallback instead of "Invalid Date" for a malformed start/end time', async ({
+    page,
+  }) => {
+    await mockMatchupGraphQL(page, {
+      startTime: 'not-a-real-timestamp',
+      endTime: 'also-not-a-real-timestamp',
+    });
+    await page.goto(MATCHUP_URL);
+    await page.waitForLoadState('load');
+
+    await expect(page.getByText('Start: —')).toBeVisible();
+    await expect(page.getByText('End: —')).toBeVisible();
+    await expect(page.getByText('Invalid Date')).toHaveCount(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Tests – card is hidden when the matchup has no timestamps
 // ---------------------------------------------------------------------------
 

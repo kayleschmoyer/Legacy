@@ -27,6 +27,11 @@ export interface MatchupDetailLayoutProps {
   rosterComparison?: ReactNode;
 }
 
+function formatMatchupTimestamp(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+}
+
 /**
  * MatchupDetailLayout — shared section structure for matchup detail screens.
  *
@@ -113,12 +118,12 @@ export function MatchupDetailLayout({
           <YStack space="$1">
             {matchup.startTime != null && (
               <Text fontSize="$3" color="$gray11">
-                Start: {new Date(String(matchup.startTime)).toLocaleString()}
+                Start: {formatMatchupTimestamp(matchup.startTime)}
               </Text>
             )}
             {matchup.endTime != null && (
               <Text fontSize="$3" color="$gray11">
-                End: {new Date(String(matchup.endTime)).toLocaleString()}
+                End: {formatMatchupTimestamp(matchup.endTime)}
               </Text>
             )}
           </YStack>
