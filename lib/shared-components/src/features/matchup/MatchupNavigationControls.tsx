@@ -200,10 +200,14 @@ export function MatchupNavigationControls({
     }
   }, [matchupWeek]);
 
-  const weekIndex = availableWeeks.indexOf(selectedWeek);
-  const canGoPrev = weekIndex > 0;
-  const canGoNext = weekIndex < availableWeeks.length - 1;
-  const totalWeeks = availableWeeks.length;
+  // Step through literal week numbers (not just weeks that happen to have
+  // matchups) so a week with zero matchups still appears — with its own
+  // empty state — instead of being silently skipped.
+  const minWeek = availableWeeks[0] ?? 1;
+  const maxWeek = availableWeeks[availableWeeks.length - 1] ?? 1;
+  const canGoPrev = selectedWeek > minWeek;
+  const canGoNext = selectedWeek < maxWeek;
+  const totalWeeks = maxWeek - minWeek + 1;
   const isCurrentWeek = selectedWeek === currentLeagueWeek;
   const isFutureWeek =
     currentLeagueWeekProp != null && selectedWeek > currentLeagueWeek;
@@ -265,7 +269,7 @@ export function MatchupNavigationControls({
 
   const handlePrevWeek = () => {
     if (!canGoPrev) return;
-    const newWeek = availableWeeks[weekIndex - 1] ?? selectedWeek;
+    const newWeek = selectedWeek - 1;
     setSelectedWeek(newWeek);
     // Auto-select the best matchup in the new week so the detail panel
     // updates immediately without requiring the user to click a card.
@@ -283,7 +287,7 @@ export function MatchupNavigationControls({
 
   const handleNextWeek = () => {
     if (!canGoNext) return;
-    const newWeek = availableWeeks[weekIndex + 1] ?? selectedWeek;
+    const newWeek = selectedWeek + 1;
     setSelectedWeek(newWeek);
     // Auto-select the best matchup in the new week so the detail panel
     // updates immediately without requiring the user to click a card.
