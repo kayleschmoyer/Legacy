@@ -228,13 +228,13 @@ test.describe('Player Stats — Row Click Opens Modal (LS-5595) @regression', ()
   test('clicking a player row opens the detail modal', async ({
     playersPage,
   }) => {
-    await playersPage.stats.row(101).click();
+    await playersPage.stats.row(101).tap();
 
     await playersPage.detail.expectOpen();
   });
 
   test('modal shows the clicked player name', async ({ playersPage }) => {
-    await playersPage.stats.row(101).click();
+    await playersPage.stats.row(101).tap();
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.waitForPlayerName('Barry Bonds');
@@ -245,7 +245,7 @@ test.describe('Player Stats — Row Click Opens Modal (LS-5595) @regression', ()
     page,
     playersPage,
   }) => {
-    await playersPage.stats.row(101).click();
+    await playersPage.stats.row(101).tap();
 
     await playersPage.detail.expectOpen();
     await expect(page).toHaveURL(/playerId=101/);
@@ -255,7 +255,7 @@ test.describe('Player Stats — Row Click Opens Modal (LS-5595) @regression', ()
     page,
     playersPage,
   }) => {
-    await playersPage.stats.row(101).click();
+    await playersPage.stats.row(101).tap();
     await playersPage.detail.expectOpen();
 
     await playersPage.detail.close();
@@ -265,7 +265,7 @@ test.describe('Player Stats — Row Click Opens Modal (LS-5595) @regression', ()
   });
 
   test('Escape key dismisses the modal', async ({ page, playersPage }) => {
-    await playersPage.stats.row(101).click();
+    await playersPage.stats.row(101).tap();
     await playersPage.detail.expectOpen();
 
     await playersPage.detail.pressEscape();
@@ -281,7 +281,7 @@ test.describe('Player Stats — Row Click Opens Modal (LS-5595) @regression', ()
   test('stats table is still visible after closing the modal', async ({
     playersPage,
   }) => {
-    await playersPage.stats.row(101).click();
+    await playersPage.stats.row(101).tap();
     await playersPage.detail.expectOpen();
 
     await playersPage.detail.close();

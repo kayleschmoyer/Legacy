@@ -66,7 +66,7 @@ const pageObjects = {
     { page }: { page: Page },
     use: (pageObject: PlayersPage) => Promise<void>,
   ) => {
-    await use(new PlayersPage(page));
+    await use(new PlayersPage(new PlaywrightWebDriver(page)));
   },
   navHeader: async (
     { page }: { page: Page },

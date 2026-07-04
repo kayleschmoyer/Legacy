@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { BasePage } from '../base/base.page';
+import { type AppDriver, PlaywrightWebDriver, type UIElement } from '../driver';
 import { PremiumGate } from '../components/premium-gate.component';
 
 /**
@@ -20,53 +20,68 @@ import { PremiumGate } from '../components/premium-gate.component';
  * hermetic and integration suites (ADR-0015 §6). Specs keep their `page.route`
  * mocks; navigation and element access live here.
  *
- * NOT migrated to the ADR-0016 driver interface (stays on `BasePage`): this
- * object's surfaces lean on web-only mechanics with no portable expression in
- * the driver vocabulary — CSS assertions (`toHaveCSS` for chip slot colors),
- * `dispatchEvent`/`force: true` workarounds for Tamagui overlay interception,
- * `page.keyboard`, and bfcache-aware `waitForURL(…, { waitUntil: 'commit' })`.
- * Migrate it if/when those mechanics gain portable equivalents; new surfaces
- * added here should prefer the portable subset so the gap shrinks over time.
+ * ADR-0016 migration status (LS-8304 stage 1; remaining stages LS-8305):
+ *   • The container and the `stats` surface are driver-typed (platform
+ *     neutral). Navigation to stats/compare goes through `driver.open()`.
+ *   • `detail` and `compare` remain WEB-ONLY: they lean on `dispatchEvent`/
+ *     `force: true` workarounds for Tamagui overlay interception (fix tracked
+ *     as LS-8305 stage 2), CSS assertions (`toHaveCSS` chip colors — stage 5
+ *     relocates these to Storybook), `page.keyboard`, and bfcache-aware
+ *     `waitForURL(…, { waitUntil: 'commit' })`. They reach the Playwright
+ *     `Page` through the web driver's escape hatch below, so constructing
+ *     this object currently REQUIRES the web driver.
  */
-export class PlayersPage extends BasePage {
+export class PlayersPage {
   /** The blurred premium-gate overlay shared across premium-gated pages. */
   readonly premiumGate: PremiumGate;
-  /** `/players/stats` surface. */
+  /** `/players/stats` surface (driver-typed — platform neutral). */
   readonly stats: PlayerStatsSurface;
   /** Player-detail modal surface (`/players/:id` and `/players/:brefId`). */
   readonly detail: PlayerDetailSurface;
   /** `/players/compare` surface. */
   readonly compare: PlayerCompareSurface;
 
-  constructor(page: Page) {
-    super(page);
+  readonly #driver: AppDriver;
+  /** Web escape hatch for the unmigrated surfaces + waitUntil navigation. */
+  readonly #page: Page;
+
+  constructor(driver: AppDriver) {
+    this.#driver = driver;
+    if (!(driver instanceof PlaywrightWebDriver)) {
+      throw new Error(
+        'PlayersPage requires the web driver until its detail/compare ' +
+          'surfaces are migrated (LS-8305 stages 4-5).',
+      );
+    }
+    this.#page = driver.page;
     this.premiumGate = new PremiumGate(
-      page.getByTestId('premium-feature-gate'),
+      this.#page.getByTestId('premium-feature-gate'),
     );
-    this.stats = new PlayerStatsSurface(page);
-    this.detail = new PlayerDetailSurface(page);
-    this.compare = new PlayerCompareSurface(page);
+    this.stats = new PlayerStatsSurface(driver);
+    this.detail = new PlayerDetailSurface(this.#page);
+    this.compare = new PlayerCompareSurface(this.#page);
   }
 
   // ── Navigation ────────────────────────────────────────────────────
 
-  /** Navigate to `/players/stats` and wait for the document to load. */
+  /** Navigate to `/players/stats`. */
   async gotoStats(): Promise<void> {
-    await this.page.goto('/players/stats');
-    await this.page.waitForLoadState('load');
+    await this.#driver.open('/players/stats');
   }
 
   /**
    * Navigate to a player-detail deep link (`/players/:id`). Pass
    * `waitUntil: 'domcontentloaded'` to catch the loading state before stats
-   * resolve; defaults to `'load'`.
+   * resolve; defaults to `'load'`. WEB-ONLY: `waitUntil` is a browser
+   * navigation semantic (specs use it to freeze the loading state), so this
+   * stays on the Page until the detail surface migrates (LS-8305 stage 4).
    */
   async gotoDetail(
     playerId: number,
     waitUntil: 'load' | 'domcontentloaded' | 'networkidle' = 'load',
   ): Promise<void> {
-    await this.page.goto(`/players/${playerId}`);
-    await this.page.waitForLoadState(waitUntil);
+    await this.#page.goto(`/players/${playerId}`);
+    await this.#page.waitForLoadState(waitUntil);
   }
 
   /** Navigate to a player-detail brefId deep link (`/players/:brefId`). */
@@ -74,23 +89,20 @@ export class PlayersPage extends BasePage {
     brefId: string,
     waitUntil: 'load' | 'domcontentloaded' | 'networkidle' = 'load',
   ): Promise<void> {
-    await this.page.goto(`/players/${brefId}`);
-    await this.page.waitForLoadState(waitUntil);
+    await this.#page.goto(`/players/${brefId}`);
+    await this.#page.waitForLoadState(waitUntil);
   }
 
-  /** Navigate to `/players/compare` and wait for the document to load. */
+  /** Navigate to `/players/compare`. */
   async gotoCompare(): Promise<void> {
-    await this.page.goto('/players/compare');
-    await this.page.waitForLoadState('load');
+    await this.#driver.open('/players/compare');
   }
 
   // ── Shared reads / assertions ─────────────────────────────────────
 
   /** Assert the page did not render the global "Unexpected Application Error". */
   async expectNoApplicationError(): Promise<void> {
-    await expect(this.page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await this.#driver.byText('Unexpected Application Error').expectCount(0);
   }
 }
 
@@ -111,22 +123,25 @@ function nameRegExp(prefix: string, name: string): RegExp {
  * carry `data-testid="player-row-<id>"`.
  */
 class PlayerStatsSurface {
-  readonly #page: Page;
-  readonly #heading: Locator;
-  readonly #search: Locator;
-  readonly #battingGrid: Locator;
-  readonly #filterControls: Locator;
-  readonly #pageSizeSelect: Locator;
+  readonly #driver: AppDriver;
+  readonly #heading: UIElement;
+  readonly #search: UIElement;
+  readonly #battingGrid: UIElement;
+  readonly #filterControls: UIElement;
+  readonly #pageSizeSelect: UIElement;
 
-  constructor(page: Page) {
-    this.#page = page;
-    this.#heading = page.getByText('MLB Player Statistics');
-    this.#search = page.getByPlaceholder('Search player name · min 2 chars');
-    this.#battingGrid = page.getByTestId('player-stats-data-grid');
-    this.#filterControls = page.getByTestId('filter-controls');
-    this.#pageSizeSelect = page
-      .getByTestId('page-size-select')
-      .locator('select');
+  constructor(driver: AppDriver) {
+    this.#driver = driver;
+    this.#heading = driver.byText('MLB Player Statistics');
+    this.#search = driver.byPlaceholder('Search player name · min 2 chars');
+    this.#battingGrid = driver.byTestId('player-stats-data-grid');
+    this.#filterControls = driver.byTestId('filter-controls');
+    // The "Rows" dropdown is a native <select> inside the testid wrapper —
+    // resolved via its implicit combobox role (portable) rather than a CSS
+    // element selector (ADR-0016).
+    this.#pageSizeSelect = driver
+      .byTestId('page-size-select')
+      .byRole('combobox');
   }
 
   // ── Actions ──────────────────────────────────────────────────────
@@ -134,18 +149,18 @@ class PlayerStatsSurface {
   /** Type a search term into the stats search input. */
   async search(term: string): Promise<void> {
     await this.#search.fill(term);
-    await expect(this.#search).toHaveValue(term);
+    await this.#search.expectValue(term);
   }
 
   /** Clear the stats search input. */
   async clearSearch(): Promise<void> {
     await this.#search.clear();
-    await expect(this.#search).toHaveValue('');
+    await this.#search.expectValue('');
   }
 
   /** Switch the stats view via its tab (Combined / Hitters / Pitchers). */
   async switchView(name: 'Combined' | 'Hitters' | 'Pitchers'): Promise<void> {
-    await this.#page.getByRole('tab', { name }).click();
+    await this.#driver.byRole('tab', { name }).tap();
   }
 
   /** Select a rows-per-page value from the "Rows" dropdown (draft — call clickApplyFilters to commit). */
@@ -155,21 +170,21 @@ class PlayerStatsSurface {
 
   /** Click the "Apply filters" button to commit the current draft filter state. */
   async clickApplyFilters(): Promise<void> {
-    await this.#page.getByTestId('apply-filters-button').click();
+    await this.#driver.byTestId('apply-filters-button').tap();
   }
 
   /** Click a column header by label (e.g. to sort). */
   async clickColumnHeader(label: string): Promise<void> {
-    await this.#page.getByText(label, { exact: true }).first().click();
+    await this.#driver.byText(label, { exact: true }).first().tap();
   }
 
   /** Open the "Advanced" filters panel (range sliders — LS-3825). */
   async openAdvancedFilters(): Promise<void> {
-    const advancedButton = this.#page.getByRole('button', {
+    const advancedButton = this.#driver.byRole('button', {
       name: /Advanced/i,
     });
-    await expect(advancedButton).toBeVisible({ timeout: 10_000 });
-    await advancedButton.click();
+    await advancedButton.expectVisible({ timeout: 10_000 });
+    await advancedButton.tap();
   }
 
   /**
@@ -181,49 +196,49 @@ class PlayerStatsSurface {
    * presses × step (mirrors the LS-8248 fix in the live integration spec).
    */
   async setMinHomeRuns(target: number): Promise<void> {
-    const slider = this.#page.getByLabel('Min Home Runs');
-    await expect(slider).toBeVisible({ timeout: 10_000 });
+    const slider = this.#driver.byLabel('Min Home Runs');
+    await slider.expectVisible({ timeout: 10_000 });
 
-    const step = Number(await slider.getAttribute('step')) || 1;
+    const step = Number(await slider.attribute('step')) || 1;
     const presses = Math.round(target / step);
 
     await slider.press('Home');
-    await expect(slider).toHaveValue('0');
+    await slider.expectValue('0');
     for (let i = 0; i < presses; i++) {
       await slider.press('ArrowUp');
     }
-    await expect(slider).toHaveValue(String(presses * step));
+    await slider.expectValue(String(presses * step));
   }
 
   /** Open a player's detail modal by clicking their row (matched by name). */
   async openPlayerByName(name: string): Promise<void> {
-    await this.#page.getByText(name).first().click();
+    await this.#driver.byText(name).first().tap();
   }
 
   /** Click the "Share player statistics link" button. */
   async clickShare(): Promise<void> {
-    await this.#page
-      .getByRole('button', { name: 'Share player statistics link' })
-      .click();
+    await this.#driver
+      .byRole('button', { name: 'Share player statistics link' })
+      .tap();
   }
 
   // ── Reads ────────────────────────────────────────────────────────
 
   /** A player row by id (`data-testid="player-row-<id>"`). */
-  row(playerId: number): Locator {
-    return this.#page.getByTestId(`player-row-${playerId}`);
+  row(playerId: number): UIElement {
+    return this.#driver.byTestId(`player-row-${playerId}`);
   }
 
   // ── Assertions ───────────────────────────────────────────────────
 
   /** Assert the stats page heading is visible. */
   async expectLoaded(timeout = 15000): Promise<void> {
-    await expect(this.#heading.first()).toBeVisible({ timeout });
+    await this.#heading.first().expectVisible({ timeout });
   }
 
   /** Assert the search input is visible. */
   async expectSearchVisible(): Promise<void> {
-    await expect(this.#search).toBeVisible();
+    await this.#search.expectVisible();
   }
 
   /** Assert a view tab is visible. */
@@ -231,173 +246,159 @@ class PlayerStatsSurface {
     name: 'Combined' | 'Hitters' | 'Pitchers',
     timeout?: number,
   ): Promise<void> {
-    await expect(this.#page.getByRole('tab', { name })).toBeVisible({
-      timeout,
-    });
+    await this.#driver.byRole('tab', { name }).expectVisible({ timeout });
   }
 
   /** Assert a view tab is the selected one. */
   async expectTabSelected(
     name: 'Combined' | 'Hitters' | 'Pitchers',
   ): Promise<void> {
-    await expect(this.#page.getByRole('tab', { name })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    await this.#driver
+      .byRole('tab', { name })
+      .expectAttribute('aria-selected', 'true');
   }
 
   /** Assert the batting-leaders heading is visible. */
   async expectBattingLeaders(): Promise<void> {
-    await expect(
-      this.#page.getByText('MLB Career Batting Leaders').first(),
-    ).toBeVisible();
+    await this.#driver
+      .byText('MLB Career Batting Leaders')
+      .first()
+      .expectVisible();
   }
 
   /** Assert the pitching-leaders heading is visible. */
   async expectPitchingLeaders(): Promise<void> {
-    await expect(
-      this.#page.getByText('MLB Career Pitching Leaders'),
-    ).toBeVisible();
+    await this.#driver.byText('MLB Career Pitching Leaders').expectVisible();
   }
 
   /** Assert the pitching-leaders heading is NOT in the DOM (Hitters tab active). */
   async expectPitchingLeadersNotVisible(): Promise<void> {
-    await expect(
-      this.#page.getByText('MLB Career Pitching Leaders'),
-    ).not.toBeVisible();
+    await this.#driver.byText('MLB Career Pitching Leaders').expectHidden();
   }
 
   /** Assert the batting-leaders heading is NOT in the DOM (Pitchers tab active). */
   async expectBattingLeadersNotVisible(): Promise<void> {
-    await expect(
-      this.#page.getByText('MLB Career Batting Leaders').first(),
-    ).not.toBeVisible();
+    await this.#driver
+      .byText('MLB Career Batting Leaders')
+      .first()
+      .expectHidden();
   }
 
   /** Assert a player name is visible somewhere on the page. */
   async expectPlayerVisible(name: string, timeout?: number): Promise<void> {
-    await expect(this.#page.getByText(name)).toBeVisible({ timeout });
+    await this.#driver.byText(name).expectVisible({ timeout });
   }
 
   /** Assert a value is rendered inside a specific player row. */
   async expectRowValue(playerId: number, value: string): Promise<void> {
-    await expect(this.row(playerId).getByText(value)).toBeVisible();
+    await this.row(playerId).byText(value).expectVisible();
   }
 
   /** Assert at least one player row is rendered (any `player-row-*`). */
   async expectAnyRowVisible(timeout = 15_000): Promise<void> {
-    await expect(
-      this.#page.locator('[data-testid^="player-row-"]').first(),
-    ).toBeVisible({ timeout });
+    await this.#driver
+      .byTestIdPrefix('player-row-')
+      .first()
+      .expectVisible({ timeout });
   }
 
   /** Assert a data-grid column header is visible. */
   async expectColumnHeader(label: string): Promise<void> {
-    await expect(
-      this.#page.getByText(label, { exact: true }).first(),
-    ).toBeVisible();
+    await this.#driver.byText(label, { exact: true }).first().expectVisible();
   }
 
   /** Assert a data-grid column header is present in the DOM (attached). Use
    * for columns in a horizontally-scrollable grid that may be off-screen. */
   async expectColumnHeaderAttached(label: string): Promise<void> {
-    await expect(
-      this.#page.getByText(label, { exact: true }).first(),
-    ).toBeAttached();
+    await this.#driver.byText(label, { exact: true }).first().expectAttached();
   }
 
   /** Assert a data-grid column header is NOT visible (grid is unmounted). */
   async expectColumnHeaderAbsent(label: string): Promise<void> {
-    await expect(
-      this.#page.getByText(label, { exact: true }).first(),
-    ).not.toBeVisible();
+    await this.#driver.byText(label, { exact: true }).first().expectHidden();
   }
 
   /** Assert the filter-controls toolbar is visible. */
   async expectFilterControls(): Promise<void> {
-    await expect(this.#filterControls).toBeVisible();
+    await this.#filterControls.expectVisible();
   }
 
   /** Assert the "Rows" page-size selector is visible. */
   async expectRowsSelectorVisible(): Promise<void> {
-    await expect(this.#pageSizeSelect).toBeVisible();
+    await this.#pageSizeSelect.expectVisible();
   }
 
   /** Assert a specific page-size option (e.g. 100) is present in the selector. */
   async expectPageSizeOptionAvailable(n: number): Promise<void> {
-    await expect(
-      this.#pageSizeSelect.locator(`option[value="${n}"]`),
-    ).toBeAttached();
+    await expect
+      .poll(() => this.#pageSizeSelect.optionValues())
+      .toContain(String(n));
   }
 
   /** Assert a specific page-size option (e.g. 100) is NOT present in the selector. */
   async expectPageSizeOptionAbsent(n: number): Promise<void> {
-    await expect(
-      this.#pageSizeSelect.locator(`option[value="${n}"]`),
-    ).not.toBeAttached();
+    await expect
+      .poll(() => this.#pageSizeSelect.optionValues())
+      .not.toContain(String(n));
   }
 
   /** Assert the selector's current value matches `n`. */
   async expectPageSizeSelected(n: number): Promise<void> {
-    await expect(this.#pageSizeSelect).toHaveValue(String(n));
+    await this.#pageSizeSelect.expectValue(String(n));
   }
 
   /** Assert the batting grid's pagination controls render. */
   async expectPaginationControls(): Promise<void> {
-    await expect(
-      this.#battingGrid.getByRole('button', { name: /next/i }),
-    ).toBeVisible();
-    await expect(
-      this.#battingGrid.getByRole('button', { name: /previous|prev/i }),
-    ).toBeVisible();
+    await this.#battingGrid.byRole('button', { name: /next/i }).expectVisible();
+    await this.#battingGrid
+      .byRole('button', { name: /previous|prev/i })
+      .expectVisible();
   }
 
   /** Assert the batting grid shows its loading indicator. */
   async expectLoadingIndicator(timeout = 5000): Promise<void> {
-    await expect(
-      this.#battingGrid.getByTestId('loading-indicator'),
-    ).toBeVisible({ timeout });
+    await this.#battingGrid
+      .byTestId('loading-indicator')
+      .expectVisible({ timeout });
   }
 
   /** Assert the batting grid shows its inline error message. */
   async expectGridError(timeout = 5000): Promise<void> {
-    await expect(this.#battingGrid.getByTestId('error-message')).toBeVisible({
-      timeout,
-    });
+    await this.#battingGrid
+      .byTestId('error-message')
+      .expectVisible({ timeout });
   }
 
   /** Assert a full-page empty/error state message is visible by text. */
   async expectMessage(text: string): Promise<void> {
-    await expect(this.#page.getByText(text)).toBeVisible();
+    await this.#driver.byText(text).expectVisible();
   }
 
   /** Assert the marketing landing page ("Dominate Your League") is NOT shown. */
   async expectMarketingLandingHidden(): Promise<void> {
-    await expect(
-      this.#page.getByText(/dominate your league/i),
-    ).not.toBeVisible();
+    await this.#driver.byText(/dominate your league/i).expectHidden();
   }
 
   /** Assert the share button is visible. */
   async expectShareButtonVisible(): Promise<void> {
-    await expect(
-      this.#page.getByRole('button', { name: 'Share player statistics link' }),
-    ).toBeVisible();
+    await this.#driver
+      .byRole('button', { name: 'Share player statistics link' })
+      .expectVisible();
   }
 
   /** Assert the share confirmation toast is visible and contains text. */
   async expectShareToast(text: string): Promise<void> {
-    await expect(this.#page.locator('.ls-stats-toast')).toContainText(text);
+    await this.#driver.byTestId('stats-share-toast').expectContainsText(text);
   }
 
   /** Assert no share toast is mounted (liveMsg is empty). */
   async expectShareToastHidden(): Promise<void> {
-    await expect(this.#page.locator('.ls-stats-toast')).not.toBeAttached();
+    await this.#driver.byTestId('stats-share-toast').expectNotAttached();
   }
 
   /** Assert the fallback URL input ("Shareable link to copy") is visible. */
   async expectShareFallbackInput(): Promise<void> {
-    await expect(this.#page.getByLabel('Shareable link to copy')).toBeVisible();
+    await this.#driver.byLabel('Shareable link to copy').expectVisible();
   }
 
   /** Assert an arbitrary value/label is visible on the stats page. */
@@ -406,11 +407,11 @@ class PlayerStatsSurface {
     opts: { exact?: boolean; first?: boolean; timeout?: number } = {},
   ): Promise<void> {
     const { exact, first = true, timeout } = opts;
-    const locator =
+    const element =
       typeof text === 'string'
-        ? this.#page.getByText(text, { exact })
-        : this.#page.getByText(text);
-    await expect(first ? locator.first() : locator).toBeVisible({ timeout });
+        ? this.#driver.byText(text, { exact })
+        : this.#driver.byText(text);
+    await (first ? element.first() : element).expectVisible({ timeout });
   }
 }
 

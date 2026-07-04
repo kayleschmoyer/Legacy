@@ -85,6 +85,10 @@ class PlaywrightElement implements UIElement {
     await this.#locator.press(key);
   }
 
+  async selectOption(value: string): Promise<void> {
+    await this.#locator.selectOption(value);
+  }
+
   // ── Reads ─────────────────────────────────────────────────────────
   count(): Promise<number> {
     return this.#locator.count();
@@ -104,6 +108,16 @@ class PlaywrightElement implements UIElement {
 
   allTexts(): Promise<string[]> {
     return this.#locator.allInnerTexts();
+  }
+
+  async optionValues(): Promise<string[]> {
+    const options = this.#locator.locator('option');
+    const count = await options.count();
+    const values: string[] = [];
+    for (let i = 0; i < count; i++) {
+      values.push((await options.nth(i).getAttribute('value')) ?? '');
+    }
+    return values;
   }
 
   value(): Promise<string> {

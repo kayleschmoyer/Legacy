@@ -754,10 +754,10 @@ test.describe('Player Detail Modal – open from stats table @regression', () =>
     // row's handler being wired (LS-8258). The row only mounts once the grid
     // has data (loading → rows), so its visibility is a single, stable "ready"
     // signal — mirroring the @critical deep-link sibling.
-    await expect(playersPage.stats.row(1)).toBeVisible({ timeout: 15_000 });
+    await playersPage.stats.row(1).expectVisible({ timeout: 15_000 });
 
     // Click the row to open the detail modal.
-    await playersPage.stats.row(1).click();
+    await playersPage.stats.row(1).tap();
 
     // A numeric player id opens the modal in place via ?playerId=1 (PST-051 /
     // LS-7124). Wait for that URL transition — the single source of truth that

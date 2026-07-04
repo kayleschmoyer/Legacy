@@ -1794,6 +1794,7 @@ export function PlayerStatsRoute() {
       {liveMsg && (
         <div
           className="ls-stats-toast"
+          data-testid="stats-share-toast"
           role="status"
           style={{
             position: 'fixed',

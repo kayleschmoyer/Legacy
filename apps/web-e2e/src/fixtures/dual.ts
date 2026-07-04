@@ -143,10 +143,10 @@ export const test = base.extend<BackendOptions & DualFixtures>({
     await use(new LeaguePage(driver));
   },
   playersPage: async (
-    { page }: { page: Page },
+    { driver }: { driver: AppDriver },
     use: (pageObject: PlayersPage) => Promise<void>,
   ) => {
-    await use(new PlayersPage(page));
+    await use(new PlayersPage(driver));
   },
   navHeader: async (
     { page }: { page: Page },

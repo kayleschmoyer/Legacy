@@ -112,6 +112,11 @@ export interface UIElement extends ElementScope {
    * (Enter, Escape, Tab, arrows); web-only chords stay in unmigrated objects.
    */
   press(key: string): Promise<void>;
+  /**
+   * Choose an option by value on a select-like control (`<select>` on web;
+   * a native driver maps this to the platform picker).
+   */
+  selectOption(value: string): Promise<void>;
 
   // ── Reads (point-in-time snapshots — for branching/logging) ──────
   count(): Promise<number>;
@@ -120,6 +125,12 @@ export interface UIElement extends ElementScope {
   text(): Promise<string>;
   /** Inner text of every match (collection queries). */
   allTexts(): Promise<string[]>;
+  /**
+   * The value attributes of a select-like control's options (`<option>`
+   * values on web; picker items on native). For asserting which choices a
+   * control offers.
+   */
+  optionValues(): Promise<string[]>;
   /** Current input value. */
   value(): Promise<string>;
   /**
