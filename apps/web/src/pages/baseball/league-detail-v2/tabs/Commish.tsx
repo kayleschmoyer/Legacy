@@ -216,6 +216,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
   const [nextStepError, setNextStepError] = useState<string | null>(null);
   const [waiverSuccess, setWaiverSuccess] = useState<string | null>(null);
   const [waiverError, setWaiverError] = useState<string | null>(null);
+  const [dangerRevealed, setDangerRevealed] = useState(false);
   const leagueId = league.id ?? 0;
 
   useEffect(() => {
@@ -493,12 +494,59 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       icon: <I.AlertTriangle size={16} />,
       testId: 'danger-zone-toggle',
       content: leagueId ? (
-        <DeleteLeagueControl
-          leagueId={leagueId}
-          leagueName={league.name ?? 'this league'}
-          teamCount={teams.length}
-          seasonNumber={league.seasonNumber ?? undefined}
-        />
+        dangerRevealed ? (
+          <DeleteLeagueControl
+            leagueId={leagueId}
+            leagueName={league.name ?? 'this league'}
+            teamCount={teams.length}
+            seasonNumber={league.seasonNumber ?? undefined}
+          />
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              padding: 16,
+              background: 'rgba(196, 30, 58, 0.06)',
+              border: '1px solid rgba(196, 30, 58, 0.3)',
+              borderRadius: 8,
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                color: '#c41e3a',
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              <span role="img" aria-label="warning">
+                ⚠️
+              </span>{' '}
+              Irreversible actions ahead. Proceed only if you intend to
+              permanently delete this league.
+            </p>
+            <button
+              type="button"
+              data-testid="danger-zone-reveal"
+              onClick={() => setDangerRevealed(true)}
+              style={{
+                alignSelf: 'flex-start',
+                padding: '8px 16px',
+                background: 'transparent',
+                border: '1px solid #c41e3a',
+                borderRadius: 6,
+                color: '#c41e3a',
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              Reveal danger options
+            </button>
+          </div>
+        )
       ) : null,
     },
   ];
@@ -559,7 +607,13 @@ export const CommishTab: React.FC<CommishTabProps> = ({
             key={s.id}
             section={s}
             open={openId === s.id}
-            onToggle={() => setOpenId(openId === s.id ? '' : s.id)}
+            onToggle={() => {
+              const next = openId === s.id ? '' : s.id;
+              if (s.id === 'danger' && next !== 'danger') {
+                setDangerRevealed(false);
+              }
+              setOpenId(next);
+            }}
           />
         ))}
       </div>

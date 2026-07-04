@@ -378,6 +378,11 @@ async function expandDangerZone(page: import('@playwright/test').Page) {
   await toggle.waitFor({ state: 'visible' });
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  // LS-5914: a reveal gate hides DeleteLeagueControl until the user clicks
+  // "Reveal danger options", preventing accidental exposure on open.
+  const revealBtn = page.getByTestId('danger-zone-reveal');
+  await revealBtn.waitFor({ state: 'visible' });
+  await revealBtn.click();
 }
 
 // ── Audit Log — Commissioner Access ──────────────────────────────────────────

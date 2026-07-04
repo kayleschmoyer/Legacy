@@ -231,6 +231,45 @@ describe('CommishTab — premium gating (LS-5205)', () => {
   });
 });
 
+describe('CommishTab — Danger Zone reveal gate (LS-5914)', () => {
+  it('does not render DeleteLeagueControl immediately when Danger Zone accordion opens', () => {
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByTestId('danger-zone-toggle'));
+    expect(
+      screen.queryByTestId('delete-league-control'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a reveal button inside the Danger Zone accordion', () => {
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByTestId('danger-zone-toggle'));
+    expect(screen.getByTestId('danger-zone-reveal')).toBeInTheDocument();
+  });
+
+  it('renders DeleteLeagueControl only after clicking reveal', () => {
+    renderCommish({ sport: 'baseball' });
+    fireEvent.click(screen.getByTestId('danger-zone-toggle'));
+    fireEvent.click(screen.getByTestId('danger-zone-reveal'));
+    expect(screen.getByTestId('delete-league-control')).toBeInTheDocument();
+  });
+
+  it('hides DeleteLeagueControl again when accordion is closed and reopened', () => {
+    renderCommish({ sport: 'baseball' });
+    // open + reveal
+    fireEvent.click(screen.getByTestId('danger-zone-toggle'));
+    fireEvent.click(screen.getByTestId('danger-zone-reveal'));
+    expect(screen.getByTestId('delete-league-control')).toBeInTheDocument();
+    // close
+    fireEvent.click(screen.getByTestId('danger-zone-toggle'));
+    // reopen — should show reveal button again, not the control
+    fireEvent.click(screen.getByTestId('danger-zone-toggle'));
+    expect(
+      screen.queryByTestId('delete-league-control'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('danger-zone-reveal')).toBeInTheDocument();
+  });
+});
+
 describe('CommishTab — DraftSettingsControl premium wiring (LS-5017)', () => {
   afterEach(() => {
     mockIsPremium = false;

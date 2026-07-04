@@ -69,9 +69,10 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Pre-Draft Warriors')).toBeVisible();
-    await expect(page.getByText('Mid-Draft Rockets')).toBeVisible();
-    await expect(page.getByText('Active Sluggers')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Pre-Draft Warriors')).toBeVisible();
+    await expect(grid.getByText('Mid-Draft Rockets')).toBeVisible();
+    await expect(grid.getByText('Active Sluggers')).toBeVisible();
   });
 
   test('"Draft Scheduled" badge appears for a pre-draft league', async ({
@@ -81,7 +82,8 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Draft Scheduled')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Draft Scheduled')).toBeVisible();
   });
 
   test('"Drafting" badge appears for a league in the draft phase', async ({
@@ -91,7 +93,8 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Drafting')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Drafting')).toBeVisible();
   });
 
   test('"Week N" badge appears for an active in-season league', async ({
@@ -101,7 +104,8 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Week 7')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Week 7')).toBeVisible();
   });
 
   test('search field filters the league list by name', async ({ page }) => {
@@ -113,9 +117,10 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await expect(search).toBeVisible();
     await search.fill('Sluggers');
 
-    await expect(page.getByText('Active Sluggers')).toBeVisible();
-    await expect(page.getByText('Pre-Draft Warriors')).not.toBeVisible();
-    await expect(page.getByText('Mid-Draft Rockets')).not.toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Active Sluggers')).toBeVisible();
+    await expect(grid.getByText('Pre-Draft Warriors')).not.toBeVisible();
+    await expect(grid.getByText('Mid-Draft Rockets')).not.toBeVisible();
   });
 
   test('clicking "View" on a league card navigates to the league detail page', async ({
@@ -159,7 +164,8 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('In Season')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('In Season')).toBeVisible();
   });
 
   test('title-cased badge appears for an unknown draftStatus value', async ({
@@ -178,7 +184,8 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Custom Status')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Custom Status')).toBeVisible();
   });
 
   test('"Advancing" badge appears when weekAdvanceStatus is processing', async ({
@@ -192,7 +199,8 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Advancing')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Advancing')).toBeVisible();
   });
 
   test('"Advancing" badge appears when weekAdvanceStatus is queued', async ({
@@ -206,7 +214,8 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Advancing')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Advancing')).toBeVisible();
   });
 
   test('"Advance failed" badge appears when weekAdvanceStatus is failed', async ({
@@ -220,7 +229,8 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Advance failed')).toBeVisible();
+    const grid = page.getByTestId('leagues-grid');
+    await expect(grid.getByText('Advance failed')).toBeVisible();
   });
 
   test('error notice is shown when the GraphQL query returns errors', async ({
