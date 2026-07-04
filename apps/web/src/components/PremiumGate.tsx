@@ -37,6 +37,21 @@ export interface PremiumGateProps {
 }
 
 // ---------------------------------------------------------------------------
+// Session-scoped analytics dedup
+// ---------------------------------------------------------------------------
+
+// Module scope persists across remounts of the same page session (e.g. tab
+// switch, week navigation) but resets on a full page reload, so a blocked
+// feature fires trackPremiumFeatureBlocked at most once per page-view
+// session instead of once per gate mount — LS-5874.
+const blockedFeaturesTrackedThisSession = new Set<string>();
+
+/** Test-only: clears session-scoped dedup state between test cases. */
+export function __resetPremiumGateTrackingForTests(): void {
+  blockedFeaturesTrackedThisSession.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -68,7 +83,12 @@ export function PremiumGate({
   const { annualMonthlyEquivalent } = useStripePrices();
 
   useEffect(() => {
-    if (isUserLoaded && !isPremium) {
+    if (
+      isUserLoaded &&
+      !isPremium &&
+      !blockedFeaturesTrackedThisSession.has(featureName)
+    ) {
+      blockedFeaturesTrackedThisSession.add(featureName);
       trackPremiumFeatureBlocked(featureName);
     }
   }, [featureName, isPremium, isUserLoaded]);

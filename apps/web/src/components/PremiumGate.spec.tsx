@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 
 import { PremiumGate } from './PremiumGate';
+import { __resetPremiumGateTrackingForTests } from './PremiumGate';
 import { trackPremiumFeatureBlocked } from '../utils/analytics';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ jest.mock('@tamagui/lucide-icons', () => ({
 describe('PremiumGate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    __resetPremiumGateTrackingForTests();
     // Default: live prices distinct from the old hardcoded "$3.33" value so
     // we can prove the displayed value is dynamic.
     mockUseStripePrices.mockReturnValue({ annualMonthlyEquivalent: '$6.67' });
@@ -171,5 +173,42 @@ describe('PremiumGate', () => {
     );
 
     expect(trackPremiumFeatureBlocked).not.toHaveBeenCalled();
+  });
+
+  it('does not re-fire trackPremiumFeatureBlocked when the gate remounts for a feature already tracked this session (LS-5874)', () => {
+    const { unmount } = render(
+      <PremiumGate isPremium={false} featureName="AI Matchup Recap">
+        <div>content</div>
+      </PremiumGate>,
+    );
+    expect(trackPremiumFeatureBlocked).toHaveBeenCalledTimes(1);
+    unmount();
+
+    // Simulates a remount of the same gate for the same feature within the
+    // same page-view session (e.g. tab switch, week navigation).
+    render(
+      <PremiumGate isPremium={false} featureName="AI Matchup Recap">
+        <div>content</div>
+      </PremiumGate>,
+    );
+
+    expect(trackPremiumFeatureBlocked).toHaveBeenCalledTimes(1);
+  });
+
+  it('tracks distinct feature names independently within the same session', () => {
+    render(
+      <PremiumGate isPremium={false} featureName="Feature A">
+        <div>content</div>
+      </PremiumGate>,
+    );
+    render(
+      <PremiumGate isPremium={false} featureName="Feature B">
+        <div>content</div>
+      </PremiumGate>,
+    );
+
+    expect(trackPremiumFeatureBlocked).toHaveBeenCalledTimes(2);
+    expect(trackPremiumFeatureBlocked).toHaveBeenNthCalledWith(1, 'Feature A');
+    expect(trackPremiumFeatureBlocked).toHaveBeenNthCalledWith(2, 'Feature B');
   });
 });
