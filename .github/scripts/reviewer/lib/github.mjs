@@ -183,30 +183,6 @@ export function getPullRequestContext(prNumber) {
 }
 
 /**
- * Fetch the latest commit status per context for a SHA (GitHub's combined
- * status endpoint already deduplicates to the most recent status per context).
- * Returns [] on API errors — callers treat "unknown" as "no status posted",
- * which errs on the side of running a review rather than skipping one.
- *
- * @param {string} sha
- * @param {typeof execFileSync} [exec]
- * @returns {Array<{context: string, state: string}>}
- */
-export function getCombinedStatusContexts(sha, exec = execFileSync) {
-  try {
-    const raw = exec(
-      'gh',
-      ['api', `repos/{owner}/{repo}/commits/${sha}/status`],
-      { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 },
-    );
-    const statuses = JSON.parse(raw)?.statuses ?? [];
-    return statuses.map((s) => ({ context: s.context, state: s.state }));
-  } catch {
-    return [];
-  }
-}
-
-/**
  * Set the bot-review commit status for a given SHA.
  *
  * @param {string} sha

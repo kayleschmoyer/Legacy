@@ -943,6 +943,29 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         return;
       }
 
+      // 405 "Waiting on code owner review" (LS-8297): path-scoped CODEOWNERS
+      // rules (e.g. .github/** → @bkrupa) are invisible to the reviewDecision
+      // pre-check — reviewDecision reads APPROVED once the review bot (the
+      // catch-all code owner) approves, so the queue attempts the merge and
+      // GitHub refuses it. That is a legitimate blocked state, not a
+      // processing error: report it like any other blocker (comment + Discord
+      // escalation) and return cleanly. The code owner's approval submission
+      // re-triggers the queue via pull_request_review, so no retry is needed.
+      if (
+        error.status === 405 &&
+        /waiting on code owner review/i.test(mergeErrMsg)
+      ) {
+        console.log(
+          `🔐 PR #${pr.number}: merge blocked awaiting code owner review — ` +
+            `will merge automatically once the code owner approves.`,
+        );
+        await reportMergeBlocker(pr, {
+          canMerge: false,
+          reason: 'PR requires CODEOWNER approval for sensitive path(s)',
+        });
+        return;
+      }
+
       console.error(
         `❌ Failed to merge PR #${pr.number}: ${sanitizeLog(error.message)}`,
       );

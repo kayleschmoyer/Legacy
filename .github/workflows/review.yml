@@ -7,15 +7,13 @@ name: Reviewer (W1)
 # and on synchronize when bot:ready-for-review is present so agents don't
 # need to re-apply the label after each push to trigger a new cycle.
 #
-# Queued-PR coverage (LS-8289): also fires on labeled merge-when-ready and
-# on synchronize when merge-when-ready is present. A PR in the merge queue
-# must always end up with a bot-review status on its head SHA — previously,
-# queueing a PR (or pushing to a queued one) whose bot:ready-for-review
-# label had been lost registered nothing, and the merge queue waited
-# forever on a check no event would ever create (30+ PRs frozen on
-# 2026-07-01). The merge-when-ready trigger is deduped in index.mjs: it
-# exits early when the head SHA already carries a bot-review status, so
-# normal label choreography does not double-spend LLM reviews.
+# Queued-PR coverage (LS-8289/LS-8297): merge-when-ready deliberately does
+# NOT trigger this workflow. When a queued PR's head SHA is missing its
+# bot-review status (the deadlock that froze 30+ PRs on 2026-07-01), the
+# merge-queue processor's self-heal re-applies bot:ready-for-review, and
+# that label — the only review trigger — fires this workflow through its
+# normal path. Labels stay single-purpose: bot:ready-for-review = review,
+# merge-when-ready = merge.
 
 on:
   pull_request:
@@ -32,7 +30,6 @@ concurrency:
        github.event.label.name != 'bot:ready-for-review' &&
        github.event.label.name != 'review-bot-degraded' &&
        github.event.label.name != 'bot:reset-cycle-counter' &&
-       github.event.label.name != 'merge-when-ready' &&
        github.event.label.name != 'review-bot-override') && 'noop' || 'active' }}
   cancel-in-progress: true
 
@@ -65,8 +62,7 @@ jobs:
 
   review:
     # Skip drafts, fork PRs, labeled events for irrelevant labels, and
-    # synchronize events when neither bot:ready-for-review nor
-    # merge-when-ready is present.
+    # synchronize events when bot:ready-for-review is not present.
     # When review-bot-override is labeled, fire in auto-approve mode (no LLM
     # review). For all other triggers, skip when review-bot-override is present.
     needs: [check-runner-access]
@@ -77,10 +73,8 @@ jobs:
        (!contains(github.event.pull_request.labels.*.name, 'review-bot-override') &&
         (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
          github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
-         github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'merge-when-ready') ||
          github.event.label.name == 'bot:ready-for-review' ||
          github.event.label.name == 'review-bot-degraded' ||
-         github.event.label.name == 'merge-when-ready' ||
          github.event.label.name == 'bot:reset-cycle-counter')))
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 15
@@ -119,7 +113,6 @@ jobs:
           REVIEWER_AUTO_APPROVE: ${{ github.event.label.name == 'review-bot-override' && 'true' || '' }}
           CYCLE_RESET_SENDER: ${{ github.event.action == 'labeled' && github.event.label.name == 'bot:reset-cycle-counter' && github.event.sender.login || '' }}
           TRIGGERED_BY_SYNCHRONIZE: ${{ github.event.action == 'synchronize' && 'true' || '' }}
-          TRIGGERED_BY_QUEUE_LABEL: ${{ github.event.action == 'labeled' && github.event.label.name == 'merge-when-ready' && 'true' || '' }}
         run: |
           if [ -f .github/scripts/reviewer/index.mjs ]; then
             node .github/scripts/reviewer/index.mjs

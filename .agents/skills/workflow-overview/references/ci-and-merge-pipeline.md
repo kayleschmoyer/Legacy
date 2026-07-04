@@ -238,6 +238,22 @@ Before merging, each PR must pass all of these:
 
 > **Config union (LS-7963):** `validateStatusChecks` unions the live required set with the config-tracked contexts in `.github/ruleset.json` (`loadConfigRequiredChecks` in `merge-queue-processor.js`), so the checked-in config can tighten the queue's gate ahead of the owner-gated live apply — never loosen it. Staging model: [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md#config-vs-live-the-staged-cutover-model).
 
+### Self-Heal for Missing `bot-review` (LS-8289)
+
+A queued PR whose head SHA has no `bot-review` status would otherwise wait forever — the reviewer only fires on the `bot:ready-for-review` label, and nothing re-applies it once an agent session ends (30+ PRs froze this way on 2026-07-01). On every queue run, the processor detects three stuck shapes and re-applies `bot:ready-for-review` itself:
+
+1. `bot-review` is required but never registered on the head SHA.
+2. `reviewDecision` is `CHANGES_REQUESTED` but the bot never adjudicated the current SHA.
+3. A `bot-review` `pending` is older than 45 minutes (Reviewer W1's job timeout is 15 minutes, so the run died).
+
+The re-applied label fires Reviewer (W1) through its normal trigger; the review submission re-wakes the queue via `pull_request_review`, so remediation chains drain a backlog without a timer. Capped at 10 remediations per run; idempotent (skips when the label is already present or the SHA already carries a verdict).
+
+**Label semantics are single-purpose (LS-8297):** `bot:ready-for-review` is the only review trigger; `merge-when-ready` only feeds the queue. The queue deliberately has **no cron** — it is fully event-driven (labels, review submissions, CI completions). The one residual corner (a crashed reviewer run in a totally idle repo) clears on the next repo event or a manual `workflow_dispatch`.
+
+### Codeowner-Blocked Merges (LS-8297)
+
+Path-scoped CODEOWNERS rules (e.g. `.github/**` → `@bkrupa`) are invisible to the queue's `reviewDecision` pre-check, so the merge API can refuse with 405 "Waiting on code owner review". The processor treats this as a clean blocked state — it posts the CODEOWNER blocker comment and Discord escalation and exits successfully. The code owner's approval submission re-triggers the queue, which then merges.
+
 ### SHA Pinning
 
 The merge API call includes `sha: pr.head.sha` -- if the branch has advanced since validation, GitHub rejects the merge with a 409, preventing merging an unvalidated commit.

@@ -1561,3 +1561,78 @@ describe('merge-queue-processor — bot-review self-heal (LS-8289)', () => {
     );
   });
 });
+
+// ── codeowner-blocked merge handling (LS-8297) ───────────────────────────────
+
+describe('merge-queue-processor — codeowner-blocked 405 is a clean blocker (LS-8297)', () => {
+  const CODEOWNER_405 = () => {
+    throw Object.assign(new Error('Repository rule violations found'), {
+      status: 405,
+      response: {
+        data: {
+          message:
+            'Repository rule violations found\n\n' +
+            'Waiting on code owner review from bkrupa.',
+          documentation_url:
+            'https://docs.github.com/rest/pulls/pulls#merge-a-pull-request',
+        },
+      },
+    });
+  };
+
+  it('reports a CODEOWNER blocker comment instead of failing the run', async () => {
+    delete process.env.ESCALATION_WEBHOOK_URL;
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+    });
+    github.rest.pulls.merge = async () => CODEOWNER_405();
+
+    // Must not throw — a codeowner block is a legitimate waiting state.
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.merges.length, 0, 'merge API rejected');
+    assert.ok(
+      calls.comments.some((c) => c.body?.includes('CODEOWNER approval')),
+      'should post the CODEOWNER blocker comment',
+    );
+    assert.ok(
+      !calls.comments.some((c) => c.body?.includes('Processing Error')),
+      'must not post a processing-error comment',
+    );
+  });
+
+  it('still propagates unrecognized 405 causes as processing errors', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+    });
+    github.rest.pulls.merge = async () => {
+      throw Object.assign(new Error('Pull Request is not mergeable'), {
+        status: 405,
+        response: { data: { message: 'Pull Request is not mergeable' } },
+      });
+    };
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.ok(
+      calls.comments.some((c) => c.body?.includes('Processing Error')),
+      'unknown 405 causes still surface as processing errors',
+    );
+  });
+});
