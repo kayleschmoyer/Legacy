@@ -102,6 +102,25 @@ describe('RosterBoard', () => {
     expect(onPlayerAssign.mock.calls[0]?.[1].id).toBe(2);
   });
 
+  it('does not fire mutations for disabled position slots', () => {
+    const onPlayerAssign = jest.fn();
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={onPlayerAssign}
+        onPlayerRemove={noop}
+        disabledPositionIds={new Set([2])}
+      />,
+    );
+    // Select Wade Boggs from the bench (eligible at 1B, which is position id 2).
+    fireEvent.click(screen.getByRole('button', { name: /Wade Boggs — bench/ }));
+    // The 1B slot (id 2) is disabled — clicking it should not fire the callback.
+    const slot1B = screen.getByRole('button', { name: /1B/i });
+    fireEvent.click(slot1B);
+    expect(onPlayerAssign).not.toHaveBeenCalled();
+  });
+
   it('does not fire mutations when read-only', () => {
     const onPlayerAssign = jest.fn();
     const onPlayerRemove = jest.fn();

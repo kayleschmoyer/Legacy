@@ -16,6 +16,7 @@ import {
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
+import { LOGGER } from '@legacy-sports/logging';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { Button, Text, YStack } from 'tamagui';
 import { PendingWaiverClaims } from '../../../../features/roster';
@@ -56,27 +57,81 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   const [updatePosition] = useUpdateTeamMemberPositionMutation();
   const [swapPositions] = useSwapTeamMemberPositionsMutation();
 
+  const [inFlightPositionIds, setInFlightPositionIds] = useState<
+    ReadonlySet<number>
+  >(new Set());
+
+  const addInFlight = useCallback((ids: number[]) => {
+    setInFlightPositionIds((prev) => new Set([...prev, ...ids]));
+  }, []);
+
+  const removeInFlight = useCallback((ids: number[]) => {
+    setInFlightPositionIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+  }, []);
+
   const handleAssign = useCallback(
     async (player: TeamMemberFragment, position: LeaguePositionFragment) => {
       if (player.id == null || position.id == null) return;
-      await updatePosition({
-        variables: { teamMemberId: player.id, positionId: position.id },
-      });
-      await refetch();
+      if (inFlightPositionIds.has(position.id)) return;
+      addInFlight([position.id]);
+      try {
+        await updatePosition({
+          variables: { teamMemberId: player.id, positionId: position.id },
+        });
+        await refetch();
+      } catch (err) {
+        LOGGER.error(
+          'Failed to assign player to position',
+          err instanceof Error ? err : undefined,
+          {
+            playerId: player.id,
+            positionId: position.id,
+          },
+        );
+      } finally {
+        removeInFlight([position.id]);
+      }
     },
-    [updatePosition, refetch],
+    [updatePosition, refetch, inFlightPositionIds, addInFlight, removeInFlight],
   );
 
   const handleRemove = useCallback(
     async (position: LeaguePositionFragment) => {
+      if (position.id == null) return;
+      if (inFlightPositionIds.has(position.id)) return;
       const occupant = teamPlayers.find((p) => p.positionId === position.id);
       if (!occupant?.id) return;
-      await updatePosition({
-        variables: { teamMemberId: occupant.id, positionId: null },
-      });
-      await refetch();
+      addInFlight([position.id]);
+      try {
+        await updatePosition({
+          variables: { teamMemberId: occupant.id, positionId: null },
+        });
+        await refetch();
+      } catch (err) {
+        LOGGER.error(
+          'Failed to remove player from position',
+          err instanceof Error ? err : undefined,
+          {
+            playerId: occupant.id,
+            positionId: position.id,
+          },
+        );
+      } finally {
+        removeInFlight([position.id]);
+      }
     },
-    [updatePosition, refetch, teamPlayers],
+    [
+      updatePosition,
+      refetch,
+      teamPlayers,
+      inFlightPositionIds,
+      addInFlight,
+      removeInFlight,
+    ],
   );
 
   const handleSwap = useCallback(
@@ -87,17 +142,35 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
     ) => {
       if (incoming.id == null || displaced.id == null || target.id == null)
         return;
-      await swapPositions({
-        variables: {
-          teamMemberIdA: incoming.id,
-          positionIdA: target.id,
-          teamMemberIdB: displaced.id,
-          positionIdB: incoming.positionId ?? undefined,
-        },
-      });
-      await refetch();
+      const affectedIds = [target.id];
+      if (incoming.positionId != null) affectedIds.push(incoming.positionId);
+      if (affectedIds.some((id) => inFlightPositionIds.has(id))) return;
+      addInFlight(affectedIds);
+      try {
+        await swapPositions({
+          variables: {
+            teamMemberIdA: incoming.id,
+            positionIdA: target.id,
+            teamMemberIdB: displaced.id,
+            positionIdB: incoming.positionId ?? undefined,
+          },
+        });
+        await refetch();
+      } catch (err) {
+        LOGGER.error(
+          'Failed to swap player positions',
+          err instanceof Error ? err : undefined,
+          {
+            incomingId: incoming.id,
+            displacedId: displaced.id,
+            positionId: target.id,
+          },
+        );
+      } finally {
+        removeInFlight(affectedIds);
+      }
     },
-    [swapPositions, refetch],
+    [swapPositions, refetch, inFlightPositionIds, addInFlight, removeInFlight],
   );
 
   const currentWeek = league.currentWeekNumber ?? 1;
@@ -182,6 +255,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         loading={loading}
         error={error ?? null}
         readOnly={isPast || isFuture}
+        disabledPositionIds={inFlightPositionIds}
       />
     </div>
   );

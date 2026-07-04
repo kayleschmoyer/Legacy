@@ -58,6 +58,8 @@ export interface RosterBoardProps<
   loading?: boolean;
   error?: Error | null;
   readOnly?: boolean;
+  /** Position IDs whose slots are blocked while a mutation is in-flight. */
+  disabledPositionIds?: ReadonlySet<number>;
 }
 
 // ── Row primitives ──────────────────────────────────────────────────────────
@@ -69,6 +71,7 @@ interface SlotRowProps {
   selectedName: string | null;
   state: SlotState;
   readOnly: boolean;
+  disabled?: boolean;
   onPress: () => void;
   onPlayerPress?: () => void;
 }
@@ -80,6 +83,7 @@ function SlotRow({
   selectedName,
   state,
   readOnly,
+  disabled = false,
   onPress,
   onPlayerPress,
 }: SlotRowProps): React.JSX.Element {
@@ -109,25 +113,28 @@ function SlotRow({
       ? `Tap to assign ${selectedName}`
       : 'Open slot';
 
+  const isBlocked = readOnly || disabled;
+
   return (
     <XStack
       role="button"
       aria-pressed={state === 'selected'}
-      aria-disabled={readOnly}
+      aria-disabled={isBlocked}
       aria-label={ariaLabel}
-      tabIndex={readOnly ? -1 : 0}
+      tabIndex={isBlocked ? -1 : 0}
       paddingVertical="$2.5"
       paddingHorizontal="$3"
       borderRadius="$3"
       borderWidth={state === 'selected' ? 2 : 0}
       borderColor={state === 'selected' ? '$blue8' : undefined}
-      backgroundColor={background}
+      backgroundColor={disabled ? '$gray2' : background}
       alignItems="center"
       gap="$2"
-      hoverStyle={readOnly ? undefined : { backgroundColor: '$gray3' }}
-      pressStyle={readOnly ? undefined : { scale: 0.99 }}
+      opacity={disabled ? 0.6 : 1}
+      hoverStyle={isBlocked ? undefined : { backgroundColor: '$gray3' }}
+      pressStyle={isBlocked ? undefined : { scale: 0.99 }}
       animation="quick"
-      onPress={readOnly ? undefined : onPress}
+      onPress={isBlocked ? undefined : onPress}
     >
       <YStack
         width={36}
@@ -138,9 +145,13 @@ function SlotRow({
         alignItems="center"
         flexShrink={0}
       >
-        <Text fontSize="$2" fontWeight="800" color={badge.text}>
-          {posType}
-        </Text>
+        {disabled ? (
+          <Spinner size="small" color={badge.text} />
+        ) : (
+          <Text fontSize="$2" fontWeight="800" color={badge.text}>
+            {posType}
+          </Text>
+        )}
       </YStack>
       <YStack flex={1} minWidth={0}>
         <Text fontSize="$3" fontWeight="600" color="$gray12" numberOfLines={1}>
@@ -306,6 +317,7 @@ export function RosterBoard<
   loading = false,
   error = null,
   readOnly = false,
+  disabledPositionIds,
 }: RosterBoardProps<P, Pos>): React.JSX.Element {
   const [selected, setSelected] = useState<P | null>(null);
 
@@ -345,6 +357,7 @@ export function RosterBoard<
   const handleSlotPress = useCallback(
     (position: Pos) => {
       if (readOnly) return;
+      if (position.id != null && disabledPositionIds?.has(position.id)) return;
       const assigned = teamPlayers.find((p) => p.positionId === position.id);
       if (!selected) {
         if (assigned) setSelected(assigned);
@@ -375,7 +388,14 @@ export function RosterBoard<
       if (assigned) setSelected(assigned);
       else setSelected(null);
     },
-    [readOnly, selected, teamPlayers, onPlayerAssign, onPlayerSwap],
+    [
+      readOnly,
+      selected,
+      teamPlayers,
+      onPlayerAssign,
+      onPlayerSwap,
+      disabledPositionIds,
+    ],
   );
 
   const handleBenchSelect = useCallback(
@@ -445,6 +465,8 @@ export function RosterBoard<
       else if (assigned && canAccept) state = 'eligible-swap';
       else if (!assigned && canAccept) state = 'eligible-empty';
     }
+    const slotDisabled =
+      position.id != null && (disabledPositionIds?.has(position.id) ?? false);
     return (
       <SlotRow
         key={position.id}
@@ -454,6 +476,7 @@ export function RosterBoard<
         selectedName={selectedName}
         state={state}
         readOnly={readOnly}
+        disabled={slotDisabled}
         onPress={() => handleSlotPress(position)}
         onPlayerPress={
           assigned && onPlayerPress ? () => onPlayerPress(assigned) : undefined
