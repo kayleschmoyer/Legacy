@@ -443,6 +443,18 @@ TeamMember.implement({
       resolve: (parent) =>
         (parent as { nickname?: string | null }).nickname ?? null,
     }),
+    isLocked: t.boolean({
+      nullable: true,
+      description:
+        'True when this player has game selections recorded in the active matchup week and cannot be moved (LS-5955).',
+      resolve: async (parent, _args, context) => {
+        const { leagueId, teamId, playerId } = parent;
+        if (!teamId) return false;
+        const lockedSet =
+          await context.loaders.lockedTeamMembers.load(leagueId);
+        return lockedSet.has(`${playerId}:${teamId}`);
+      },
+    }),
     player: t.field({
       type: 'Player',
       nullable: true,

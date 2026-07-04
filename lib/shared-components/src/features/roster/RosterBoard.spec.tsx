@@ -18,9 +18,11 @@ const mk = (
   lastName: string,
   eligible: string[],
   positionId: number | null,
+  isLocked?: boolean,
 ): RosterBoardPlayer => ({
   id,
   positionId,
+  isLocked,
   player: { firstName, lastName, eligiblePositions: eligible },
 });
 
@@ -136,5 +138,74 @@ describe('RosterBoard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Wade Boggs — bench/ }));
     expect(onPlayerAssign).not.toHaveBeenCalled();
     expect(onPlayerRemove).not.toHaveBeenCalled();
+  });
+
+  it('shows lock indicator and locked text for a locked starter', () => {
+    const lockedPlayers: RosterBoardPlayer[] = [
+      mk(101, 'Mike', 'Johnson', ['C'], 1, true), // locked starter at C
+      mk(102, 'Wade', 'Boggs', ['1B'], null),
+      mk(103, 'Nolan', 'Ryan', ['SP'], null),
+    ];
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={lockedPlayers}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+      />,
+    );
+    expect(screen.getByText('Locked — game in progress')).toBeTruthy();
+  });
+
+  it('does not select a locked starter when tapped', () => {
+    const onPlayerAssign = jest.fn();
+    const lockedPlayers: RosterBoardPlayer[] = [
+      mk(101, 'Mike', 'Johnson', ['C'], 1, true), // locked starter at C
+      mk(102, 'Wade', 'Boggs', ['1B'], null), // bench, eligible at 1B
+      mk(103, 'Nolan', 'Ryan', ['SP'], null),
+    ];
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={lockedPlayers}
+        onPlayerAssign={onPlayerAssign}
+        onPlayerRemove={noop}
+      />,
+    );
+    // Tap the locked C slot — Mike is locked so he should NOT become selected.
+    fireEvent.click(
+      screen.getByRole('button', { name: /Mike Johnson at C — locked/ }),
+    );
+    // Tap the empty 1B slot — if Mike were selected, onPlayerAssign would fire
+    // because Mike is eligible at C but not 1B; however since nothing is selected, nothing fires.
+    fireEvent.click(
+      screen.getByRole('button', { name: /1st Base.*open slot/i }),
+    );
+    expect(onPlayerAssign).not.toHaveBeenCalled();
+  });
+
+  it('does not swap into a locked starter slot', () => {
+    const onPlayerSwap = jest.fn();
+    const lockedPlayers: RosterBoardPlayer[] = [
+      mk(101, 'Mike', 'Johnson', ['C'], 1, true), // locked at C
+      mk(102, 'Wade', 'Boggs', ['C', '1B'], 2), // unlocked at 1B, eligible at C
+      mk(103, 'Nolan', 'Ryan', ['SP'], null),
+    ];
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={lockedPlayers}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+        onPlayerSwap={onPlayerSwap}
+      />,
+    );
+    // Select the unlocked 1B player (Wade Boggs).
+    fireEvent.click(screen.getByRole('button', { name: /Wade Boggs at 1B/ }));
+    // Attempt to swap into the locked C slot (Mike Johnson) — should be blocked.
+    fireEvent.click(
+      screen.getByRole('button', { name: /Mike Johnson at C — locked/ }),
+    );
+    expect(onPlayerSwap).not.toHaveBeenCalled();
   });
 });

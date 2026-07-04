@@ -4334,6 +4334,11 @@ type TeamMember {
   """
   askingPrice: String
   id: Int
+
+  """
+  True when this player has game selections recorded in the active matchup week and cannot be moved (LS-5955).
+  """
+  isLocked: Boolean
   leagueId: Int
 
   """

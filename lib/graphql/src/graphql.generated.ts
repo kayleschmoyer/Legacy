@@ -4315,6 +4315,8 @@ export type TeamMember = {
   /** Free-text asking price displayed on the trade block listing. Null when not set. */
   askingPrice?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  /** True when this player has game selections recorded in the active matchup week and cannot be moved (LS-5955). */
+  isLocked?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   /** Optional custom nickname for this player on this roster. (LS-1813) */
   nickname?: Maybe<Scalars['String']['output']>;
@@ -7649,6 +7651,7 @@ export type UpdateTeamMemberPositionMutation = {
     salary?: number | null;
     askingPrice?: string | null;
     nickname?: string | null;
+    isLocked?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7685,6 +7688,7 @@ export type SwapTeamMemberPositionsMutation = {
     salary?: number | null;
     askingPrice?: string | null;
     nickname?: string | null;
+    isLocked?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -7785,6 +7789,7 @@ export type SetNicknameMutation = {
     salary?: number | null;
     askingPrice?: string | null;
     nickname?: string | null;
+    isLocked?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -9932,6 +9937,7 @@ export type GetLeagueTradeBlockQuery = {
     salary?: number | null;
     askingPrice?: string | null;
     nickname?: string | null;
+    isLocked?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -10503,6 +10509,7 @@ export type GetTeamMembersQuery = {
     salary?: number | null;
     askingPrice?: string | null;
     nickname?: string | null;
+    isLocked?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -12456,6 +12463,7 @@ export type SetTradeBlockMutation = {
     salary?: number | null;
     askingPrice?: string | null;
     nickname?: string | null;
+    isLocked?: boolean | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -12567,6 +12575,7 @@ export type TeamMemberFragment = {
   salary?: number | null;
   askingPrice?: string | null;
   nickname?: string | null;
+  isLocked?: boolean | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -14640,6 +14649,7 @@ export const TeamMemberFragmentDoc = gql`
     salary
     askingPrice
     nickname
+    isLocked
     player {
       id
       firstName

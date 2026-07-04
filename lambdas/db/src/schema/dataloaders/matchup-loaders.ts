@@ -7,6 +7,130 @@ import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 
 /**
+ * DataLoader for locked team members by leagueId (LS-5955).
+ *
+ * Key: leagueId (number)
+ * Returns: Set of "playerId:teamId" strings that are locked in the league's
+ *   active matchup week (i.e. have at least one row in matchupPlayerGames).
+ *
+ * Batches all leagueIds in a single request into three queries — one for
+ * current-week resolution, one for legacy matchup FK fallback, and one for
+ * the actual lock check — instead of N×3 queries (one set per TeamMember).
+ */
+export const createLockedTeamMembersLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, Set<string>>(async (keys) => {
+    const leagueIds = [...new Set(keys)] as number[];
+
+    // Step 1: Resolve current week for each league.
+    const leagueRows = await db
+      .select({
+        id: PublicSchema.leagues.id,
+        currentWeek: PublicSchema.leagues.currentWeek,
+        currentMatchup: PublicSchema.leagues.currentMatchup,
+      })
+      .from(PublicSchema.leagues)
+      .where(inArray(PublicSchema.leagues.id, leagueIds));
+
+    // Step 2: For leagues whose currentWeek is null, fall back to the legacy
+    //   currentMatchup FK to resolve the week number.
+    const legacyMatchupIds = leagueRows
+      .filter((l) => l.currentWeek == null && l.currentMatchup != null)
+      .map((l) => l.currentMatchup as number);
+
+    const matchupWeekMap = new Map<number, number>();
+    if (legacyMatchupIds.length > 0) {
+      const matchupRows = await db
+        .select({
+          id: PublicSchema.matchups.id,
+          weekNumber: PublicSchema.matchups.weekNumber,
+        })
+        .from(PublicSchema.matchups)
+        .where(inArray(PublicSchema.matchups.id, legacyMatchupIds));
+      for (const m of matchupRows) {
+        if (m.weekNumber != null) matchupWeekMap.set(m.id, m.weekNumber);
+      }
+    }
+
+    // Build (leagueId → weekNumber) map, skipping leagues with no active week.
+    const leagueWeekMap = new Map<number, number>();
+    for (const l of leagueRows) {
+      const week =
+        l.currentWeek ??
+        (l.currentMatchup != null
+          ? (matchupWeekMap.get(l.currentMatchup) ?? null)
+          : null);
+      if (week != null) leagueWeekMap.set(l.id, week);
+    }
+
+    // Step 3: Fetch all locked (playerId, teamId) pairs for every active
+    //   league+week in a single query using OR conditions.
+    const lockedSets = new Map<number, Set<string>>();
+    for (const leagueId of leagueIds) {
+      lockedSets.set(leagueId, new Set<string>());
+    }
+
+    const activeLeagues = [...leagueWeekMap.entries()];
+    if (activeLeagues.length > 0) {
+      const orClauses = activeLeagues.map(([leagueId, weekNumber]) =>
+        and(
+          eq(PublicSchema.matchups.leagueId, leagueId),
+          eq(PublicSchema.matchups.weekNumber, weekNumber),
+        ),
+      );
+
+      const lockedRows = await db
+        .selectDistinct({
+          leagueId: PublicSchema.matchups.leagueId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          teamId: PublicSchema.matchupPlayers.teamId,
+        })
+        .from(PublicSchema.matchupPlayerGames)
+        .innerJoin(
+          PublicSchema.matchupPlayers,
+          eq(
+            PublicSchema.matchupPlayerGames.matchupPlayerId,
+            PublicSchema.matchupPlayers.id,
+          ),
+        )
+        .innerJoin(
+          PublicSchema.matchups,
+          eq(PublicSchema.matchupPlayers.matchupId, PublicSchema.matchups.id),
+        )
+        .where(
+          and(
+            or(...orClauses),
+            or(
+              eq(
+                PublicSchema.matchups.team1Id,
+                PublicSchema.matchupPlayers.teamId,
+              ),
+              eq(
+                PublicSchema.matchups.team2Id,
+                PublicSchema.matchupPlayers.teamId,
+              ),
+            ),
+          ),
+        );
+
+      for (const row of lockedRows) {
+        if (
+          row.leagueId != null &&
+          row.playerId != null &&
+          row.teamId != null
+        ) {
+          lockedSets.get(row.leagueId)?.add(`${row.playerId}:${row.teamId}`);
+        }
+      }
+    }
+
+    return keys.map(
+      (leagueId) => lockedSets.get(leagueId) ?? new Set<string>(),
+    );
+  });
+
+/**
  * DataLoader for matchup player games
  * Key: matchupPlayerId (number)
  * Returns: Array of games for that matchup player

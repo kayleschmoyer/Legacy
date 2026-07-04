@@ -33,6 +33,7 @@ import {
 
 import {
   createLeagueWeekPlayerSeasonsLoader,
+  createLockedTeamMembersLoader,
   createMatchupMessagesLoader,
   createMatchupPlayerGamesLoader,
   createMatchupPlayersLoader,
@@ -83,6 +84,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   leaguePositionById: createLeaguePositionByIdLoader(db),
   leaguePayrollConfig: createLeaguePayrollConfigLoader(db),
   teamPayroll: createTeamPayrollLoader(db),
+  lockedTeamMembers: createLockedTeamMembersLoader(db),
 });
 
 /**

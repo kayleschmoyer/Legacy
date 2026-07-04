@@ -8,6 +8,7 @@ fragment TeamMember on TeamMember {
   salary
   askingPrice
   nickname
+  isLocked
   player {
     id
     firstName

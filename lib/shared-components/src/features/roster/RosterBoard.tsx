@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Card, H2, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ChevronRight, Users } from '@tamagui/lucide-icons';
+import { ChevronRight, Lock, Users } from '@tamagui/lucide-icons';
 import {
   canPlayerPlayPosition,
   getPositionLabel,
@@ -25,6 +25,7 @@ export interface RosterBoardPlayer {
   id?: number | null;
   positionId?: number | null;
   nickname?: string | null;
+  isLocked?: boolean | null;
   player?: {
     id?: number | null;
     firstName?: string | null;
@@ -72,6 +73,7 @@ interface SlotRowProps {
   state: SlotState;
   readOnly: boolean;
   disabled?: boolean;
+  isLocked?: boolean;
   onPress: () => void;
   onPlayerPress?: () => void;
 }
@@ -84,44 +86,50 @@ function SlotRow({
   state,
   readOnly,
   disabled = false,
+  isLocked = false,
   onPress,
   onPlayerPress,
 }: SlotRowProps): React.JSX.Element {
   const posType = positionType.toUpperCase();
   const badge = getPositionColors(posType);
+  const effectiveReadOnly = readOnly || isLocked;
 
   const background =
-    state === 'selected'
-      ? '$blue3'
-      : state === 'eligible-swap'
-        ? '$blue2'
-        : state === 'eligible-empty'
-          ? '$green2'
-          : undefined;
+    isLocked && assignedName
+      ? '$amber2'
+      : state === 'selected'
+        ? '$blue3'
+        : state === 'eligible-swap'
+          ? '$blue2'
+          : state === 'eligible-empty'
+            ? '$green2'
+            : undefined;
 
   const ariaLabel = assignedName
-    ? state === 'eligible-swap' && selectedName
-      ? `Swap ${selectedName} into ${posType}`
-      : `${assignedName} at ${posType}`
+    ? isLocked
+      ? `${assignedName} at ${posType} — locked`
+      : state === 'eligible-swap' && selectedName
+        ? `Swap ${selectedName} into ${posType}`
+        : `${assignedName} at ${posType}`
     : state === 'eligible-empty' && selectedName
       ? `Assign ${selectedName} to ${posType}`
       : `${getPositionLabel(posType)} — open slot`;
 
   const subText = assignedName
-    ? assignedEligible.join(' · ')
+    ? isLocked
+      ? 'Locked — game in progress'
+      : assignedEligible.join(' · ')
     : state === 'eligible-empty' && selectedName
       ? `Tap to assign ${selectedName}`
       : 'Open slot';
-
-  const isBlocked = readOnly || disabled;
 
   return (
     <XStack
       role="button"
       aria-pressed={state === 'selected'}
-      aria-disabled={isBlocked}
+      aria-disabled={effectiveReadOnly}
       aria-label={ariaLabel}
-      tabIndex={isBlocked ? -1 : 0}
+      tabIndex={effectiveReadOnly ? -1 : 0}
       paddingVertical="$2.5"
       paddingHorizontal="$3"
       borderRadius="$3"
@@ -131,10 +139,10 @@ function SlotRow({
       alignItems="center"
       gap="$2"
       opacity={disabled ? 0.6 : 1}
-      hoverStyle={isBlocked ? undefined : { backgroundColor: '$gray3' }}
-      pressStyle={isBlocked ? undefined : { scale: 0.99 }}
+      hoverStyle={effectiveReadOnly ? undefined : { backgroundColor: '$gray3' }}
+      pressStyle={effectiveReadOnly ? undefined : { scale: 0.99 }}
       animation="quick"
-      onPress={isBlocked ? undefined : onPress}
+      onPress={effectiveReadOnly ? undefined : onPress}
     >
       <YStack
         width={36}
@@ -157,10 +165,17 @@ function SlotRow({
         <Text fontSize="$3" fontWeight="600" color="$gray12" numberOfLines={1}>
           {assignedName ?? getPositionLabel(posType)}
         </Text>
-        <Text fontSize="$1" color="$gray10" numberOfLines={1}>
+        <Text
+          fontSize="$1"
+          color={isLocked && assignedName ? '$amber11' : '$gray10'}
+          numberOfLines={1}
+        >
           {subText}
         </Text>
       </YStack>
+      {assignedName && isLocked && (
+        <Lock size={14} color="var(--amber9)" aria-label="Locked" />
+      )}
       {assignedName && onPlayerPress && (
         <YStack
           role="button"
@@ -184,6 +199,7 @@ interface BenchRowProps {
   primaryPosition: string;
   selected: boolean;
   readOnly: boolean;
+  isLocked?: boolean;
   onPress: () => void;
   onPlayerPress?: () => void;
 }
@@ -194,29 +210,31 @@ function BenchRow({
   primaryPosition,
   selected,
   readOnly,
+  isLocked = false,
   onPress,
   onPlayerPress,
 }: BenchRowProps): React.JSX.Element {
   const badge = getPositionColors(primaryPosition);
+  const effectiveReadOnly = readOnly || isLocked;
   return (
     <XStack
       role="button"
       aria-pressed={selected}
-      aria-disabled={readOnly}
-      aria-label={`${name} — bench${selected ? ', selected' : ''}`}
-      tabIndex={readOnly ? -1 : 0}
+      aria-disabled={effectiveReadOnly}
+      aria-label={`${name} — bench${isLocked ? ', locked' : ''}${selected ? ', selected' : ''}`}
+      tabIndex={effectiveReadOnly ? -1 : 0}
       paddingVertical="$2.5"
       paddingHorizontal="$3"
       borderRadius="$3"
       borderWidth={selected ? 2 : 0}
       borderColor={selected ? '$blue8' : undefined}
-      backgroundColor={selected ? '$blue3' : undefined}
+      backgroundColor={isLocked ? '$amber2' : selected ? '$blue3' : undefined}
       alignItems="center"
       gap="$2"
-      hoverStyle={readOnly ? undefined : { backgroundColor: '$gray3' }}
-      pressStyle={readOnly ? undefined : { scale: 0.99 }}
+      hoverStyle={effectiveReadOnly ? undefined : { backgroundColor: '$gray3' }}
+      pressStyle={effectiveReadOnly ? undefined : { scale: 0.99 }}
       animation="quick"
-      onPress={readOnly ? undefined : onPress}
+      onPress={effectiveReadOnly ? undefined : onPress}
     >
       <YStack
         width={36}
@@ -235,10 +253,19 @@ function BenchRow({
         <Text fontSize="$3" fontWeight="600" color="$gray12" numberOfLines={1}>
           {name}
         </Text>
-        <Text fontSize="$1" color="$gray10" numberOfLines={1}>
-          {eligible.length > 0 ? eligible.join(' · ') : 'Unclassified'}
+        <Text
+          fontSize="$1"
+          color={isLocked ? '$amber11' : '$gray10'}
+          numberOfLines={1}
+        >
+          {isLocked
+            ? 'Locked — game in progress'
+            : eligible.length > 0
+              ? eligible.join(' · ')
+              : 'Unclassified'}
         </Text>
       </YStack>
+      {isLocked && <Lock size={14} color="var(--amber9)" aria-label="Locked" />}
       {onPlayerPress && (
         <YStack
           role="button"
@@ -360,7 +387,7 @@ export function RosterBoard<
       if (position.id != null && disabledPositionIds?.has(position.id)) return;
       const assigned = teamPlayers.find((p) => p.positionId === position.id);
       if (!selected) {
-        if (assigned) setSelected(assigned);
+        if (assigned && !assigned.isLocked) setSelected(assigned);
         return;
       }
       // Clicking the already-selected player's own slot → deselect.
@@ -370,6 +397,11 @@ export function RosterBoard<
       }
       const canAccept = canPlayerPlayPosition(selected, position.positionType);
       if (assigned && canAccept) {
+        if (assigned.isLocked) {
+          // Can't swap into a locked player's slot; re-select them instead.
+          setSelected(assigned);
+          return;
+        }
         // Swap when the data layer supports it; otherwise re-select occupant.
         if (onPlayerSwap) {
           onPlayerSwap(selected, position, assigned);
@@ -401,6 +433,7 @@ export function RosterBoard<
   const handleBenchSelect = useCallback(
     (player: P) => {
       if (readOnly) return;
+      if (player.isLocked) return;
       // Tapping the bench while a lineup player is selected → bench that player.
       if (selected && selected.positionId != null) {
         const pos = positions.find((p) => p.id === selected.positionId);
@@ -477,6 +510,7 @@ export function RosterBoard<
         state={state}
         readOnly={readOnly}
         disabled={slotDisabled}
+        isLocked={assigned?.isLocked ?? false}
         onPress={() => handleSlotPress(position)}
         onPlayerPress={
           assigned && onPlayerPress ? () => onPlayerPress(assigned) : undefined
@@ -593,6 +627,7 @@ export function RosterBoard<
                     primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
                     selected={selected?.id === p.id}
                     readOnly={readOnly}
+                    isLocked={p.isLocked ?? false}
                     onPress={() => handleBenchSelect(p)}
                     onPlayerPress={
                       onPlayerPress ? () => onPlayerPress(p) : undefined
@@ -618,6 +653,7 @@ export function RosterBoard<
                     primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
                     selected={selected?.id === p.id}
                     readOnly={readOnly}
+                    isLocked={p.isLocked ?? false}
                     onPress={() => handleBenchSelect(p)}
                     onPlayerPress={
                       onPlayerPress ? () => onPlayerPress(p) : undefined
