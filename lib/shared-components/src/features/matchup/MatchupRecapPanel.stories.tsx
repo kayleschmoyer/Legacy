@@ -65,3 +65,60 @@ export const Default: Story = {
     matchupId: 1,
   },
 };
+
+export const RecapPending: Story = {
+  decorators: [
+    (Story) => (
+      <MockedProvider
+        mocks={[
+          {
+            request: { query: GetMatchupRecap, variables: { id: 2 } },
+            result: {
+              data: {
+                getMatchupById: {
+                  id: 2,
+                  weekNumber: 12,
+                  status: 'in_progress',
+                  team1Id: 1,
+                  team2Id: 2,
+                  team1Score: 12.5,
+                  team2Score: 9.3,
+                  recap: null,
+                },
+              },
+            },
+          },
+        ]}
+      >
+        <div style={{ maxWidth: 500, padding: 20 }}>
+          <Story />
+        </div>
+      </MockedProvider>
+    ),
+  ],
+  args: {
+    matchupId: 2,
+  },
+};
+
+export const ErrorState: Story = {
+  decorators: [
+    (Story) => (
+      <MockedProvider
+        mocks={[
+          {
+            request: { query: GetMatchupRecap, variables: { id: 3 } },
+            error: new Error('Failed to fetch matchup recap'),
+          },
+        ]}
+      >
+        <div style={{ maxWidth: 500, padding: 20 }}>
+          <Story />
+        </div>
+      </MockedProvider>
+    ),
+  ],
+  args: {
+    matchupId: 3,
+  },
+};

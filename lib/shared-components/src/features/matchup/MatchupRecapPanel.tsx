@@ -6,7 +6,7 @@
  * and exposed via the `recap` field on the `Matchup` GraphQL type.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Card,
   Paragraph,
@@ -18,6 +18,9 @@ import {
 } from 'tamagui';
 import { BookOpen, Star, Trophy } from '@tamagui/lucide-icons';
 import { useGetMatchupRecapQuery } from '@legacy-sports/graphql';
+import { LOGGER } from '@legacy-sports/logging';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorState } from '../../components/ErrorState';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -34,11 +37,12 @@ interface MatchupRecapPanelProps {
 // -- Component --------------------------------------------------------
 
 /**
- * Fetches and renders the narrative recap for a completed matchup.
- * Returns null while loading or if the matchup has no recap yet.
+ * Fetches and renders the narrative recap for a completed matchup. Shows a
+ * spinner while loading, a retryable error message on fetch/library failure,
+ * and a "recap pending" message when the matchup has no recap yet.
  */
 export function MatchupRecapPanel({ matchupId }: MatchupRecapPanelProps) {
-  const { data, loading, error } = useGetMatchupRecapQuery({
+  const { data, loading, error, refetch } = useGetMatchupRecapQuery({
     variables: { id: matchupId },
     // cache-and-network (not cache-first) so a stale cached recap is never
     // served on its own — a subscription-status flip always re-asks the
@@ -46,6 +50,12 @@ export function MatchupRecapPanel({ matchupId }: MatchupRecapPanelProps) {
     // (LS-5875).
     fetchPolicy: 'cache-and-network',
   });
+
+  useEffect(() => {
+    if (error) {
+      LOGGER.error('Failed to load matchup recap', error, { matchupId });
+    }
+  }, [error, matchupId]);
 
   if (loading) {
     return (
@@ -55,8 +65,29 @@ export function MatchupRecapPanel({ matchupId }: MatchupRecapPanelProps) {
     );
   }
 
-  if (error || !data?.getMatchupById?.recap) {
-    return null;
+  // A premium user paid for this feature — a real fetch/library failure must
+  // say so (with a retry) rather than collapse into the same blank space as
+  // "not generated yet" (BMD-007).
+  if (error) {
+    return (
+      <ErrorState
+        error="Matchup recap unavailable — we are working on it."
+        onRetry={() => {
+          void refetch();
+        }}
+      />
+    );
+  }
+
+  if (!data?.getMatchupById?.recap) {
+    return (
+      <EmptyState
+        icon={<BookOpen size={22} color={BRAND_NAVY_LIGHT} />}
+        title="Recap not generated yet"
+        description="Recap will be generated after the matchup is finalized."
+        compact
+      />
+    );
   }
 
   const { headline, narrative, highlights, matchupType } =

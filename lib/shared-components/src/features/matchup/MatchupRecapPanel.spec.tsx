@@ -1,9 +1,21 @@
 import React from 'react';
 import { useGetMatchupRecapQuery } from '@legacy-sports/graphql';
 import { MatchupRecapPanel } from './MatchupRecapPanel';
-import { render } from '../../test-utils';
+import { fireEvent, render } from '../../test-utils';
 
 jest.mock('@legacy-sports/graphql');
+
+const mockLoggerError = jest.fn();
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: {
+    error: (...args: unknown[]) => {
+      mockLoggerError(...args);
+    },
+    warn: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
 
 const mockRecapData = {
   getMatchupById: {
@@ -16,6 +28,8 @@ const mockRecapData = {
   },
 };
 
+const mockRefetch = jest.fn();
+
 function setupMock(
   overrides: Partial<ReturnType<typeof useGetMatchupRecapQuery>> = {},
 ) {
@@ -23,6 +37,7 @@ function setupMock(
     data: mockRecapData,
     loading: false,
     error: undefined,
+    refetch: mockRefetch,
     ...overrides,
   } as unknown as ReturnType<typeof useGetMatchupRecapQuery>);
 }
@@ -60,15 +75,57 @@ describe('MatchupRecapPanel', () => {
     expect(container.innerHTML.length).toBeGreaterThan(0);
   });
 
-  it('renders null when there is an error', () => {
+  it('shows a retryable error message instead of a blank space on error', () => {
     setupMock({
       data: undefined,
       error: new Error('Network error') as unknown as ReturnType<
         typeof useGetMatchupRecapQuery
       >['error'],
     });
-    const { container } = render(<MatchupRecapPanel matchupId={1} />);
-    expect(container.innerHTML).toBe('');
+    const { getByText } = render(<MatchupRecapPanel matchupId={1} />);
+    expect(
+      getByText('Matchup recap unavailable — we are working on it.'),
+    ).toBeTruthy();
+    expect(getByText('Retry')).toBeTruthy();
+  });
+
+  it('calls refetch when the retry button is pressed after an error', () => {
+    setupMock({
+      data: undefined,
+      error: new Error('Network error') as unknown as ReturnType<
+        typeof useGetMatchupRecapQuery
+      >['error'],
+    });
+    const { getByText } = render(<MatchupRecapPanel matchupId={1} />);
+    fireEvent.click(getByText('Retry'));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs the error to LOGGER (Rollbar-forwarded) when the query fails', () => {
+    const testError = new Error('Network error') as unknown as ReturnType<
+      typeof useGetMatchupRecapQuery
+    >['error'];
+    setupMock({ data: undefined, error: testError });
+    render(<MatchupRecapPanel matchupId={1} />);
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      'Failed to load matchup recap',
+      testError,
+      { matchupId: 1 },
+    );
+  });
+
+  it('shows a "recap pending" message (not a blank space) when there is no recap yet', () => {
+    setupMock({
+      data: { getMatchupById: { recap: null } },
+      error: undefined,
+    });
+    const { getByText, queryByText } = render(
+      <MatchupRecapPanel matchupId={1} />,
+    );
+    expect(
+      getByText('Recap will be generated after the matchup is finalized.'),
+    ).toBeTruthy();
+    expect(queryByText('Retry')).toBeNull();
   });
 
   it('shows BLOWOUT badge for blowout matchupType', () => {
