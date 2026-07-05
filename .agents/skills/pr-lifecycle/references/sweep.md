@@ -41,7 +41,7 @@ github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true, format: "jso
 ```
 
 - Pass `excludeDrafts: true` explicitly on **every** dashboard call (drafts are owned by their creating agent; the response's top-level `draftsExcluded` count goes in the report). Pass `limit: 100` explicitly — the default is 30 and the hard cap is 100; if more than 100 PRs are open, cover the remainder with filtered slices (`label:` / `author:` params).
-- `format: "json"` returns the structured payload (`summary`, `prs[]` with `mergeable`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`).
+- `format: "json"` returns the structured payload (`summary`, `prs[]` with `mergeable`, `hasConflictSignal`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`).
 - **Post-filter in-context**: the dashboard does **not** filter `agent-in-progress` or `sweep-claimed` server-side. Drop any PR whose `labels` include either — it is owned by another agent. Log the skipped count.
 - **Dashboard `ciStatus` can be stale** (checks latched on an old SHA). Before classifying a PR as CI-failing or clean, confirm job-level state with `github_pr_batch_status(numbers: [...])` — max 50 numbers per call, chunk larger lists.
 
@@ -61,7 +61,7 @@ For each PR, take whichever action applies:
 
 For each remaining PR (not settled by Step 2), pick the **single highest-priority** problem:
 
-1. **Conflicting with main** → rebase chip.
+1. **Conflicting with main** (`hasConflictSignal: true` — the union of `mergeable: CONFLICTING`, the `CI: Conflicts` label, and a red "No Merge Conflicts" check; trust it over a lone `mergeable` value, which goes UNKNOWN/stale after every base push) → rebase chip.
 2. **Failing CI on the current SHA** (after the re-run pass) → CI-fix chip.
 3. **Unresolved bot/Copilot review threads needing code** → review-fix chip.
 

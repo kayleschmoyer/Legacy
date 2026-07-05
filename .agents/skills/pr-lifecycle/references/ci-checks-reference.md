@@ -67,7 +67,7 @@ Two consumers already bridge the config/live gap — useful when debugging:
 
 ### `No Merge Conflicts`
 
-**Writer:** `check-conflicts.yml` job `check-conflicts` on PR events (`opened`/`synchronize`/`reopened`/`edited`). It runs a real local `git merge --no-commit --no-ff` test against the base — deterministic, no dependency on GitHub's lazy mergeability API (which caused stuck "Mergeability could not be determined" states, LS-4479). `check-conflicts-sweep.yml` re-evaluates **all open PRs** whenever `main` advances, reusing the existing check-run id per head SHA so terminal duplicates never stack (LS-7992).
+**Writer:** `check-conflicts.yml` job `check-conflicts` on PR events (`opened`/`synchronize`/`reopened`/`edited`). It runs a real local `git merge --no-commit --no-ff` test against the base — deterministic, no dependency on GitHub's lazy mergeability API (which caused stuck "Mergeability could not be determined" states, LS-4479). `check-conflicts-sweep.yml` re-evaluates **all open PRs** whenever `main` advances; when the recorded check-run state disagrees with its fresh test-merge it re-dispatches `check-conflicts.yml` on the PR's head branch (GitHub forbids updating Actions-created check runs via the API, which is why the earlier LS-7992 PATCH-in-place design silently no-opped — the required check went stale whenever main introduced a conflict).
 
 **Why it fails:** `main` moved ahead with commits that textually conflict with this branch. Side effects: `CI: Conflicts` label + one sticky comment keyed on the `<!-- conflict-notice -->` marker (LS-8229).
 

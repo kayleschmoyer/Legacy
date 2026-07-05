@@ -23,6 +23,7 @@ function row(overrides: Partial<DashboardRow>): DashboardRow {
     author: 'user',
     isDraft: false,
     mergeable: 'MERGEABLE',
+    hasConflictSignal: false,
     ciStatus: 'pass',
     ciFailingCount: 0,
     hadStaleChecks: false,
@@ -41,7 +42,7 @@ function payload(rows: DashboardRow[]): DashboardPayload {
   return {
     summary: {
       total: rows.length,
-      conflicting: rows.filter((r) => r.mergeable === 'CONFLICTING').length,
+      conflicting: rows.filter((r) => r.hasConflictSignal).length,
       ciFailing: rows.filter((r) => r.ciStatus === 'fail').length,
       ciPending: rows.filter((r) => r.ciStatus === 'pending').length,
       ciPassing: rows.filter((r) => r.ciStatus === 'pass').length,
@@ -77,6 +78,7 @@ const FIXTURE_ROWS: DashboardRow[] = [
     title: 'chore(deps): bump zod to 3.24',
     branch: 'dependabot/npm_and_yarn/zod-3.24.0',
     mergeable: 'CONFLICTING',
+    hasConflictSignal: true,
     ciStatus: 'pass',
     reviewDecision: null,
   }),
@@ -135,6 +137,7 @@ const FIXTURE_ROWS: DashboardRow[] = [
     ciStatus: 'fail',
     ciFailingCount: 4,
     mergeable: 'CONFLICTING',
+    hasConflictSignal: true,
     reviewDecision: 'CHANGES_REQUESTED',
     unresolvedThreads: 7,
   }),
@@ -214,6 +217,27 @@ describe('renderDashboardMarkdown', () => {
     // #1006 — approved + CI fail → No
     const r1006 = lines.find((l) => l.startsWith('| #1006 '));
     expect(r1006).toMatch(/\| No \|$/);
+  });
+
+  it('treats a label/check conflict signal as blocking even when mergeable reads MERGEABLE', () => {
+    // Stale-GraphQL scenario: the deterministic CI: Conflicts label / failing
+    // "No Merge Conflicts" check fired, but GitHub's lazy mergeable field has
+    // not caught up yet.
+    const md = renderDashboardMarkdown(
+      payload([
+        row({
+          number: 3001,
+          title: 'fix(web): stale mergeable with conflict label',
+          branch: 'claude/ls-3001-stale',
+          mergeable: 'MERGEABLE',
+          hasConflictSignal: true,
+          reviewDecision: 'APPROVED',
+        }),
+      ]),
+    );
+    expect(md).toMatch(/- #3001 — merge conflict/);
+    const r3001 = md.split('\n').find((l) => l.startsWith('| #3001 '));
+    expect(r3001).toMatch(/\| No \|$/);
   });
 
   it('markdown output is at least 40% smaller than the JSON payload', () => {

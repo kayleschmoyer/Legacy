@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to check (used by recheck-conflicts-on-push)"
+        description: "PR number to check (dispatched by check-conflicts-sweep.yml when a PR's recorded check-run state goes stale after main advances)"
         required: true
         type: number
 

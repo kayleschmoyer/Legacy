@@ -18,6 +18,8 @@ Prefer MCP tools; use `gh pr view --json` only when MCP is unavailable or the us
 
 **`mergeable: UNKNOWN` does not mean blocked** — it can mean GitHub is still computing mergeability, and it can also appear for PRs that are already merged or closed. Do not treat `UNKNOWN` as a merge-queue signal by itself. To confirm the actual PR outcome, call `github_view_pr({ number: N })` and check `state` plus `mergedAt`/`closedAt`: `state: "MERGED"` or a populated `mergedAt` means it merged successfully; a closed PR with `closedAt` and no `mergedAt` means it was closed without merging.
 
+**Merge-conflict signals (three, any one means "rebase")**: `mergeable: CONFLICTING` (GraphQL hint — goes `UNKNOWN`/stale every time main advances), the **`CI: Conflicts` label**, and a red **"No Merge Conflicts" required check**. The label and check come from a deterministic `git merge` test (`check-conflicts.yml` + the base-push sweep) and are the source of truth when signals disagree. A red "No Merge Conflicts" check is never a CI failure to debug — it means rebase ([fix reference Step 1](references/fix.md)). Both the label and the check clear automatically after the rebase push; never remove the label yourself. `github_pr_why_blocked` / `github_pr_diagnose` / `github_pr_dashboard` already union all three signals into their `MERGE_CONFLICT` / `merge conflict` verdicts.
+
 ## Phases
 
 Work through these phases sequentially. Each phase links to a detailed reference doc.

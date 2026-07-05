@@ -1,5 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
+import {
+  detectConflictSignals,
+  isConflictCheckFailure,
+} from '../conflict-signals.js';
 import { githubGraphQL } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
 import type { CIPartition } from '../required-checks.js';
@@ -208,14 +212,27 @@ export function diagnose(
     };
   }
 
-  if (pr.mergeable === 'CONFLICTING') {
+  // Conflict detection unions all three signals (GraphQL mergeable, the
+  // CI: Conflicts label, the required "No Merge Conflicts" check) — GraphQL
+  // mergeable alone goes UNKNOWN/stale on every base push, which used to let
+  // conflicting PRs fall through to a misleading CI_FAILING verdict.
+  const conflictSignals = detectConflictSignals({
+    mergeable: pr.mergeable,
+    labels,
+    failingChecks: ci.failing,
+  });
+  if (conflictSignals.conflicting) {
+    const otherFailing = ci.failing.filter((f) => !isConflictCheckFailure(f));
     return {
       status: 'BLOCKED',
       reason: 'MERGE_CONFLICT',
       summary: 'Branch has merge conflicts with the base branch.',
-      details: { base: 'origin/main' },
-      nextAction:
-        'Rebase onto main to resolve conflicts, then force-push the branch.',
+      details: {
+        base: pr.baseRefName,
+        signals: conflictSignals.sources,
+        ...(otherFailing.length > 0 ? { alsoFailingChecks: otherFailing } : {}),
+      },
+      nextAction: `Rebase onto ${pr.baseRefName} to resolve conflicts, then force-push the branch.`,
     };
   }
 
@@ -223,11 +240,12 @@ export function diagnose(
     return {
       status: 'BLOCKED',
       reason: 'CI_FAILING',
-      summary: `${ci.failing.length} required CI check${ci.failing.length === 1 ? '' : 's'} ${ci.failing.length === 1 ? 'is' : 'are'} failing.`,
+      summary: `${ci.failing.length} required CI check${ci.failing.length === 1 ? '' : 's'} ${ci.failing.length === 1 ? 'is' : 'are'} failing.${pr.mergeable === 'UNKNOWN' ? ' (Mergeability is still being computed — conflicts cannot be ruled out yet.)' : ''}`,
       details: {
         failingChecks: ci.failing,
         pendingChecks: ci.pending,
         passingChecks: ci.passing,
+        ...(pr.mergeable === 'UNKNOWN' ? { mergeable: 'UNKNOWN' } : {}),
       },
       nextAction:
         'Fix the root cause of the failing checks and push a new commit.',

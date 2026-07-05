@@ -35,12 +35,14 @@ github_pr_batch_status({ numbers: [<PR#>] })   # mergeable, ciSummary, reviewDec
 
 Build a triage list:
 
-| Signal                        | Action needed        |
-| ----------------------------- | -------------------- |
-| `mergeable: CONFLICTING`      | Rebase (Step 1)      |
-| Unresolved review threads > 0 | Fix reviews (Step 2) |
-| CI checks failing             | Fix CI (Step 3)      |
-| All green                     | Skip to Step 4       |
+| Signal                                                                             | Action needed        |
+| ---------------------------------------------------------------------------------- | -------------------- |
+| `mergeable: CONFLICTING`, `CI: Conflicts` label, or "No Merge Conflicts" check red | Rebase (Step 1)      |
+| Unresolved review threads > 0                                                      | Fix reviews (Step 2) |
+| CI checks failing (other than "No Merge Conflicts")                                | Fix CI (Step 3)      |
+| All green                                                                          | Skip to Step 4       |
+
+**Conflict signals**: the `CI: Conflicts` label and the required "No Merge Conflicts" check come from a deterministic `git merge` test (check-conflicts.yml + the base-push sweep) and are the source of truth. `mergeable` is GitHub's lazily-computed hint — it goes `UNKNOWN`/stale every time main advances. Any ONE of the three signals firing means rebase; never treat a red "No Merge Conflicts" check as a CI failure to debug.
 
 **Jira-link marker check (do this during assessment)**: the PR body must carry the structured `<!-- jira-link -->` marker — the source of truth for ticket linkage (see [create-pr reference](./create-pr.md#jira-link-marker-source-of-truth-for-ticket-linkage)). If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number: <PR#>, body: "<marker block>\n\n<existing body>" })` with `primary:` set to the PR's ticket key (from title/branch), or `primary: none` for ticket-less bot PRs. Editing the body is the supported correction path — never force-push or rename the branch to fix linkage.
 
@@ -95,7 +97,7 @@ Build a triage list:
 After all fixes are applied and pushed:
 
 1. Re-check PR status: `github_pr_batch_status({ numbers: [<PR#>] })`
-2. Confirm: `mergeable != CONFLICTING`, no unresolved threads, CI green
+2. Confirm: `mergeable != CONFLICTING`, `CI: Conflicts` label gone (it clears automatically once the re-run check passes — never remove it yourself), no unresolved threads, CI green
 3. If new issues appeared (Copilot re-review found new problems, CI regressed), loop back to the relevant step — but cap total iterations at 3.
 4. (Re-)apply `bot:ready-for-review` so the Reviewer Bot fires a fresh cycle on the new HEAD: `github_manage_labels({ prs: [<PR#>], add: ["bot:ready-for-review"] })`. The Reviewer Bot will add `merge-when-ready` itself on APPROVED — **do not apply it manually** (see [Label Ownership](../SKILL.md#label-ownership)).
 

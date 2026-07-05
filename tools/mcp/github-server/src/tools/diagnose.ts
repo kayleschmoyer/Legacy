@@ -1,5 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
+import { detectConflictSignals } from '../conflict-signals.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
@@ -57,7 +58,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
     pullRequest(number: $number) {
       number title url state isDraft mergeable isInMergeQueue
       headRefOid baseRefName reviewDecision
-      labels(first: 20) { nodes { name } }
+      labels(first: 100) { nodes { name } }
       reviews(first: 20, states: [CHANGES_REQUESTED, APPROVED]) {
         nodes { author { login } state submittedAt }
       }
@@ -84,8 +85,10 @@ async function fetchFailingCheckRuns(
       query: { per_page: '100', page: String(page) },
     });
     for (const run of data.check_runs) {
+      // Check-run ids increase monotonically, so the highest id is the most
+      // recent run for a name (the API's response order is not guaranteed).
       const existing = byName.get(run.name);
-      if (!existing) byName.set(run.name, run);
+      if (!existing || run.id > existing.id) byName.set(run.name, run);
     }
     if (data.check_runs.length < 100) break;
     page++;
@@ -113,7 +116,7 @@ type BlockReason =
 
 function deriveReason(
   pr: NonNullable<PRStateResponse['repository']['pullRequest']>,
-  ci: { hasFailures: boolean; isPending: boolean },
+  ci: { hasFailures: boolean; isPending: boolean; failingNames: string[] },
   failing: CheckRun[],
 ): { reason: BlockReason; summary: string; nextAction: string } {
   if (pr.state === 'MERGED') {
@@ -137,19 +140,30 @@ function deriveReason(
       nextAction: 'Call github_mark_pr_ready to mark it ready for review.',
     };
   }
-  if (pr.mergeable === 'CONFLICTING') {
+  // Union of all three conflict signals — GraphQL mergeable alone goes
+  // UNKNOWN/stale on every base push (see conflict-signals.ts).
+  const conflictSignals = detectConflictSignals({
+    mergeable: pr.mergeable,
+    labels: pr.labels.nodes.map((l) => l.name),
+    failingChecks: ci.failingNames,
+  });
+  if (conflictSignals.conflicting) {
     return {
       reason: 'MERGE_CONFLICT',
-      summary: 'PR has merge conflicts.',
+      summary: `PR has merge conflicts (${conflictSignals.sources.join(', ')}).`,
       nextAction:
         'Rebase onto main: worktree_rebase_onto_main or worktree_rebase.',
     };
   }
   if (ci.hasFailures) {
     const names = failing.map((r) => r.name).join(', ');
+    const unknownNote =
+      pr.mergeable === 'UNKNOWN'
+        ? ' (Mergeability is still being computed — conflicts cannot be ruled out yet.)'
+        : '';
     return {
       reason: 'CI_FAILING',
-      summary: `CI failing: ${names || 'unknown jobs'}`,
+      summary: `CI failing: ${names || 'unknown jobs'}${unknownNote}`,
       nextAction: 'Fix the failing tests/checks, then push.',
     };
   }
@@ -235,7 +249,11 @@ export async function diagnose(params: DiagnoseParams): Promise<ToolResult> {
     }
 
     // Evaluate CI using the same logic as pr-why-blocked (required checks, dedup)
-    let ci = { hasFailures: false, isPending: false };
+    let ci = {
+      hasFailures: false,
+      isPending: false,
+      failingNames: [] as string[],
+    };
     let failingRuns: CheckRun[] = [];
     let ciEvalWarning: string | undefined;
     try {
@@ -248,6 +266,7 @@ export async function diagnose(params: DiagnoseParams): Promise<ToolResult> {
       ci = {
         hasFailures: ciEval.failing.length > 0,
         isPending: ciEval.pending.length > 0,
+        failingNames: ciEval.failing,
       };
       if (ci.hasFailures) {
         failingRuns = await fetchFailingCheckRuns(

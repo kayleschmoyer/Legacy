@@ -122,6 +122,53 @@ describe('diagnose', () => {
       expect(result.status).toBe('BLOCKED');
       expect(result.reason).toBe('MERGE_CONFLICT');
     });
+
+    it('returns MERGE_CONFLICT from the CI: Conflicts label when mergeable is stale-MERGEABLE', () => {
+      const pr = withLabel(makePR({ mergeable: 'MERGEABLE' }), 'CI: Conflicts');
+      const result = diagnose(pr, NO_CI);
+      expect(result.status).toBe('BLOCKED');
+      expect(result.reason).toBe('MERGE_CONFLICT');
+      expect((result.details as { signals: string[] }).signals).toContain(
+        'label:CI: Conflicts',
+      );
+    });
+
+    it('returns MERGE_CONFLICT (not CI_FAILING) when the No Merge Conflicts check fails during a mergeable UNKNOWN window', () => {
+      const result = diagnose(
+        makePR({ mergeable: 'UNKNOWN' }),
+        ci({ failing: ['No Merge Conflicts (failure)'] }),
+      );
+      expect(result.status).toBe('BLOCKED');
+      expect(result.reason).toBe('MERGE_CONFLICT');
+    });
+
+    it('surfaces non-conflict failing checks alongside a MERGE_CONFLICT verdict', () => {
+      const result = diagnose(
+        makePR({ mergeable: 'CONFLICTING' }),
+        ci({ failing: ['No Merge Conflicts (failure)', 'lint (failure)'] }),
+      );
+      expect(result.reason).toBe('MERGE_CONFLICT');
+      expect(
+        (result.details as { alsoFailingChecks: string[] }).alsoFailingChecks,
+      ).toEqual(['lint (failure)']);
+    });
+
+    it('does not treat a cancelled No Merge Conflicts run as a conflict', () => {
+      const result = diagnose(
+        makePR(),
+        ci({ failing: ['No Merge Conflicts (cancelled)'] }),
+      );
+      expect(result.reason).toBe('CI_FAILING');
+    });
+
+    it('names the PR base branch in details and nextAction', () => {
+      const result = diagnose(
+        makePR({ mergeable: 'CONFLICTING', baseRefName: 'release/1.2' }),
+        NO_CI,
+      );
+      expect((result.details as { base: string }).base).toBe('release/1.2');
+      expect(result.nextAction).toContain('release/1.2');
+    });
   });
 
   describe('CI', () => {
@@ -149,6 +196,18 @@ describe('diagnose', () => {
         ci({ failing: ['lint (failure)'], pending: ['build (in_progress)'] }),
       );
       expect(result.reason).toBe('CI_FAILING');
+    });
+
+    it('flags un-ruled-out conflicts on CI_FAILING while mergeable is UNKNOWN', () => {
+      const result = diagnose(
+        makePR({ mergeable: 'UNKNOWN' }),
+        ci({ failing: ['lint (failure)'] }),
+      );
+      expect(result.reason).toBe('CI_FAILING');
+      expect(result.summary).toContain('conflicts cannot be ruled out');
+      expect((result.details as { mergeable: string }).mergeable).toBe(
+        'UNKNOWN',
+      );
     });
   });
 

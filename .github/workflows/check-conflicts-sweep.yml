@@ -5,27 +5,34 @@ name: "Check Merge Conflicts (Base Push Sweep)"
 # synchronize, etc.) by covering the case where new commits on main introduce
 # conflicts into an existing PR — an event that check-conflicts.yml never sees.
 #
-# Creates/updates the "No Merge Conflicts" check run (must match the name
-# registered as a required status check in .github/ruleset.json) for each open
-# PR's head SHA using the Checks API.
-#
 # This also serves as a recovery path when GitHub fails to deliver the
 # pull_request: opened event to check-conflicts.yml (observed on PRs where
 # only push-triggered workflows ran on open, e.g. LS-7717).
 #
-# IDEMPOTENCY (LS-7992, Phase 3 of LS-7988): main can advance several times
-# while a PR sits open, so this sweep re-runs against the SAME head SHA
-# repeatedly. To avoid stacking multiple terminal "No Merge Conflicts" runs on
-# one SHA — which GitHub's ruleset evaluator and the MCP triage tooling
-# mishandle — the sweep REUSES the existing check-run id for
-# (head_sha, "No Merge Conflicts") instead of POSTing a new one each push
-# (Option A in the ticket). Option B (a shared cancel-in-progress concurrency
-# group keyed by PR) was rejected: this is a single job that sweeps ALL open
-# PRs, so it cannot be keyed by one PR number, and cancel-in-progress would
-# itself leave `cancelled` terminal runs — the exact duplicate-required-name
-# state Phase 3 exists to eliminate. The reusable-id lookup lives in
-# .github/scripts/resolve-conflict-check-run.mjs (unit-tested via
-# .github/checks/conflict-check-idempotency-tests.sh).
+# HOW THE CHECK RUN GETS REFRESHED (LS-7992 → superseded): the "No Merge
+# Conflicts" required check is normally the check-conflicts.yml JOB run, and
+# GitHub forbids updating Actions-created check runs through the Checks API
+# ("Check run status and conclusions can only be updated internally by GitHub
+# Actions", changelog 2025-02-12). The previous design PATCHed that run and
+# silently no-opped on every PR, leaving the required check stale whenever main
+# introduced or resolved a conflict. So instead of writing the check run
+# directly, this sweep test-merges each PR locally and, when the recorded
+# check-run state disagrees with the fresh result, DISPATCHES
+# check-conflicts.yml on the PR's head branch (`workflow_dispatch` with
+# pr_number). The dispatched job re-runs the test merge and reports through its
+# own job check run — the one writer GitHub still allows. Fork PRs (whose head
+# branch we cannot dispatch on) fall back to POSTing a new API-owned completed
+# check run, which the Checks API still permits; the newest-run-per-name dedup
+# in the ruleset evaluator and the MCP triage tooling picks it up.
+#
+# The label + sticky-comment sync stays here (in addition to the dispatched
+# workflow's own sync) so the fast signal lands even before the dispatched run
+# finishes, and so label drift from other writers (e.g. ci-pipeline's
+# read-modify-write labels PUT) heals on the next sweep.
+#
+# Update failures are COUNTED and fail this job — a sweep that cannot refresh
+# check runs must be red, not green with buried ::warning lines (that is
+# exactly how the PATCH regression went unnoticed).
 
 on:
   push:
@@ -39,6 +46,11 @@ permissions:
   contents: read
   checks: write
   pull-requests: write
+  # Required to dispatch check-conflicts.yml for out-of-sync PRs. The dispatch
+  # must use GITHUB_TOKEN: workflow_dispatch is one of the two event types a
+  # GITHUB_TOKEN-triggered action still fires, and the Agent Author app lacks
+  # actions:write (see cloud-agent-mode Quirk 4).
+  actions: write
 
 jobs:
   sweep:
@@ -46,6 +58,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Read-heavy API calls go through the Agent Author app installation so the
+      # sweep (4+ calls per open PR per main push) stops draining the single
+      # shared GITHUB_TOKEN installation bucket (~1,000 req/hr) that every other
+      # workflow in the repo uses — the same rate-limit failure mode LS-8277
+      # fixed in check-conflicts.yml. Falls back to GITHUB_TOKEN when the secret
+      # is unavailable.
+      - name: Generate App Token
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
       - name: Checkout base branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -54,7 +80,11 @@ jobs:
 
       - name: Check all open PRs for conflicts
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          # Dispatch and check-run writes need GITHUB_TOKEN specifically: the
+          # app token lacks actions:write, and API-owned check runs created with
+          # GITHUB_TOKEN must be completed by the same identity.
+          DISPATCH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           BASE_SHA: ${{ github.sha }}
           BASE_REF: ${{ github.ref_name }}
@@ -70,7 +100,7 @@ jobs:
           if ! PR_NUMBERS=$(gh api --paginate \
               "repos/${GH_REPO}/pulls?state=open&base=${BASE_REF}&per_page=100" \
               --jq '.[].number'); then
-            echo "::error::Failed to list open PRs for ${BASE_REF} — check GITHUB_TOKEN permissions and API rate limits"
+            echo "::error::Failed to list open PRs for ${BASE_REF} — check token permissions and API rate limits"
             exit 1
           fi
 
@@ -81,11 +111,15 @@ jobs:
 
           echo "Open PRs targeting ${BASE_REF}: $(echo "$PR_NUMBERS" | tr '\n' ' ')"
 
+          FAILED_UPDATES=0
+
           while IFS= read -r PR_NUM; do
             [ -z "$PR_NUM" ] && continue
 
-            PR_JSON=$(gh pr view "$PR_NUM" --json headRefOid,labels 2>/dev/null || true)
+            PR_JSON=$(gh pr view "$PR_NUM" --json headRefOid,headRefName,isCrossRepository,labels 2>/dev/null || true)
             HEAD_SHA=$([ -n "$PR_JSON" ] && printf '%s' "$PR_JSON" | jq -r '.headRefOid // empty' || true)
+            HEAD_REF=$([ -n "$PR_JSON" ] && printf '%s' "$PR_JSON" | jq -r '.headRefName // empty' || true)
+            IS_FORK=$([ -n "$PR_JSON" ] && printf '%s' "$PR_JSON" | jq -r '.isCrossRepository // false' || echo 'false')
             HAS_CONFLICT_LABEL=$([ -n "$PR_JSON" ] && printf '%s' "$PR_JSON" | jq -r 'any(.labels[]; .name == "CI: Conflicts")' || echo 'false')
             if [ -z "$HEAD_SHA" ]; then
               echo "::warning::Could not resolve head SHA for PR #${PR_NUM}; skipping"
@@ -95,37 +129,6 @@ jobs:
             echo "--- PR #${PR_NUM} (head: ${HEAD_SHA:0:7}) ---"
             STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-            # Idempotency (LS-7992): reuse the existing "No Merge Conflicts" run
-            # for this head SHA instead of creating a duplicate on every base
-            # push. Look up the prior run (created by an earlier sweep or by the
-            # PR-side check-conflicts.yml); the end-of-loop PATCH overwrites it
-            # with this sweep's terminal result. We deliberately do NOT reset a
-            # reused run to in_progress: that would replace a known-good terminal
-            # state with a "pending" one that could stick (blocking the PR) if
-            # the sweep crashes mid-test, and adds a needless API round-trip.
-            RUN_ID=""
-            EXISTING_RUNS=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/check-runs" \
-              -X GET -f check_name="No Merge Conflicts" -f per_page=100 2>/dev/null || true)
-            if [ -n "$EXISTING_RUNS" ]; then
-              RUN_ID=$(printf '%s' "$EXISTING_RUNS" \
-                | node .github/scripts/resolve-conflict-check-run.mjs "No Merge Conflicts" \
-                || true)
-            fi
-
-            if [ -n "$RUN_ID" ]; then
-              echo "Reusing existing 'No Merge Conflicts' check run ${RUN_ID} for PR #${PR_NUM}"
-            else
-              # No prior run — create an in_progress run before doing the work.
-              # Capture stdout (the run ID) separately; let stderr flow to the log.
-              # On failure, warn and fall back to a single completed POST at the end.
-              if ! RUN_ID=$(printf '{"name":"No Merge Conflicts","head_sha":"%s","status":"in_progress","started_at":"%s"}' \
-                  "$HEAD_SHA" "$STARTED_AT" \
-                  | gh api "repos/${GH_REPO}/check-runs" -X POST --input - --jq '.id'); then
-                echo "::warning::Failed to create in_progress check run for PR #${PR_NUM}; will POST completed run directly"
-                RUN_ID=""
-              fi
-            fi
-
             # Detach to the pushed base so each PR starts from the same base.
             git checkout --detach "${BASE_SHA}" --quiet
             git clean -fd --quiet 2>/dev/null || true
@@ -134,12 +137,6 @@ jobs:
             if ! git fetch --no-tags origin \
                 "+refs/pull/${PR_NUM}/head:refs/remotes/origin/pr/${PR_NUM}" 2>/dev/null; then
               echo "::warning::Could not fetch head for PR #${PR_NUM}; skipping"
-              if [ -n "$RUN_ID" ]; then
-                printf '{"status":"completed","conclusion":"neutral","completed_at":"%s","output":{"title":"Skipped","summary":"Could not fetch PR head; unable to verify merge conflicts."}}' \
-                  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-                  | gh api "repos/${GH_REPO}/check-runs/${RUN_ID}" -X PATCH --input - > /dev/null \
-                  || echo "::warning::Failed to neutralize check run ${RUN_ID} for PR #${PR_NUM}"
-              fi
               continue
             fi
 
@@ -157,22 +154,48 @@ jobs:
             git merge --abort 2>/dev/null || git reset --hard HEAD
             git clean -fd --quiet 2>/dev/null || true
 
-            COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-            if [ -n "$RUN_ID" ]; then
-              printf '{"status":"completed","conclusion":"%s","completed_at":"%s","output":{"title":"%s","summary":"%s"}}' \
-                "$CONCLUSION" "$COMPLETED_AT" "$OUT_TITLE" "$OUT_SUMMARY" \
-                | gh api "repos/${GH_REPO}/check-runs/${RUN_ID}" -X PATCH --input - > /dev/null \
-                || echo "::warning::Failed to update check run ${RUN_ID} for PR #${PR_NUM}"
-            else
-              # Fallback: POST a completed run directly if the in_progress create failed.
-              printf '{"name":"No Merge Conflicts","head_sha":"%s","status":"completed","conclusion":"%s","started_at":"%s","completed_at":"%s","output":{"title":"%s","summary":"%s"}}' \
-                "$HEAD_SHA" "$CONCLUSION" "$STARTED_AT" "$COMPLETED_AT" "$OUT_TITLE" "$OUT_SUMMARY" \
-                | gh api "repos/${GH_REPO}/check-runs" -X POST --input - > /dev/null \
-                || echo "::warning::Failed to create check run for PR #${PR_NUM}"
-            fi
-
             echo "PR #${PR_NUM}: ${CONCLUSION}"
+
+            # Compare against the recorded "No Merge Conflicts" check-run state
+            # on the head SHA (newest run per name — the one the ruleset
+            # evaluator and MCP triage tooling read). `status:conclusion`, e.g.
+            # "completed:success"; "absent:" when no run exists yet. An API
+            # failure here yields an empty string, which falls through to the
+            # refresh path — fail open toward re-checking, never toward stale.
+            RECORDED=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/check-runs" \
+              -X GET -f check_name="No Merge Conflicts" -f per_page=100 \
+              --jq '.check_runs | max_by(.id) | "\(.status // "absent"):\(.conclusion // "")"' \
+              2>/dev/null || true)
+            RECORDED_STATUS="${RECORDED%%:*}"
+            RECORDED_CONCLUSION="${RECORDED#*:}"
+
+            if [ "$RECORDED_STATUS" = "completed" ] && [ "$RECORDED_CONCLUSION" = "$CONCLUSION" ]; then
+              echo "Check run already in sync (${RECORDED}); no refresh needed"
+            elif [ "$RECORDED_STATUS" = "in_progress" ] || [ "$RECORDED_STATUS" = "queued" ]; then
+              # A live check-conflicts run (PR push or earlier dispatch) is
+              # already recomputing against the current base; don't cancel it
+              # with a competing dispatch (shared concurrency group).
+              echo "Check run currently ${RECORDED_STATUS}; letting the live run report"
+            elif [ "$IS_FORK" != "true" ] && \
+                GH_TOKEN="$DISPATCH_TOKEN" gh workflow run check-conflicts.yml \
+                  --ref "$HEAD_REF" -f "pr_number=${PR_NUM}" 2>/dev/null; then
+              echo "Recorded state '${RECORDED:-<none>}' is stale (want completed:${CONCLUSION}); dispatched check-conflicts.yml on ${HEAD_REF}"
+            else
+              # Fork PR, or dispatch failed (e.g. the branch predates the
+              # workflow's dispatch input). POST a fresh API-owned completed
+              # run — still permitted, unlike updating the job's run. This can
+              # stack a duplicate run name on the SHA, but only on state
+              # transitions; newest-run-per-name dedup handles it.
+              COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              if printf '{"name":"No Merge Conflicts","head_sha":"%s","status":"completed","conclusion":"%s","started_at":"%s","completed_at":"%s","output":{"title":"%s","summary":"%s"}}' \
+                  "$HEAD_SHA" "$CONCLUSION" "$STARTED_AT" "$COMPLETED_AT" "$OUT_TITLE" "$OUT_SUMMARY" \
+                  | GH_TOKEN="$DISPATCH_TOKEN" gh api "repos/${GH_REPO}/check-runs" -X POST --input - > /dev/null; then
+                echo "Posted API-owned 'No Merge Conflicts' run (${CONCLUSION}) for PR #${PR_NUM}"
+              else
+                echo "::error::Failed to refresh 'No Merge Conflicts' for PR #${PR_NUM} — dispatch and direct POST both failed"
+                FAILED_UPDATES=$((FAILED_UPDATES + 1))
+              fi
+            fi
 
             # Sync "CI: Conflicts" label to match the merge-test result.
             # Mirrors the label management in check-conflicts.yml so agents and
@@ -226,3 +249,8 @@ jobs:
               fi
             fi
           done <<< "$PR_NUMBERS"
+
+          if [ "$FAILED_UPDATES" -gt 0 ]; then
+            echo "::error::${FAILED_UPDATES} PR(s) could not have their 'No Merge Conflicts' check refreshed"
+            exit 1
+          fi

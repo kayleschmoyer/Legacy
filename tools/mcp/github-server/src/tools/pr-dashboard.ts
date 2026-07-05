@@ -1,5 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
+import { detectConflictSignals } from '../conflict-signals.js';
 import { githubGraphQL } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
 import type { CIPartition } from '../required-checks.js';
@@ -65,6 +66,13 @@ export interface DashboardRow {
   author: string;
   isDraft: boolean;
   mergeable: string;
+  /**
+   * Union of the three conflict signals: mergeable CONFLICTING, the
+   * `CI: Conflicts` label, or a failing required "No Merge Conflicts" check.
+   * The label/check signals stay reliable while GraphQL mergeable is
+   * UNKNOWN/stale after a base push.
+   */
+  hasConflictSignal: boolean;
   ciStatus: CIStatus;
   ciFailingCount: number;
   hadStaleChecks: boolean;
@@ -259,6 +267,7 @@ function formatThreads(row: DashboardRow): string {
 function isReady(row: DashboardRow): boolean {
   return (
     row.mergeable === 'MERGEABLE' &&
+    !row.hasConflictSignal &&
     row.ciStatus === 'pass' &&
     row.unresolvedThreads === 0 &&
     row.reviewDecision === 'APPROVED'
@@ -272,7 +281,7 @@ interface BlockedReason {
 
 function blockedReasons(row: DashboardRow): string[] {
   const reasons: string[] = [];
-  if (row.mergeable === 'CONFLICTING') reasons.push('merge conflict');
+  if (row.hasConflictSignal) reasons.push('merge conflict');
   if (row.ciStatus === 'fail') {
     reasons.push(
       row.ciFailingCount > 0
@@ -349,7 +358,7 @@ function buildPayload(
 ): DashboardPayload {
   const summary: DashboardSummary = {
     total: rows.length,
-    conflicting: rows.filter((r) => r.mergeable === 'CONFLICTING').length,
+    conflicting: rows.filter((r) => r.hasConflictSignal).length,
     ciFailing: rows.filter((r) => r.ciStatus === 'fail').length,
     ciPending: rows.filter((r) => r.ciStatus === 'pending').length,
     ciPassing: rows.filter((r) => r.ciStatus === 'pass').length,
@@ -562,6 +571,12 @@ query($owner: String!, $repo: String!, $first: Int!) {
         unresolved: -1,
         truncated: false,
       };
+      const labelNames = pr.labels.nodes.map((l) => l.name);
+      const conflictSignals = detectConflictSignals({
+        mergeable: pr.mergeable,
+        labels: labelNames,
+        failingChecks: ci?.failing,
+      });
 
       return {
         number: pr.number,
@@ -571,6 +586,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
         author: pr.author?.login ?? 'unknown',
         isDraft: pr.isDraft,
         mergeable: pr.mergeable,
+        hasConflictSignal: conflictSignals.conflicting,
         ciStatus,
         ciFailingCount,
         hadStaleChecks,

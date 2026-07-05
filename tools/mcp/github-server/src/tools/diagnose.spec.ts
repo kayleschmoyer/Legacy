@@ -99,6 +99,60 @@ describe('diagnose', () => {
     expect(payload.reason).toBe('MERGE_CONFLICT');
   });
 
+  it('returns MERGE_CONFLICT from the CI: Conflicts label when mergeable is stale-MERGEABLE', async () => {
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: {
+          pullRequest: {
+            ...BASE_PR,
+            mergeable: 'MERGEABLE',
+            labels: { nodes: [{ name: 'CI: Conflicts' }] },
+          },
+        },
+      },
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.reason).toBe('MERGE_CONFLICT');
+  });
+
+  it('returns MERGE_CONFLICT (not CI_FAILING) when the No Merge Conflicts check fails during a mergeable UNKNOWN window', async () => {
+    mockEvaluatePRChecks.mockResolvedValue({
+      failing: ['No Merge Conflicts (failure)'],
+      pending: [],
+      passing: 0,
+      hadDuplicateRuns: false,
+    });
+    mockGithubRest.mockResolvedValue({ total_count: 0, check_runs: [] });
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: { pullRequest: { ...BASE_PR, mergeable: 'UNKNOWN' } },
+      },
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.reason).toBe('MERGE_CONFLICT');
+  });
+
+  it('notes un-ruled-out conflicts on CI_FAILING while mergeable is UNKNOWN', async () => {
+    mockEvaluatePRChecks.mockResolvedValue({
+      failing: ['typecheck (failure)'],
+      pending: [],
+      passing: 0,
+      hadDuplicateRuns: false,
+    });
+    mockGithubRest.mockResolvedValue({ total_count: 0, check_runs: [] });
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: { pullRequest: { ...BASE_PR, mergeable: 'UNKNOWN' } },
+      },
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.reason).toBe('CI_FAILING');
+    expect(payload.summary).toContain('conflicts cannot be ruled out');
+  });
+
   it('returns CI_FAILING when evaluatePRChecks reports failures', async () => {
     mockEvaluatePRChecks.mockResolvedValue({
       failing: ['typecheck'],

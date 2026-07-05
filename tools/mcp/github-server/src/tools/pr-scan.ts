@@ -1,5 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
+import { detectConflictSignals } from '../conflict-signals.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import { FAILED_CONCLUSIONS } from '../types.js';
 import type { ToolResult } from '../types.js';
@@ -440,7 +441,18 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         headRefName: pr.headRefName,
       };
 
-      if (pr.mergeable === 'CONFLICTING') {
+      // Conflict detection unions GraphQL mergeable with the CI: Conflicts
+      // label — the label stays reliable while mergeable is UNKNOWN/stale after
+      // a base push, and it survives into degraded mode (which omits mergeable
+      // entirely). The failing-check signal is deliberately NOT used here: this
+      // tool reads the raw statusCheckRollup, where a stale failed
+      // "No Merge Conflicts" run superseded by a newer success would false-
+      // positive (the rollup is not deduped to latest-run-per-name).
+      const conflictSignals = detectConflictSignals({
+        mergeable: pr.mergeable,
+        labels: pr.labels.nodes.map((l) => l.name),
+      });
+      if (conflictSignals.conflicting) {
         conflicting.push(base);
       }
 
@@ -502,11 +514,14 @@ export async function prScan(params: PRScanParams): Promise<ToolResult> {
         });
       } else if (
         pr.mergeable === 'MERGEABLE' &&
+        !pr.labels.nodes.some((l) => l.name === 'CI: Conflicts') &&
         ciPassingNumbers.has(pr.number)
       ) {
-        // Only classify as clean when CI is positively passing and mergeable
-        // is positively known. In degraded mode, skip label sync instead of
-        // assuming clean based on incomplete data.
+        // Only classify as clean when CI is positively passing, mergeable
+        // is positively known, and the deterministic conflict label is absent
+        // (it can contradict a stale MERGEABLE right after a base push). In
+        // degraded mode, skip label sync instead of assuming clean based on
+        // incomplete data.
         clean.push({
           number: pr.number,
           title: pr.title,
