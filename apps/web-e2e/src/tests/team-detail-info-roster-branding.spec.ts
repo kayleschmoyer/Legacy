@@ -1,9 +1,10 @@
 /**
- * Team Detail Page E2E Tests (LS-680)
+ * Team Detail Page E2E Tests (LS-680, LS-5362)
  *
  * Covers: team info display (league ID, custom avatar/banner), roster view
- * with position type names, branding display & form interactions, owner vs
- * visitor vs commissioner access.
+ * with position type names, branding display & form interactions, branding
+ * save/clear/upload actions (LS-5362), owner vs visitor vs commissioner
+ * access.
  *
  * Complements the base team-detail.spec.ts (LS-602) which covers the
  * fundamental page structure, basic roster listing, and error states.
@@ -153,6 +154,7 @@ interface SetupOptions {
   team?: ReturnType<typeof mockTeam>;
   positions?: ReturnType<typeof mockPositions>;
   errorMembers?: boolean;
+  errorBranding?: boolean;
 }
 
 async function setupGraphQL(
@@ -166,6 +168,7 @@ async function setupGraphQL(
     team = mockTeam(),
     positions = mockPositions(),
     errorMembers = false,
+    errorBranding = false,
   } = opts;
 
   const teamList = [team];
@@ -225,13 +228,23 @@ async function setupGraphQL(
         body: JSON.stringify({ data: { leaguePositions: positions } }),
       });
     } else if (postData.includes('updateteambranding')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: { updateTeamBranding: { id: 1 } },
-        }),
-      });
+      if (errorBranding) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Failed to save branding' }],
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { updateTeamBranding: { id: 1 } },
+          }),
+        });
+      }
     } else if (
       postData.includes('getteamassistantsettings') ||
       postData.includes('teamassistant')
@@ -512,6 +525,467 @@ test.describe('Team Detail – branding form (GM) @regression', () => {
     const clearButtons = page.getByRole('button', { name: /clear/i });
     // One Clear button for avatar, one for banner
     await expect(clearButtons).toHaveCount(2);
+  });
+});
+
+// ── Tests: Branding Save / Clear / Upload Actions (LS-5362) ──────────────────
+
+// Note: these waitForRequest predicates intentionally use a quoted
+// postData().includes('"updateteambranding"') check rather than
+// extractOperationName() — that helper reads route.request().postData()
+// and only works inside a page.route() handler; it takes a Route, not the
+// Request object page.waitForRequest's predicate receives here.
+test.describe('Team Detail – branding actions (GM) @regression', () => {
+  test('saves an avatar URL and shows success feedback', async ({ page }) => {
+    await setupGraphQL(page, { userTeamId: 1 });
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    const avatarUrlInput = page.getByPlaceholder(
+      'https://example.com/my-logo.png',
+    );
+    await avatarUrlInput.fill('https://cdn.example.com/new-logo.png');
+
+    const [request] = await Promise.all([
+      page.waitForRequest((req) =>
+        (req.postData()?.toLowerCase() ?? '').includes('"updateteambranding"'),
+      ),
+      page.getByRole('button', { name: /save branding/i }).click(),
+    ]);
+
+    const body = request.postDataJSON() as {
+      variables?: Record<string, unknown>;
+    };
+    expect(body.variables?.avatarUrl).toBe(
+      'https://cdn.example.com/new-logo.png',
+    );
+
+    await expect(page.getByText('Branding saved!')).toBeVisible();
+    await expect(avatarUrlInput).toHaveValue('');
+  });
+
+  test('rejects a non-HTTPS avatar URL without saving', async ({ page }) => {
+    await setupGraphQL(page, { userTeamId: 1 });
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    await page
+      .getByPlaceholder('https://example.com/my-logo.png')
+      .fill('http://insecure.example.com/logo.png');
+    await page.getByRole('button', { name: /save branding/i }).click();
+
+    await expect(
+      page.getByText('Avatar URL must start with https://'),
+    ).toBeVisible();
+    await expect(page.getByText('Branding saved!')).not.toBeVisible();
+  });
+
+  test('clears the avatar after confirming the dialog', async ({ page }) => {
+    await mockExternalImages(page);
+    await setupGraphQL(page, {
+      userTeamId: 1,
+      team: mockTeam({ avatarUrl: 'https://cdn.example.com/avatar.png' }),
+    });
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    await page
+      .getByRole('button', { name: /^clear$/i })
+      .first()
+      .click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await expect(page.getByText('Clear team logo?')).toBeVisible();
+
+    const [request] = await Promise.all([
+      page.waitForRequest((req) =>
+        (req.postData()?.toLowerCase() ?? '').includes('"updateteambranding"'),
+      ),
+      page.getByRole('button', { name: /clear logo/i }).click(),
+    ]);
+
+    const body = request.postDataJSON() as {
+      variables?: Record<string, unknown>;
+    };
+    expect(body.variables?.avatarUrl).toBe('');
+
+    await expect(page.getByText('Branding saved!')).toBeVisible();
+  });
+
+  test('cancelling the clear dialog leaves the current avatar untouched', async ({
+    page,
+  }) => {
+    await mockExternalImages(page);
+    await setupGraphQL(page, {
+      userTeamId: 1,
+      team: mockTeam({ avatarUrl: 'https://cdn.example.com/avatar.png' }),
+    });
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    await page
+      .getByRole('button', { name: /^clear$/i })
+      .first()
+      .click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await page.getByRole('button', { name: /cancel/i }).click();
+
+    await expect(page.getByRole('alertdialog')).not.toBeVisible();
+    await expect(
+      page.getByText('Current: https://cdn.example.com/avatar.png'),
+    ).toBeVisible();
+  });
+
+  test('uploads a valid avatar image with a CSRF-protected request', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, { userTeamId: 1 });
+
+    await page.route(
+      (url) => url.pathname.includes('/images/upload'),
+      async (route) => {
+        // Cross-origin POST with a non-simple Content-Type (image/png)
+        // triggers a real CORS preflight — answer OPTIONS with CORS headers
+        // so the browser proceeds to send the actual POST. The real fetch
+        // uses credentials: 'include', so the origin must be echoed back
+        // (not '*') and Allow-Credentials set, or the browser blocks the
+        // response after a successful network round-trip.
+        const origin = (await route.request().allHeaders())['origin'] ?? '*';
+        const corsHeaders = {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Credentials': 'true',
+        };
+        if (route.request().method() === 'OPTIONS') {
+          await route.fulfill({
+            status: 204,
+            headers: {
+              ...corsHeaders,
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
+            },
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: corsHeaders,
+          body: JSON.stringify({
+            url: 'https://cdn.example.com/uploaded-logo.png',
+          }),
+        });
+      },
+    );
+
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    const [uploadRequest] = await Promise.all([
+      page.waitForRequest(
+        (req) =>
+          req.url().includes('/images/upload') && req.method() === 'POST',
+      ),
+      page
+        .locator('input[type="file"]')
+        .first()
+        .setInputFiles({
+          name: 'logo.png',
+          mimeType: 'image/png',
+          buffer: Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+            'base64',
+          ),
+        }),
+    ]);
+
+    // Read headers off the captured Request object rather than a
+    // side-channel variable set inside the route handler above — that
+    // handler runs concurrently with waitForRequest's resolution and isn't
+    // guaranteed to have finished by the time this line runs.
+    const uploadRequestHeaders = await uploadRequest.allHeaders();
+    expect(uploadRequestHeaders['x-csrf-token']).toBe('e2e-csrf-token');
+
+    const brandingRequest = await page.waitForRequest((req) =>
+      (req.postData()?.toLowerCase() ?? '').includes('"updateteambranding"'),
+    );
+    const body = brandingRequest.postDataJSON() as {
+      variables?: Record<string, unknown>;
+    };
+    expect(body.variables?.avatarUrl).toBe(
+      'https://cdn.example.com/uploaded-logo.png',
+    );
+
+    await expect(page.getByText('Branding saved!')).toBeVisible();
+  });
+
+  test('rejects an oversized avatar upload without calling the upload endpoint', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, { userTeamId: 1 });
+
+    let uploadCalled = false;
+    await page.route(
+      (url) => url.pathname.includes('/images/upload'),
+      async (route) => {
+        uploadCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ url: 'https://cdn.example.com/x.png' }),
+        });
+      },
+    );
+
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'huge-logo.png',
+        mimeType: 'image/png',
+        buffer: Buffer.alloc(2 * 1024 * 1024 + 1),
+      });
+
+    await expect(page.getByText(/maximum allowed size is 2 mb/i)).toBeVisible();
+    expect(uploadCalled).toBe(false);
+  });
+
+  test('rejects an unsupported avatar file type without calling the upload endpoint', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, { userTeamId: 1 });
+
+    let uploadCalled = false;
+    await page.route(
+      (url) => url.pathname.includes('/images/upload'),
+      async (route) => {
+        uploadCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ url: 'https://cdn.example.com/x.png' }),
+        });
+      },
+    );
+
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'not-an-image.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('hello'),
+      });
+
+    await expect(page.getByText(/unsupported file type/i)).toBeVisible();
+    expect(uploadCalled).toBe(false);
+  });
+
+  test('saves a banner URL and shows success feedback', async ({ page }) => {
+    await setupGraphQL(page, { userTeamId: 1 });
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    const bannerUrlInput = page.getByPlaceholder(
+      'https://example.com/my-banner.jpg',
+    );
+    await bannerUrlInput.fill('https://cdn.example.com/new-banner.jpg');
+
+    const [request] = await Promise.all([
+      page.waitForRequest((req) =>
+        (req.postData()?.toLowerCase() ?? '').includes('"updateteambranding"'),
+      ),
+      page.getByRole('button', { name: /save branding/i }).click(),
+    ]);
+
+    const body = request.postDataJSON() as {
+      variables?: Record<string, unknown>;
+    };
+    expect(body.variables?.bannerUrl).toBe(
+      'https://cdn.example.com/new-banner.jpg',
+    );
+
+    await expect(page.getByText('Branding saved!')).toBeVisible();
+    await expect(bannerUrlInput).toHaveValue('');
+  });
+
+  test('clears the banner after confirming the dialog', async ({ page }) => {
+    await mockExternalImages(page);
+    await setupGraphQL(page, {
+      userTeamId: 1,
+      team: mockTeam({ bannerUrl: 'https://cdn.example.com/banner.jpg' }),
+    });
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    await page
+      .getByRole('button', { name: /^clear$/i })
+      .first()
+      .click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await expect(page.getByText('Clear team banner?')).toBeVisible();
+
+    const [request] = await Promise.all([
+      page.waitForRequest((req) =>
+        (req.postData()?.toLowerCase() ?? '').includes('"updateteambranding"'),
+      ),
+      page.getByRole('button', { name: /clear banner/i }).click(),
+    ]);
+
+    const body = request.postDataJSON() as {
+      variables?: Record<string, unknown>;
+    };
+    expect(body.variables?.bannerUrl).toBe('');
+
+    await expect(page.getByText('Branding saved!')).toBeVisible();
+  });
+
+  test('uploads a valid banner image with a CSRF-protected request', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, { userTeamId: 1 });
+
+    await page.route(
+      (url) => url.pathname.includes('/images/upload'),
+      async (route) => {
+        const origin = (await route.request().allHeaders())['origin'] ?? '*';
+        const corsHeaders = {
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Credentials': 'true',
+        };
+        if (route.request().method() === 'OPTIONS') {
+          await route.fulfill({
+            status: 204,
+            headers: {
+              ...corsHeaders,
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
+            },
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: corsHeaders,
+          body: JSON.stringify({
+            url: 'https://cdn.example.com/uploaded-banner.png',
+          }),
+        });
+      },
+    );
+
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    const [uploadRequest] = await Promise.all([
+      page.waitForRequest(
+        (req) =>
+          req.url().includes('/images/upload') && req.method() === 'POST',
+      ),
+      page
+        .locator('input[type="file"]')
+        .nth(1)
+        .setInputFiles({
+          name: 'banner.png',
+          mimeType: 'image/png',
+          buffer: Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+            'base64',
+          ),
+        }),
+    ]);
+
+    const uploadRequestHeaders = await uploadRequest.allHeaders();
+    expect(uploadRequestHeaders['x-csrf-token']).toBe('e2e-csrf-token');
+
+    const brandingRequest = await page.waitForRequest((req) =>
+      (req.postData()?.toLowerCase() ?? '').includes('"updateteambranding"'),
+    );
+    const body = brandingRequest.postDataJSON() as {
+      variables?: Record<string, unknown>;
+    };
+    expect(body.variables?.bannerUrl).toBe(
+      'https://cdn.example.com/uploaded-banner.png',
+    );
+
+    await expect(page.getByText('Branding saved!')).toBeVisible();
+  });
+
+  test('shows an error message when the save mutation returns a GraphQL error', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, { userTeamId: 1, errorBranding: true });
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    await page
+      .getByPlaceholder('https://example.com/my-logo.png')
+      .fill('https://cdn.example.com/new-logo.png');
+    await page.getByRole('button', { name: /save branding/i }).click();
+
+    // .first() — the error surfaces both inline and via an aria-live
+    // region wrapping the same text, so the plain text query matches twice.
+    await expect(
+      page.getByText('Failed to save branding').first(),
+    ).toBeVisible();
+    await expect(page.getByText('Branding saved!')).not.toBeVisible();
+  });
+
+  test('shows an error message when the upload endpoint returns an HTTP error', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, { userTeamId: 1 });
+
+    await page.route(
+      (url) => url.pathname.includes('/images/upload'),
+      async (route) => {
+        if (route.request().method() === 'OPTIONS') {
+          await route.fulfill({
+            status: 204,
+            headers: {
+              'Access-Control-Allow-Origin':
+                (await route.request().allHeaders())['origin'] ?? '*',
+              'Access-Control-Allow-Credentials': 'true',
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, X-CSRF-Token',
+            },
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          headers: {
+            'Access-Control-Allow-Origin':
+              (await route.request().allHeaders())['origin'] ?? '*',
+            'Access-Control-Allow-Credentials': 'true',
+          },
+          body: JSON.stringify({ error: 'Storage backend unavailable' }),
+        });
+      },
+    );
+
+    await page.goto(TEAM_URL);
+    await page.waitForLoadState('load');
+
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'logo.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          'base64',
+        ),
+      });
+
+    await expect(page.getByText('Storage backend unavailable')).toBeVisible();
   });
 });
 
