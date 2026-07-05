@@ -20,19 +20,19 @@ import { PremiumGate } from '../components/premium-gate.component';
  * hermetic and integration suites (ADR-0015 §6). Specs keep their `page.route`
  * mocks; navigation and element access live here.
  *
- * ADR-0016 migration status (LS-8304 stage 1; remaining stages LS-8305):
- *   • The container and the `stats` surface are driver-typed (platform
- *     neutral). Navigation to stats/compare goes through `driver.open()`.
- *   • `detail` and `compare` remain WEB-ONLY. They reach the Playwright
- *     `Page` through the web driver's escape hatch below, so constructing
- *     this object currently REQUIRES the web driver. What keeps them on the
- *     raw `Page` is web-only *behaviour*, not test workarounds:
- *     - `detail` uses `page.keyboard` (Escape-to-close) and bfcache-aware
- *       `waitForURL(…, { waitUntil: 'commit' })` for the back/deep-link flows;
- *       the surface migrates in LS-8305 stage 4.
- *     - `compare` still leans on `force: true` (premium-gate overlay) and CSS
- *       assertions (`toHaveCSS` chip colors — stage 5 relocates these to
- *       Storybook).
+ * ADR-0016 migration status (LS-8304 stage 1, LS-8305 stage 4; remaining LS-8305):
+ *   • The container, the `stats` surface, and the `detail` surface are
+ *     driver-typed (platform neutral). Navigation to stats/compare goes
+ *     through `driver.open()`.
+ *   • `detail` keeps only a slim, DOCUMENTED web-only remainder reached via the
+ *     escape hatch below: `page.keyboard` (Escape-to-close), bfcache-aware
+ *     `waitForURL(…, { waitUntil: 'commit' })`, the filter-by-descendant
+ *     sort-table helpers, and the raw-`Locator` `dialog` / position-badge
+ *     getters a few specs use for compound or `toHaveCSS` assertions.
+ *   • `compare` remains WEB-ONLY: it leans on `force: true` (premium-gate
+ *     overlay) and CSS assertions (`toHaveCSS` chip colors — stage 5 migrates
+ *     the behavioral verbs and relocates the CSS assertions to Storybook).
+ *   Constructing this object still REQUIRES the web driver until stage 5.
  */
 export class PlayersPage {
   /** The blurred premium-gate overlay shared across premium-gated pages. */
@@ -61,7 +61,7 @@ export class PlayersPage {
       this.#page.getByTestId('premium-feature-gate'),
     );
     this.stats = new PlayerStatsSurface(driver);
-    this.detail = new PlayerDetailSurface(this.#page);
+    this.detail = new PlayerDetailSurface(driver, this.#page);
     this.compare = new PlayerCompareSurface(this.#page);
   }
 
@@ -422,23 +422,44 @@ class PlayerStatsSurface {
 // /players/:id  +  /players/:brefId  (detail modal)
 // ===========================================================================
 
+/** Detail-modal stat-tab label → test id (expectTabVisible / expectTabHidden). */
+const TAB_TEST_IDS = {
+  'Career Arc': 'tab-career-arc',
+  Batting: 'tab-batting',
+  Pitching: 'tab-pitching',
+  Fielding: 'tab-fielding',
+} as const;
+
 /**
- * Semantic surface for the player-detail modal route. The modal is the only
- * `div[role="dialog"]` on the page; all reads scope to it. The brefId route
- * additionally renders a loading `status` and (on miss) an inline `alert`.
+ * Semantic surface for the player-detail modal route (ADR-0016 stage 4).
+ *
+ * Driver-typed: all reads/actions/assertions resolve through the platform
+ * {@link AppDriver}, scoped to the modal by its stable `player-detail-modal`
+ * test id (BaseModal → Dialog.Content, stage 3 — replaces the old
+ * `[role="dialog"][aria-modal="true"]` CSS selector; the id is precise enough
+ * to exclude Tamagui sheets / select portals, the LS-5807 concern, and maps to
+ * the accessibility id on native). The brefId route additionally renders a
+ * loading `status` and (on miss) an inline `alert`.
+ *
+ * A slim, DOCUMENTED web-only remainder still reaches the Playwright `Page`
+ * (constructed alongside the driver): bfcache-aware back navigation
+ * (`waitForURL(commit)`), page-level `keyboard` (Escape-to-close), the
+ * filter-by-descendant sort-table helpers, `focus()`, and the raw-`Locator`
+ * `dialog` / position-badge getters that a handful of specs use for compound
+ * or CSS (`toHaveCSS`) assertions — the latter bound for Storybook in stage 5.
  */
 class PlayerDetailSurface {
+  readonly #driver: AppDriver;
+  /** Web escape hatch for the documented web-only remainder (see class doc). */
   readonly #page: Page;
-  readonly #dialog: Locator;
-  readonly #loading: Locator;
+  readonly #dialog: UIElement;
+  readonly #loading: UIElement;
 
-  constructor(page: Page) {
+  constructor(driver: AppDriver, page: Page) {
+    this.#driver = driver;
     this.#page = page;
-    // Scope to aria-modal="true" to match only BaseModal content and exclude
-    // other Tamagui elements (sheets, select portals) that also use role="dialog"
-    // but are not true modal dialogs (LS-5807 fix).
-    this.#dialog = page.locator('[role="dialog"][aria-modal="true"]');
-    this.#loading = page.getByTestId('player-detail-loading');
+    this.#dialog = driver.byTestId('player-detail-modal');
+    this.#loading = driver.byTestId('player-detail-loading');
   }
 
   // ── Actions ──────────────────────────────────────────────────────
@@ -452,24 +473,27 @@ class PlayerDetailSurface {
   async switchTab(
     name: 'Career Arc' | 'Batting' | 'Pitching' | 'Fielding',
   ): Promise<void> {
-    await this.#dialog.getByText(name, { exact: true }).first().click();
+    await this.#dialog.byText(name, { exact: true }).first().tap();
   }
 
   /** Click the modal's Close (X) button. */
   async close(): Promise<void> {
-    const btn = this.#dialog.getByRole('button', { name: 'Close' });
-    await btn.waitFor({ state: 'visible', timeout: 5000 });
-    await btn.click();
+    const btn = this.#dialog.byRole('button', { name: 'Close' });
+    await btn.expectVisible({ timeout: 5000 });
+    await btn.tap();
   }
 
-  /** Press Escape to close the modal. */
+  /**
+   * Press Escape to close the modal. WEB-ONLY: page-level keyboard input has no
+   * portable driver verb (a native driver dismisses via a back gesture).
+   */
   async pressEscape(): Promise<void> {
     await this.#page.keyboard.press('Escape');
   }
 
   /** Click the "Open full page" external-link button to navigate to /players/:id. */
   async openFullPage(): Promise<void> {
-    await this.#dialog.getByRole('button', { name: /open full page/i }).click();
+    await this.#dialog.byRole('button', { name: /open full page/i }).tap();
   }
 
   /**
@@ -480,44 +504,51 @@ class PlayerDetailSurface {
    * in-masthead Back button, which lives inside the dialog (LS-5578 / LS-8311).
    */
   async back(): Promise<void> {
-    await this.#dialog.getByRole('button', { name: /← back/i }).click();
+    await this.#dialog.byRole('button', { name: /← back/i }).tap();
   }
 
-  /** Wait for navigation back to the stats list. */
+  /**
+   * Wait for navigation back to the stats list. WEB-ONLY: the regex covers
+   * /players/stats with or without query params, and `waitUntil: 'commit'` is
+   * required for bfcache restores (navigate(-1)) which don't fire the 'load'
+   * event the default condition waits for — a browser navigation semantic.
+   */
   async waitForStatsList(): Promise<void> {
-    // Regex covers /players/stats with or without query params.
-    // 'commit' is required for bfcache restores (navigate(-1)) which don't
-    // fire a 'load' event that the default waitUntil condition requires.
     await this.#page.waitForURL(/\/players\/stats/, { waitUntil: 'commit' });
   }
 
   // ── Reads ────────────────────────────────────────────────────────
 
-  /** The modal dialog root, for compound assertions in a spec. */
+  /**
+   * The modal dialog root as a raw `Locator` — WEB-ONLY escape hatch for the
+   * compound `dialog.getByTestId(...)` assertions a few specs build inline
+   * (career-summary-cards, season tables, career-arc). Resolves by the same
+   * `player-detail-modal` test id the driver-typed reads use.
+   */
   get dialog(): Locator {
-    return this.#dialog;
+    return this.#page.getByTestId('player-detail-modal');
   }
 
   // ── Assertions ───────────────────────────────────────────────────
 
   /** Assert the modal dialog is open. */
   async expectOpen(): Promise<void> {
-    await expect(this.#dialog).toBeVisible();
+    await this.#dialog.expectVisible();
   }
 
   /** Assert the modal dialog is not mounted/visible. */
   async expectClosed(): Promise<void> {
-    await expect(this.#dialog).not.toBeVisible();
+    await this.#dialog.expectHidden();
   }
 
   /** Assert the loading spinner is visible. */
   async expectLoading(): Promise<void> {
-    await expect(this.#loading).toBeVisible();
+    await this.#loading.expectVisible();
   }
 
   /** Assert the loading spinner has cleared. */
   async expectNotLoading(): Promise<void> {
-    await expect(this.#loading).not.toBeVisible();
+    await this.#loading.expectHidden();
   }
 
   /**
@@ -529,119 +560,100 @@ class PlayerDetailSurface {
    * {@link expectCareerBattingCard}) that proves the data has already rendered.
    */
   async expectNeverLoaded(): Promise<void> {
-    await expect(this.#loading).toHaveCount(0);
+    await this.#loading.expectCount(0);
   }
 
   /** Assert the in-modal "← Back" button is visible (scoped to the dialog to
    * avoid the page-level `.player-back-btn` on the standalone route). */
   async expectBackButton(): Promise<void> {
-    await expect(
-      this.#dialog.getByRole('button', { name: /← back/i }),
-    ).toBeVisible({ timeout: 15000 });
+    await this.#dialog
+      .byRole('button', { name: /← back/i })
+      .expectVisible({ timeout: 15000 });
   }
 
   /** Assert the eligible-positions section is visible. */
   async expectEligiblePositions(): Promise<void> {
-    await expect(this.#dialog.getByTestId('eligible-positions')).toBeVisible();
+    await this.#dialog.byTestId('eligible-positions').expectVisible();
   }
 
   /** Assert the career-batting summary card is visible. */
   async expectCareerBattingCard(): Promise<void> {
-    await expect(this.#dialog.getByTestId('career-batting-card')).toBeVisible();
+    await this.#dialog.byTestId('career-batting-card').expectVisible();
   }
 
   /** Assert the career-batting summary card is absent (detached or never mounted). */
   async expectNoCareerBattingCard(timeout = 3000): Promise<void> {
-    await expect(
-      this.#dialog.getByTestId('career-batting-card'),
-    ).not.toBeAttached({ timeout });
+    await this.#dialog
+      .byTestId('career-batting-card')
+      .expectNotAttached({ timeout });
   }
 
   /** Assert the career-pitching summary card is visible. */
   async expectCareerPitchingCard(): Promise<void> {
-    await expect(
-      this.#dialog.getByTestId('career-pitching-card'),
-    ).toBeVisible();
+    await this.#dialog.byTestId('career-pitching-card').expectVisible();
   }
 
   /** Assert the empty-state (no seasons) is visible. */
   async expectEmptyState(): Promise<void> {
-    await expect(this.#dialog.getByTestId('player-detail-empty')).toBeVisible();
+    await this.#dialog.byTestId('player-detail-empty').expectVisible();
   }
 
   /** Assert the error-state is visible. */
   async expectErrorState(): Promise<void> {
-    await expect(this.#dialog.getByTestId('player-detail-error')).toBeVisible();
+    await this.#dialog.byTestId('player-detail-error').expectVisible();
   }
 
   /** Assert the eligible-positions band is NOT visible. */
   async expectEligiblePositionsNotVisible(): Promise<void> {
-    await expect(
-      this.#dialog.getByTestId('eligible-positions'),
-    ).not.toBeVisible();
+    await this.#dialog.byTestId('eligible-positions').expectHidden();
   }
 
-  /** All position badge elements in the eligible-positions band. */
+  /**
+   * All position badge elements in the eligible-positions band — WEB-ONLY raw
+   * `Locator`: specs run `toHaveCSS` color assertions on these, which LS-8305
+   * stage 5 relocates to Storybook.
+   */
   getPlayerPositionBadges(): Locator {
-    return this.#dialog.getByTestId('player-position');
+    return this.dialog.getByTestId('player-position');
   }
 
-  /** A single position badge filtered by its abbreviation text. */
+  /** A single position badge filtered by its abbreviation text (WEB-ONLY). */
   getPlayerPositionBadge(abbr: string): Locator {
     return this.getPlayerPositionBadges().filter({ hasText: abbr });
   }
 
   /** Assert exactly `n` position badges are rendered. */
   async expectPlayerPositionCount(n: number): Promise<void> {
-    await expect(this.getPlayerPositionBadges()).toHaveCount(n);
+    await this.#dialog.byTestId('player-position').expectCount(n);
   }
 
   /** Assert the "No fantasy eligibility yet" placeholder is visible. */
   async expectEligiblePositionsUnranked(): Promise<void> {
-    await expect(
-      this.#dialog.getByTestId('eligible-positions-unranked'),
-    ).toBeVisible();
+    await this.#dialog.byTestId('eligible-positions-unranked').expectVisible();
   }
 
   /** Assert the career-batting summary card is NOT visible. */
   async expectCareerBattingCardNotVisible(): Promise<void> {
-    await expect(
-      this.#dialog.getByTestId('career-batting-card'),
-    ).not.toBeVisible();
+    await this.#dialog.byTestId('career-batting-card').expectHidden();
   }
 
   /** Assert the stat tab with the given label is present in the tab bar. */
   async expectTabVisible(
     name: 'Career Arc' | 'Batting' | 'Pitching' | 'Fielding',
   ): Promise<void> {
-    const testIdMap = {
-      'Career Arc': 'tab-career-arc',
-      Batting: 'tab-batting',
-      Pitching: 'tab-pitching',
-      Fielding: 'tab-fielding',
-    } as const;
-    await expect(this.#dialog.getByTestId(testIdMap[name])).toBeVisible();
+    await this.#dialog.byTestId(TAB_TEST_IDS[name]).expectVisible();
   }
 
   /** Assert the stat tab with the given label is absent from the tab bar. */
   async expectTabHidden(
     name: 'Career Arc' | 'Batting' | 'Pitching' | 'Fielding',
   ): Promise<void> {
-    const testIdMap = {
-      'Career Arc': 'tab-career-arc',
-      Batting: 'tab-batting',
-      Pitching: 'tab-pitching',
-      Fielding: 'tab-fielding',
-    } as const;
-    await expect(this.#dialog.getByTestId(testIdMap[name])).toHaveCount(0);
+    await this.#dialog.byTestId(TAB_TEST_IDS[name]).expectCount(0);
   }
 
   /** Wait until the player name is visible in the modal header. */
   async waitForPlayerName(name: string, timeout = 5000): Promise<void> {
-    await this.#dialog
-      .getByText(name)
-      .first()
-      .waitFor({ state: 'visible', timeout });
+    await this.#dialog.byText(name).first().expectVisible({ timeout });
   }
 
   /**
@@ -653,26 +665,30 @@ class PlayerDetailSurface {
     opts: { exact?: boolean; first?: boolean } = {},
   ): Promise<void> {
     const { exact, first = true } = opts;
-    const locator =
+    const element =
       typeof text === 'string'
-        ? this.#dialog.getByText(text, { exact })
-        : this.#dialog.getByText(text);
-    await expect(first ? locator.first() : locator).toBeVisible();
+        ? this.#dialog.byText(text, { exact })
+        : this.#dialog.byText(text);
+    await (first ? element.first() : element).expectVisible();
   }
 
   // ── Season-table sorting ─────────────────────────────────────────
 
-  /** The sort button for `column` (e.g. 'ERA', 'Year') inside the modal. */
+  /**
+   * The sort button for `column` (e.g. 'ERA', 'Year') inside the modal —
+   * WEB-ONLY raw `Locator`, paired with the filter-by-descendant
+   * {@link columnHeader} the narrow driver vocabulary can't express.
+   */
   sortButton(column: string): Locator {
-    return this.#dialog.getByRole('button', {
+    return this.dialog.getByRole('button', {
       name: `Sort by ${column}`,
       exact: true,
     });
   }
 
-  /** The `columnheader` cell that wraps the sort button for `column`. */
+  /** The `columnheader` cell that wraps the sort button for `column` (WEB-ONLY). */
   columnHeader(column: string): Locator {
-    return this.#dialog.getByRole('columnheader').filter({
+    return this.dialog.getByRole('columnheader').filter({
       has: this.#page.getByRole('button', {
         name: `Sort by ${column}`,
         exact: true,
@@ -682,25 +698,32 @@ class PlayerDetailSurface {
 
   /** The full text content of the modal dialog. */
   async dialogTextContent(): Promise<string> {
-    return (await this.#dialog.textContent()) ?? '';
+    return this.#dialog.text();
   }
 
   /** Assert the sort button for `column` is visible. */
   async expectSortButtonVisible(column: string): Promise<void> {
-    await expect(this.sortButton(column)).toBeVisible();
+    await this.#dialog
+      .byRole('button', { name: `Sort by ${column}`, exact: true })
+      .expectVisible();
   }
 
   /** Click the sort button for `column`. */
   async clickSortButton(column: string): Promise<void> {
-    await this.sortButton(column).click();
+    await this.#dialog
+      .byRole('button', { name: `Sort by ${column}`, exact: true })
+      .tap();
   }
 
-  /** Focus the sort button for `column`. */
+  /** Focus the sort button for `column`. WEB-ONLY: `focus()` has no driver verb. */
   async focusSortButton(column: string): Promise<void> {
     await this.sortButton(column).focus();
   }
 
-  /** Assert the `aria-sort` value on the columnheader for `column`. */
+  /**
+   * Assert the `aria-sort` value on the columnheader for `column`. WEB-ONLY:
+   * the columnheader is resolved by filter-by-descendant (see {@link columnHeader}).
+   */
   async expectSortDirection(
     column: string,
     direction: 'none' | 'ascending' | 'descending',
@@ -713,21 +736,21 @@ class PlayerDetailSurface {
 
   /** Assert the given text is NOT visible anywhere inside the modal dialog. */
   async expectTextAbsent(text: string | RegExp): Promise<void> {
-    await expect(this.#dialog.getByText(text)).not.toBeVisible();
+    await this.#dialog.byText(text).expectHidden();
   }
 
   // ── brefId route ─────────────────────────────────────────────────
 
   /** Assert the brefId loading `status` indicator is visible. */
   async expectLoadingStatus(): Promise<void> {
-    await expect(this.#page.getByRole('status')).toBeVisible();
+    await this.#driver.byRole('status').expectVisible();
   }
 
   /** Assert the brefId "No player found" alert is visible. */
   async expectNotFoundAlert(): Promise<void> {
-    const alert = this.#page.getByRole('alert');
-    await expect(alert).toBeVisible();
-    await expect(alert).toContainText('No player found');
+    const alert = this.#driver.byRole('alert');
+    await alert.expectVisible();
+    await alert.expectContainsText('No player found');
   }
 }
 

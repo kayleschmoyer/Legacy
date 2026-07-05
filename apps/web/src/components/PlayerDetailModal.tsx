@@ -1360,6 +1360,11 @@ export function PlayerDetailModal({
           padding={24}
           $sm={{ padding: 16 }}
           style={{ background: mastheadBackground }}
+          // Stable id for the whole modal body — the e2e detail surface scopes
+          // reads here instead of the generic aria-modal selector (ADR-0016
+          // stage 3). This YStack wraps every state (masthead, loading, error,
+          // empty, cards, tables), so it is present whenever the modal is open.
+          data-testid="player-detail-modal"
         >
           {/* ── Back button for in-app context (LS-5578) ── */}
           {onBack && (
