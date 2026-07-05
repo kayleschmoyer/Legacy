@@ -134,7 +134,12 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
       positionId: t.arg.int({ required: false }),
     },
     resolve: authorized(
-      { teamMembers: (args) => [args.teamMemberId], checkLocked: true },
+      {
+        teamMembers: (args) => [args.teamMemberId],
+        checkLocked: true,
+        // Lineup edits are core assistant-manager responsibilities (LS-6024).
+        allowAssistantManager: true,
+      },
       async (_parent, args, context, user) => {
         const { teamMemberId, positionId } = args;
 
@@ -266,6 +271,8 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
       {
         teamMembers: (args) => [args.teamMemberIdA, args.teamMemberIdB],
         checkLocked: true,
+        // Lineup edits are core assistant-manager responsibilities (LS-6024).
+        allowAssistantManager: true,
       },
       async (_parent, args, context, user) => {
         const { teamMemberIdA, positionIdA, teamMemberIdB, positionIdB } = args;
@@ -1076,7 +1083,11 @@ builder.mutationField('setTradeBlock', (t) =>
       askingPrice: t.arg.string({ required: false }),
     },
     resolve: authorized(
-      { teamMembers: (args) => [args.teamMemberId] },
+      {
+        teamMembers: (args) => [args.teamMemberId],
+        // Docstring above states GM or assistant manager may call this (LS-6024).
+        allowAssistantManager: true,
+      },
       async (_parent, args, _context) => {
         const { teamMemberId, onTradeBlock, askingPrice } = args;
         const db = _context.db;
@@ -1142,7 +1153,11 @@ builder.mutationField('setNickname', (t) =>
       nickname: t.arg.string({ required: false }),
     },
     resolve: authorized(
-      { teamMembers: (args) => [args.teamMemberId] },
+      {
+        teamMembers: (args) => [args.teamMemberId],
+        // Cosmetic roster customization is a standard assistant-manager action (LS-6024).
+        allowAssistantManager: true,
+      },
       async (_parent, args, _context) => {
         const { teamMemberId, nickname } = args;
         const db = _context.db;

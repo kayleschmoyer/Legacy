@@ -450,6 +450,42 @@ describe('verifyTeamEditAccess', () => {
       extensions: { code: 'FORBIDDEN' },
     });
   });
+
+  // LS-6024: an assistant_manager's teamId matches the assisted team, so
+  // absent an explicit opt-in this must NOT silently grant edit access.
+  it('throws FORBIDDEN for an assistant_manager who owns the team when allowAssistantManager is not set', async () => {
+    const members = [{ id: 1, teamId: 10, leagueId: 2, playerId: 50 }];
+    const membership = [{ permissionLevel: 'assistant_manager', teamId: 10 }];
+    const db = makeDbForTeamEdit(members, membership);
+
+    await expect(
+      verifyTeamEditAccess(db as never, 1, [1]),
+    ).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
+  });
+
+  it('allows an assistant_manager who owns the team when allowAssistantManager is true', async () => {
+    const members = [{ id: 1, teamId: 10, leagueId: 2, playerId: 50 }];
+    const membership = [{ permissionLevel: 'assistant_manager', teamId: 10 }];
+    const db = makeDbForTeamEdit(members, membership);
+
+    await expect(
+      verifyTeamEditAccess(db as never, 1, [1], true),
+    ).resolves.toBeUndefined();
+  });
+
+  it('throws FORBIDDEN for an assistant_manager of a different team even when allowAssistantManager is true', async () => {
+    const members = [{ id: 1, teamId: 10, leagueId: 2, playerId: 50 }];
+    const membership = [{ permissionLevel: 'assistant_manager', teamId: 99 }];
+    const db = makeDbForTeamEdit(members, membership);
+
+    await expect(
+      verifyTeamEditAccess(db as never, 1, [1], true),
+    ).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
+  });
 });
 
 // ── checkPlayersNotLocked ──────────────────────────────────────────────────────
@@ -758,6 +794,81 @@ describe('authorized() wrapper', () => {
       resolve({}, { memberIds: [1] }, makeContext(USER, db)),
     ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  // LS-6024: allowAssistantManager must be opt-in per call site.
+  it('throws FORBIDDEN via teamMembers config for an assistant_manager when allowAssistantManager is not set', async () => {
+    const handler = jest.fn();
+    const resolve = authorized(
+      { teamMembers: (args: { memberIds: number[] }) => args.memberIds },
+      handler,
+    );
+
+    let selectCall = 0;
+    const db = {
+      select: jest.fn(() => {
+        selectCall++;
+        if (selectCall === 1) {
+          const where = jest
+            .fn()
+            .mockResolvedValue([
+              { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+            ]);
+          return { from: jest.fn(() => ({ where })) };
+        }
+        const limit = jest
+          .fn()
+          .mockResolvedValue([
+            { permissionLevel: 'assistant_manager', teamId: 10 },
+          ]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
+      }),
+    };
+
+    await expect(
+      resolve({}, { memberIds: [1] }, makeContext(USER, db)),
+    ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('allows the handler via teamMembers config for an assistant_manager when allowAssistantManager is true', async () => {
+    const handler = jest.fn().mockResolvedValue('am-result');
+    const resolve = authorized(
+      {
+        teamMembers: (args: { memberIds: number[] }) => args.memberIds,
+        allowAssistantManager: true,
+      },
+      handler,
+    );
+
+    let selectCall = 0;
+    const db = {
+      select: jest.fn(() => {
+        selectCall++;
+        if (selectCall === 1) {
+          const where = jest
+            .fn()
+            .mockResolvedValue([
+              { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+            ]);
+          return { from: jest.fn(() => ({ where })) };
+        }
+        const limit = jest
+          .fn()
+          .mockResolvedValue([
+            { permissionLevel: 'assistant_manager', teamId: 10 },
+          ]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
+      }),
+    };
+
+    const result = await resolve({}, { memberIds: [1] }, makeContext(USER, db));
+    expect(result).toBe('am-result');
+    expect(handler).toHaveBeenCalled();
   });
 
   it('throws FORBIDDEN when noImpersonation is set and user is impersonating', async () => {

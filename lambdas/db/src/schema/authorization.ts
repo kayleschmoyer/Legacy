@@ -103,6 +103,20 @@ export interface AuthConfig<TArgs> {
   teamMembers?: (args: TArgs) => number[];
 
   /**
+   * When `true` (and `teamMembers` is also provided), a caller whose
+   * `assistant_manager` membership matches the target team's `teamId` is
+   * also granted access. Defaults to `false` — assistant managers get **no**
+   * edit access unless a mutation explicitly opts in here. Reserve `true`
+   * for day-to-day roster/lineup actions; leave `false` for destructive or
+   * high-stakes actions (e.g. dropping a player, accepting a trade). See
+   * LS-6024 — this must stay explicit per call site, never inferred from
+   * `teamId` alone.
+   *
+   * @default false
+   */
+  allowAssistantManager?: boolean;
+
+  /**
    * Extract a league ID for a commissioner-only guard.  When provided the
    * wrapper will call {@link verifyCommissionerAccess}.
    */
@@ -469,11 +483,15 @@ export async function verifyCommissionerAccess(
  * Verifies the user has edit access to the team(s) that the given team members
  * belong to.  Access is granted when either:
  *
- *   1. The user owns the team (their `league_members.teamId` matches), **or**
- *   2. The user is a commissioner / General Manager of the league.
+ *   1. The user is a commissioner / General Manager of the league, **or**
+ *   2. `allowAssistantManager` is `true` and the user is the `assistant_manager`
+ *      of the team that owns every given team member.
  *
  * Use this for any mutation that modifies a team's roster, lineup, trade
- * proposals, etc.
+ * proposals, etc. `allowAssistantManager` must be set per call site — a
+ * matching `teamId` alone is never sufficient (LS-6024): without the
+ * explicit flag, an assistant_manager (or any future non-elevated
+ * permission level sharing the assisted team's `teamId`) is denied.
  *
  * @throws Error when the user lacks permission.
  */
@@ -481,6 +499,7 @@ export async function verifyTeamEditAccess(
   db: PublicDb,
   userId: number,
   teamMemberIds: number[],
+  allowAssistantManager = false,
 ): Promise<void> {
   const members = await getTeamMemberInfo(db, teamMemberIds);
 
@@ -491,13 +510,23 @@ export async function verifyTeamEditAccess(
 
   const membership = await verifyLeagueMembership(db, leagueId, userId);
 
-  // Commissioners and owners can edit any team's roster
+  // Commissioners and team owners (general managers) can edit any team's roster
   if (isCommissionerOrOwner(membership)) {
     return;
   }
 
-  // Regular members can only edit their own team's roster
-  if (membership.teamId && teamIds.every((tid) => tid === membership.teamId)) {
+  // Assistant managers may edit their assigned team's roster only when the
+  // calling mutation explicitly opts in — a matching teamId never grants
+  // access on its own.
+  const ownsAssistedTeam =
+    membership.teamId != null &&
+    teamIds.every((tid) => tid === membership.teamId);
+
+  if (
+    allowAssistantManager &&
+    membership.permissionLevel === 'assistant_manager' &&
+    ownsAssistedTeam
+  ) {
     return;
   }
 
@@ -674,7 +703,12 @@ export function authorized<TArgs, TResult>(
     // 5. Team edit access check (team owner OR commissioner)
     if (config.teamMembers) {
       const memberIds = config.teamMembers(args);
-      await verifyTeamEditAccess(db, user.id, memberIds);
+      await verifyTeamEditAccess(
+        db,
+        user.id,
+        memberIds,
+        config.allowAssistantManager,
+      );
 
       // 6. Player lock check (only meaningful when team members are specified)
       if (config.checkLocked) {
