@@ -1,0 +1,139 @@
+/**
+ * Tests for MatchupDetailPage PageMeta description sport-gating (LS-5892 / BMD-022).
+ *
+ * Covers:
+ *   1. Baseball league: description reads "fantasy baseball".
+ *   2. Football league: description reads "fantasy football" (not hardcoded baseball).
+ *   3. League data not yet loaded: description falls back to "fantasy baseball".
+ */
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { MatchupDetailPage } from './MatchupDetailPage';
+
+// --- router ------------------------------------------------------------------
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual<typeof import('react-router-dom')>('react-router-dom'),
+  useNavigate: () => jest.fn(),
+  useParams: () => ({ leagueId: '100', matchupId: '1' }),
+}));
+
+// --- analytics -----------------------------------------------------------------
+jest.mock('../../utils/analytics', () => ({
+  trackMatchupViewed: jest.fn(),
+}));
+
+// --- hooks ---------------------------------------------------------------------
+const baseMatchup = {
+  id: 1,
+  weekNumber: 3,
+  leagueId: 100,
+  team1Id: 10,
+  team2Id: 20,
+  status: 'scheduled',
+  gamesPerMatchup: 5,
+  selectedGamesCount: 2,
+};
+
+jest.mock('../../hooks/useMatchup', () => ({
+  useMatchupById: jest.fn(() => ({
+    matchup: baseMatchup,
+    loading: false,
+    error: undefined,
+  })),
+  useMatchupsForLeague: jest.fn(() => ({ matchups: [] })),
+  useCurrentWeek: jest.fn(() => ({ currentWeek: 3 })),
+}));
+
+jest.mock('../../hooks/useIsPremium', () => ({
+  useHasEntitlement: jest.fn(() => false),
+}));
+
+let mockLeagueSport: string | undefined = 'baseball';
+jest.mock('@legacy-sports/graphql', () => ({
+  MatchupStatus: {
+    Scheduled: 'scheduled',
+    InProgress: 'in_progress',
+    Completed: 'completed',
+  },
+  useGetUserTeamIdQuery: jest.fn(() => ({ data: { userTeamId: 10 } })),
+  useGetLeagueByIdQuery: jest.fn(() => ({
+    data: mockLeagueSport ? { league: { sport: mockLeagueSport } } : undefined,
+  })),
+}));
+
+// --- PageMeta: capture the description prop instead of rendering meta tags -----
+jest.mock('../../components/PageMeta', () => ({
+  PageMeta: ({ description }: { description?: string }) => (
+    <div data-testid="page-meta-description">{description}</div>
+  ),
+}));
+
+// --- heavy sub-components -------------------------------------------------------
+jest.mock('../../components/PremiumGate', () => ({
+  PremiumGate: ({ children }: { children: React.ReactNode }) => children,
+}));
+jest.mock('../../features/matchup/MatchupScoreboard', () => ({
+  MatchupScoreboard: () => <div data-testid="scoreboard" />,
+}));
+jest.mock('../../features/matchup/MatchupWinProbabilityPanel', () => ({
+  MatchupWinProbabilityPanel: () => <div data-testid="win-probability" />,
+}));
+jest.mock('../../features/matchup/MatchupRosterComparison', () => ({
+  MatchupRosterComparison: () => <div data-testid="roster-comparison" />,
+}));
+jest.mock('../../features/matchup/MatchupRosterEditor', () => ({
+  MatchupRosterEditor: () => <div data-testid="roster-editor" />,
+}));
+jest.mock('@legacy-sports/shared-components/matchup', () => ({
+  MatchupDetailLayout: (props: {
+    header?: React.ReactNode;
+    scoreboard?: React.ReactNode;
+    winProbabilityPanel?: React.ReactNode;
+    rosterEditor?: React.ReactNode;
+    recapPanel?: React.ReactNode;
+    rosterComparison?: React.ReactNode;
+  }) => (
+    <div data-testid="matchup-detail-layout">
+      {props.header}
+      {props.scoreboard}
+      {props.winProbabilityPanel}
+      {props.rosterEditor}
+      {props.recapPanel}
+      {props.rosterComparison}
+    </div>
+  ),
+  MatchupRecapPanel: () => <div data-testid="recap-panel" />,
+}));
+
+describe('MatchupDetailPage – PageMeta description sport-gating (LS-5892)', () => {
+  beforeEach(() => {
+    mockLeagueSport = 'baseball';
+  });
+
+  it('describes the matchup as fantasy baseball for a baseball league', () => {
+    mockLeagueSport = 'baseball';
+    render(<MatchupDetailPage />);
+
+    expect(screen.getByTestId('page-meta-description')).toHaveTextContent(
+      'View Week 3 fantasy baseball matchup scores, rosters, and stats on Legacy Sports.',
+    );
+  });
+
+  it('describes the matchup as fantasy football for a football league', () => {
+    mockLeagueSport = 'football';
+    render(<MatchupDetailPage />);
+
+    expect(screen.getByTestId('page-meta-description')).toHaveTextContent(
+      'View Week 3 fantasy football matchup scores, rosters, and stats on Legacy Sports.',
+    );
+  });
+
+  it('falls back to fantasy baseball while league data has not loaded yet', () => {
+    mockLeagueSport = undefined;
+    render(<MatchupDetailPage />);
+
+    expect(screen.getByTestId('page-meta-description')).toHaveTextContent(
+      'View Week 3 fantasy baseball matchup scores, rosters, and stats on Legacy Sports.',
+    );
+  });
+});

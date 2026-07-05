@@ -6,7 +6,11 @@ import {
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components/matchup';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
-import { MatchupStatus, useGetUserTeamIdQuery } from '@legacy-sports/graphql';
+import {
+  MatchupStatus,
+  useGetLeagueByIdQuery,
+  useGetUserTeamIdQuery,
+} from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
@@ -45,6 +49,12 @@ export function MatchupDetailPage() {
     skip: !leagueIdNum,
   });
   const userTeamId = userTeamData?.userTeamId ?? null;
+
+  const { data: leagueData } = useGetLeagueByIdQuery({
+    variables: { id: leagueIdNum ?? 0 },
+    skip: !leagueIdNum,
+  });
+  const leagueSport = leagueData?.league?.sport ?? 'baseball';
 
   const userCurrentMatchup = React.useMemo(() => {
     if (!currentWeek || !userTeamId || !allLeagueMatchups.length) return null;
@@ -170,7 +180,7 @@ export function MatchupDetailPage() {
             ? `Week ${matchup.weekNumber} Matchup`
             : 'Matchup Details'
         }
-        description={`View Week ${matchup.weekNumber ?? ''} fantasy baseball matchup scores, rosters, and stats on Legacy Sports.`}
+        description={`View Week ${matchup.weekNumber ?? ''} fantasy ${leagueSport} matchup scores, rosters, and stats on Legacy Sports.`}
       />
       <MatchupDetailLayout
         matchup={matchup}
