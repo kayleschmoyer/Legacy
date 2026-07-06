@@ -9,11 +9,20 @@ export interface GetOccurrenceParams {
 }
 
 interface OccurrenceResult {
-  instance: Record<string, unknown>;
+  /**
+   * Some Rollbar responses nest the instance under `result.instance`; others
+   * return the instance object directly as `result` (see the unwrap below).
+   */
+  instance?: Record<string, unknown>;
 }
 
 interface InstancesResult {
   instances: Array<Record<string, unknown>>;
+}
+
+/** Narrow an unknown value to a non-null, non-array plain object. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -41,13 +50,21 @@ export async function getOccurrence(
   }
 
   try {
-    let occurrence: Record<string, unknown>;
+    let occurrence: unknown;
 
     if (occurrenceId !== undefined) {
-      const result = await rollbarGet<OccurrenceResult>({
-        path: `/instance/${occurrenceId}`,
-      });
-      occurrence = result.instance;
+      const result = await rollbarGet<
+        OccurrenceResult & Record<string, unknown>
+      >({ path: `/instance/${occurrenceId}` });
+      // `/instance/{id}` returns the instance object directly as the envelope
+      // `result` (same convention as `/item/{id}`); some responses instead nest
+      // it under `result.instance`. Accept either shape. If `occurrence` were
+      // left undefined it would serialize to `undefined` (not a string) below
+      // and fail MCP content-schema validation with a Zod invalid_union error.
+      occurrence =
+        isRecord(result) && isRecord(result.instance)
+          ? result.instance
+          : result;
     } else {
       const result = await rollbarGet<InstancesResult>({
         path: `/item/${itemId}/instances`,
@@ -65,6 +82,22 @@ export async function getOccurrence(
         };
       }
       occurrence = instances[0];
+    }
+
+    if (!isRecord(occurrence)) {
+      const label =
+        occurrenceId !== undefined
+          ? `occurrence ${occurrenceId}`
+          : `latest occurrence of item ${itemId}`;
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Rollbar returned no usable payload for ${label}.`,
+          },
+        ],
+      };
     }
 
     return {

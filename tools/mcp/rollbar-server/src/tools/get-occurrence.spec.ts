@@ -41,7 +41,11 @@ describe('getOccurrence', () => {
     );
   });
 
-  it('fetches /instance/{id} when occurrenceId is provided', async () => {
+  it('fetches /instance/{id} and unwraps the instance returned directly as `result`', async () => {
+    // Real API shape: `/instance/{id}` returns the instance object directly as
+    // the envelope `result` (same convention as `/item/{id}`). Reading
+    // `result.instance` here yielded undefined -> JSON.stringify(undefined) ->
+    // a non-string `text` -> Zod invalid_union failure (LS-8346).
     const fullOccurrence = {
       id: 999,
       timestamp: 1700000000,
@@ -56,10 +60,9 @@ describe('getOccurrence', () => {
     };
     const fn = mockFetch(
       () =>
-        new Response(
-          JSON.stringify({ err: 0, result: { instance: fullOccurrence } }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ err: 0, result: fullOccurrence }), {
+          status: 200,
+        }),
     );
 
     const result = await getOccurrence({ occurrenceId: 999 });
@@ -70,11 +73,52 @@ describe('getOccurrence', () => {
     expect(calledUrl).toBe(`${ROLLBAR_API_BASE}/instance/999`);
 
     const text = (result.content[0] as { text: string }).text;
+    // Regression guard: `text` must always be a plain string so it satisfies
+    // the MCP text-content schema.
+    expect(typeof text).toBe('string');
     const parsed = JSON.parse(text);
     expect(parsed.data.body.trace_chain[0].exception.message).toBe(
       'something went wrong',
     );
     expect(parsed.data.body.custom.userId).toBe(42);
+  });
+
+  it('also unwraps the instance when nested under `result.instance`', async () => {
+    const fullOccurrence = {
+      id: 1001,
+      timestamp: 1700000002,
+      data: { body: { message: { body: 'nested shape' } } },
+    };
+    mockFetch(
+      () =>
+        new Response(
+          JSON.stringify({ err: 0, result: { instance: fullOccurrence } }),
+          { status: 200 },
+        ),
+    );
+
+    const result = await getOccurrence({ occurrenceId: 1001 });
+
+    expect(result.isError).toBeUndefined();
+    const text = (result.content[0] as { text: string }).text;
+    expect(typeof text).toBe('string');
+    const parsed = JSON.parse(text);
+    expect(parsed.id).toBe(1001);
+    expect(parsed.data.body.message.body).toBe('nested shape');
+  });
+
+  it('returns a string error result when the instance payload is missing', async () => {
+    mockFetch(
+      () =>
+        new Response(JSON.stringify({ err: 0, result: null }), { status: 200 }),
+    );
+
+    const result = await getOccurrence({ occurrenceId: 555 });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content[0] as { text: string }).text;
+    expect(typeof text).toBe('string');
+    expect(text).toMatch(/no usable payload for occurrence 555/);
   });
 
   it('fetches /item/{itemId}/instances?per_page=1 when only itemId is provided', async () => {
