@@ -140,6 +140,82 @@ describe('NodeRollbarImplementation', () => {
     });
   });
 
+  describe('captureError de-duplication (LS-8343)', () => {
+    let nowSpy: jest.SpyInstance<number, []>;
+    let currentNow: number;
+
+    beforeEach(() => {
+      currentNow = 1_000_000;
+      nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => currentNow);
+    });
+
+    afterEach(() => {
+      nowSpy.mockRestore();
+    });
+
+    it('reports the first occurrence but suppresses identical items within the window', () => {
+      rollbar.init({ accessToken: 'direct-token-value', environment: 'test' });
+
+      const makeErr = () =>
+        new Error('CORS: rejected unrecognized WebSocket origin');
+      rollbar.captureError(makeErr(), undefined, 'warning');
+      rollbar.captureError(makeErr(), undefined, 'warning');
+      rollbar.captureError(makeErr(), undefined, 'warning');
+
+      // Only the first identical warning reaches Rollbar; the rest are collapsed.
+      expect(rollbarInstanceMock.warning).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports again once the window elapses and attaches the suppressed count', () => {
+      rollbar.init({
+        accessToken: 'direct-token-value',
+        environment: 'test',
+        dedupeWindowMs: 60_000,
+      });
+
+      const makeErr = () => new Error('flood');
+      rollbar.captureError(makeErr()); // reported
+      rollbar.captureError(makeErr()); // suppressed
+      rollbar.captureError(makeErr()); // suppressed
+
+      currentNow += 60_000; // advance past the window
+
+      rollbar.captureError(makeErr()); // reported again, with suppressed count
+
+      expect(rollbarInstanceMock.error).toHaveBeenCalledTimes(2);
+      const secondCallPayload = (
+        rollbarInstanceMock.error.mock.calls as unknown[][]
+      )[1][1] as { suppressedSinceLastReport?: number };
+      expect(secondCallPayload.suppressedSinceLastReport).toBe(2);
+    });
+
+    it('reports distinct fingerprints independently', () => {
+      rollbar.init({ accessToken: 'direct-token-value', environment: 'test' });
+
+      rollbar.captureError(new Error('alpha'));
+      rollbar.captureError(new Error('beta'));
+      // Same message, different severity is a distinct fingerprint.
+      rollbar.captureError(new Error('alpha'), undefined, 'warning');
+
+      expect(rollbarInstanceMock.error).toHaveBeenCalledTimes(2);
+      expect(rollbarInstanceMock.warning).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends every item when de-duplication is disabled (dedupeWindowMs: 0)', () => {
+      rollbar.init({
+        accessToken: 'direct-token-value',
+        environment: 'test',
+        dedupeWindowMs: 0,
+      });
+
+      rollbar.captureError(new Error('same'));
+      rollbar.captureError(new Error('same'));
+      rollbar.captureError(new Error('same'));
+
+      expect(rollbarInstanceMock.error).toHaveBeenCalledTimes(3);
+    });
+  });
+
   describe('isClientFacingGraphQLError', () => {
     it('returns true for GraphQLError with BAD_USER_INPUT code', () => {
       const err = Object.assign(new Error('Draft not found'), {
@@ -200,6 +276,7 @@ describe('NodeRollbarImplementation', () => {
       delete process.env['APP_VERSION'];
       delete process.env['COMMIT_SHA'];
       delete process.env['ROLLBAR_VERBOSE'];
+      delete process.env['ROLLBAR_DEDUPE_WINDOW_MS'];
     });
     afterAll(() => {
       process.env = originalEnv;
@@ -228,6 +305,25 @@ describe('NodeRollbarImplementation', () => {
       expect(config?.accessToken).toBe('');
       expect(config?.accessTokenSecretName).toBe('prod/rollbar-access-token');
       expect(config?.environment).toBe('prod');
+    });
+
+    it('parses ROLLBAR_DEDUPE_WINDOW_MS into dedupeWindowMs (including 0)', () => {
+      process.env['ROLLBAR_ACCESS_TOKEN'] = 'env-token';
+      process.env['ROLLBAR_DEDUPE_WINDOW_MS'] = '0';
+
+      expect(rollbar.getRollbarConfigFromEnv()?.dedupeWindowMs).toBe(0);
+
+      process.env['ROLLBAR_DEDUPE_WINDOW_MS'] = '30000';
+      expect(rollbar.getRollbarConfigFromEnv()?.dedupeWindowMs).toBe(30000);
+    });
+
+    it('leaves dedupeWindowMs undefined when ROLLBAR_DEDUPE_WINDOW_MS is unset or non-numeric', () => {
+      process.env['ROLLBAR_ACCESS_TOKEN'] = 'env-token';
+
+      expect(rollbar.getRollbarConfigFromEnv()?.dedupeWindowMs).toBeUndefined();
+
+      process.env['ROLLBAR_DEDUPE_WINDOW_MS'] = 'not-a-number';
+      expect(rollbar.getRollbarConfigFromEnv()?.dedupeWindowMs).toBeUndefined();
     });
 
     it('returns null and warns when neither token env var is set', () => {

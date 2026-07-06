@@ -35,6 +35,17 @@ export interface RollbarConfig {
    * via `checkIgnore` since Rollbar.js has no native sample-rate option.
    */
   captureRate?: number;
+  /**
+   * Rolling window, in milliseconds, over which identical items (same severity
+   * + error message) are collapsed to a single report before being sent to
+   * Rollbar. A burst of the same error (e.g. thousands of rejected-Origin
+   * WebSocket warnings) would otherwise exhaust the `itemsPerMinute` budget and
+   * cause Rollbar to drop *distinct* real errors ("item per minute limit
+   * reached", LS-8343). Within the window only the first occurrence of a
+   * fingerprint is sent; the suppressed count is attached to the next report
+   * so volume stays visible. Defaults to 60000 (60s). Set to 0 to disable.
+   */
+  dedupeWindowMs?: number;
 }
 
 export interface RollbarBreadcrumb {

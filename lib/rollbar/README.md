@@ -22,16 +22,33 @@ Exposes the same function API as the previous `@legacy-sports/sentry` library fo
 
 ## Environment Variables
 
-| Variable                           | Description                                                                                                                                |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ROLLBAR_ACCESS_TOKEN`             | Server-side (post_server_item) token. Used in local dev/CLI; Lambdas prefer `ROLLBAR_ACCESS_TOKEN_SECRET_NAME`.                            |
-| `ROLLBAR_ACCESS_TOKEN_SECRET_NAME` | AWS Secrets Manager secret name holding the server-side token. Fetched at cold-start in Lambda runtime (LS-2790).                          |
-| `VITE_ROLLBAR_ACCESS_TOKEN`        | Browser-side (post_client_item) token. Reused by the Expo app via `apps/app/app.config.js`.                                                |
-| `EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN` | React Native (post_client_item) token. Auto-aliased from `VITE_ROLLBAR_ACCESS_TOKEN` at config-load time. Set explicitly only to override. |
-| `EXPO_PUBLIC_APP_VERSION`          | Optional release/version string for the native bundle. Auto-aliased from `APP_VERSION` when unset.                                         |
-| `ROLLBAR_ENVIRONMENT`              | Override environment name                                                                                                                  |
-| `ROLLBAR_RELEASE`                  | Override release/version string                                                                                                            |
-| `ROLLBAR_VERBOSE`                  | Set to `true` for verbose logging                                                                                                          |
+| Variable                           | Description                                                                                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ROLLBAR_ACCESS_TOKEN`             | Server-side (post_server_item) token. Used in local dev/CLI; Lambdas prefer `ROLLBAR_ACCESS_TOKEN_SECRET_NAME`.                                                         |
+| `ROLLBAR_ACCESS_TOKEN_SECRET_NAME` | AWS Secrets Manager secret name holding the server-side token. Fetched at cold-start in Lambda runtime (LS-2790).                                                       |
+| `VITE_ROLLBAR_ACCESS_TOKEN`        | Browser-side (post_client_item) token. Reused by the Expo app via `apps/app/app.config.js`.                                                                             |
+| `EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN` | React Native (post_client_item) token. Auto-aliased from `VITE_ROLLBAR_ACCESS_TOKEN` at config-load time. Set explicitly only to override.                              |
+| `EXPO_PUBLIC_APP_VERSION`          | Optional release/version string for the native bundle. Auto-aliased from `APP_VERSION` when unset.                                                                      |
+| `ROLLBAR_ENVIRONMENT`              | Override environment name                                                                                                                                               |
+| `ROLLBAR_RELEASE`                  | Override release/version string                                                                                                                                         |
+| `ROLLBAR_VERBOSE`                  | Set to `true` for verbose logging                                                                                                                                       |
+| `ROLLBAR_DEDUPE_WINDOW_MS`         | Node only. Rolling window (ms) for collapsing identical items to one report; protects the `itemsPerMinute` budget from bursts (LS-8343). Default `60000`; `0` disables. |
+
+## Server-side de-duplication (LS-8343)
+
+The Node implementation collapses identical items (same severity + error
+message) to a single Rollbar report per `dedupeWindowMs` (default 60s). Rollbar
+counts every `captureError`/`captureWarning` call against a client-side
+`itemsPerMinute` budget (25). A burst of one repeating error — e.g. thousands of
+`CORS: rejected unrecognized WebSocket origin` warnings — would otherwise exhaust
+that budget in seconds, causing Rollbar to drop _distinct_ real errors and emit
+its "item per minute limit reached, ignoring errors until timeout" notice. The
+suppressed occurrence count is attached to the next report of that fingerprint as
+`suppressedSinceLastReport`, so burst volume stays visible. Tune or disable via
+`ROLLBAR_DEDUPE_WINDOW_MS` (or the `dedupeWindowMs` config field) without a code
+change. This is orthogonal to fixing a noisy call site at its source (e.g.
+LS-8342 for the WebSocket origin allowlist) — it is the safety net that keeps any
+future noise source from monopolizing the ingestion budget.
 
 ## How the mobile token gets wired (LS-4777)
 

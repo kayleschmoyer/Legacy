@@ -37,12 +37,12 @@
 
 ## Shared libs with env knobs
 
-| Lib                 | Vars                                                                                      |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| `lib/db-client`     | Axis C set + `DB_MIGRATION_USER/PASSWORD`, `DB_APP_PASSWORD` (migrations), `DATABASE_URL` |
-| `lib/rollbar`       | `ROLLBAR_ENVIRONMENT`, `ROLLBAR_RELEASE`, `ROLLBAR_VERBOSE` (`rollbar.node.ts`)           |
-| `lib/pfr-client`    | `PFR_USER_AGENT`, `PFR_CF_CLEARANCE` (`PFRSession.ts` — Cloudflare clearance)             |
-| `lib/env-utilities` | The `getEnvVar*` helpers themselves                                                       |
+| Lib                 | Vars                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `lib/db-client`     | Axis C set + `DB_MIGRATION_USER/PASSWORD`, `DB_APP_PASSWORD` (migrations), `DATABASE_URL`                   |
+| `lib/rollbar`       | `ROLLBAR_ENVIRONMENT`, `ROLLBAR_RELEASE`, `ROLLBAR_VERBOSE`, `ROLLBAR_DEDUPE_WINDOW_MS` (`rollbar.node.ts`) |
+| `lib/pfr-client`    | `PFR_USER_AGENT`, `PFR_CF_CLEARANCE` (`PFRSession.ts` — Cloudflare clearance)                               |
+| `lib/env-utilities` | The `getEnvVar*` helpers themselves                                                                         |
 
 ## Agent/MCP tooling (not product config — do not wire into Terraform)
 
