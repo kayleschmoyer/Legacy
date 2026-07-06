@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -124,6 +130,51 @@ describe('background job registry', () => {
     expect(third.existing).toBe(false);
     await waitForJob(third.jobId, 20_000);
   }, 30_000);
+
+  it('marks a job failed with an internal-timeout error when it exceeds timeoutMs', async () => {
+    const { jobId } = startJob({
+      command: 'make',
+      args: ['slow'],
+      cwd: workDir,
+      label: 'slow-timeout',
+      timeoutMs: 1_500,
+    });
+    const snapshot = await waitForJob(jobId, 20_000);
+    expect(snapshot?.status).toBe('failed');
+    expect(snapshot?.error).toContain('internal timeout');
+  }, 25_000);
+
+  it('reports a disk-recovered job past its deadline as orphaned even if the pid is alive', () => {
+    // Simulate a job persisted by a dead server process: not in this process's
+    // registry, done:false, a live pid (this test process), expired deadline.
+    const jobId = `nx-test-orphan-${process.pid}`;
+    const jobsDir = join(tmpdir(), 'nx-mcp-jobs');
+    mkdirSync(jobsDir, { recursive: true });
+    const metaPath = join(jobsDir, `${jobId}.json`);
+    writeFileSync(
+      metaPath,
+      JSON.stringify({
+        jobId,
+        pid: process.pid,
+        label: 'recovered-expired',
+        cwd: workDir,
+        command: 'make',
+        args: ['slow'],
+        startTime: Date.now() - 10_000,
+        timeoutMs: 1_000,
+        done: false,
+        exitCode: null,
+        error: null,
+      }),
+    );
+    try {
+      const snapshot = snapshotJob(jobId);
+      expect(snapshot?.status).toBe('orphaned');
+      expect(snapshot?.hint).toContain('exceeded its process timeout');
+    } finally {
+      unlinkSync(metaPath);
+    }
+  });
 
   it('listJobs returns recent jobs newest-first with status', async () => {
     const { jobId } = startJob({

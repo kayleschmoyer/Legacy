@@ -35,7 +35,7 @@ The seven `pc-*` chunks in canonical order — `pc-db-prep` → `pc-typecheck` �
 
 | Platform             | Binding (owner ruling 2026-07-02)                                                                                                                                                                                                                 |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Copilot Coding Agent | `nx_run_pc_chunk({ chunk: "pc-db-prep" })` → … → `({ chunk: "pc-build" })` — **mandatory** wherever the tool exists (5-min timeout, structured pass/fail)                                                                                         |
+| Copilot Coding Agent | `nx_run_pc_chunk({ chunk: "pc-db-prep" })` → … → `({ chunk: "pc-build" })` — **mandatory** wherever the tool exists (30-min runaway backstop, structured pass/fail)                                                                               |
 | Connector CC web     | Same — `nx_run_pc_chunk` per chunk, **mandatory**                                                                                                                                                                                                 |
 | Default CC web       | `nx_run_pc_chunk` does not exist here. Sanctioned path: Bash `make pc-<chunk>` with **`run_in_background: true`**, one chunk at a time, waiting for each background completion before starting the next. This is the only compliant degraded path |
 

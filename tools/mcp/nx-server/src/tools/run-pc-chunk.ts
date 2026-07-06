@@ -4,8 +4,12 @@ import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
-// 5-minute process timeout — each pc-chunk can take longer than the Bash tool's ~120s limit.
-const PC_CHUNK_TIMEOUT_MS = 5 * 60 * 1000;
+// 30-minute process timeout — a runaway backstop only, NOT a transport guard (that is the
+// sync budget + bounded nx_job_wait calls). It must never fire on legitimate work: a cold
+// Nx cache (every fresh worktree/cloud session) can push a single chunk past 5 minutes,
+// and killing it forces a retry loop that never converges when one task alone exceeds the
+// cap (LS-8353).
+const PC_CHUNK_TIMEOUT_MS = 30 * 60 * 1000;
 // Single-call sync budget — stays safely under the ~60s MCP transport timeout in cloud
 // sessions. Chunks that finish inside the budget return their result in one call; slower
 // chunks return a running snapshot with a jobId to poll via nx_job_wait.

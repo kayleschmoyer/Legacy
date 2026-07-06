@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import {
   closeSync,
   existsSync,
@@ -53,6 +53,8 @@ interface JobMeta {
   command: string;
   args: string[];
   startTime: number;
+  /** Process-level timeout; lets a later server process detect an expired job. */
+  timeoutMs?: number;
   done: boolean;
   exitCode: number | null;
   error: string | null;
@@ -109,6 +111,7 @@ function persistMeta(record: JobRecord): void {
     command: record.command,
     args: record.args,
     startTime: record.startTime,
+    timeoutMs: record.timeoutMs,
     done: record.done,
     exitCode: record.exitCode,
     error: record.error,
@@ -135,6 +138,30 @@ function isPidAlive(pid: number): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Kill a job's entire process tree. `child.kill()` alone terminates only the
+ * direct child (`make`), leaving nx/node grandchildren running — they contend
+ * with any retry via daemon and file locks. On Windows, taskkill /T walks the
+ * tree; on POSIX the child is spawned as a process-group leader (detached) so
+ * signalling -pid reaches the whole group.
+ */
+function killJobTree(child: ChildProcess): void {
+  const pid = child.pid;
+  if (!pid) return;
+  if (process.platform === 'win32') {
+    spawn('taskkill', ['/pid', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    return;
+  }
+  try {
+    process.kill(-pid, 'SIGTERM');
+  } catch {
+    child.kill();
   }
 }
 
@@ -188,18 +215,29 @@ export function snapshotJob(jobId: string): JobSnapshot | null {
   // Not marked done. For in-memory jobs the close handler will flip the flag;
   // for disk-recovered jobs from a dead server, completion is never recorded —
   // if the pid has exited, report the job as orphaned so the caller inspects
-  // the log instead of waiting forever.
+  // the log instead of waiting forever. A recovered job also has no timeout
+  // timer (it died with the old server), and isPidAlive can hit a recycled
+  // pid — so a job past its own process deadline is orphaned too, even if the
+  // pid still reads as alive.
   const inMemory = jobRegistry.has(jobId);
-  if (!inMemory && !isPidAlive(record.pid)) {
-    return {
-      ...base,
-      status: 'orphaned',
-      logTail: readLog(record.logPath).slice(-LOG_TAIL_CHARS),
-      hint:
-        'This job was started by a previous MCP server process and has exited, but its ' +
-        'result was not recorded. Inspect logTail for pass/fail markers; re-run the ' +
-        'command if the outcome is unclear.',
-    };
+  if (!inMemory) {
+    const deadlinePassed =
+      record.timeoutMs !== undefined &&
+      Date.now() - record.startTime > record.timeoutMs;
+    if (!isPidAlive(record.pid) || deadlinePassed) {
+      return {
+        ...base,
+        status: 'orphaned',
+        logTail: readLog(record.logPath).slice(-LOG_TAIL_CHARS),
+        hint: deadlinePassed
+          ? 'This job was started by a previous MCP server process and has exceeded its ' +
+            'process timeout; its result will never be recorded. Inspect logTail for ' +
+            'pass/fail markers; re-run the command if the outcome is unclear.'
+          : 'This job was started by a previous MCP server process and has exited, but its ' +
+            'result was not recorded. Inspect logTail for pass/fail markers; re-run the ' +
+            'command if the outcome is unclear.',
+      };
+    }
   }
 
   return {
@@ -244,6 +282,9 @@ export function startJob(opts: StartJobOptions): {
         cwd: opts.cwd,
         stdio: ['ignore', fd, fd],
         windowsHide: true,
+        // POSIX: make the child a process-group leader so killJobTree can
+        // signal the whole tree via -pid. Windows tree-kill uses taskkill /T.
+        detached: process.platform !== 'win32',
       });
     } finally {
       // The child holds its own copy of the descriptor.
@@ -259,6 +300,7 @@ export function startJob(opts: StartJobOptions): {
     command: opts.command,
     args: opts.args,
     startTime: Date.now(),
+    timeoutMs: opts.timeoutMs,
     done: false,
     exitCode: null,
     error: null,
@@ -273,7 +315,7 @@ export function startJob(opts: StartJobOptions): {
 
   // Enforce a process-level timeout independent of the MCP client transport.
   const timer = setTimeout(() => {
-    child.kill();
+    killJobTree(child);
     record.done = true;
     record.error = `Process killed after ${opts.timeoutMs}ms (internal timeout)`;
     persistMeta(record);
