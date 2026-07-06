@@ -20,8 +20,8 @@ import { PremiumGate } from '../components/premium-gate.component';
  * hermetic and integration suites (ADR-0015 §6). Specs keep their `page.route`
  * mocks; navigation and element access live here.
  *
- * ADR-0016 migration status (LS-8304 stage 1, LS-8305 stage 4; remaining LS-8305):
- *   • The container, the `stats` surface, and the `detail` surface are
+ * ADR-0016 migration status (LS-8304 stage 1, LS-8305 stages 4-5):
+ *   • The container and every surface (`stats`, `detail`, `compare`) are
  *     driver-typed (platform neutral). Navigation to stats/compare goes
  *     through `driver.open()`.
  *   • `detail` keeps only a slim, DOCUMENTED web-only remainder reached via the
@@ -29,10 +29,15 @@ import { PremiumGate } from '../components/premium-gate.component';
  *     `waitForURL(…, { waitUntil: 'commit' })`, the filter-by-descendant
  *     sort-table helpers, and the raw-`Locator` `dialog` / position-badge
  *     getters a few specs use for compound or `toHaveCSS` assertions.
- *   • `compare` remains WEB-ONLY: it leans on `force: true` (premium-gate
- *     overlay) and CSS assertions (`toHaveCSS` chip colors — stage 5 migrates
- *     the behavioral verbs and relocates the CSS assertions to Storybook).
- *   Constructing this object still REQUIRES the web driver until stage 5.
+ *   • `compare` is driver-typed with a slim, DOCUMENTED web-only remainder:
+ *     `force: true` (the intentional premium-gate overlay bypass), `blur()` /
+ *     `focus()` / `toBeFocused()`, `toHaveText(RegExp)`, and a negated
+ *     contains-text cell assertion — none of which have a portable driver verb.
+ *     The chip slot-color regression moved out of the spec entirely to
+ *     PlayerComparison.stories.tsx (Chromatic); slot *identity* stays here as a
+ *     platform-neutral `aria-label="Slot N"` check (LS-8352 stage 5).
+ *   Constructing this object still REQUIRES the web driver because both
+ *   `detail` and `compare` keep the web-only remainders above.
  */
 export class PlayersPage {
   /** The blurred premium-gate overlay shared across premium-gated pages. */
@@ -52,8 +57,9 @@ export class PlayersPage {
     this.#driver = driver;
     if (!(driver instanceof PlaywrightWebDriver)) {
       throw new Error(
-        'PlayersPage requires the web driver until its detail/compare ' +
-          'surfaces are migrated (LS-8305 stages 4-5).',
+        'PlayersPage requires the web driver: its detail/compare surfaces ' +
+          'keep documented web-only remainders reached via the Page escape ' +
+          'hatch (LS-8305 stages 4-5).',
       );
     }
     this.#page = driver.page;
@@ -62,7 +68,7 @@ export class PlayersPage {
     );
     this.stats = new PlayerStatsSurface(driver);
     this.detail = new PlayerDetailSurface(driver, this.#page);
-    this.compare = new PlayerCompareSurface(this.#page);
+    this.compare = new PlayerCompareSurface(this.#driver, this.#page);
   }
 
   // ── Navigation ────────────────────────────────────────────────────
@@ -765,45 +771,64 @@ class PlayerDetailSurface {
  * stat label; the BEST badge and stat values are asserted relative to a row.
  */
 class PlayerCompareSurface {
+  readonly #driver: AppDriver;
+  /** Web escape hatch for the documented web-only remainder (see class doc). */
   readonly #page: Page;
-  readonly #search: Locator;
-  readonly #suggestions: Locator;
-  readonly #selectedPlayers: Locator;
-  readonly #table: Locator;
+  readonly #search: UIElement;
+  readonly #suggestions: UIElement;
+  readonly #selectedPlayers: UIElement;
+  readonly #table: UIElement;
 
-  constructor(page: Page) {
+  constructor(driver: AppDriver, page: Page) {
+    this.#driver = driver;
     this.#page = page;
-    this.#search = page.getByLabel('Search players to compare');
-    this.#suggestions = page.getByLabel('Player suggestions');
-    this.#selectedPlayers = page.getByLabel('Selected players');
-    this.#table = page.getByRole('table', { name: 'Player comparison' });
+    this.#search = driver.byLabel('Search players to compare');
+    this.#suggestions = driver.byLabel('Player suggestions');
+    this.#selectedPlayers = driver.byLabel('Selected players');
+    this.#table = driver.byRole('table', { name: 'Player comparison' });
+  }
+
+  /**
+   * The search input as a raw `Locator` — WEB-ONLY escape hatch for the
+   * `force: true` premium-gate bypass, `blur()`, and `toBeFocused()` below,
+   * none of which have a portable driver verb. Resolves by the same accessible
+   * label the driver-typed `#search` uses.
+   */
+  #searchInput(): Locator {
+    return this.#page.getByLabel('Search players to compare');
   }
 
   // ── Actions ──────────────────────────────────────────────────────
 
   /**
-   * Add a player by typing `searchTerm` and clicking the `fullName` result.
+   * Add a player by typing `searchTerm` and tapping the `fullName` result.
    * Retry-wrapped: the suggestion dropdown can close on a stale blur, so the
-   * fill + click is retried until it lands (mirrors every comparison spec).
+   * fill + tap is retried until it lands (mirrors every comparison spec).
+   * `fill()` focuses the input itself, so the old explicit `focus()` before it
+   * was redundant and is dropped (same cleanup as the detail surface).
    */
   async addPlayer(searchTerm: string, fullName: string): Promise<void> {
+    const result = this.#driver.byText(fullName);
     await expect(async () => {
       await this.#search.clear();
-      await this.#search.focus();
       await this.#search.fill(searchTerm);
-      await expect(this.#page.getByText(fullName)).toBeVisible({
-        timeout: 5000,
-      });
-      await this.#page.getByText(fullName).click({ timeout: 5000 });
+      await result.expectVisible({ timeout: 5000 });
+      await result.tap();
     }).toPass({ timeout: 15000 });
   }
 
-  /** As {@link addPlayer} but forces each interaction past the gate overlay. */
+  /**
+   * As {@link addPlayer} but forces each interaction past the gate overlay.
+   * WEB-ONLY: `force: true` bypasses the PremiumGate overlay's `pointerEvents:
+   * 'none'` on blurred content for non-premium users (an intentional gate, not
+   * the LS-5807 overlay bug) — there is no portable "click through an overlay"
+   * driver verb, so this stays on the raw `Locator`.
+   */
   async addPlayerForce(searchTerm: string, fullName: string): Promise<void> {
+    const search = this.#searchInput();
     await expect(async () => {
-      await this.#search.clear({ force: true });
-      await this.#search.focus();
-      await this.#search.fill(searchTerm, { force: true });
+      await search.clear({ force: true });
+      await search.fill(searchTerm, { force: true });
       await expect(this.#page.getByText(fullName)).toBeVisible({
         timeout: 5000,
       });
@@ -816,34 +841,41 @@ class PlayerCompareSurface {
   /** Type into the comparison search input without selecting a result. */
   async typeSearch(term: string): Promise<void> {
     await this.#search.fill(term);
-    await expect(this.#search).toHaveValue(term);
+    await this.#search.expectValue(term);
   }
 
-  /** Blur the comparison search input (drives the blur-before-click race). */
+  /**
+   * Blur the comparison search input (drives the blur-before-click race).
+   * WEB-ONLY: `blur()` has no portable driver verb (native dismisses focus via
+   * a tap elsewhere, not an explicit blur).
+   */
   async blurSearch(): Promise<void> {
-    await this.#search.blur();
+    await this.#searchInput().blur();
   }
 
   /** Click a suggestion in the dropdown by player name. */
   async clickSuggestion(name: string): Promise<void> {
-    await this.#suggestions.getByText(name).first().click();
+    await this.#suggestions.byText(name).first().tap();
   }
 
   /** Remove a selected player via their chip's Remove button (matched by name). */
   async removePlayer(fullName: string): Promise<void> {
-    await this.#page
-      .getByRole('button', { name: nameRegExp('remove', fullName) })
-      .click();
+    await this.#driver
+      .byRole('button', { name: nameRegExp('remove', fullName) })
+      .tap();
   }
 
   /** Click the empty-slot chip-button for the given slot number. */
   async clickEmptySlot(slotNumber: number): Promise<void> {
-    await this.#page
-      .getByRole('button', { name: `Slot ${slotNumber} empty — add a player` })
-      .click();
+    await this.#driver
+      .byRole('button', { name: `Slot ${slotNumber} empty — add a player` })
+      .tap();
   }
 
-  /** Focus the empty-slot chip-button for the given slot number. */
+  /**
+   * Focus the empty-slot chip-button for the given slot number. WEB-ONLY:
+   * `focus()` has no portable driver verb.
+   */
   async focusEmptySlot(slotNumber: number): Promise<void> {
     await this.#page
       .getByRole('button', { name: `Slot ${slotNumber} empty — add a player` })
@@ -852,36 +884,36 @@ class PlayerCompareSurface {
 
   /** Click "Undo" in the remove-player toast (matched by player name). */
   async clickUndoRemove(fullName: string): Promise<void> {
-    await this.#page
-      .getByRole('button', { name: nameRegExp('undo removing', fullName) })
-      .click();
+    await this.#driver
+      .byRole('button', { name: nameRegExp('undo removing', fullName) })
+      .tap();
   }
 
   /** Click the "Get Started Free" CTA shown to unauthenticated visitors. */
   async clickGetStartedFree(): Promise<void> {
-    await this.#page.getByRole('button', { name: /get started free/i }).click();
+    await this.#driver.byRole('button', { name: /get started free/i }).tap();
   }
 
   /** Click a season-breakdown expand/collapse toggle by player id. */
   async clickSeasonExpand(playerId: number): Promise<void> {
-    await this.#page.getByTestId(`season-expand-${playerId}`).click();
+    await this.#driver.byTestId(`season-expand-${playerId}`).tap();
   }
 
   // ── Reads ────────────────────────────────────────────────────────
 
   /** A comparison-table row matched by its stat label. */
-  row(label: string | RegExp): Locator {
-    return this.#page.getByRole('row').filter({ hasText: label });
+  row(label: string | RegExp): UIElement {
+    return this.#driver.byRole('row').filterByText(label);
   }
 
   /** A selected-player chip by player id. */
-  chip(playerId: number): Locator {
-    return this.#page.getByTestId(`selected-chip-${playerId}`);
+  chip(playerId: number): UIElement {
+    return this.#driver.byTestId(`selected-chip-${playerId}`);
   }
 
   /** A season-breakdown table by kind + player name. */
-  seasonTable(kind: 'batting' | 'pitching', playerName: string): Locator {
-    return this.#page.getByRole('table', {
+  seasonTable(kind: 'batting' | 'pitching', playerName: string): UIElement {
+    return this.#driver.byRole('table', {
       name: `Season ${kind} for ${playerName}`,
     });
   }
@@ -890,53 +922,54 @@ class PlayerCompareSurface {
 
   /** Assert the comparison search input is visible. */
   async expectSearchVisible(): Promise<void> {
-    await expect(this.#search).toBeVisible();
+    await this.#search.expectVisible();
   }
 
   /** Assert the comparison search input is enabled. */
   async expectSearchEnabled(): Promise<void> {
-    await expect(this.#search).toBeEnabled();
+    await this.#search.expectEnabled();
   }
 
-  /** Assert the search input is focused. */
+  /**
+   * Assert the search input is focused. WEB-ONLY: `toBeFocused()` has no
+   * portable driver assertion (focus is not a first-class native concept).
+   */
   async expectSearchFocused(): Promise<void> {
-    await expect(this.#search).toBeFocused();
+    await expect(this.#searchInput()).toBeFocused();
   }
 
   /** Assert the search input has the given value. */
   async expectSearchValue(value: string): Promise<void> {
-    await expect(this.#search).toHaveValue(value);
+    await this.#search.expectValue(value);
   }
 
   /** Assert the capacity-reached placeholder is shown and the input disabled. */
   async expectSearchAtCapacity(): Promise<void> {
-    const input = this.#page.getByPlaceholder(
+    const input = this.#driver.byPlaceholder(
       '4 players selected — remove one to add more',
     );
-    await expect(input).toBeVisible();
-    await expect(input).toBeDisabled();
+    await input.expectVisible();
+    await input.expectDisabled();
   }
 
   /** Assert the default-capacity placeholder ("Search player name…") is shown. */
   async expectSearchPlaceholderDefault(): Promise<void> {
-    await expect(
-      this.#page.getByPlaceholder('Search player name…'),
-    ).toBeVisible();
+    await this.#driver.byPlaceholder('Search player name…').expectVisible();
   }
 
   /** Assert the suggestions dropdown is not visible. */
   async expectSuggestionsHidden(timeout = 2000): Promise<void> {
-    await expect(this.#suggestions).not.toBeVisible({ timeout });
+    await this.#suggestions.expectHidden({ timeout });
   }
 
   /** Assert a suggestion with `name` is visible in the dropdown. */
   async expectSuggestionVisible(name: string, timeout?: number): Promise<void> {
-    await expect(this.#suggestions.getByText(name)).toBeVisible({ timeout });
+    await this.#suggestions.byText(name).expectVisible({ timeout });
   }
 
   /** Assert a suggestion with `name` is NOT visible in the dropdown. */
   async expectSuggestionHidden(name: string): Promise<void> {
-    await expect(this.#suggestions.getByText(name)).not.toBeVisible();
+    await this.#suggestions.byText(name).expectHidden();
   }
 
   /** Wait until the suggestions dropdown is visible (retry-wrapped fill). */
@@ -946,192 +979,180 @@ class PlayerCompareSurface {
   ): Promise<void> {
     await expect(async () => {
       await this.#search.fill(term);
-      await expect(this.#suggestions).toBeVisible({ timeout: 3000 });
+      await this.#suggestions.expectVisible({ timeout: 3000 });
     }).toPass({ timeout });
   }
 
   /** Assert a selected-player chip (by id) is visible. */
   async expectChipVisible(playerId: number): Promise<void> {
-    await expect(this.chip(playerId)).toBeVisible();
+    await this.chip(playerId).expectVisible();
   }
 
   /** Assert a selected-player chip (by id) is not visible. */
   async expectChipHidden(playerId: number): Promise<void> {
-    await expect(this.chip(playerId)).not.toBeVisible();
+    await this.chip(playerId).expectHidden();
   }
 
   /** Assert a selected-player chip (by id) has count 0. */
   async expectChipCount(playerId: number, count: number): Promise<void> {
-    await expect(this.chip(playerId)).toHaveCount(count);
+    await this.chip(playerId).expectCount(count);
   }
 
   /** Assert a chip contains the given text (name / position). */
   async expectChipContains(playerId: number, text: string): Promise<void> {
-    await expect(this.chip(playerId)).toContainText(text);
+    await this.chip(playerId).expectContainsText(text);
   }
 
-  /** Assert a chip's top-border accent color (slot color coding). */
-  async expectChipBorderTopColor(
-    playerId: number,
-    color: string,
-  ): Promise<void> {
-    await expect(this.chip(playerId)).toHaveCSS('border-top-color', color);
-  }
-
-  /** Assert a chip's accent dot (first child div) background color. */
-  async expectChipAccentDotColor(
-    playerId: number,
-    color: string,
-  ): Promise<void> {
-    await expect(this.chip(playerId).locator('div').first()).toHaveCSS(
-      'background-color',
-      color,
-    );
+  /**
+   * Assert a chip carries the slot-`slot` badge (1-indexed). The {@link SlotBadge}
+   * renders `aria-label="Slot N"` as the PRIMARY, color-blind-safe slot
+   * differentiator (PCM-044 / LS-7039); the accent colors are a secondary cue.
+   * This replaces the old `toHaveCSS` border/dot-color assertions — the color
+   * regression itself now lives in PlayerComparison.stories.tsx (Chromatic),
+   * while slot *identity* (and its stability across removals) stays here as a
+   * platform-neutral behavioral check.
+   */
+  async expectChipSlot(playerId: number, slot: number): Promise<void> {
+    await this.chip(playerId).byLabel(`Slot ${slot}`).expectVisible();
   }
 
   /** Assert the player's Remove button is visible. */
   async expectRemoveButton(fullName: string): Promise<void> {
-    await expect(
-      this.#page.getByRole('button', { name: nameRegExp('remove', fullName) }),
-    ).toBeVisible();
+    await this.#driver
+      .byRole('button', { name: nameRegExp('remove', fullName) })
+      .expectVisible();
   }
 
   /** Assert the player's Remove button carries the id-based test id. */
   async expectRemoveTestId(playerId: number): Promise<void> {
-    await expect(
-      this.#page.getByTestId(`remove-player-${playerId}`),
-    ).toBeVisible();
+    await this.#driver.byTestId(`remove-player-${playerId}`).expectVisible();
   }
 
   /** Assert the selected-players container is visible. */
   async expectSelectedPlayersContainer(): Promise<void> {
-    await expect(this.#selectedPlayers).toBeVisible();
+    await this.#selectedPlayers.expectVisible();
   }
 
   /** Assert the number of empty-slot placeholders in the selection bar. */
   async expectEmptySlotCount(count: number): Promise<void> {
-    await expect(this.#selectedPlayers.getByText(/slot.*empty/i)).toHaveCount(
-      count,
-    );
+    await this.#selectedPlayers.byText(/slot.*empty/i).expectCount(count);
   }
 
   /** Assert an "Slot N · empty" placeholder text is visible. */
   async expectEmptySlotText(slotNumber: number): Promise<void> {
-    await expect(
-      this.#page.getByText(`Slot ${slotNumber} · empty`),
-    ).toBeVisible();
+    await this.#driver.byText(`Slot ${slotNumber} · empty`).expectVisible();
   }
 
   /** Assert an empty-slot chip-button is visible. */
   async expectEmptySlotButton(slotNumber: number): Promise<void> {
-    await expect(
-      this.#page.getByRole('button', {
+    await this.#driver
+      .byRole('button', {
         name: `Slot ${slotNumber} empty — add a player`,
-      }),
-    ).toBeVisible();
+      })
+      .expectVisible();
   }
 
   /** Assert the "N of 4 selected · M slots open" count hint. */
   async expectCountHint(text: string): Promise<void> {
-    await expect(this.#page.getByText(text)).toBeVisible();
+    await this.#driver.byText(text).expectVisible();
   }
 
   /** Assert the "Add player · up to 4" slot label is visible. */
   async expectSlotLabel(): Promise<void> {
-    await expect(this.#page.getByText('Add player · up to 4')).toBeVisible();
+    await this.#driver.byText('Add player · up to 4').expectVisible();
   }
 
   /** Assert the undo-remove toast is visible and names the removed player. */
   async expectUndoToast(fullName: string): Promise<void> {
-    const toast = this.#page.getByTestId('undo-remove-toast');
-    await expect(toast).toBeVisible();
-    await expect(toast).toContainText(`Removed ${fullName}`);
+    const toast = this.#driver.byTestId('undo-remove-toast');
+    await toast.expectVisible();
+    await toast.expectContainsText(`Removed ${fullName}`);
   }
 
   /** Assert the undo-remove toast is no longer present. */
   async expectUndoToastGone(): Promise<void> {
-    await expect(this.#page.getByTestId('undo-remove-toast')).toHaveCount(0);
+    await this.#driver.byTestId('undo-remove-toast').expectCount(0);
   }
 
   // ── Assertions: states ───────────────────────────────────────────
 
   /** Assert the empty-state `status` region is visible (0-player card). */
   async expectStatusVisible(): Promise<void> {
-    await expect(this.#page.getByRole('status')).toBeVisible();
+    await this.#driver.byRole('status').expectVisible();
   }
 
   /** Assert the 0-player empty-state heading ("Nobody on deck yet") is visible. */
   async expectEmptyStateHeading(): Promise<void> {
-    await expect(this.#page.getByText('Nobody on deck yet')).toBeVisible();
+    await this.#driver.byText('Nobody on deck yet').expectVisible();
   }
 
   /** Assert the empty-state heading is hidden. */
   async expectEmptyStateHidden(): Promise<void> {
-    await expect(this.#page.getByText('Nobody on deck yet')).not.toBeVisible();
+    await this.#driver.byText('Nobody on deck yet').expectHidden();
   }
 
   /** Assert the empty-state "add at least two players" prompt is visible. */
   async expectEmptyStatePrompt(): Promise<void> {
-    await expect(
-      this.#page.getByText(/add at least two players to begin comparing/i),
-    ).toBeVisible();
+    await this.#driver
+      .byText(/add at least two players to begin comparing/i)
+      .expectVisible();
   }
 
   /** Assert the one-player minimum-selection nudge is visible. */
   async expectOnePlayerNudge(): Promise<void> {
-    await expect(this.#page.getByText('One player on deck.')).toBeVisible();
+    await this.#driver.byText('One player on deck.').expectVisible();
   }
 
   /** Assert the one-player nudge is hidden. */
   async expectOnePlayerNudgeHidden(): Promise<void> {
-    await expect(this.#page.getByText('One player on deck.')).not.toBeVisible();
+    await this.#driver.byText('One player on deck.').expectHidden();
   }
 
   /** Assert the "add at least one more for head-to-head" copy is visible. */
   async expectAddOneMoreHint(): Promise<void> {
-    await expect(
-      this.#page.getByText(/add at least one more to run the head-to-head/i),
-    ).toBeVisible();
+    await this.#driver
+      .byText(/add at least one more to run the head-to-head/i)
+      .expectVisible();
   }
 
   /** Assert the legacy "add at least 2 players to run the comparison" hint. */
   async expectMinimumPlayersHint(): Promise<void> {
-    await expect(
-      this.#page.getByText(/add at least 2 players to run the comparison/i),
-    ).toBeVisible();
+    await this.#driver
+      .byText(/add at least 2 players to run the comparison/i)
+      .expectVisible();
   }
 
   /** Assert the legacy minimum-players hint is hidden. */
   async expectMinimumPlayersHintHidden(): Promise<void> {
-    await expect(
-      this.#page.getByText(/add at least 2 players to run the comparison/i),
-    ).not.toBeVisible();
+    await this.#driver
+      .byText(/add at least 2 players to run the comparison/i)
+      .expectHidden();
   }
 
   // ── Assertions: comparison table ─────────────────────────────────
 
   /** Assert the comparison table is visible. */
   async expectTableVisible(): Promise<void> {
-    await expect(this.#table).toBeVisible();
+    await this.#table.expectVisible();
   }
 
   /** Assert the comparison table is hidden. */
   async expectTableHidden(): Promise<void> {
-    await expect(this.#table).not.toBeVisible();
+    await this.#table.expectHidden();
   }
 
   /** Assert the "Head-to-Head" section heading is visible (exact by default). */
   async expectHeadToHeadVisible(): Promise<void> {
-    await expect(
-      this.#page.getByRole('heading', { name: 'Head-to-Head' }),
-    ).toBeVisible();
+    await this.#driver
+      .byRole('heading', { name: 'Head-to-Head' })
+      .expectVisible();
   }
 
   /** Assert no "Head-to-Head" heading is shown. */
   async expectHeadToHeadHidden(): Promise<void> {
-    await expect(
-      this.#page.getByRole('heading', { name: /head-to-head/i }),
-    ).not.toBeVisible();
+    await this.#driver
+      .byRole('heading', { name: /head-to-head/i })
+      .expectHidden();
   }
 
   /** Assert a section header is visible (matched by text; pass a RegExp for fuzzy). */
@@ -1139,11 +1160,11 @@ class PlayerCompareSurface {
     name: string | RegExp,
     opts: { exact?: boolean } = {},
   ): Promise<void> {
-    const locator =
+    const element =
       typeof name === 'string'
-        ? this.#page.getByText(name, { exact: opts.exact })
-        : this.#page.getByText(name);
-    await expect(locator.first()).toBeVisible();
+        ? this.#driver.byText(name, { exact: opts.exact })
+        : this.#driver.byText(name);
+    await element.first().expectVisible();
   }
 
   /** Assert a section header is hidden. */
@@ -1151,18 +1172,16 @@ class PlayerCompareSurface {
     name: string | RegExp,
     opts: { exact?: boolean } = {},
   ): Promise<void> {
-    const locator =
+    const element =
       typeof name === 'string'
-        ? this.#page.getByText(name, { exact: opts.exact })
-        : this.#page.getByText(name);
-    await expect(locator.first()).not.toBeVisible();
+        ? this.#driver.byText(name, { exact: opts.exact })
+        : this.#driver.byText(name);
+    await element.first().expectHidden();
   }
 
   /** Assert a `rowgroup` section (e.g. "Career Batting") is visible. */
   async expectRowGroupVisible(name: string): Promise<void> {
-    await expect(
-      this.#page.getByRole('rowgroup').filter({ hasText: name }),
-    ).toBeVisible();
+    await this.#driver.byRole('rowgroup').filterByText(name).expectVisible();
   }
 
   /** Assert every given row label is present inside the named `rowgroup`. */
@@ -1170,26 +1189,20 @@ class PlayerCompareSurface {
     groupName: string,
     labels: readonly string[],
   ): Promise<void> {
-    const section = this.#page
-      .getByRole('rowgroup')
-      .filter({ hasText: groupName });
+    const section = this.#driver.byRole('rowgroup').filterByText(groupName);
     for (const label of labels) {
-      await expect(
-        section.getByRole('row').filter({ hasText: label }).first(),
-      ).toBeVisible();
+      await section.byRole('row').filterByText(label).first().expectVisible();
     }
   }
 
   /** Assert a row (by label) is visible. */
   async expectRowVisible(label: string | RegExp): Promise<void> {
-    await expect(this.row(label).first()).toBeVisible();
+    await this.row(label).first().expectVisible();
   }
 
   /** Assert the BEST badge is present in the row matched by `label`. */
   async expectBestInRow(label: string | RegExp): Promise<void> {
-    await expect(
-      this.row(label).getByText('BEST', { exact: true }),
-    ).toBeVisible();
+    await this.row(label).byText('BEST', { exact: true }).expectVisible();
   }
 
   /**
@@ -1198,16 +1211,15 @@ class PlayerCompareSurface {
    * both Career Batting and Career Pitching, batting rendered first).
    */
   async expectBestInFirstRow(label: string | RegExp): Promise<void> {
-    await expect(
-      this.row(label).first().getByText('BEST', { exact: true }),
-    ).toBeVisible();
+    await this.row(label)
+      .first()
+      .byText('BEST', { exact: true })
+      .expectVisible();
   }
 
   /** Assert no BEST badge appears in the row matched by `label`. */
   async expectNoBestInRow(label: string | RegExp): Promise<void> {
-    await expect(
-      this.row(label).getByText('BEST', { exact: true }),
-    ).not.toBeVisible();
+    await this.row(label).byText('BEST', { exact: true }).expectHidden();
   }
 
   /** Assert the BEST badge count in the row matched by `label`. */
@@ -1215,14 +1227,12 @@ class PlayerCompareSurface {
     label: string | RegExp,
     count: number,
   ): Promise<void> {
-    await expect(
-      this.row(label).getByText('BEST', { exact: true }),
-    ).toHaveCount(count);
+    await this.row(label).byText('BEST', { exact: true }).expectCount(count);
   }
 
   /** Assert a value is visible inside the row matched by `label`. */
   async expectValueInRow(label: string | RegExp, value: string): Promise<void> {
-    await expect(this.row(label).getByText(value)).toBeVisible();
+    await this.row(label).byText(value).expectVisible();
   }
 
   /** Assert a value appears exactly `count` times inside the row. */
@@ -1231,24 +1241,24 @@ class PlayerCompareSurface {
     value: string,
     count: number,
   ): Promise<void> {
-    await expect(this.row(label).getByText(value)).toHaveCount(count);
+    await this.row(label).byText(value).expectCount(count);
   }
 
   /** Assert the row matched by `label` contains `text` (substring). */
   async expectRowContains(label: string | RegExp, text: string): Promise<void> {
-    await expect(this.row(label).first()).toContainText(text);
+    await this.row(label).first().expectContainsText(text);
   }
 
   /** Assert a suppressed-stat dash ("—") appears in the row. */
   async expectDashInRow(label: string | RegExp): Promise<void> {
-    await expect(this.row(label).getByText('—').first()).toBeVisible();
+    await this.row(label).byText('—').first().expectVisible();
   }
 
   /** Assert the "Min. 50 IP required" qualifier note appears in the row. */
   async expectQualifierNoteInRow(label: string | RegExp): Promise<void> {
-    await expect(
-      this.row(label).getByText(/min\. 50 ip required/i),
-    ).toBeVisible();
+    await this.row(label)
+      .byText(/min\. 50 ip required/i)
+      .expectVisible();
   }
 
   /** Assert the BEST cell of a row contains `value` (badge co-located w/ value). */
@@ -1256,78 +1266,80 @@ class PlayerCompareSurface {
     label: string | RegExp,
     value: string,
   ): Promise<void> {
-    await expect(
-      this.row(label).getByRole('cell').filter({ hasText: 'BEST' }),
-    ).toContainText(value);
+    await this.row(label)
+      .byRole('cell')
+      .filterByText('BEST')
+      .expectContainsText(value);
   }
 
-  /** Assert the cell containing `value` in a row does NOT carry the BEST badge. */
+  /**
+   * Assert the cell containing `value` in a row does NOT carry the BEST badge.
+   * WEB-ONLY: a negated `toContainText` has no portable driver assertion (the
+   * vocabulary offers `expectContainsText` but no negation), so this stays on
+   * the raw `Locator`.
+   */
   async expectCellWithoutBest(
     label: string | RegExp,
     value: string,
   ): Promise<void> {
     await expect(
-      this.row(label).getByRole('cell').filter({ hasText: value }),
+      this.#page
+        .getByRole('row')
+        .filter({ hasText: label })
+        .getByRole('cell')
+        .filter({ hasText: value }),
     ).not.toContainText('BEST');
   }
 
   /** Assert at least one BEST badge is visible in the table. */
   async expectAnyBest(): Promise<void> {
-    await expect(
-      this.#page.getByText('BEST', { exact: true }).first(),
-    ).toBeVisible();
+    await this.#driver.byText('BEST', { exact: true }).first().expectVisible();
   }
 
   /** Assert no BEST badges exist in the DOM. */
   async expectNoBest(): Promise<void> {
-    await expect(this.#page.getByText('BEST', { exact: true })).toHaveCount(0);
+    await this.#driver.byText('BEST', { exact: true }).expectCount(0);
   }
 
   /** Assert at least `min` BEST badges are present. */
   async expectBestCountAtLeast(min: number): Promise<void> {
-    const count = await this.#page.getByText('BEST', { exact: true }).count();
+    const count = await this.#driver.byText('BEST', { exact: true }).count();
     expect(count).toBeGreaterThanOrEqual(min);
   }
 
   /** Assert the upward triangle (▲) BEST indicator is visible. */
   async expectTriangle(): Promise<void> {
-    await expect(this.#page.getByText('▲').first()).toBeVisible();
+    await this.#driver.byText('▲').first().expectVisible();
   }
 
   /** Assert no upward-triangle indicators exist in the DOM. */
   async expectNoTriangle(): Promise<void> {
-    await expect(this.#page.getByText('▲')).toHaveCount(0);
+    await this.#driver.byText('▲').expectCount(0);
   }
 
   /** Assert the BEST badge appears in the value-filtered row, scoped to table. */
   async expectBestInTableRowWithValue(value: string): Promise<void> {
-    await expect(
-      this.#table
-        .getByRole('row')
-        .filter({ hasText: value })
-        .getByText('BEST', {
-          exact: true,
-        }),
-    ).toBeVisible();
+    await this.#table
+      .byRole('row')
+      .filterByText(value)
+      .byText('BEST', { exact: true })
+      .expectVisible();
   }
 
   /** Assert the BEST badge appears in the table row matched by `label`. */
   async expectBestInTableRow(label: string | RegExp): Promise<void> {
-    await expect(
-      this.#table
-        .getByRole('row')
-        .filter({ hasText: label })
-        .getByText('BEST', {
-          exact: true,
-        }),
-    ).toBeVisible();
+    await this.#table
+      .byRole('row')
+      .filterByText(label)
+      .byText('BEST', { exact: true })
+      .expectVisible();
   }
 
   // ── Assertions: season-by-season tables ──────────────────────────
 
   /** Assert the "Season by Season" heading is visible. */
   async expectSeasonBySeasonHeading(): Promise<void> {
-    await expect(this.#page.getByText('Season by Season')).toBeVisible();
+    await this.#driver.byText('Season by Season').expectVisible();
   }
 
   /** Assert a season-breakdown table (kind + player) is visible. */
@@ -1335,7 +1347,7 @@ class PlayerCompareSurface {
     kind: 'batting' | 'pitching',
     playerName: string,
   ): Promise<void> {
-    await expect(this.seasonTable(kind, playerName)).toBeVisible();
+    await this.seasonTable(kind, playerName).expectVisible();
   }
 
   /** Assert a season-breakdown table (kind + player) is hidden. */
@@ -1343,7 +1355,7 @@ class PlayerCompareSurface {
     kind: 'batting' | 'pitching',
     playerName: string,
   ): Promise<void> {
-    await expect(this.seasonTable(kind, playerName)).not.toBeVisible();
+    await this.seasonTable(kind, playerName).expectHidden();
   }
 
   /** Assert a column header is visible inside a season-breakdown table. */
@@ -1352,9 +1364,10 @@ class PlayerCompareSurface {
     playerName: string,
     header: string,
   ): Promise<void> {
-    await expect(
-      this.seasonTable(kind, playerName).getByText(header).first(),
-    ).toBeVisible();
+    await this.seasonTable(kind, playerName)
+      .byText(header)
+      .first()
+      .expectVisible();
   }
 
   /** Assert a season year row is visible inside a season-breakdown table. */
@@ -1363,9 +1376,9 @@ class PlayerCompareSurface {
     playerName: string,
     year: string,
   ): Promise<void> {
-    await expect(
-      this.seasonTable(kind, playerName).getByText(year, { exact: true }),
-    ).toBeVisible();
+    await this.seasonTable(kind, playerName)
+      .byText(year, { exact: true })
+      .expectVisible();
   }
 
   /** Assert a season year row is absent from a season-breakdown table. */
@@ -1374,19 +1387,22 @@ class PlayerCompareSurface {
     playerName: string,
     year: string,
   ): Promise<void> {
-    await expect(
-      this.seasonTable(kind, playerName).getByText(year, { exact: true }),
-    ).toHaveCount(0);
+    await this.seasonTable(kind, playerName)
+      .byText(year, { exact: true })
+      .expectCount(0);
   }
 
   /** Assert the season-expand toggle for a player is absent. */
   async expectSeasonExpandAbsent(playerId: number): Promise<void> {
-    await expect(
-      this.#page.getByTestId(`season-expand-${playerId}`),
-    ).toHaveCount(0);
+    await this.#driver.byTestId(`season-expand-${playerId}`).expectCount(0);
   }
 
-  /** Assert the season-expand toggle is visible and matches `text`. */
+  /**
+   * Assert the season-expand toggle is visible and matches `text`. WEB-ONLY:
+   * `toHaveText(RegExp)` (whole-node regex match) has no portable driver
+   * assertion — the vocabulary offers substring `expectContainsText`, not an
+   * anchored regex — so this stays on the raw `Locator`.
+   */
   async expectSeasonExpandText(playerId: number, text: RegExp): Promise<void> {
     const toggle = this.#page.getByTestId(`season-expand-${playerId}`);
     await expect(toggle).toBeVisible();
@@ -1397,16 +1413,17 @@ class PlayerCompareSurface {
 
   /** Assert the "Compare up to four" headline is visible. */
   async expectHeadlineVisible(): Promise<void> {
-    await expect(
-      this.#page.getByRole('heading', { name: /compare up to four/i }).first(),
-    ).toBeVisible();
+    await this.#driver
+      .byRole('heading', { name: /compare up to four/i })
+      .first()
+      .expectVisible();
   }
 
   /** Assert the comparison tool headline is NOT shown (unauthenticated). */
   async expectHeadlineHidden(): Promise<void> {
-    await expect(
-      this.#page.getByRole('heading', { name: /compare up to four/i }),
-    ).not.toBeVisible();
+    await this.#driver
+      .byRole('heading', { name: /compare up to four/i })
+      .expectHidden();
   }
 
   /**
@@ -1419,11 +1436,11 @@ class PlayerCompareSurface {
     opts: { exact?: boolean; first?: boolean } = {},
   ): Promise<void> {
     const { exact, first = true } = opts;
-    const locator =
+    const element =
       typeof text === 'string'
-        ? this.#page.getByText(text, { exact })
-        : this.#page.getByText(text);
-    await expect(first ? locator.first() : locator).toBeVisible();
+        ? this.#driver.byText(text, { exact })
+        : this.#driver.byText(text);
+    await (first ? element.first() : element).expectVisible();
   }
 
   /** Assert a free-text label/value is hidden on the page. */
@@ -1431,25 +1448,23 @@ class PlayerCompareSurface {
     text: string | RegExp,
     opts: { exact?: boolean } = {},
   ): Promise<void> {
-    const locator =
+    const element =
       typeof text === 'string'
-        ? this.#page.getByText(text, { exact: opts.exact })
-        : this.#page.getByText(text);
-    await expect(locator.first()).not.toBeVisible();
+        ? this.#driver.byText(text, { exact: opts.exact })
+        : this.#driver.byText(text);
+    await element.first().expectHidden();
   }
 
   /** Assert the inline premium-upgrade CTA (PremiumBanner) is visible. */
   async expectPremiumUpgradeCta(): Promise<void> {
-    await expect(
-      this.#page.getByRole('button', { name: /upgrade/i }),
-    ).toBeVisible();
+    await this.#driver.byRole('button', { name: /upgrade/i }).expectVisible();
   }
 
   /** Assert the "Get Started Free" CTA is visible and enabled. */
   async expectGetStartedFree(): Promise<void> {
-    const cta = this.#page.getByRole('button', { name: /get started free/i });
-    await expect(cta).toBeVisible({ timeout: 15000 });
-    await expect(cta).toBeEnabled();
+    const cta = this.#driver.byRole('button', { name: /get started free/i });
+    await cta.expectVisible({ timeout: 15000 });
+    await cta.expectEnabled();
   }
 
   // ── Actions: keyboard ────────────────────────────────────────────
@@ -1463,15 +1478,15 @@ class PlayerCompareSurface {
 
   /** Assert the named option in the suggestions list has aria-selected="true". */
   async expectSuggestionSelected(name: string): Promise<void> {
-    await expect(
-      this.#suggestions.getByRole('option', { name }),
-    ).toHaveAttribute('aria-selected', 'true');
+    await this.#suggestions
+      .byRole('option', { name })
+      .expectAttribute('aria-selected', 'true');
   }
 
   /** Assert the named option in the suggestions list has aria-selected="false". */
   async expectSuggestionDeselected(name: string): Promise<void> {
-    await expect(
-      this.#suggestions.getByRole('option', { name }),
-    ).toHaveAttribute('aria-selected', 'false');
+    await this.#suggestions
+      .byRole('option', { name })
+      .expectAttribute('aria-selected', 'false');
   }
 }

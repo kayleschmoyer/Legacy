@@ -890,7 +890,7 @@ export function SlotBadge({
 // Player chip
 // ---------------------------------------------------------------------------
 
-function PlayerChip({
+export function PlayerChip({
   player,
   index,
   onRemove,

@@ -467,97 +467,22 @@ adminTest.describe(
 );
 
 // ---------------------------------------------------------------------------
-// Tests: slot-based accent colors @regression
+// Slot accent COLORS (gold/blue/green/red per slot) are a rendered-CSS concern
+// and were relocated to Storybook/Chromatic per the testing skill's visual-
+// assertion rule (LS-8352): see
+// lib/shared-components/src/features/players/PlayerComparison.stories.tsx
+// (AllSlots / Slot{0..3} / SlotBadges). The E2E suite below keeps only the
+// platform-neutral slot *identity* checks — which slot a chip occupies, via the
+// `aria-label="Slot N"` badge — since that is behavior (stable across removals),
+// not styling.
 // ---------------------------------------------------------------------------
 
-adminTest.describe('Player Comparison – slot accent colors @regression', () => {
-  adminTest.beforeEach(async ({ page, playersPage }) => {
-    await mockGraphQL(page);
-    await playersPage.gotoCompare();
-    await playersPage.compare.expectSearchVisible();
-  });
-
-  adminTest(
-    'slot 0 chip (gold) has gold accent border color',
-    async ({ playersPage }) => {
-      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
-      await playersPage.compare.expectChipBorderTopColor(
-        1,
-        'rgba(197, 165, 90, 0.5)',
-      );
-    },
-  );
-
-  adminTest(
-    'slot 1 chip (blue) has blue accent border color',
-    async ({ playersPage }) => {
-      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
-      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
-      await playersPage.compare.expectChipBorderTopColor(
-        2,
-        'rgba(96, 165, 250, 0.5)',
-      );
-    },
-  );
-
-  adminTest(
-    'slot 2 chip (green) has green accent border color',
-    async ({ playersPage }) => {
-      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
-      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
-      await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
-      await playersPage.compare.expectChipBorderTopColor(
-        3,
-        'rgba(52, 211, 153, 0.5)',
-      );
-    },
-  );
-
-  adminTest(
-    'slot 3 chip (red) has red accent border color',
-    async ({ playersPage }) => {
-      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
-      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
-      await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
-      await playersPage.compare.addPlayer('Mi', 'Miguel Cabrera');
-      await playersPage.compare.expectChipBorderTopColor(
-        4,
-        'rgba(248, 113, 113, 0.5)',
-      );
-    },
-  );
-
-  adminTest(
-    'slot 0 chip has gold accent dot background color',
-    async ({ playersPage }) => {
-      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
-      // The accent dot is the first child div inside the chip
-      await playersPage.compare.expectChipAccentDotColor(
-        1,
-        'rgb(197, 165, 90)',
-      );
-    },
-  );
-
-  adminTest(
-    'slot 1 chip has blue accent dot background color',
-    async ({ playersPage }) => {
-      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
-      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
-      await playersPage.compare.expectChipAccentDotColor(
-        2,
-        'rgb(96, 165, 250)',
-      );
-    },
-  );
-});
-
 // ---------------------------------------------------------------------------
-// Tests: slot color stability after player removal @regression
+// Tests: slot identity stability after player removal @regression
 // ---------------------------------------------------------------------------
 
 adminTest.describe(
-  'Player Comparison – slot color stability after removal @regression',
+  'Player Comparison – slot identity stability after removal @regression',
   () => {
     adminTest.beforeEach(async ({ page, playersPage }) => {
       await mockGraphQL(page);
@@ -566,52 +491,40 @@ adminTest.describe(
     });
 
     adminTest(
-      'second slot player retains blue accent after first slot player is removed',
+      'second slot player retains its slot after first slot player is removed',
       async ({ playersPage }) => {
-        // Add two players: Judge to slot 0 (gold), Ohtani to slot 1 (blue)
+        // Add two players: Judge to slot 1, Ohtani to slot 2
         await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
         await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
 
-        // Verify Ohtani's chip is initially blue (slot 1)
-        await playersPage.compare.expectChipBorderTopColor(
-          2,
-          'rgba(96, 165, 250, 0.5)',
-        );
+        // Ohtani's chip is initially in slot 2 (blue accent — see Storybook)
+        await playersPage.compare.expectChipSlot(2, 2);
 
-        // Remove Judge (slot 0 — the gold chip)
+        // Remove Judge (slot 1)
         await playersPage.compare.removePlayer('Aaron Judge');
         await playersPage.compare.expectChipHidden(1);
 
-        // Ohtani's chip must still be blue (slot 1) — not promoted to gold
-        await playersPage.compare.expectChipBorderTopColor(
-          2,
-          'rgba(96, 165, 250, 0.5)',
-        );
+        // Ohtani's chip must still be slot 2 — not promoted to slot 1
+        await playersPage.compare.expectChipSlot(2, 2);
       },
     );
 
     adminTest(
-      'third slot player retains green accent after second slot player is removed',
+      'third slot player retains its slot after second slot player is removed',
       async ({ playersPage }) => {
         await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
         await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
         await playersPage.compare.addPlayer('Mo', 'Mookie Betts');
 
-        // Betts is in slot 2 (green)
-        await playersPage.compare.expectChipBorderTopColor(
-          3,
-          'rgba(52, 211, 153, 0.5)',
-        );
+        // Betts is in slot 3 (green accent — see Storybook)
+        await playersPage.compare.expectChipSlot(3, 3);
 
-        // Remove Ohtani (slot 1)
+        // Remove Ohtani (slot 2)
         await playersPage.compare.removePlayer('Shohei Ohtani');
         await playersPage.compare.expectChipHidden(2);
 
-        // Betts must still be green (slot 2 unchanged)
-        await playersPage.compare.expectChipBorderTopColor(
-          3,
-          'rgba(52, 211, 153, 0.5)',
-        );
+        // Betts must still be slot 3 (unchanged)
+        await playersPage.compare.expectChipSlot(3, 3);
       },
     );
 
