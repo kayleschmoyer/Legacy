@@ -658,6 +658,14 @@ jobs:
           # Reporters: line for console, blob for merge+deploy
           PLAYWRIGHT_ARGS+=( "--reporter=line,blob" )
 
+          # Diagnosability (LS-8350): a runner-level death (OOM/process kill)
+          # can fail this step while GitHub uploads no log blob for the job,
+          # leaving nothing to root-cause after the fact. Tee stdout+stderr to
+          # a file so "Upload Test Output" below can still capture it via
+          # if: always(), even when the run below is killed mid-test.
+          mkdir -p playwright-output
+          LOG_FILE="playwright-output/${{ matrix.suite }}-${{ strategy.job-index }}.log"
+
           # Run with test file as a safe positional arg after --
           # Word-split TEST_FILE so multiple space-separated filenames become
           # separate arguments to Playwright. Without read -ra, passing
@@ -670,15 +678,54 @@ jobs:
               exit 0
             fi
             echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]} -- ${INTEGRATION_SPEC_ARGS[*]}"
-            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "${INTEGRATION_SPEC_ARGS[@]}"
+            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "${INTEGRATION_SPEC_ARGS[@]}" 2>&1 | tee "$LOG_FILE"
+            exit "${PIPESTATUS[0]}"
           elif [ -n "$TEST_FILE" ]; then
             read -ra TEST_FILE_ARGS <<< "$TEST_FILE"
             echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]} -- ${TEST_FILE_ARGS[*]}"
-            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "${TEST_FILE_ARGS[@]}"
+            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" -- "${TEST_FILE_ARGS[@]}" 2>&1 | tee "$LOG_FILE"
+            exit "${PIPESTATUS[0]}"
           else
             echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]}"
-            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}"
+            pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}" 2>&1 | tee "$LOG_FILE"
+            exit "${PIPESTATUS[0]}"
           fi
+
+      # Diagnosability (LS-8350): surface any OOM-killer signature from the
+      # runner's kernel log before the job's workspace is torn down. dmesg
+      # requires kernel log read access, which self-hosted runners may or may
+      # not grant — failures here are non-fatal (`|| true`) since an empty
+      # signature just means "inconclusive", not "no OOM occurred".
+      - name: "Capture OOM Signature"
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p playwright-output
+          SIG_FILE="playwright-output/${{ matrix.suite }}-${{ strategy.job-index }}-dmesg.log"
+          if command -v dmesg >/dev/null 2>&1; then
+            OOM_LINES=$(dmesg 2>/dev/null | grep -i -E "out of memory|oom-kill|oom_kill|killed process" || true)
+            if [ -n "$OOM_LINES" ]; then
+              echo "::warning::Possible OOM kill detected on this runner (see ${SIG_FILE})"
+              echo "$OOM_LINES" | tee "$SIG_FILE"
+            else
+              echo "No OOM-killer signature found in dmesg."
+            fi
+          else
+            echo "dmesg unavailable on this runner — cannot check for an OOM-killer signature." | tee "$SIG_FILE"
+          fi
+
+      # Diagnosability (LS-8350): upload the tee'd Playwright output + any OOM
+      # signature even when the job/step above was killed, so a future
+      # "conclusion=failure, no log blob" run has something to root-cause
+      # from instead of a BlobNotFound black hole.
+      - name: "Upload Playwright Test Output"
+        if: always()
+        uses: ./.github/actions/s3-artifact
+        with:
+          mode: upload
+          name: playwright-output/${{ strategy.job-index }}
+          path: playwright-output/
+          if-no-files-found: ignore
 
       - name: "Stop Dev Server"
         if: always() && matrix.suite == 'e2e'
