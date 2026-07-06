@@ -81,16 +81,30 @@ describe('e2e-surface-map.json coverage', () => {
 });
 
 describe('e2e surface-map selection', () => {
-  it('selects only the admin specs for an admin page change', () => {
+  it('selects every admin spec for an admin page change', () => {
+    // Superset check, not an exhaustive-membership check: the coverage
+    // auditor may legitimately map a non admin-*-named spec onto an admin
+    // glob (e.g. entitlement-tiers.spec.ts exercises admin-page premium
+    // gating) as real coverage data comes in. This test's job is to catch a
+    // malformed/missing glob breaking admin coverage, not to assert that
+    // admin pages are exclusively covered by admin-named specs.
     const r = selectSpecs({
       changedFiles: ['apps/web/src/pages/admin/AdminConsole.tsx'],
       manifest,
     });
     assert.equal(r.runAll, false);
-    assert.ok(r.specs.length > 0);
+    const adminSpecs = Object.keys(manifest.specs).filter((s) =>
+      s.includes('/admin-'),
+    );
     assert.ok(
-      r.specs.every((s) => s.includes('/admin-')),
-      `expected only admin-* specs, got: ${r.specs.join(', ')}`,
+      adminSpecs.length > 0,
+      'expected at least one admin-* spec in the manifest',
+    );
+    const missing = adminSpecs.filter((s) => !r.specs.includes(s));
+    assert.deepEqual(
+      missing,
+      [],
+      `expected every admin-* spec to be selected, missing: ${missing.join(', ')}`,
     );
   });
 
