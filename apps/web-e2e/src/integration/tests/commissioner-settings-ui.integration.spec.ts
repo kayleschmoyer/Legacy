@@ -307,13 +307,17 @@ test.describe
         state.leagueName,
         { timeout: 15_000 },
       );
-      // Commissioner tab should not exist for a non-commissioner.
-      // Scope to main so the nav league-switcher
-      // "Current league: ..." button is not matched.
+      // Commissioner tab should not exist for a non-commissioner. The nav
+      // affordance is a role="tab" (filtered out of the DOM entirely for
+      // non-commissioners — TabBar uses TABS.filter(...commishOnly)), so assert
+      // on the tab specifically. The previous broad role="button" match (LS-8332)
+      // false-matched an unrelated "Commissioner"-named control in main; this
+      // mirrors the hermetic sibling commissioner-tab-nav.spec.ts. Scope to main
+      // so the nav league-switcher ("Current league: …") is not matched.
       await expect(
         managerPage1
           .getByRole('main')
-          .getByRole('button', { name: /Commissioner/i }),
+          .getByRole('tab', { name: /Commissioner/i }),
       ).not.toBeVisible({ timeout: 5_000 });
     });
 
