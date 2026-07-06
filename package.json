@@ -105,7 +105,7 @@
   },
   "private": true,
   "dependencies": {
-    "@apollo/client": "^4.1.6",
+    "@apollo/client": "4.1.6",
     "@apollo/server": "^5.4.0",
     "@as-integrations/aws-lambda": "^4.0.1",
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1025.0",
@@ -114,9 +114,9 @@
     "@aws-sdk/client-lambda": "^3.1025.0",
     "@aws-sdk/client-s3": "^3.1025.0",
     "@aws-sdk/client-secrets-manager": "^3.1025.0",
-    "@aws-sdk/s3-request-presigner": "^3.1025.0",
     "@aws-sdk/client-sns": "^3.1025.0",
     "@aws-sdk/client-sqs": "^3.1025.0",
+    "@aws-sdk/s3-request-presigner": "^3.1025.0",
     "@dataplan/json": "1.0.0-rc.5",
     "@dataplan/pg": "1.0.0-rc.5",
     "@dnd-kit/core": "^6.3.1",
@@ -397,7 +397,8 @@
     "patchedDependencies": {
       "tr46@0.0.3": "patches/tr46@0.0.3.patch",
       "tr46@3.0.0": "patches/tr46@3.0.0.patch",
-      "expo-modules-core@56.0.13": "patches/expo-modules-core@56.0.13.patch"
+      "expo-modules-core@56.0.13": "patches/expo-modules-core@56.0.13.patch",
+      "@apollo/client@4.1.6": "patches/@apollo__client@4.1.6.patch"
     }
   }
 }

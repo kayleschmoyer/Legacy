@@ -82,6 +82,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
       };
       onCreateLeague: (input: unknown) => Promise<void>;
       onJoinLeague: () => void;
+      onMockDraft?: () => void;
       onViewLeague: (id: number) => void;
       onInviteFriends?: () => void;
       onSignIn?: () => void;
@@ -103,6 +104,9 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
         </Pressable>
         <Pressable testID="join" onPress={() => props.onJoinLeague()}>
           <Text>join</Text>
+        </Pressable>
+        <Pressable testID="mock-draft" onPress={() => props.onMockDraft?.()}>
+          <Text>mock-draft</Text>
         </Pressable>
         <Pressable testID="view" onPress={() => props.onViewLeague(2)}>
           <Text>view</Text>
@@ -379,6 +383,12 @@ describe('BaseballHome (mobile MLBHome wrapper)', () => {
       render(<BaseballHome />);
       fireEvent.press(screen.getByTestId('join'));
       expect(mockPush).toHaveBeenCalledWith('/baseball/league/join');
+    });
+
+    it('navigates to the mock-draft screen when onMockDraft is pressed (LS-5808)', () => {
+      render(<BaseballHome />);
+      fireEvent.press(screen.getByTestId('mock-draft'));
+      expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft');
     });
 
     it('navigates to a league when a league is viewed', () => {
