@@ -7,6 +7,7 @@ import {
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 import { LOGGER } from '@legacy-sports/logging';
 
 import {
@@ -16,6 +17,11 @@ import {
   getUnfilledPositionTypes,
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from './helpers';
+import {
+  describeDbError,
+  formatDbError,
+  withTransientRetry,
+} from '../leagues/delete-resilience';
 import {
   CurrentDraftPick,
   Draft,
@@ -677,32 +683,87 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
       }
 
       const { draftId } = args;
+      const userId = context.user.id;
 
-      // Verify the draft exists and the caller is a league member
-      const [draft] = await context.db
-        .select({ leagueId: PublicSchema.drafts.leagueId })
-        .from(PublicSchema.drafts)
-        .where(eq(PublicSchema.drafts.id, draftId))
-        .limit(1);
+      try {
+        // This query refetches after every pick/auto-pick event on the live
+        // draft board, so it races concurrent writes to draft_teams (e.g. a
+        // makeDraftPick / toggleAutoPick mutation firing off the same event).
+        // Wrap the two reads in a bounded retry so a transient Postgres failure
+        // (deadlock / serialization / lock-timeout) recovers silently instead
+        // of surfacing a generic error toast to drafting users (LS-8287).
+        const [draft] = await withTransientRetry(
+          () =>
+            context.db
+              .select({ leagueId: PublicSchema.drafts.leagueId })
+              .from(PublicSchema.drafts)
+              .where(eq(PublicSchema.drafts.id, draftId))
+              .limit(1),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn('Retrying draft lookup after transient DB error', {
+                draftId,
+                attempt,
+                dbError: formatDbError(detail),
+              }),
+          },
+        );
 
-      if (!draft) {
-        throw UserInputError('Draft not found');
+        if (!draft) {
+          throw UserInputError('Draft not found');
+        }
+
+        await verifyLeagueMembership(context.db, draft.leagueId, userId);
+
+        const rows = await withTransientRetry(
+          () =>
+            context.db
+              .select({
+                teamId: PublicSchema.draftTeams.teamId,
+                autoPick: PublicSchema.draftTeams.autoPick,
+              })
+              .from(PublicSchema.draftTeams)
+              .where(eq(PublicSchema.draftTeams.draftId, draftId)),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn(
+                'Retrying draft-team auto-pick read after transient DB error',
+                { draftId, attempt, dbError: formatDbError(detail) },
+              ),
+          },
+        );
+
+        return rows.map((row) => ({
+          teamId: row.teamId,
+          autoPick: row.autoPick,
+        }));
+      } catch (error) {
+        // Preserve typed client-facing errors (UNAUTHENTICATED / BAD_USER_INPUT
+        // / FORBIDDEN) so the client still receives the intended code.
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        // A DB failure that survived the bounded retry above (e.g. a connection
+        // drop or statement timeout) would otherwise be masked by the formatter
+        // as a generic "Internal server error", diagnosable only via a manual
+        // CloudWatch hunt (LS-8287, mirroring the startDraft fix in LS-8239).
+        // Log the real cause for Rollbar/CloudWatch and re-throw with a stable,
+        // client-facing code carrying the SQLSTATE so the browser-side Rollbar
+        // occurrence is self-diagnosing instead of a generic 500.
+        const detail = describeDbError(error);
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Failed to load draft auto-pick statuses', err, {
+          draftId,
+          userId,
+          dbError: formatDbError(detail),
+        });
+        throw new GraphQLError(
+          detail.code
+            ? `Failed to load auto-pick statuses (database error ${detail.code})`
+            : 'Failed to load auto-pick statuses',
+          { extensions: { code: 'DRAFT_AUTO_PICK_STATUS_FAILED' } },
+        );
       }
-
-      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
-
-      const rows = await context.db
-        .select({
-          teamId: PublicSchema.draftTeams.teamId,
-          autoPick: PublicSchema.draftTeams.autoPick,
-        })
-        .from(PublicSchema.draftTeams)
-        .where(eq(PublicSchema.draftTeams.draftId, draftId));
-
-      return rows.map((row) => ({
-        teamId: row.teamId,
-        autoPick: row.autoPick,
-      }));
     },
   }),
 );
