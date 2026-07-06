@@ -453,6 +453,11 @@ jobs:
           # The real secret is never read during E2E — this only needs to be
           # truthy so the button mounts and can be located via getByRole.
           VITE_DISCORD_CLIENT_ID: "e2e-placeholder-discord-id"
+          # Required at build time so the TeamDetailPage upload handler
+          # doesn't throw "Image uploads are not configured" before ever
+          # calling fetch — the actual upload endpoint is always mocked by
+          # Playwright (LS-8349).
+          VITE_IMAGE_UPLOAD_URL: "https://e2e-placeholder.test/images"
         run: |
           export NX_NO_CLOUD=true
           pnpm exec nx build web
