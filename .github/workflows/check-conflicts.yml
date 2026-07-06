@@ -128,7 +128,22 @@ jobs:
                 repo: context.repo.repo,
                 pull_number: prNumber,
               });
-              baseSha = pr.base.sha;
+              // Do NOT use pr.base.sha here. The pulls API freezes base.sha at
+              // the PR's last synchronize (head push), so on a long-open PR it
+              // lags the live base-branch tip by many commits (observed 117
+              // behind). check-conflicts-sweep.yml dispatches this workflow
+              // precisely BECAUSE the base advanced and may now conflict —
+              // test-merging against the stale pr.base.sha merges against an old
+              // main, finds no conflict, and stamps a false-green on the
+              // required check while also clearing the CI: Conflicts label. Pull
+              // the current base-branch tip instead so the dispatched re-check
+              // matches the sweep's own test-merge (which uses live main).
+              const { data: baseBranch } = await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: pr.base.ref,
+              });
+              baseSha = baseBranch.commit.sha;
               headSha = pr.head.sha;
             }
             core.setOutput('pr_number', String(prNumber));
