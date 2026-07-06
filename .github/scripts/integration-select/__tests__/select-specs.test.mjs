@@ -146,9 +146,14 @@ describe('integration-surface-map.json coverage', () => {
 
   it('maps every spec on disk and references no missing specs', () => {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-    const onDisk = readdirSync(specsDir)
+    // recursive: true (Node 20.1+) so specs nested under subdirectories are
+    // discovered, not just top-level files (mirrors e2e-surface-map.test.mjs).
+    const onDisk = readdirSync(specsDir, { recursive: true })
       .filter((f) => f.endsWith('.integration.spec.ts'))
-      .map((f) => `apps/web-e2e/src/integration/tests/${f}`)
+      .map(
+        (f) =>
+          `apps/web-e2e/src/integration/tests/${f.split(path.sep).join('/')}`,
+      )
       .sort();
     const mapped = Object.keys(manifest.specs).sort();
 

@@ -33,9 +33,11 @@ const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 
 describe('e2e-surface-map.json coverage', () => {
   it('maps every spec on disk and references no missing specs', () => {
-    const onDisk = readdirSync(specsDir)
+    // recursive: true (Node 20.1+) so specs nested under subdirectories
+    // (e.g. tests/shared/*.dual.spec.ts) are discovered, not just top-level files.
+    const onDisk = readdirSync(specsDir, { recursive: true })
       .filter((f) => f.endsWith('.spec.ts'))
-      .map((f) => `apps/web-e2e/src/tests/${f}`)
+      .map((f) => `apps/web-e2e/src/tests/${f.split(path.sep).join('/')}`)
       .sort();
     const mapped = Object.keys(manifest.specs).sort();
 
