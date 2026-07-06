@@ -258,10 +258,14 @@ resource "aws_lambda_function" "websocket" {
       # explicitly wired so staging/preview domains can also be added.
       # In dev, also allow localhost dev-server origins (web app on :4200,
       # storybook on :4280) so developers can connect from a local frontend
-      # to the dev WebSocket gateway (LS-4546).
+      # to the dev WebSocket gateway (LS-4546), plus the GitHub Pages origin
+      # that serves PR previews and Storybook from the legacy-sports-deploys
+      # repo (https://<github_username>.github.io). Those preview builds point
+      # at the dev WebSocket gateway, so without this entry every preview /
+      # Storybook connection was rejected and flooded Rollbar (LS-8342/LS-8343).
       CORS_ALLOWED_ORIGINS = join(",", concat(
         var.domain_name != "" ? ["https://${var.domain_name}", "https://www.${var.domain_name}"] : ["https://legacy-fantasy.com", "https://www.legacy-fantasy.com"],
-        var.environment == "dev" ? ["http://localhost:4200", "http://localhost:4280"] : []
+        var.environment == "dev" ? ["http://localhost:4200", "http://localhost:4280", "https://${var.github_username}.github.io"] : []
       ))
     }
   }

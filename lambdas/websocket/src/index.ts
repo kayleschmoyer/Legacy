@@ -21,7 +21,6 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   addBreadcrumb,
   captureError,
-  captureWarning,
   getRollbarConfigFromEnv,
   initRollbar,
   withRollbar,
@@ -300,13 +299,18 @@ async function handleConnect(
         .split(',')
         .map((o) => o.trim());
       if (!allowed.includes(origin)) {
+        // A rejected Origin is an expected, fully-handled access-control
+        // outcome (we return a clean 403), not an application fault. The
+        // public WebSocket endpoint continuously attracts connections from
+        // unrecognized origins (bots, scanners, stale preview builds) and
+        // browsers auto-reconnect on failure, so capturing every rejection to
+        // Rollbar floods the item (1,200+ occurrences) and feeds the
+        // per-minute ingestion throttle (LS-8342/LS-8343). Keep a CloudWatch
+        // warning for debuggability, but do not report to Rollbar.
         LOGGER.warn('WebSocket connection rejected: invalid Origin', {
           origin,
+          allowedOrigins: allowed,
         });
-        captureWarning(
-          new Error('CORS: rejected unrecognized WebSocket origin'),
-          { origin, allowedOrigins: allowed },
-        );
         return { statusCode: 403, body: 'Forbidden: Invalid origin' };
       }
     }

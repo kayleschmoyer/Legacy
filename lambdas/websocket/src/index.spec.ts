@@ -89,6 +89,7 @@ jest.mock('drizzle-orm', () => ({
 
 import { verify } from 'jsonwebtoken';
 import { LOGGER } from '@legacy-sports/logging';
+import { captureWarning } from '@legacy-sports/rollbar';
 // Type-only import erased at compile time — produces no `require('./index')` at
 // runtime, so it does not interfere with the env-var setup below.
 import type * as IndexModule from './index';
@@ -110,7 +111,8 @@ const {
 } = require('./index') as typeof IndexModule;
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-const mockLogger = LOGGER as { error: jest.Mock };
+const mockLogger = LOGGER as { error: jest.Mock; warn: jest.Mock };
+const mockCaptureWarning = captureWarning as jest.Mock;
 
 const mockVerify = verify as jest.MockedFunction<typeof verify>;
 
@@ -279,6 +281,53 @@ describe('WebSocket Lambda Handler', () => {
       const result = asResult(await handler(event));
       expect(result.statusCode).toBe(403);
       expect(result.body).toContain('Forbidden');
+
+      delete process.env['CORS_ALLOWED_ORIGINS'];
+    });
+
+    it('does not report rejected origins to Rollbar, only CloudWatch (LS-8342)', async () => {
+      // A rejected Origin is an expected, handled 403 — it must stay out of
+      // Rollbar so the public endpoint's constant stream of unrecognized
+      // origins (bots/scanners, browser auto-reconnects) cannot flood the
+      // item or feed the per-minute ingestion throttle (LS-8343). A local
+      // CloudWatch warning is still emitted for debuggability.
+      mockValidJwt();
+      process.env['CORS_ALLOWED_ORIGINS'] = 'https://allowed.com';
+
+      const event = makeEvent({
+        routeKey: '$connect',
+        queryStringParameters: { token: 'valid-jwt' },
+        headers: { origin: 'https://evil.com' },
+      });
+
+      const result = asResult(await handler(event));
+      expect(result.statusCode).toBe(403);
+      expect(mockCaptureWarning).not.toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'WebSocket connection rejected: invalid Origin',
+        expect.objectContaining({ origin: 'https://evil.com' }),
+      );
+
+      delete process.env['CORS_ALLOWED_ORIGINS'];
+    });
+
+    it('allows the GitHub Pages preview/storybook origin when configured (LS-8342)', async () => {
+      // PR previews and Storybook are served from https://<user>.github.io and
+      // connect to the dev WebSocket gateway; that origin is added to the dev
+      // allowlist so those legitimate clients are no longer rejected.
+      mockValidJwt();
+      process.env['CORS_ALLOWED_ORIGINS'] =
+        'https://legacy-fantasy.com,https://bkrupa.github.io';
+
+      const event = makeEvent({
+        routeKey: '$connect',
+        queryStringParameters: { token: 'valid-jwt' },
+        headers: { origin: 'https://bkrupa.github.io' },
+      });
+
+      const result = asResult(await handler(event));
+      expect(result.statusCode).toBe(200);
+      expect(mockCaptureWarning).not.toHaveBeenCalled();
 
       delete process.env['CORS_ALLOWED_ORIGINS'];
     });
