@@ -56,6 +56,44 @@ resource "aws_iam_role_policy_attachment" "mcp_ci_lambda_secrets" {
   role       = aws_iam_role.mcp_ci_lambda.name
 }
 
+# Read-only access to Playwright blob artifacts so ci_get_playwright_test_result
+# (source: "s3") works — the exact grants the server requires are documented in
+# tools/mcp/ci-server/src/s3-artifacts.ts. Writes stay with the GitHub Actions
+# role (ci-artifacts.tf). LS-8330: the tool shipped before this grant existed,
+# so S3 mode 403'd for every agent.
+resource "aws_iam_policy" "mcp_ci_lambda_artifacts_read" {
+  name        = "${local.name_prefix}-mcp-ci-lambda-artifacts-read"
+  description = "Allows the MCP CI Lambda read-only access to CI artifact handoffs in S3"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "${aws_s3_bucket.ci_artifacts.arn}/ci-artifacts/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.ci_artifacts.arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["ci-artifacts/*"]
+          }
+        }
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "mcp_ci_lambda_artifacts_read" {
+  policy_arn = aws_iam_policy.mcp_ci_lambda_artifacts_read.arn
+  role       = aws_iam_role.mcp_ci_lambda.name
+}
+
 # ── CloudWatch Log Group ──────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "mcp_ci_lambda" {

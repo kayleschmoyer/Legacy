@@ -9,6 +9,8 @@ The campaign layer for the repo's hardest live problem: keeping the nightly Play
 
 **Glossary** (defined once): _nightly_ = the `schedule` (cron `0 3 * * *` UTC) run of `.github/workflows/run-playwright-tests.yml` against `main`, running both suites sharded. _Shard_ = one parallel Playwright process in that run; integration shards each hammer the one shared live backend (`api.legacy-fantasy.com`). _0/0_ = a nightly report showing 0 failed and 0 flaked (flakes count the same as failures). _Bisect_ = attributing a nightly regression to one of the day's merge commits.
 
+**Scope note:** `run:integration` PR-label runs (`run-integration-tests.yml`) execute the same specs against the same shared backend, so their failures triage with THIS skill's phases too — with two differences: (1) evidence comes from raw CI logs, not a report — those runs publish no `pr-<N>` GH-Pages report (see [read-playwright-report § Report Location](../read-playwright-report/SKILL.md#report-location)); use `ci_get_logs(jobName: "Run Integration Suite", errorSummary: true)`. (2) The bisect window is the PR's base..head against the last green run's actual tested SHA. Verify candidate commits with `git merge-base --is-ancestor <sha> <passing-head>` before naming them — a candidate already contained in the passing run is exonerated by construction (LS-8310's original window made exactly this error).
+
 ## When NOT to use this skill
 
 | Situation                                                              | Go to instead                                                                                                                |

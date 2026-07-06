@@ -75,6 +75,12 @@ What type of failure are you debugging?
 ├── Bug report / code defect (exceptions, incorrect behavior, error handling)
 │   → Load references/bug-fixing.md
 │
+├── Test failure (a *.spec.ts is red — hermetic e2e, integration, or unit)
+│   → Hermetic e2e or unit spec: load ../testing/SKILL.md
+│   → *.integration.spec.ts (live backend — PR run:integration label OR nightly):
+│     load ../nightly-green-campaign/SKILL.md for triage/classification,
+│     ../fix-integration-tests/SKILL.md for the fix workflow
+│
 └── Dev environment issue (module errors, DB, ports, Nx cache, file locks)
     → Load references/environment-troubleshooting.md
 ```

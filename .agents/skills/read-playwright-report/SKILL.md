@@ -22,6 +22,18 @@ Report URL pattern:
 https://bkrupa.github.io/legacy-sports-deploys/playwright-report/<name>/
 ```
 
+**`pr-<N>` covers the hermetic PR CI e2e run only.** `run:integration`
+label runs (run-integration-tests.yml) do NOT reliably publish a GH-Pages
+report — expect a 404 for `pr-<N>` when the failure came from the
+"Run Integration Suite" check. The PRIMARY evidence path for those runs is
+raw CI logs: `ci_get_logs(jobName: "Run Integration Suite",
+errorSummary: true)` on the run, which carries the per-spec Playwright
+error blocks. `ci_get_playwright_test_result(source: "s3")` reaches the
+raw blob artifacts once the Lambda's read grant is deployed (LS-8330 —
+broken before 2026-07-04). In cloud sandboxes `gh` is usually NOT
+installed, so the GitHub-API artifact download is not a fallback there —
+raw CI logs are the fallback of record. (Canary finding, 2026-07-04.)
+
 ## Preferred: `summary.md` (LS-7838)
 
 Every report published after LS-7838 includes a compact, agent-targeted **`summary.md`** next to `index.html`:

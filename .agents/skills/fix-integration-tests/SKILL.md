@@ -39,6 +39,16 @@ Before touching any code, verify:
 
    Confirm from the worktree root: `test -e .env && echo "env ok" || echo "MISSING"`
 
+   **`.env` MISSING in an autonomous cloud session** (link script reports
+   "not present in main repo, nothing to link"): live-backend credentials
+   do not exist in that environment and no user turn is available to
+   supply them. Do not stall and do not fabricate a reproduction: proceed
+   on static analysis + CI-log evidence, record the local-reproduction
+   gate as UNVERIFIED in your report/ticket, and hand the reproduction
+   step to a credentialed session. In an interactive local session, the
+   original rule stands: missing credentials are a prompt to ask the
+   user, not a reason to skip reproduction. (Canary finding, 2026-07-04.)
+
    Credential/cache landscape (know which is which before debugging auth):
 
    | Artifact                                                             | Used by                                 | Notes                                                                                 |
