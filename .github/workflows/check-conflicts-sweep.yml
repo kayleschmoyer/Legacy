@@ -34,7 +34,11 @@ name: "Check Merge Conflicts (Base Push Sweep)"
 # per name (highest id), so the POSTed run supersedes any older job run. To
 # avoid stacking a duplicate on every push, the POST is gated on the recorded
 # newest run DISAGREEING with the fresh result (LS-7992 duplicate concern):
-# once the correct result is recorded, later sweeps see a match and skip.
+# once the correct result is recorded, later sweeps see a match and skip. So at
+# most one API run is added per conclusion transition, and it self-clears on the
+# PR's next push (new head SHA). Verified in practice: a POSTed failure over a
+# pre-existing stale job-run success left the required check evaluating as
+# failure (newest-wins) at both the merge gate and github_pr_why_blocked.
 #
 # The label + sticky-comment sync uses the same fresh result, so the label can
 # never contradict the check, and label drift from other writers (e.g.
@@ -173,19 +177,26 @@ jobs:
             RECORDED_STATUS="${RECORDED%%:*}"
             RECORDED_CONCLUSION="${RECORDED#*:}"
 
-            if [ "$RECORDED_STATUS" = "completed" ] && [ "$RECORDED_CONCLUSION" = "$CONCLUSION" ]; then
+            # Decide whether to write the check run. Logic lives in a unit-tested
+            # helper (.github/scripts/__tests__/conflict-sweep-decision.test.mjs)
+            # so the false-green regression — stale completed:success under a
+            # fresh failure → must POST — is pinned by a test, not just review.
+            ACTION=$(node .github/scripts/conflict-sweep-decision.mjs \
+              "$CONCLUSION" "$RECORDED_STATUS" "$RECORDED_CONCLUSION")
+
+            if [ "$ACTION" = "in-sync" ]; then
               echo "Check run already in sync (${RECORDED}); no refresh needed"
-            elif [ "$RECORDED_STATUS" = "in_progress" ] || [ "$RECORDED_STATUS" = "queued" ]; then
+            elif [ "$ACTION" = "defer-to-live" ]; then
               # A live check-conflicts.yml run (the PR was just pushed) is already
               # recomputing against the current base and will post the authoritative
               # result with a newer id. Don't race it with a POST that it would then
               # supersede anyway (or vice-versa).
               echo "Check run currently ${RECORDED_STATUS}; letting the live run report"
             else
-              # Recorded newest run is stale, wrong, or absent. POST a fresh
-              # API-owned completed run carrying this sweep's own live-main test
-              # result. POST is permitted (unlike PATCH of the Actions-owned job
-              # run); the newest run per name wins at the merge gate, so this
+              # ACTION=post — recorded newest run is stale, wrong, or absent. POST
+              # a fresh API-owned completed run carrying this sweep's own live-main
+              # test result. POST is permitted (unlike PATCH of the Actions-owned
+              # job run); the newest run per name wins at the merge gate, so this
               # supersedes the stale run. Gated on disagreement above, so steady
               # state posts nothing and no duplicates accrue.
               COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

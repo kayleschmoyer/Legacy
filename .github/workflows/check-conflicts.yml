@@ -15,10 +15,17 @@ on:
     # 'ready_for_review' omitted: synchronize already fires on every commit
     # (even while draft), so the result is always current when a PR goes live.
     types: [opened, synchronize, reopened, edited]
+  # MANUAL RECHECK ONLY. Dispatch this (with a pr_number) to force a fresh
+  # conflict check on one PR — e.g. after resolving conflicts when no push is
+  # imminent. Do NOT wire an automated sweep back to dispatching this: a
+  # workflow_dispatch runs the workflow file FROM the dispatched ref, so
+  # dispatching a PR's own (possibly stale) branch runs that branch's stale copy
+  # of this workflow — the false-green regression check-conflicts-sweep.yml was
+  # rebuilt to avoid (it now POSTs the required check directly; see its header).
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to check (dispatched by check-conflicts-sweep.yml when a PR's recorded check-run state goes stale after main advances)"
+        description: "PR number to force a fresh conflict check on (manual recheck)"
         required: true
         type: number
 
