@@ -437,11 +437,18 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await page.waitForURL('**/players/501');
       await expect(page.locator('div[role="dialog"]')).toBeVisible();
 
-      // dispatchEvent bypasses overlay interception from the open dialog
+      // Click the in-masthead "← Back" button. The standalone /players/:id
+      // route renders TWO "← Back" affordances: the page-level `.player-back-btn`
+      // (PlayerStatsPage) and the in-modal one (PlayerDetailModal). The page-level
+      // button sits UNDER the modal overlay, so a page-wide `.first()` match
+      // resolves it and any real click is (correctly) intercepted by the overlay
+      // — the reason this used to need `dispatchEvent('click')`. Scoping to the
+      // dialog targets the reachable in-modal button instead (LS-5578 / LS-8311),
+      // matching PlayerDetailSurface.back().
       await page
+        .locator('div[role="dialog"]')
         .getByRole('button', { name: /← back/i })
-        .first()
-        .dispatchEvent('click');
+        .click();
       await page.waitForURL(ROSTER_URL);
     });
 
@@ -472,10 +479,13 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await page.waitForURL('**/players/501');
       await expect(page.locator('div[role="dialog"]')).toBeVisible();
 
+      // Scope to the dialog so the reachable in-modal "← Back" is clicked, not
+      // the page-level `.player-back-btn` that sits under the overlay (see the
+      // desktop case above for the full rationale).
       await page
+        .locator('div[role="dialog"]')
         .getByRole('button', { name: /← back/i })
-        .first()
-        .dispatchEvent('click');
+        .click();
       await page.waitForURL(ROSTER_URL);
     });
   });

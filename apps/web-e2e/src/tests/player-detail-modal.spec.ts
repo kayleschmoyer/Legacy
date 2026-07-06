@@ -636,7 +636,9 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
 
     // The PlayerDetailPage renders a "← Back" button
     await playersPage.detail.expectBackButton();
-    // dispatchEvent bypasses overlay interception from the open dialog
+    // back() is dialog-scoped, so it clicks the reachable in-modal button (not
+    // the page-level `.player-back-btn` under the overlay) — a plain click, no
+    // dispatchEvent needed.
     await playersPage.detail.back();
 
     await playersPage.detail.waitForStatsList();
