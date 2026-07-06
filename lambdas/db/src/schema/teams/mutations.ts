@@ -105,17 +105,84 @@ export async function syncCurrentMatchupPositions(
     }
   }
 
-  // 4. For each change, update matchup_players rows where manuallyEdited = false
+  // 4. For each change, update matchup_players rows where manuallyEdited = false.
+  //
+  //    The partial unique index `matchup_players_unique_slot_idx`
+  //    (matchup_id, team_id, position_id) WHERE position_id IS NOT NULL allows
+  //    only one player per slot per matchup+team. Writing `position_id` directly
+  //    therefore collides with whichever player already holds that slot in a
+  //    future matchup — the normal state of a freshly-drafted league (every
+  //    slot auto-assigned) and of any swap. That collision surfaced as an opaque
+  //    "Failed query" (LS-8327 / LS-8328 / LS-8340 / LS-8341).
+  //
+  //    Mirror the clear-then-assign the `team_members` update already performs:
+  //    free the target slot from any non-manually-edited incumbent first, then
+  //    move our player in. Matchups where a *manually edited* row still holds
+  //    the slot are skipped entirely — that intentional future-week edit wins,
+  //    consistent with the manuallyEdited-preservation rule above.
   for (const change of changes) {
     const matchupIds = matchupIdsByTeam.get(change.teamId);
     if (!matchupIds || matchupIds.length === 0) continue;
 
+    // Benching a player (null position) can never violate the slot index.
+    if (change.positionId == null) {
+      await db
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: null })
+        .where(
+          and(
+            inArray(PublicSchema.matchupPlayers.matchupId, matchupIds),
+            eq(PublicSchema.matchupPlayers.playerId, change.playerId),
+            eq(PublicSchema.matchupPlayers.teamId, change.teamId),
+            eq(PublicSchema.matchupPlayers.manuallyEdited, false),
+          ),
+        );
+      continue;
+    }
+
+    // 4a. Free the target slot: bench any non-manually-edited incumbent that
+    //     currently holds it (a different player) so the assign below can't
+    //     collide with the unique slot index.
+    await db
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: null })
+      .where(
+        and(
+          inArray(PublicSchema.matchupPlayers.matchupId, matchupIds),
+          eq(PublicSchema.matchupPlayers.teamId, change.teamId),
+          eq(PublicSchema.matchupPlayers.positionId, change.positionId),
+          eq(PublicSchema.matchupPlayers.manuallyEdited, false),
+          ne(PublicSchema.matchupPlayers.playerId, change.playerId),
+        ),
+      );
+
+    // 4b. A manually-edited row may still hold the slot in some matchups; those
+    //     edits are sacred, so skip assigning our player there (moving it in
+    //     would collide with the preserved edit).
+    const lockedRows = await db
+      .select({ matchupId: PublicSchema.matchupPlayers.matchupId })
+      .from(PublicSchema.matchupPlayers)
+      .where(
+        and(
+          inArray(PublicSchema.matchupPlayers.matchupId, matchupIds),
+          eq(PublicSchema.matchupPlayers.teamId, change.teamId),
+          eq(PublicSchema.matchupPlayers.positionId, change.positionId),
+          eq(PublicSchema.matchupPlayers.manuallyEdited, true),
+        ),
+      );
+    const lockedMatchupIds = new Set(lockedRows.map((r) => r.matchupId));
+    const assignableMatchupIds = matchupIds.filter(
+      (id) => !lockedMatchupIds.has(id),
+    );
+    if (assignableMatchupIds.length === 0) continue;
+
+    // 4c. Assign our player into the now-free slot.
     await db
       .update(PublicSchema.matchupPlayers)
       .set({ positionId: change.positionId })
       .where(
         and(
-          inArray(PublicSchema.matchupPlayers.matchupId, matchupIds),
+          inArray(PublicSchema.matchupPlayers.matchupId, assignableMatchupIds),
           eq(PublicSchema.matchupPlayers.playerId, change.playerId),
           eq(PublicSchema.matchupPlayers.teamId, change.teamId),
           eq(PublicSchema.matchupPlayers.manuallyEdited, false),
