@@ -91,7 +91,7 @@ export interface MLBHomeProps {
   onAdvancedCreate?: (leagueName: string) => void;
   /** Free-tier league-cap context (mobile, LS-5182). */
   leagueCap?: MLBHomeLeagueCap;
-  /** When true, renders an "Unlimited leagues" badge instead of the free-tier cap indicator (LS-5870). */
+  /** Whether the viewer has a premium subscription. Renders an "Unlimited leagues" badge (LS-5870) and enables the premium-feature section in the quick-create dialog (LS-5861). */
   isPremium?: boolean;
   /**
    * When provided, renders a compact in-page sport switcher (LS-5815). Called
@@ -99,6 +99,8 @@ export interface MLBHomeProps {
    * available — the switcher renders a button per entry.
    */
   onSwitchSport?: (sport: 'football') => void;
+  /** Called when a non-premium viewer tries to enable a premium-gated feature in the dialog. */
+  onUpgrade?: () => void;
 }
 
 interface LeagueBadge {
@@ -276,6 +278,7 @@ export function MLBHome({
   leagueCap,
   isPremium,
   onSwitchSport,
+  onUpgrade,
 }: MLBHomeProps) {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -1346,6 +1349,8 @@ export function MLBHome({
         onOpenChange={setShowCreateDialog}
         onSubmit={onCreateLeague}
         onAdvanced={onAdvancedCreate}
+        isPremium={isPremium}
+        onUpgrade={onUpgrade}
       />
     </ScrollView>
   );

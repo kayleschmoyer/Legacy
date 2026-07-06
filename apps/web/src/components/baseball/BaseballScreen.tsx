@@ -123,6 +123,10 @@ export function BaseballScreen() {
           isPublic: input.isPublic,
           tradingEnabled: true,
           waiverEnabled: true,
+          waiverType: input.waiverType,
+          faabBudgetDefault: input.faabBudget,
+          salaryCapEnabled: input.salaryCapEnabled,
+          salaryCap: input.salaryCapAmount,
         },
       },
     });

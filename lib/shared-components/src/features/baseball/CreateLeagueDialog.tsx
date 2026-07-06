@@ -18,6 +18,16 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../utils/colors';
+import { SalaryCapField } from '../leagues/premium/SalaryCapField';
+import {
+  FaabBudgetField,
+  WaiverSystemField,
+} from '../leagues/premium/WaiverFields';
+import { OptionButtonGroup } from '../leagues/premium/_controls';
+import {
+  FAAB_BUDGET_OPTIONS,
+  type WaiverType,
+} from '../leagues/premium/constants';
 
 /** Default number of teams pre-selected in the quick-create dialog. */
 export const DEFAULT_NUM_TEAMS = 12;
@@ -30,6 +40,8 @@ export type PlayerPool = 'all' | 'nl' | 'al';
 export type DraftMode = 'live' | 'automated';
 export type SelectionMethod = 'standard' | 'auction' | 'random';
 export type DraftOrder = 'snake' | 'linear';
+
+export type PlayoffFormat = '4-team' | '6-team' | '8-team';
 
 /**
  * Platform-agnostic payload emitted when the user submits the quick-create
@@ -46,6 +58,12 @@ export interface QuickCreateLeagueInput {
   draftOrder: DraftOrder;
   maxRosterSize: number;
   isPublic: boolean;
+  // Premium fields — present when the dialog is rendered in premium-aware mode
+  waiverType?: WaiverType;
+  faabBudget?: number;
+  salaryCapEnabled?: boolean;
+  salaryCapAmount?: number;
+  playoffFormat?: PlayoffFormat;
 }
 
 export interface CreateLeagueDialogProps {
@@ -70,6 +88,17 @@ export interface CreateLeagueDialogProps {
    * flow can pre-fill it. When omitted, the link is hidden.
    */
   onAdvanced?: (leagueName: string) => void;
+  /**
+   * When provided, the premium-feature section (salary cap, waiver/FAAB,
+   * playoff format) is rendered. True = user can enable them; false = controls
+   * show but route taps to `onUpgrade`.
+   */
+  isPremium?: boolean;
+  /**
+   * Called when a non-premium viewer tries to enable a premium-gated feature.
+   * Required when `isPremium` is supplied.
+   */
+  onUpgrade?: () => void;
 }
 
 interface OptionButtonProps<T> {
@@ -124,6 +153,8 @@ export function CreateLeagueDialog({
   onSubmit,
   submitting = false,
   onAdvanced,
+  isPremium,
+  onUpgrade,
 }: CreateLeagueDialogProps) {
   const [leagueName, setLeagueName] = React.useState('');
   const [teamCount, setTeamCount] = React.useState<number>(DEFAULT_NUM_TEAMS);
@@ -139,6 +170,19 @@ export function CreateLeagueDialog({
   const [isPublic, setIsPublic] = React.useState(false);
   const [createError, setCreateError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
+
+  // Premium fields — only included in the payload when onUpgrade is provided
+  const showPremiumSection = onUpgrade !== undefined;
+  const [waiverType, setWaiverType] = React.useState<WaiverType>('standard');
+  const [faabBudget, setFaabBudget] = React.useState<number>(
+    FAAB_BUDGET_OPTIONS[1],
+  );
+  const [salaryCapEnabled, setSalaryCapEnabled] = React.useState(false);
+  const [salaryCapAmount, setSalaryCapAmount] = React.useState<
+    number | undefined
+  >(undefined);
+  const [playoffFormat, setPlayoffFormat] =
+    React.useState<PlayoffFormat>('4-team');
 
   const busy = submitting || pending;
   const trimmedName = leagueName.trim();
@@ -156,6 +200,11 @@ export function CreateLeagueDialog({
     setNumberOfDivisions(DEFAULT_NUM_DIVISIONS);
     setIsPublic(false);
     setCreateError(null);
+    setWaiverType('standard');
+    setFaabBudget(FAAB_BUDGET_OPTIONS[1]);
+    setSalaryCapEnabled(false);
+    setSalaryCapAmount(undefined);
+    setPlayoffFormat('4-team');
   }, []);
 
   const handleOpenChange = (next: boolean) => {
@@ -179,6 +228,13 @@ export function CreateLeagueDialog({
       draftOrder,
       maxRosterSize,
       isPublic,
+      ...(showPremiumSection && {
+        waiverType,
+        faabBudget: waiverType === 'faab' ? faabBudget : undefined,
+        salaryCapEnabled,
+        salaryCapAmount: salaryCapEnabled ? salaryCapAmount : undefined,
+        playoffFormat,
+      }),
     })
       .then(() => {
         setPending(false);
@@ -440,6 +496,80 @@ export function CreateLeagueDialog({
                   : 'Only people with your invite code can join this league'}
               </Text>
             </YStack>
+
+            {/* Premium features — shown when the consumer provides onUpgrade */}
+            {showPremiumSection && onUpgrade && (
+              <YStack gap="$3" marginTop="$1">
+                <Separator />
+                <Text
+                  fontWeight="700"
+                  fontSize="$2"
+                  color={BRAND_GOLD}
+                  textTransform="uppercase"
+                  letterSpacing={1}
+                >
+                  Premium Settings
+                </Text>
+
+                <WaiverSystemField
+                  value={waiverType}
+                  onChange={setWaiverType}
+                  isPremium={isPremium ?? false}
+                  disabled={busy}
+                  onUpgrade={onUpgrade}
+                />
+
+                {waiverType === 'faab' && (
+                  <FaabBudgetField
+                    value={faabBudget}
+                    onChange={setFaabBudget}
+                    disabled={busy}
+                  />
+                )}
+
+                <SalaryCapField
+                  enabled={salaryCapEnabled}
+                  amount={salaryCapAmount}
+                  onToggleEnabled={setSalaryCapEnabled}
+                  onAmountChange={setSalaryCapAmount}
+                  isPremium={isPremium ?? false}
+                  disabled={busy}
+                  onUpgrade={onUpgrade}
+                />
+
+                <YStack gap="$2">
+                  <Text fontWeight="600" fontSize="$3" color="$gray12">
+                    Playoff Format
+                  </Text>
+                  <OptionButtonGroup<PlayoffFormat>
+                    value={playoffFormat}
+                    testIDPrefix="create-league-playoff-format"
+                    options={[
+                      { value: '4-team', label: '4-Team' },
+                      {
+                        value: '6-team',
+                        label: '6-Team  ·  Premium',
+                        locked: !isPremium,
+                      },
+                      {
+                        value: '8-team',
+                        label: '8-Team  ·  Premium',
+                        locked: !isPremium,
+                      },
+                    ]}
+                    onChange={(v) => {
+                      if ((v === '6-team' || v === '8-team') && !isPremium) {
+                        onUpgrade();
+                        return;
+                      }
+                      setPlayoffFormat(v);
+                    }}
+                    disabled={busy}
+                    wide
+                  />
+                </YStack>
+              </YStack>
+            )}
           </YStack>
 
           <Separator />
