@@ -136,7 +136,7 @@ After creation, announce the ticket key:
 
 **Goal:** fix the defect, validate, and ship a PR.
 
-Run the [work-ticket](../work-ticket/SKILL.md) leaf-mode workflow from Step 2 onward. Step ordering — commit → push → **draft PR before validation** → migrations → validate → self-review → mark ready → watch to merge — is owned by the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md) and bound per environment there; do not reorder it here. Layer these bug-specific requirements on top:
+Run the [work-ticket leaf-mode workflow](../work-ticket/references/leaf-mode.md) from step 2 onward. Step ordering — commit → push → **draft PR before validation** → migrations → validate → self-review → mark ready → watch to merge — is owned by the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md) and bound per environment there; do not reorder it here. Layer these bug-specific requirements on top:
 
 1. **Reproduce before fixing** — follow the [verification-by-bug-type table](../debugging/SKILL.md#verification-by-bug-type). Capture before-state evidence (screenshot, failing test, query result). This is not optional — you cannot prove a fix works without showing the broken state first.
 
@@ -146,7 +146,7 @@ Run the [work-ticket](../work-ticket/SKILL.md) leaf-mode workflow from Step 2 on
 
 4. **Verify after fixing** — re-run the exact reproduction from step 1 and confirm the broken behavior is gone. Capture after-state evidence. Include both under a `## Verification` section in the PR body (appended after the standard template — see [debugging](../debugging/SKILL.md#verification-by-bug-type)).
 
-5. **Keep the Jira path selected in Phase 3a** — ticket transitions and the `## Implementation Notes` comment (work-ticket Step 4; AC verification is Step 7a) use the same path for the rest of the session: custom Jira MCP tools (`jira_transition`, `jira_edit_ticket`) when available, otherwise the Atlassian-plugin equivalents from `cloud-agent-mode`.
+5. **Keep the Jira path selected in Phase 3a** — ticket transitions and the `## Implementation Notes` comment ([work-ticket leaf-mode](../work-ticket/references/leaf-mode.md) step 4; AC verification is step 7a) use the same path for the rest of the session: custom Jira MCP tools (`jira_transition`, `jira_edit_ticket`) when available, otherwise the Atlassian-plugin equivalents from `cloud-agent-mode`.
 
 6. **Drive to merge** — the flow ends only at PR merged → Jira "Done" → MCP gap audit ([gaps reference](../mcp-first/references/gaps.md) Phase 1) → tracking tasks completed. work-ticket owns the step-by-step mechanics; do not stop at PR creation.
 

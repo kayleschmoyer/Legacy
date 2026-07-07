@@ -36,7 +36,7 @@ Rules that fall out of this:
 
 - An `Epic` can parent a `Story`, `Task`, or `Bug` — this is the normal pattern (e.g. bucket epics like `LS-2981` parenting work tickets).
 - A `Story` **cannot** parent a `Task` or `Bug`. They sit at the same level. Trying it (via `parent: "<story-key>"`) returns HTTP 400 `"Please select valid parent issue"`.
-- Epic→Epic parent links **exist in this Jira project** (see [work-ticket Parent Dispatch Mode](../../work-ticket/SKILL.md), whose transcript recurses into child epics) — do not design ticket trees assuming epics are the top of the hierarchy.
+- Epic→Epic parent links **exist in this Jira project** (see [work-ticket dispatch modes](../../work-ticket/references/dispatch-modes.md), whose transcript recurses into child epics) — do not design ticket trees assuming epics are the top of the hierarchy.
 - Hierarchy levels themselves are only editable on **Jira Premium company-managed projects** (Settings → Issues → Issue type hierarchy). This workspace is team-managed, so the three levels above are fixed — work within them.
 
 ### Umbrella grouping pattern

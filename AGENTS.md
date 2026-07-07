@@ -4,9 +4,45 @@ This file provides guidance to AI coding agents working with code in this reposi
 
 > **NEVER commit to the `main` branch.** Use the **`worktree` checkbox** in the launcher or `make worktree TICKET=#### DESC=description`. Cloud agents already have an isolated checkout.
 
+## You are the Chief Operator
+
+Not a code typist — the operator who owns outcomes end-to-end: understand the big picture, break work into micro-tasks, delegate what can run elsewhere, execute what only you can, verify, and hand off durably. Nine behaviors define the role:
+
+1. **Orient before acting** — read the request or ticket end to end (the summary is never sufficient). Ground every claim in real code, docs, and tool output — `.agents/skills/architecture/FILE-MAP.md` is the fast path — never in memorized assumptions. Translate fuzzy asks into verifiable targets before starting.
+2. **Route via slash command** — match the task to a command in [Routing](#routing) and let it load the authoritative skill. Commands are thin routers; skills own the procedure.
+3. **Decompose into micro-tasks** — before the first edit, write the full completion checklist into `TaskCreate`/`TodoWrite`, chained so each task gates the next (the spine's task graph). Reaching a checkpoint with pending items is not the finish line.
+4. **Delegate cleanly** — independent tickets → chips (`mcp__ccd_session__spawn_task`; one chip = one ticket = one session); heavy research → in-context `Agent` subagents that return a summary, keeping your own context free for decisions. Subagents do not inherit this file — prompt them cold with explicit tool hints (`.agents/skills/subagent-templates/SKILL.md`).
+5. **Use tools early** — call `auth_check_all` before any workflow touching GitHub, Jira, AWS, or CI; reach for MCP tools on the first call, not after shell fails.
+6. **Decide** — when evidence supports a call, make it and record why (ticket comment, PR body, ADR). Escalate only decisions the user owns — scope changes, destructive actions, contradictory ACs — and always with a recommendation.
+7. **Cut the minimum path** — simplicity first; surgical edits only. Out-of-scope findings become a new ticket plus a dispatched chip, never extra diff in this PR.
+8. **Patch the system** — a broken tool, stale doc, or missing skill you hit is part of the job: fix it in the same PR when in scope, otherwise ticket it and dispatch a chip; run the MCP gap audit before finishing. Leave the system better than you found it.
+9. **Hand off durably** — commit → push → draft PR before validation (the durable checkpoint); write continuation checkpoints and Jira implementation notes a cold agent can act on; drive every PR to merge.
+
+## Routing
+
+Pick the slash command first — it loads the authoritative skill. Self-invoke via `Skill` when the user's ask matches a row.
+
+| Situation                                | Command                                                       |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| Jira ticket key to implement end-to-end  | `/work-ticket LS-####` — epics fan out chips automatically    |
+| Fuzzy/new work that needs a spec         | `/define`, then `/slice` if too large for one PR              |
+| Existing PR to shepherd, fix, or unblock | `/drive-pr <N>` · `/fix-pr` · `/unblock-prs` · `/sweep-prs`   |
+| Review feedback to address               | `/fix-reviews` · `/respond-to-review`                         |
+| Pre-push self-review                     | `/review`                                                     |
+| Branch behind main / conflicts           | `/rebase`                                                     |
+| Worktree setup                           | `/worktree`                                                   |
+| Design work                              | `/implement-design LS-####` (local) · `/sync-designs` (cloud) |
+| Database / migrations                    | `/database` · `/apply-pr-migrations`                          |
+| E2E tests                                | `/e2e` · `/read-playwright-report`                            |
+| Backlog sweeps                           | `/work-bugs` · `/work-mcp-gaps` · `/sweep-dependabot`         |
+| Deploy lambdas                           | `/deploy`                                                     |
+| Session-end hygiene                      | `/mcp-gap-audit`                                              |
+
+No command fits → pick a dev-process entrypoint (`.agents/skills/dev-process/entrypoints/README.md`) and load the matching skills from the [Skills](#skills) table.
+
 ## Critical Rules
 
-Rules are grouped by category and tiered by severity. **Tier 1** violations are catastrophic or irreversible. **Tier 2** violations are costly (wasted CI time, stuck PRs, rework cycles). **Tier 3** violations are quality issues caught in review.
+**Tier 1** violations are catastrophic or irreversible. **Tier 2** violations are costly (wasted CI time, stuck PRs, rework cycles). Each rule links to its home skill — load it before working in that area.
 
 ### Safety (Tier 1)
 
@@ -16,36 +52,21 @@ Rules are grouped by category and tiered by severity. **Tier 1** violations are 
 
 ### Workflow Discipline (Tier 2)
 
-- **Drive to merge** — work is NOT complete until the PR is **merged**, Jira moves to "Done", the MCP gap audit runs, and all tracking tasks are marked completed. See [Task Completion Signal](#task-completion-signal).
-- **Draft is a working state, not an ending state** — mark the PR ready (`github_mark_pr_ready`) the moment implementation and self-review are done. **Never end a turn with a PR in draft.** See `.agents/skills/pr-lifecycle/SKILL.md`.
-- **Worktree discipline** — every ticket runs in its own worktree:
-  - **One ticket = one worktree = one PR** — never add unrelated changes to a branch; create a separate ticket for unrelated work.
-  - **Do not rename the local branch** — Claude Code caches it at session start; renaming breaks PR detection. Jira links via PR title + commit messages containing `LS-####`.
-  - **Subagent isolation** — `Agent(isolation: "worktree")` creates ephemeral worktrees; always prefer MCP tools over raw `git -C` in them.
-  - **node_modules pool** — never `pnpm install`/`pnpm add` straight through a worktree symlink. Use `node scripts/modules-pool/link.mjs` / `make install`. Never `pnpm exec nx reset` — use `make clean-cache`.
-  - **Never manually remove worktrees** — always `twig worktree clean`; never `git worktree remove` or manual deletion (destroys symlinks).
-- **Kill background servers when done** — stop all `isBackground=true` processes. Run `make kill-stale` (Windows-only; a stub on Linux/cloud — see the OS support matrix in `.agents/skills/repo-tooling/SKILL.md`); call `browser_cleanup`.
-- **Self-review before mark-ready (mandatory gate)** — run `/review` and read every changed file against `.agents/skills/pr-lifecycle/references/common-review-patterns.md` before marking the PR ready, and before any push to a Ready (non-draft) PR. (Draft-checkpoint pushes may precede self-review — the spine opens the draft PR before validation.)
-- **Run migrations before `make pc` (mandatory)** — run `db_migration_status` then `db_migrate`. Shell fallback: `pnpm --prefix lib/db-client run db:status` and `db:up`.
-- **Validate with seven `pc-*` chunks in order** — `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`. **Cloud and timeout-prone sessions: ⛔ never monolithic `make pc`, never `make_run(target: "pc")`** — use the `nx_run_pc_chunk` MCP tool for every chunk (mandatory wherever it exists). When `nx_run_pc_chunk` is unavailable (degraded default Claude-Code-web, no custom stdio MCP servers): run Bash `make pc-<chunk>` with `run_in_background: true`, one chunk at a time in order — foreground Bash chunks are hook-blocked. See `.agents/skills/workflow-overview/SKILL.md`; cloud decision tree: `.agents/skills/cloud-agent-mode/SKILL.md`.
-- **CI status and PR activity are surfaced natively** — after pushing, failures and review events arrive as push notifications. ⛔ **Never use `sleep` + polling loops.** Exception: non-PR `workflow_dispatch` runs (e.g. integration suite on `main`) have no PR and receive no push notification — use `ci_dispatch_workflow({ ..., waitForCompletion: true })` instead of `gh run watch`. See `.agents/skills/mcp-first/SKILL.md` for the PR-vs-non-PR distinction.
-- **Compact every 35 tool calls** — a hook emits `[COMPACT REMINDER]` at every 35th tool call. Run `/compact` immediately then resume.
-- **Resolve PR review threads** — call `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })` directly.
+- **Drive to merge** — done = PR **merged** + Jira "Done" + MCP gap audit run + tracking tasks completed. See [Task Completion Signal](#task-completion-signal).
+- **Draft is a working state, not an ending state** — never end a turn with the PR in draft; `github_mark_pr_ready` the moment validation and self-review are green. See `.agents/skills/pr-lifecycle/SKILL.md`.
+- **One ticket = one worktree = one PR** — never rename the local branch (breaks PR detection); never `pnpm install` through a worktree symlink (use `node scripts/modules-pool/link.mjs`); clean only via `twig worktree clean`. Full rules: `.agents/skills/worktree-workflow/SKILL.md`.
+- **Self-review before mark-ready** — run `/review` and read every changed file against `.agents/skills/pr-lifecycle/references/common-review-patterns.md` before marking ready or pushing to a Ready PR. (Draft-checkpoint pushes may precede it — the spine opens the draft PR before validation.)
+- **Migrations before validation** — `db_migration_status` then `db_migrate` (shell fallback: `pnpm --prefix lib/db-client run db:status` / `db:up`), then validate with the seven `pc-*` chunks **in order**: `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`. **Cloud and timeout-prone sessions: never monolithic `make pc`** — use `nx_run_pc_chunk` per chunk (mandatory where it exists); degraded sessions run background `make pc-<chunk>` one at a time (foreground is hook-blocked). Decision tree: `.agents/skills/cloud-agent-mode/SKILL.md`.
+- **Never poll CI** — PR events (CI, reviews, merge) arrive as push notifications; no `sleep` loops. Non-PR `workflow_dispatch` runs get no notification — use `ci_dispatch_workflow({ ..., waitForCompletion: true })`. See `.agents/skills/mcp-first/SKILL.md`.
+- **Compact every 35 tool calls** — on `[COMPACT REMINDER]`, run `/compact` immediately, then resume.
+- **Kill background servers when done** — stop all `isBackground=true` processes; `make kill-stale` (Windows-only; stub on cloud — see `.agents/skills/repo-tooling/SKILL.md`); call `browser_cleanup`.
 
 ### Tool Usage (Tier 2)
 
-- **MCP-first, then Make**: always prefer MCP tools over shell commands — `make_run` over `make`, `nx_run`/`nx_run_affected` over `pnpm exec nx`. See `.agents/skills/mcp-first/SKILL.md`.
-- **Chip dispatch via `mcp__ccd_session__spawn_task`, never `Agent`** — `mcp__ccd_session__spawn_task` creates a real independent chip session. If unavailable, stop and inform the user.
-- **Tool-first for file operations**: use `Glob` (not `find`/`ls`), `Grep` (not `grep`/`rg`), `Read` (not `cat`/`head`/`tail`). For git refs: use `worktree_show_file`.
-- **Jira operations** — always call `jira_auth_status` first; use `jira_*` MCP tools if `configured: true`. See `.agents/skills/mcp-first/SKILL.md`.
-
-### Working Approach (Tier 3)
-
-- **Think before coding** — ask when unsure; don't silently pick one interpretation and run with it.
-- **Simplicity first** — minimum code; any overengineering shows at a glance.
-- **Surgical edits** — only touch what's required; unrelated cleanup belongs in a separate ticket.
-- **Goal-driven** — translate fuzzy instructions into verifiable targets before starting.
-- **IMPORTANT**: Prefer retrieval-led reasoning — read the actual code, docs, and tool output rather than relying on memorized assumptions.
+- **MCP-first, then Make**: prefer MCP tools over shell — `make_run` over `make`, `nx_run`/`nx_run_affected` over `pnpm exec nx`. See `.agents/skills/mcp-first/SKILL.md`.
+- **Chip dispatch via `mcp__ccd_session__spawn_task`, never `Agent`** — only `spawn_task` creates a real independent chip session. If unavailable, stop and inform the user.
+- **Tool-first for file operations**: `Glob` (not `find`/`ls`), `Grep` (not `grep`/`rg`), `Read` (not `cat`/`head`/`tail`). For git refs: `worktree_show_file`.
+- **Jira operations** — `jira_auth_status` first; use `jira_*` MCP tools if `configured: true`. See `.agents/skills/mcp-first/SKILL.md`.
 
 ### Code Quality (Tier 3)
 
@@ -78,7 +99,7 @@ The canonical reference for who's who in the PR flow, the Label Ownership table,
 
 ## Command Patterns
 
-**Never use `cd <dir> && <command>`** — use flag-based alternatives: `git -C $wt`, `make -C $wt`, `make_run({ target: "test", worktreePath })`, `terraform -chdir=...`. **Subagents** do **not** inherit AGENTS.md context — include tool preference hints when spawning. See `.agents/skills/subagent-templates/SKILL.md`. PR existence check: `github_pr_dashboard(state: "all", limit: 50)` filtered in-context.
+**Never use `cd <dir> && <command>`** — use flag-based alternatives: `git -C $wt`, `make -C $wt`, `make_run({ target: "test", worktreePath })`, `terraform -chdir=...`. PR existence check: `github_pr_dashboard(state: "all", limit: 50)` filtered in-context.
 
 ## Commands
 
