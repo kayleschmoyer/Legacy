@@ -258,11 +258,32 @@ test.describe('League Creation @critical', () => {
     // Fill in some form data
     await leaguePage.fillLeagueName('Test League');
 
-    // Click cancel button
+    // Click cancel button — with unsaved changes this opens a
+    // "Discard this league?" confirmation dialog (LS-6109) instead of
+    // navigating immediately.
     await leaguePage.cancelButton.tap();
+    await leaguePage.button('Discard').tap();
 
     // Should navigate back to baseball homepage
     await expect(page).toHaveURL('/baseball');
+  });
+
+  test('should stay on the create form when discarding is declined', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+
+    // Fill in some form data
+    await leaguePage.fillLeagueName('Test League');
+
+    // Click cancel, then decline the discard confirmation.
+    await leaguePage.cancelButton.tap();
+    await leaguePage.button('Keep Editing').tap();
+
+    // Should remain on the create form with the entered data intact.
+    await leaguePage.leagueNameInput.expectVisible();
+    expect(await leaguePage.leagueNameInput.value()).toBe('Test League');
   });
 
   test('should preserve form state during selection changes', async ({
