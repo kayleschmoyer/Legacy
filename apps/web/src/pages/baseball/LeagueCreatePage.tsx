@@ -317,6 +317,35 @@ function poolDisplayLabel(sport: SportId, v: string): string {
   );
 }
 
+// ── Form messages ─────────────────────────────────────────────────────────────
+// Follows the DISCORD_SERVER_ERROR_MESSAGES precedent in
+// apps/web/src/pages/login/LoginPage.tsx — a colocated messages object next
+// to the component that uses it, rather than inline string literals.
+
+const LEAGUE_FORM_MESSAGES = {
+  leagueNameTooShort: 'League name must be 3–50 characters.',
+  leagueNameTooLong: (maxLength: number) =>
+    `League name must be less than ${maxLength} characters`,
+  teamsOutOfRange: 'Teams must be 4–16.',
+  moreDivisionsThanTeams: 'More divisions than teams.',
+  divisionParityMismatch: 'Division parity must match team parity.',
+  rosterOutOfRange: (min: number, max: number) =>
+    `Roster must be ${min}–${max}.`,
+  gamesPerMatchupOutOfRange: (min: number, max: number, sport: string) =>
+    `Games per matchup must be ${min}–${max} for ${sport} leagues.`,
+  customEraRequired: 'Both start and end year required.',
+  customEraOrderInvalid: 'Start year must be ≤ end year.',
+  draftDateInPast: 'Draft date must be in the future.',
+  salaryCapRequired: 'Salary cap amount is required.',
+  salaryFloorNegative: 'Salary floor cannot be negative.',
+  luxuryTaxThresholdNegative: 'Luxury tax threshold cannot be negative.',
+  minSalaryTooLow: 'Minimum salary must be at least 1.',
+  salaryEscalationPctOutOfRange: 'Salary escalation % must be 0–100.',
+  salaryDecayPctOutOfRange: 'Salary decay % must be 0–100.',
+  submitFallback:
+    'Unable to save league. Your settings are still filled in — try again or come back later.',
+} as const;
+
 // ── Validation (returns all errors, not just first) ──────────────────────────
 
 export function validateFormFull(
@@ -325,18 +354,23 @@ export function validateFormFull(
   const errs: Record<string, string> = {};
   const trimmed = f.leagueName.trim();
   if (!trimmed || trimmed.length < 3)
-    errs.leagueName = 'League name must be 3–50 characters.';
+    errs.leagueName = LEAGUE_FORM_MESSAGES.leagueNameTooShort;
   if (trimmed.length > MAX_LEAGUE_NAME_LENGTH)
-    errs.leagueName = `League name must be less than ${MAX_LEAGUE_NAME_LENGTH} characters`;
+    errs.leagueName = LEAGUE_FORM_MESSAGES.leagueNameTooLong(
+      MAX_LEAGUE_NAME_LENGTH,
+    );
   if (f.numberOfTeams < 4 || f.numberOfTeams > 16)
-    errs.numberOfTeams = 'Teams must be 4–16.';
+    errs.numberOfTeams = LEAGUE_FORM_MESSAGES.teamsOutOfRange;
   if (f.numberOfDivisions > f.numberOfTeams)
-    errs.numberOfDivisions = 'More divisions than teams.';
+    errs.numberOfDivisions = LEAGUE_FORM_MESSAGES.moreDivisionsThanTeams;
   if (f.numberOfTeams % 2 === 1 && f.numberOfDivisions % 2 === 0)
-    errs.numberOfDivisions = 'Division parity must match team parity.';
+    errs.numberOfDivisions = LEAGUE_FORM_MESSAGES.divisionParityMismatch;
   const range = ROSTER_RANGE_BY_SPORT[f.sport];
   if (f.maxRosterSize < range.min || f.maxRosterSize > range.max)
-    errs.maxRosterSize = `Roster must be ${range.min}–${range.max}.`;
+    errs.maxRosterSize = LEAGUE_FORM_MESSAGES.rosterOutOfRange(
+      range.min,
+      range.max,
+    );
   const gpmRange = GAMES_PER_MATCHUP_BY_SPORT[f.sport];
   if (
     gpmRange &&
@@ -344,34 +378,39 @@ export function validateFormFull(
       f.gamesPerMatchup < gpmRange.min ||
       f.gamesPerMatchup > gpmRange.max)
   )
-    errs.gamesPerMatchup = `Games per matchup must be ${gpmRange.min}–${gpmRange.max} for ${f.sport} leagues.`;
+    errs.gamesPerMatchup = LEAGUE_FORM_MESSAGES.gamesPerMatchupOutOfRange(
+      gpmRange.min,
+      gpmRange.max,
+      f.sport,
+    );
   if (f.baseballEraFilter === 'custom') {
     if (f.customEraStartYear == null || f.customEraEndYear == null)
-      errs.customEra = 'Both start and end year required.';
+      errs.customEra = LEAGUE_FORM_MESSAGES.customEraRequired;
     else if (f.customEraStartYear > f.customEraEndYear)
-      errs.customEra = 'Start year must be ≤ end year.';
+      errs.customEra = LEAGUE_FORM_MESSAGES.customEraOrderInvalid;
   }
   if (f.draftDate && f.draftDate < new Date())
-    errs.draftDate = 'Draft date must be in the future.';
+    errs.draftDate = LEAGUE_FORM_MESSAGES.draftDateInPast;
   if (f.salaryCapEnabled && f.salaryCap === undefined)
-    errs.salaryCap = 'Salary cap amount is required.';
+    errs.salaryCap = LEAGUE_FORM_MESSAGES.salaryCapRequired;
   if (f.salaryCapEnabled) {
     if (f.salaryFloor !== undefined && f.salaryFloor < 0)
-      errs.salaryFloor = 'Salary floor cannot be negative.';
+      errs.salaryFloor = LEAGUE_FORM_MESSAGES.salaryFloorNegative;
     if (f.luxuryTaxThreshold !== undefined && f.luxuryTaxThreshold < 0)
-      errs.luxuryTaxThreshold = 'Luxury tax threshold cannot be negative.';
+      errs.luxuryTaxThreshold = LEAGUE_FORM_MESSAGES.luxuryTaxThresholdNegative;
     if (f.minSalary !== undefined && f.minSalary < 1)
-      errs.minSalary = 'Minimum salary must be at least 1.';
+      errs.minSalary = LEAGUE_FORM_MESSAGES.minSalaryTooLow;
     if (
       f.salaryEscalationPct !== undefined &&
       (f.salaryEscalationPct < 0 || f.salaryEscalationPct > 100)
     )
-      errs.salaryEscalationPct = 'Salary escalation % must be 0–100.';
+      errs.salaryEscalationPct =
+        LEAGUE_FORM_MESSAGES.salaryEscalationPctOutOfRange;
     if (
       f.salaryDecayPct !== undefined &&
       (f.salaryDecayPct < 0 || f.salaryDecayPct > 100)
     )
-      errs.salaryDecayPct = 'Salary decay % must be 0–100.';
+      errs.salaryDecayPct = LEAGUE_FORM_MESSAGES.salaryDecayPctOutOfRange;
   }
   if (
     !PLAYER_POOL_OPTIONS_BY_SPORT[f.sport].some((p) => p.value === f.playerPool)
@@ -1459,8 +1498,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         error instanceof Error ? error : String(error),
       );
       setSubmitError(
-        (error as Error).message ||
-          'Unable to save league. Your settings are still filled in — try again or come back later.',
+        (error as Error).message || LEAGUE_FORM_MESSAGES.submitFallback,
       );
     }
   };
