@@ -788,6 +788,23 @@ describe('LeagueCreatePage — Divisional vs 1 division (LS-6105)', () => {
   });
 });
 
+describe('LeagueCreatePage — draft date sidebar fallback (LS-6077)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('shows friendly fallback text in the "What happens next?" sidebar when no draft date is set', () => {
+    renderPage('/baseball/league/create');
+    expect(
+      screen.getByText('Draft opens whenever you schedule it.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Invalid Date/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('validateFormFull — gamesPerMatchup (LS-6102)', () => {
   const baseFormData: CreateLeagueFormData = {
     sport: 'baseball',
