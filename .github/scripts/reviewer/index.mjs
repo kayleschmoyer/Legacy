@@ -63,6 +63,11 @@ import {
   formatContextForPrompt,
   parseChangedFilePaths,
 } from './lib/context.mjs';
+import {
+  fetchBaseBranchFailingChecks,
+  formatBaseBranchCiSection,
+} from './lib/base-branch-ci.mjs';
+import { filterStaleMissingArtifactFindings } from './lib/head-artifacts.mjs';
 
 // Cap on the current-HEAD file context injected into the review prompt (LS-7768).
 // Keeps a large PR from blowing the prompt size; the diff is always included in
@@ -646,6 +651,28 @@ async function main() {
     );
   }
 
+  // Fetch the base branch's current CI state so the LLM can classify a check
+  // that is already failing on the base branch as pre-existing (non-blocking)
+  // rather than a regression this PR introduced (LS-8312, AC1). Non-fatal —
+  // proceed without the section on any error.
+  let baseBranchCiSection = '';
+  try {
+    const baseFailingChecks = fetchBaseBranchFailingChecks(ctx.baseRefName);
+    if (baseFailingChecks.length > 0) {
+      baseBranchCiSection = formatBaseBranchCiSection(
+        baseFailingChecks,
+        ctx.baseRefName,
+      );
+      process.stdout.write(
+        `[reviewer] Base-branch CI: ${baseFailingChecks.length} check(s) failing on ${ctx.baseRefName}: ${baseFailingChecks.join(', ')}\n`,
+      );
+    }
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Base-branch CI fetch failed (non-fatal): ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+
   // Build prompts — fail open on infra errors (e.g. missing reviewer-rules.md)
   let systemPrompt, userPrompt;
   try {
@@ -663,6 +690,7 @@ async function main() {
       existingCrossReferences,
       integrationResultsSection,
       fullFileContextSection,
+      baseBranchCiSection,
     );
   } catch (err) {
     process.stderr.write(
@@ -938,12 +966,25 @@ async function main() {
     return;
   }
 
+  // HEAD-artifact validator (LS-8312, AC2): strip "missing tests/file" findings
+  // whose cited artifact already exists at HEAD (the reviewer runs on the PR-head
+  // checkout, so working-tree existence is HEAD existence). Runs before the
+  // cycle validators and on every cycle.
+  const headArtifactFilter = filterStaleMissingArtifactFindings(
+    parsed.findings,
+  );
+  if (headArtifactFilter.stripped.length > 0) {
+    process.stdout.write(
+      `::warning::[reviewer] HEAD-artifact validator: stripped ${headArtifactFilter.stripped.length} stale "missing artifact" finding(s) — ${formatStrippedLog(headArtifactFilter.stripped)}\n`,
+    );
+  }
+
   // Apply cycle-specific post-LLM validator (T22).
-  let filteredFindings = parsed.findings;
-  let strippedFindings = [];
+  let filteredFindings = headArtifactFilter.kept;
+  let strippedFindings = headArtifactFilter.stripped;
   if (cycle === 2) {
     const { kept, stripped } = filterFindingsCycle2(
-      parsed.findings,
+      filteredFindings,
       priorTitles,
       postReviewCommitShas,
       resolvedTitles,
@@ -955,10 +996,10 @@ async function main() {
       );
     }
     filteredFindings = kept;
-    strippedFindings = stripped;
+    strippedFindings = [...strippedFindings, ...stripped];
   } else if (cycle === 3) {
     const { kept, stripped } = filterFindingsCycle3(
-      parsed.findings,
+      filteredFindings,
       priorTitles,
       resolvedTitles,
     );
@@ -968,7 +1009,7 @@ async function main() {
       );
     }
     filteredFindings = kept;
-    strippedFindings = stripped;
+    strippedFindings = [...strippedFindings, ...stripped];
   }
 
   const gated = gateFindingsBySeverity(filteredFindings);

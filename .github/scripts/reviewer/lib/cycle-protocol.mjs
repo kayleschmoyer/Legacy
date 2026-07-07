@@ -266,7 +266,7 @@ restrictions on what you may raise in this cycle.`;
 
     const justifiedBlock =
       justifiedTitles.size > 0
-        ? `\n\n**Author posted a JUSTIFY: reply for these findings — do NOT re-raise unless the justification is demonstrably wrong.** Re-raising a sound justification wastes a review cycle toward the arbitration limit; the validator will strip it regardless:\n${[...justifiedTitles].map((t) => `  - ${t}`).join('\n')}`
+        ? `\n\n**Author posted a JUSTIFY: reply for these findings — do NOT re-raise unless the justification is demonstrably wrong.** Re-raising a sound justification wastes a review cycle toward the arbitration limit; the validator will strip it regardless. If you DO re-raise one of these, your finding \`body\` MUST explicitly quote the author's rationale and state the specific reason it is wrong — never repeat the original finding text verbatim:\n${[...justifiedTitles].map((t) => `  - ${t}`).join('\n')}`
         : '';
 
     const shaListBlock =
@@ -292,7 +292,12 @@ why the pattern is safe in this specific context, (b) the finding is correctly \
 scoped as out-of-scope for this PR (e.g. "pre-existing component has no tests; \
 adding tests is out of scope for this build-fix PR"), or (c) the risk is \
 hypothetical rather than demonstrated. Only re-raise if the justification is \
-demonstrably wrong or the risk is concrete and unmitigated.
+demonstrably wrong or the risk is concrete and unmitigated. **When you re-raise \
+a justified finding, do NOT repeat the original finding verbatim** — the \`body\` \
+must directly address the author's rationale: quote or paraphrase what they \
+argued, then explain the specific reason it does not hold (e.g. "the author says \
+X is safe because Y, but Y does not apply here because Z"). A re-raise that \
+ignores the rationale is a process failure.
 - No reply — treat as unaddressed; re-raise if the issue is still present in the diff.
 
 **Your instructions:**
@@ -333,7 +338,7 @@ they will be stripped before the review is posted.`;
 
     const justifiedBlock =
       justifiedTitles.size > 0
-        ? `\n\n**Author posted a JUSTIFY: reply for these findings — they are NOT mandates; OMIT from output unless the justification is demonstrably wrong:**\n${[...justifiedTitles].map((t) => `  - ${t}`).join('\n')}`
+        ? `\n\n**Author posted a JUSTIFY: reply for these findings — they are NOT mandates; OMIT from output unless the justification is demonstrably wrong. If you do re-raise one, the \`body\` MUST quote the author's rationale and give the specific reason it is wrong — do not repeat the original finding verbatim:**\n${[...justifiedTitles].map((t) => `  - ${t}`).join('\n')}`
         : '';
 
     return `\

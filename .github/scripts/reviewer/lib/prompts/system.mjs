@@ -103,6 +103,10 @@ export function buildSystemPrompt(cycleRoleSection = '') {
  *   current file state rather than only the diff context lines — this prevents phantom
  *   findings such as "function is undefined" (when it was merely moved) or "write not wrapped
  *   in try/catch" (when the surrounding lines, absent from the diff, already wrap it) (LS-7768).
+ * @param {string} [baseBranchCiSection]  Pre-formatted "base-branch CI state" section from
+ *   `formatBaseBranchCiSection()` listing checks/jobs currently failing on the base branch.
+ *   Injected so the LLM classifies a failure that is already red on the base branch as
+ *   pre-existing (non-blocking) rather than a regression introduced by this PR (LS-8312).
  * @returns {string}
  */
 export function buildUserPrompt(
@@ -111,6 +115,7 @@ export function buildUserPrompt(
   existingCrossReferences = [],
   integrationResultsSection = '',
   fullFileContextSection = '',
+  baseBranchCiSection = '',
 ) {
   const { title, body, headRefName, baseRefName, diff } = ctx;
 
@@ -150,9 +155,18 @@ export function buildUserPrompt(
       `When deciding whether a finding is real, verify it against this current content — NOT against the diff context lines, ` +
       `which omit unchanged surrounding code. Do not raise a finding that the current file content already resolves ` +
       `(e.g. a missing guard, wrapper, import, or definition that is present here but outside the diff hunk).\n\n` +
+      `Before raising any "missing X" finding (a missing test, file, handler, export, or function), first confirm X is ` +
+      `genuinely absent at HEAD: check the current file contents above and the repository state. If the artifact already ` +
+      `exists at HEAD — even outside this PR's diff (e.g. it was added by a sibling PR) — the finding is stale; do NOT raise it.\n\n` +
       `${fullFileContextSection}\n` +
       `<!-- END CURRENT FILE CONTENTS -->`
     : '';
+
+  // Inject the base-branch CI state so the LLM can distinguish a check that is
+  // already failing on the base branch (pre-existing, non-blocking) from one this
+  // PR introduced (a regression). Already wrapped in safety markers by the
+  // formatter (LS-8312).
+  const baseCiBlock = baseBranchCiSection ? `\n\n${baseBranchCiSection}` : '';
 
   return `## Pull Request: ${title}
 
@@ -165,7 +179,7 @@ ${body?.trim() || '_No description provided._'}
 
 \`\`\`diff
 ${diff?.trim() || '_No diff available._'}
-\`\`\`${fullFileBlock}${authorBlock}${refBlock}${integrationBlock}
+\`\`\`${fullFileBlock}${baseCiBlock}${authorBlock}${refBlock}${integrationBlock}
 
 Review this pull request according to your instructions. Apply the self-critique pass, then respond with ONLY valid JSON in this exact format — no prose, no markdown fences:
 
