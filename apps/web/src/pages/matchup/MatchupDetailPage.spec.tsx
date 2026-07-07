@@ -1,10 +1,13 @@
 /**
- * Tests for MatchupDetailPage PageMeta description sport-gating (LS-5892 / BMD-022).
+ * Tests for MatchupDetailPage PageMeta description sport-gating (LS-5892 / BMD-022)
+ * and the error state (LS-5901 / BMD-031).
  *
  * Covers:
  *   1. Baseball league: description reads "fantasy baseball".
  *   2. Football league: description reads "fantasy football" (not hardcoded baseball).
  *   3. League data not yet loaded: description falls back to "fantasy baseball".
+ *   4. Error state: shows a generic message instead of the raw error.
+ *   5. Error state: does not leak the raw error message to the user.
  */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -34,12 +37,22 @@ const baseMatchup = {
   selectedGamesCount: 2,
 };
 
-jest.mock('../../hooks/useMatchup', () => ({
-  useMatchupById: jest.fn(() => ({
+interface MockMatchupByIdResult {
+  matchup: typeof baseMatchup | undefined;
+  loading: boolean;
+  error: Error | undefined;
+}
+
+const mockUseMatchupById = jest.fn<MockMatchupByIdResult, [number | null]>(
+  () => ({
     matchup: baseMatchup,
     loading: false,
     error: undefined,
-  })),
+  }),
+);
+
+jest.mock('../../hooks/useMatchup', () => ({
+  useMatchupById: (matchupId: number | null) => mockUseMatchupById(matchupId),
   useMatchupsForLeague: jest.fn(() => ({ matchups: [] })),
   useCurrentWeek: jest.fn(() => ({ currentWeek: 3 })),
 }));
@@ -54,6 +67,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     Scheduled: 'scheduled',
     InProgress: 'in_progress',
     Completed: 'completed',
+    Cancelled: 'cancelled',
   },
   useGetUserTeamIdQuery: jest.fn(() => ({ data: { userTeamId: 10 } })),
   useGetLeagueByIdQuery: jest.fn(() => ({
@@ -108,6 +122,11 @@ jest.mock('@legacy-sports/shared-components/matchup', () => ({
 describe('MatchupDetailPage – PageMeta description sport-gating (LS-5892)', () => {
   beforeEach(() => {
     mockLeagueSport = 'baseball';
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: undefined,
+    });
   });
 
   it('describes the matchup as fantasy baseball for a baseball league', () => {
@@ -135,5 +154,40 @@ describe('MatchupDetailPage – PageMeta description sport-gating (LS-5892)', ()
     expect(screen.getByTestId('page-meta-description')).toHaveTextContent(
       'View Week 3 fantasy baseball matchup scores, rosters, and stats on Legacy Sports.',
     );
+  });
+});
+
+const RAW_ERROR_MESSAGE =
+  'relation "matchups" does not exist at character 15 in SELECT * FROM matchups';
+
+describe('MatchupDetailPage error state (LS-5901)', () => {
+  beforeEach(() => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: undefined,
+      loading: false,
+      error: new Error(RAW_ERROR_MESSAGE),
+    });
+  });
+
+  afterEach(() => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: undefined,
+    });
+  });
+
+  it('shows a generic message instead of the raw error', () => {
+    render(<MatchupDetailPage />);
+    expect(
+      screen.getByText(
+        'Something went wrong loading this matchup. Please try again.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('does not leak the raw error message to the user', () => {
+    render(<MatchupDetailPage />);
+    expect(screen.queryByText(RAW_ERROR_MESSAGE)).not.toBeInTheDocument();
   });
 });

@@ -111,7 +111,7 @@ export function MatchupDetailPage() {
           Error loading matchup
         </Text>
         <Text marginTop="$2" color="$gray11">
-          {error.message}
+          Something went wrong loading this matchup. Please try again.
         </Text>
         <Button
           marginTop="$4"
