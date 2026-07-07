@@ -80,7 +80,16 @@ jest.mock('react-router-dom', () => {
   const actual = jest.requireActual('react-router-dom');
   return {
     ...actual,
-    useNavigate: () => mockNavigate,
+    // Spy on navigate() calls while still delegating to the real navigate,
+    // so route-driven effects (sport switch, Cancel navigation) keep working
+    // for tests that don't care about the call args.
+    useNavigate: () => {
+      const realNavigate = actual.useNavigate();
+      return (...args: Parameters<typeof realNavigate>) => {
+        mockNavigate(...args);
+        return realNavigate(...args);
+      };
+    },
   };
 });
 
@@ -643,6 +652,68 @@ describe('LeagueCreatePage — unsaved-changes navigation guard (LS-6109)', () =
 
     await waitFor(() =>
       expect(dispatchBeforeUnload().defaultPrevented).toBe(false),
+    );
+  });
+});
+
+describe('LeagueCreatePage — Divisional vs 1 division (LS-6105)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+  });
+
+  it('disables Divisional once an odd team count forces 1 division', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    expect(screen.getByRole('button', { name: /^Divisional$/i })).toBeEnabled();
+
+    // 9 teams only allows odd division counts — division count auto-resets to 1.
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+
+    expect(
+      screen.getByRole('button', { name: /^Divisional$/i }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/would be identical to Round Robin/i),
+    ).toBeInTheDocument();
+  });
+
+  it('re-enables Divisional after switching back to an even team count', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+    expect(
+      screen.getByRole('button', { name: /^Divisional$/i }),
+    ).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '12' }));
+    fireEvent.click(screen.getByRole('button', { name: '2' }));
+
+    expect(screen.getByRole('button', { name: /^Divisional$/i })).toBeEnabled();
+  });
+
+  it('falls back to round-robin in the mutation when 1 division forced Divisional off', async () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+    expect(mockCreateLeague).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          input: expect.objectContaining({
+            numberOfDivisions: 1,
+            schedulingStrategy: 'round-robin',
+          }),
+        }),
+      }),
     );
   });
 });

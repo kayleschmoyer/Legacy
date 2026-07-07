@@ -1182,6 +1182,12 @@ export function LeagueCreatePage(): React.JSX.Element {
       ) {
         next.numberOfDivisions = 1;
       }
+      if (
+        next.numberOfDivisions === 1 &&
+        next.schedulingStrategy === 'divisional'
+      ) {
+        next.schedulingStrategy = 'round-robin';
+      }
       return next;
     });
   };
@@ -1858,13 +1864,20 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <div style={{ gridColumn: '1 / -1' }}>
                     <FieldRow
                       label="Scheduling Strategy"
-                      hint="Divisional schedules prioritize in-division matchups"
+                      hint={
+                        formData.numberOfDivisions === 1
+                          ? "Only 1 division — Divisional would be identical to Round Robin, so it's disabled."
+                          : 'Divisional schedules prioritize in-division matchups'
+                      }
                     >
                       <ButtonGroup
                         value={formData.schedulingStrategy}
                         options={SCHEDULING_STRATEGY_OPTIONS.map((o) => ({
                           value: o.value,
                           label: o.label,
+                          disabled:
+                            o.value === 'divisional' &&
+                            formData.numberOfDivisions === 1,
                         }))}
                         onChange={(v) =>
                           handleInputChange('schedulingStrategy', v)
