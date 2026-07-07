@@ -88,7 +88,17 @@
           },
           {
             "type": "command",
+            "command": "node .claude/hooks/delivery-gate.mjs",
+            "windowsHide": true
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/check-open-pr.sh"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-model-audit.mjs",
+            "windowsHide": true
           }
         ]
       }
@@ -127,6 +137,45 @@
           {
             "type": "command",
             "command": ".claude/hooks/reset-tool-count.sh"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-model-audit.mjs",
+            "windowsHide": true
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/read-compact-handoff.mjs",
+            "windowsHide": true
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/write-compact-handoff.mjs",
+            "windowsHide": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/log-tool-evidence.mjs",
+            "windowsHide": true
           }
         ]
       }
@@ -186,11 +235,26 @@
         ]
       },
       {
+        "matcher": "^(Bash|Edit|Write|NotebookEdit|mcp__legacy-sports-db__db_query|mcp__legacy-sports-db-admin__db_query)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/guard-risky-tools.mjs",
+            "windowsHide": true
+          }
+        ]
+      },
+      {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
             "command": ".claude/hooks/remind-compact.sh"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/budget-governor.mjs",
+            "windowsHide": true
           }
         ]
       }

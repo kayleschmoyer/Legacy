@@ -347,6 +347,9 @@ scratch/*
 # Claude Code local settings (machine-specific paths and overrides)
 .claude/settings.local.json
 
+# Hook audit trails (session-model, risk-guard, budget-governor JSONL logs)
+.claude/audit/
+
 # Claude Code built-in worktrees (ephemeral, not ticket-tracked)
 .claude/worktrees/
 
