@@ -1,6 +1,8 @@
 ---
 name: work-ticket
 description: 'Autonomously implement a Jira ticket end-to-end. For leaf tickets (task/story/bug with no children): blocker check, auto-enrich the ticket via an isolated research subagent if underspecified, worktree, code, validate, PR, Jira transition. For all Epics: auto-batch-dispatch chips for all unblocked To Do descendants without asking the user. For Story/Task parents with To Do children: never implements the parent itself — gathers To Do descendants and asks the user how to dispatch (chips for all / pick one / chips for a subset). Pass --batch to skip the prompt and chip-dispatch every unblocked To Do descendant. Updates ticket and parent statuses automatically. Runs MCP gap audit before finishing. Load when the user gives a ticket key and expects autonomous completion.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Work Ticket

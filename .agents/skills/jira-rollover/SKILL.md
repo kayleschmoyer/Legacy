@@ -1,6 +1,8 @@
 ---
 name: jira-rollover
 description: 'Manage Jira bucket epic rollovers at sprint boundaries. Run after sprint close to sync project properties, close old epics, and re-parent stranded tickets. Use jira_get_bucket_epic to look up current epic keys instead of hardcoding a specific ticket number.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Jira Rollover

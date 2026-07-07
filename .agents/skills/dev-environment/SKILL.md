@@ -1,6 +1,8 @@
 ---
 name: dev-environment
 description: 'Run and operate the local stack and the Legacy Sports CLI: dev servers, Docker Compose, the canonical port map, per-OS setup, and admin/recovery CLI commands. Load when: starting local dev services, running the app or CLI, debugging a port/service conflict, seeding data, unblocking a stuck league, or operating in a Linux/cloud session.'
+metadata:
+  scope: 'lambdas/**, apps/**, lib/**'
 ---
 
 # Skill: Dev Environment (run and operate)

@@ -1,6 +1,8 @@
 ---
 name: secrets-handling
 description: 'How agents should handle secrets without exposing values in conversation history. Load when writing, reading, or populating secret values (API keys, tokens, private keys, secrets.auto.tfvars). Covers safe write patterns, file-to-file copy, and what NOT to do.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Secrets Handling

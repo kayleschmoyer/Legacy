@@ -1,6 +1,8 @@
 ---
 name: slice
 description: 'Decompose an existing Jira ticket into structured child tasks. Reads the ticket description (especially the Technical Approach section), proposes a logical breakdown of implementation phases, confirms with the user, then creates child tickets each with their own structured description. Load when the user wants to split an epic or story into actionable tasks before starting implementation.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Slice

@@ -1,6 +1,8 @@
 ---
 name: fix-problem
 description: 'End-to-end problem resolution: elicit a problem description from the user through structured dialogue, investigate the root cause, create a Jira ticket with findings, and implement the fix — all in one session. Load when: the user reports a bug, describes unexpected behavior, pastes an error/screenshot/stack trace, or says something is broken and wants it fixed without an existing ticket.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Fix Problem

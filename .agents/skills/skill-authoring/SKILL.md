@@ -1,6 +1,8 @@
 ---
 name: skill-authoring
 description: 'How to write and maintain SKILL.md files in this repo. Load when: creating a new skill, restructuring an existing skill, or reviewing skill guidance for clarity and enforceability. Encodes the precondition + TaskCreate pattern that replaces prevention-style "never X" prohibitions.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Skill Authoring
@@ -54,10 +56,14 @@ Required frontmatter:
 ---
 name: <kebab-case slug matching directory name>
 description: 'One-sentence trigger description. Load when: <comma-separated triggers>.'
+metadata:
+  scope: '<comma-separated path globs, or ** for repo-wide>'
 ---
 ```
 
 The `description` field powers auto-discovery — write it as a trigger, not a summary. "Load when: writing new tests, debugging E2E flake, or updating Playwright config" tells the agent when to read the skill; "Testing utilities reference" does not.
+
+Frontmatter is the **single home for routing facts** (rule 1 below): `description` is the load-when trigger, `metadata.scope` the path globs the skill applies to. [`INDEX.md`](../INDEX.md) — the routing table agents read at task start — is **generated** from this frontmatter by `scripts/generate-skill-index.mjs`. After any frontmatter change (or adding/removing a skill), run `make sync-skill-index` and commit the regenerated index; `make lint-skills` errors on a missing `metadata.scope`, and CI's custom-checks job fails on index drift. Deprecated tombstone skills additionally set `metadata.deprecated: 'true'`, which moves them to the index's trailing pointer list. Design record: [docs/dev-process/skill-routing.md](../../../docs/dev-process/skill-routing.md).
 
 Recommended sections (in order):
 
@@ -132,5 +138,7 @@ This makes the next editor's freshness check copy-pasteable instead of archaeolo
 ## Provenance and maintenance
 
 - 2026-07-02: anti-drift rules added from the skills audit (`scratch/skills-audit/synthesis.json`); earlier sections predate it.
+- 2026-07-07 (LS-8355): `metadata.scope` frontmatter + generated `INDEX.md` routing table replaced the eager AGENTS.md skills table.
 - Verify lint enforcement matches this doc: `node scripts/lint-skills.js` and read the check list at the top of `scripts/lint-skills.js`.
 - Verify spine home still exists: `ls .agents/skills/workflow-overview/references/ticket-to-merge-spine.md`
+- Verify index generation: `node scripts/generate-skill-index.mjs --check`

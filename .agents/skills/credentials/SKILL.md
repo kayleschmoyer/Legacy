@@ -1,6 +1,9 @@
 ---
 name: credentials
 description: 'Deprecated pointer — the auth model and pre-flight checks moved to mcp-first. Load when: an inbound link brought you here; then load ../mcp-first/SKILL.md (Auth Model + Pre-flight Auth Check sections) instead.'
+metadata:
+  scope: '**'
+  deprecated: 'true'
 ---
 
 # Skill: Credentials (merged into mcp-first, 2026-07-02)

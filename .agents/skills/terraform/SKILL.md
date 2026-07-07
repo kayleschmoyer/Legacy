@@ -1,6 +1,8 @@
 ---
 name: terraform
 description: 'Working on AWS infrastructure under terraform/. Load when adding or modifying any Terraform resource, running plan/apply locally against AWS dev, or adding a new secret or environment variable that needs Terraform plumbing (variables.tf / secrets.tf / Secrets Manager / Lambda env / GitHub Actions TF_VAR_*). Covers IAM permission planning for the CI roles (predict → diff → patch → local-plan-as-role), the two-state architecture (terraform/main/ for Lambda app, terraform/runners/ for runners), state lock clearance, and the full secret-or-env-var checklist. Distinct from `secrets-handling`, which covers safely transiting an existing secret VALUE in tool calls — this skill is about wiring NEW secrets/env vars through the infrastructure.'
+metadata:
+  scope: 'terraform/**, .github/workflows/**, lambdas/**'
 ---
 
 # Skill: Terraform

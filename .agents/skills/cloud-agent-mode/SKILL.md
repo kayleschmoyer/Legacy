@@ -1,6 +1,8 @@
 ---
 name: cloud-agent-mode
 description: 'Cloud tool binding for the ticket-to-merge spine, organized as a per-platform decision tree (Copilot Coding Agent / connector Claude Code web / default degraded Claude Code web). Single home for cloud platform facts: validation binding per platform, mark-ready label mechanics, Jira transition IDs, egress quirks, degraded-mode fallbacks. Load when: operating in any cloud environment, choosing a validation path in cloud, or troubleshooting cloud-agent auth or MCP availability.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Cloud Agent Mode

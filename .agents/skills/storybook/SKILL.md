@@ -1,6 +1,8 @@
 ---
 name: storybook
 description: 'Add or run Storybook stories for shared-components with proper conventions. Load before adding new stories, writing interaction tests, or running storybook locally.'
+metadata:
+  scope: 'lib/shared-components/**'
 ---
 
 # Skill: Storybook for Shared Components

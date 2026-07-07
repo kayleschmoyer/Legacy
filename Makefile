@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows lint-skills sync-agent-prompts lint-agent-prompts format fmt typecheck validate \
+	lint lint-fix lint-workflows lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index format fmt typecheck validate \
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
@@ -285,6 +285,14 @@ sync-agent-prompts: ## Regenerate per-agent slash-command prompts from .claude/c
 lint-agent-prompts: ## Check generated agent prompts are in sync with .claude/commands/
 	@$(call echo_blue,Checking agent prompt sync...)
 	@node scripts/sync-agent-prompts.mjs --check
+
+sync-skill-index: ## Regenerate .agents/skills/INDEX.md from SKILL.md frontmatter
+	@$(call echo_blue,Syncing skill routing index...)
+	@node scripts/generate-skill-index.mjs
+
+lint-skill-index: ## Check .agents/skills/INDEX.md is in sync with SKILL.md frontmatter
+	@$(call echo_blue,Checking skill index sync...)
+	@node scripts/generate-skill-index.mjs --check
 
 diagrams: ## Generate SVG files from Mermaid (.mmd) sources under .agents/skills/**/diagrams/
 	@$(call echo_blue,Generating diagrams...)

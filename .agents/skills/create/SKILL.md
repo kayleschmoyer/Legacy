@@ -1,6 +1,8 @@
 ---
 name: create
 description: 'Create a new project in the monorepo: shared library (lib/), AWS Lambda (lambdas/), application (apps/), MCP server (tools/mcp/), or agent skill (.agents/skills/). Load before scaffolding any new project or skill.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Create a New Project

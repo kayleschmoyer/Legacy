@@ -1,6 +1,8 @@
 ---
 name: ui
 description: 'Brand colors and UI component standards — load when creating/styling components, choosing colors, layout patterns, or reviewing visual changes.'
+metadata:
+  scope: 'apps/web/**, apps/app/**, lib/shared-components/**'
 ---
 
 # UI Skill

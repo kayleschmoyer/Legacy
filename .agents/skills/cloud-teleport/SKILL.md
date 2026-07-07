@@ -1,6 +1,8 @@
 ---
 name: cloud-teleport
 description: 'Session teleport protocol for cloud-to-local handoff. When a cloud agent hits a capability boundary (AWS operations, real DB migrations, Terraform, infrastructure), it commits progress, writes a structured handoff artifact, and alerts the user to continue locally. Load when a cloud agent detects it cannot complete a task due to environment limitations.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Cloud Session Teleport

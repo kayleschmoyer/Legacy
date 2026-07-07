@@ -1,6 +1,8 @@
 ---
 name: domain-reference
 description: 'Product and data-model ground truth for Legacy Sports — what the product actually is, the users→leagues→matchups→scoring entity chain, the lifecycle invariants agents most often get wrong, and domain rules that exist only in code. Load when: starting work without product context, reasoning about leagues/drafts/matchups/seasons/scoring, writing queries against the fantasy schema, debugging game selection or week advancement, or deciding whether a schema doc can be trusted.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Domain Reference

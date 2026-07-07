@@ -40,15 +40,18 @@ Every `SKILL.md` must start with a YAML frontmatter block:
 ---
 name: <skill-name>
 description: '<what this skill does and when to use it>'
+metadata:
+  scope: '<comma-separated path globs, or ** for repo-wide>'
 ---
 ```
 
 ### Rules
 
-| Field         | Constraints                                                                |
-| ------------- | -------------------------------------------------------------------------- |
-| `name`        | Lowercase + hyphens only · Max 64 chars · Must match parent directory name |
-| `description` | Max 1024 chars · Used by agents to decide auto-load · Be specific          |
+| Field            | Constraints                                                                                                                                  |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`           | Lowercase + hyphens only · Max 64 chars · Must match parent directory name                                                                   |
+| `description`    | Max 1024 chars · Used by agents to decide auto-load · Be specific                                                                            |
+| `metadata.scope` | Path globs the skill applies to (`**` = repo-wide) · Feeds the generated routing index (`INDEX.md`) · `make lint-skills` errors when missing |
 
 ### Optional Frontmatter
 
@@ -233,9 +236,15 @@ $c = Get-Content ".agents\skills\<name>\SKILL.md" -Raw
 
 If over 500 lines or 5,000 tokens, extract content to `references/` (see Token Budget section).
 
-### 4. Verify discovery
+### 4. Regenerate the routing index
 
-Skills are auto-discovered from `.agents/skills/<name>/SKILL.md` frontmatter — no manual registration in `AGENTS.md` is needed.
+Agents route to skills via the generated [`INDEX.md`](../../INDEX.md) (see [skill-authoring](../../skill-authoring/SKILL.md)). After adding, removing, or re-describing a skill:
+
+```powershell
+make sync-skill-index
+```
+
+Commit the regenerated `.agents/skills/INDEX.md` in the same PR — CI's custom-checks job fails on drift. No manual registration in `AGENTS.md` is needed.
 
 > `AGENTS.md` is the single canonical agent instructions file. `CLAUDE.md` is a compatibility shim (symlink where supported; on Windows with `core.symlinks=false` it is a plain copy). Different agents may read either file based on their configuration.
 
@@ -272,4 +281,4 @@ uvx --from skills-ref agentskills validate .agents/skills/<name>
 | Validator fails on frontmatter             | Ensure line 1 is `---` (no BOM, no leading whitespace) and `name` matches directory name |
 | Skill loads but agent ignores instructions | Move critical rules to the top of the file — agents sometimes truncate long skills       |
 | SKILL.md exceeds 500 lines or 5,000 tokens | Extract verbose sections to `references/` — see Token Budget section above               |
-| Skill not listed in AGENTS.md Skills table | The Skills Reference table in AGENTS.md is manually maintained — add a row if needed     |
+| Skill not listed in the routing index      | Run `make sync-skill-index` to regenerate `.agents/skills/INDEX.md` from frontmatter     |

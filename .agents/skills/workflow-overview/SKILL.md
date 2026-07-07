@@ -1,6 +1,8 @@
 ---
 name: workflow-overview
 description: 'Local (Windows worktree) implementation of the ticket-to-merge workflow. Load when: following the step-by-step ticket-to-merge runbook in a local session, setting up worktrees, or running local validation gates. The environment-neutral ordering lives in references/ticket-to-merge-spine.md; this skill is the local tool binding plus local-only setup and validation.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Workflow Overview (Local)

@@ -1,6 +1,8 @@
 ---
 name: testing
-description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests (hermetic, mocked), Playwright integration tests (real services), and DB integration tests (Jest + real PostgreSQL). Covers test type selection, which suites gate merge, surface-map registration, coverage reality, commands, tagging, API isolation, and CI pipeline.'
+description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests (hermetic, mocked), Playwright integration tests (real services), and DB integration tests (Jest + real PostgreSQL). Covers test type selection, which suites gate merge, surface-map registration, coverage reality, commands, tagging, API isolation, and CI pipeline. references/e2e-determinism.md is the 12-lever determinism checklist for every PR touching E2E or integration tests.'
+metadata:
+  scope: 'apps/web-e2e/**, lib/shared-components/**'
 ---
 
 # Skill: Testing

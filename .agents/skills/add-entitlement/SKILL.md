@@ -1,6 +1,8 @@
 ---
 name: add-entitlement
 description: 'How premium feature gating works and how to add or gate a feature behind a Stripe entitlement end-to-end. Load when: adding a new premium feature, gating an existing feature, editing lib/utils/src/lib/entitlements.ts, adding a subscription tier, or touching requireEntitlement/hasEntitlement/PremiumGate/useHasEntitlement.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Add / Gate a Premium Entitlement

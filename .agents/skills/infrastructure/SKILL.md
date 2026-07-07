@@ -1,6 +1,8 @@
 ---
 name: infrastructure
 description: 'AWS authentication, Terraform infrastructure management (two-state split: main/ + runners/), Lambda deployment, orphaned resource cleanup, Rollbar error monitoring and sourcemaps, CloudWatch log querying, and GitHub Actions CI log parsing. Load when: any AWS operation, cloud infrastructure change, deployment task, production error/log debugging, or CI failure diagnosis.'
+metadata:
+  scope: 'lambdas/**, terraform/**'
 ---
 
 # Skill: Infrastructure

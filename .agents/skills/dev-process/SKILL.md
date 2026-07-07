@@ -1,6 +1,8 @@
 ---
 name: dev-process
 description: 'The development process framework: 13 entrypoints, 6-phase shared spine, structured artifacts (RFC, ADR, postmortem, continuation, test-plan, repro), risk-tier gates, and documentation freshness rules. Load when: starting any task, evaluating which gates apply, producing or consuming a process artifact, or onboarding a new agent.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Development Process

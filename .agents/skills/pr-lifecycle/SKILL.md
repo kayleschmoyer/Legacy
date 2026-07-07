@@ -1,6 +1,8 @@
 ---
 name: pr-lifecycle
 description: 'PR lifecycle (end-to-end): create PRs with Jira linkage, self-review before push, drive a single PR to merge, fix conflicts/CI/reviews, respond to bot review threads, unblock stuck PRs, sweep all open PRs, and react to CI/review events on a watched PR. Load when creating PRs, reviewing changes, fixing review comments, driving/shipping/landing a PR, unblocking stuck PRs, sweeping open PRs, reacting to CI failures, or responding to bot review threads.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: PR Lifecycle

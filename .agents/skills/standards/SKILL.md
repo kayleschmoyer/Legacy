@@ -1,6 +1,8 @@
 ---
 name: standards
 description: 'Coding standards, config conventions, lint discipline, and codegen policy. Load when: writing new code, reviewing configs, handling lint errors, encountering generated files, or creating new projects.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Standards

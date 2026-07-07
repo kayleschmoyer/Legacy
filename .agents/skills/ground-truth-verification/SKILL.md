@@ -1,6 +1,8 @@
 ---
 name: ground-truth-verification
 description: 'Per-claim-type probe recipes for verifying any statement about this repo against code before acting on it or writing it down. Load when: about to cite a command, tool name, port, CI gate, schema fact, or Make target from a doc; writing or reviewing documentation; debugging why a documented behavior does not happen; or applying the retrieval-led-reasoning rule from AGENTS.md.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Ground-Truth Verification

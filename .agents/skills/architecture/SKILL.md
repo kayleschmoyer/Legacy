@@ -1,6 +1,8 @@
 ---
 name: architecture
 description: 'System architecture ground truth: where code lives, how apps/lambdas/libs connect, load-bearing invariants, and the codegen model. Load when: planning features that span multiple projects, debugging import/dependency issues, or before broad Glob/Grep exploration (use FILE-MAP.md first).'
+metadata:
+  scope: '**'
 ---
 
 # Skill: System Architecture

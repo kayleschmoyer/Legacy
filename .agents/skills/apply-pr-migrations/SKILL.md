@@ -1,6 +1,8 @@
 ---
 name: apply-pr-migrations
 description: 'Find open PRs that add an unapplied database migration and apply those migrations to the shared dev RDS via the hosted db-admin MCP server. Load when: a PR''s "Verify All Migrations Applied" CI check is failing, you see the `CI: Migration` label, or someone asks to "apply the migrations from the open PRs".'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Apply PR Migrations

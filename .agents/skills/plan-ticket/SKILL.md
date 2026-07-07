@@ -1,6 +1,8 @@
 ---
 name: plan-ticket
 description: 'Scope and capture new work as a Jira ticket. Covers: dialogue-driven spec elicitation (define), Phase 0 codebase recon + risk classification before implementation, ticket archetype catalog (Task, Bug, Story, Epic, Spike, MCP-gap, QA Coverage), and writing structured descriptions (Problem/Goals/Acceptance Criteria/Out of Scope/Technical Approach). Load before creating any Jira ticket, before non-trivial implementation, or when an existing ticket needs Technical Approach or risk filled in. For decomposing an existing ticket into children, see slice.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Plan & Ticket

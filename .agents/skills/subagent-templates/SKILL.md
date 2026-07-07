@@ -1,6 +1,8 @@
 ---
 name: subagent-templates
 description: Copy-paste template blocks for spawning subagents via the Agent tool — tool preference hints, setup steps for work subagents, and recovery patterns for parent agents. Load when spawning subagents or dispatching parallel work.
+metadata:
+  scope: '**'
 ---
 
 # Skill: Subagent Tool Preferences

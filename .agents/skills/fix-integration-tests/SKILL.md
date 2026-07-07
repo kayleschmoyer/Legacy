@@ -7,6 +7,8 @@ description: >-
   bug), applies a targeted fix, and verifies locally before pushing. Blocks
   push until the test passes locally — no exceptions. Load when a Jira ticket
   references a failing *.integration.spec.ts test and expects a merged PR.
+metadata:
+  scope: 'apps/web-e2e/**'
 ---
 
 # Skill: fix-integration-tests

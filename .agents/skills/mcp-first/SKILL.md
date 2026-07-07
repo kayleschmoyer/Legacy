@@ -1,6 +1,8 @@
 ---
 name: mcp-first
 description: 'Tool routing and auth for every agent environment — which MCP servers exist (stdio from .mcp.json, hosted OAuth connectors, platform built-ins, Copilot bearers), which tool to reach for per task, and how to recover auth failures. Load when: choosing between shell and MCP tools; an MCP server is missing, failing to connect, or returning 401; opening a PR and unsure which github_* tool applies; checking credentials before a workflow; filing or working MCP-gap tickets.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: MCP-First

@@ -1,6 +1,8 @@
 ---
 name: design-sync
 description: 'Bridge Claude Design (claude.ai/design) and this repo. Phase 1 (Sync): cloud-dispatched agent fetches design bundles via WebFetch, diffs against docs/design/manifest.json, files one Jira ticket per changed design under the design-sync bucket epic, and opens a single sync PR. Phase 2 (Consume): locally-dispatched agent reads a design ticket, runs a completeness gate, then either notifies on gaps, implements directly, or slices into child tickets and spawns chips. Load when running /sync-designs (cloud) or /implement-design (local), or when designing the design-to-code pipeline.'
+metadata:
+  scope: 'docs/design/**'
 ---
 
 # Skill: Design Sync

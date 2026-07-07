@@ -1,6 +1,8 @@
 ---
 name: worktree-workflow
 description: 'Route agents to the correct worktree flow for Jira ticket work, plus branch naming and rebase conventions as sub-references. Two flows: (1) native ephemeral worktree via Claude Code launcher `worktree` checkbox (primary, single-ticket); (2) sibling worktree under D:\code\legacy-sports-worktrees\ (legacy fallback for chained stacks). Multi-ticket orchestrators (`/sweep-prs`, `/work-bugs`, `/work-mcp-gaps`) dispatch chips via `mcp__ccd_session__spawn_task` — each chip uses the native flow. Sub-references cover branch naming (human/launcher/agent drivers, Jira linking via PR title and commits) and rebase (rebasing onto main, resolving merge conflicts, updating stale branches, post-rebase stabilization, recovery). Load when starting ticket work, creating or naming a branch, first push to remote, rebasing onto main, or resolving a merge conflict.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Worktree Workflow

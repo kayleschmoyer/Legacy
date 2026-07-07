@@ -1,6 +1,8 @@
 ---
 name: repo-tooling
 description: 'Build, validate, and manage dependencies in the Nx/pnpm monorepo: the make pc pipeline and pc-* chunks, GraphQL codegen, the node_modules pool, Make-target OS support, and what each Claude Code hook blocks. Load when: running pre-commit validation, diagnosing lint/typecheck/build/codegen failures, installing packages, picking a Make target, or a hook blocked your tool call.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Repo Tooling

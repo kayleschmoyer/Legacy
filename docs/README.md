@@ -66,7 +66,7 @@ Older docs in this tree claim a stack that no longer exists. Ground truth:
 
 ## Routing by role
 
-- **AI agents**: [AGENTS.md](../AGENTS.md) → the skills table in it → [`.agents/skills/`](../.agents/skills/). This `docs/` tree is your reference library, not your runbook. The CSVs in [agents/](agents/) are a legacy stratum — prefer skills.
+- **AI agents**: [AGENTS.md](../AGENTS.md) → the generated routing index [`.agents/skills/INDEX.md`](../.agents/skills/INDEX.md) → [`.agents/skills/`](../.agents/skills/). This `docs/` tree is your reference library, not your runbook. The CSVs in [agents/](agents/) are a legacy stratum — prefer skills.
 - **New engineers**: [guides/development-setup.md](guides/development-setup.md) → [dev-process/README.md](dev-process/README.md) → [architecture/](architecture/).
 - **Backend/API**: [architecture/graphql-integration.md](architecture/graphql-integration.md), [api/](api/), [database/](database/).
 - **Web**: [web/](web/) (mind the stack corrections above), [architecture/shared-components.md](architecture/shared-components.md).

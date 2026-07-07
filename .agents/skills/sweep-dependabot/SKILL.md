@@ -1,6 +1,8 @@
 ---
 name: sweep-dependabot
 description: 'Triage all open Dependabot PRs in one pass: close stale duplicates, dispatch chips to rebase + ready clean PRs, fix lint-toolchain breakages, re-run flaky CI, and skip human-review PRs. Closes the loop on Dependabot PRs that stall because Dependabot never applies `bot:ready-for-review`. Use when the user asks to sweep, triage, clean up, or unstick Dependabot PRs.'
+metadata:
+  scope: '**'
 ---
 
 <!-- Role: orchestrator (per .agents/ROLES.md). The `role` field is documented in ROLES.md but rejected by scripts/lint-skills.js, so it is kept as a comment here rather than frontmatter. -->

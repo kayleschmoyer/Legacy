@@ -4,56 +4,41 @@
 
 Two complementary mechanisms route agents to the right skill at the right time:
 
-| Layer                 | Mechanism                                                                 | When it fires                                                      |
-| --------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Instruction**       | Agent reads the routing table in `AGENTS.md` / skill `SKILL.md` files     | At session start or when the agent proactively loads a skill       |
-| **Harness injection** | `PreToolUse` hooks in `.claude/settings.json` push reminders into context | Immediately before any `Edit`/`Write` tool call on a matching path |
+| Layer                 | Mechanism                                                                       | When it fires                                                      |
+| --------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **Instruction**       | Agent reads the generated routing index `.agents/skills/INDEX.md` at task start | At task start or when the agent proactively loads a skill          |
+| **Harness injection** | `PreToolUse` hooks in `.claude/settings.json` push reminders into context       | Immediately before any `Edit`/`Write` tool call on a matching path |
 
-Harness injection is stronger: it fires mid-task, even when the agent drifted into a new directory after session start. The routing table in `AGENTS.md` remains the human-readable source of truth; the hooks are a deterministic backstop for the rows where a missed load is expensive.
+Harness injection is stronger: it fires mid-task, even when the agent drifted into a new directory after session start. SKILL.md frontmatter is the source of routing truth; the hooks are a deterministic backstop for the rows where a missed load is expensive.
 
 ---
 
-# Instruction layer: the Skill Routing table (LS-7921)
+# Instruction layer: the generated Skill Routing Index (LS-8355, supersedes the eager table of LS-7921)
 
 ## Goal
 
-Replace AGENTS.md's inline prose trigger-lines with a compact Skill Routing table — the single source of scoping truth for ALL coding agents (Claude Code, Copilot, Cursor, Codex) — and push procedural prose into lazily-loaded skill bodies.
+Keep the always-loaded agent context small: `AGENTS.md` carries only a short routing contract, and the full routing table lives in [`.agents/skills/INDEX.md`](../../.agents/skills/INDEX.md), read on demand at task start. The index is **generated** from each SKILL.md's frontmatter so it cannot drift.
 
 ## Principles
 
 1. **Skill bodies live in exactly one place**: `.agents/skills/<name>/SKILL.md`. Never injected eagerly into any agent context; loaded only on `Read`.
-2. **Scoping lives in exactly one routing table**: the table in AGENTS.md. One row per skill directory. Adding a skill = write `SKILL.md` + add one table row.
-3. **Per-agent files are static pointers**: they contain no skill data and cannot drift. Claude Code reads AGENTS.md natively; Codex/Copilot also read AGENTS.md; Cursor gets a routing instruction in `.cursor/rules/`; VS Code Copilot gets `.github/instructions/skill-routing.instructions.md`.
-4. **Scoping is metadata, not file location**: `frontend-design` scopes to `apps/web/**`, `apps/app/**`, `lib/shared-components/**` even though the skill file is in `.agents/skills/`. The table is the only place that declares what paths trigger what skill.
+2. **Routing facts live in exactly one place: SKILL.md frontmatter.** `description` is the load-when trigger; `metadata.scope` is the comma-separated path globs (`**` = repo-wide); `metadata.deprecated: 'true'` marks tombstone pointers. Adding a skill = write `SKILL.md` (frontmatter included) + `make sync-skill-index`.
+3. **INDEX.md is generated output** (`scripts/generate-skill-index.mjs`), listed in `.prettierignore`, and drift-checked by `.github/checks/skill-index-sync.sh` in CI's custom-checks job. `make lint-skills` errors on a skill missing `metadata.scope`.
+4. **AGENTS.md carries the contract, not the data**: a three-paragraph § Skills section instructing agents to read the index at task start and re-read it on directory change or after compaction, naming only `dev-process` and `mcp-first` as read-always skills.
+5. **Scoping is metadata, not file location**: `frontend-design` scopes to `apps/web/**`, `apps/app/**`, `lib/shared-components/**` even though the skill file is in `.agents/skills/`.
 
-## Table Format
+## History: eager table (LS-7921) → lazy generated index (LS-8355)
 
-```
-| Scope (globs) | Skill | Load when |
-| ------------- | ----- | --------- |
-```
-
-- **Scope**: one or more path globs (comma-separated if multiple). `**` means repo-wide.
-- **Skill**: relative path to the skill directory (SKILL.md is implied).
-- **Load when**: one-line trigger — the condition under which an agent reading the table should `Read` that skill's SKILL.md before proceeding.
-
-## Preamble Instruction
-
-The table is preceded by:
-
-> Before starting work, and again whenever your task moves into a new directory, `Read` every skill whose scope matches the files you're touching.
-
-## Why Eager Table, Not Lazy Pointer
-
-The table stays in AGENTS.md (not behind an indirection) because eagerness is what makes instruction-routing reliable. An agent that doesn't know to look up a pointer will skip it entirely. ~52 rows ≈ ~1K eager tokens — negligible compared to the 10–12K the previous inline prose occupied.
+LS-7921 (2026-06) put the routing table inline in AGENTS.md, arguing "eagerness is what makes instruction-routing reliable" and estimating the table at ~1K tokens. By 2026-07 the table had grown to ~15.6KB (~4K tokens, over half of AGENTS.md) and restated every skill's triggers — a standing "one home per fact" violation that the 2026-07 skills audit flagged as a top drift source. On 2026-07-07 the owner requested on-demand routing (LS-8355): the table moved behind a generated index, and reliability is now carried by (a) the short always-loaded contract in AGENTS.md § Skills, (b) the harness-injection hooks below, and (c) the CI drift check the LS-7921 design deferred as future work.
 
 ## Rejected Alternatives
 
-| Alternative                                                                                                                  | Why rejected                                                                                                                  |
-| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Symlinking `.claude/skills → .agents/skills`                                                                                 | Re-eagerizes all 52 skill descriptions (~2–4 K tokens/session), name collisions with commands, Windows symlink + git friction |
-| Moving skill bodies into project dirs (e.g. `frontend-design → lib/shared-components`)                                       | Saves zero tokens (bodies already lazy), breaks hardcoded cross-refs, mis-scopes triggers                                     |
-| Generated per-agent shims (nested CLAUDE.md, `.cursor/rules/*.mdc`, `.github/instructions` per skill, via `make skills-gen`) | Adds generator + drift-check machinery solving a duplication problem the routing table eliminates outright                    |
+| Alternative                                                                                                                  | Why rejected                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Symlinking `.claude/skills → .agents/skills`                                                                                 | Rejected in LS-7921 and again in LS-8355: re-eagerizes all skill descriptions (~2–4 K tokens/session, against the on-demand goal), collides with `.claude/commands` names (`database`, `work-ticket`, `slice`, …), Windows symlink + git friction. The stray `.claude/skills` file (committed as a plain file, mode 100644 — never a working symlink) was removed in LS-8355. |
+| Moving skill bodies into project dirs (e.g. `frontend-design → lib/shared-components`)                                       | Saves zero tokens (bodies already lazy), breaks hardcoded cross-refs, mis-scopes triggers                                                                                                                                                                                                                                                                                     |
+| Generated per-agent shims (nested CLAUDE.md, `.cursor/rules/*.mdc`, `.github/instructions` per skill, via `make skills-gen`) | Adds per-agent generator machinery; the single generated INDEX.md serves every agent that reads AGENTS.md                                                                                                                                                                                                                                                                     |
+| Keeping the eager table in AGENTS.md (LS-7921 status quo)                                                                    | ~4K always-loaded tokens per session across every agent, and a hand-maintained restatement of frontmatter that demonstrably drifted                                                                                                                                                                                                                                           |
 
 ## Prose Migrations
 
@@ -65,14 +50,10 @@ Three blocks of AGENTS.md procedural prose were relocated to skill bodies in LS-
 | `node_modules` pool mechanics + `pnpm exec nx reset` warning | `.agents/skills/repo-tooling/SKILL.md` | Immutable pool slots, setup commands, LS-5242 (`nx reset` destroys symlink)                                                             |
 | CI watch/polling antipatterns                                | `.agents/skills/pr-lifecycle/SKILL.md` | Already present (Critical Rules 9, 11, 13); AGENTS.md now points there                                                                  |
 
-## Drift Prevention (LS-7922 child — not LS-7921)
+## Drift Prevention (delivered in LS-8355)
 
-A future `custom-checks` CI assertion will verify:
-
-- Every directory under `.agents/skills/` has a row in the routing table.
-- Every path referenced in the table exists.
-
-Until that lint lands, the table is maintained manually. Adding a skill requires a table row in the same PR.
+- `scripts/generate-skill-index.mjs --check` (CI: `.github/checks/skill-index-sync.sh`; local: `make lint-skill-index`) fails when INDEX.md is stale — which also guarantees every skill directory has a row, since the generator enumerates `.agents/skills/*/`.
+- `scripts/lint-skills.js` (CI custom-checks; local: `make lint-skills`) errors when a skill's frontmatter lacks `metadata.scope`.
 
 ## Dead/Potentially Unused Skills
 
@@ -111,7 +92,8 @@ These hooks are registered in the `PreToolUse → ^(Edit|Write)$` entry in [`.cl
 
 ## See also
 
-- [AGENTS.md § Skills](../../AGENTS.md#skills) — the instruction-routing table agents read at session start.
+- [AGENTS.md § Skills](../../AGENTS.md#skills) — the always-loaded routing contract.
+- [`.agents/skills/INDEX.md`](../../.agents/skills/INDEX.md) — the generated routing table agents read at task start.
 - [`.claude/settings.json`](../../.claude/settings.json) — full hook configuration.
 - [LS-7922](https://bkrupa.atlassian.net/browse/LS-7922) — epic; full design and rejected alternatives.
 - [`.agents/skills/terraform/SKILL.md`](../../.agents/skills/terraform/SKILL.md) (and [`references/permission-planning.md`](../../.agents/skills/terraform/references/permission-planning.md))

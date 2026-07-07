@@ -1,6 +1,8 @@
 ---
 name: ui-audit
 description: 'Systematically navigate every web page at mobile, tablet, and desktop viewports, screenshot each, identify visual and functional bugs against the design system (https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb) and supplemental guidelines in AGENTS.md, and file bugs via the in-app bug report button. Use when the user wants a full UI audit, visual regression check, or design compliance sweep.'
+metadata:
+  scope: 'apps/web/**, apps/app/**, lib/shared-components/**'
 ---
 
 # Skill: UI Audit

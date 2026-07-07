@@ -1,6 +1,8 @@
 ---
 name: debugging
 description: 'Debug and fix failures across the stack. Load when: a CI pipeline run fails, a PR is stuck at a merge gate, a distributed Lambda/SQS flow breaks, a production error appears in Rollbar, a bug is reported, or the dev environment misbehaves. Covers evidence-first methodology, root-cause analysis, and symptom-based routing to the right reference.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Debugging

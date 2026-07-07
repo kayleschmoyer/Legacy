@@ -1,6 +1,8 @@
 ---
 name: config-and-flags
 description: 'The five configuration axes of this repo — client env registry, server secret indirection, DB credentials, Terraform variables, safety switches — plus where feature-flag and env-var truth lives. Load when: adding or consuming any env var, adding a client-side URL/key, debugging "config is undefined at runtime", touching .env files, wiring a secret into CI, or auditing feature flags.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Config and Flags

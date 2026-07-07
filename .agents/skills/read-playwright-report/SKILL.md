@@ -1,6 +1,8 @@
 ---
 name: read-playwright-report
 description: 'Download and parse Playwright HTML reports from the bkrupa/legacy-sports-deploys GitHub Pages repo. Use when asked about test results, which tests ran, pass/fail/skip counts, or whether specific tests (e.g. integration/draft) were included in a run.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Reading Playwright Reports

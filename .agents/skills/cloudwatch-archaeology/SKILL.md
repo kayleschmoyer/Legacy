@@ -1,6 +1,8 @@
 ---
 name: cloudwatch-archaeology
 description: 'Recover the server-side truth from CloudWatch logs and the dev RDS when client-side narratives lie. Load when: E2E stdout is opaque (n/a, stuck, timeout, silent count mismatch), a Rollbar payload lacks the server story, a fix keeps shifting the symptom, or you need what a Lambda/cron actually did during a test window. Covers the query chain (log groups → filter → cross-reference IDs → DB fallback) and a worked example from LS-4295.'
+metadata:
+  scope: 'lambdas/**, apps/web-e2e/**'
 ---
 
 # Skill: CloudWatch Log Archaeology

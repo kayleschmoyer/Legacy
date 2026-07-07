@@ -1,6 +1,8 @@
 ---
 name: nightly-green-campaign
 description: "Operational playbook for keeping the nightly live-backend Playwright suite at 0 failures / 0 flakes: triage a red nightly, bisect the day's merges, classify against the known failure classes, fix the pattern, and validate suite-config changes. Load when: a nightly run-playwright-tests.yml run failed, tracking or reporting the 0/0 streak, proposing a change to INTEGRATION_SHARD_CEILING, retries, sharding, or global setup/teardown, or deciding whether a nightly failure is backend flake vs spec bug vs product regression."
+metadata:
+  scope: 'apps/web-e2e/**, .github/workflows/run-playwright-tests.yml'
 ---
 
 # Skill: Nightly Green Campaign

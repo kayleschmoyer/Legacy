@@ -1,6 +1,8 @@
 ---
 name: database
 description: 'All local database operations: running migrations, ad-hoc queries, schema inspection, dump/restore, and health checks. Use when writing or applying migrations, checking schema state, running SQL, or troubleshooting database connectivity.'
+metadata:
+  scope: '**'
 ---
 
 # Skill: Database

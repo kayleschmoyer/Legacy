@@ -1,6 +1,8 @@
 ---
 name: promote-shared-components
 description: 'Promoting components from apps/web (or apps/app) to lib/shared-components. Load when: moving UI code to shared-components, refactoring for cross-platform reuse, or fixing CI failures on promotion PRs.'
+metadata:
+  scope: 'apps/web/**, apps/app/**, lib/shared-components/**'
 ---
 
 # Skill: Promote to shared-components

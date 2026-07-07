@@ -5,6 +5,9 @@
 //   ERRORS (exit 1):
 //     1. Official agentskills validator (uvx --from skills-ref agentskills validate)
 //     2. Frontmatter `name:` must equal the skill directory name
+//     2b. Frontmatter must declare `metadata.scope` — the path-glob routing scope
+//         consumed by scripts/generate-skill-index.mjs (INDEX.md drift is checked
+//         separately by .github/checks/skill-index-sync.sh)
 //     3. Relative markdown links (outside code blocks/spans) must resolve on disk
 //   WARNINGS (reported, exit 0):
 //     4. `file.ext:NNN` line-number citations — cite anchors/symbols instead
@@ -94,6 +97,17 @@ function frontmatterName(text) {
   return m ? m[1] : null;
 }
 
+/** Parse the full frontmatter block as YAML, or null if absent/invalid. */
+function frontmatterData(text) {
+  const fm = text.match(/^---\n([\s\S]*?)\n---/);
+  if (!fm) return null;
+  try {
+    return require('yaml').parse(fm[1]);
+  } catch {
+    return null; // invalid YAML — the agentskills validator reports it
+  }
+}
+
 const errors = []; // { file, msg }
 const warnings = []; // { file, msg }
 let validatorPassed = 0;
@@ -121,11 +135,24 @@ for (const name of dirs) {
   // 2. frontmatter name === directory name
   const skillMd = join(skillPath, 'SKILL.md');
   if (existsSync(skillMd)) {
-    const fmName = frontmatterName(readFileSync(skillMd, 'utf8'));
+    const skillMdText = readFileSync(skillMd, 'utf8');
+    const fmName = frontmatterName(skillMdText);
     if (fmName !== null && fmName !== name) {
       errors.push({
         file: `${name}/SKILL.md`,
         msg: `frontmatter name '${fmName}' does not match directory name '${name}'`,
+      });
+    }
+
+    // 2b. metadata.scope is the routing source of truth for INDEX.md
+    const fmData = frontmatterData(skillMdText);
+    if (fmData !== null && !fmData?.metadata?.scope) {
+      errors.push({
+        file: `${name}/SKILL.md`,
+        msg:
+          `frontmatter has no metadata.scope — every skill must declare its ` +
+          `path-glob routing scope ('**' = repo-wide), then run ` +
+          `'make sync-skill-index'. See skill-authoring/SKILL.md.`,
       });
     }
   }

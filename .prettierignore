@@ -32,3 +32,7 @@ apps/app/android/
 .cursor/commands/
 .opencode/commands/
 .codex/prompts/
+# Generated skill routing index — byte-exact output of
+# scripts/generate-skill-index.mjs (source of truth: SKILL.md frontmatter);
+# reformatting it would break the sync drift check
+.agents/skills/INDEX.md

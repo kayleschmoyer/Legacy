@@ -1,6 +1,8 @@
 ---
 name: shared-components-first
 description: 'Cross-platform UI principle: build shared Tamagui components in lib/shared-components, consumed by both apps/web and apps/app via viewport-responsive props. Load when building or reviewing UI for web or native.'
+metadata:
+  scope: 'apps/web/**, apps/app/**'
 ---
 
 # Skill: Shared-Components-First, Viewport-Responsive UI

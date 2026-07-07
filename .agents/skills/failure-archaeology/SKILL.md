@@ -1,6 +1,8 @@
 ---
 name: failure-archaeology
 description: "Where this repo's incident record lives and how to dig it up before re-fighting an old battle. Load when: investigating whether a bug/CI failure/outage has happened before, hunting the origin of a workaround or odd config, writing an RCA, or when git log/blame returns suspiciously little history."
+metadata:
+  scope: '**'
 ---
 
 # Skill: Failure Archaeology

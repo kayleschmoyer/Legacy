@@ -1,6 +1,8 @@
 ---
 name: frontend-design
 description: Create distinctive, production-grade frontend interfaces using the Legacy Sports design system. Use when building web components, pages, or any frontend UI in this repo.
+metadata:
+  scope: 'apps/web/**, apps/app/**, lib/shared-components/**'
 ---
 
 ## Design System
