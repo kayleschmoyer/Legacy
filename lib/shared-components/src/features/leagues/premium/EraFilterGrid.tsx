@@ -69,8 +69,12 @@ export function EraFilterGrid({
             key={era.id}
             testID={`era-card-${era.id}`}
             accessibilityRole="button"
-            accessibilityLabel={era.name}
-            aria-label={era.name}
+            accessibilityLabel={
+              locked ? `${era.name} — Locked, premium required` : era.name
+            }
+            aria-label={
+              locked ? `${era.name} — Locked, premium required` : era.name
+            }
             onPress={() => {
               if (disabled) return;
               if (locked) {

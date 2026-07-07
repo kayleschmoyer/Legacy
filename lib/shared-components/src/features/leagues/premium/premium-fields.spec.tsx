@@ -76,6 +76,29 @@ describe('premium league-create fields (LS-5174)', () => {
       expect(onChange).toHaveBeenCalledWith('dead_ball');
       expect(onUpgrade).not.toHaveBeenCalled();
     });
+
+    it('announces a locked era differently from an unlocked one (LS-6085)', () => {
+      const { getByLabelText, queryByLabelText } = render(
+        <EraFilterGrid {...baseProps} isPremium={false} />,
+      );
+      expect(
+        getByLabelText('Dead Ball (pre-1920) — Locked, premium required'),
+      ).toBeTruthy();
+      expect(
+        queryByLabelText('Dead Ball (pre-1920)', { exact: true }),
+      ).toBeNull();
+      expect(getByLabelText('Modern (2006+)')).toBeTruthy();
+    });
+
+    it('does not mark a premium era as locked for premium users (LS-6085)', () => {
+      const { getByLabelText, queryByLabelText } = render(
+        <EraFilterGrid {...baseProps} isPremium />,
+      );
+      expect(
+        queryByLabelText('Dead Ball (pre-1920) — Locked, premium required'),
+      ).toBeNull();
+      expect(getByLabelText('Dead Ball (pre-1920)')).toBeTruthy();
+    });
   });
 
   describe('WaiverSystemField', () => {
