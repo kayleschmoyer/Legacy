@@ -60,6 +60,12 @@ export const matchups = pgTable(
     pitcherStartsPerMatchup: integer('pitcher_starts_per_matchup'),
     startTime: timestamp('start_time', { mode: 'string' }),
     endTime: timestamp('end_time', { mode: 'string' }),
+    /**
+     * Persisted AI matchup recap (headline/narrative/highlights/matchupType/
+     * winnerId), populated the first time Matchup.recap generates one so
+     * subsequent fetches read the cached JSON instead of regenerating (LS-5878).
+     */
+    recapJson: jsonb('recap_json').$type<Record<string, unknown>>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

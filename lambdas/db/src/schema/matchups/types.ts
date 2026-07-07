@@ -10,6 +10,7 @@ import {
   type PlayerPerformance,
 } from '@legacy-sports/narrative';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { builder } from '../builder';
 import { hasEntitlement } from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
@@ -22,6 +23,18 @@ import {
   SeasonFieldingRef,
   SeasonPitchingRef,
 } from '../statistics';
+
+// Mirrors @legacy-sports/narrative's MatchupNarrativeResult shape. Used to
+// validate matchups.recap_json (an untyped jsonb column) when read back from
+// the DB, so a malformed or future-incompatible stored value falls back to
+// regeneration instead of being cast blindly (LS-5878 review follow-up).
+const matchupRecapSchema = z.object({
+  headline: z.string(),
+  narrative: z.string(),
+  highlights: z.array(z.string()),
+  matchupType: z.enum(['blowout', 'close', 'normal']),
+  winnerId: z.number().nullable(),
+});
 
 // ── Enum Types ───────────────────────────────────────────────────────────────
 
@@ -65,6 +78,7 @@ export const Matchup = builder.objectRef<{
   pitcherStartsPerMatchup: number | null;
   startTime: string | null;
   endTime: string | null;
+  recapJson: Record<string, unknown> | null;
 }>('Matchup');
 
 // MatchupRecap ref — declared here so the Matchup.recap field can reference it.
@@ -155,6 +169,23 @@ builder.objectType(Matchup, {
         if (!context.user) return null;
         if (!(await hasEntitlement(context, ENTITLEMENTS.ai_matchup_recap))) {
           return null;
+        }
+
+        // Serve the persisted recap if one was already generated for this
+        // matchup, instead of re-running the ~75-DataLoader fan-out below on
+        // every fetch (and risking a different narrative on refresh if
+        // generateMatchupRecap is non-deterministic). See LS-5878. Validate
+        // the stored JSON before trusting it — a malformed or stale-shape
+        // value falls back to regeneration rather than being cast blindly.
+        if (matchup.recapJson) {
+          const cached = matchupRecapSchema.safeParse(matchup.recapJson);
+          if (cached.success) {
+            return cached.data;
+          }
+          LOGGER.warn(
+            '[Matchup.recap] Cached recapJson failed validation, regenerating',
+            { matchupId: matchup.id, issues: cached.error.issues },
+          );
         }
 
         // Load team names
@@ -289,7 +320,24 @@ builder.objectType(Matchup, {
           },
         };
 
-        return generateMatchupRecap(ctx);
+        const recap = generateMatchupRecap(ctx);
+
+        // Persist so subsequent fetches read the cached JSON instead of
+        // regenerating. Best-effort: a failed write just means the next
+        // fetch regenerates, so it shouldn't fail this request.
+        try {
+          await context.db
+            .update(PublicSchema.matchups)
+            .set({ recapJson: { ...recap } })
+            .where(eq(PublicSchema.matchups.id, matchup.id));
+        } catch (err) {
+          LOGGER.warn(
+            '[Matchup.recap] Failed to persist recap cache (non-fatal)',
+            { matchupId: matchup.id, err },
+          );
+        }
+
+        return recap;
       },
     }),
   }),
@@ -359,6 +407,7 @@ export const AdvanceLeagueWeekResponse = builder.objectRef<{
     pitcherStartsPerMatchup: number | null;
     startTime: string | null;
     endTime: string | null;
+    recapJson: Record<string, unknown> | null;
   }>;
   currentMatchupId: number | null;
 }>('AdvanceLeagueWeekResponse');
