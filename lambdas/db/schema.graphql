@@ -532,6 +532,7 @@ input CreateLeagueAndTeamsInput {
   salaryDecayPct: Int
   salaryEscalationPct: Int
   salaryFloor: Int
+  schedulingDivisionalWeightPct: Int
   schedulingStrategy: String
   scoringFormat: String
   selectionMethod: String

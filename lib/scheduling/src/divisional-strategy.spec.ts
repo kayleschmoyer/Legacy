@@ -285,6 +285,54 @@ describe('DivisionalStrategy', () => {
     });
   });
 
+  describe('custom divisionalGamePercentage (LS-6106)', () => {
+    // 10 teams / 2 * 10 weeks = 50 total games; 30% divisional → 15 divisional,
+    // 35 inter-divisional (floor-based, matching the production algorithm).
+    const teams = makeTeams(10, 2);
+    const numberOfWeeks = 10;
+    const customStrategy = new DivisionalStrategy({
+      divisionalGamePercentage: 0.3,
+    });
+    const pairings = customStrategy.generatePairings(teams, numberOfWeeks);
+
+    it('produces the expected in-division / out-of-division split for a low ratio', () => {
+      const divisionalCount = pairings.filter((p) => {
+        const t1 = teams.find((t) => t.id === p.team1Id);
+        const t2 = teams.find((t) => t.id === p.team2Id);
+        return (
+          t1 !== undefined &&
+          t2 !== undefined &&
+          t1.divisionId === t2.divisionId
+        );
+      }).length;
+      expect(pairings.length).toBe(50);
+      // Target is floor(50 * 0.3) = 15; the per-week scheduling loop can
+      // overshoot by up to one division's pairing count on the final week,
+      // matching the existing "approximately 60%" tolerance pattern above.
+      expect(divisionalCount).toBeGreaterThanOrEqual(15);
+      expect(divisionalCount).toBeLessThanOrEqual(20);
+      // And it must be meaningfully lower than the 100%-default case below.
+      expect(divisionalCount).toBeLessThan(pairings.length);
+    });
+
+    it('produces ~100% in-division games at the historical hardcoded default', () => {
+      const fullStrategy = new DivisionalStrategy({
+        divisionalGamePercentage: 1.0,
+      });
+      const fullPairings = fullStrategy.generatePairings(teams, numberOfWeeks);
+      const divisionalCount = fullPairings.filter((p) => {
+        const t1 = teams.find((t) => t.id === p.team1Id);
+        const t2 = teams.find((t) => t.id === p.team2Id);
+        return (
+          t1 !== undefined &&
+          t2 !== undefined &&
+          t1.divisionId === t2.divisionId
+        );
+      }).length;
+      expect(divisionalCount).toBe(fullPairings.length);
+    });
+  });
+
   describe('12 teams across 3 divisions of 4', () => {
     const teams = makeTeams(12, 3);
     const numberOfWeeks = 8;

@@ -289,6 +289,45 @@ describe('Leagues - DB Integration Tests', () => {
       expect(inserted.gamesPerMatchup).toBe(5);
       expect(inserted.draftStatus).toBe('not-started');
     });
+
+    it('persists a custom schedulingDivisionalWeightPct when set (LS-6106)', async () => {
+      const user = getUser(2);
+
+      const [inserted] = await db
+        .insert(integrationTestSchema.leagues)
+        .values({
+          name: 'Advanced Scheduling League',
+          owner: user.id,
+          inviteCode: 'ADVSCHED',
+          schedulingStrategy: 'divisional',
+          schedulingDivisionalWeightPct: 80,
+        })
+        .returning();
+
+      expect(inserted.schedulingDivisionalWeightPct).toBe(80);
+
+      const [queried] = await db
+        .select()
+        .from(integrationTestSchema.leagues)
+        .where(eq(integrationTestSchema.leagues.id, inserted.id));
+
+      expect(queried.schedulingDivisionalWeightPct).toBe(80);
+    });
+
+    it('defaults schedulingDivisionalWeightPct to null when not set (LS-6106)', async () => {
+      const user = getUser(2);
+
+      const [inserted] = await db
+        .insert(integrationTestSchema.leagues)
+        .values({
+          name: 'Default Scheduling League',
+          owner: user.id,
+          inviteCode: 'DEFSCHED',
+        })
+        .returning();
+
+      expect(inserted.schedulingDivisionalWeightPct).toBeNull();
+    });
   });
 
   describe('deleteLeague', () => {

@@ -53,6 +53,7 @@ export const ENTITLEMENTS = {
   league_history_analytics: 'league_history_analytics',
   optimal_lineup: 'optimal_lineup',
   logo_upload: 'logo_upload',
+  advanced_scheduling: 'advanced_scheduling',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -96,6 +97,7 @@ export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
     ENTITLEMENTS.league_history_analytics,
     ENTITLEMENTS.optimal_lineup,
     ENTITLEMENTS.logo_upload,
+    ENTITLEMENTS.advanced_scheduling,
   ],
 };
 
@@ -127,6 +129,7 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
     'Premium league history analytics (championship leaderboard, manager awards)',
   optimal_lineup: 'Optimal Lineup (auto-set)',
   logo_upload: 'Team logo upload (direct file upload)',
+  advanced_scheduling: 'Advanced scheduling (custom in-division game ratio)',
 };
 
 export function tierHasEntitlement(

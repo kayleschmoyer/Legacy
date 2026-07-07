@@ -67,6 +67,11 @@ export interface CreateLeagueOptions {
   numberOfTeams?: number;
   numberOfDivisions?: number;
   schedulingStrategy?: 'round-robin' | 'divisional' | 'random';
+  /** Premium-only: custom in-division game percentage (0-100) for the
+   *  Divisional strategy. Null/undefined preserves the existing default
+   *  (100% in-division games). Callers must have already enforced the
+   *  `advanced_scheduling` entitlement — this service does not gate. */
+  schedulingDivisionalWeightPct?: number | null;
   playerPool?: PlayerPoolValue;
   /** Era-based player pool filter. Default 'all' (no restriction). */
   eraFilter?: EraFilterValue;
@@ -179,6 +184,7 @@ export class LeagueService {
       numberOfTeams = 12,
       numberOfDivisions = 2,
       schedulingStrategy = 'divisional',
+      schedulingDivisionalWeightPct = null,
       playerPool = 'all',
       eraFilter = 'all',
       baseballHofOnly = false,
@@ -288,6 +294,7 @@ export class LeagueService {
             waiverEnabled,
             faabBudgetDefault,
             schedulingStrategy,
+            schedulingDivisionalWeightPct,
             numberOfDivisions,
             isPublic,
             // Salary cap settings

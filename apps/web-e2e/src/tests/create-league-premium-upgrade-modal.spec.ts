@@ -3,9 +3,10 @@
  *
  * Covers the `create-league-baseball` page's premium-gating journey:
  * a free user is blocked with an `UpgradeModal` when they try to select
- * FAAB waivers, enable a salary cap, or pick a non-free historical era.
+ * FAAB waivers, enable a salary cap, pick a non-free historical era, or
+ * customize the Advanced Scheduling in-division game ratio (LS-6106).
  * A premium user hits none of these gates and can submit the form with
- * all three settings enabled.
+ * all settings enabled.
  *
  * All GraphQL responses are mocked (hermetic) — no live backend required.
  */
@@ -116,6 +117,20 @@ freeUserTest.describe(
         await expect(page).toHaveURL(/\/pricing/);
       },
     );
+
+    freeUserTest(
+      'Advanced Scheduling field is behind a premium gate for the default Divisional strategy; upgrading opens the upgrade modal (LS-6106)',
+      async ({ leaguePage }) => {
+        // Divisional is the default schedulingStrategy, so the "roster-schedule"
+        // section already shows the gated control once expanded.
+        await leaguePage.expandSection('roster-schedule');
+
+        await leaguePage.premiumGate.expectVisible();
+        await leaguePage.clickPremiumGateUpgrade();
+
+        await leaguePage.expectUpgradeModalVisible('Advanced Scheduling');
+      },
+    );
   },
 );
 
@@ -142,6 +157,9 @@ adminTest.describe(
 
         await leaguePage.expandSection('era-history');
         await leaguePage.clickButton('Golden Age');
+
+        await leaguePage.expandSection('roster-schedule');
+        await leaguePage.clickButton('80%', { exact: true });
 
         await leaguePage.expectNoUpgradeModal();
 

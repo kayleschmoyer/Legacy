@@ -214,6 +214,9 @@ export interface GenerateScheduleParams {
   leagueId: number;
   numberOfWeeks: number;
   strategyType: 'round-robin' | 'divisional' | 'random';
+  /** Divisional strategy only: fraction (0.0-1.0) of games played in-division.
+   *  Undefined/null falls back to the existing default (1.0 — 100% in-division). */
+  divisionalGamePercentage?: number | null;
 }
 
 export interface CreateMatchupParams {
@@ -234,7 +237,8 @@ export class MatchupService {
     db: GenericDatabase<typeof PublicSchema>,
     params: GenerateScheduleParams,
   ): Promise<ScheduleResult> {
-    const { leagueId, numberOfWeeks, strategyType } = params;
+    const { leagueId, numberOfWeeks, strategyType, divisionalGamePercentage } =
+      params;
 
     const leagueResult = await db
       .select({
@@ -380,7 +384,10 @@ export class MatchupService {
       minGamesPerSeason: leagueConfig.minGamesPerSeason,
     });
 
-    const strategy = this.createStrategy(strategyType);
+    const strategy = this.createStrategy(
+      strategyType,
+      divisionalGamePercentage,
+    );
     const scheduler = new MatchupScheduler(strategy);
     const scheduleResult = scheduler.generateSchedule({
       teams,
@@ -503,12 +510,15 @@ export class MatchupService {
 
   private static createStrategy(
     strategyType: 'round-robin' | 'divisional' | 'random',
+    divisionalGamePercentage?: number | null,
   ): SchedulingStrategy {
     switch (strategyType) {
       case 'round-robin':
         return new RoundRobinStrategy();
       case 'divisional':
-        return new DivisionalStrategy({ divisionalGamePercentage: 1.0 });
+        return new DivisionalStrategy({
+          divisionalGamePercentage: divisionalGamePercentage ?? 1.0,
+        });
       case 'random':
         return new RandomStrategy();
     }
@@ -1068,6 +1078,8 @@ export async function createAllMatchupsForLeague(
       gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
       pitcherStartsPerMatchup: PublicSchema.leagues.pitcherStartsPerMatchup,
       schedulingStrategy: PublicSchema.leagues.schedulingStrategy,
+      schedulingDivisionalWeightPct:
+        PublicSchema.leagues.schedulingDivisionalWeightPct,
     })
     .from(PublicSchema.leagues)
     .where(eq(PublicSchema.leagues.id, leagueId))
@@ -1082,11 +1094,16 @@ export async function createAllMatchupsForLeague(
   const gamesPerMatchup = league.gamesPerMatchup ?? 5;
   const pitcherStartsPerMatchup = league.pitcherStartsPerMatchup ?? 1;
   const strategyType = league.schedulingStrategy ?? 'round-robin';
+  const divisionalGamePercentage =
+    league.schedulingDivisionalWeightPct != null
+      ? league.schedulingDivisionalWeightPct / 100
+      : undefined;
 
   const scheduleResult = await MatchupService.generateSchedule(db, {
     leagueId,
     numberOfWeeks: totalMatchups,
     strategyType,
+    divisionalGamePercentage,
   });
 
   if (scheduleResult.matchups.length === 0) {

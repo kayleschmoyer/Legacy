@@ -105,6 +105,10 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       numberOfTeams: t.int({ required: true }),
       numberOfDivisions: t.int({ required: false }), // default 2 (two divisions)
       schedulingStrategy: t.string({ required: false }), // 'round-robin' | 'divisional' | 'random' (optional, defaults to 'divisional')
+      // Premium-only (advanced_scheduling entitlement): custom in-division game
+      // percentage (0-100) for the Divisional strategy. Omitted/null keeps the
+      // existing default (100% in-division games). LS-6106.
+      schedulingDivisionalWeightPct: t.int({ required: false }),
       playerPool: t.string({ required: true }), // 'all' | 'nl' | 'al'
       draftMode: t.string({ required: false }), // 'live' | 'automated' (optional, defaults to 'live')
       selectionMethod: t.string({ required: false }), // 'standard' | 'auction' | 'random' (optional, defaults to 'standard')
@@ -237,6 +241,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         numberOfTeams,
         numberOfDivisions,
         schedulingStrategy: inputSchedulingStrategy,
+        schedulingDivisionalWeightPct: inputSchedulingDivisionalWeightPct,
         playerPool = 'all',
         draftMode = 'live',
         selectionMethod = 'standard',
@@ -324,6 +329,27 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           context,
           ENTITLEMENTS.auction_draft,
           'Auction draft mode requires a premium subscription. Upgrade to unlock auction drafts.',
+        );
+      }
+
+      // Custom in-division scheduling weight is a premium feature (LS-6106).
+      // Any explicit value — including one that matches the default — requires
+      // the entitlement, since presence of the field signals an attempt to
+      // override the server default. Hard-reject rather than silently coerce,
+      // matching the FAAB / salary cap / auction / era-filter pattern above.
+      if (inputSchedulingDivisionalWeightPct != null) {
+        if (
+          inputSchedulingDivisionalWeightPct < 0 ||
+          inputSchedulingDivisionalWeightPct > 100
+        ) {
+          throw UserInputError(
+            'schedulingDivisionalWeightPct must be between 0 and 100.',
+          );
+        }
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.advanced_scheduling,
+          'Advanced scheduling requires a premium subscription. Upgrade to customize your in-division game ratio.',
         );
       }
 
@@ -496,6 +522,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               | 'random'
               | null
               | undefined) ?? 'divisional',
+          schedulingDivisionalWeightPct:
+            inputSchedulingDivisionalWeightPct ?? null,
           playerPool: validatedPlayerPool,
           draftMode: draftMode as 'live' | 'automated',
           selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',

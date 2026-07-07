@@ -140,6 +140,10 @@ export interface CreateLeagueFormData {
   numberOfTeams: number;
   numberOfDivisions: number;
   schedulingStrategy: 'divisional' | 'round-robin' | 'random';
+  // Premium-only (advanced_scheduling entitlement): custom in-division game
+  // percentage for the Divisional strategy. undefined = use server default
+  // (100% in-division, matching pre-LS-6106 behavior).
+  schedulingDivisionalWeightPct?: number;
   playerPool: string;
   draftMode: 'live' | 'automated';
   selectionMethod: 'standard' | 'auction' | 'random';
@@ -236,6 +240,11 @@ const SCHEDULING_STRATEGY_OPTIONS = [
   { label: 'Round Robin', value: 'round-robin' },
   { label: 'Random', value: 'random' },
 ] as const;
+
+// Discrete steps for the Premium "Advanced Scheduling" in-division game ratio
+// control (Divisional strategy only). 100% matches the existing default
+// behavior for leagues that never customize it (LS-6106).
+const DIVISIONAL_WEIGHT_OPTIONS = [60, 70, 80, 90, 100] as const;
 
 // Era presets, free-era ids, FAAB budgets, and waiver options now live in
 // `@legacy-sports/shared-components/leagues` so web and mobile stay in sync
@@ -1441,6 +1450,12 @@ export function LeagueCreatePage(): React.JSX.Element {
             numberOfTeams: formData.numberOfTeams,
             numberOfDivisions: formData.numberOfDivisions,
             schedulingStrategy: formData.schedulingStrategy,
+            schedulingDivisionalWeightPct:
+              formData.schedulingStrategy === 'divisional' &&
+              isPremium &&
+              !premiumLoading
+                ? formData.schedulingDivisionalWeightPct
+                : undefined,
             playerPool: formData.playerPool,
             draftMode: formData.draftMode,
             selectionMethod: formData.selectionMethod,
@@ -1982,6 +1997,39 @@ export function LeagueCreatePage(): React.JSX.Element {
                       />
                     </FieldRow>
                   </div>
+
+                  {/* Advanced Scheduling — custom in-division game ratio (Premium, Divisional only) */}
+                  {formData.schedulingStrategy === 'divisional' && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <PremiumGate
+                        isPremium={isPremium}
+                        featureName="Advanced Scheduling"
+                        featureDescription="Set a custom in-division vs out-of-division game ratio instead of the default schedule."
+                      >
+                        <FieldRow
+                          label="In-Division Game Ratio"
+                          hint="Percentage of games played against division opponents"
+                        >
+                          <ButtonGroup
+                            value={
+                              formData.schedulingDivisionalWeightPct ?? 100
+                            }
+                            options={DIVISIONAL_WEIGHT_OPTIONS.map((pct) => ({
+                              value: pct,
+                              label: `${pct}%`,
+                            }))}
+                            onChange={(v) =>
+                              handleInputChange(
+                                'schedulingDivisionalWeightPct',
+                                v,
+                              )
+                            }
+                            disabled={isFormDisabled}
+                          />
+                        </FieldRow>
+                      </PremiumGate>
+                    </div>
+                  )}
 
                   {/* Max Roster Size */}
                   <FieldRow

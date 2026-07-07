@@ -1561,4 +1561,137 @@ describe('League Mutations', () => {
       );
     });
   });
+
+  describe('createLeagueAndTeams mutation — advanced scheduling entitlement gate (LS-6106)', () => {
+    const baseInput = {
+      leagueName: 'Divisional League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+      schedulingStrategy: 'divisional',
+    };
+
+    it('blocks a free user from setting a custom schedulingDivisionalWeightPct', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { ...baseInput, schedulingDivisionalWeightPct: 80 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Advanced scheduling requires a premium subscription');
+
+      // The gate must fire before any league is created.
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects an out-of-range schedulingDivisionalWeightPct even for a premium user', async () => {
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { ...baseInput, schedulingDivisionalWeightPct: 150 } },
+          adminContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        'schedulingDivisionalWeightPct must be between 0 and 100',
+      );
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a premium (admin) user to set a custom schedulingDivisionalWeightPct', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 1,
+          name: 'Divisional League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: { ...baseInput, schedulingDivisionalWeightPct: 80 } },
+        adminContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ schedulingDivisionalWeightPct: 80 }),
+      );
+    });
+
+    it('allows a free user to create a divisional league without a custom weight', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 2,
+          name: 'Divisional League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: baseInput },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ schedulingDivisionalWeightPct: null }),
+      );
+    });
+  });
 });

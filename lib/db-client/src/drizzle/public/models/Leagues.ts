@@ -71,6 +71,11 @@ export const leagues = pgTable(
     schedulingStrategy: schedulingStrategy('scheduling_strategy')
       .notNull()
       .default('round-robin'),
+    /** Premium-only custom in-division game percentage (0-100) for the
+     *  Divisional scheduling strategy. Null means "use the default" (100,
+     *  matching the pre-LS-6106 hardcoded behavior) — see `advanced_scheduling`
+     *  entitlement in `@legacy-sports/utils`. */
+    schedulingDivisionalWeightPct: integer('scheduling_divisional_weight_pct'),
     weekAdvanceStatus: weekAdvanceStatus('week_advance_status')
       .notNull()
       .default('idle'),
