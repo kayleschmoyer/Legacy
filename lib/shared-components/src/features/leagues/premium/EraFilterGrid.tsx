@@ -80,8 +80,8 @@ export function EraFilterGrid({
               onChange(era.id);
             }}
             flexGrow={1}
-            flexBasis="30%"
-            minWidth={96}
+            flexBasis="45%"
+            minWidth={140}
             minHeight={76}
             padding="$3"
             gap={3}
