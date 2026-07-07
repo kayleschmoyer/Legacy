@@ -405,6 +405,33 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.placeholder('e.g. 1940').expectHidden();
   });
 
+  freeUserTest(
+    'should show upgrade modal when free user clicks a premium era option',
+    async ({ page, leaguePage }) => {
+      // Premium status is sourced from GetUserById, whose baseline mock now
+      // returns a premium user (LS-5030 / #5236). Pin this user back to free so
+      // the era-selection upgrade gate actually fires for this test (LS-5368).
+      await useTier(page, 'free');
+      await leaguePage.gotoCreate();
+      await leaguePage.leagueNameInput.expectVisible();
+
+      // Expand the Era & History section
+      await leaguePage.expandSection('era-history');
+
+      // Clicking a locked (premium) era as a free user opens the Upgrade
+      // modal instead of applying the selection — EraFilterGrid routes the
+      // tap to `onUpgrade` (LS-5174).
+      await leaguePage.clickButton('Dead Ball (pre-1920)');
+
+      await leaguePage.text('Upgrade to Premium').expectVisible({
+        timeout: 10000,
+      });
+      await leaguePage
+        .text('Unlock Historical Era Selection and more')
+        .expectVisible();
+    },
+  );
+
   // ─── League Visibility ────────────────────────────────────────────────────
 
   test('should display Private and Public league visibility options', async ({
