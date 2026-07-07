@@ -503,6 +503,22 @@ export async function verifyTeamEditAccess(
 ): Promise<void> {
   const members = await getTeamMemberInfo(db, teamMemberIds);
 
+  // Multi-member calls (e.g. swapping two team members' positions) must
+  // operate on a single coherent league + team. Without this, a
+  // commissioner/owner in one league could bypass the per-league membership
+  // check below and reach into an unrelated league's team via a crafted
+  // teamMemberIds pair (LS-6033).
+  if (
+    members.some(
+      (m) =>
+        m.leagueId !== members[0].leagueId || m.teamId !== members[0].teamId,
+    )
+  ) {
+    throw ForbiddenError(
+      'Team members in this operation must all belong to the same team',
+    );
+  }
+
   const leagueId = members[0].leagueId;
   const teamIds = [
     ...new Set(members.map((m) => m.teamId).filter(Boolean)),

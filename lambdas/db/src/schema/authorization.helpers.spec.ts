@@ -486,6 +486,34 @@ describe('verifyTeamEditAccess', () => {
       extensions: { code: 'FORBIDDEN' },
     });
   });
+
+  it('throws FORBIDDEN when team members span different leagues', async () => {
+    const members = [
+      { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+      { id: 2, teamId: 20, leagueId: 3, playerId: 60 },
+    ];
+    const db = makeDbForTeamEdit(members, []);
+
+    await expect(
+      verifyTeamEditAccess(db as never, 1, [1, 2]),
+    ).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
+  });
+
+  it('throws FORBIDDEN when team members are on different teams in the same league', async () => {
+    const members = [
+      { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+      { id: 2, teamId: 11, leagueId: 2, playerId: 60 },
+    ];
+    const db = makeDbForTeamEdit(members, []);
+
+    await expect(
+      verifyTeamEditAccess(db as never, 1, [1, 2]),
+    ).rejects.toMatchObject({
+      extensions: { code: 'FORBIDDEN' },
+    });
+  });
 });
 
 // ── checkPlayersNotLocked ──────────────────────────────────────────────────────
