@@ -42,10 +42,19 @@ jest.mock('../../features/baseball/TeamAssistantManagerSettings', () => ({
   ),
 }));
 
+jest.mock('@legacy-sports/shared-components/roster', () => ({
+  RosterBoard: ({ readOnly }: { readOnly?: boolean }) => (
+    <div data-testid="roster-board" data-read-only={String(!!readOnly)} />
+  ),
+}));
+
 // ── GraphQL ───────────────────────────────────────────────────────────────────
 
 const mockUpdateBranding = jest.fn();
 const mockRefetchTeams = jest.fn();
+const mockRefetchMembers = jest.fn();
+const mockUpdateTeamMemberPosition = jest.fn();
+const mockSwapTeamMemberPositions = jest.fn();
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamMembersQuery: jest.fn(() => ({
@@ -61,7 +70,16 @@ jest.mock('@legacy-sports/graphql', () => ({
     },
     loading: false,
     error: undefined,
+    refetch: mockRefetchMembers,
   })),
+  useUpdateTeamMemberPositionMutation: jest.fn(() => [
+    mockUpdateTeamMemberPosition,
+    { loading: false },
+  ]),
+  useSwapTeamMemberPositionsMutation: jest.fn(() => [
+    mockSwapTeamMemberPositions,
+    { loading: false },
+  ]),
   useGetTeamByIdQuery: jest.fn(() => ({
     data: { teamById: { id: 1, leagueId: 100 } },
     loading: false,
@@ -261,5 +279,42 @@ describe('TeamDetailPage – clear branding confirmation (LS-4063)', () => {
         });
       });
     });
+  });
+});
+
+// ── Lineup Editor (LS-5360) ────────────────────────────────────────────────
+
+describe('TeamDetailPage – lineup editor (LS-5360)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchMembers.mockResolvedValue({});
+    mockUpdateTeamMemberPosition.mockResolvedValue({});
+    mockSwapTeamMemberPositions.mockResolvedValue({});
+  });
+
+  it('renders the RosterBoard as editable for the team GM', () => {
+    render(<TeamDetailPage />);
+
+    const board = screen.getByTestId('roster-board');
+    expect(board).toBeInTheDocument();
+    expect(board).toHaveAttribute('data-read-only', 'false');
+  });
+
+  it('renders the RosterBoard as read-only for a visitor', () => {
+    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetUserTeamIdQuery.mockReturnValue({
+      data: { userTeamId: 999 },
+      loading: false,
+      error: undefined,
+    });
+
+    render(<TeamDetailPage />);
+
+    const board = screen.getByTestId('roster-board');
+    expect(board).toHaveAttribute('data-read-only', 'true');
   });
 });

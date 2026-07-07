@@ -13,6 +13,7 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  LeaguePositionFragment,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetLeagueTeamsQuery,
@@ -20,8 +21,12 @@ import {
   useGetTeamByIdQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
+  useSwapTeamMemberPositionsMutation,
   useUpdateTeamBrandingMutation,
+  useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
+import { RosterBoard } from '@legacy-sports/shared-components/roster';
+import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import { TeamAssistantManagerSettings } from '../../features/baseball/TeamAssistantManagerSettings';
 import {
@@ -72,6 +77,7 @@ export function TeamDetailPage() {
     data: membersData,
     loading: membersLoading,
     error: membersError,
+    refetch: refetchMembers,
   } = useGetTeamMembersQuery({
     variables: { teamId: teamIdNum },
     skip: !isValidTeamId,
@@ -123,15 +129,13 @@ export function TeamDetailPage() {
       skip: !leagueId,
     });
 
-  const positionMap = useMemo(() => {
-    const map = new Map<number, string>();
-    positionsData?.leaguePositions?.forEach((pos) => {
-      if (pos.id != null && pos.positionType) {
-        map.set(pos.id, pos.positionType);
-      }
-    });
-    return map;
-  }, [positionsData]);
+  const leaguePositions = useMemo<readonly LeaguePositionFragment[]>(
+    () =>
+      (positionsData?.leaguePositions ?? []).filter(
+        (p): p is LeaguePositionFragment => p != null,
+      ),
+    [positionsData],
+  );
 
   useEffect(() => {
     if (teamIdNum && leagueId) {
@@ -141,6 +145,72 @@ export function TeamDetailPage() {
 
   const [updateTeamBranding, { loading: brandingLoading }] =
     useUpdateTeamBrandingMutation();
+  const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
+  const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
+
+  const handleLineupAssign = async (
+    player: TeamMemberFragment,
+    position: LeaguePositionFragment,
+  ) => {
+    if (player.id == null || position.id == null) return;
+    try {
+      await updateTeamMemberPosition({
+        variables: { teamMemberId: player.id, positionId: position.id },
+      });
+      await refetchMembers();
+    } catch (err: unknown) {
+      LOGGER.error(
+        'Failed to assign player to lineup slot',
+        err instanceof Error ? err : String(err),
+        { playerId: player.id, positionId: position.id },
+      );
+    }
+  };
+
+  const handleLineupRemove = async (position: LeaguePositionFragment) => {
+    const occupant = membersData?.teamMembers?.find(
+      (m) => m?.positionId === position.id,
+    );
+    if (!occupant?.id) return;
+    try {
+      await updateTeamMemberPosition({
+        variables: { teamMemberId: occupant.id, positionId: null },
+      });
+      await refetchMembers();
+    } catch (err: unknown) {
+      LOGGER.error(
+        'Failed to move player to bench',
+        err instanceof Error ? err : String(err),
+        { teamMemberId: occupant.id },
+      );
+    }
+  };
+
+  const handleLineupSwap = async (
+    incoming: TeamMemberFragment,
+    target: LeaguePositionFragment,
+    displaced: TeamMemberFragment,
+  ) => {
+    if (incoming.id == null || displaced.id == null || target.id == null)
+      return;
+    try {
+      await swapTeamMemberPositions({
+        variables: {
+          teamMemberIdA: incoming.id,
+          positionIdA: target.id,
+          teamMemberIdB: displaced.id,
+          positionIdB: incoming.positionId ?? undefined,
+        },
+      });
+      await refetchMembers();
+    } catch (err: unknown) {
+      LOGGER.error(
+        'Failed to swap lineup positions',
+        err instanceof Error ? err : String(err),
+        { teamMemberIdA: incoming.id, teamMemberIdB: displaced.id },
+      );
+    }
+  };
 
   const userPermissionLevel =
     leagueData?.league?.userMembership?.permissionLevel;
@@ -500,31 +570,27 @@ export function TeamDetailPage() {
         </YStack>
       </XStack>
 
-      {/* ── Roster ── */}
+      {/* ── Roster / Lineup Editor (LS-5360) ── */}
       <YStack gap="$3">
         <Text fontSize="$6" fontWeight="bold">
           Roster
         </Text>
-        {teamMembers.map(
-          (member: TeamMemberFragment | null) =>
-            member && (
-              <YStack
-                key={member.id}
-                padding="$3"
-                backgroundColor="$gray2"
-                borderRadius="$4"
-              >
-                <Text fontWeight="bold">
-                  {member.player?.firstName} {member.player?.lastName}
-                </Text>
-                <Text fontSize="$2" color="$gray11">
-                  {member.positionId != null
-                    ? (positionMap.get(member.positionId) ?? 'Unassigned')
-                    : 'Unassigned'}
-                </Text>
-              </YStack>
-            ),
-        )}
+        <RosterBoard<TeamMemberFragment, LeaguePositionFragment>
+          positions={leaguePositions}
+          teamPlayers={teamMembers.filter(
+            (m): m is TeamMemberFragment => m != null,
+          )}
+          onPlayerAssign={(player, position) => {
+            void handleLineupAssign(player, position);
+          }}
+          onPlayerRemove={(position) => {
+            void handleLineupRemove(position);
+          }}
+          onPlayerSwap={(incoming, target, displaced) => {
+            void handleLineupSwap(incoming, target, displaced);
+          }}
+          readOnly={!isGM}
+        />
       </YStack>
 
       {/* ── GM / Commissioner Settings ── */}

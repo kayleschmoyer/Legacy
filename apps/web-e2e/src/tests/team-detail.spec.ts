@@ -10,7 +10,10 @@
 
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -131,6 +134,7 @@ async function setupGraphQL(
 
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operationName = extractOperationName(route).toLowerCase();
 
     if (postData.includes('getteammembers')) {
       if (errorMembers) {
@@ -188,6 +192,20 @@ async function setupGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { updateTeamBranding: { id: 1 } } }),
+      });
+    } else if (operationName === 'updateteammemberposition') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { updateTeamMemberPosition: { id: 1 } },
+        }),
+      });
+    } else if (operationName === 'swapteammemberpositions') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { swapTeamMemberPositions: [] } }),
       });
     } else if (
       postData.includes('getteamassistantsettings') ||
