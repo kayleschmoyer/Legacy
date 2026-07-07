@@ -123,6 +123,21 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('premium-feature-gate');
   }
 
+  /**
+   * The `UpgradeModal` dialog (`apps/web/src/components/UpgradeModal.tsx`) —
+   * opened by any premium-gated control's upgrade CTA, including create-form
+   * fields (FAAB waivers, historical eras, salary cap) and the {@link premiumGate}
+   * overlay's own CTA.
+   */
+  get upgradeModal(): UIElement {
+    return this.driver.byRole('dialog', { name: /upgrade to premium/i });
+  }
+
+  /** The salary-cap amount input (visible once the salary cap toggle is on). */
+  get salaryCapAmountInput(): UIElement {
+    return this.driver.byTestId('create-league-salary-cap-input');
+  }
+
   // ── Reads: named detail getters ──────────────────────────────────
 
   /** The league name rendered as the detail page `<h1>`. */
@@ -312,6 +327,23 @@ export class LeaguePage extends BaseScreen {
     await this.createButton.tap();
   }
 
+  /** Type an amount into the salary-cap input (only visible when enabled). */
+  async fillSalaryCapAmount(amount: number): Promise<void> {
+    await this.salaryCapAmountInput.fill(String(amount));
+  }
+
+  /** Click the {@link premiumGate}'s "Upgrade to Premium" CTA. */
+  async clickPremiumGateUpgrade(): Promise<void> {
+    await this.premiumGate
+      .byRole('button', { name: /upgrade to premium/i })
+      .tap();
+  }
+
+  /** Close the currently-open {@link upgradeModal}. */
+  async closeUpgradeModal(): Promise<void> {
+    await this.upgradeModal.byRole('button', { name: 'Close' }).tap();
+  }
+
   /** Switch the active sport via the SportSwitcher tab. */
   async switchSport(sport: Sport): Promise<void> {
     await this.sportTab(sport).tap();
@@ -401,6 +433,20 @@ export class LeaguePage extends BaseScreen {
     await this.joinHeading.expectVisible({ timeout: 15000 });
     await this.inviteCodeInput.expectVisible();
     await this.teamNameInput.expectVisible();
+  }
+
+  /**
+   * Assert the {@link upgradeModal} is open and shows the given feature's
+   * "Unlock <featureName> and more" subtitle.
+   */
+  async expectUpgradeModalVisible(featureName: string): Promise<void> {
+    await this.upgradeModal.expectVisible();
+    await this.text(`Unlock ${featureName} and more`).expectVisible();
+  }
+
+  /** Assert no upgrade modal is currently open. */
+  async expectNoUpgradeModal(): Promise<void> {
+    await this.upgradeModal.expectHidden();
   }
 
   /** Assert the page did not crash into the global error boundary. */
