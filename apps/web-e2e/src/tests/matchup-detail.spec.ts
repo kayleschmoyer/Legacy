@@ -89,21 +89,15 @@ async function mockMatchupGraphQL(page: import('@playwright/test').Page) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const op = extractOperationName(route);
 
-      if (
-        postData.includes('getmatchupbyid') ||
-        postData.includes('matchupbyid')
-      ) {
+      if (op === 'GetMatchupById') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { getMatchupById: MOCK_MATCHUP } }),
         });
-      } else if (
-        postData.includes('getmatchupsforleague') ||
-        postData.includes('matchupsforleague')
-      ) {
+      } else if (op === 'GetMatchupsForLeague') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -111,28 +105,19 @@ async function mockMatchupGraphQL(page: import('@playwright/test').Page) {
             data: { getMatchupsForLeague: MOCK_MATCHUPS_FOR_LEAGUE },
           }),
         });
-      } else if (
-        postData.includes('getcurrentweekforleague') ||
-        postData.includes('currentweek')
-      ) {
+      } else if (op === 'GetCurrentWeekForLeague') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
         });
-      } else if (
-        postData.includes('getuserteamid') ||
-        postData.includes('userteamid')
-      ) {
+      } else if (op === 'GetUserTeamId') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { userTeamId: 1 } }),
         });
-      } else if (
-        postData.includes('getleagueteams') ||
-        postData.includes('leagueteams')
-      ) {
+      } else if (op === 'GetLeagueTeams') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -179,6 +164,38 @@ test.describe('Matchup Detail – page structure @smoke', () => {
     await page.getByRole('button', { name: /back to league/i }).click();
     await page.waitForLoadState('load');
     await expect(page).toHaveURL(`/baseball/league/${LEAGUE_ID}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests – page meta (dynamic title + description) (LS-5354)
+// ---------------------------------------------------------------------------
+
+test.describe('Matchup Detail – page meta @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockMatchupGraphQL(page);
+    await page.goto(MATCHUP_URL);
+    await page.waitForLoadState('load');
+  });
+
+  test('sets a dynamic document title reflecting the matchup week', async ({
+    page,
+  }) => {
+    // MOCK_MATCHUP.weekNumber === 3, so PageMeta renders
+    // "Week 3 Matchup | Legacy Sports".
+    await expect(page).toHaveTitle(/Week 3 Matchup \| Legacy Sports/);
+  });
+
+  test('sets a meta description mentioning the matchup week', async ({
+    page,
+  }) => {
+    // The static index.html ships a default description meta; PageMeta injects
+    // a second, matchup-specific one. Scope to the dynamic tag by its content
+    // ("matchup" appears only in PageMeta's description) so the strict-mode
+    // locator resolves to exactly one element.
+    await expect(
+      page.locator('head > meta[name="description"][content*="matchup"]'),
+    ).toHaveAttribute('content', /Week 3 .*matchup/i);
   });
 });
 
