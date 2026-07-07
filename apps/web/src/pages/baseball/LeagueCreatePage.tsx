@@ -275,6 +275,7 @@ function applySportSwitch(
   return {
     ...f,
     sport: nextSport,
+    leagueName: '',
     numberOfTeams: fresh.numberOfTeams,
     maxRosterSize: fresh.maxRosterSize,
     gamesPerMatchup: fresh.gamesPerMatchup,

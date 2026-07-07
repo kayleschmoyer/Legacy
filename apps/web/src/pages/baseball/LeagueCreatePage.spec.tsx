@@ -300,6 +300,20 @@ describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
       screen.queryByTestId('football-beta-banner'),
     ).not.toBeInTheDocument();
   });
+
+  it('resets leagueName when switching sport via the URL (LS-6111)', () => {
+    renderPage('/baseball/league/create');
+
+    const nameInput = screen.getByPlaceholderText('Enter your league name');
+    fireEvent.change(nameInput, { target: { value: 'My MLB Dynasty' } });
+    expect(nameInput).toHaveValue('My MLB Dynasty');
+
+    fireEvent.click(screen.getByTestId('sport-tab-football'));
+
+    expect(screen.getByPlaceholderText('Enter your league name')).toHaveValue(
+      '',
+    );
+  });
 });
 
 describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
