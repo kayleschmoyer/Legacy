@@ -75,6 +75,15 @@ jest.mock('../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
 }));
 
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => {
+  const actual = jest.requireActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 jest.mock('@legacy-sports/shared-components/ui', () => ({
   Button: ({ children, onPress, disabled, ...rest }: any) => (
     <button
@@ -221,6 +230,16 @@ describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
     mockIsPremium = false;
+  });
+
+  it('pushes (not replaces) history when switching sport, so Back returns to the prior sport create page (LS-6110)', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.click(screen.getByTestId('sport-tab-football'));
+    const call = mockNavigate.mock.calls.find(
+      ([to]) => to === '/football/league/create',
+    );
+    expect(call).toBeDefined();
+    expect(call?.[1]?.replace).not.toBe(true);
   });
 
   it('renders both sport tabs at the baseball URL', () => {

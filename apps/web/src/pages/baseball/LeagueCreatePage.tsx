@@ -1044,7 +1044,9 @@ export function LeagueCreatePage(): React.JSX.Element {
   const handleSportSelect = useCallback(
     (sport: SportId) => {
       if (sport === selectedSport) return;
-      navigate(`/${sport}/league/create`, { replace: true });
+      // Push (not replace) so the current sport's create page stays in
+      // history — Back returns here instead of skipping past it (LS-6110).
+      navigate(`/${sport}/league/create`);
     },
     [navigate, selectedSport],
   );
