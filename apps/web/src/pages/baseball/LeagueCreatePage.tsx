@@ -1938,8 +1938,16 @@ export function LeagueCreatePage(): React.JSX.Element {
                           value={String(formData.gamesPerMatchup)}
                           onChangeText={(text: string) => {
                             const n = parseInt(text, 10);
-                            if (!isNaN(n))
-                              handleInputChange('gamesPerMatchup', n);
+                            if (isNaN(n)) return;
+                            const gpmRange =
+                              GAMES_PER_MATCHUP_BY_SPORT[formData.sport];
+                            const clamped = gpmRange
+                              ? Math.min(
+                                  Math.max(n, gpmRange.min),
+                                  gpmRange.max,
+                                )
+                              : n;
+                            handleInputChange('gamesPerMatchup', clamped);
                           }}
                           borderColor={
                             validationErrors.gamesPerMatchup

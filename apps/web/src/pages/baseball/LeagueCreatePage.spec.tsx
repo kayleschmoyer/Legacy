@@ -777,3 +777,44 @@ describe('validateFormFull — gamesPerMatchup (LS-6102)', () => {
     expect(errs.gamesPerMatchup).toBeDefined();
   });
 });
+
+describe('LeagueCreatePage — Games Per Matchup typing bounds (LS-6101)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('clamps to the sport max while typing a value above the bound (baseball, max 162)', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    const input = screen.getByDisplayValue('5');
+    fireEvent.change(input, { target: { value: '999' } });
+    expect(input).toHaveValue('162');
+  });
+
+  it('clamps to the sport max while typing a value above the bound (football, max 17)', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+    const input = screen.getByDisplayValue('5');
+    fireEvent.change(input, { target: { value: '99' } });
+    expect(input).toHaveValue('17');
+  });
+
+  it('clamps to the sport min while typing a value below the bound', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    const input = screen.getByDisplayValue('5');
+    fireEvent.change(input, { target: { value: '-5' } });
+    expect(input).toHaveValue('1');
+  });
+
+  it('accepts an in-range value unchanged while typing', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    const input = screen.getByDisplayValue('5');
+    fireEvent.change(input, { target: { value: '42' } });
+    expect(input).toHaveValue('42');
+  });
+});
