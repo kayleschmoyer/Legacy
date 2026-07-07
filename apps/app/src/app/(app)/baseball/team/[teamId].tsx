@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Separator, Tabs, Text, YStack } from 'tamagui';
-import { Alert, ScrollView } from 'react-native';
+import { Separator, Tabs, Text, XStack, YStack } from 'tamagui';
+import { Alert, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { computeAverageScoring, computeScoring } from '@legacy-sports/scoring';
 import {
+  BRAND_NAVY_LIGHT,
   TeamBrandingControl,
   type TeamBrandingTeam,
   UnifiedLoadingPanel,
@@ -12,6 +13,7 @@ import {
   AppMatchupFragment,
   AppTeamMemberFragment,
   LeaguePositionFragment,
+  useGetLeagueByIdQuery,
   useGetLeagueScoringProfileQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
@@ -299,6 +301,107 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
   }
 }
 
+/** Small circular avatar with a letter-fallback, shared by the header and body identity block. */
+function TeamAvatarGlyph({
+  avatarUrl,
+  name,
+  size,
+}: {
+  avatarUrl?: string | null;
+  name?: string | null;
+  size: number;
+}): React.JSX.Element {
+  const [imgError, setImgError] = useState(false);
+  const showImage = !!avatarUrl && !imgError;
+
+  return (
+    <XStack
+      width={size}
+      height={size}
+      borderRadius={size / 2}
+      overflow="hidden"
+      alignItems="center"
+      justifyContent="center"
+      backgroundColor={BRAND_NAVY_LIGHT}
+      testID="team-avatar"
+    >
+      {showImage ? (
+        <Image
+          source={{ uri: avatarUrl }}
+          style={{ width: size, height: size }}
+          onError={() => setImgError(true)}
+          testID="team-avatar-image"
+        />
+      ) : (
+        <Text
+          color="white"
+          fontWeight="700"
+          fontSize={Math.round(size * 0.4)}
+          testID="team-avatar-fallback"
+        >
+          {(name || 'T').charAt(0).toUpperCase()}
+        </Text>
+      )}
+    </XStack>
+  );
+}
+
+interface TeamIdentityBlockProps {
+  name: string;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
+  leagueId: number;
+  isOwner: boolean;
+  isCommissioner: boolean;
+}
+
+/** Team avatar/banner/league-id/visitor-note identity block, rendered in the screen body (LS-8313). */
+function TeamIdentityBlock({
+  name,
+  avatarUrl,
+  bannerUrl,
+  leagueId,
+  isOwner,
+  isCommissioner,
+}: TeamIdentityBlockProps): React.JSX.Element {
+  return (
+    <YStack gap="$3" padding="$4">
+      {bannerUrl && (
+        <YStack height={120} borderRadius="$4" overflow="hidden">
+          <Image
+            source={{ uri: bannerUrl }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+            testID="team-banner-image"
+          />
+        </YStack>
+      )}
+      <XStack gap="$3" alignItems="center">
+        <TeamAvatarGlyph avatarUrl={avatarUrl} name={name} size={72} />
+        <YStack gap="$1" flex={1}>
+          <Text fontSize="$6" fontWeight="bold">
+            {name}
+          </Text>
+          <Text fontSize="$3" color="$gray11" testID="team-league-id">
+            League ID: {leagueId}
+          </Text>
+          {!isOwner && !isCommissioner && (
+            <Text
+              fontSize="$3"
+              color="$gray11"
+              fontStyle="italic"
+              testID="team-visitor-note"
+            >
+              You are viewing this team as a visitor. Only the General Manager
+              can make changes.
+            </Text>
+          )}
+        </YStack>
+      </XStack>
+    </YStack>
+  );
+}
+
 export default function Team(): React.JSX.Element {
   const params = useLocalSearchParams();
   const teamId = params.teamId;
@@ -337,6 +440,17 @@ export default function Team(): React.JSX.Element {
 
   // League data query removed as matchup feature not currently used
   const loadingLeague = false;
+
+  const { data: leagueData, loading: loadingLeagueDetails } =
+    useGetLeagueByIdQuery({
+      skip: team?.team?.leagueId === undefined,
+      variables: {
+        id: team?.team?.leagueId || -1,
+      },
+    });
+
+  const isCommissioner =
+    leagueData?.league?.userMembership?.permissionLevel === 'commissioner';
 
   const { loading: loadingPositions, data: positions } =
     useGetPositionsForLeagueQuery({
@@ -405,6 +519,7 @@ export default function Team(): React.JSX.Element {
     loadingTeam ||
     loadingPositions ||
     loadingLeague ||
+    loadingLeagueDetails ||
     loadingScoringProfile
   ) {
     return <UnifiedLoadingPanel />;
@@ -421,6 +536,14 @@ export default function Team(): React.JSX.Element {
   return (
     <ScrollView data-testid="scrollview">
       <YStack data-testid="layout">
+        <TeamIdentityBlock
+          name={team.team.name ?? 'Team'}
+          avatarUrl={team.team.avatarUrl}
+          bannerUrl={team.team.bannerUrl}
+          leagueId={team.team.leagueId ?? 0}
+          isOwner={isOwner}
+          isCommissioner={isCommissioner}
+        />
         <Tabs
           value={visibleTabs[selectedTabIdx] ?? visibleTabs[0]}
           onValueChange={(value) => {
@@ -473,6 +596,15 @@ export function TeamIdHeader(): React.JSX.Element {
     },
   });
 
-  return <Text>{team?.team?.name}</Text>;
+  return (
+    <XStack gap="$2" alignItems="center">
+      <TeamAvatarGlyph
+        avatarUrl={team?.team?.avatarUrl}
+        name={team?.team?.name}
+        size={24}
+      />
+      <Text>{team?.team?.name}</Text>
+    </XStack>
+  );
 }
 export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

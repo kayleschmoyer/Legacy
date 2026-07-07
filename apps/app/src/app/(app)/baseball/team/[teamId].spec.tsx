@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
-import BaseballTeam from './[teamId]';
+import BaseballTeam, { TeamIdHeader } from './[teamId]';
 
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
 
@@ -26,9 +26,14 @@ jest.mock('@legacy-sports/scoring', () => ({
   computeScoring: jest.fn(() => 0),
 }));
 
+// Mock value mirrors the real BRAND_NAVY_LIGHT constant; requireActual isn't
+// used here since it pulls in the full barrel (native OAuth deps Jest can't parse).
+const MOCK_BRAND_NAVY_LIGHT = '#2C4A7C';
+
 jest.mock('@legacy-sports/shared-components', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
+    BRAND_NAVY_LIGHT: MOCK_BRAND_NAVY_LIGHT,
     UnifiedLoadingPanel: () => <View testID="loading-panel" />,
     TeamBrandingControl: () => <View testID="team-branding-control" />,
   };
@@ -150,6 +155,10 @@ const mockUseGetTeamByIdQuery = jest.fn(() => ({
   data: { team: mockTeam },
 }));
 const mockUseGetUserTeamIdQuery = jest.fn(() => ({ data: { userTeamId: 10 } }));
+const mockUseGetLeagueByIdQuery = jest.fn(() => ({
+  loading: false,
+  data: { league: { userMembership: { permissionLevel: 'owner' } } },
+}));
 const mockUseGetLeagueScoringProfileQuery = jest.fn(() => ({
   loading: false,
   data: { leagueScoringProfile: { multiplierGroups: [] } },
@@ -168,6 +177,8 @@ jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamByIdQuery: (...args: unknown[]) => mockUseGetTeamByIdQuery(...args),
   useGetUserTeamIdQuery: (...args: unknown[]) =>
     mockUseGetUserTeamIdQuery(...args),
+  useGetLeagueByIdQuery: (...args: unknown[]) =>
+    mockUseGetLeagueByIdQuery(...args),
   useGetLeagueScoringProfileQuery: (...args: unknown[]) =>
     mockUseGetLeagueScoringProfileQuery(...args),
   useGetMatchupPlayersQuery: (...args: unknown[]) =>
@@ -198,6 +209,10 @@ describe('BaseballTeam route — projection gating', () => {
       data: { team: mockTeam },
     });
     mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { userMembership: { permissionLevel: 'owner' } } },
+    });
     mockUseGetLeagueScoringProfileQuery.mockReturnValue({
       loading: false,
       data: { leagueScoringProfile: { multiplierGroups: [] } },
@@ -234,5 +249,104 @@ describe('BaseballTeam route — projection gating', () => {
     expect(screen.getByTestId('lineup-editor')).toBeTruthy();
     // The gate opens for premium users but team=[] means hitters=[] → projections still {}
     expect(lastProjections).toEqual({});
+  });
+});
+
+describe('BaseballTeam route — team identity header (LS-8313)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    lastProjections = undefined;
+
+    mockUseGetTeamByIdQuery.mockReturnValue({
+      loading: false,
+      data: { team: mockTeam },
+    });
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { userMembership: { permissionLevel: 'owner' } } },
+    });
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: { leagueScoringProfile: { multiplierGroups: [] } },
+    });
+    mockUseGetMatchupPlayersQuery.mockReturnValue({
+      loading: false,
+      data: { getMatchupPlayers: [] },
+    });
+    mockUseGetPositionsForLeagueQuery.mockReturnValue({
+      loading: false,
+      data: { leaguePositions: mockPositions },
+    });
+    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
+    mockUseSubscription.mockReturnValue({ isPremium: true });
+  });
+
+  it('shows a letter fallback avatar and league ID when no avatarUrl is set (AC1, AC2)', () => {
+    render(<BaseballTeam />);
+    expect(screen.getByTestId('team-avatar-fallback')).toHaveTextContent('T');
+    expect(screen.queryByTestId('team-avatar-image')).toBeNull();
+    expect(screen.getByTestId('team-league-id')).toHaveTextContent(
+      'League ID: 5',
+    );
+  });
+
+  it('renders the avatar image instead of the fallback when avatarUrl is set (AC1)', () => {
+    mockUseGetTeamByIdQuery.mockReturnValue({
+      loading: false,
+      data: {
+        team: { ...mockTeam, avatarUrl: 'https://example.com/logo.png' },
+      },
+    });
+    render(<BaseballTeam />);
+    expect(screen.getByTestId('team-avatar-image')).toBeTruthy();
+    expect(screen.queryByTestId('team-avatar-fallback')).toBeNull();
+  });
+
+  it('omits the banner image when bannerUrl is not set (AC3)', () => {
+    render(<BaseballTeam />);
+    expect(screen.queryByTestId('team-banner-image')).toBeNull();
+  });
+
+  it('renders the banner image when bannerUrl is set (AC3)', () => {
+    mockUseGetTeamByIdQuery.mockReturnValue({
+      loading: false,
+      data: {
+        team: { ...mockTeam, bannerUrl: 'https://example.com/banner.jpg' },
+      },
+    });
+    render(<BaseballTeam />);
+    expect(screen.getByTestId('team-banner-image')).toBeTruthy();
+  });
+
+  it('shows the visitor note for a non-owner, non-commissioner viewer (AC4)', () => {
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 999 } });
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { userMembership: { permissionLevel: 'member' } } },
+    });
+    render(<BaseballTeam />);
+    expect(screen.getByTestId('team-visitor-note')).toBeTruthy();
+  });
+
+  it('hides the visitor note for the owner (AC4)', () => {
+    render(<BaseballTeam />);
+    expect(screen.queryByTestId('team-visitor-note')).toBeNull();
+  });
+
+  it('hides the visitor note for a commissioner who is not the owner (AC4)', () => {
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 999 } });
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { userMembership: { permissionLevel: 'commissioner' } } },
+    });
+    render(<BaseballTeam />);
+    expect(screen.queryByTestId('team-visitor-note')).toBeNull();
+  });
+
+  it('TeamIdHeader still renders the team name alongside the avatar/letter-fallback (AC5)', () => {
+    render(<TeamIdHeader />);
+    expect(screen.getByText('Test Team')).toBeTruthy();
+    expect(screen.getByTestId('team-avatar-fallback')).toHaveTextContent('T');
   });
 });
