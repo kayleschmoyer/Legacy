@@ -589,6 +589,20 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expect(page).toHaveURL('/baseball/league/create');
   });
 
+  // ─── URL Pre-fill (LS-5372) ───────────────────────────────────────────────
+
+  test('should pre-fill the league name from the ?name= query param', async ({
+    page,
+    leaguePage,
+  }) => {
+    await page.route('**/graphql**', async (route) =>
+      unmockedGraphQLFallback(route),
+    );
+    await leaguePage.gotoCreateWithName('Diamond Dynasty');
+
+    await leaguePage.leagueNameInput.expectValue('Diamond Dynasty');
+  });
+
   // ─── Cancel Button ────────────────────────────────────────────────────────
 
   test('should navigate to /baseball when Cancel is clicked', async ({

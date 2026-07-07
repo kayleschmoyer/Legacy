@@ -21,12 +21,14 @@ type RNComponents = {
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockNavigate = jest.fn();
+let mockSearchParams: { name?: string } = {};
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
     back: mockBack,
     navigate: mockNavigate,
   }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 let mockIsPremium = false;
@@ -123,6 +125,7 @@ describe('CreateLeagueScreen (unified)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsPremium = false;
+    mockSearchParams = {};
   });
 
   describe('sport selector', () => {
@@ -189,10 +192,17 @@ describe('CreateLeagueScreen (unified)', () => {
       expect(input.props.value).toBe('My Test League');
     });
 
-    it('cancel button navigates back', () => {
+    it('cancel button navigates to /baseball (LS-5372)', () => {
       render(<CreateLeagueScreen />);
       fireEvent.press(screen.getByText('Cancel'));
-      expect(mockBack).toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith('/baseball');
+    });
+
+    it('pre-fills the league name from the ?name= route param (LS-5372)', () => {
+      mockSearchParams = { name: 'Diamond Dynasty' };
+      render(<CreateLeagueScreen />);
+      const input = screen.getByPlaceholderText('Enter your league name');
+      expect(input.props.value).toBe('Diamond Dynasty');
     });
 
     it('calls mutation with baseball input and navigates to baseball league on success', async () => {

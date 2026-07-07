@@ -277,6 +277,20 @@ export class LeaguePage extends BaseScreen {
   }
 
   /**
+   * Navigate to the league creation page with a `?name=` query param
+   * pre-filling the league name (LS-5372).
+   */
+  async gotoCreateWithName(
+    name: string,
+    sport: Sport = 'baseball',
+  ): Promise<void> {
+    await this.driver.open(
+      `/${sport}/league/create?name=${encodeURIComponent(name)}`,
+    );
+    await this.leagueNameInput.expectVisible({ timeout: 30000 });
+  }
+
+  /**
    * Navigate to a league detail tab. The driver's `open` resolves once the
    * document has loaded (`networkidle` is defeated by the league activity/chat
    * long-poll — ADR-0015 Context); specs gate on the element they need next.

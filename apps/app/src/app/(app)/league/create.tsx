@@ -10,7 +10,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { DateTimePicker } from '@legacy-sports/shared-components';
 import {
@@ -236,11 +236,14 @@ function SportSelector({
 
 export default function CreateLeagueScreen(): React.JSX.Element {
   const router = useRouter();
+  const { name: prefillName } = useLocalSearchParams<{ name?: string }>();
   const [sport, setSport] = useState<SportChoice>('baseball');
+
+  const initialLeagueName = (prefillName ?? '').trim().slice(0, 50);
 
   // ── Baseball form state ──────────────────────────────────────────────────
   const [baseballForm, setBaseballForm] = useState<BaseballFormData>({
-    leagueName: '',
+    leagueName: initialLeagueName,
     numberOfTeams: 12,
     playerPool: 'all',
     draftMode: 'live',
@@ -256,7 +259,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
 
   // ── Football form state ──────────────────────────────────────────────────
   const [footballForm, setFootballForm] = useState<FootballFormData>({
-    leagueName: '',
+    leagueName: initialLeagueName,
     numberOfTeams: 12,
     playerPool: 'all',
     draftMode: 'live',
@@ -948,7 +951,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
               <Button
                 size="$4"
                 variant="outlined"
-                onPress={() => router.back()}
+                onPress={() => router.navigate(`/${sport}`)}
                 disabled={loading}
                 backgroundColor="$color1"
                 borderColor="$borderColor"
