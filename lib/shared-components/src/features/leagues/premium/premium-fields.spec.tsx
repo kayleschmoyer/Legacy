@@ -99,6 +99,62 @@ describe('premium league-create fields (LS-5174)', () => {
       ).toBeNull();
       expect(getByLabelText('Dead Ball (pre-1920)')).toBeTruthy();
     });
+
+    // testID does not reach the DOM as data-testid for a raw tamagui
+    // YStack in this jsdom test setup (no tamagui compiler pass), so
+    // these target the tile via its aria-label like the click tests
+    // above target it via visible text.
+
+    it('routes a locked premium era to onUpgrade on Enter keydown (LS-6084)', () => {
+      const onChange = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByLabelText } = render(
+        <EraFilterGrid
+          {...baseProps}
+          onChange={onChange}
+          onUpgrade={onUpgrade}
+          isPremium={false}
+        />,
+      );
+      fireEvent.keyDown(
+        getByLabelText('Dead Ball (pre-1920) — Locked, premium required'),
+        { key: 'Enter' },
+      );
+      expect(onUpgrade).toHaveBeenCalledTimes(1);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('selects a free era on Space keydown (LS-6084)', () => {
+      const onChange = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByLabelText } = render(
+        <EraFilterGrid
+          {...baseProps}
+          onChange={onChange}
+          onUpgrade={onUpgrade}
+          isPremium={false}
+        />,
+      );
+      fireEvent.keyDown(getByLabelText('Modern (2006+)'), { key: ' ' });
+      expect(onChange).toHaveBeenCalledWith('modern');
+      expect(onUpgrade).not.toHaveBeenCalled();
+    });
+
+    it('ignores unrelated keydowns (LS-6084)', () => {
+      const onChange = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByLabelText } = render(
+        <EraFilterGrid
+          {...baseProps}
+          onChange={onChange}
+          onUpgrade={onUpgrade}
+          isPremium={false}
+        />,
+      );
+      fireEvent.keyDown(getByLabelText('Modern (2006+)'), { key: 'a' });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(onUpgrade).not.toHaveBeenCalled();
+    });
   });
 
   describe('WaiverSystemField', () => {

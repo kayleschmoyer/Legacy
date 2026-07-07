@@ -64,6 +64,15 @@ export function EraFilterGrid({
             : withAlpha(themePrimary, 0.22)
           : BG_DARK;
 
+        const activate = () => {
+          if (disabled) return;
+          if (locked) {
+            onUpgrade();
+            return;
+          }
+          onChange(era.id);
+        };
+
         return (
           <YStack
             key={era.id}
@@ -75,13 +84,13 @@ export function EraFilterGrid({
             aria-label={
               locked ? `${era.name} — Locked, premium required` : era.name
             }
-            onPress={() => {
-              if (disabled) return;
-              if (locked) {
-                onUpgrade();
-                return;
+            tabIndex={disabled ? -1 : 0}
+            onPress={activate}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                activate();
               }
-              onChange(era.id);
             }}
             flexGrow={1}
             flexBasis="45%"
