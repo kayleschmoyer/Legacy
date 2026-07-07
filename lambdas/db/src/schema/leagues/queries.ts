@@ -7,7 +7,17 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, count, eq, ilike, inArray, ne, sql, SQL } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  ne,
+  sql,
+  SQL,
+} from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
   League,
@@ -291,7 +301,10 @@ builder.queryField('userLeagues', (t) =>
               eq(PublicSchema.leagues.isMockDraft, false),
             ),
           )
-          .orderBy(PublicSchema.leagues.id)
+          .orderBy(
+            desc(PublicSchema.leagues.createdAt),
+            desc(PublicSchema.leagues.id),
+          )
           .limit(50);
 
         return results.map((league) => ({
