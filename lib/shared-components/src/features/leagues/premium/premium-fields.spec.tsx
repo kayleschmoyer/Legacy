@@ -184,6 +184,81 @@ describe('premium league-create fields (LS-5174)', () => {
       );
       expect(getByPlaceholderText('e.g. 50000000')).toBeTruthy();
     });
+
+    // LS-6119 — advanced fields (floor, luxury tax, min salary, escalation/decay)
+    it('does not render advanced fields when their onChange handlers are omitted', () => {
+      const { queryByPlaceholderText } = render(
+        <SalaryCapField {...baseProps} enabled isPremium />,
+      );
+      expect(queryByPlaceholderText('e.g. 40000000')).toBeNull();
+      expect(queryByPlaceholderText('e.g. 60000000')).toBeNull();
+      expect(queryByPlaceholderText('e.g. 1')).toBeNull();
+      expect(queryByPlaceholderText('e.g. 10')).toBeNull();
+      expect(queryByPlaceholderText('e.g. 25')).toBeNull();
+    });
+
+    it('renders and wires up advanced fields when handlers are provided', () => {
+      const onSalaryFloorChange = jest.fn();
+      const onLuxuryTaxThresholdChange = jest.fn();
+      const onMinSalaryChange = jest.fn();
+      const onSalaryEscalationPctChange = jest.fn();
+      const onSalaryDecayPctChange = jest.fn();
+      const { getByPlaceholderText } = render(
+        <SalaryCapField
+          {...baseProps}
+          enabled
+          isPremium
+          salaryFloor={40000000}
+          onSalaryFloorChange={onSalaryFloorChange}
+          luxuryTaxThreshold={60000000}
+          onLuxuryTaxThresholdChange={onLuxuryTaxThresholdChange}
+          minSalary={1}
+          onMinSalaryChange={onMinSalaryChange}
+          salaryEscalationPct={10}
+          onSalaryEscalationPctChange={onSalaryEscalationPctChange}
+          salaryDecayPct={25}
+          onSalaryDecayPctChange={onSalaryDecayPctChange}
+        />,
+      );
+
+      fireEvent.change(getByPlaceholderText('e.g. 40000000'), {
+        target: { value: '45000000' },
+      });
+      expect(onSalaryFloorChange).toHaveBeenCalledWith(45000000);
+
+      fireEvent.change(getByPlaceholderText('e.g. 60000000'), {
+        target: { value: '65000000' },
+      });
+      expect(onLuxuryTaxThresholdChange).toHaveBeenCalledWith(65000000);
+
+      fireEvent.change(getByPlaceholderText('e.g. 1'), {
+        target: { value: '2' },
+      });
+      expect(onMinSalaryChange).toHaveBeenCalledWith(2);
+
+      fireEvent.change(getByPlaceholderText('e.g. 10'), {
+        target: { value: '15' },
+      });
+      expect(onSalaryEscalationPctChange).toHaveBeenCalledWith(15);
+
+      fireEvent.change(getByPlaceholderText('e.g. 25'), {
+        target: { value: '30' },
+      });
+      expect(onSalaryDecayPctChange).toHaveBeenCalledWith(30);
+    });
+
+    it('surfaces validation errors on advanced fields', () => {
+      const { getByText } = render(
+        <SalaryCapField
+          {...baseProps}
+          enabled
+          isPremium
+          onMinSalaryChange={jest.fn()}
+          minSalaryError="Minimum salary must be at least 1."
+        />,
+      );
+      expect(getByText('Minimum salary must be at least 1.')).toBeTruthy();
+    });
   });
 
   describe('constants', () => {

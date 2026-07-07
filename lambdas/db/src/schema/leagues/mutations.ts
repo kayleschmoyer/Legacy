@@ -449,6 +449,33 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       // ── Pick time limit validation ───────────────────────────────────────
       validatePickTimeLimitSeconds(inputPickTimeLimitSeconds);
 
+      // ── Salary cap sub-field validation (LS-6119) ────────────────────────
+      // Mirrors the constraints updateLeague already enforces on these fields.
+      if (inputSalaryCap != null && inputSalaryCap < 1) {
+        throw UserInputError('Salary cap must be a positive integer');
+      }
+      if (inputSalaryFloor != null && inputSalaryFloor < 0) {
+        throw UserInputError('Salary floor cannot be negative');
+      }
+      if (inputLuxuryTaxThreshold != null && inputLuxuryTaxThreshold < 0) {
+        throw UserInputError('Luxury tax threshold cannot be negative');
+      }
+      if (inputMinSalary != null && inputMinSalary < 1) {
+        throw UserInputError('Minimum salary must be at least 1');
+      }
+      if (
+        inputSalaryEscalationPct != null &&
+        (inputSalaryEscalationPct < 0 || inputSalaryEscalationPct > 100)
+      ) {
+        throw UserInputError('Salary escalation must be between 0 and 100');
+      }
+      if (
+        inputSalaryDecayPct != null &&
+        (inputSalaryDecayPct < 0 || inputSalaryDecayPct > 100)
+      ) {
+        throw UserInputError('Salary decay must be between 0 and 100');
+      }
+
       try {
         const result = await leagueService.createLeague({
           name: leagueName,

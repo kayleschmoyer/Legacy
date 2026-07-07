@@ -153,6 +153,11 @@ interface CreateLeagueFormData {
   customEraEndYear?: number;
   salaryCapEnabled: boolean;
   salaryCap?: number;
+  salaryFloor?: number;
+  luxuryTaxThreshold?: number;
+  minSalary?: number;
+  salaryEscalationPct?: number;
+  salaryDecayPct?: number;
   auctionBudget: number;
   auctionMinBid: number;
   pickTimeLimitSeconds: number;
@@ -344,6 +349,24 @@ function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
     errs.draftDate = 'Draft date must be in the future.';
   if (f.salaryCapEnabled && f.salaryCap === undefined)
     errs.salaryCap = 'Salary cap amount is required.';
+  if (f.salaryCapEnabled) {
+    if (f.salaryFloor !== undefined && f.salaryFloor < 0)
+      errs.salaryFloor = 'Salary floor cannot be negative.';
+    if (f.luxuryTaxThreshold !== undefined && f.luxuryTaxThreshold < 0)
+      errs.luxuryTaxThreshold = 'Luxury tax threshold cannot be negative.';
+    if (f.minSalary !== undefined && f.minSalary < 1)
+      errs.minSalary = 'Minimum salary must be at least 1.';
+    if (
+      f.salaryEscalationPct !== undefined &&
+      (f.salaryEscalationPct < 0 || f.salaryEscalationPct > 100)
+    )
+      errs.salaryEscalationPct = 'Salary escalation % must be 0–100.';
+    if (
+      f.salaryDecayPct !== undefined &&
+      (f.salaryDecayPct < 0 || f.salaryDecayPct > 100)
+    )
+      errs.salaryDecayPct = 'Salary decay % must be 0–100.';
+  }
   return errs;
 }
 
@@ -1049,6 +1072,11 @@ export function LeagueCreatePage(): React.JSX.Element {
       baseballHofOnly: false,
       salaryCapEnabled: false,
       salaryCap: undefined,
+      salaryFloor: undefined,
+      luxuryTaxThreshold: undefined,
+      minSalary: undefined,
+      salaryEscalationPct: undefined,
+      salaryDecayPct: undefined,
       auctionBudget: 200,
       auctionMinBid: 1,
       pickTimeLimitSeconds: 120,
@@ -1233,6 +1261,21 @@ export function LeagueCreatePage(): React.JSX.Element {
             salaryCapEnabled: formData.salaryCapEnabled,
             salaryCap: formData.salaryCapEnabled
               ? formData.salaryCap
+              : undefined,
+            salaryFloor: formData.salaryCapEnabled
+              ? formData.salaryFloor
+              : undefined,
+            luxuryTaxThreshold: formData.salaryCapEnabled
+              ? formData.luxuryTaxThreshold
+              : undefined,
+            minSalary: formData.salaryCapEnabled
+              ? formData.minSalary
+              : undefined,
+            salaryEscalationPct: formData.salaryCapEnabled
+              ? formData.salaryEscalationPct
+              : undefined,
+            salaryDecayPct: formData.salaryCapEnabled
+              ? formData.salaryDecayPct
               : undefined,
             auctionBudget:
               formData.selectionMethod === 'auction'
@@ -2234,6 +2277,35 @@ export function LeagueCreatePage(): React.JSX.Element {
                           setShowWaiverUpgradeModal(true);
                         }}
                         error={validationErrors.salaryCap}
+                        salaryFloor={formData.salaryFloor}
+                        onSalaryFloorChange={(v) =>
+                          handleInputChange('salaryFloor', v)
+                        }
+                        salaryFloorError={validationErrors.salaryFloor}
+                        luxuryTaxThreshold={formData.luxuryTaxThreshold}
+                        onLuxuryTaxThresholdChange={(v) =>
+                          handleInputChange('luxuryTaxThreshold', v)
+                        }
+                        luxuryTaxThresholdError={
+                          validationErrors.luxuryTaxThreshold
+                        }
+                        minSalary={formData.minSalary}
+                        onMinSalaryChange={(v) =>
+                          handleInputChange('minSalary', v)
+                        }
+                        minSalaryError={validationErrors.minSalary}
+                        salaryEscalationPct={formData.salaryEscalationPct}
+                        onSalaryEscalationPctChange={(v) =>
+                          handleInputChange('salaryEscalationPct', v)
+                        }
+                        salaryEscalationPctError={
+                          validationErrors.salaryEscalationPct
+                        }
+                        salaryDecayPct={formData.salaryDecayPct}
+                        onSalaryDecayPctChange={(v) =>
+                          handleInputChange('salaryDecayPct', v)
+                        }
+                        salaryDecayPctError={validationErrors.salaryDecayPct}
                       />
                     </PremiumGate>
                   </div>

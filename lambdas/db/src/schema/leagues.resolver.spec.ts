@@ -1459,4 +1459,106 @@ describe('League Mutations', () => {
       );
     });
   });
+
+  describe('createLeagueAndTeams mutation — salary cap sub-field validation (LS-6119)', () => {
+    const baseInput = {
+      leagueName: 'Salary Cap League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+    };
+
+    async function resolve(
+      input: Record<string, unknown>,
+      context: unknown = mockContext,
+    ) {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+      return field.resolve(
+        {},
+        { input: { ...baseInput, ...input } },
+        context,
+        undefined as never,
+      );
+    }
+
+    it('rejects a negative salary floor', async () => {
+      await expect(resolve({ salaryFloor: -1 })).rejects.toThrow(
+        'Salary floor cannot be negative',
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a negative luxury tax threshold', async () => {
+      await expect(resolve({ luxuryTaxThreshold: -1 })).rejects.toThrow(
+        'Luxury tax threshold cannot be negative',
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a minimum salary below 1', async () => {
+      await expect(resolve({ minSalary: 0 })).rejects.toThrow(
+        'Minimum salary must be at least 1',
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a salary escalation percentage outside 0-100', async () => {
+      await expect(resolve({ salaryEscalationPct: 101 })).rejects.toThrow(
+        'Salary escalation must be between 0 and 100',
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a salary decay percentage outside 0-100', async () => {
+      await expect(resolve({ salaryDecayPct: -5 })).rejects.toThrow(
+        'Salary decay must be between 0 and 100',
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('accepts valid salary cap sub-field values', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 3,
+          name: 'Salary Cap League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      await resolve(
+        {
+          salaryCapEnabled: true,
+          salaryCap: 50000000,
+          salaryFloor: 0,
+          luxuryTaxThreshold: 0,
+          minSalary: 1,
+          salaryEscalationPct: 0,
+          salaryDecayPct: 100,
+        },
+        adminContext,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({
+          salaryFloor: 0,
+          luxuryTaxThreshold: 0,
+          minSalary: 1,
+          salaryEscalationPct: 0,
+          salaryDecayPct: 100,
+        }),
+      );
+    });
+  });
 });
