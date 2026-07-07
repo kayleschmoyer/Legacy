@@ -24,6 +24,21 @@ If `PR_NUMBER` is omitted, resolve it from the current branch via `github_pr_das
    - **1 prior bot review** → Responding to **Cycle 2** (allow `FIX:` only)
    - **2+ prior bot reviews** → Responding to **Cycle 3+** (allow `FIX:` and `CANNOT-COMPLY:`)
 
+### Step 1b — Check for dismissed-review stall
+
+Before fetching threads, check whether the most recent bot review is `DISMISSED` (GitHub auto-dismisses reviews when new commits are pushed):
+
+```
+github_list_reviews({ number: PR#, reviewer: "legacy-sports-review-bot" })
+```
+
+If the latest bot review is `DISMISSED` **and** `bot:ready-for-review` is not currently on the PR, the review cycle has stalled — a push invalidated the old review but no one re-triggered the bot. In this case:
+
+1. Skip to Step 6 immediately (apply `bot:ready-for-review`).
+2. There is nothing to reply to yet — the bot has not posted a fresh review on the current HEAD. Wait for the next `review_changes_requested` or `review_approved` event (see [drive.md Step 6](drive.md)).
+
+A `DISMISSED` review is **not** a clean state and is **not** a terminal state. It means the bot's last verdict no longer applies to the current code — treat it as "cycle pending."
+
 ### Step 2 — Fetch open threads
 
 Call `github_get_review_threads({ number: PR# })`.
