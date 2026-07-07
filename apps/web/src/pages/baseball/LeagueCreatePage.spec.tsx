@@ -48,8 +48,31 @@ jest.mock('../../components/PremiumGate', () => ({
   PremiumGate: ({ children }: any) => <>{children}</>,
 }));
 jest.mock('../../components/UpgradeModal', () => ({
-  UpgradeModal: () => null,
+  UpgradeModal: ({ open, featureName }: any) =>
+    open ? <div data-testid="upgrade-modal">{featureName}</div> : null,
 }));
+
+// Real SalaryCapField/WaiverSystemField hard-disable their upgrade toggle for
+// non-premium users (LS-6114), which makes the upgrade CTA unreachable via a
+// simulated click in jsdom. Stub both to a bare button wired directly to
+// onUpgrade so LS-6096's featureName-wiring bug (in LeagueCreatePage itself)
+// can be exercised in isolation from that gating behavior.
+jest.mock('@legacy-sports/shared-components/leagues', () => {
+  const actual = jest.requireActual('@legacy-sports/shared-components/leagues');
+  return {
+    ...actual,
+    SalaryCapField: ({ onUpgrade }: any) => (
+      <button type="button" onClick={onUpgrade}>
+        Upgrade Salary Cap
+      </button>
+    ),
+    WaiverSystemField: ({ onUpgrade }: any) => (
+      <button type="button" onClick={onUpgrade}>
+        Upgrade Waiver Settings
+      </button>
+    ),
+  };
+});
 
 jest.mock('@legacy-sports/shared-components', () => ({
   Dialog: ({
@@ -248,6 +271,35 @@ describe('LeagueCreatePage — free league limit (LS-5012)', () => {
     mockIsPremium = true;
     renderPage('/baseball/league/create');
     expect(screen.queryByTestId('league-limit-banner')).not.toBeInTheDocument();
+  });
+});
+
+describe('LeagueCreatePage — Salary Cap upgrade modal title (LS-6096)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('opens the modal titled "Salary Cap" (not FAAB) from the Salary Cap trigger', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: 'Upgrade Salary Cap' }));
+    const modal = screen.getByTestId('upgrade-modal');
+    expect(modal).toHaveTextContent('Salary Cap');
+    expect(modal).not.toHaveTextContent('FAAB Waiver Settings');
+  });
+
+  it('still opens the modal titled "FAAB Waiver Settings" from the FAAB trigger', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Upgrade Waiver Settings' }),
+    );
+    expect(screen.getByTestId('upgrade-modal')).toHaveTextContent(
+      'FAAB Waiver Settings',
+    );
   });
 });
 

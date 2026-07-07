@@ -1059,6 +1059,8 @@ export function LeagueCreatePage(): React.JSX.Element {
     ? SPORTS
     : SPORTS.filter((s) => s.id !== 'football');
   const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] = useState(false);
+  const [showSalaryCapUpgradeModal, setShowSalaryCapUpgradeModal] =
+    useState(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
   const [showLeagueLimitModal, setShowLeagueLimitModal] = useState(false);
 
@@ -2476,7 +2478,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                         disabled={isFormDisabled}
                         onUpgrade={() => {
                           trackPremiumFeatureClick('Salary Cap');
-                          setShowWaiverUpgradeModal(true);
+                          setShowSalaryCapUpgradeModal(true);
                         }}
                         error={validationErrors.salaryCap}
                         salaryFloor={formData.salaryFloor}
@@ -2766,6 +2768,12 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowWaiverUpgradeModal}
         featureName="FAAB Waiver Settings"
         featureDescription="Use Free Agent Acquisition Budget (FAAB) bidding for waiver claims, where the highest bid wins."
+      />
+      <UpgradeModal
+        open={showSalaryCapUpgradeModal}
+        onOpenChange={setShowSalaryCapUpgradeModal}
+        featureName="Salary Cap"
+        featureDescription="Track player salaries and enforce roster spending caps for a competitive salary cap league format."
       />
       <UpgradeModal
         open={showEraUpgradeModal}
