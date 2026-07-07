@@ -29,6 +29,8 @@ import {
   CustomEraRange,
   EraFilterGrid,
   ERAS_BY_SPORT,
+  FAAB_BUDGET_MAX,
+  FAAB_BUDGET_MIN,
   FaabBudgetField,
   FREE_ERA_IDS_BY_SPORT,
   SalaryCapField,
@@ -424,6 +426,12 @@ export function validateFormFull(
     else if (f.auctionMinBid > f.auctionBudget)
       errs.auctionMinBid = 'Auction minimum bid cannot exceed auction budget.';
   }
+  if (
+    f.waiverType === 'faab' &&
+    (f.faabBudgetDefault < FAAB_BUDGET_MIN ||
+      f.faabBudgetDefault > FAAB_BUDGET_MAX)
+  )
+    errs.faabBudget = `FAAB budget must be ${FAAB_BUDGET_MIN}–${FAAB_BUDGET_MAX}.`;
   return errs;
 }
 
@@ -2505,6 +2513,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                             handleInputChange('faabBudgetDefault', v)
                           }
                           disabled={isFormDisabled}
+                          error={validationErrors.faabBudget}
                         />
                       </PremiumGate>
                     </div>

@@ -101,6 +101,10 @@ export const FREE_ERA_IDS_BY_SPORT: Record<LeagueSport, ReadonlySet<string>> = {
 /** Selectable FAAB starting-budget amounts (dollars per manager). */
 export const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500] as const;
 
+/** Valid range for a custom FAAB budget amount (LS-6116). */
+export const FAAB_BUDGET_MIN = 1;
+export const FAAB_BUDGET_MAX = 100_000;
+
 /** Waiver system options. FAAB is a premium feature. */
 export const WAIVER_TYPE_OPTIONS: ReadonlyArray<{
   label: string;

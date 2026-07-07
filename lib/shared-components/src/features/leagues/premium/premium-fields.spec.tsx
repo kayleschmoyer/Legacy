@@ -1,6 +1,6 @@
 import React from 'react';
 import { EraFilterGrid } from './EraFilterGrid';
-import { WaiverSystemField } from './WaiverFields';
+import { FaabBudgetField, WaiverSystemField } from './WaiverFields';
 import { SalaryCapField } from './SalaryCapField';
 import { CustomEraRange } from './CustomEraRange';
 import { FREE_ERA_IDS_BY_SPORT } from './constants';
@@ -433,6 +433,83 @@ describe('premium league-create fields (LS-5174)', () => {
       );
       expect(queryByText('Year cannot be negative.')).toBeNull();
       expect(queryByText('Enter a 4-digit year.')).toBeNull();
+    });
+  });
+
+  describe('FaabBudgetField', () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it('renders the existing presets unchanged, plus a Custom option', () => {
+      const { getByText } = render(
+        <FaabBudgetField value={100} onChange={jest.fn()} />,
+      );
+      expect(getByText('$50')).toBeTruthy();
+      expect(getByText('$500')).toBeTruthy();
+      expect(getByText('Custom')).toBeTruthy();
+    });
+
+    it('selects a preset amount without entering custom mode', () => {
+      const onChange = jest.fn();
+      const { getByText, queryByPlaceholderText } = render(
+        <FaabBudgetField value={100} onChange={onChange} />,
+      );
+      fireEvent.click(getByText('$250'));
+      expect(onChange).toHaveBeenCalledWith(250);
+      expect(queryByPlaceholderText('Enter amount')).toBeNull();
+    });
+
+    it('reveals a numeric input when Custom is selected, without changing the committed value', () => {
+      const onChange = jest.fn();
+      const { getByText, getByPlaceholderText } = render(
+        <FaabBudgetField value={100} onChange={onChange} />,
+      );
+      fireEvent.click(getByText('Custom'));
+      expect(getByPlaceholderText('Enter amount')).toBeTruthy();
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('calls onChange with the parsed integer when typing a custom amount', () => {
+      const onChange = jest.fn();
+      const { getByText, getByPlaceholderText } = render(
+        <FaabBudgetField value={100} onChange={onChange} />,
+      );
+      fireEvent.click(getByText('Custom'));
+      fireEvent.change(getByPlaceholderText('Enter amount'), {
+        target: { value: '175' },
+      });
+      expect(onChange).toHaveBeenCalledWith(175);
+    });
+
+    it('does not call onChange for non-numeric custom input', () => {
+      const onChange = jest.fn();
+      const { getByText, getByPlaceholderText } = render(
+        <FaabBudgetField value={100} onChange={onChange} />,
+      );
+      fireEvent.click(getByText('Custom'));
+      fireEvent.change(getByPlaceholderText('Enter amount'), {
+        target: { value: 'abc' },
+      });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('opens directly in Custom mode and pre-fills a non-preset value', () => {
+      const { getByPlaceholderText } = render(
+        <FaabBudgetField value={175} onChange={jest.fn()} />,
+      );
+      expect(getByPlaceholderText('Enter amount')).toHaveValue('175');
+    });
+
+    it('shows a validation error for an out-of-range custom amount', () => {
+      const { getByText, getByPlaceholderText } = render(
+        <FaabBudgetField
+          value={100}
+          onChange={jest.fn()}
+          error="FAAB budget must be 1–100000."
+        />,
+      );
+      fireEvent.click(getByText('Custom'));
+      expect(getByText('FAAB budget must be 1–100000.')).toBeTruthy();
+      expect(getByPlaceholderText('Enter amount')).toBeTruthy();
     });
   });
 

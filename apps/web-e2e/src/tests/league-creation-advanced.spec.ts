@@ -315,6 +315,39 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     },
   );
 
+  adminTest(
+    'should let a premium user enter a custom FAAB budget and validate its range (LS-6116)',
+    async ({ page, leaguePage }) => {
+      await useTier(page, 'premium');
+      await leaguePage.gotoCreate();
+      await leaguePage.fillLeagueName('Custom FAAB League');
+
+      await leaguePage.expandSection('waiver-budget');
+      await leaguePage.clickButton(/FAAB/i, { exact: false });
+      await leaguePage.text('FAAB Budget (per manager)').expectVisible();
+
+      // Presets stay exactly as-is alongside the new "Custom" option.
+      await leaguePage.button('$100', { exact: true }).expectVisible();
+      await leaguePage.button('Custom', { exact: true }).expectVisible();
+
+      await leaguePage.clickButton('Custom', { exact: true });
+      await leaguePage.faabBudgetCustomInput.expectVisible();
+
+      // Out-of-range amount surfaces the validation error — both inline on
+      // the field and in the sticky status bar render the same message, so
+      // scope to the first match to avoid a Playwright strict-mode error.
+      await leaguePage.fillFaabBudgetAmount(500000);
+      await leaguePage
+        .text(/FAAB budget must be/i)
+        .first()
+        .expectVisible();
+
+      // Back in range clears the error.
+      await leaguePage.fillFaabBudgetAmount(1000);
+      await leaguePage.text('All settings look good.').expectVisible();
+    },
+  );
+
   // ─── Hall of Fame Only ────────────────────────────────────────────────────
 
   test('should toggle Hall of Fame Only mode text', async ({ leaguePage }) => {

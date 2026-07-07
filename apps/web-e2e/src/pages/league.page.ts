@@ -138,6 +138,11 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('create-league-salary-cap-input');
   }
 
+  /** The FAAB custom-budget amount input (visible once "Custom" is selected). */
+  get faabBudgetCustomInput(): UIElement {
+    return this.driver.byTestId('create-league-faab-budget-custom-input');
+  }
+
   // ── Reads: named detail getters ──────────────────────────────────
 
   /** The league name rendered as the detail page `<h1>`. */
@@ -354,6 +359,11 @@ export class LeaguePage extends BaseScreen {
   /** Type an amount into the salary-cap input (only visible when enabled). */
   async fillSalaryCapAmount(amount: number): Promise<void> {
     await this.salaryCapAmountInput.fill(String(amount));
+  }
+
+  /** Type an amount into the FAAB custom-budget input (only visible in Custom mode). */
+  async fillFaabBudgetAmount(amount: number): Promise<void> {
+    await this.faabBudgetCustomInput.fill(String(amount));
   }
 
   /** Click the {@link premiumGate}'s "Upgrade to Premium" CTA. */

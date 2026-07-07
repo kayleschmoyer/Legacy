@@ -5,8 +5,8 @@
 // selected) is a premium control — callers wrap it in their platform's
 // PremiumGate. Shared by web and mobile.
 
-import React from 'react';
-import { XStack } from 'tamagui';
+import React, { useState } from 'react';
+import { Input, Text, XStack, YStack } from 'tamagui';
 import { LeagueFieldRow, OptionButtonGroup } from './_controls';
 import {
   FAAB_BUDGET_OPTIONS,
@@ -80,29 +80,87 @@ export function WaiverSystemField({
   );
 }
 
+const CUSTOM_FAAB_OPTION = 'custom' as const;
+
+type FaabBudgetPreset = (typeof FAAB_BUDGET_OPTIONS)[number];
+
+function isPresetFaabBudget(v: number): v is FaabBudgetPreset {
+  return (FAAB_BUDGET_OPTIONS as readonly number[]).includes(v);
+}
+
 export interface FaabBudgetFieldProps {
   value: number;
   onChange: (v: number) => void;
   disabled?: boolean;
+  /** Validation message for a custom budget amount, if any. */
+  error?: string;
 }
 
 export function FaabBudgetField({
   value,
   onChange,
   disabled = false,
+  error,
 }: FaabBudgetFieldProps): React.JSX.Element {
+  // Opens directly in Custom mode when the incoming value isn't a preset
+  // (e.g. a draft/edit flow with a previously-saved custom amount) so it's
+  // never silently clobbered.
+  const [customMode, setCustomMode] = useState(!isPresetFaabBudget(value));
+  const [customText, setCustomText] = useState(
+    !isPresetFaabBudget(value) ? String(value) : '',
+  );
+
   return (
     <LeagueFieldRow
       label="FAAB Budget (per manager)"
       hint="Each manager starts the season with this budget."
     >
-      <OptionButtonGroup<number>
-        value={value}
-        testIDPrefix="create-league-faab-budget"
-        options={FAAB_BUDGET_OPTIONS.map((v) => ({ value: v, label: `$${v}` }))}
-        onChange={onChange}
-        disabled={disabled}
-      />
+      <YStack gap="$2">
+        <OptionButtonGroup<FaabBudgetPreset | typeof CUSTOM_FAAB_OPTION>
+          value={customMode ? CUSTOM_FAAB_OPTION : (value as FaabBudgetPreset)}
+          testIDPrefix="create-league-faab-budget"
+          options={[
+            ...FAAB_BUDGET_OPTIONS.map((v) => ({ value: v, label: `$${v}` })),
+            { value: CUSTOM_FAAB_OPTION, label: 'Custom' },
+          ]}
+          onChange={(v) => {
+            if (v === CUSTOM_FAAB_OPTION) {
+              // Don't touch the committed value until the user types one —
+              // avoids silently submitting a stale/default number under the
+              // "Custom" label.
+              setCustomMode(true);
+              setCustomText('');
+              return;
+            }
+            setCustomMode(false);
+            onChange(v);
+          }}
+          disabled={disabled}
+        />
+        {customMode && (
+          <XStack alignItems="center" gap="$3">
+            <Input
+              size="$3"
+              testID="create-league-faab-budget-custom-input"
+              value={customText}
+              onChangeText={(text: string) => {
+                setCustomText(text);
+                const n = parseInt(text, 10);
+                if (!isNaN(n)) onChange(n);
+              }}
+              placeholder="Enter amount"
+              keyboardType="numeric"
+              disabled={disabled}
+              borderColor={error ? '$red8' : '$borderColor'}
+            />
+            {error && (
+              <Text fontFamily="$body" fontSize={12} color="$red10">
+                {error}
+              </Text>
+            )}
+          </XStack>
+        )}
+      </YStack>
     </LeagueFieldRow>
   );
 }
