@@ -329,8 +329,10 @@ export function MatchupNavigationControls({
       <WeekStepperRow>
         <StepperButton
           disabled={!canGoPrev}
-          onPress={handlePrevWeek}
+          onPress={canGoPrev ? handlePrevWeek : undefined}
+          role="button"
           aria-label="Previous week"
+          tabIndex={canGoPrev ? 0 : -1}
         >
           <ChevronLeft size={18} color="var(--color)" />
         </StepperButton>
@@ -373,8 +375,10 @@ export function MatchupNavigationControls({
 
         <StepperButton
           disabled={!canGoNext}
-          onPress={handleNextWeek}
+          onPress={canGoNext ? handleNextWeek : undefined}
+          role="button"
           aria-label="Next week"
+          tabIndex={canGoNext ? 0 : -1}
         >
           <ChevronRight size={18} color="var(--color)" />
         </StepperButton>

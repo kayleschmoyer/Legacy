@@ -433,6 +433,17 @@ test.describe('Matchup Week Navigation – stepper controls @regression', () => 
     await expect(prevButton).toHaveAttribute('aria-disabled', 'true');
   });
 
+  test('previous week button is removed from tab order when disabled (LS-5891)', async ({
+    page,
+  }) => {
+    // Week 3 is the first available week, so the prev button is disabled.
+    // A disabled stepper button must not be keyboard-focusable — tabIndex=-1
+    // keeps it out of the tab order instead of a silent dead stop.
+    const prevButton = page.getByLabel('Previous week');
+    await expect(prevButton).toBeVisible();
+    await expect(prevButton).toHaveAttribute('tabindex', '-1');
+  });
+
   test('clicking next week loads week 4 matchup data', async ({ page }) => {
     const nextButton = page.getByLabel('Next week');
     await expect(nextButton).toBeVisible();
