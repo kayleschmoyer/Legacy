@@ -482,6 +482,30 @@ describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
       screen.queryByTestId('selection-reset-notice'),
     ).not.toBeInTheDocument();
   });
+
+  it('calls out the hidden auction settings when switching from Auction to Automated draft (LS-6073)', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Auction$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+
+    expect(screen.getByTestId('selection-reset-notice')).toHaveTextContent(
+      'Selection method reset to Random; auction settings hidden.',
+    );
+  });
+
+  it('uses the generic reset copy when switching from Standard to Automated draft (LS-6073)', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Standard$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+
+    expect(screen.getByTestId('selection-reset-notice')).toHaveTextContent(
+      'Switching to automated draft reset your selection method to Random.',
+    );
+  });
 });
 
 describe('LeagueCreatePage — Cancel discard confirmation (LS-6108)', () => {

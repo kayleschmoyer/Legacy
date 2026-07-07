@@ -1249,11 +1249,15 @@ export function LeagueCreatePage(): React.JSX.Element {
       if (field === 'draftMode') {
         if (value === 'automated') {
           if (prev.selectionMethod !== 'random') {
-            setSelectionResetNotice(true);
+            setSelectionResetNotice(
+              prev.selectionMethod === 'auction'
+                ? 'Selection method reset to Random; auction settings hidden.'
+                : 'Switching to automated draft reset your selection method to Random.',
+            );
           }
           next.selectionMethod = 'random';
         } else {
-          setSelectionResetNotice(false);
+          setSelectionResetNotice(null);
         }
       }
       if (
@@ -1282,7 +1286,9 @@ export function LeagueCreatePage(): React.JSX.Element {
   const firstError = errorCount > 0 ? Object.values(validationErrors)[0] : null;
 
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [selectionResetNotice, setSelectionResetNotice] = useState(false);
+  const [selectionResetNotice, setSelectionResetNotice] = useState<
+    string | null
+  >(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Unsaved-changes navigation guard (LS-6109). Without this, a stray click on
@@ -2297,13 +2303,12 @@ export function LeagueCreatePage(): React.JSX.Element {
                           color="$color11"
                           flex={1}
                         >
-                          Switching to automated draft reset your selection
-                          method to Random.
+                          {selectionResetNotice}
                         </Text>
                         <Button
                           size="$2"
                           variant="outlined"
-                          onPress={() => setSelectionResetNotice(false)}
+                          onPress={() => setSelectionResetNotice(null)}
                         >
                           Dismiss
                         </Button>
