@@ -62,8 +62,12 @@ jest.mock('@legacy-sports/shared-components', () => ({
     open ? (
       <div role="alertdialog" aria-label={title}>
         <span>{description}</span>
-        <button onClick={onConfirm}>{confirmLabel}</button>
-        <button onClick={onCancel}>{cancelLabel}</button>
+        <button type="button" onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+        <button type="button" onClick={onCancel}>
+          {cancelLabel}
+        </button>
       </div>
     ) : null,
 }));
@@ -77,14 +81,15 @@ jest.mock('../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
 }));
 
+// Records navigate() calls for assertions (e.g. push-vs-replace options)
+// while still forwarding to the real MemoryRouter navigate — a full stub
+// silently no-ops navigation, which breaks every test that depends on a
+// route change actually re-rendering the tree (LS-8368).
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => {
   const actual = jest.requireActual('react-router-dom');
   return {
     ...actual,
-    // Spy on navigate() calls while still delegating to the real navigate,
-    // so route-driven effects (sport switch, Cancel navigation) keep working
-    // for tests that don't care about the call args.
     useNavigate: () => {
       const realNavigate = actual.useNavigate();
       return (...args: Parameters<typeof realNavigate>) => {
@@ -96,8 +101,14 @@ jest.mock('react-router-dom', () => {
 });
 
 jest.mock('@legacy-sports/shared-components/ui', () => ({
-  Button: ({ children, onPress, disabled, ...rest }: any) => (
+  // Real Button.tsx defaults `type` to 'button' (lib/shared-components/src/Button.tsx)
+  // so clicks never implicitly submit an enclosing <form>. Mirror that default
+  // here — without it, fireEvent.click on any button inside <form onSubmit={...}>
+  // also fires a native form submit, which was silently corrupting
+  // navigation-after-click assertions (LS-8368).
+  Button: ({ children, onPress, disabled, type, ...rest }: any) => (
     <button
+      type={type ?? 'button'}
       data-testid={rest['data-testid']}
       aria-selected={rest['aria-selected']}
       aria-label={rest['aria-label']}
