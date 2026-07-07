@@ -19,6 +19,7 @@ import {
 } from 'tamagui';
 import { AlertCircle, Check, ChevronRight } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
+import { Dialog } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   GAMES_PER_MATCHUP_BY_SPORT,
@@ -1085,6 +1086,11 @@ export function LeagueCreatePage(): React.JSX.Element {
     };
   });
 
+  // Snapshot of formData as it stood on mount, so Cancel can detect unsaved
+  // edits (LS-6108). Captured once via useRef's lazy-eval-once-on-mount
+  // semantics — not re-synced on the sport-switch effect below.
+  const initialFormDataRef = useRef(formData);
+
   // When the URL-derived sport changes, reset sport-keyed fields so eras /
   // pools / roster sizes track the active sport.
   const prevSportRef = useRef<SportId>(selectedSport);
@@ -1312,6 +1318,17 @@ export function LeagueCreatePage(): React.JSX.Element {
   };
 
   const isFormDisabled = loading;
+
+  const isFormDirty =
+    JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const handleCancel = useCallback(() => {
+    if (isFormDirty) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+    navigate(`/${formData.sport}`);
+  }, [isFormDirty, navigate, formData.sport]);
 
   return (
     <ScrollView flex={1} backgroundColor="$background">
@@ -2513,7 +2530,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   <Button
                     size="$4"
                     variant="outlined"
-                    onPress={() => navigate(`/${formData.sport}`)}
+                    onPress={handleCancel}
                     disabled={isFormDisabled}
                   >
                     Cancel
@@ -2545,6 +2562,20 @@ export function LeagueCreatePage(): React.JSX.Element {
         </XStack>
       </YStack>
 
+      <Dialog
+        open={showDiscardConfirm}
+        onOpenChange={setShowDiscardConfirm}
+        title="Discard this league?"
+        description="You have unsaved settings. Leaving now will discard everything you've entered."
+        confirmLabel="Discard"
+        cancelLabel="Keep Editing"
+        destructive
+        onConfirm={() => {
+          setShowDiscardConfirm(false);
+          navigate(`/${formData.sport}`);
+        }}
+        onCancel={() => setShowDiscardConfirm(false)}
+      />
       <UpgradeModal
         open={showWaiverUpgradeModal}
         onOpenChange={setShowWaiverUpgradeModal}

@@ -47,6 +47,25 @@ jest.mock('../../components/UpgradeModal', () => ({
   UpgradeModal: () => null,
 }));
 
+jest.mock('@legacy-sports/shared-components', () => ({
+  Dialog: ({
+    open,
+    title,
+    description,
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Cancel',
+    onConfirm,
+    onCancel,
+  }: any) =>
+    open ? (
+      <div role="alertdialog" aria-label={title}>
+        <span>{description}</span>
+        <button onClick={onConfirm}>{confirmLabel}</button>
+        <button onClick={onCancel}>{cancelLabel}</button>
+      </div>
+    ) : null,
+}));
+
 let mockIsPremium = false;
 jest.mock('../../hooks/useIsPremium', () => ({
   useIsPremiumStatus: () => ({ isPremium: mockIsPremium, isLoading: false }),
@@ -146,6 +165,8 @@ function renderPage(initialPath = '/baseball/league/create') {
       <Routes>
         <Route path="/baseball/league/create" element={<Page />} />
         <Route path="/football/league/create" element={<Page />} />
+        <Route path="/baseball" element={<div>Baseball Home</div>} />
+        <Route path="/football" element={<div>Football Home</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -348,6 +369,67 @@ describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
     expect(
       screen.queryByTestId('selection-reset-notice'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('LeagueCreatePage — Cancel discard confirmation (LS-6108)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('navigates immediately when Cancel is clicked with no unsaved changes', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByText('Baseball Home')).toBeInTheDocument();
+  });
+
+  it('shows a discard-confirmation dialog when Cancel is clicked with unsaved changes', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(
+      screen.getByRole('alertdialog', { name: 'Discard this league?' }),
+    ).toBeInTheDocument();
+    // Still on the create page — no navigation happened yet.
+    expect(
+      screen.getByPlaceholderText('Enter your league name'),
+    ).toBeInTheDocument();
+  });
+
+  it('navigates away when the discard confirmation is confirmed', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+
+    expect(screen.getByText('Baseball Home')).toBeInTheDocument();
+  });
+
+  it('stays on the page and preserves form state when discard is dismissed', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep Editing' }));
+
+    expect(
+      screen.queryByRole('alertdialog', { name: 'Discard this league?' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Enter your league name')).toHaveValue(
+      'Test League',
+    );
   });
 });
 
