@@ -174,6 +174,16 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byPlaceholder(/message/i).first();
   }
 
+  /** The History tab season selector combobox. */
+  get seasonSelector(): UIElement {
+    return this.driver.byRole('combobox', { name: /select season/i });
+  }
+
+  /** A standings table column header by its accessible name. */
+  standingsColumnHeader(name: string | RegExp): UIElement {
+    return this.driver.byRole('columnheader', { name });
+  }
+
   // ── Reads: named discovery getters ───────────────────────────────
 
   /** The discovery page `<h1>` ("Browse Public Leagues"). */

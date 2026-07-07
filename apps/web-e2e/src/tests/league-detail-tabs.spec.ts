@@ -10,7 +10,10 @@
  */
 
 import { expect, test } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { agoIso } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -211,6 +214,111 @@ const MOCK_WAIVER_CLAIMS = [
   },
 ];
 
+// ── History Tab Mock Data ─────────────────────────────────────────────────────
+
+const MOCK_HISTORY_SEASONS = [
+  {
+    __typename: 'LeagueHistory',
+    leagueId: 100,
+    seasonNumber: 1,
+    name: 'Playoff Push League — Season 1',
+    frozenAt: '2023-12-01T00:00:00.000Z',
+    leaguePhase: 'complete',
+    totalMatchups: 10,
+    championTeamId: 1,
+    championTeamName: 'Alpha Squad',
+    runnerUpTeamId: 2,
+    runnerUpTeamName: 'Beta Force',
+    championScore: 145.5,
+    runnerUpScore: 132.2,
+  },
+  {
+    __typename: 'LeagueHistory',
+    leagueId: 1,
+    seasonNumber: 2,
+    name: 'Playoff Push League — Season 2',
+    frozenAt: null,
+    leaguePhase: 'regular',
+    totalMatchups: 10,
+    championTeamId: null,
+    championTeamName: null,
+    runnerUpTeamId: null,
+    runnerUpTeamName: null,
+    championScore: null,
+    runnerUpScore: null,
+  },
+];
+
+const MOCK_ALL_TIME_RECORDS = [
+  {
+    __typename: 'AllTimeRecord',
+    recordType: 'highest_score',
+    value: 201.4,
+    teamName: 'Alpha Squad',
+    teamId: 1,
+    seasonNumber: 1,
+    leagueId: 1,
+    details: null,
+  },
+  {
+    __typename: 'AllTimeRecord',
+    recordType: 'most_wins',
+    value: 9,
+    teamName: 'Beta Force',
+    teamId: 2,
+    seasonNumber: 1,
+    leagueId: 1,
+    details: null,
+  },
+  {
+    __typename: 'AllTimeRecord',
+    recordType: 'most_points_season',
+    value: 1456.8,
+    teamName: 'Alpha Squad',
+    teamId: 1,
+    seasonNumber: 1,
+    leagueId: 1,
+    details: null,
+  },
+  {
+    __typename: 'AllTimeRecord',
+    recordType: 'longest_win_streak',
+    value: 7,
+    teamName: 'Alpha Squad',
+    teamId: 1,
+    seasonNumber: 1,
+    leagueId: 1,
+    details: null,
+  },
+];
+
+const MOCK_STANDINGS_FOR_HISTORY = [
+  {
+    __typename: 'TeamStanding',
+    teamId: 1,
+    teamName: 'Alpha Squad',
+    wins: 9,
+    losses: 1,
+    ties: 0,
+    winPercentage: 0.9,
+    pointsFor: 1456.8,
+    pointsAgainst: 1100.5,
+    primaryColor: null,
+  },
+  {
+    __typename: 'TeamStanding',
+    teamId: 2,
+    teamName: 'Beta Force',
+    wins: 7,
+    losses: 3,
+    ties: 0,
+    winPercentage: 0.7,
+    pointsFor: 1210.3,
+    pointsAgainst: 1055.2,
+    primaryColor: null,
+  },
+];
+
 // ── GraphQL Mock Setup ────────────────────────────────────────────────────────
 
 interface MockOptions {
@@ -242,6 +350,12 @@ interface MockOptions {
     leagueId: number;
     newName: string;
   }) => void;
+  /** Override history seasons returned by getleaguehistory (default: [] = first-season state) */
+  historySeasons?: typeof MOCK_HISTORY_SEASONS | [];
+  /** Override all-time records returned by getalltimerecords (default: MOCK_ALL_TIME_RECORDS) */
+  allTimeRecords?: typeof MOCK_ALL_TIME_RECORDS | [];
+  /** Override standings returned by getleaguestandings */
+  standings?: typeof MOCK_STANDINGS_FOR_HISTORY | [];
 }
 
 async function mockLeagueDetailGraphQL(
@@ -257,6 +371,9 @@ async function mockLeagueDetailGraphQL(
     onRenameTeam,
     userTeamId = 1,
     leagueOwner = 1,
+    historySeasons = [],
+    allTimeRecords = MOCK_ALL_TIME_RECORDS,
+    standings = [],
   } = opts;
   const leagueForResponse =
     inviteCode !== undefined || leagueOwner !== 1
@@ -390,7 +507,23 @@ async function mockLeagueDetailGraphQL(
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { getLeagueStandings: [] } }),
+        body: JSON.stringify({ data: { getLeagueStandings: standings } }),
+      });
+    } else if (
+      extractOperationName(route).toLowerCase() === 'getleaguehistory'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getLeagueHistory: historySeasons } }),
+      });
+    } else if (
+      extractOperationName(route).toLowerCase() === 'getalltimerecords'
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { getAllTimeRecords: allTimeRecords } }),
       });
     } else if (
       postData.includes('getuserleagues') ||
@@ -805,6 +938,223 @@ test.describe('Team rename confirmation — LS-4018 @regression', () => {
 
     await leaguePage.renameConfirmDialog.expectVisible();
     expect(renameCalled).toBe(false);
+  });
+});
+
+// ── History Tab — navigation @smoke ──────────────────────────────────────────
+
+test.describe('History Tab — navigation @smoke', () => {
+  test('navigates to the history tab without error', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+    await leaguePage.gotoDetail(1, 'history');
+
+    await expect(page).toHaveURL('/baseball/league/1/history');
+    await leaguePage.expectNoAppError();
+  });
+
+  test('clicking the History tab navigates from overview', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page);
+    await leaguePage.gotoDetail(1, 'overview');
+
+    await leaguePage.openTab('History');
+    await expect(page).toHaveURL(/\/history/);
+    await leaguePage.expectNoAppError();
+  });
+});
+
+// ── History Tab — first-season empty state @regression ───────────────────────
+
+test.describe('History Tab — first season state @regression', () => {
+  test('shows "First season in progress" when only one season exists', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page, { historySeasons: [] });
+    await leaguePage.gotoDetail(1, 'history');
+
+    await leaguePage
+      .text('First season in progress', { exact: false })
+      .expectVisible();
+  });
+
+  test('does not show season selector when history is empty', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page, { historySeasons: [] });
+    await leaguePage.gotoDetail(1, 'history');
+
+    await leaguePage.seasonSelector.expectNotAttached();
+  });
+});
+
+// ── History Tab — season selector @regression ─────────────────────────────────
+
+test.describe('History Tab — season selector @regression', () => {
+  test('shows season selector dropdown when multiple seasons exist', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page, {
+      historySeasons: MOCK_HISTORY_SEASONS,
+      standings: MOCK_STANDINGS_FOR_HISTORY,
+    });
+    await leaguePage.gotoDetail(1, 'history');
+
+    await leaguePage.seasonSelector.expectVisible();
+  });
+
+  test('season selector lists each past season by number', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page, {
+      historySeasons: MOCK_HISTORY_SEASONS,
+      standings: MOCK_STANDINGS_FOR_HISTORY,
+    });
+    await leaguePage.gotoDetail(1, 'history');
+
+    await leaguePage.seasonSelector.expectContainsText('Season 1');
+    await leaguePage.seasonSelector.expectContainsText('Season 2');
+  });
+});
+
+// ── History Tab — standings table @regression ─────────────────────────────────
+
+test.describe('History Tab — standings table @regression', () => {
+  test.beforeEach(async ({ page, leaguePage }) => {
+    await mockLeagueDetailGraphQL(page, {
+      historySeasons: MOCK_HISTORY_SEASONS,
+      standings: MOCK_STANDINGS_FOR_HISTORY,
+    });
+    await leaguePage.gotoDetail(1, 'history');
+  });
+
+  test('shows League History section heading', async ({ leaguePage }) => {
+    await leaguePage.text('League History').expectVisible();
+  });
+
+  test('renders standings table with W column header', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.standingsColumnHeader(/^W$/i).expectVisible();
+  });
+
+  test('renders standings table with L column header', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.standingsColumnHeader(/^L$/i).expectVisible();
+  });
+
+  test('renders standings table with T column header', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.standingsColumnHeader(/^T$/i).expectVisible();
+  });
+
+  test('renders standings table with Win% column header', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.standingsColumnHeader(/win\s*%/i).expectVisible();
+  });
+
+  test('renders standings table with PF column header', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.standingsColumnHeader(/^PF$/i).expectVisible();
+  });
+
+  test('renders standings table with PA column header', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.standingsColumnHeader(/^PA$/i).expectVisible();
+  });
+
+  test('shows team names from mocked standings data', async ({
+    leaguePage,
+  }) => {
+    await leaguePage
+      .text('Alpha Squad', { exact: false })
+      .first()
+      .expectVisible();
+    await leaguePage
+      .text('Beta Force', { exact: false })
+      .first()
+      .expectVisible();
+  });
+});
+
+// ── History Tab — all-time records @regression ────────────────────────────────
+
+test.describe('History Tab — all-time records @regression', () => {
+  test.beforeEach(async ({ page, leaguePage }) => {
+    await mockLeagueDetailGraphQL(page, {
+      historySeasons: MOCK_HISTORY_SEASONS,
+      standings: MOCK_STANDINGS_FOR_HISTORY,
+      allTimeRecords: MOCK_ALL_TIME_RECORDS,
+    });
+    await leaguePage.gotoDetail(1, 'history');
+  });
+
+  test('shows All-Time Records section heading', async ({ leaguePage }) => {
+    await leaguePage.text('All-Time Records').expectVisible();
+  });
+
+  test('shows Highest Single-Matchup Score record card', async ({
+    leaguePage,
+  }) => {
+    await leaguePage
+      .text('Highest Single-Matchup Score', { exact: false })
+      .expectVisible();
+  });
+
+  test('shows Most Wins in a Season record card', async ({ leaguePage }) => {
+    await leaguePage
+      .text('Most Wins in a Season', { exact: false })
+      .expectVisible();
+  });
+
+  test('shows Most Points in a Season record card', async ({ leaguePage }) => {
+    await leaguePage
+      .text('Most Points in a Season', { exact: false })
+      .expectVisible();
+  });
+
+  test('shows Longest Win Streak record card', async ({ leaguePage }) => {
+    await leaguePage
+      .text('Longest Win Streak', { exact: false })
+      .expectVisible();
+  });
+
+  test('shows record holder team name', async ({ leaguePage }) => {
+    await leaguePage
+      .text('Alpha Squad', { exact: false })
+      .first()
+      .expectVisible();
+  });
+});
+
+// ── History Tab — all-time records empty state @regression ────────────────────
+
+test.describe('History Tab — no records state @regression', () => {
+  test('shows "No records yet" when all-time records are empty', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockLeagueDetailGraphQL(page, {
+      historySeasons: MOCK_HISTORY_SEASONS,
+      standings: MOCK_STANDINGS_FOR_HISTORY,
+      allTimeRecords: [],
+    });
+    await leaguePage.gotoDetail(1, 'history');
+
+    await leaguePage.text('No records yet', { exact: false }).expectVisible();
   });
 });
 
