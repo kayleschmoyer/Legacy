@@ -377,6 +377,14 @@ export function validateFormFull(
     !PLAYER_POOL_OPTIONS_BY_SPORT[f.sport].some((p) => p.value === f.playerPool)
   )
     errs.playerPool = `Player pool "${f.playerPool}" is not valid for ${f.sport} leagues.`;
+  if (f.selectionMethod === 'auction') {
+    if (Number.isNaN(f.auctionBudget) || f.auctionBudget < 1)
+      errs.auctionBudget = 'Auction budget must be at least 1.';
+    if (Number.isNaN(f.auctionMinBid) || f.auctionMinBid < 1)
+      errs.auctionMinBid = 'Auction minimum bid must be at least 1.';
+    else if (f.auctionMinBid > f.auctionBudget)
+      errs.auctionMinBid = 'Auction minimum bid cannot exceed auction budget.';
+  }
   return errs;
 }
 

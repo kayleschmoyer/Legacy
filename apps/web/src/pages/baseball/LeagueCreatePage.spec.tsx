@@ -852,6 +852,74 @@ describe('validateFormFull — gamesPerMatchup (LS-6102)', () => {
   });
 });
 
+describe('validateFormFull — auction budget/min bid (LS-6092)', () => {
+  const baseFormData: CreateLeagueFormData = {
+    sport: 'baseball',
+    leagueName: 'Test League',
+    numberOfTeams: 8,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'auction',
+    draftOrder: 'snake',
+    maxRosterSize: 26,
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
+    isPublic: false,
+    gamesPerMatchup: 5,
+    baseballEraFilter: 'all',
+    baseballHofOnly: false,
+    salaryCapEnabled: false,
+    auctionBudget: 200,
+    auctionMinBid: 1,
+    pickTimeLimitSeconds: 120,
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
+  };
+
+  it('accepts a valid, correctly-ordered auction budget/min bid', () => {
+    const errs = validateFormFull(baseFormData);
+    expect(errs.auctionBudget).toBeUndefined();
+    expect(errs.auctionMinBid).toBeUndefined();
+  });
+
+  it('rejects an auctionBudget below 1 when selectionMethod is auction', () => {
+    const errs = validateFormFull({ ...baseFormData, auctionBudget: 0 });
+    expect(errs.auctionBudget).toBeDefined();
+  });
+
+  it('rejects a negative auctionBudget when selectionMethod is auction', () => {
+    const errs = validateFormFull({ ...baseFormData, auctionBudget: -50 });
+    expect(errs.auctionBudget).toBeDefined();
+  });
+
+  it('rejects an auctionMinBid below 1 when selectionMethod is auction', () => {
+    const errs = validateFormFull({ ...baseFormData, auctionMinBid: 0 });
+    expect(errs.auctionMinBid).toBeDefined();
+  });
+
+  it('rejects auctionMinBid greater than auctionBudget even when both individually pass range checks', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      auctionBudget: 50,
+      auctionMinBid: 100,
+    });
+    expect(errs.auctionMinBid).toBeDefined();
+  });
+
+  it('does not validate auction fields when selectionMethod is not auction', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      selectionMethod: 'standard',
+      auctionBudget: 0,
+      auctionMinBid: -5,
+    });
+    expect(errs.auctionBudget).toBeUndefined();
+    expect(errs.auctionMinBid).toBeUndefined();
+  });
+});
+
 describe('LeagueCreatePage — Games Per Matchup typing bounds (LS-6101)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
