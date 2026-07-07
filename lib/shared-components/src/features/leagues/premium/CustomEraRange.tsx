@@ -20,6 +20,14 @@ function parseYear(text: string): number | undefined {
   return isNaN(year) ? undefined : year;
 }
 
+/** Per-field message for a single year value: negative or not exactly 4 digits. */
+function validateEraYear(value: number | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (value < 0) return 'Year cannot be negative.';
+  if (String(value).length !== 4) return 'Enter a 4-digit year.';
+  return undefined;
+}
+
 export function CustomEraRange({
   startYear,
   endYear,
@@ -28,7 +36,10 @@ export function CustomEraRange({
   disabled = false,
   invalid = false,
 }: CustomEraRangeProps): React.JSX.Element {
-  const borderColor = invalid ? '$red8' : '$brandNavyLight';
+  const startError = validateEraYear(startYear);
+  const endError = validateEraYear(endYear);
+  const startBorderColor = invalid || startError ? '$red8' : '$brandNavyLight';
+  const endBorderColor = invalid || endError ? '$red8' : '$brandNavyLight';
   return (
     <XStack gap="$3" alignItems="flex-end" flexWrap="wrap">
       <YStack flex={1} gap="$2" minWidth={120}>
@@ -51,8 +62,13 @@ export function CustomEraRange({
           onChangeText={(text: string) => onChangeStart(parseYear(text))}
           keyboardType="numeric"
           disabled={disabled}
-          borderColor={borderColor}
+          borderColor={startBorderColor}
         />
+        {startError && (
+          <Text fontFamily="$body" fontSize={12} color="$red10">
+            {startError}
+          </Text>
+        )}
       </YStack>
       <Text color="$gray9" marginBottom="$3">
         –
@@ -77,8 +93,13 @@ export function CustomEraRange({
           onChangeText={(text: string) => onChangeEnd(parseYear(text))}
           keyboardType="numeric"
           disabled={disabled}
-          borderColor={borderColor}
+          borderColor={endBorderColor}
         />
+        {endError && (
+          <Text fontFamily="$body" fontSize={12} color="$red10">
+            {endError}
+          </Text>
+        )}
       </YStack>
     </XStack>
   );

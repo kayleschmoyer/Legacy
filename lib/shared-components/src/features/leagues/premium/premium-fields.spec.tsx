@@ -2,6 +2,7 @@ import React from 'react';
 import { EraFilterGrid } from './EraFilterGrid';
 import { WaiverSystemField } from './WaiverFields';
 import { SalaryCapField } from './SalaryCapField';
+import { CustomEraRange } from './CustomEraRange';
 import { FREE_ERA_IDS_BY_SPORT } from './constants';
 import { fireEvent, render } from '../../../test-utils';
 
@@ -268,6 +269,59 @@ describe('premium league-create fields (LS-5174)', () => {
         />,
       );
       expect(getByText('Minimum salary must be at least 1.')).toBeTruthy();
+    });
+  });
+
+  describe('CustomEraRange (LS-6083)', () => {
+    const baseProps = {
+      onChangeStart: jest.fn(),
+      onChangeEnd: jest.fn(),
+    };
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('shows no per-field errors when both years are valid 4-digit years', () => {
+      const { queryByText } = render(
+        <CustomEraRange {...baseProps} startYear={1940} endYear={1960} />,
+      );
+      expect(queryByText('Year cannot be negative.')).toBeNull();
+      expect(queryByText('Enter a 4-digit year.')).toBeNull();
+    });
+
+    it('flags a negative start year with a per-field message', () => {
+      const { getByText } = render(
+        <CustomEraRange {...baseProps} startYear={-1940} endYear={1960} />,
+      );
+      expect(getByText('Year cannot be negative.')).toBeTruthy();
+    });
+
+    it('flags a negative end year with a per-field message', () => {
+      const { getByText } = render(
+        <CustomEraRange {...baseProps} startYear={1940} endYear={-1960} />,
+      );
+      expect(getByText('Year cannot be negative.')).toBeTruthy();
+    });
+
+    it('flags a non-4-digit start year with a per-field message', () => {
+      const { getByText } = render(
+        <CustomEraRange {...baseProps} startYear={194} endYear={1960} />,
+      );
+      expect(getByText('Enter a 4-digit year.')).toBeTruthy();
+    });
+
+    it('flags a non-4-digit end year with a per-field message', () => {
+      const { getByText } = render(
+        <CustomEraRange {...baseProps} startYear={1940} endYear={19600} />,
+      );
+      expect(getByText('Enter a 4-digit year.')).toBeTruthy();
+    });
+
+    it('shows no per-field error when a year is unset', () => {
+      const { queryByText } = render(
+        <CustomEraRange {...baseProps} startYear={undefined} endYear={1960} />,
+      );
+      expect(queryByText('Year cannot be negative.')).toBeNull();
+      expect(queryByText('Enter a 4-digit year.')).toBeNull();
     });
   });
 
