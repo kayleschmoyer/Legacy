@@ -136,6 +136,20 @@ describe('useStripePrices', () => {
     );
   });
 
+  it('passes skip through to the underlying query (deferred fetch while a modal is closed)', () => {
+    useGetStripePricesQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: undefined,
+    });
+
+    renderHook(() => useStripePrices({ skip: true }));
+
+    expect(useGetStripePricesQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
   it('computes annualMonthlyEquivalent correctly from live prices', () => {
     useGetStripePricesQuery.mockReturnValue({
       data: {

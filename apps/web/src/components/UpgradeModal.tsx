@@ -65,7 +65,7 @@ export function UpgradeModal({
     annualPriceDisplay: ANNUAL_PRICE_DISPLAY,
     annualSavingsPct: ANNUAL_SAVINGS_PCT,
     pricesFailed,
-  } = useStripePrices();
+  } = useStripePrices({ skip: !open });
 
   return (
     <BaseModal

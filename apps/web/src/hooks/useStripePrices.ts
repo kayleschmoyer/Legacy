@@ -13,6 +13,14 @@ const fallbackPricing = derivePricing(
   FALLBACK_ANNUAL_TOTAL_CENTS,
 );
 
+export interface UseStripePricesOptions {
+  /**
+   * Skip the network fetch (e.g. while a modal that displays these prices
+   * is closed). Callers still get hardcoded fallback pricing back.
+   */
+  skip?: boolean;
+}
+
 /**
  * Fetches live subscription prices from Stripe via GraphQL
  * and derives all display values. Falls back to hardcoded
@@ -21,9 +29,10 @@ const fallbackPricing = derivePricing(
  * Also exposes `monthlyPriceId` and `annualPriceId` (Stripe price IDs)
  * so the checkout flow does not depend on build-time env vars.
  */
-export function useStripePrices() {
+export function useStripePrices(options?: UseStripePricesOptions) {
   const { data, loading, error } = useGetStripePricesQuery({
     fetchPolicy: 'cache-and-network',
+    skip: options?.skip,
   });
 
   const warnedRef = useRef(false);
