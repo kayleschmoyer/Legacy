@@ -8,6 +8,8 @@
  *   3. The H1 reflects the active sport.
  *   4. Football mode swaps in football-specific era + pool options.
  *   5. Baseball mode keeps baseball-specific era + pool options.
+ *   6. validateFormFull rejects a playerPool value that isn't valid for the
+ *      current sport (LS-6103), and the mismatch blocks submission.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 /* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factories need runtime require */
@@ -928,5 +930,97 @@ describe('LeagueCreatePage — Max Roster Size recommended marker (LS-6104)', ()
     expect(
       rosterGroup().queryByRole('button', { name: '26' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('LeagueCreatePage — playerPool/sport validation (LS-6103)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  /** Baseline valid baseball form data — every field satisfies validateFormFull. */
+  function baseballFormData(overrides: Record<string, any> = {}) {
+    return {
+      sport: 'baseball',
+      leagueName: 'Test League',
+      numberOfTeams: 12,
+      numberOfDivisions: 2,
+      schedulingStrategy: 'divisional',
+      playerPool: 'all',
+      draftMode: 'live',
+      selectionMethod: 'standard',
+      draftOrder: 'snake',
+      maxRosterSize: 26,
+      draftDate: undefined,
+      waiverType: 'standard',
+      faabBudgetDefault: 100,
+      isPublic: false,
+      gamesPerMatchup: 5,
+      baseballEraFilter: 'all',
+      baseballHofOnly: false,
+      customEraStartYear: undefined,
+      customEraEndYear: undefined,
+      salaryCapEnabled: false,
+      salaryCap: undefined,
+      auctionBudget: 200,
+      auctionMinBid: 1,
+      pickTimeLimitSeconds: 120,
+      scoringFormat: 'ppr',
+      defensiveFormat: 'dst',
+      ...overrides,
+    };
+  }
+
+  function footballFormData(overrides: Record<string, any> = {}) {
+    return baseballFormData({
+      sport: 'football',
+      numberOfTeams: 10,
+      maxRosterSize: 16,
+      playerPool: 'all',
+      ...overrides,
+    });
+  }
+
+  it('flags a baseball pool value submitted while sport is football', () => {
+    const errs = validateFormFull(footballFormData({ playerPool: 'nl' }));
+    expect(errs.playerPool).toBe(
+      'Player pool "nl" is not valid for football leagues.',
+    );
+  });
+
+  it('flags a football pool value submitted while sport is baseball', () => {
+    const errs = validateFormFull(baseballFormData({ playerPool: 'nfc' }));
+    expect(errs.playerPool).toBe(
+      'Player pool "nfc" is not valid for baseball leagues.',
+    );
+  });
+
+  it('accepts every valid baseball pool value', () => {
+    for (const pool of ['all', 'nl', 'al']) {
+      const errs = validateFormFull(baseballFormData({ playerPool: pool }));
+      expect(errs.playerPool).toBeUndefined();
+    }
+  });
+
+  it('accepts every valid football pool value', () => {
+    for (const pool of ['all', 'nfc', 'afc']) {
+      const errs = validateFormFull(footballFormData({ playerPool: pool }));
+      expect(errs.playerPool).toBeUndefined();
+    }
+  });
+
+  it('does not call the mutation when validation fails (generic errorCount gate)', () => {
+    // The playerPool/sport check flows through the same validationErrors ->
+    // errorCount -> handleSubmit gate as every other field (lines 1183-1186,
+    // unchanged by this fix). An empty league name exercises that same gate
+    // deterministically, since a genuine playerPool/sport race is a one-render
+    // window that RTL's act()-synchronous effect flushing cannot reproduce.
+    renderPage('/baseball/league/create');
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    expect(mockCreateLeague).not.toHaveBeenCalled();
   });
 });

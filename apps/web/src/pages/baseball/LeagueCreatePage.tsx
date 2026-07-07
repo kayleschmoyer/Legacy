@@ -373,6 +373,10 @@ export function validateFormFull(
     )
       errs.salaryDecayPct = 'Salary decay % must be 0–100.';
   }
+  if (
+    !PLAYER_POOL_OPTIONS_BY_SPORT[f.sport].some((p) => p.value === f.playerPool)
+  )
+    errs.playerPool = `Player pool "${f.playerPool}" is not valid for ${f.sport} leagues.`;
   return errs;
 }
 
