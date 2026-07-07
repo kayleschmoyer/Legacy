@@ -553,7 +553,7 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
 
   const { data, loading, error } = useGetPlayersWithStatsQuery({
     variables: {
-      limit: PAGE_SIZE,
+      limit: PAGE_SIZE + 1,
       offset: page * PAGE_SIZE,
       orderBy: sortBy,
       orderDirection: sortDirection,
@@ -606,12 +606,13 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
     `${page}|${playerType}|${positionFilter}|${sortBy}|${sortDirection}|${debouncedSearch}`,
   );
 
-  const players = data?.players ?? [];
+  const rawPlayers = data?.players ?? [];
+  const hasNextPage = rawPlayers.length > PAGE_SIZE;
 
   // Client-side: only exclude taken players (position + search filtering is now server-side)
-  const displayPlayers = players.filter(
-    (player) => !(!player?.id || takenPlayerIds.has(player.id)),
-  );
+  const displayPlayers = rawPlayers
+    .slice(0, PAGE_SIZE)
+    .filter((player) => !(!player?.id || takenPlayerIds.has(player.id)));
 
   const positions =
     playerType === 'hitters' ? HITTER_POSITIONS : PITCHER_POSITIONS;
@@ -621,7 +622,6 @@ export const LeagueFreeAgents: React.FC<LeagueFreeAgentsProps> = ({
     playerType === 'hitters' ? HITTING_STAT_COLUMNS : PITCHING_STAT_COLUMNS;
 
   const isLoading = loading || takenLoading;
-  const hasNextPage = players.length >= PAGE_SIZE;
 
   return (
     <YStack flex={1}>

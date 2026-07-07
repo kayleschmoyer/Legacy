@@ -550,7 +550,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
 
   const { data, loading, error } = useGetPlayersWithStatsQuery({
     variables: {
-      limit: PAGE_SIZE,
+      limit: PAGE_SIZE + 1,
       offset: page * PAGE_SIZE,
       orderBy,
       orderDirection: 'desc',
@@ -567,18 +567,22 @@ export const LeagueDetailFreeAgentsTab: React.FC<
     `${page}|${group}|${pos}|${debouncedSearch}`,
   );
 
+  const hasNextPage = (data?.players ?? []).length > PAGE_SIZE;
+
   const players = useMemo(
     () =>
-      (data?.players ?? []).filter(
-        (p): p is PlayerWithStats => p?.id != null && !takenPlayerIds.has(p.id),
-      ),
+      (data?.players ?? [])
+        .slice(0, PAGE_SIZE)
+        .filter(
+          (p): p is PlayerWithStats =>
+            p?.id != null && !takenPlayerIds.has(p.id),
+        ),
     [data?.players, takenPlayerIds],
   );
 
   const cols = group === 'pitchers' ? PITCHER_COLS : HITTER_COLS;
   const positions = group === 'pitchers' ? PITCHER_POSITIONS : HITTER_POSITIONS;
   const isLoading = loading || takenLoading;
-  const hasNextPage = (data?.players ?? []).length >= PAGE_SIZE;
 
   if (isFootball) {
     return (
