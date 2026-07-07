@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Button, Dialog, H3, Text, XStack, YStack } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import {
@@ -81,6 +81,19 @@ export function BaseModal({
   hideHeader = false,
   children,
 }: BaseModalProps) {
+  // Capture whatever had focus right before the dialog opened so it can be
+  // restored on close. Tamagui's own Dialog only restores focus to a
+  // `Dialog.Trigger` element (Dialog.tsx `context.triggerRef`), but none of
+  // this app's BaseModal consumers render a `Dialog.Trigger` — they toggle
+  // `open` from external state — so that fallback is always a no-op here.
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (open) {
+      previouslyFocusedElementRef.current =
+        document.activeElement as HTMLElement | null;
+    }
+  }, [open]);
+
   const headerBackground = headerAccentColor
     ? `radial-gradient(ellipse at 100% 0%, ${withAlpha(headerAccentColor, 0.32)} 0%, transparent 60%), radial-gradient(ellipse at 0% 100%, ${withAlpha(headerAccentColor, 0.18)} 0%, transparent 55%), linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`
     : `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`;
@@ -118,6 +131,10 @@ export function BaseModal({
           borderRadius="$5"
           overflow="hidden"
           padding={0}
+          onCloseAutoFocus={(event: Event) => {
+            event.preventDefault();
+            previouslyFocusedElementRef.current?.focus();
+          }}
         >
           {/* ── Glass gradient header (suppressed when `hideHeader`) ── */}
           {!hideHeader && (
