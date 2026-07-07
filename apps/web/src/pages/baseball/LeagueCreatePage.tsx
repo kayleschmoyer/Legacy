@@ -132,7 +132,7 @@ const SCORING_FORMAT_OPTIONS: ReadonlyArray<{
   },
 ];
 
-interface CreateLeagueFormData {
+export interface CreateLeagueFormData {
   sport: SportId;
   leagueName: string;
   numberOfTeams: number;
@@ -319,7 +319,9 @@ function poolDisplayLabel(sport: SportId, v: string): string {
 
 // ── Validation (returns all errors, not just first) ──────────────────────────
 
-function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
+export function validateFormFull(
+  f: CreateLeagueFormData,
+): Record<string, string> {
   const errs: Record<string, string> = {};
   const trimmed = f.leagueName.trim();
   if (!trimmed || trimmed.length < 3)
@@ -338,7 +340,9 @@ function validateFormFull(f: CreateLeagueFormData): Record<string, string> {
   const gpmRange = GAMES_PER_MATCHUP_BY_SPORT[f.sport];
   if (
     gpmRange &&
-    (f.gamesPerMatchup < gpmRange.min || f.gamesPerMatchup > gpmRange.max)
+    (Number.isNaN(f.gamesPerMatchup) ||
+      f.gamesPerMatchup < gpmRange.min ||
+      f.gamesPerMatchup > gpmRange.max)
   )
     errs.gamesPerMatchup = `Games per matchup must be ${gpmRange.min}–${gpmRange.max} for ${f.sport} leagues.`;
   if (f.baseballEraFilter === 'custom') {

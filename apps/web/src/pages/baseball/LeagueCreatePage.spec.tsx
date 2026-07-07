@@ -22,6 +22,8 @@ import {
   within,
 } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import type { CreateLeagueFormData } from './LeagueCreatePage';
+import { validateFormFull } from './LeagueCreatePage';
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -715,5 +717,52 @@ describe('LeagueCreatePage — Divisional vs 1 division (LS-6105)', () => {
         }),
       }),
     );
+  });
+});
+
+describe('validateFormFull — gamesPerMatchup (LS-6102)', () => {
+  const baseFormData: CreateLeagueFormData = {
+    sport: 'baseball',
+    leagueName: 'Test League',
+    numberOfTeams: 8,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'standard',
+    draftOrder: 'snake',
+    maxRosterSize: 26,
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
+    isPublic: false,
+    gamesPerMatchup: 5,
+    baseballEraFilter: 'all',
+    baseballHofOnly: false,
+    salaryCapEnabled: false,
+    auctionBudget: 200,
+    auctionMinBid: 1,
+    pickTimeLimitSeconds: 120,
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
+  };
+
+  it('accepts a valid gamesPerMatchup value', () => {
+    const errs = validateFormFull({ ...baseFormData, gamesPerMatchup: 5 });
+    expect(errs.gamesPerMatchup).toBeUndefined();
+  });
+
+  it('rejects a negative gamesPerMatchup value', () => {
+    const errs = validateFormFull({ ...baseFormData, gamesPerMatchup: -5 });
+    expect(errs.gamesPerMatchup).toBeDefined();
+  });
+
+  it('rejects a zero gamesPerMatchup value', () => {
+    const errs = validateFormFull({ ...baseFormData, gamesPerMatchup: 0 });
+    expect(errs.gamesPerMatchup).toBeDefined();
+  });
+
+  it('rejects a NaN gamesPerMatchup value instead of silently passing', () => {
+    const errs = validateFormFull({ ...baseFormData, gamesPerMatchup: NaN });
+    expect(errs.gamesPerMatchup).toBeDefined();
   });
 });
