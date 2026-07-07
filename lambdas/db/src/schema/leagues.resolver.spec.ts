@@ -1361,4 +1361,102 @@ describe('League Mutations', () => {
       );
     });
   });
+
+  describe('createLeagueAndTeams mutation — FAAB budget server-side gate (LS-6117)', () => {
+    const baseInput = {
+      leagueName: 'Waiver League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+      selectionMethod: 'standard',
+    };
+
+    it('forces faabBudgetDefault to 100 when a free user submits waiverType=standard with a smuggled-in budget', async () => {
+      // A free user bypassing the client PremiumGate (URL hack/devtools) could
+      // still submit waiverType='standard' + a non-default faabBudgetDefault.
+      // The server must not persist that value dormant (LS-6117).
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 1,
+          name: 'Waiver League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        {
+          input: {
+            ...baseInput,
+            waiverType: 'standard',
+            faabBudgetDefault: 500,
+          },
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({
+          waiverType: 'standard',
+          faabBudgetDefault: 100,
+        }),
+      );
+    });
+
+    it('preserves the submitted faabBudgetDefault when waiverType=faab (already entitlement-gated)', async () => {
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 2,
+          name: 'Waiver League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        {
+          input: {
+            ...baseInput,
+            waiverType: 'faab',
+            faabBudgetDefault: 500,
+          },
+        },
+        adminContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({
+          waiverType: 'faab',
+          faabBudgetDefault: 500,
+        }),
+      );
+    });
+  });
 });

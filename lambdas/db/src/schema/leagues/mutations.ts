@@ -478,7 +478,12 @@ builder.mutationField('createLeagueAndTeams', (t) =>
               ? ('faab' as const)
               : ('standard' as const),
           waiverEnabled: inputWaiverEnabled ?? true,
-          faabBudgetDefault: inputFaabBudgetDefault ?? 100,
+          // faabBudgetDefault only applies to FAAB-waiver leagues, which are a
+          // premium feature gated above. Force the stored default to 100 for
+          // non-FAAB leagues so a free-tier request can't smuggle in a budget
+          // that later activates if the league is flipped to FAAB (LS-6117).
+          faabBudgetDefault:
+            inputWaiverType === 'faab' ? (inputFaabBudgetDefault ?? 100) : 100,
           eraFilter:
             (inputEraFilter as
               | 'all'
