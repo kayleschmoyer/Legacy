@@ -1158,6 +1158,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     field: keyof CreateLeagueFormData,
     value: string | number | boolean | Date | undefined,
   ) => {
+    setHasUnsavedChanges(true);
     setFormData((prev) => {
       const next = { ...prev, [field]: value };
       if (field === 'draftMode') {
@@ -1191,6 +1192,100 @@ export function LeagueCreatePage(): React.JSX.Element {
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [selectionResetNotice, setSelectionResetNotice] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Unsaved-changes navigation guard (LS-6109). Without this, a stray click on
+  // a nav link mid-flow (or the browser back button / a refresh) silently
+  // discards everything the user has entered.
+  //
+  // Implementation note: react-router-dom v6's `useBlocker` only works under a
+  // Data Router (`createBrowserRouter` + `RouterProvider`). This app mounts a
+  // classic `<BrowserRouter>` (see apps/web/src/main.tsx), so `useBlocker`
+  // would throw "must be used within a data router". We therefore guard
+  // navigation with window/document listeners instead — the same pattern used
+  // by LeagueScoringEditor (LS-4104) and EliteDraftBoardScreenWrapper
+  // (LS-4986).
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const promptMessage =
+      'You have unsaved league settings. Leave without creating your league?';
+
+    // 1. Browser-level: refresh, tab close, typed-URL navigation. The browser
+    //    supplies its own dialog text in modern Chrome/Firefox/Safari;
+    //    `event.returnValue` is required for the prompt to appear at all but
+    //    its value is ignored.
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // 2. SPA-level: in-app clicks that would trigger a route change (header
+    //    nav, sidebar links). Capture-phase so we run before any onClick
+    //    handler that calls `navigate()`. Clicks anywhere within the create
+    //    page itself (sport tabs, section toggles, form fields, Cancel /
+    //    Create buttons) are page interactions, not navigations away from the
+    //    flow, so they're excluded via the page root.
+    const pageRoot = document.querySelector(
+      '[data-testid="league-create-page"]',
+    );
+
+    const handleNavClick = (event: MouseEvent) => {
+      // Only respond to primary clicks without modifier keys; cmd/ctrl-click
+      // opens a new tab, which doesn't lose the current page's state.
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      // event.target on a click can be a Text node (e.g., a click landing on
+      // selected text inside a `<p>`). `.closest()` only exists on Element,
+      // so narrow with `instanceof Element` rather than a blind cast.
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      // Clicks inside the create-league page are never navigations away from
+      // this flow — let them through.
+      if (pageRoot?.contains(target)) return;
+
+      const navTarget = target.closest('[role="tab"], a[href]');
+      if (!navTarget) return;
+
+      // Re-clicking the currently selected tab is a no-op route-wise.
+      if (navTarget.getAttribute('aria-selected') === 'true') return;
+
+      // External / new-window links bypass our SPA — beforeunload will fire
+      // for those, so we can let them through here.
+      if (navTarget instanceof HTMLAnchorElement) {
+        if (navTarget.target === '_blank') return;
+        const href = navTarget.getAttribute('href');
+        if (!href) return;
+        // Skip hash-only and pure query-string changes — they don't unmount
+        // this page.
+        if (href.startsWith('#') || href.startsWith('?')) return;
+      }
+
+      if (!window.confirm(promptMessage)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    document.addEventListener('click', handleNavClick, { capture: true });
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleNavClick, {
+        capture: true,
+      });
+    };
+  }, [hasUnsavedChanges]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1301,6 +1396,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       });
 
       if (result.data?.createLeagueAndTeams?.league?.id) {
+        setHasUnsavedChanges(false);
         navigate(
           `/${formData.sport}/league/${result.data.createLeagueAndTeams.league.id}`,
         );
@@ -1342,6 +1438,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       />
 
       <YStack
+        data-testid="league-create-page"
         padding="$6"
         $sm={{ padding: '$4', paddingBottom: '$8' }}
         maxWidth={1200}

@@ -516,3 +516,100 @@ describe('LeagueCreatePage — Pick Timer (LS-7966)', () => {
     );
   });
 });
+
+describe('LeagueCreatePage — unsaved-changes navigation guard (LS-6109)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  function dispatchBeforeUnload() {
+    const event = new Event('beforeunload', {
+      cancelable: true,
+    }) as BeforeUnloadEvent;
+    window.dispatchEvent(event);
+    return event;
+  }
+
+  function clickOutsideNavLink() {
+    const nav = document.createElement('a');
+    nav.href = '/dashboard';
+    document.body.appendChild(nav);
+    fireEvent.click(nav);
+    document.body.removeChild(nav);
+  }
+
+  it('does not warn on beforeunload before any field has been edited', () => {
+    renderPage('/baseball/league/create');
+    const event = dispatchBeforeUnload();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('warns on beforeunload once a field has been edited', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    const event = dispatchBeforeUnload();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('prompts before an outside nav-link click when there are unsaved changes', () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    clickOutsideNavLink();
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unsaved league settings'),
+    );
+    confirmSpy.mockRestore();
+  });
+
+  it('does not prompt for outside nav-link clicks when there are no unsaved changes', () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage('/baseball/league/create');
+
+    clickOutsideNavLink();
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('does not prompt for clicks inside the create-league page itself', () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand all/i }));
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('clears the unsaved-changes guard after a successful submit', async () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: { id: 42 } } },
+    });
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+
+    await waitFor(() =>
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(false),
+    );
+  });
+});
