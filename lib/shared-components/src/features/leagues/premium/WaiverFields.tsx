@@ -6,18 +6,28 @@
 // PremiumGate. Shared by web and mobile.
 
 import React from 'react';
+import { XStack } from 'tamagui';
 import { LeagueFieldRow, OptionButtonGroup } from './_controls';
 import {
   FAAB_BUDGET_OPTIONS,
   WAIVER_TYPE_OPTIONS,
   type WaiverType,
 } from './constants';
+import { Spinner } from '../../../components/Spinner';
 
 export interface WaiverSystemFieldProps {
   value: WaiverType;
   onChange: (v: WaiverType) => void;
   /** Whether the viewer can select the premium FAAB option. */
   isPremium: boolean;
+  /**
+   * True while premium entitlement is still resolving. While loading, the
+   * FAAB option is neither "locked" nor selectable — a premium viewer must
+   * not have an upgrade prompt fired at them just because their entitlement
+   * hasn't confirmed yet (LS-6100). The whole group is disabled with a
+   * spinner until `isPremium` reflects a resolved status.
+   */
+  loading?: boolean;
   disabled?: boolean;
   /** Called when a non-premium viewer tries to select FAAB. */
   onUpgrade: () => void;
@@ -27,6 +37,7 @@ export function WaiverSystemField({
   value,
   onChange,
   isPremium,
+  loading = false,
   disabled = false,
   onUpgrade,
 }: WaiverSystemFieldProps): React.JSX.Element {
@@ -39,26 +50,32 @@ export function WaiverSystemField({
           : 'Teams have a priority order'
       }
     >
-      <OptionButtonGroup<WaiverType>
-        value={value}
-        testIDPrefix="create-league-waiver-type"
-        // Proactively lock the premium FAAB option for free viewers so the gate
-        // is visible before selection (LS-5173); the onChange below still routes
-        // a locked FAAB tap to onUpgrade.
-        options={WAIVER_TYPE_OPTIONS.map((o) => ({
-          ...o,
-          locked: o.value === 'faab' && !isPremium,
-        }))}
-        onChange={(v) => {
-          if (v === 'faab' && !isPremium) {
-            onUpgrade();
-            return;
-          }
-          onChange(v);
-        }}
-        disabled={disabled}
-        wide
-      />
+      <XStack gap="$2" alignItems="center">
+        <OptionButtonGroup<WaiverType>
+          value={value}
+          testIDPrefix="create-league-waiver-type"
+          // Proactively lock the premium FAAB option for free viewers so the
+          // gate is visible before selection (LS-5173); the onChange below
+          // still routes a locked FAAB tap to onUpgrade. While loading, skip
+          // the "locked" treatment entirely — entitlement isn't resolved yet,
+          // so we don't know whether to show it as gated (LS-6100).
+          options={WAIVER_TYPE_OPTIONS.map((o) => ({
+            ...o,
+            locked: o.value === 'faab' && !isPremium && !loading,
+          }))}
+          onChange={(v) => {
+            if (loading) return;
+            if (v === 'faab' && !isPremium) {
+              onUpgrade();
+              return;
+            }
+            onChange(v);
+          }}
+          disabled={disabled || loading}
+          wide
+        />
+        {loading && <Spinner size="sm" inline />}
+      </XStack>
     </LeagueFieldRow>
   );
 }

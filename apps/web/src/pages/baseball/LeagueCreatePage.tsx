@@ -2438,7 +2438,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                     <WaiverSystemField
                       value={formData.waiverType}
                       onChange={(v) => handleInputChange('waiverType', v)}
-                      isPremium={!!isPremium && !premiumLoading}
+                      isPremium={!!isPremium}
+                      loading={premiumLoading}
                       disabled={isFormDisabled}
                       onUpgrade={() => {
                         trackPremiumFeatureClick('FAAB Waiver Settings');

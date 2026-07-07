@@ -138,6 +138,38 @@ describe('premium league-create fields (LS-5174)', () => {
       );
       expect(queryByTestId('Lock')).toBeNull();
     });
+
+    // LS-6100 — a premium viewer toggling FAAB while entitlement is still
+    // resolving must not have the upgrade modal fired at them.
+    it('does not route a FAAB tap to onUpgrade while loading, even if isPremium is currently false', () => {
+      const onChange = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByText } = render(
+        <WaiverSystemField
+          value="standard"
+          onChange={onChange}
+          isPremium={false}
+          loading
+          onUpgrade={onUpgrade}
+        />,
+      );
+      fireEvent.click(getByText(/FAAB/));
+      expect(onUpgrade).not.toHaveBeenCalled();
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('does not show the proactive lock on FAAB while loading (LS-6100)', () => {
+      const { queryByTestId } = render(
+        <WaiverSystemField
+          value="standard"
+          onChange={jest.fn()}
+          isPremium={false}
+          loading
+          onUpgrade={jest.fn()}
+        />,
+      );
+      expect(queryByTestId('Lock')).toBeNull();
+    });
   });
 
   describe('SalaryCapField', () => {
