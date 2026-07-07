@@ -10,7 +10,7 @@ You went unresponsive while running a long/blocking command (likely `make pc`, a
 
 Do the following, in order:
 
-1. **Take stock, fast.** Run `git status` and `git diff --stat` to see what's already on disk. Do **not** run any build, typecheck, lint, test, or `make pc`/`pc-*` step right now.
+1. **Take stock, fast.** Run `git status` and `git diff --stat` to see what's already on disk. Do **not** run any build, typecheck, lint, test, or `make pc`/`pc-*` step right now. If a PR already exists for this branch, call `github_pr_why_blocked` immediately — don't conclude "nothing to recover" from git/CI state alone. A clean working tree and green-looking CI summary can coexist with `MERGE_CONFLICT`/`mergeable:CONFLICTING`; that reason demands a rebase (see step 7), not a no-op.
 
 2. **Commit whatever exists.** Stage your work and commit inline (never open `$EDITOR`):
    - Use `worktree_commit({ message: "..." })` if available, else `git commit -m "$(cat <<'EOF' … EOF)"`.
@@ -26,6 +26,6 @@ Do the following, in order:
 
 6. **Watch CI instead of running heavy validation locally.** CI status and review events arrive as push notifications — do **not** poll with `sleep` loops. When CI reports failures, fix them and push. If you must run something locally, run the seven `pc-*` chunks one at a time via `make_run` (never the monolithic `make pc`), and skip any chunk that looks like it will hang — note it in the PR body instead of blocking.
 
-7. **Drive to merge** once CI is green, the bot review is addressed (`FIX: <sha>` replies), and threads are resolved. The task is complete only when `github_view_pr` shows `state: "MERGED"`.
+7. **Drive to merge** once CI is green, the bot review is addressed (`FIX: <sha>` replies), and threads are resolved. If `github_pr_why_blocked` reported `MERGE_CONFLICT`, rebase onto main first (`/rebase` skill) and resolve any conflicts before waiting on CI — a conflicting branch will never go green. The task is complete only when `github_view_pr` shows `state: "MERGED"`.
 
 **Guardrails:** never commit to `main`; stay in your worktree/branch; prefer MCP tools over raw shell; never apply maintainer/override labels; never run `aws sso login` or any auth command — if you hit an auth error, stop and surface it.
