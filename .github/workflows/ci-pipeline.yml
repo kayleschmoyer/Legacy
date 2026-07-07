@@ -457,7 +457,7 @@ jobs:
           include-optional-deps: false
 
       - name: "Setup uv"
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@f98e06938123ccabd21905ea5d0069192241f9f1 # v8.3.1
 
       # Each custom-checks step tees into one shared log so that, on failure,
       # the capture step can distil whichever check broke.
@@ -933,7 +933,7 @@ jobs:
 
       - name: "Comment Playwright Report URL"
         if: steps.check-reports.outputs.has-reports == 'true' && github.event.pull_request.number
-        uses: marocchino/sticky-pull-request-comment@0ea0beb66eb9baf113663a64ec522f60e49231c0 # v3.0.4
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: playwright-report
           number: ${{ github.event.pull_request.number }}
