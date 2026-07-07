@@ -70,6 +70,9 @@ jest.mock('@legacy-sports/shared-components', () => ({
         </button>
       </div>
     ) : null,
+  StatusBadge: ({ label }: { label: string }) => (
+    <span data-testid="status-badge">{label}</span>
+  ),
 }));
 
 let mockIsPremium = false;
@@ -816,5 +819,114 @@ describe('LeagueCreatePage — Games Per Matchup typing bounds (LS-6101)', () =>
     const input = screen.getByDisplayValue('5');
     fireEvent.change(input, { target: { value: '42' } });
     expect(input).toHaveValue('42');
+  });
+});
+
+describe('LeagueCreatePage — Max Roster Size recommended marker (LS-6104)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  // Scoped to the roster-size group's container, not `screen` — "16" is also
+  // a valid football team-count option (TEAM_COUNT_OPTIONS), so an unscoped
+  // getByRole('button', { name: '16' }) would match two buttons.
+  function rosterGroup() {
+    return within(screen.getByTestId('max-roster-size-group'));
+  }
+
+  it('shows a Recommended marker on "26" at the baseball URL', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    const rosterButton = rosterGroup().getByRole('button', { name: '26' });
+    expect(within(rosterButton).getByTestId('status-badge')).toHaveTextContent(
+      'Recommended',
+    );
+  });
+
+  it('shows a Recommended marker on "16" at the football URL', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+    const rosterButton = rosterGroup().getByRole('button', { name: '16' });
+    expect(within(rosterButton).getByTestId('status-badge')).toHaveTextContent(
+      'Recommended',
+    );
+  });
+
+  it('does not mark non-recommended roster sizes', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    const otherButton = rosterGroup().getByRole('button', { name: '20' });
+    expect(
+      within(otherButton).queryByTestId('status-badge'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the marker on "26" whether or not it is the current selection', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    // "26" is the default selection — marker present.
+    expect(
+      within(rosterGroup().getByRole('button', { name: '26' })).getByTestId(
+        'status-badge',
+      ),
+    ).toBeInTheDocument();
+
+    // Select a different roster size — marker stays on "26", does not move.
+    fireEvent.click(rosterGroup().getByRole('button', { name: '20' }));
+    expect(
+      within(rosterGroup().getByRole('button', { name: '26' })).getByTestId(
+        'status-badge',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(rosterGroup().getByRole('button', { name: '20' })).queryByTestId(
+        'status-badge',
+      ),
+    ).not.toBeInTheDocument();
+
+    // Re-select "26" — marker still shows exactly once, no clash/duplication.
+    fireEvent.click(rosterGroup().getByRole('button', { name: '26' }));
+    expect(
+      within(rosterGroup().getByRole('button', { name: '26' })).getAllByTestId(
+        'status-badge',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('does not change the accessible name of the "26" button', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    // Exact-name lookup must resolve to exactly one button within the roster
+    // group (Testing Library throws if getByRole matches more than one),
+    // proving the badge text is not concatenated into the accessible name.
+    expect(
+      rosterGroup().getByRole('button', { name: '26' }),
+    ).toBeInTheDocument();
+  });
+
+  it('moves the marker to "16" and clears it from baseball values when switching to football', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(
+      within(rosterGroup().getByRole('button', { name: '26' })).getByTestId(
+        'status-badge',
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('sport-tab-football'));
+    expandAllSections();
+
+    expect(
+      within(rosterGroup().getByRole('button', { name: '16' })).getByTestId(
+        'status-badge',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      rosterGroup().queryByRole('button', { name: '26' }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -19,7 +19,7 @@ import {
 } from 'tamagui';
 import { AlertCircle, Check, ChevronRight } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
-import { Dialog } from '@legacy-sports/shared-components';
+import { Dialog, StatusBadge } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   GAMES_PER_MATCHUP_BY_SPORT,
@@ -633,10 +633,15 @@ function CollapsibleSection({
 
 interface ButtonGroupProps<T extends string | number> {
   value: T;
-  options: readonly (T | { value: T; label: string; disabled?: boolean })[];
+  options: readonly (
+    | T
+    | { value: T; label: string; disabled?: boolean; recommended?: boolean }
+  )[];
   onChange: (v: T) => void;
   disabled?: boolean;
   wide?: boolean;
+  /** Test hook to disambiguate button groups that share option labels (e.g. roster size vs. team count both offering "16"). */
+  'data-testid'?: string;
 }
 
 function ButtonGroup<T extends string | number>({
@@ -645,13 +650,15 @@ function ButtonGroup<T extends string | number>({
   onChange,
   disabled,
   wide,
+  'data-testid': testId,
 }: ButtonGroupProps<T>): React.JSX.Element {
   return (
-    <XStack flexWrap="wrap" gap="$1.5">
+    <XStack flexWrap="wrap" gap="$1.5" data-testid={testId}>
       {options.map((o) => {
         const val = typeof o === 'object' ? o.value : o;
         const label = typeof o === 'object' ? o.label : String(o);
         const itemDisabled = disabled || (typeof o === 'object' && o.disabled);
+        const recommended = typeof o === 'object' && o.recommended === true;
         const selected = value === val;
         return (
           <Button
@@ -669,14 +676,32 @@ function ButtonGroup<T extends string | number>({
               borderColor: selected ? '$brandNavy' : '$borderColorHover',
             }}
             pressStyle={{ scale: 0.95 }}
+            // Recommended badge text sits inside the button visually, but the
+            // accessible name must stay the bare label so existing
+            // getByRole('button', { name: ... }) selectors (unit + e2e) keep
+            // resolving to this button (LS-6104).
+            aria-label={recommended ? label : undefined}
           >
-            <Text
-              color={selected ? '$brandGold' : '$color'}
-              fontWeight={selected ? '600' : '400'}
-              style={{ fontVariantNumeric: 'tabular-nums' }}
-            >
-              {label}
-            </Text>
+            {recommended ? (
+              <YStack alignItems="center" gap="$0.5">
+                <StatusBadge label="Recommended" variant="accent" size="xs" />
+                <Text
+                  color={selected ? '$brandGold' : '$color'}
+                  fontWeight={selected ? '600' : '400'}
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {label}
+                </Text>
+              </YStack>
+            ) : (
+              <Text
+                color={selected ? '$brandGold' : '$color'}
+                fontWeight={selected ? '600' : '400'}
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              >
+                {label}
+              </Text>
+            )}
           </Button>
         );
       })}
@@ -1898,8 +1923,17 @@ export function LeagueCreatePage(): React.JSX.Element {
                     hint={`Active + bench. ${ROSTER_RANGE_BY_SPORT[formData.sport].defaultLabel}`}
                   >
                     <ButtonGroup
+                      data-testid="max-roster-size-group"
                       value={formData.maxRosterSize}
-                      options={ROSTER_SIZE_OPTIONS_BY_SPORT[formData.sport]}
+                      options={ROSTER_SIZE_OPTIONS_BY_SPORT[formData.sport].map(
+                        (size) => ({
+                          value: size,
+                          label: String(size),
+                          recommended:
+                            size ===
+                            defaultsForSport(formData.sport).maxRosterSize,
+                        }),
+                      )}
                       onChange={(v) => handleInputChange('maxRosterSize', v)}
                       disabled={isFormDisabled}
                     />
