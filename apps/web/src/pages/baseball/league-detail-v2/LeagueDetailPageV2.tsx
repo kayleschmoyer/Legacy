@@ -538,7 +538,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
               {settingsSuccess}
             </div>
           ) : null}
-          {tab === 'commish' && isCommissioner && (
+          {tab === 'commish' && effIsCommish && (
             <div
               role="tabpanel"
               id="panel-commish"
