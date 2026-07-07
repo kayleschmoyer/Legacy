@@ -2069,19 +2069,41 @@ export function LeagueCreatePage(): React.JSX.Element {
                         Hall-of-Fame-only pool with Legacy Commissioner.
                       </Text>
                     </YStack>
-                    <Button
-                      size="$2"
-                      onPress={() => {
-                        trackPremiumFeatureClick('Historical Era Selection');
-                        setShowEraUpgradeModal(true);
-                      }}
-                      backgroundColor="$brandGold"
-                      borderWidth={0}
-                    >
-                      <Text color="#111" fontWeight="700" fontSize={13}>
-                        Unlock
-                      </Text>
-                    </Button>
+                    <YStack alignItems="flex-end" gap="$1.5">
+                      <Button
+                        size="$2"
+                        onPress={() => {
+                          trackPremiumFeatureClick('Historical Era Selection');
+                          setShowEraUpgradeModal(true);
+                        }}
+                        backgroundColor="$brandGold"
+                        borderWidth={0}
+                      >
+                        <Text color="#111" fontWeight="700" fontSize={13}>
+                          Unlock
+                        </Text>
+                      </Button>
+                      <Button
+                        unstyled
+                        size="$1"
+                        data-testid="era-banner-view-pricing-link"
+                        onPress={() => {
+                          trackPremiumFeatureClick('Historical Era Selection');
+                          void navigate('/pricing');
+                        }}
+                        backgroundColor="transparent"
+                        borderWidth={0}
+                        padding={0}
+                      >
+                        <Text
+                          color="$brandGoldLight"
+                          fontSize={11}
+                          textDecorationLine="underline"
+                        >
+                          View pricing
+                        </Text>
+                      </Button>
+                    </YStack>
                   </XStack>
                 )}
 

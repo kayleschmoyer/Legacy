@@ -105,6 +105,17 @@ freeUserTest.describe(
         await leaguePage.expectUpgradeModalVisible('Salary Cap');
       },
     );
+
+    freeUserTest(
+      'the era banner "View pricing" link deep-links straight to /pricing (LS-6086)',
+      async ({ page, leaguePage }) => {
+        await leaguePage.expandSection('era-history');
+
+        await leaguePage.testId('era-banner-view-pricing-link').tap();
+
+        await expect(page).toHaveURL(/\/pricing/);
+      },
+    );
   },
 );
 
