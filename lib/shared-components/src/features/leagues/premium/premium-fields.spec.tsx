@@ -149,7 +149,10 @@ describe('premium league-create fields (LS-5174)', () => {
 
     beforeEach(() => jest.clearAllMocks());
 
-    it('routes enabling the cap to onUpgrade for free users', () => {
+    it('disables the toggle for free users so no activation path reaches it (LS-6114)', () => {
+      // PremiumGate only blocks pointer events on the wrapper; the toggle must
+      // be hard-disabled too so keyboard/programmatic activation can't reach
+      // it either.
       const onToggleEnabled = jest.fn();
       const onUpgrade = jest.fn();
       const { getByText } = render(
@@ -161,8 +164,15 @@ describe('premium league-create fields (LS-5174)', () => {
         />,
       );
       fireEvent.click(getByText('On'));
-      expect(onUpgrade).toHaveBeenCalledTimes(1);
       expect(onToggleEnabled).not.toHaveBeenCalled();
+      expect(onUpgrade).not.toHaveBeenCalled();
+    });
+
+    it('disables the cap amount input for free users (LS-6114)', () => {
+      const { getByPlaceholderText } = render(
+        <SalaryCapField {...baseProps} enabled isPremium={false} />,
+      );
+      expect(getByPlaceholderText('e.g. 50000000')).toBeDisabled();
     });
 
     it('enables the cap for premium users', () => {

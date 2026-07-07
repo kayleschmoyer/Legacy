@@ -123,6 +123,12 @@ export function SalaryCapField({
   onSalaryDecayPctChange,
   salaryDecayPctError,
 }: SalaryCapFieldProps): React.JSX.Element {
+  // Non-premium viewers get a hard-disabled toggle/input, not just a visual
+  // tease from the caller's PremiumGate — PremiumGate only blocks pointer
+  // events, so keyboard or programmatic activation could still reach these
+  // controls if they weren't also disabled here (LS-6114).
+  const gated = disabled || !isPremium;
+
   return (
     <YStack gap="$3">
       <LeagueFieldRow
@@ -141,7 +147,7 @@ export function SalaryCapField({
             }
             onToggleEnabled(v);
           }}
-          disabled={disabled}
+          disabled={gated}
         />
       </LeagueFieldRow>
 
@@ -161,7 +167,7 @@ export function SalaryCapField({
               }}
               placeholder="e.g. 50000000"
               keyboardType="numeric"
-              disabled={disabled}
+              disabled={gated}
               borderColor={error ? '$red8' : '$borderColor'}
             />
             {error && (
