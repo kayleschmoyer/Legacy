@@ -91,6 +91,7 @@ describe('Premium authorization helpers', () => {
   let getSubscriptionTier: typeof import('./authorization').getSubscriptionTier;
   let requirePremium: typeof import('./authorization').requirePremium;
   let authorized: typeof import('./authorization').authorized;
+  let hasEntitlement: typeof import('./authorization').hasEntitlement;
 
   const freeUser = {
     id: 1,
@@ -141,6 +142,7 @@ describe('Premium authorization helpers', () => {
     getSubscriptionTier = auth.getSubscriptionTier;
     requirePremium = auth.requirePremium;
     authorized = auth.authorized;
+    hasEntitlement = auth.hasEntitlement;
   });
 
   describe('getSubscriptionTier', () => {
@@ -279,6 +281,67 @@ describe('Premium authorization helpers', () => {
       const wrapped = authorized({}, handler);
       await wrapped(null, {}, ctx as any);
       expect(selectSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // LS-6071 / CLB-065 — a user who downgrades mid-session must not keep
+  // passing entitlement checks off a stale value. `hasEntitlement` must
+  // always resolve the tier from a live DB read for the *current* request,
+  // never from an optimistically-cached or JWT-carried tier claim.
+  describe('hasEntitlement freshness across the downgrade window', () => {
+    it('reflects a tier change between two separate requests for the same user', async () => {
+      // Request #1: user is still premium (e.g. before the Stripe downgrade
+      // webhook lands).
+      const beforeDowngrade = makeContext(premiumUser, 'premium');
+      await expect(
+        hasEntitlement(beforeDowngrade as any, 'unlimited_leagues' as any),
+      ).resolves.toBe(true);
+
+      // Request #2: a brand-new Context (as Apollo builds per-invocation) for
+      // the same user, now reading the post-downgrade DB row. No shared
+      // in-memory cache should carry the stale 'premium' result forward.
+      const afterDowngrade = makeContext(premiumUser, 'free');
+      await expect(
+        hasEntitlement(afterDowngrade as any, 'unlimited_leagues' as any),
+      ).resolves.toBe(false);
+    });
+
+    it('ignores a stale optimistic subscriptionTier on context.user and reads the DB instead', async () => {
+      // Simulate a JWT minted before the downgrade: context.user carries a
+      // 'premium' claim, but the DB (source of truth) has already moved the
+      // user to 'free'. hasEntitlement must never branch on
+      // context.user.subscriptionTier — only getSubscriptionTier()'s live
+      // DB read.
+      const staleJwtUser = { ...premiumUser, subscriptionTier: 'premium' };
+      const ctx = makeContext(staleJwtUser as any, 'free');
+      const selectSpy = jest.spyOn(ctx.db, 'select');
+
+      await expect(
+        hasEntitlement(ctx as any, 'unlimited_leagues' as any),
+      ).resolves.toBe(false);
+      expect(selectSpy).toHaveBeenCalled();
+    });
+
+    it('memoizes concurrent calls within a single request but re-queries on the next request', async () => {
+      // Within one request/context, concurrent hasEntitlement calls should
+      // share a single DB round-trip (tierCache keyed on the Context
+      // instance) — this is a performance optimization, not a source of
+      // staleness, because a fresh Context is built per request.
+      const ctx = makeContext(premiumUser, 'premium');
+      const selectSpy = jest.spyOn(ctx.db, 'select');
+
+      await Promise.all([
+        hasEntitlement(ctx as any, 'unlimited_leagues' as any),
+        hasEntitlement(ctx as any, 'salary_cap_leagues' as any),
+      ]);
+      expect(selectSpy).toHaveBeenCalledTimes(1);
+
+      // A subsequent request (new Context) must not reuse that memoized
+      // value even for the same user.
+      const nextRequestCtx = makeContext(premiumUser, 'free');
+      await expect(
+        hasEntitlement(nextRequestCtx as any, 'unlimited_leagues' as any),
+      ).resolves.toBe(false);
     });
   });
 });
