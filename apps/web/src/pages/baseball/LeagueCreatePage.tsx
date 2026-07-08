@@ -105,6 +105,43 @@ function sportFromPathname(pathname: string): SportId {
   return pathname.startsWith('/football') ? 'football' : 'baseball';
 }
 
+// GraphQL error codes documented as client-facing/expected — mirrors
+// CLIENT_FACING_CODES in lambdas/db/src/server/graphql-error-codes.ts (kept
+// in sync manually; that module is server-only and cannot be imported into
+// the web bundle). Any code outside this set — including the server's
+// sanitized INTERNAL_SERVER_ERROR fallback text and any error with no code
+// at all — is untrusted and falls back to a generic message so raw
+// server/internal vocabulary never reaches the UI (LS-6069).
+const SAFE_TO_DISPLAY_CODES = new Set([
+  'GRAPHQL_VALIDATION_FAILED',
+  'GRAPHQL_PARSE_FAILED',
+  'BAD_USER_INPUT',
+  'BAD_REQUEST',
+  'UNAUTHENTICATED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'PREMIUM_REQUIRED',
+  'GAME_UNAVAILABLE',
+  'PERSISTED_QUERY_NOT_FOUND',
+  'PERSISTED_QUERY_NOT_SUPPORTED',
+  'SEASON_DRAFT_GAME_ALREADY_STARTED',
+  'SEASON_DRAFT_GAME_FULL',
+  'DRAFT_START_FAILED',
+  'DRAFT_AUTO_PICK_STATUS_FAILED',
+]);
+
+/** Resolve a safe, user-facing message for the submit catch block — never the raw `error.message`. */
+export function getSubmitErrorMessage(error: unknown): string {
+  if (CombinedGraphQLErrors.is(error) && error.errors.length > 0) {
+    const firstError = error.errors[0];
+    const code = firstError.extensions?.['code'] as string | undefined;
+    if (code !== undefined && SAFE_TO_DISPLAY_CODES.has(code)) {
+      return firstError.message || LEAGUE_FORM_MESSAGES.submitFallback;
+    }
+  }
+  return LEAGUE_FORM_MESSAGES.submitFallback;
+}
+
 // ── Football scoring presets (LS-4158) ──────────────────────────────────────
 // Only `receiving_rec` differs across Standard / Half-PPR / PPR. All other
 // multipliers (passing yds, rush yds, TDs, etc.) are identical.
@@ -1744,9 +1781,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         error instanceof Error ? error : new Error(String(error)),
         { code, correlationId },
       );
-      setSubmitError(
-        (error as Error).message || LEAGUE_FORM_MESSAGES.submitFallback,
-      );
+      setSubmitError(getSubmitErrorMessage(error));
       setSubmitErrorMeta({ code, correlationId });
     }
   };

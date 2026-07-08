@@ -162,7 +162,11 @@ test.describe('League Creation @critical', () => {
               {
                 message: 'League name already exists',
                 extensions: {
-                  code: 'DUPLICATE_LEAGUE_NAME',
+                  // BAD_USER_INPUT is the real server-side code
+                  // (lambdas/db/src/server/graphql-error-codes.ts) that
+                  // CLIENT_FACING_CODES lets through unsanitized — matches
+                  // the client's own allowlist (LS-6069).
+                  code: 'BAD_USER_INPUT',
                 },
               },
             ],
