@@ -1200,6 +1200,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [showSalaryCapUpgradeModal, setShowSalaryCapUpgradeModal] =
     useState(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
+  const [showHofUpgradeModal, setShowHofUpgradeModal] = useState(false);
   const [showLeagueLimitModal, setShowLeagueLimitModal] = useState(false);
   const [createdLeague, setCreatedLeague] = useState<{
     id: number;
@@ -1621,6 +1622,11 @@ export function LeagueCreatePage(): React.JSX.Element {
       !FREE_ERA_IDS_BY_SPORT[formData.sport].has(formData.baseballEraFilter)
     ) {
       openEraUpgradeModal();
+      return;
+    }
+    if ((!isPremium || premiumLoading) && formData.baseballHofOnly) {
+      trackPremiumFeatureClick('Hall of Fame Only');
+      setShowHofUpgradeModal(true);
       return;
     }
 
@@ -2556,7 +2562,10 @@ export function LeagueCreatePage(): React.JSX.Element {
                     </XStack>
                   )}
 
-                {/* HOF Only */}
+                {/* HOF Only — locked-tap pattern (matches EraFilterGrid immediately
+                    above) rather than PremiumGate, which would stack a second
+                    "Upgrade to Premium" CTA in the same section as the era
+                    banner/modal already rendered here. */}
                 <FieldRow
                   label="Hall of Fame Draft Mode"
                   hint="Restrict the player pool to HOF inductees — smaller, more legendary."
@@ -2565,7 +2574,14 @@ export function LeagueCreatePage(): React.JSX.Element {
                     value={formData.baseballHofOnly}
                     offLabel="🏆 Off"
                     onLabel="🏆 On"
-                    onChange={(v) => handleInputChange('baseballHofOnly', v)}
+                    onChange={(v) => {
+                      if (v && (!isPremium || premiumLoading)) {
+                        trackPremiumFeatureClick('Hall of Fame Only');
+                        setShowHofUpgradeModal(true);
+                        return;
+                      }
+                      handleInputChange('baseballHofOnly', v);
+                    }}
                     disabled={isFormDisabled}
                   />
                 </FieldRow>
@@ -3284,6 +3300,12 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowEraUpgradeModal}
         featureName="Historical Era Selection"
         featureDescription="Unlock all historical eras to restrict your league's player pool — Dead Ball, Golden Age, Expansion, and more."
+      />
+      <UpgradeModal
+        open={showHofUpgradeModal}
+        onOpenChange={setShowHofUpgradeModal}
+        featureName="Hall of Fame Only"
+        featureDescription="Restrict the draft board to Hall of Fame inductees for a smaller, more legendary player pool."
       />
       <UpgradeModal
         open={showLeagueLimitModal}

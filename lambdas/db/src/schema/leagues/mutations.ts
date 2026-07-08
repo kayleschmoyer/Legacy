@@ -406,6 +406,19 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         );
       }
 
+      // Hall-of-Fame-only draft pool is bundled with the historical era
+      // filters premium feature (LS-6080) — the UI markets it alongside era
+      // selection ("Pick a specific era or Hall-of-Fame-only pool with Legacy
+      // Commissioner"), but the resolver previously wrote it through
+      // unconditionally, bypassing the entitlement check entirely.
+      if (inputHofOnly) {
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.historical_era_filters,
+          'Hall-of-Fame-only draft pools require a premium subscription. Upgrade to unlock this feature.',
+        );
+      }
+
       const resolvedNumberOfDivisions = numberOfDivisions ?? 2;
       if (resolvedNumberOfDivisions > numberOfTeams) {
         throw UserInputError(

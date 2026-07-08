@@ -1362,6 +1362,115 @@ describe('League Mutations', () => {
     });
   });
 
+  describe('createLeagueAndTeams mutation — Hall of Fame Only entitlement gate (LS-6080)', () => {
+    const baseInput = {
+      leagueName: 'HOF League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+      baseballHofOnly: true,
+    };
+
+    it('blocks a free user from creating a Hall-of-Fame-only league', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: baseInput },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        'Hall-of-Fame-only draft pools require a premium subscription',
+      );
+
+      // The gate must fire before any league is created.
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a premium (admin) user to create a Hall-of-Fame-only league', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 3,
+          name: 'HOF League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: baseInput },
+        adminContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ baseballHofOnly: true }),
+      );
+    });
+
+    it('allows a free user to create a league without Hall-of-Fame-only enabled', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 4,
+          name: 'Standard League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: { ...baseInput, baseballHofOnly: false } },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ baseballHofOnly: false }),
+      );
+    });
+  });
+
   describe('createLeagueAndTeams mutation — FAAB budget server-side gate (LS-6117)', () => {
     const baseInput = {
       leagueName: 'Waiver League',
