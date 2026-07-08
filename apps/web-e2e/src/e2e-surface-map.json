@@ -1588,6 +1588,23 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/games-remaining-visualization.spec.ts": [
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/components/matchup/**",
+      "lib/shared-components/src/features/matchup/**",
+      "apps/web/src/config/**",
+      "apps/web/src/constants/**",
+      "apps/web/src/hooks/**",
+      "apps/web/src/store/**",
+      "apps/web/src/utils/**",
+      "lib/app-config/src/lib/**",
+      "lib/design-tokens/src/lib/**",
+      "lib/graphql/src/**",
+      "lib/tamagui-config/src/lib/**",
+      "lib/test-fixtures/src/lib/**",
+      "lib/utils/src/lib/**"
+    ],
     "apps/web-e2e/src/tests/gif-picker.spec.ts": [
       "apps/web/src/pages/baseball/**",
       "apps/web/src/pages/football/**",
