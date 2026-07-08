@@ -15,7 +15,7 @@ When a per-run finding is filed, its Feature Story is created with `parent` set 
 
 ## Coverage is automated E2E, not manual testing
 
-The QA team is at capacity and cannot hand-test every feature on every run. **A feature is "covered" only when a passing, hermetic Playwright E2E test in `apps/web-e2e/src/tests/` asserts the user-facing journey end to end.** Every Feature Story under a Page Epic must be backed by such a test. Manual spot-checks do not satisfy a Feature Story.
+The QA team is at capacity and cannot hand-test every feature on every run. **A feature is "covered" only when a passing automated E2E flow asserts the user-facing journey end to end — hermetic Playwright in `apps/web-e2e/src/tests/` for web, Maestro in `maestro/flows/` for android.** Every Feature Story under a Page Epic must be backed by such a test on each declared platform, tracked per feature in its `feature.md` **Platform coverage** table (convention: [`qa-coverage-model.md`](../../../../.agents/skills/plan-ticket/references/qa-coverage-model.md)). Manual spot-checks do not satisfy a Feature Story.
 
 ## Folder layout
 

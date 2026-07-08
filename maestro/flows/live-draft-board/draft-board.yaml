@@ -1,0 +1,30 @@
+# Draft board: stateful — the board only exists while the first league has an
+# active/scheduled draft (draft-status-chip). The flow degrades gracefully: it
+# screenshots whatever draft state the league is in.
+appId: com.legacysports.app
+tags:
+  - live-draft-board
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- takeScreenshot: maestro/artifacts/live-draft-board/01-league-overview
+- runFlow:
+    when:
+      visible:
+        id: "draft-status-chip"
+    commands:
+      - takeScreenshot: maestro/artifacts/live-draft-board/02-before-open-draft
+      - tapOn:
+          id: "draft-status-chip"
+      - extendedWaitUntil:
+          visible:
+            id: "elite-draft-board-screen"
+          timeout: 30000
+          optional: true
+      - takeScreenshot: maestro/artifacts/live-draft-board/03-after-open-draft-board
+      - scroll
+      - takeScreenshot: maestro/artifacts/live-draft-board/04-draft-board-scrolled
+      - back

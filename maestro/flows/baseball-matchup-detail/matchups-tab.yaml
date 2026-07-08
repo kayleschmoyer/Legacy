@@ -1,0 +1,33 @@
+# Matchups: league Matchups tab, then drill into a matchup card (before/after pair).
+appId: com.legacysports.app
+tags:
+  - baseball-matchup-detail
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- tapOn: "Matchups"
+- extendedWaitUntil:
+    visible:
+      id: "matchup-list"
+    timeout: 20000
+    optional: true # pre-season leagues have no matchups yet
+- takeScreenshot: maestro/artifacts/baseball-matchup-detail/01-matchups-tab
+- runFlow:
+    when:
+      visible:
+        id: "matchup-card"
+    commands:
+      - takeScreenshot: maestro/artifacts/baseball-matchup-detail/02-before-open-matchup
+      - tapOn:
+          id: "matchup-card"
+          index: 0
+      - extendedWaitUntil:
+          visible: "Matchup"
+          timeout: 20000
+      - takeScreenshot: maestro/artifacts/baseball-matchup-detail/03-after-open-matchup
+      - scroll
+      - takeScreenshot: maestro/artifacts/baseball-matchup-detail/04-matchup-detail-scrolled
+      - back

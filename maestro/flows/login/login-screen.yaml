@@ -1,0 +1,26 @@
+# Login screen smoke: OAuth-only on mobile (LS-6656) — this flow asserts the
+# unauthenticated surface renders; it does not complete a real OAuth handshake.
+# Requires a build WITHOUT EXPO_PUBLIC_BYPASS_AUTH (the bypass hides this screen).
+appId: com.legacysports.app
+tags:
+  - login
+  - unauthenticated
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 45000
+- takeScreenshot: maestro/artifacts/login/01-login-screen
+- assertVisible:
+    id: "login-title"
+- assertVisible:
+    id: "login-button" # Google OAuth entry point
+- assertVisible:
+    id: "apple-login-button"
+    optional: true # iOS only
+- assertVisible:
+    id: "biometric-login-button"
+    optional: true # only after a prior session stored a JWT
+- takeScreenshot: maestro/artifacts/login/02-providers-visible

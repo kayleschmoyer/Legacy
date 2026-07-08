@@ -1,0 +1,38 @@
+# Player stats: Players tab, segment/filter controls, drill into a player detail.
+appId: com.legacysports.app
+tags:
+  - player-stats
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- tapOn: "Players"
+- extendedWaitUntil:
+    visible:
+      id: "players-segment"
+    timeout: 20000
+- takeScreenshot: maestro/artifacts/player-stats/01-players-tab
+- tapOn:
+    id: "players-sport-filter"
+    optional: true
+- takeScreenshot: maestro/artifacts/player-stats/02-sport-filter
+- runFlow:
+    when:
+      visible:
+        id: "browse-players"
+    commands:
+      - takeScreenshot: maestro/artifacts/player-stats/03-before-browse-players
+      - tapOn:
+          id: "browse-players"
+      - takeScreenshot: maestro/artifacts/player-stats/04-after-browse-players
+- scroll
+- takeScreenshot: maestro/artifacts/player-stats/05-players-scrolled
+- runFlow:
+    # Drill into a player detail when the header back affordance confirms the screen
+    when:
+      visible:
+        id: "player-detail-header-back"
+    commands:
+      - takeScreenshot: maestro/artifacts/player-stats/06-player-detail
+      - tapOn:
+          id: "player-detail-header-back"

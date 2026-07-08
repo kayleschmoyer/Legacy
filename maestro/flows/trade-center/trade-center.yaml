@@ -1,0 +1,33 @@
+# Trade center: league Trades tab, open the Propose Trade dialog, step to team
+# selection (before/after pairs), then dismiss without submitting.
+appId: com.legacysports.app
+tags:
+  - trade-center
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- tapOn: "Trades"
+- extendedWaitUntil:
+    visible: "Propose Trade"
+    timeout: 20000
+- takeScreenshot: maestro/artifacts/trade-center/01-trades-tab
+- takeScreenshot: maestro/artifacts/trade-center/02-before-propose-trade
+- tapOn: "Propose Trade"
+- extendedWaitUntil:
+    visible: "Select the team you want to trade with"
+    timeout: 15000
+- takeScreenshot: maestro/artifacts/trade-center/03-after-propose-trade-team-step
+- runFlow:
+    # Advance to the player-offer step when another team exists in the league
+    when:
+      visible: "Select the team you want to trade with"
+    commands:
+      - tapOn:
+          below: "Select the team you want to trade with"
+          optional: true
+      - takeScreenshot: maestro/artifacts/trade-center/04-after-team-selected
+- back
+- takeScreenshot: maestro/artifacts/trade-center/05-after-dismiss

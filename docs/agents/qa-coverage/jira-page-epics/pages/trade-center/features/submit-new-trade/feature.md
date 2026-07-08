@@ -50,6 +50,17 @@ passes `leagueId`, `userTeamId`, and `isPastDeadline` in.
 button is disabled and the submit step shows a warning banner; `handleSubmit`
 also short-circuits with an error message.
 
+## Platform coverage
+
+| Platform | Harness    | Spec / Flow                                       | Status  |
+| -------- | ---------- | ------------------------------------------------- | ------- |
+| web      | Playwright | `apps/web-e2e/src/tests/submit-new-trade.spec.ts` | covered |
+| android  | Maestro    | `maestro/flows/trade-center/trade-center.yaml`    | pending |
+
+The Maestro flow opens the Propose Trade dialog and steps to team selection with
+before/after screenshots; it does not yet assert the full 4-step submit journey,
+so android stays `pending` until it does.
+
 ## Test Coverage
 
 ### Unit tests

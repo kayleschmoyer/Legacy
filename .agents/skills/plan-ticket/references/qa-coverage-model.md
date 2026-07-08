@@ -4,7 +4,27 @@ How the project structures QA coverage in Jira. The catalog entry is §4 of [tic
 
 ## Core principle: coverage = automated E2E, not manual passes
 
-The QA team cannot hand-test every feature on every run. A feature is **covered** only when a passing, hermetic Playwright E2E test in `apps/web-e2e/src/tests/` asserts the user-facing journey end to end. Manual spot-checks do not satisfy a Feature Story. Every ticket in this model exists to drive toward one automated test per user journey.
+The QA team cannot hand-test every feature on every run. A feature is **covered** only when a passing automated E2E flow asserts the user-facing journey end to end — per platform:
+
+- **web** — a hermetic Playwright spec in `apps/web-e2e/src/tests/`.
+- **android** — a Maestro flow in `maestro/flows/<page>/` (run per the [mobile-qa](../../mobile-qa/SKILL.md) skill, which adds AI screenshot judging on top).
+
+Manual spot-checks do not satisfy a Feature Story. Every ticket in this model exists to drive toward one automated test per user journey on each platform the feature's `**Platforms:**` line declares.
+
+## Platform coverage in feature docs
+
+Each `feature.md` tracks its per-platform automation status in a **Platform coverage** table so web (Playwright) and mobile (Maestro) coverage are visible side by side:
+
+```markdown
+## Platform coverage
+
+| Platform | Harness    | Spec / Flow                                | Status  |
+| -------- | ---------- | ------------------------------------------ | ------- |
+| web      | Playwright | `apps/web-e2e/src/tests/<feature>.spec.ts` | covered |
+| android  | Maestro    | `maestro/flows/<page>/<flow>.yaml`         | pending |
+```
+
+Status values: `covered` (passing automated flow exists), `pending` (flow path targeted, not yet written/passing), `n/a` (platform not in the feature's `**Platforms:**`). A Feature Story's acceptance criteria point at the target spec/flow path for every non-`n/a` row.
 
 ## Hierarchy
 
@@ -37,11 +57,12 @@ A `feature.md` records the unit tests and the hermetic E2E spec that back the fe
 
 1. Create the **Page Epic** (`QA — Page: <Name>`, type `Epic`). Apply `qa-page-epic` after creation.
 2. Enumerate the page's user-facing features. For each, create a **Feature Story** (`Feature: <Name>`, parent = the epic). Use `jira_bulk_create_tickets` when filing several at once. Apply `qa-feature-story` + `page-<slug>` after creation.
-3. In each Feature Story, write the user journey as an E2E acceptance criterion pointing at the target spec path in `apps/web-e2e/src/tests/`.
+3. In each Feature Story, write the user journey as an E2E acceptance criterion pointing at the target spec/flow path for each platform (web: `apps/web-e2e/src/tests/`; android: `maestro/flows/<page>/`).
 4. As QA runs surface defects, file **Bug/finding** tickets parented under the relevant Feature Story.
 
 ## Gotchas
 
 - **Labels are not settable via the create tools** — `qa-page-epic` / `qa-feature-story` / `page-<slug>` must be applied after creation (Atlassian plugin or by hand). Note the required labels in your handoff.
 - **The epic is permanent** — never close a page epic when a run finishes; new runs nest fresh findings under the same epic for a durable cross-run rollup.
-- **Hermetic, not live** — specs under `apps/web-e2e/src/tests/` mock the backend (`route.fulfill()`, never `route.continue()`). Live-backend checks belong in `apps/web-e2e/src/integration/tests/` and are a separate, complementary layer — don't conflate the two in a Feature Story's acceptance criteria. See the [testing](../../testing/SKILL.md) skill.
+- **Hermetic, not live (web)** — specs under `apps/web-e2e/src/tests/` mock the backend (`route.fulfill()`, never `route.continue()`). Live-backend checks belong in `apps/web-e2e/src/integration/tests/` and are a separate, complementary layer — don't conflate the two in a Feature Story's acceptance criteria. See the [testing](../../testing/SKILL.md) skill.
+- **Mobile flows are live** — Maestro drives a real dev build against the dev backend, so android rows depend on seeded data (a league on the test account, matchup/draft state). Flows degrade gracefully around data-dependent states — see the [mobile-qa](../../mobile-qa/SKILL.md) flow-authoring gotchas.

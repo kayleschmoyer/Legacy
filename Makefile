@@ -7,7 +7,7 @@
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
-	android ios build-android build-ios \
+	android ios build-android build-ios maestro \
 	db-migrate db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars rebuild-tfvars tfvars-from-aws \
 	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync \
@@ -448,9 +448,13 @@ android: ## Run Android application
 	@$(call echo_blue,Running Android application...)
 	pnpm run android
 
-ios: ## Run iOS application  
+ios: ## Run iOS application
 	@$(call echo_blue,Running iOS application...)
 	pnpm run ios
+
+maestro: ## Run Maestro mobile E2E flows against a running Android emulator (see maestro/README.md)
+	@$(call echo_blue,Running Maestro flows...)
+	maestro test maestro/
 
 build-android: ## Build Android APK
 	@$(call echo_blue,Building Android APK...)

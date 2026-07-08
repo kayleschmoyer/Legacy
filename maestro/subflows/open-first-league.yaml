@@ -1,0 +1,13 @@
+# Subflow: from any tab, open the Leagues tab and enter the first league.
+# Assumes the test account has at least one league (dynamic testID league-row-<id>).
+- tapOn: "Leagues"
+- extendedWaitUntil:
+    visible:
+      id: "leagues-list"
+    timeout: 15000
+- tapOn:
+    id: "league-row-.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Overview"
+    timeout: 20000

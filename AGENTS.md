@@ -33,7 +33,8 @@ Pick the slash command first — it loads the authoritative skill. Self-invoke v
 | Worktree setup                           | `/worktree`                                                   |
 | Design work                              | `/implement-design LS-####` (local) · `/sync-designs` (cloud) |
 | Database / migrations                    | `/database` · `/apply-pr-migrations`                          |
-| E2E tests                                | `/e2e` · `/read-playwright-report`                            |
+| E2E tests (web)                          | `/e2e` · `/read-playwright-report`                            |
+| Mobile QA sweep (Android emulator)       | `/mobile-qa` — Maestro flows + AI screenshot judging          |
 | Backlog sweeps                           | `/work-bugs` · `/work-mcp-gaps` · `/sweep-dependabot`         |
 | Deploy lambdas                           | `/deploy`                                                     |
 | Session-end hygiene                      | `/mcp-gap-audit`                                              |
@@ -113,7 +114,7 @@ Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scr
 
 ## Architecture
 
-`apps/` (web, mobile, CLI) · `lambdas/` (GraphQL API, game-selection, stats, etc.) · `lib/` (shared libraries) · `terraform/` · `.agents/skills/`
+`apps/` (web, mobile, CLI) · `lambdas/` (GraphQL API, game-selection, stats, etc.) · `lib/` (shared libraries) · `terraform/` · `maestro/` (mobile E2E flows) · `.agents/skills/`
 
 Multi-sport data model with `sport` discriminator: [`docs/architecture/multi-sport.md`](docs/architecture/multi-sport.md). UI built once in `lib/shared-components` (Tamagui): [`docs/architecture/shared-components.md`](docs/architecture/shared-components.md). Fast path: **`.agents/skills/architecture/FILE-MAP.md`**.
 

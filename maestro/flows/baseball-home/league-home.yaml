@@ -1,0 +1,37 @@
+# League home: home tab hero/content, sport card into baseball home, leagues tab list.
+appId: com.legacysports.app
+tags:
+  - baseball-home
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- takeScreenshot: maestro/artifacts/baseball-home/01-home-screen
+- assertVisible:
+    id: "home-content"
+- runFlow:
+    # Hero card only renders when the account has an active league
+    when:
+      visible:
+        id: "home-hero-card"
+    commands:
+      - takeScreenshot: maestro/artifacts/baseball-home/02-hero-card
+- tapOn:
+    id: "sport-card-title-baseball"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "baseball-home-screen"
+    timeout: 20000
+    optional: true
+- takeScreenshot: maestro/artifacts/baseball-home/03-baseball-home
+- tapOn: "Leagues"
+- extendedWaitUntil:
+    visible:
+      id: "leagues-list"
+    timeout: 15000
+- takeScreenshot: maestro/artifacts/baseball-home/04-leagues-tab
+- assertVisible:
+    id: "leagues-add-button"
+- scroll
+- takeScreenshot: maestro/artifacts/baseball-home/05-leagues-scrolled

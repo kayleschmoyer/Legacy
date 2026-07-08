@@ -1,0 +1,5 @@
+# Maestro workspace config for the Legacy Sports mobile app (apps/app).
+# Run from the repo root: `maestro test maestro/`
+# Docs: maestro/README.md · Agent workflow: .agents/skills/mobile-qa/SKILL.md
+flows:
+  - "flows/**"

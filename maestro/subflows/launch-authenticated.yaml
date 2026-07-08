@@ -1,0 +1,8 @@
+# Subflow: cold-launch the app and wait for the authenticated home screen.
+# Requires a dev build with EXPO_PUBLIC_BYPASS_AUTH=true (see maestro/README.md).
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 45000

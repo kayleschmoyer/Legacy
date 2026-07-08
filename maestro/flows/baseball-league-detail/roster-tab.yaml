@@ -1,0 +1,32 @@
+# Roster tab: open first league, switch to Roster, verify sections, scroll the board.
+# League-detail tab bar has no per-tab testIDs — tabs are tapped by visible text.
+appId: com.legacysports.app
+tags:
+  - baseball-league-detail
+  - roster
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- takeScreenshot: maestro/artifacts/baseball-league-detail/01-overview-tab
+- tapOn: "Roster"
+- extendedWaitUntil:
+    visible:
+      id: "roster-section-hitters"
+    timeout: 20000
+- takeScreenshot: maestro/artifacts/baseball-league-detail/02-roster-hitters
+- scrollUntilVisible:
+    element:
+      id: "roster-section-pitchers"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: maestro/artifacts/baseball-league-detail/03-roster-pitchers
+- scrollUntilVisible:
+    element:
+      id: "roster-section-bench"
+    direction: DOWN
+    timeout: 15000
+    optional: true
+- takeScreenshot: maestro/artifacts/baseball-league-detail/04-roster-bench

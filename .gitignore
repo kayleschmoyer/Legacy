@@ -52,6 +52,9 @@ yarn-error.log
 # Agent browser screenshots (captured by legacy-sports-browser MCP server)
 .screenshots/
 
+# Maestro mobile E2E artifacts (screenshots, AI judge findings, dedup reports)
+maestro/artifacts/
+
 # AI Agent Commands (temporary files)
 NEXT_AGENT_COMMAND.md
 .github/tmp-pr-body.md
