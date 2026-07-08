@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { CombinedGraphQLErrors, ServerError } from '@apollo/client';
 import {
   Card,
   H1,
@@ -326,6 +327,19 @@ function poolDisplayLabel(sport: SportId, v: string): string {
   return (
     PLAYER_POOL_OPTIONS_BY_SPORT[sport].find((p) => p.value === v)?.label ?? '—'
   );
+}
+
+// ── Submit error correlation token ────────────────────────────────────────────
+// jsdom (used by our Jest tests) does not implement crypto.randomUUID on all
+// versions, so fall back to a Math.random-based hex token in that case.
+function generateCorrelationId(): string {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID().slice(0, 8);
+  }
+  return Math.random().toString(16).slice(2, 10).padEnd(8, '0');
 }
 
 // ── Form messages ─────────────────────────────────────────────────────────────
@@ -1319,6 +1333,10 @@ export function LeagueCreatePage(): React.JSX.Element {
   const firstError = errorCount > 0 ? Object.values(validationErrors)[0] : null;
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitErrorMeta, setSubmitErrorMeta] = useState<{
+    code?: string;
+    correlationId: string;
+  } | null>(null);
   const [selectionResetNotice, setSelectionResetNotice] = useState<
     string | null
   >(null);
@@ -1420,6 +1438,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
+    setSubmitErrorMeta(null);
 
     if (atLeagueLimit) {
       trackPremiumFeatureClick('Unlimited League Creation');
@@ -1542,13 +1561,26 @@ export function LeagueCreatePage(): React.JSX.Element {
         setSubmitError(LEAGUE_FORM_MESSAGES.submitFallback);
       }
     } catch (error) {
+      // Generate a short reference token so support can correlate a user's
+      // "Unable to save league" report with logs/Rollbar even though this
+      // mutation's errorPolicy: 'none' + suppressGlobalError bypasses the
+      // shared errorLink (apollo-client.ts) that would normally do this.
+      const correlationId = generateCorrelationId();
+      const code = CombinedGraphQLErrors.is(error)
+        ? (error.errors[0]?.extensions?.['code'] as string | undefined)
+        : ServerError.is(error)
+          ? String(error.statusCode)
+          : undefined;
+
       LOGGER.error(
         'Error creating league:',
         error instanceof Error ? error : String(error),
+        { code, correlationId },
       );
       setSubmitError(
         (error as Error).message || LEAGUE_FORM_MESSAGES.submitFallback,
       );
+      setSubmitErrorMeta({ code, correlationId });
     }
   };
 
@@ -1853,11 +1885,27 @@ export function LeagueCreatePage(): React.JSX.Element {
               >
                 {submitError}
               </Text>
+              {submitErrorMeta && (
+                <Text
+                  fontFamily="$body"
+                  fontSize={12}
+                  color="$color10"
+                  marginTop={2}
+                >
+                  {submitErrorMeta.code
+                    ? `Error code: ${submitErrorMeta.code} · `
+                    : ''}
+                  Ref: {submitErrorMeta.correlationId}
+                </Text>
+              )}
             </YStack>
             <Button
               size="$2"
               variant="outlined"
-              onPress={() => setSubmitError(null)}
+              onPress={() => {
+                setSubmitError(null);
+                setSubmitErrorMeta(null);
+              }}
             >
               Dismiss
             </Button>

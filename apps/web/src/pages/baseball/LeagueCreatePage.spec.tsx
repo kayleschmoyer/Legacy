@@ -31,8 +31,18 @@ import { validateFormFull } from './LeagueCreatePage';
 // Module mocks
 // ---------------------------------------------------------------------------
 
+const mockLoggerError = jest.fn();
 jest.mock('@legacy-sports/logging', () => ({
-  LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+  LOGGER: {
+    warn: jest.fn(),
+    // Wrapped in an arrow function (rather than passing mockLoggerError
+    // directly) so this eagerly-evaluated factory doesn't read the const's
+    // value before its declaration runs — jest hoists jest.mock() above
+    // other top-level statements, and this file's own eager (non-lazy)
+    // import of ./LeagueCreatePage triggers the factory immediately.
+    error: (...args: unknown[]) => mockLoggerError(...args),
+    info: jest.fn(),
+  },
 }));
 
 // Default football_enabled = true so both sport tabs are visible in tests.
@@ -1339,5 +1349,89 @@ describe('LeagueCreatePage — post-create confirmation (LS-6067)', () => {
     expect(
       screen.queryByRole('button', { name: 'Copy Invite Code' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('LeagueCreatePage — submit error code + correlation token (LS-6065)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  function submitForm() {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+  }
+
+  it('renders the GraphQL extensions.code alongside the message on a GraphQL error', async () => {
+    const { CombinedGraphQLErrors } = require('@apollo/client');
+    const graphQLError = new CombinedGraphQLErrors({ data: null }, [
+      {
+        message: 'League name is already in use.',
+        extensions: { code: 'BAD_USER_INPUT' },
+      },
+    ]);
+    mockCreateLeague.mockRejectedValue(graphQLError);
+
+    submitForm();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('League name is already in use.'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Error code: BAD_USER_INPUT/)).toBeInTheDocument();
+    expect(screen.getByText(/Ref: [0-9a-f]{8}/)).toBeInTheDocument();
+  });
+
+  it('still renders a generated correlation token when the error has no extensions.code', async () => {
+    // A plain thrown Error (not CombinedGraphQLErrors, not ServerError) has no
+    // GraphQL extensions.code and no HTTP statusCode to fall back on.
+    mockCreateLeague.mockRejectedValue(new Error('Failed to fetch'));
+
+    submitForm();
+
+    await waitFor(() =>
+      expect(screen.getByText(/Ref: [0-9a-f]{8}/)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Error code:/)).not.toBeInTheDocument();
+  });
+
+  it('renders the HTTP status code as the error code on a ServerError with no GraphQL extensions', async () => {
+    const { ServerError } = require('@apollo/client');
+    const serverError = new ServerError('Server error', {
+      response: { status: 502 } as Response,
+      bodyText: '',
+    });
+    mockCreateLeague.mockRejectedValue(serverError);
+
+    submitForm();
+
+    await waitFor(() =>
+      expect(screen.getByText(/Error code: 502/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Ref: [0-9a-f]{8}/)).toBeInTheDocument();
+  });
+
+  it('passes the code and correlation token to LOGGER.error as structured metadata', async () => {
+    const { CombinedGraphQLErrors } = require('@apollo/client');
+    const graphQLError = new CombinedGraphQLErrors({ data: null }, [
+      { message: 'Boom', extensions: { code: 'BAD_USER_INPUT' } },
+    ]);
+    mockCreateLeague.mockRejectedValue(graphQLError);
+
+    submitForm();
+
+    await waitFor(() => expect(mockLoggerError).toHaveBeenCalled());
+    const metaArg = mockLoggerError.mock.calls[0][2];
+    expect(metaArg).toEqual({
+      code: 'BAD_USER_INPUT',
+      correlationId: expect.stringMatching(/^[0-9a-f]{8}$/),
+    });
   });
 });
