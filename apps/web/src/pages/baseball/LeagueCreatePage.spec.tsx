@@ -30,7 +30,7 @@ import {
   useNavigationType,
 } from 'react-router-dom';
 import type { CreateLeagueFormData } from './LeagueCreatePage';
-import { validateFormFull } from './LeagueCreatePage';
+import { validateFormFull, VALIDATION_ERROR_SECTION } from './LeagueCreatePage';
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -1086,6 +1086,140 @@ describe('validateFormFull — custom era year bounds (LS-6082)', () => {
       customEraEndYear: currentYear + 1,
     });
     expect(errs.customEra).toBeDefined();
+  });
+});
+
+describe('VALIDATION_ERROR_SECTION coverage (LS-6090)', () => {
+  const baseFormData: CreateLeagueFormData = {
+    sport: 'baseball',
+    leagueName: 'Test League',
+    numberOfTeams: 8,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'standard',
+    draftOrder: 'snake',
+    maxRosterSize: 26,
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
+    isPublic: false,
+    gamesPerMatchup: 5,
+    baseballEraFilter: 'all',
+    baseballHofOnly: false,
+    salaryCapEnabled: false,
+    auctionBudget: 200,
+    auctionMinBid: 1,
+    pickTimeLimitSeconds: 120,
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
+  };
+
+  // Every field validateFormFull() can flag pushed invalid at once, so the
+  // resulting error object exercises every key the sticky bar / auto-expand
+  // logic (LS-6090) needs a section mapping for.
+  const fullyInvalidFormData: CreateLeagueFormData = {
+    ...baseFormData,
+    leagueName: '',
+    numberOfTeams: 20,
+    numberOfDivisions: 25,
+    maxRosterSize: 999,
+    gamesPerMatchup: NaN,
+    playerPool: 'nfc',
+    selectionMethod: 'auction',
+    auctionBudget: 0,
+    auctionMinBid: 0,
+    waiverType: 'faab',
+    faabBudgetDefault: 0,
+    baseballEraFilter: 'custom',
+    customEraStartYear: undefined,
+    customEraEndYear: undefined,
+    draftDate: new Date('2000-01-01'),
+    salaryCapEnabled: true,
+    salaryCap: undefined,
+    salaryFloor: -1,
+    luxuryTaxThreshold: -1,
+    minSalary: 0,
+    salaryEscalationPct: 150,
+    salaryDecayPct: 150,
+  };
+
+  it('produces at least one error for every key VALIDATION_ERROR_SECTION maps', () => {
+    const errs = validateFormFull(fullyInvalidFormData);
+    // Sanity check the fixture actually exercises every mapped key — if this
+    // fails, the fixture (not the mapping) needs updating.
+    expect(Object.keys(errs).sort()).toEqual(
+      Object.keys(VALIDATION_ERROR_SECTION).sort(),
+    );
+  });
+
+  it('maps every validateFormFull() error key to a known CollapsibleSection id', () => {
+    const errs = validateFormFull(fullyInvalidFormData);
+    const knownSectionIds = new Set([
+      'basic',
+      'roster-schedule',
+      'era-history',
+      'draft',
+      'waiver-budget',
+      'football-scoring',
+    ]);
+    for (const field of Object.keys(errs)) {
+      expect(VALIDATION_ERROR_SECTION[field]).toBeDefined();
+      expect(knownSectionIds.has(VALIDATION_ERROR_SECTION[field])).toBe(true);
+    }
+  });
+});
+
+describe('LeagueCreatePage — sticky bar surfaces all validation errors (LS-6090)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('lists the validation error message instead of a truncated "· message" summary', () => {
+    renderPage('/baseball/league/create');
+    // The default league name is empty, so exactly one error (leagueName) is active.
+    expect(screen.getByText('1 item need attention:')).toBeInTheDocument();
+    expect(
+      screen.getByText('• League name must be 3–50 characters.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the all-clear message once the only invalid field is fixed', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    expect(screen.getByText('All settings look good.')).toBeInTheDocument();
+    expect(screen.queryByText(/item.*need attention/)).not.toBeInTheDocument();
+  });
+
+  it('does not submit the mutation while a validation error is active', () => {
+    renderPage('/baseball/league/create');
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    expect(mockCreateLeague).not.toHaveBeenCalled();
+  });
+
+  // E2E (baseball-ui.spec.ts, league-creation.spec.ts) locates the
+  // validation surface via `getByRole('alert')` — the sticky bar must carry
+  // that role whenever errors are active, not just the mutation-failure
+  // banner, or those specs lose their signal (LS-6090).
+  it('exposes the error summary via role="alert" while invalid', () => {
+    renderPage('/baseball/league/create');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'League name must be 3–50 characters.',
+    );
+  });
+
+  it('does not expose role="alert" once the form is valid', () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

@@ -359,12 +359,16 @@ const LEAGUE_FORM_MESSAGES = {
     `Roster must be ${min}–${max}.`,
   gamesPerMatchupOutOfRange: (min: number, max: number, sport: string) =>
     `Games per matchup must be ${min}–${max} for ${sport} leagues.`,
-  customEraRequired: 'Both start and end year required.',
-  customEraOrderInvalid: 'Start year must be ≤ end year.',
+  // Phrasing avoids the literal substrings "start year"/"end year" so the
+  // sticky bar's aggregated error list (LS-6090) can't collide with the
+  // CustomEraRange field labels in E2E getByText() locators.
+  customEraRequired: 'Both custom-era boundary years are required.',
+  customEraOrderInvalid:
+    "Custom era's first year must be on or before its last year.",
   customEraStartYearOutOfRange: (min: number, max: number) =>
-    `Start year must be between ${min} and ${max}.`,
+    `Custom era's first year must be between ${min} and ${max}.`,
   customEraEndYearOutOfRange: (min: number, max: number) =>
-    `End year must be between ${min} and ${max}.`,
+    `Custom era's last year must be between ${min} and ${max}.`,
   draftDateInPast: 'Draft date must be in the future.',
   salaryCapRequired: 'Salary cap amount is required.',
   salaryFloorNegative: 'Salary floor cannot be negative.',
@@ -476,6 +480,29 @@ export function validateFormFull(
     errs.faabBudget = `FAAB budget must be ${FAAB_BUDGET_MIN}–${FAAB_BUDGET_MAX}.`;
   return errs;
 }
+
+// Maps each validateFormFull() error key to the CollapsibleSection id that
+// contains the offending field, so a failed submit can auto-expand exactly
+// the sections the user needs to fix (LS-6090).
+export const VALIDATION_ERROR_SECTION: Record<string, string> = {
+  leagueName: 'basic',
+  numberOfTeams: 'basic',
+  numberOfDivisions: 'basic',
+  maxRosterSize: 'roster-schedule',
+  gamesPerMatchup: 'roster-schedule',
+  playerPool: 'roster-schedule',
+  customEra: 'era-history',
+  draftDate: 'draft',
+  auctionBudget: 'draft',
+  auctionMinBid: 'draft',
+  faabBudget: 'waiver-budget',
+  salaryCap: 'waiver-budget',
+  salaryFloor: 'waiver-budget',
+  luxuryTaxThreshold: 'waiver-budget',
+  minSalary: 'waiver-budget',
+  salaryEscalationPct: 'waiver-budget',
+  salaryDecayPct: 'waiver-budget',
+};
 
 // ── Sport switcher ───────────────────────────────────────────────────────────
 
@@ -1304,6 +1331,29 @@ export function LeagueCreatePage(): React.JSX.Element {
     setOpenSections(new Set(['basic']));
   }, []);
 
+  // Auto-expands every section that has an invalid field and scrolls to the
+  // first one, so a failed submit shows the user where all N errors live
+  // instead of leaving them to guess from a single truncated message
+  // (LS-6090).
+  const revealValidationErrors = useCallback(
+    (errors: Record<string, string>) => {
+      const errorSectionIds = Object.keys(errors)
+        .map((field) => VALIDATION_ERROR_SECTION[field])
+        .filter((id): id is string => Boolean(id));
+      if (errorSectionIds.length === 0) return;
+
+      setOpenSections((prev) => new Set([...prev, ...errorSectionIds]));
+
+      const firstSectionId = errorSectionIds[0];
+      requestAnimationFrame(() => {
+        document
+          .querySelector(`[data-testid="section-toggle-${firstSectionId}"]`)
+          ?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+      });
+    },
+    [],
+  );
+
   const [createLeagueAndTeams, { loading }] = useCreateLeagueAndTeamsMutation({
     update: (cache, { data }) => {
       if (data?.createLeagueAndTeams?.league) {
@@ -1373,7 +1423,6 @@ export function LeagueCreatePage(): React.JSX.Element {
     [formData],
   );
   const errorCount = Object.keys(validationErrors).length;
-  const firstError = errorCount > 0 ? Object.values(validationErrors)[0] : null;
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitErrorMeta, setSubmitErrorMeta] = useState<{
@@ -1502,7 +1551,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       return;
     }
     if (errorCount > 0) {
-      setSubmitError(firstError);
+      revealValidationErrors(validationErrors);
       return;
     }
 
@@ -2941,7 +2990,14 @@ export function LeagueCreatePage(): React.JSX.Element {
                 $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
               >
                 {/* Validation status */}
-                <XStack gap="$2" alignItems="center" flex={1}>
+                <XStack
+                  gap="$2"
+                  alignItems="flex-start"
+                  flex={1}
+                  data-testid="create-league-validation-status"
+                  role={errorCount > 0 ? 'alert' : undefined}
+                  aria-live={errorCount > 0 ? 'assertive' : undefined}
+                >
                   {errorCount === 0 ? (
                     <>
                       <Check size={14} color="#6FD39A" />
@@ -2951,11 +3007,34 @@ export function LeagueCreatePage(): React.JSX.Element {
                     </>
                   ) : (
                     <>
-                      <AlertCircle size={14} color="#E07A8C" />
-                      <Text fontFamily="$body" fontSize={13} color="#E07A8C">
-                        {errorCount} item{errorCount > 1 ? 's' : ''} need
-                        attention · {firstError}
-                      </Text>
+                      <AlertCircle
+                        size={14}
+                        color="#E07A8C"
+                        style={{ marginTop: 2 }}
+                      />
+                      <YStack gap="$1" flex={1}>
+                        <Text
+                          fontFamily="$body"
+                          fontWeight="700"
+                          fontSize={13}
+                          color="#E07A8C"
+                        >
+                          {errorCount} item{errorCount > 1 ? 's' : ''} need
+                          attention:
+                        </Text>
+                        {Object.entries(validationErrors).map(
+                          ([field, message]) => (
+                            <Text
+                              key={field}
+                              fontFamily="$body"
+                              fontSize={12}
+                              color="#E07A8C"
+                            >
+                              • {message}
+                            </Text>
+                          ),
+                        )}
+                      </YStack>
                     </>
                   )}
                 </XStack>
