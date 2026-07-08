@@ -2008,3 +2008,54 @@ describe('LeagueCreatePage — era upgrade modal analytics dedup (LS-6097)', () 
     expect(trackPremiumFeatureClickMock()).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('LeagueCreatePage — ?name= sanitization (LS-6107 / CLB-051)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('AC1: strips a <script> tag-shaped ?name= param instead of prefilling it verbatim', () => {
+    renderPage(
+      '/baseball/league/create?name=%3Cscript%3Ealert(1)%3C%2Fscript%3E',
+    );
+    const input = screen.getByPlaceholderText('Enter your league name');
+    expect(input.value).not.toContain('<script>');
+    expect(input.value).not.toContain('</script>');
+  });
+
+  it('AC2: strips a Unicode RTL override character (U+202E) from the ?name= param', () => {
+    renderPage(
+      `/baseball/league/create?name=${encodeURIComponent('evil\u202Ename')}`,
+    );
+    const input = screen.getByPlaceholderText('Enter your league name');
+    expect(input.value).not.toContain('\u202E');
+    expect(input.value).toBe('evilname');
+  });
+
+  it('AC3: strips control/RTL-override characters typed or pasted into the field', () => {
+    renderPage('/baseball/league/create');
+    const input = screen.getByPlaceholderText('Enter your league name');
+    fireEvent.change(input, {
+      target: { value: 'Evil\u202ELeague' },
+    });
+    expect(input.value).not.toMatch(/[\u202E]/);
+    expect(input.value).toBe('EvilLeague');
+  });
+
+  it('AC4: preserves trim + max-length truncation after sanitization', () => {
+    const longName = `  ${'a'.repeat(60)}  `;
+    renderPage(`/baseball/league/create?name=${encodeURIComponent(longName)}`);
+    const input = screen.getByPlaceholderText('Enter your league name');
+    expect(input.value).toHaveLength(50);
+    expect(input.value).toBe('a'.repeat(50));
+  });
+
+  it('AC5: prefills normally for a plain alphanumeric ?name= param (no regression)', () => {
+    renderPage('/baseball/league/create?name=My%20Great%20League');
+    const input = screen.getByPlaceholderText('Enter your league name');
+    expect(input.value).toBe('My Great League');
+  });
+});

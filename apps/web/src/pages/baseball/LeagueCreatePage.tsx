@@ -22,6 +22,7 @@ import { AlertCircle, Check, ChevronRight, Copy } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { Dialog, StatusBadge } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
+import { stripInvisibleAndControlChars } from '@legacy-sports/utils';
 import {
   CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   GAMES_PER_MATCHUP_BY_SPORT,
@@ -103,6 +104,15 @@ type SportId = (typeof SPORTS)[number]['id'];
 /** Read the sport from a pathname (`/football/...` → football, otherwise baseball). */
 function sportFromPathname(pathname: string): SportId {
   return pathname.startsWith('/football') ? 'football' : 'baseball';
+}
+
+// Strips Unicode control/format characters (Cc/Cf — covers bidi overrides
+// like U+202E) and neutralizes HTML-tag-shaped substrings. Applied to both
+// the ?name= URL-param prefill and manual typing so neither is more
+// permissive than the other (CLB-051). Reuses the server-side sanitizer's
+// control/bidi stripping (LS-6056) for consistency.
+function sanitizeLeagueNameInput(raw: string): string {
+  return stripInvisibleAndControlChars(raw).replace(/<[^>]*>/g, '');
 }
 
 // GraphQL error codes documented as client-facing/expected — mirrors
@@ -1290,7 +1300,9 @@ export function LeagueCreatePage(): React.JSX.Element {
   );
 
   const [formData, setFormData] = useState<CreateLeagueFormData>(() => {
-    const initialLeagueName = (searchParams.get('name') ?? '')
+    const initialLeagueName = sanitizeLeagueNameInput(
+      searchParams.get('name') ?? '',
+    )
       .trim()
       .slice(0, MAX_LEAGUE_NAME_LENGTH);
     const initialDefaults = defaultsForSport(selectedSport);
@@ -1493,7 +1505,11 @@ export function LeagueCreatePage(): React.JSX.Element {
   ) => {
     setHasUnsavedChanges(true);
     setFormData((prev) => {
-      const next = { ...prev, [field]: value };
+      const sanitizedValue =
+        field === 'leagueName' && typeof value === 'string'
+          ? sanitizeLeagueNameInput(value)
+          : value;
+      const next = { ...prev, [field]: sanitizedValue };
       if (field === 'draftMode') {
         if (value === 'automated') {
           if (prev.selectionMethod !== 'random') {
