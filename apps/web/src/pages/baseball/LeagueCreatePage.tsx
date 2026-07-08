@@ -2513,7 +2513,11 @@ export function LeagueCreatePage(): React.JSX.Element {
                   >
                     <ButtonGroup
                       value={formData.selectionMethod}
-                      options={SELECTION_METHOD_OPTIONS.map((o) => ({
+                      options={SELECTION_METHOD_OPTIONS.filter(
+                        (o) =>
+                          formData.draftMode !== 'automated' ||
+                          o.value === 'random',
+                      ).map((o) => ({
                         value: o.value,
                         label: o.label,
                       }))}

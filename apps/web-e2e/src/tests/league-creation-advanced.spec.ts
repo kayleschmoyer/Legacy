@@ -185,7 +185,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       .expectVisible();
   });
 
-  test('should disable selection method buttons when Automated Draft is selected', async ({
+  test('should hide Standard/Auction selection method options when Automated Draft is selected (LS-6078)', async ({
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
@@ -197,9 +197,13 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Switch to Automated Draft
     await leaguePage.clickButton('Automated Draft');
 
-    // Selection method buttons should be disabled
-    await leaguePage.button('Standard').first().expectDisabled();
-    await leaguePage.button('Auction').expectDisabled();
+    // Selection method is forced to Random — Standard/Auction are hidden, not
+    // shown disabled, so users aren't misled into thinking they're unlockable.
+    // exact: true avoids matching the collapsed "Waivers, Budget & Salary Cap"
+    // section toggle, whose summary text substring-matches "Standard waivers".
+    await leaguePage.button('Random', { exact: true }).expectVisible();
+    await leaguePage.button('Standard', { exact: true }).expectHidden();
+    await leaguePage.button('Auction', { exact: true }).expectHidden();
 
     // Explanatory note should mention automated
     await leaguePage
@@ -207,7 +211,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       .expectVisible();
   });
 
-  test('should re-enable selection method when switching back to Live Draft', async ({
+  test('should restore Standard/Auction selection method options when switching back to Live Draft', async ({
     leaguePage,
   }) => {
     await leaguePage.gotoCreate();
@@ -219,7 +223,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.clickButton('Automated Draft');
     await leaguePage.clickButton('Live Draft');
 
-    // Selection method buttons should be enabled again
+    // Selection method buttons should be visible and enabled again
     await leaguePage.button('Standard').first().expectEnabled();
     await leaguePage.button('Auction').expectEnabled();
   });

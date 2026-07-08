@@ -767,6 +767,60 @@ describe('LeagueCreatePage — validate before premium gate on submit (LS-6091 /
   });
 });
 
+describe('LeagueCreatePage — Selection Method options in automated mode (LS-6078)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  // "Selection Method" FieldRow — scoped separately because "Random" also
+  // appears as a Scheduling Strategy option elsewhere on the page.
+  function selectionMethodRow() {
+    return screen.getByText('Selection Method').closest('div')
+      ?.parentElement as HTMLElement;
+  }
+
+  it('shows Standard and Auction options when draft mode is live (default)', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    const row = within(selectionMethodRow());
+    expect(
+      row.getByRole('button', { name: /^Standard$/i }),
+    ).toBeInTheDocument();
+    expect(row.getByRole('button', { name: /^Auction$/i })).toBeInTheDocument();
+  });
+
+  it('hides Standard and Auction options when switching to automated draft mode', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+
+    const row = within(selectionMethodRow());
+    expect(
+      row.queryByRole('button', { name: /^Standard$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      row.queryByRole('button', { name: /^Auction$/i }),
+    ).not.toBeInTheDocument();
+    expect(row.getByRole('button', { name: /^Random$/i })).toBeInTheDocument();
+  });
+
+  it('restores Standard and Auction options when switching back to live draft mode', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Automated Draft$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Live Draft$/i }));
+
+    const row = within(selectionMethodRow());
+    expect(
+      row.getByRole('button', { name: /^Standard$/i }),
+    ).toBeInTheDocument();
+    expect(row.getByRole('button', { name: /^Auction$/i })).toBeInTheDocument();
+  });
+});
+
 describe('LeagueCreatePage — unsaved-changes navigation guard (LS-6109)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
