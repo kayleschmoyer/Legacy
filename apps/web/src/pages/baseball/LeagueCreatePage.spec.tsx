@@ -383,6 +383,43 @@ describe('LeagueCreatePage — Salary Cap upgrade modal title (LS-6096)', () => 
   });
 });
 
+describe('LeagueCreatePage — Auction draft premium gate (LS-6072)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+  });
+
+  it('locks the Auction option and opens the upgrade modal instead of selecting it for a free user', () => {
+    mockIsPremium = false;
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    const auctionButton = screen.getByRole('button', { name: 'Auction' });
+    fireEvent.click(auctionButton);
+
+    expect(screen.getByTestId('upgrade-modal')).toHaveTextContent(
+      'Auction Draft',
+    );
+    // Selecting Auction must not have applied — the Auction-only budget
+    // fields must not have been mounted.
+    expect(
+      screen.queryByText('Auction Budget per Team'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('selects Auction directly for a premium user (no upgrade modal)', () => {
+    mockIsPremium = true;
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Auction' }));
+
+    expect(screen.queryByTestId('upgrade-modal')).not.toBeInTheDocument();
+    expect(screen.getByText('Auction Budget per Team')).toBeInTheDocument();
+  });
+});
+
 describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -500,7 +537,11 @@ describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
     jest.clearAllMocks();
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
-    mockIsPremium = false;
+    // Premium: these tests exercise the draftMode-reset notice mechanic, not
+    // the Auction premium gate (LS-6072) — a free user can no longer select
+    // Auction at all, so reaching the "reset from Auction" state requires a
+    // premium viewer.
+    mockIsPremium = true;
   });
 
   it('shows the reset notice when switching from Auction to Automated draft', () => {

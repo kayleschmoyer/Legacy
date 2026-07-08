@@ -18,7 +18,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { AlertCircle, Check, ChevronRight, Copy } from '@tamagui/lucide-icons';
+import {
+  AlertCircle,
+  Check,
+  ChevronRight,
+  Copy,
+  Lock,
+} from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { Dialog, StatusBadge } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
@@ -825,7 +831,17 @@ interface ButtonGroupProps<T extends string | number> {
   value: T;
   options: readonly (
     | T
-    | { value: T; label: string; disabled?: boolean; recommended?: boolean }
+    | {
+        value: T;
+        label: string;
+        disabled?: boolean;
+        recommended?: boolean;
+        /** Premium-gated option (e.g. Auction). Stays pressable so the
+         * caller's onChange can route to an upgrade flow, but renders a
+         * Lock icon + dashed gold border. Mirrors OptionButtonGroup's
+         * `locked` treatment (lib/shared-components premium fields). */
+        locked?: boolean;
+      }
   )[];
   onChange: (v: T) => void;
   disabled?: boolean;
@@ -850,6 +866,7 @@ function ButtonGroup<T extends string | number>({
         const itemDisabled = disabled || (typeof o === 'object' && o.disabled);
         const recommended = typeof o === 'object' && o.recommended === true;
         const selected = value === val;
+        const locked = !selected && typeof o === 'object' && !!o.locked;
         return (
           <Button
             key={String(val)}
@@ -859,8 +876,15 @@ function ButtonGroup<T extends string | number>({
             flex={wide ? 1 : undefined}
             minWidth={44}
             backgroundColor={selected ? '$brandNavyLight' : '$color2'}
-            borderColor={selected ? '$brandNavyLight' : '$borderColor'}
+            borderColor={
+              selected
+                ? '$brandNavyLight'
+                : locked
+                  ? '$brandGold'
+                  : '$borderColor'
+            }
             borderWidth={selected ? 2 : 1}
+            borderStyle={locked ? 'dashed' : 'solid'}
             hoverStyle={{
               backgroundColor: selected ? '$brandNavy' : '$color3',
               borderColor: selected ? '$brandNavy' : '$borderColorHover',
@@ -872,9 +896,20 @@ function ButtonGroup<T extends string | number>({
             // resolving to this button (LS-6104).
             aria-label={recommended ? label : undefined}
           >
-            {recommended ? (
-              <YStack alignItems="center" gap="$0.5">
-                <StatusBadge label="Recommended" variant="accent" size="xs" />
+            <XStack alignItems="center" gap="$1.5">
+              {locked && <Lock size={12} color={BRAND_GOLD} />}
+              {recommended ? (
+                <YStack alignItems="center" gap="$0.5">
+                  <StatusBadge label="Recommended" variant="accent" size="xs" />
+                  <Text
+                    color={selected ? '$brandGold' : '$color'}
+                    fontWeight={selected ? '600' : '400'}
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {label}
+                  </Text>
+                </YStack>
+              ) : (
                 <Text
                   color={selected ? '$brandGold' : '$color'}
                   fontWeight={selected ? '600' : '400'}
@@ -882,16 +917,8 @@ function ButtonGroup<T extends string | number>({
                 >
                   {label}
                 </Text>
-              </YStack>
-            ) : (
-              <Text
-                color={selected ? '$brandGold' : '$color'}
-                fontWeight={selected ? '600' : '400'}
-                style={{ fontVariantNumeric: 'tabular-nums' }}
-              >
-                {label}
-              </Text>
-            )}
+              )}
+            </XStack>
           </Button>
         );
       })}
@@ -1249,6 +1276,7 @@ export function LeagueCreatePage(): React.JSX.Element {
     useState(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
   const [showHofUpgradeModal, setShowHofUpgradeModal] = useState(false);
+  const [showAuctionUpgradeModal, setShowAuctionUpgradeModal] = useState(false);
   const [showLeagueLimitModal, setShowLeagueLimitModal] = useState(false);
   const [createdLeague, setCreatedLeague] = useState<{
     id: number;
@@ -2750,8 +2778,24 @@ export function LeagueCreatePage(): React.JSX.Element {
                       ).map((o) => ({
                         value: o.value,
                         label: o.label,
+                        // Auction draft is a premium selection method
+                        // (LS-6072). Proactively lock it for free viewers so
+                        // the gate is visible before selection; the onChange
+                        // below still routes a locked tap to the upgrade
+                        // modal instead of applying the selection. Mirrors
+                        // WaiverSystemField's FAAB-option gating.
+                        locked:
+                          o.value === 'auction' &&
+                          (!isPremium || premiumLoading),
                       }))}
-                      onChange={(v) => handleInputChange('selectionMethod', v)}
+                      onChange={(v) => {
+                        if (v === 'auction' && (!isPremium || premiumLoading)) {
+                          trackPremiumFeatureClick('Auction Draft');
+                          setShowAuctionUpgradeModal(true);
+                          return;
+                        }
+                        handleInputChange('selectionMethod', v);
+                      }}
                       disabled={
                         isFormDisabled || formData.draftMode === 'automated'
                       }
@@ -3401,6 +3445,12 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowHofUpgradeModal}
         featureName="Hall of Fame Only"
         featureDescription="Restrict the draft board to Hall of Fame inductees for a smaller, more legendary player pool."
+      />
+      <UpgradeModal
+        open={showAuctionUpgradeModal}
+        onOpenChange={setShowAuctionUpgradeModal}
+        featureName="Auction Draft"
+        featureDescription="Run a live auction where managers bid on players from a shared budget — the most competitive draft format for serious leagues."
       />
       <UpgradeModal
         open={showLeagueLimitModal}
