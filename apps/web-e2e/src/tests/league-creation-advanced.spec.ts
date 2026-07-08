@@ -94,6 +94,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Fill name and submit to verify the selection was accepted (form submits)
     await leaguePage.fillLeagueName('My League');
     await leaguePage.submitCreate();
+    await leaguePage.continueToLeague();
     await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
 
@@ -129,6 +130,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.clickButton('National League');
     await leaguePage.fillLeagueName('NL League');
     await leaguePage.submitCreate();
+    await leaguePage.continueToLeague();
     await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
 

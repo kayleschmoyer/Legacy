@@ -83,10 +83,12 @@ jest.mock('@legacy-sports/shared-components', () => ({
     cancelLabel = 'Cancel',
     onConfirm,
     onCancel,
+    children,
   }: any) =>
     open ? (
       <div role="alertdialog" aria-label={title}>
         <span>{description}</span>
+        {children}
         <button type="button" onClick={onConfirm}>
           {confirmLabel}
         </button>
@@ -154,6 +156,7 @@ jest.mock('@tamagui/lucide-icons', () => ({
   AlertCircle: () => <span data-testid="icon-alert" />,
   Check: () => <span data-testid="icon-check" />,
   ChevronRight: () => <span data-testid="icon-chevron" />,
+  Copy: () => <span data-testid="icon-copy" />,
   Lock: () => <span data-testid="icon-lock" />,
 }));
 
@@ -226,6 +229,14 @@ function renderPage(initialPath = '/baseball/league/create') {
         <Route path="/football/league/create" element={<Page />} />
         <Route path="/baseball" element={<div>Baseball Home</div>} />
         <Route path="/football" element={<div>Football Home</div>} />
+        <Route
+          path="/baseball/league/:id"
+          element={<div>Baseball League Detail</div>}
+        />
+        <Route
+          path="/football/league/:id"
+          element={<div>Football League Detail</div>}
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -1205,5 +1216,128 @@ describe('LeagueCreatePage — playerPool/sport validation (LS-6103)', () => {
     const submitBtn = screen.getByTestId('create-league-submit');
     fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
     expect(mockCreateLeague).not.toHaveBeenCalled();
+  });
+});
+
+describe('LeagueCreatePage — post-create confirmation (LS-6067)', () => {
+  const originalClipboard = Object.getOwnPropertyDescriptor(
+    navigator,
+    'clipboard',
+  );
+
+  const setClipboard = (value: unknown) =>
+    Object.defineProperty(navigator, 'clipboard', {
+      value,
+      configurable: true,
+      writable: true,
+    });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  afterEach(() => {
+    Object.defineProperty(
+      navigator,
+      'clipboard',
+      originalClipboard ?? {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      },
+    );
+  });
+
+  function submitWithLeagueName(name = 'Test League') {
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: name },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+  }
+
+  it('shows a confirmation dialog with the invite code instead of navigating immediately', async () => {
+    mockCreateLeague.mockResolvedValue({
+      data: {
+        createLeagueAndTeams: {
+          league: { id: 42, inviteCode: 'ABC123' },
+        },
+      },
+    });
+    renderPage('/baseball/league/create');
+    submitWithLeagueName();
+
+    expect(
+      await screen.findByRole('alertdialog', { name: 'League created!' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('ABC123')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalledWith('/baseball/league/42');
+    expect(
+      screen.queryByText('Baseball League Detail'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('navigates to the league page when Continue to League is clicked', async () => {
+    mockCreateLeague.mockResolvedValue({
+      data: {
+        createLeagueAndTeams: {
+          league: { id: 42, inviteCode: 'ABC123' },
+        },
+      },
+    });
+    renderPage('/baseball/league/create');
+    submitWithLeagueName();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Continue to League' }),
+    );
+
+    expect(screen.getByText('Baseball League Detail')).toBeInTheDocument();
+  });
+
+  it('copies the invite code to the clipboard without dismissing the dialog', async () => {
+    mockCreateLeague.mockResolvedValue({
+      data: {
+        createLeagueAndTeams: {
+          league: { id: 42, inviteCode: 'ABC123' },
+        },
+      },
+    });
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    setClipboard({ writeText });
+    renderPage('/baseball/league/create');
+    submitWithLeagueName();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Copy Invite Code' }),
+    );
+
+    expect(writeText).toHaveBeenCalledWith('ABC123');
+    expect(
+      await screen.findByRole('button', { name: 'Copied!' }),
+    ).toBeInTheDocument();
+    // Copying doesn't dismiss the dialog — the user can still continue.
+    expect(
+      screen.getByRole('alertdialog', { name: 'League created!' }),
+    ).toBeInTheDocument();
+  });
+
+  it('omits the invite code block when the mutation response has none', async () => {
+    mockCreateLeague.mockResolvedValue({
+      data: {
+        createLeagueAndTeams: { league: { id: 42, inviteCode: null } },
+      },
+    });
+    renderPage('/baseball/league/create');
+    submitWithLeagueName();
+
+    expect(
+      await screen.findByRole('alertdialog', { name: 'League created!' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Copy Invite Code' }),
+    ).not.toBeInTheDocument();
   });
 });

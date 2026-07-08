@@ -17,7 +17,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { AlertCircle, Check, ChevronRight } from '@tamagui/lucide-icons';
+import { AlertCircle, Check, ChevronRight, Copy } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { Dialog, StatusBadge } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
@@ -1127,6 +1127,22 @@ export function LeagueCreatePage(): React.JSX.Element {
     useState(false);
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
   const [showLeagueLimitModal, setShowLeagueLimitModal] = useState(false);
+  const [createdLeague, setCreatedLeague] = useState<{
+    id: number;
+    inviteCode: string | null;
+  } | null>(null);
+  const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
+  const inviteCodeCopiedResetTimer = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  useEffect(
+    () => () => {
+      if (inviteCodeCopiedResetTimer.current) {
+        clearTimeout(inviteCodeCopiedResetTimer.current);
+      }
+    },
+    [],
+  );
 
   const { data: leaguesData } = useGetUserLeaguesQuery();
   const leagueCount = leaguesData?.userLeagues?.length ?? 0;
@@ -1515,11 +1531,13 @@ export function LeagueCreatePage(): React.JSX.Element {
         },
       });
 
-      if (result.data?.createLeagueAndTeams?.league?.id) {
+      const newLeague = result.data?.createLeagueAndTeams?.league;
+      if (newLeague?.id) {
         setHasUnsavedChanges(false);
-        navigate(
-          `/${formData.sport}/league/${result.data.createLeagueAndTeams.league.id}`,
-        );
+        setCreatedLeague({
+          id: newLeague.id,
+          inviteCode: newLeague.inviteCode ?? null,
+        });
       } else {
         setSubmitError(LEAGUE_FORM_MESSAGES.submitFallback);
       }
@@ -1533,6 +1551,33 @@ export function LeagueCreatePage(): React.JSX.Element {
       );
     }
   };
+
+  const handleContinueToLeague = useCallback(() => {
+    if (!createdLeague) return;
+    setCreatedLeague(null);
+    setInviteCodeCopied(false);
+    navigate(`/${formData.sport}/league/${createdLeague.id}`);
+  }, [createdLeague, formData.sport, navigate]);
+
+  const handleCopyInviteCode = useCallback(() => {
+    const writeText =
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard?.writeText.bind(navigator.clipboard);
+    if (!writeText || !createdLeague?.inviteCode) return;
+    void writeText(createdLeague.inviteCode).then(
+      () => {
+        setInviteCodeCopied(true);
+        if (inviteCodeCopiedResetTimer.current) {
+          clearTimeout(inviteCodeCopiedResetTimer.current);
+        }
+        inviteCodeCopiedResetTimer.current = setTimeout(
+          () => setInviteCodeCopied(false),
+          1500,
+        );
+      },
+      () => undefined,
+    );
+  }, [createdLeague]);
 
   const isFormDisabled = loading;
 
@@ -2874,6 +2919,61 @@ export function LeagueCreatePage(): React.JSX.Element {
         }}
         onCancel={() => setShowDiscardConfirm(false)}
       />
+      <Dialog
+        open={createdLeague !== null}
+        onOpenChange={(open) => {
+          if (!open) handleContinueToLeague();
+        }}
+        title="League created!"
+        description={
+          createdLeague?.inviteCode
+            ? `Share this invite code so managers can join ${formData.leagueName.trim()}.`
+            : `${formData.leagueName.trim()} is ready.`
+        }
+        confirmLabel="Continue to League"
+        cancelLabel={
+          createdLeague?.inviteCode
+            ? inviteCodeCopied
+              ? 'Copied!'
+              : 'Copy Invite Code'
+            : 'Got it'
+        }
+        onConfirm={handleContinueToLeague}
+        onCancel={
+          createdLeague?.inviteCode
+            ? handleCopyInviteCode
+            : handleContinueToLeague
+        }
+      >
+        {createdLeague?.inviteCode ? (
+          <XStack
+            alignItems="center"
+            justifyContent="space-between"
+            gap={12}
+            paddingVertical={12}
+            paddingHorizontal={16}
+            borderRadius={12}
+            borderWidth={1}
+            borderColor="$outlineStrong"
+            backgroundColor="$surfacePanel"
+          >
+            <Text
+              fontFamily="$heading"
+              fontWeight="800"
+              fontSize={20}
+              letterSpacing={1.2}
+              color="$brandGoldLight"
+            >
+              {createdLeague.inviteCode}
+            </Text>
+            {inviteCodeCopied ? (
+              <Check size={18} color="$brandGoldLight" />
+            ) : (
+              <Copy size={18} color="$textMuted" />
+            )}
+          </XStack>
+        ) : null}
+      </Dialog>
       <UpgradeModal
         open={showWaiverUpgradeModal}
         onOpenChange={setShowWaiverUpgradeModal}

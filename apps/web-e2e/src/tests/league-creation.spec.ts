@@ -135,6 +135,10 @@ test.describe('League Creation @critical', () => {
     // Submit form
     await leaguePage.submitCreate();
 
+    // Confirm the post-create "League created!" dialog (LS-6067) before the
+    // page navigates to the new league.
+    await leaguePage.continueToLeague();
+
     // Wait for successful creation and navigation to the new league page
     await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
@@ -395,6 +399,10 @@ test.describe('League Creation @critical', () => {
 
     // Verify button is disabled during loading
     await leaguePage.creatingButton.expectDisabled();
+
+    // Confirm the post-create "League created!" dialog (LS-6067) before the
+    // page navigates to the new league.
+    await leaguePage.continueToLeague();
 
     // Wait for completion
     await expect(page).toHaveURL('/baseball/league/999');

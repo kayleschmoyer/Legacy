@@ -356,6 +356,14 @@ export class LeaguePage extends BaseScreen {
     await this.createButton.tap();
   }
 
+  /**
+   * Confirm the post-create "League created!" dialog (LS-6067), which shows
+   * the invite code and gates navigation to the new league page.
+   */
+  async continueToLeague(): Promise<void> {
+    await this.button(/continue to league/i).tap();
+  }
+
   /** Type an amount into the salary-cap input (only visible when enabled). */
   async fillSalaryCapAmount(amount: number): Promise<void> {
     await this.salaryCapAmountInput.fill(String(amount));

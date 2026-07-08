@@ -415,6 +415,10 @@ test.describe('Scenario 1: Football league creation @regression', () => {
 
     await page.getByRole('button', { name: /create league/i }).click();
 
+    // Confirm the post-create "League created!" dialog (LS-6067) before the
+    // page navigates to the new league.
+    await page.getByRole('button', { name: /continue to league/i }).click();
+
     // Must redirect under /football
     await expect(page).toHaveURL(
       new RegExp(`/football/league/${CREATED_LEAGUE_ID}`),

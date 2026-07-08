@@ -176,6 +176,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
 
     await leaguePage.fillLeagueName('Hermetic Baseball League');
     await leaguePage.submitCreate();
+    await leaguePage.continueToLeague();
 
     await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
     expect(captured.current?.sport).toBe('baseball');
@@ -195,6 +196,7 @@ test.describe('League Creation — Sport-aware @regression', () => {
 
     await leaguePage.fillLeagueName('Hermetic Football League');
     await leaguePage.submitCreate();
+    await leaguePage.continueToLeague();
 
     await expect(page).toHaveURL(/\/football\/league\/\d+/);
     expect(captured.current?.sport).toBe('football');

@@ -165,6 +165,7 @@ adminTest.describe(
 
         await leaguePage.fillLeagueName('Premium League');
         await leaguePage.submitCreate();
+        await leaguePage.continueToLeague();
         await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
       },
     );
