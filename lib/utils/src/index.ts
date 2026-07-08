@@ -14,6 +14,7 @@ export * from './lib/help-content';
 export * from './lib/league-utils';
 export * from './lib/notification-copy';
 export * from './lib/notification-types';
+export * from './lib/sanitize-name';
 export * from './lib/scoring-math';
 export * from './lib/season-constants';
 // Node.js-only exports (DbCredentials, DbOptions, LambdaHelpers, version) are in '@legacy-sports/utils/node'

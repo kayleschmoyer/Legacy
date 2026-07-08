@@ -1803,4 +1803,91 @@ describe('League Mutations', () => {
       );
     });
   });
+
+  describe('createLeagueAndTeams mutation — server-side name sanitization (LS-6056)', () => {
+    const baseInput = {
+      numberOfTeams: 10,
+      playerPool: 'all',
+    };
+
+    async function resolve(leagueName: string) {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+      return field.resolve(
+        {},
+        { input: { ...baseInput, leagueName } },
+        mockContext,
+        undefined as never,
+      );
+    }
+
+    it('rejects a name containing HTML/script tags', async () => {
+      await expect(resolve('<script>alert(1)</script>')).rejects.toThrow(
+        'League name cannot contain HTML tags',
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a name containing an img tag with an event handler', async () => {
+      await expect(resolve('<img src=x onerror=alert(1)>')).rejects.toThrow(
+        'League name cannot contain HTML tags',
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('strips control characters, zero-width characters, and bidi overrides before persisting', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 3,
+          name: 'adminLeague',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      // U+202E (RTL override) + zero-width space + a control char, wrapping a
+      // legitimate-looking name — the exact repro from the ticket.
+      await resolve('\u202Eadmin\u200BLeague');
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'adminLeague' }),
+      );
+    });
+
+    it('still rejects a name that is too short after sanitization strips it down', async () => {
+      // Only invisible/control characters — sanitizes to an empty string.
+      await expect(resolve('\u200B\u200B\u200B')).rejects.toThrow(
+        'League name cannot be empty',
+      );
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a normal league name unchanged', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 4,
+          name: "Bobby's Dynasty League",
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      await resolve("Bobby's Dynasty League");
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Bobby's Dynasty League" }),
+      );
+    });
+  });
 });

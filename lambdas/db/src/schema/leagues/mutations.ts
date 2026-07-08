@@ -12,6 +12,10 @@ import {
   DraftService,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  containsHtmlLikeMarkup,
+  sanitizeDisplayName,
+} from '@legacy-sports/utils';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   and,
@@ -275,17 +279,23 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const username = context.user.username || 'User';
 
       // ── Input validation ────────────────────────────────────────────────────
-      const trimmedLeagueName = leagueName.trim();
-      if (trimmedLeagueName.length === 0) {
+      // Server-side sanitization — the client only trims before submit, so the
+      // resolver cannot trust that control chars, zero-width chars, or bidi
+      // overrides have already been stripped (LS-6056).
+      const sanitizedLeagueName = sanitizeDisplayName(leagueName);
+      if (sanitizedLeagueName.length === 0) {
         throw UserInputError('League name cannot be empty');
       }
-      if (trimmedLeagueName.length < 3) {
+      if (sanitizedLeagueName.length < 3) {
         throw UserInputError('League name must be at least 3 characters');
       }
-      if (leagueName.length > MAX_LEAGUE_NAME_LENGTH) {
+      if (sanitizedLeagueName.length > MAX_LEAGUE_NAME_LENGTH) {
         throw UserInputError(
           `League name must be ${MAX_LEAGUE_NAME_LENGTH} characters or fewer`,
         );
+      }
+      if (containsHtmlLikeMarkup(sanitizedLeagueName)) {
+        throw UserInputError('League name cannot contain HTML tags');
       }
       if (
         numberOfTeams < MIN_NUMBER_OF_TEAMS ||
@@ -544,7 +554,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
 
       try {
         const result = await leagueService.createLeague({
-          name: leagueName,
+          name: sanitizedLeagueName,
           ownerId: userId,
           ownerUsername: username,
           sport: inputSport ?? 'baseball',
@@ -633,7 +643,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           error instanceof Error ? error : new Error(String(error)),
           {
             userId: context.user?.id,
-            leagueName,
+            leagueName: sanitizedLeagueName,
             numberOfTeams,
             playerPool,
             draftMode,
