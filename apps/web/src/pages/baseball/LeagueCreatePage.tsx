@@ -1537,6 +1537,10 @@ export function LeagueCreatePage(): React.JSX.Element {
       setShowLeagueLimitModal(true);
       return;
     }
+    if (errorCount > 0) {
+      revealValidationErrors(validationErrors);
+      return;
+    }
     if ((!isPremium || premiumLoading) && formData.waiverType === 'faab') {
       trackPremiumFeatureClick('FAAB Waiver Settings');
       setShowWaiverUpgradeModal(true);
@@ -1548,10 +1552,6 @@ export function LeagueCreatePage(): React.JSX.Element {
     ) {
       trackPremiumFeatureClick('Historical Era Selection');
       setShowEraUpgradeModal(true);
-      return;
-    }
-    if (errorCount > 0) {
-      revealValidationErrors(validationErrors);
       return;
     }
 

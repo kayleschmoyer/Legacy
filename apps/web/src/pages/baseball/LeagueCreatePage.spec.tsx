@@ -31,6 +31,7 @@ import {
 } from 'react-router-dom';
 import type { CreateLeagueFormData } from './LeagueCreatePage';
 import { validateFormFull, VALIDATION_ERROR_SECTION } from './LeagueCreatePage';
+import { trackPremiumFeatureClick } from '../../utils/analytics';
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -72,6 +73,14 @@ jest.mock('../../components/UpgradeModal', () => ({
 // simulated click in jsdom. Stub both to a bare button wired directly to
 // onUpgrade so LS-6096's featureName-wiring bug (in LeagueCreatePage itself)
 // can be exercised in isolation from that gating behavior.
+//
+// `mockWaiverFaabSelectable` opts a test into a FAAB-selectable variant
+// instead, wired to `onChange('faab')` — needed to reproduce a
+// waiverType='faab' + non-premium submit combination (LS-6091), which can
+// only occur via a selection made while premium (before status later
+// resolves to non-premium); defaults to false so existing tests are
+// unaffected.
+let mockWaiverFaabSelectable = false;
 jest.mock('@legacy-sports/shared-components/leagues', () => {
   const actual = jest.requireActual('@legacy-sports/shared-components/leagues');
   return {
@@ -81,11 +90,16 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
         Upgrade Salary Cap
       </button>
     ),
-    WaiverSystemField: ({ onUpgrade }: any) => (
-      <button type="button" onClick={onUpgrade}>
-        Upgrade Waiver Settings
-      </button>
-    ),
+    WaiverSystemField: ({ onChange, onUpgrade }: any) =>
+      mockWaiverFaabSelectable ? (
+        <button type="button" onClick={() => onChange('faab')}>
+          Select FAAB
+        </button>
+      ) : (
+        <button type="button" onClick={onUpgrade}>
+          Upgrade Waiver Settings
+        </button>
+      ),
   };
 });
 
@@ -182,9 +196,11 @@ jest.mock('tamagui', () => {
     ReactLocal.createElement(
       'div',
       {
-        'data-testid': rest['data-testid'],
-        role: rest.role,
+        'data-testid': rest['data-testid'] ?? rest.testID,
+        role: rest.role ?? rest.accessibilityRole,
+        'aria-label': rest['aria-label'] ?? rest.accessibilityLabel,
         'aria-live': rest['aria-live'],
+        onClick: rest.onPress,
       },
       children,
     );
@@ -690,6 +706,64 @@ describe('LeagueCreatePage — Pick Timer (LS-7966)', () => {
         }),
       }),
     );
+  });
+});
+
+describe('LeagueCreatePage — validate before premium gate on submit (LS-6091 / CLB-041)', () => {
+  // `revealValidationErrors` (LS-6090) is the only call site in this component
+  // that invokes `scrollIntoView`, and it only runs from the `errorCount > 0`
+  // branch of handleSubmit — so observing it fire (and the FAAB gate/mutation
+  // NOT firing) is an unambiguous signal that validation ran before the
+  // premium gate, without depending on which section a given field maps to
+  // (jsdom doesn't implement scrollIntoView, and rAF doesn't auto-flush, so
+  // both are stubbed to run synchronously for the assertion).
+  let scrollIntoViewMock: jest.Mock;
+  let rafSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockWaiverFaabSelectable = false;
+    scrollIntoViewMock = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
+    rafSpy = jest
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((cb: FrameRequestCallback) => {
+        cb(0);
+        return 0;
+      });
+  });
+
+  afterEach(() => {
+    rafSpy.mockRestore();
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  it('runs validation instead of the FAAB upgrade gate when both a validation error and a FAAB selection are present', () => {
+    // Select FAAB while premium so the selection is allowed, then simulate the
+    // viewer's premium status resolving to false before submit — this is the
+    // path that produced a stored waiverType of 'faab' on a non-premium submit.
+    mockIsPremium = true;
+    mockWaiverFaabSelectable = true;
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: 'Select FAAB' }));
+
+    mockIsPremium = false;
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'AB' },
+    });
+
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+
+    // revealValidationErrors ran (the errorCount branch), not the FAAB gate.
+    expect(scrollIntoViewMock).toHaveBeenCalled();
+    expect(trackPremiumFeatureClick).not.toHaveBeenCalledWith(
+      'FAAB Waiver Settings',
+    );
+    expect(mockCreateLeague).not.toHaveBeenCalled();
   });
 });
 
