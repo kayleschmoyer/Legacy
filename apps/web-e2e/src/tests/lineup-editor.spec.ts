@@ -290,11 +290,13 @@ test.describe('Lineup Editor — visitor sees a read-only board @regression', ()
     const startingSlot = page.getByRole('button', { name: /babe ruth at 1b/i });
     await expect(startingSlot).toBeVisible();
     await expect(startingSlot).toHaveAttribute('tabindex', '-1');
+    // Read-only slots render as genuinely disabled buttons, so a normal
+    // click is refused by Playwright's actionability checks — assert the
+    // disabled state directly rather than attempting to click through it.
+    await expect(startingSlot).toBeDisabled();
 
-    await startingSlot.click();
-
-    // Read-only: no selection banner appears and no "Move to bench" action
-    // becomes available.
+    // No selection banner appears and no "Move to bench" action becomes
+    // available, since nothing can be selected in read-only mode.
     await expect(
       page.getByRole('button', { name: /move babe ruth to bench/i }),
     ).toHaveCount(0);

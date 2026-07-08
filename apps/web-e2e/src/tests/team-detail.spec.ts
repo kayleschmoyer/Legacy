@@ -301,6 +301,10 @@ test.describe('Team Detail Page – roster @regression', () => {
         mockMember({
           id: 2,
           playerId: 102,
+          // Distinct positionId (SS) from the first member's default (1B) —
+          // RosterBoard renders at most one player per position slot, so two
+          // members sharing a positionId collide and only the first renders.
+          positionId: 5,
           player: {
             firstName: 'Ty',
             lastName: 'Cobb',
