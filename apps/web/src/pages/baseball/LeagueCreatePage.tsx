@@ -1218,6 +1218,17 @@ export function LeagueCreatePage(): React.JSX.Element {
     [],
   );
 
+  // Guards against firing trackPremiumFeatureClick once per trigger (e.g. per
+  // locked era tile clicked) — only the closed->open transition should track.
+  const openEraUpgradeModal = useCallback(() => {
+    setShowEraUpgradeModal((prev) => {
+      if (!prev) {
+        trackPremiumFeatureClick('Historical Era Selection');
+      }
+      return true;
+    });
+  }, []);
+
   const { data: leaguesData } = useGetUserLeaguesQuery();
   const leagueCount = leaguesData?.userLeagues?.length ?? 0;
   const atLeagueLimit =
@@ -1609,8 +1620,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       (!isPremium || premiumLoading) &&
       !FREE_ERA_IDS_BY_SPORT[formData.sport].has(formData.baseballEraFilter)
     ) {
-      trackPremiumFeatureClick('Historical Era Selection');
-      setShowEraUpgradeModal(true);
+      openEraUpgradeModal();
       return;
     }
 
@@ -2428,10 +2438,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     <YStack alignItems="flex-end" gap="$1.5">
                       <Button
                         size="$2"
-                        onPress={() => {
-                          trackPremiumFeatureClick('Historical Era Selection');
-                          setShowEraUpgradeModal(true);
-                        }}
+                        onPress={openEraUpgradeModal}
                         backgroundColor="$brandGold"
                         borderWidth={0}
                       >
@@ -2473,10 +2480,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     onChange={(v) => handleInputChange('baseballEraFilter', v)}
                     isPremium={!!isPremium && !premiumLoading}
                     disabled={isFormDisabled}
-                    onUpgrade={() => {
-                      trackPremiumFeatureClick('Historical Era Selection');
-                      setShowEraUpgradeModal(true);
-                    }}
+                    onUpgrade={openEraUpgradeModal}
                   />
                 </FieldRow>
 

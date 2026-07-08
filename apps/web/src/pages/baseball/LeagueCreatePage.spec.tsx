@@ -68,8 +68,23 @@ jest.mock('../../components/PremiumGate', () => ({
   PremiumGate: ({ children }: any) => <>{children}</>,
 }));
 jest.mock('../../components/UpgradeModal', () => ({
-  UpgradeModal: ({ open, featureName }: any) =>
-    open ? <div data-testid="upgrade-modal">{featureName}</div> : null,
+  UpgradeModal: ({
+    open,
+    onOpenChange,
+    featureName,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    featureName: string;
+  }) =>
+    open ? (
+      <div role="dialog" aria-label={featureName} data-testid="upgrade-modal">
+        {featureName}
+        <button type="button" onClick={() => onOpenChange(false)}>
+          Close
+        </button>
+      </div>
+    ) : null,
 }));
 
 // Real SalaryCapField/WaiverSystemField hard-disable their upgrade toggle for
@@ -1900,5 +1915,44 @@ describe('LeagueCreatePage — URL prefill allowlist (LS-6112)', () => {
     const input = mockCreateLeague.mock.calls[0][0].variables.input;
     expect(input.leagueName).toBe('Deep Link League');
     expect(input.numberOfTeams).toBe(8);
+  });
+});
+
+describe('LeagueCreatePage — era upgrade modal analytics dedup (LS-6097)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  function trackPremiumFeatureClickMock(): jest.Mock {
+    return jest.requireMock('../../utils/analytics').trackPremiumFeatureClick;
+  }
+
+  it('fires trackPremiumFeatureClick exactly once across repeated triggers while the modal is open, then again after close/reopen', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    const unlockButton = screen.getByRole('button', { name: /Unlock/i });
+
+    fireEvent.click(unlockButton);
+    expect(
+      screen.getByRole('dialog', { name: 'Historical Era Selection' }),
+    ).toBeInTheDocument();
+    expect(trackPremiumFeatureClickMock()).toHaveBeenCalledTimes(1);
+
+    // Repeated triggers while the modal is already open must not re-fire.
+    fireEvent.click(unlockButton);
+    fireEvent.click(unlockButton);
+    expect(trackPremiumFeatureClickMock()).toHaveBeenCalledTimes(1);
+
+    // Closing and re-triggering is a new user intent — fires again.
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(
+      screen.queryByRole('dialog', { name: 'Historical Era Selection' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(unlockButton);
+    expect(trackPremiumFeatureClickMock()).toHaveBeenCalledTimes(2);
   });
 });
