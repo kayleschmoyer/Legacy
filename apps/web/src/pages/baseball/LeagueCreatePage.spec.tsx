@@ -987,6 +987,89 @@ describe('validateFormFull — auction budget/min bid (LS-6092)', () => {
   });
 });
 
+describe('validateFormFull — custom era year bounds (LS-6082)', () => {
+  const baseFormData: CreateLeagueFormData = {
+    sport: 'baseball',
+    leagueName: 'Test League',
+    numberOfTeams: 8,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'standard',
+    draftOrder: 'snake',
+    maxRosterSize: 26,
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
+    isPublic: false,
+    gamesPerMatchup: 5,
+    baseballEraFilter: 'custom',
+    baseballHofOnly: false,
+    salaryCapEnabled: false,
+    auctionBudget: 200,
+    auctionMinBid: 1,
+    pickTimeLimitSeconds: 120,
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
+  };
+
+  it('accepts a custom era range within MLB history (e.g. 1920-1960)', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      customEraStartYear: 1920,
+      customEraEndYear: 1960,
+    });
+    expect(errs.customEra).toBeUndefined();
+  });
+
+  it('accepts the current year as the end year', () => {
+    const currentYear = new Date().getFullYear();
+    const errs = validateFormFull({
+      ...baseFormData,
+      customEraStartYear: currentYear,
+      customEraEndYear: currentYear,
+    });
+    expect(errs.customEra).toBeUndefined();
+  });
+
+  it('rejects a start year before MLB existed (1800) instead of silently passing', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      customEraStartYear: 1800,
+      customEraEndYear: 1900,
+    });
+    expect(errs.customEra).toBeDefined();
+  });
+
+  it('rejects an end year in the far future (3000) instead of silently passing', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      customEraStartYear: 1950,
+      customEraEndYear: 3000,
+    });
+    expect(errs.customEra).toBeDefined();
+  });
+
+  it('rejects a start year one before MLB’s first professional season (1870)', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      customEraStartYear: 1870,
+      customEraEndYear: 1900,
+    });
+    expect(errs.customEra).toBeDefined();
+  });
+
+  it('rejects an end year one past the current year', () => {
+    const currentYear = new Date().getFullYear();
+    const errs = validateFormFull({
+      ...baseFormData,
+      customEraStartYear: 1950,
+      customEraEndYear: currentYear + 1,
+    });
+    expect(errs.customEra).toBeDefined();
+  });
+});
+
 describe('LeagueCreatePage — Games Per Matchup typing bounds (LS-6101)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

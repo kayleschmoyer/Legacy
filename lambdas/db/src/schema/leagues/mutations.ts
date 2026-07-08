@@ -34,8 +34,10 @@ import {
   Team,
 } from './types';
 import {
+  CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   DEFAULT_ROSTER_SIZE_BY_SPORT,
   GAMES_PER_MATCHUP_RANGE_BY_SPORT,
+  isCustomEraYearValidForSport,
   isEraFreeForSport,
   isEraValidForSport,
   isGamesPerMatchupValidForSport,
@@ -468,6 +470,31 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         if (inputCustomEraStartYear > inputCustomEraEndYear) {
           throw new Error(
             'Start year must be earlier than or equal to end year.',
+          );
+        }
+        const currentYear = new Date().getFullYear();
+        if (
+          !isCustomEraYearValidForSport(
+            resolvedSport,
+            inputCustomEraStartYear,
+            currentYear,
+          )
+        ) {
+          const minYear = CUSTOM_ERA_MIN_YEAR_BY_SPORT[resolvedSport];
+          throw UserInputError(
+            `Custom era start year must be between ${minYear} and ${currentYear} for ${resolvedSport} leagues.`,
+          );
+        }
+        if (
+          !isCustomEraYearValidForSport(
+            resolvedSport,
+            inputCustomEraEndYear,
+            currentYear,
+          )
+        ) {
+          const minYear = CUSTOM_ERA_MIN_YEAR_BY_SPORT[resolvedSport];
+          throw UserInputError(
+            `Custom era end year must be between ${minYear} and ${currentYear} for ${resolvedSport} leagues.`,
           );
         }
       }

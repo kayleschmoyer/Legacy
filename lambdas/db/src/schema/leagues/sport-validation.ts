@@ -108,3 +108,18 @@ export function isRosterSizeValidForSport(
   const range = ROSTER_RANGE_BY_SPORT[sport];
   return size >= range.min && size <= range.max;
 }
+
+/** Earliest historically valid year for a sport's custom era range (first professional season). */
+export const CUSTOM_ERA_MIN_YEAR_BY_SPORT: Record<SportKind, number> = {
+  baseball: 1871,
+  football: 1920,
+};
+
+/** True when a custom era year is between the sport's min year and the current year, inclusive. */
+export function isCustomEraYearValidForSport(
+  sport: SportKind,
+  year: number,
+  currentYear: number = new Date().getFullYear(),
+): boolean {
+  return year >= CUSTOM_ERA_MIN_YEAR_BY_SPORT[sport] && year <= currentYear;
+}

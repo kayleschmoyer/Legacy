@@ -9,8 +9,10 @@
  */
 
 import {
+  CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   FREE_ERA_IDS_BY_SPORT,
   GAMES_PER_MATCHUP_RANGE_BY_SPORT,
+  isCustomEraYearValidForSport,
   isEraFreeForSport,
   isEraValidForSport,
   isGamesPerMatchupValidForSport,
@@ -192,6 +194,38 @@ describe('sport-validation', () => {
           'Games per matchup must be between 1 and 17 for football leagues',
         );
       });
+    });
+  });
+
+  describe('isCustomEraYearValidForSport', () => {
+    it('accepts the inclusive min year and the current year for each sport', () => {
+      const currentYear = new Date().getFullYear();
+      expect(isCustomEraYearValidForSport('baseball', 1871)).toBe(true);
+      expect(isCustomEraYearValidForSport('baseball', currentYear)).toBe(true);
+      expect(isCustomEraYearValidForSport('football', 1920)).toBe(true);
+      expect(isCustomEraYearValidForSport('football', currentYear)).toBe(true);
+    });
+
+    it('rejects years before MLB/NFL existed (CLB-017: 1800 silently accepted before this fix)', () => {
+      expect(isCustomEraYearValidForSport('baseball', 1800)).toBe(false);
+      expect(isCustomEraYearValidForSport('baseball', 1870)).toBe(false);
+      expect(isCustomEraYearValidForSport('football', 1919)).toBe(false);
+    });
+
+    it('rejects years past the current year (CLB-017: 3000 silently accepted before this fix)', () => {
+      const currentYear = new Date().getFullYear();
+      expect(isCustomEraYearValidForSport('baseball', 3000)).toBe(false);
+      expect(isCustomEraYearValidForSport('baseball', currentYear + 1)).toBe(
+        false,
+      );
+      expect(isCustomEraYearValidForSport('football', currentYear + 1)).toBe(
+        false,
+      );
+    });
+
+    it('matches CUSTOM_ERA_MIN_YEAR_BY_SPORT for both sports', () => {
+      expect(CUSTOM_ERA_MIN_YEAR_BY_SPORT.baseball).toBe(1871);
+      expect(CUSTOM_ERA_MIN_YEAR_BY_SPORT.football).toBe(1920);
     });
   });
 });

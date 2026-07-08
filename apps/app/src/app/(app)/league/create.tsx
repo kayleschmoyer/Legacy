@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { DateTimePicker } from '@legacy-sports/shared-components';
 import {
+  CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   CustomEraRange,
   EraFilterGrid,
   FaabBudgetField,
@@ -293,7 +294,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
     onError: (err: unknown) => {
       LOGGER.error(
         'Error creating league:',
-        err instanceof Error ? err : String(err),
+        err instanceof Error ? err : new Error(String(err)),
       );
       const message =
         err instanceof Error ? err.message : 'Failed to create league';
@@ -330,6 +331,18 @@ export default function CreateLeagueScreen(): React.JSX.Element {
         return 'Please enter both a start and end year for the custom era';
       if (baseballForm.customEraStartYear > baseballForm.customEraEndYear)
         return 'Custom era start year must be before the end year';
+      const minYear = CUSTOM_ERA_MIN_YEAR_BY_SPORT.baseball;
+      const currentYear = new Date().getFullYear();
+      if (
+        baseballForm.customEraStartYear < minYear ||
+        baseballForm.customEraStartYear > currentYear
+      )
+        return `Custom era start year must be between ${minYear} and ${currentYear}`;
+      if (
+        baseballForm.customEraEndYear < minYear ||
+        baseballForm.customEraEndYear > currentYear
+      )
+        return `Custom era end year must be between ${minYear} and ${currentYear}`;
     }
     if (baseballForm.salaryCapEnabled && baseballForm.salaryCap === undefined)
       return 'Please enter a salary cap amount';

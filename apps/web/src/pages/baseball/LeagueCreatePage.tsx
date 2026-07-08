@@ -23,6 +23,7 @@ import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import { Dialog, StatusBadge } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   GAMES_PER_MATCHUP_BY_SPORT,
   PICK_TIME_OPTIONS,
 } from '@legacy-sports/shared-components/sports';
@@ -360,6 +361,10 @@ const LEAGUE_FORM_MESSAGES = {
     `Games per matchup must be ${min}–${max} for ${sport} leagues.`,
   customEraRequired: 'Both start and end year required.',
   customEraOrderInvalid: 'Start year must be ≤ end year.',
+  customEraStartYearOutOfRange: (min: number, max: number) =>
+    `Start year must be between ${min} and ${max}.`,
+  customEraEndYearOutOfRange: (min: number, max: number) =>
+    `End year must be between ${min} and ${max}.`,
   draftDateInPast: 'Draft date must be in the future.',
   salaryCapRequired: 'Salary cap amount is required.',
   salaryFloorNegative: 'Salary floor cannot be negative.',
@@ -413,6 +418,20 @@ export function validateFormFull(
       errs.customEra = LEAGUE_FORM_MESSAGES.customEraRequired;
     else if (f.customEraStartYear > f.customEraEndYear)
       errs.customEra = LEAGUE_FORM_MESSAGES.customEraOrderInvalid;
+    else {
+      const minYear = CUSTOM_ERA_MIN_YEAR_BY_SPORT[f.sport];
+      const currentYear = new Date().getFullYear();
+      if (f.customEraStartYear < minYear || f.customEraStartYear > currentYear)
+        errs.customEra = LEAGUE_FORM_MESSAGES.customEraStartYearOutOfRange(
+          minYear,
+          currentYear,
+        );
+      else if (f.customEraEndYear < minYear || f.customEraEndYear > currentYear)
+        errs.customEra = LEAGUE_FORM_MESSAGES.customEraEndYearOutOfRange(
+          minYear,
+          currentYear,
+        );
+    }
   }
   if (f.draftDate && f.draftDate < new Date())
     errs.draftDate = LEAGUE_FORM_MESSAGES.draftDateInPast;
@@ -1574,7 +1593,7 @@ export function LeagueCreatePage(): React.JSX.Element {
 
       LOGGER.error(
         'Error creating league:',
-        error instanceof Error ? error : String(error),
+        error instanceof Error ? error : new Error(String(error)),
         { code, correlationId },
       );
       setSubmitError(

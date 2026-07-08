@@ -247,6 +247,17 @@ export const ERA_YEAR_RANGES_BY_SPORT: Record<
 export const ERA_YEAR_RANGES = ERA_YEAR_RANGES_BY_SPORT.baseball;
 
 /**
+ * Earliest historically valid year for a sport's custom era range (first
+ * professional season). Mirrors `CUSTOM_ERA_MIN_YEAR_BY_SPORT` in
+ * `lambdas/db/src/schema/leagues/sport-validation.ts`, which is the
+ * server-side authority — this constant only drives the client-side UX hint.
+ */
+export const CUSTOM_ERA_MIN_YEAR_BY_SPORT: Record<SportKind, number> = {
+  baseball: 1871,
+  football: 1920,
+};
+
+/**
  * Derive the era name from a career midpoint year for the given sport.
  * Defaults to baseball when sport is not specified.
  */
