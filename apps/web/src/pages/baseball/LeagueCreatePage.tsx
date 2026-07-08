@@ -45,6 +45,7 @@ import {
   Sport,
   useCreateLeagueAndTeamsMutation,
   useGetUserLeaguesQuery,
+  usePreviewEligiblePlayerCountQuery,
 } from '@legacy-sports/graphql';
 import {
   formatDateAsUTC,
@@ -379,6 +380,19 @@ const LEAGUE_FORM_MESSAGES = {
   submitFallback:
     'Unable to save league. Your settings are still filled in — try again or come back later.',
 } as const;
+
+// ── Custom era eligible-player-pool preview (LS-6089) ─────────────────────────
+// A narrow custom era (e.g. 1942-1944, wartime baseball) can yield too few
+// eligible players to fill every roster. This is a warning only — it never
+// blocks league creation.
+
+export function isPoolTooSmall(
+  eligibleCount: number,
+  numberOfTeams: number,
+  maxRosterSize: number,
+): boolean {
+  return eligibleCount < numberOfTeams * maxRosterSize;
+}
 
 // ── Validation (returns all errors, not just first) ──────────────────────────
 
@@ -1378,6 +1392,51 @@ export function LeagueCreatePage(): React.JSX.Element {
     },
     refetchQueries: [{ query: GetUserLeagues }],
   });
+
+  // Live eligible-player-count preview for a custom era range (LS-6089).
+  // Debounced on a 400ms trailing timer so the query doesn't fire per keystroke
+  // as the user types into the Start Year / End Year inputs.
+  const [debouncedCustomEra, setDebouncedCustomEra] = useState<{
+    startYear?: number;
+    endYear?: number;
+  }>({
+    startYear: formData.customEraStartYear,
+    endYear: formData.customEraEndYear,
+  });
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedCustomEra({
+        startYear: formData.customEraStartYear,
+        endYear: formData.customEraEndYear,
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [formData.customEraStartYear, formData.customEraEndYear]);
+
+  const isCustomEraRangeComplete =
+    formData.baseballEraFilter === 'custom' &&
+    debouncedCustomEra.startYear != null &&
+    debouncedCustomEra.endYear != null &&
+    debouncedCustomEra.startYear <= debouncedCustomEra.endYear;
+
+  const {
+    data: eligiblePlayerCountData,
+    loading: eligiblePlayerCountLoading,
+    error: eligiblePlayerCountError,
+  } = usePreviewEligiblePlayerCountQuery({
+    variables: {
+      sport: formData.sport,
+      playerPool: formData.playerPool,
+      baseballHofOnly: formData.baseballHofOnly,
+      baseballEraFilter: formData.baseballEraFilter,
+      customEraStartYear: debouncedCustomEra.startYear,
+      customEraEndYear: debouncedCustomEra.endYear,
+    },
+    skip: !isCustomEraRangeComplete,
+    fetchPolicy: 'cache-and-network',
+  });
+  const eligiblePlayerCount =
+    eligiblePlayerCountData?.previewEligiblePlayerCount;
 
   const handleInputChange = (
     field: keyof CreateLeagueFormData,
@@ -2436,6 +2495,62 @@ export function LeagueCreatePage(): React.JSX.Element {
                     invalid={!!validationErrors.customEra}
                   />
                 )}
+
+                {/* Live eligible-player-count preview for custom era (LS-6089) */}
+                {isCustomEraRangeComplete && (
+                  <XStack
+                    gap="$2"
+                    alignItems="center"
+                    flexWrap="wrap"
+                    data-testid="custom-era-eligible-count"
+                  >
+                    {eligiblePlayerCountError ? (
+                      <Text fontFamily="$body" fontSize={13} color="$red9">
+                        Couldn't check eligible players. Try again shortly.
+                      </Text>
+                    ) : (
+                      <Text fontFamily="$body" fontSize={13} color="$color11">
+                        {eligiblePlayerCountLoading &&
+                        eligiblePlayerCount == null
+                          ? 'Checking eligible players…'
+                          : `${eligiblePlayerCount ?? 0} eligible players`}
+                      </Text>
+                    )}
+                  </XStack>
+                )}
+                {isCustomEraRangeComplete &&
+                  eligiblePlayerCount != null &&
+                  isPoolTooSmall(
+                    eligiblePlayerCount,
+                    formData.numberOfTeams,
+                    formData.maxRosterSize,
+                  ) && (
+                    <XStack
+                      role="status"
+                      aria-live="polite"
+                      gap="$3"
+                      alignItems="center"
+                      backgroundColor={withAlpha(AMBER, 0.1)}
+                      borderWidth={1}
+                      borderColor={withAlpha(AMBER, 0.4)}
+                      borderRadius="$4"
+                      padding="$3"
+                      data-testid="custom-era-shortfall-warning"
+                    >
+                      <AlertCircle size={16} color={AMBER} flexShrink={0} />
+                      <Text
+                        fontFamily="$body"
+                        fontSize={13}
+                        color="$color11"
+                        flex={1}
+                      >
+                        Only {eligiblePlayerCount} eligible players —{' '}
+                        {formData.numberOfTeams} teams ×{' '}
+                        {formData.maxRosterSize} roster needs{' '}
+                        {formData.numberOfTeams * formData.maxRosterSize}+
+                      </Text>
+                    </XStack>
+                  )}
 
                 {/* HOF Only */}
                 <FieldRow

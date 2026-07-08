@@ -176,3 +176,21 @@ mutation CreateLeague($input: CreateLeagueAndTeamsInput!) {
     }
   }
 }
+
+query PreviewEligiblePlayerCount(
+  $sport: String!
+  $playerPool: String
+  $baseballHofOnly: Boolean
+  $baseballEraFilter: String
+  $customEraStartYear: Int
+  $customEraEndYear: Int
+) {
+  previewEligiblePlayerCount(
+    sport: $sport
+    playerPool: $playerPool
+    baseballHofOnly: $baseballHofOnly
+    baseballEraFilter: $baseballEraFilter
+    customEraStartYear: $customEraStartYear
+    customEraEndYear: $customEraEndYear
+  )
+}

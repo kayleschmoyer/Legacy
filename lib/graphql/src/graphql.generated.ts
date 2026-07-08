@@ -3075,6 +3075,8 @@ export type Query = {
   playerSeasonFielding?: Maybe<Array<SeasonFielding>>;
   playerSeasonPitching?: Maybe<Array<SeasonPitching>>;
   players?: Maybe<Array<Player>>;
+  /** Preview how many players would be eligible under a candidate league configuration, before the league is created. */
+  previewEligiblePlayerCount: Scalars['Int']['output'];
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
@@ -3579,6 +3581,17 @@ export type QueryPlayersArgs = {
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Sport>;
+};
+
+export type QueryPreviewEligiblePlayerCountArgs = {
+  baseballEraFilter?: InputMaybe<Scalars['String']['input']>;
+  baseballHofOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
+  customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
+  minCareerGames?: InputMaybe<Scalars['Int']['input']>;
+  minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  sport: Scalars['String']['input'];
 };
 
 export type QueryPublicLeaguesArgs = {
@@ -6193,6 +6206,20 @@ export type CreateLeagueMutation = {
       } | null;
     } | null;
   } | null;
+};
+
+export type PreviewEligiblePlayerCountQueryVariables = Exact<{
+  sport: Scalars['String']['input'];
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  baseballHofOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  baseballEraFilter?: InputMaybe<Scalars['String']['input']>;
+  customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
+  customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type PreviewEligiblePlayerCountQuery = {
+  __typename?: 'Query';
+  previewEligiblePlayerCount: number;
 };
 
 export type GetMyMockDraftUsageQueryVariables = Exact<{ [key: string]: never }>;
@@ -17592,6 +17619,113 @@ export type CreateLeagueMutationResult =
 export type CreateLeagueMutationOptions = BaseMutationOptions<
   CreateLeagueMutation,
   CreateLeagueMutationVariables
+>;
+export const PreviewEligiblePlayerCount = gql`
+  query PreviewEligiblePlayerCount(
+    $sport: String!
+    $playerPool: String
+    $baseballHofOnly: Boolean
+    $baseballEraFilter: String
+    $customEraStartYear: Int
+    $customEraEndYear: Int
+  ) {
+    previewEligiblePlayerCount(
+      sport: $sport
+      playerPool: $playerPool
+      baseballHofOnly: $baseballHofOnly
+      baseballEraFilter: $baseballEraFilter
+      customEraStartYear: $customEraStartYear
+      customEraEndYear: $customEraEndYear
+    )
+  }
+`;
+
+/**
+ * __usePreviewEligiblePlayerCountQuery__
+ *
+ * To run a query within a React component, call `usePreviewEligiblePlayerCountQuery` and pass it any options that fit your needs.
+ * When your component renders, `usePreviewEligiblePlayerCountQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = usePreviewEligiblePlayerCountQuery({
+ *   variables: {
+ *      sport: // value for 'sport'
+ *      playerPool: // value for 'playerPool'
+ *      baseballHofOnly: // value for 'baseballHofOnly'
+ *      baseballEraFilter: // value for 'baseballEraFilter'
+ *      customEraStartYear: // value for 'customEraStartYear'
+ *      customEraEndYear: // value for 'customEraEndYear'
+ *   },
+ * });
+ */
+export function usePreviewEligiblePlayerCountQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    PreviewEligiblePlayerCountQuery,
+    PreviewEligiblePlayerCountQueryVariables
+  > &
+    (
+      | { variables: PreviewEligiblePlayerCountQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    PreviewEligiblePlayerCountQuery,
+    PreviewEligiblePlayerCountQueryVariables
+  >(PreviewEligiblePlayerCount, options);
+}
+export function usePreviewEligiblePlayerCountLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    PreviewEligiblePlayerCountQuery,
+    PreviewEligiblePlayerCountQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    PreviewEligiblePlayerCountQuery,
+    PreviewEligiblePlayerCountQueryVariables
+  >(PreviewEligiblePlayerCount, options);
+}
+export function usePreviewEligiblePlayerCountSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        PreviewEligiblePlayerCountQuery,
+        PreviewEligiblePlayerCountQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    PreviewEligiblePlayerCountQuery,
+    PreviewEligiblePlayerCountQueryVariables
+  >(
+    PreviewEligiblePlayerCount,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          PreviewEligiblePlayerCountQuery,
+          PreviewEligiblePlayerCountQueryVariables
+        >,
+  );
+}
+export type PreviewEligiblePlayerCountQueryHookResult = ReturnType<
+  typeof usePreviewEligiblePlayerCountQuery
+>;
+export type PreviewEligiblePlayerCountLazyQueryHookResult = ReturnType<
+  typeof usePreviewEligiblePlayerCountLazyQuery
+>;
+export type PreviewEligiblePlayerCountSuspenseQueryHookResult = ReturnType<
+  typeof usePreviewEligiblePlayerCountSuspenseQuery
+>;
+export type PreviewEligiblePlayerCountQueryResult = Apollo.QueryResult<
+  PreviewEligiblePlayerCountQuery,
+  PreviewEligiblePlayerCountQueryVariables
 >;
 export const GetMyMockDraftUsage = gql`
   query GetMyMockDraftUsage {

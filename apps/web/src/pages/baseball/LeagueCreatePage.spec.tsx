@@ -30,7 +30,11 @@ import {
   useNavigationType,
 } from 'react-router-dom';
 import type { CreateLeagueFormData } from './LeagueCreatePage';
-import { validateFormFull, VALIDATION_ERROR_SECTION } from './LeagueCreatePage';
+import {
+  isPoolTooSmall,
+  validateFormFull,
+  VALIDATION_ERROR_SECTION,
+} from './LeagueCreatePage';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
 
 // ---------------------------------------------------------------------------
@@ -243,6 +247,10 @@ jest.mock('@legacy-sports/graphql', () => ({
         name: `League ${i + 1}`,
       })),
     },
+  })),
+  usePreviewEligiblePlayerCountQuery: jest.fn(() => ({
+    data: undefined,
+    loading: false,
   })),
 }));
 
@@ -1016,6 +1024,24 @@ describe('LeagueCreatePage — draft date sidebar fallback (LS-6077)', () => {
       screen.getByText('Draft opens whenever you schedule it.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Invalid Date/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('isPoolTooSmall (LS-6089)', () => {
+  it('warns when the eligible pool is smaller than teams x roster size', () => {
+    expect(isPoolTooSmall(100, 12, 26)).toBe(true);
+  });
+
+  it('does not warn when the eligible pool exactly meets the requirement', () => {
+    expect(isPoolTooSmall(312, 12, 26)).toBe(false);
+  });
+
+  it('does not warn when the eligible pool exceeds the requirement', () => {
+    expect(isPoolTooSmall(2000, 12, 26)).toBe(false);
+  });
+
+  it('warns for a narrow wartime-era pool (1942-1944 scenario)', () => {
+    expect(isPoolTooSmall(150, 12, 26)).toBe(true);
   });
 });
 

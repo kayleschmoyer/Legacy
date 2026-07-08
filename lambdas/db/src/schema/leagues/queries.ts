@@ -5,7 +5,11 @@
  *          userTeamId, validateInviteCode, teamLeagueMembers,
  *          publicLeagues
  */
-import { PublicSchema } from '@legacy-sports/db-client';
+import {
+  buildEligibilityConditions,
+  type LeagueEligibilitySettings,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   and,
@@ -1175,6 +1179,81 @@ builder.queryField('publicLeagues', (t) =>
         });
         throw new Error('Failed to fetch public leagues');
       }
+    },
+  }),
+);
+
+/**
+ * Query: previewEligiblePlayerCount
+ *
+ * Pre-creation preview of how many players would be eligible under a
+ * candidate league configuration — no league or draft needs to exist yet.
+ * Reuses the same `buildEligibilityConditions` predicate builder that
+ * `getAvailableDraftPlayers` (the live draft board) and the pick mutations
+ * apply post-creation, so the preview count can never disagree with what
+ * draft day actually shows (LS-6089).
+ */
+builder.queryField('previewEligiblePlayerCount', (t) =>
+  t.int({
+    description:
+      'Preview how many players would be eligible under a candidate league configuration, before the league is created.',
+    nullable: false,
+    args: {
+      sport: t.arg.string({ required: true }),
+      playerPool: t.arg.string({ required: false }),
+      baseballHofOnly: t.arg.boolean({ required: false }),
+      baseballEraFilter: t.arg.string({ required: false }),
+      customEraStartYear: t.arg.int({ required: false }),
+      customEraEndYear: t.arg.int({ required: false }),
+      minCareerGames: t.arg.int({ required: false }),
+      minCareerSeasons: t.arg.int({ required: false }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to preview eligible player count',
+        );
+      }
+
+      if (args.sport !== 'baseball' && args.sport !== 'football') {
+        throw UserInputError(
+          `Invalid sport: "${args.sport}". Allowed values: baseball, football.`,
+        );
+      }
+
+      let playerPool: LeagueEligibilitySettings['playerPool'] = 'all';
+      if (args.playerPool) {
+        if (!isValidPlayerPool(args.playerPool)) {
+          throw UserInputError(
+            `Invalid playerPool: "${args.playerPool}". Allowed values: ${VALID_PLAYER_POOLS.join(', ')}.`,
+          );
+        }
+        playerPool = args.playerPool;
+      }
+
+      const eligibilityConditions = buildEligibilityConditions({
+        sport: args.sport,
+        playerPool,
+        minCareerGames: args.minCareerGames ?? 50,
+        minCareerSeasons: args.minCareerSeasons ?? 3,
+        baseballHofOnly: args.baseballHofOnly ?? false,
+        baseballEraFilter: args.baseballEraFilter ?? undefined,
+        customEraStartYear: args.customEraStartYear ?? null,
+        customEraEndYear: args.customEraEndYear ?? null,
+      });
+
+      const whereClause =
+        eligibilityConditions.length > 0
+          ? sql`WHERE ${sql.join(
+              eligibilityConditions.map((c) => c.condition),
+              sql` AND `,
+            )}`
+          : sql``;
+
+      const result = await context.db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM public.players p ${whereClause}`,
+      );
+      return Number(result.rows[0]?.count ?? 0);
     },
   }),
 );

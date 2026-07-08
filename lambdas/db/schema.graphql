@@ -3506,6 +3506,20 @@ type Query {
   ): [Player!]
 
   """
+  Preview how many players would be eligible under a candidate league configuration, before the league is created.
+  """
+  previewEligiblePlayerCount(
+    baseballEraFilter: String
+    baseballHofOnly: Boolean
+    customEraEndYear: Int
+    customEraStartYear: Int
+    minCareerGames: Int
+    minCareerSeasons: Int
+    playerPool: String
+    sport: String!
+  ): Int!
+
+  """
   Check if the authenticated user has accepted the privacy policy
   """
   privacyPolicyStatus: PrivacyPolicyStatus

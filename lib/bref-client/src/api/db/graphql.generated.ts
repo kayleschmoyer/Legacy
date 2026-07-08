@@ -3069,6 +3069,8 @@ export type Query = {
   playerSeasonFielding?: Maybe<Array<SeasonFielding>>;
   playerSeasonPitching?: Maybe<Array<SeasonPitching>>;
   players?: Maybe<Array<Player>>;
+  /** Preview how many players would be eligible under a candidate league configuration, before the league is created. */
+  previewEligiblePlayerCount: Scalars['Int']['output'];
   /** Check if the authenticated user has accepted the privacy policy */
   privacyPolicyStatus?: Maybe<PrivacyPolicyStatus>;
   publicLeagues: Array<PublicLeagueInfo>;
@@ -3573,6 +3575,17 @@ export type QueryPlayersArgs = {
   position?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Sport>;
+};
+
+export type QueryPreviewEligiblePlayerCountArgs = {
+  baseballEraFilter?: InputMaybe<Scalars['String']['input']>;
+  baseballHofOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  customEraEndYear?: InputMaybe<Scalars['Int']['input']>;
+  customEraStartYear?: InputMaybe<Scalars['Int']['input']>;
+  minCareerGames?: InputMaybe<Scalars['Int']['input']>;
+  minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
+  playerPool?: InputMaybe<Scalars['String']['input']>;
+  sport: Scalars['String']['input'];
 };
 
 export type QueryPublicLeaguesArgs = {
