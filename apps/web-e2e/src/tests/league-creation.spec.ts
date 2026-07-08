@@ -262,11 +262,14 @@ test.describe('League Creation @critical', () => {
     // Fill in some form data
     await leaguePage.fillLeagueName('Test League');
 
-    // Click cancel button — with unsaved changes this opens a
-    // "Discard this league?" confirmation dialog (LS-6109) instead of
-    // navigating immediately.
+    // Click cancel button — with unsaved changes this opens a discard
+    // confirmation dialog rather than navigating immediately (LS-6108).
+    // Skip an explicit expectVisible() wait on the dialog itself: its
+    // default assertion timeout (3000ms) is shorter than the dialog's
+    // animate-in time can take under CI load, whereas .tap()'s own
+    // (longer) actionability wait handles this reliably.
     await leaguePage.cancelButton.tap();
-    await leaguePage.button('Discard').tap();
+    await leaguePage.discardConfirmButton.tap();
 
     // Should navigate back to baseball homepage
     await expect(page).toHaveURL('/baseball');

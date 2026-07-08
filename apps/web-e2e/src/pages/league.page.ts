@@ -164,6 +164,15 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('rename-team-confirm');
   }
 
+  /**
+   * The "Discard" confirm button inside the "Discard this league?" dialog
+   * shown when Cancel is clicked on the league-create form with unsaved
+   * changes (LS-6108).
+   */
+  get discardConfirmButton(): UIElement {
+    return this.driver.byRole('button', { name: /^discard$/i });
+  }
+
   /** The QR-code loading skeleton (shown until the invite code resolves). */
   get qrCodeSkeleton(): UIElement {
     return this.driver.byTestId('qr-code-skeleton');

@@ -1204,10 +1204,34 @@ export function LeagueCreatePage(): React.JSX.Element {
       .trim()
       .slice(0, MAX_LEAGUE_NAME_LENGTH);
     const initialDefaults = defaultsForSport(selectedSport);
+
+    // Deep-link prefill for partner integrations / marketing campaigns
+    // (LS-6112). Each param is allowlist-validated against the same option
+    // sets the form controls use; anything invalid or absent falls back to
+    // the existing default, matching the tolerant `?name=` behavior above.
+    const teamsParam = Number(searchParams.get('teams'));
+    const initialNumberOfTeams = TEAM_COUNT_OPTIONS.includes(teamsParam)
+      ? teamsParam
+      : initialDefaults.numberOfTeams;
+
+    const eraFilterParam = searchParams.get('eraFilter');
+    const initialEraFilter = ERAS_BY_SPORT[selectedSport].some(
+      (e) => e.id === eraFilterParam,
+    )
+      ? (eraFilterParam as string)
+      : 'all';
+
+    const scoringFormatParam = searchParams.get('scoringFormat');
+    const initialScoringFormat: ScoringFormat =
+      selectedSport === 'football' &&
+      SCORING_FORMAT_OPTIONS.some((o) => o.id === scoringFormatParam)
+        ? (scoringFormatParam as ScoringFormat)
+        : 'ppr';
+
     return {
       sport: selectedSport,
       leagueName: initialLeagueName,
-      numberOfTeams: initialDefaults.numberOfTeams,
+      numberOfTeams: initialNumberOfTeams,
       numberOfDivisions: DEFAULT_NUM_DIVISIONS,
       schedulingStrategy: 'divisional',
       playerPool: 'all',
@@ -1220,7 +1244,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       waiverType: 'standard',
       faabBudgetDefault: 100,
       isPublic: false,
-      baseballEraFilter: 'all',
+      baseballEraFilter: initialEraFilter,
       baseballHofOnly: false,
       salaryCapEnabled: false,
       salaryCap: undefined,
@@ -1232,7 +1256,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       auctionBudget: 200,
       auctionMinBid: 1,
       pickTimeLimitSeconds: 120,
-      scoringFormat: 'ppr',
+      scoringFormat: initialScoringFormat,
       defensiveFormat: 'dst',
     };
   });

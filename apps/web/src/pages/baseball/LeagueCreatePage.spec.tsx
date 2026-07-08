@@ -23,7 +23,12 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useNavigationType,
+} from 'react-router-dom';
 import type { CreateLeagueFormData } from './LeagueCreatePage';
 import { validateFormFull } from './LeagueCreatePage';
 
@@ -229,11 +234,24 @@ jest.mock('@legacy-sports/graphql', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Exposes the router's current navigation action (PUSH/REPLACE/POP) via a
+ * hidden testid, so tests can assert push-vs-replace behavior (LS-6110)
+ * without mocking `useNavigate` — a blanket mock there would no-op real
+ * navigation for every other test in this file that relies on the
+ * MemoryRouter actually changing routes.
+ */
+function NavigationTypeProbe() {
+  const navigationType = useNavigationType();
+  return <span data-testid="nav-type">{navigationType}</span>;
+}
+
 function renderPage(initialPath = '/baseball/league/create') {
   const Page = require('./LeagueCreatePage')
     .LeagueCreatePage as React.ComponentType;
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
+      <NavigationTypeProbe />
       <Routes>
         <Route path="/baseball/league/create" element={<Page />} />
         <Route path="/football/league/create" element={<Page />} />
@@ -335,11 +353,12 @@ describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
   it('pushes (not replaces) history when switching sport, so Back returns to the prior sport create page (LS-6110)', () => {
     renderPage('/baseball/league/create');
     fireEvent.click(screen.getByTestId('sport-tab-football'));
-    const call = mockNavigate.mock.calls.find(
-      ([to]) => to === '/football/league/create',
-    );
-    expect(call).toBeDefined();
-    expect(call?.[1]?.replace).not.toBe(true);
+    expect(
+      screen.getByRole('heading', { name: /Create Football League/i }),
+    ).toBeInTheDocument();
+    // 'PUSH' (not 'REPLACE') confirms the sport switch added a new history
+    // entry rather than overwriting the current one.
+    expect(screen.getByTestId('nav-type')).toHaveTextContent('PUSH');
   });
 
   it('renders both sport tabs at the baseball URL', () => {
@@ -1516,5 +1535,82 @@ describe('LeagueCreatePage — submit error code + correlation token (LS-6065)',
       code: 'BAD_USER_INPUT',
       correlationId: expect.stringMatching(/^[0-9a-f]{8}$/),
     });
+  });
+});
+
+describe('LeagueCreatePage — URL prefill allowlist (LS-6112)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  async function submitAndGetInput() {
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+    return mockCreateLeague.mock.calls[0][0].variables.input;
+  }
+
+  it('AC1: prefills numberOfTeams from a valid ?teams= value', async () => {
+    renderPage('/baseball/league/create?teams=8');
+    const input = await submitAndGetInput();
+    expect(input.numberOfTeams).toBe(8);
+  });
+
+  it('AC1: rejects ?teams=15 (not in TEAM_COUNT_OPTIONS) and falls back to the sport default', async () => {
+    renderPage('/baseball/league/create?teams=15');
+    const input = await submitAndGetInput();
+    expect(input.numberOfTeams).toBe(12); // baseball's SPORTS.defaultTeams
+  });
+
+  it('AC2: ignores a non-numeric ?teams= value and falls back to the sport default', async () => {
+    renderPage('/baseball/league/create?teams=abc');
+    const input = await submitAndGetInput();
+    expect(input.numberOfTeams).toBe(12); // baseball's SPORTS.defaultTeams
+  });
+
+  it('AC3: prefills baseballEraFilter from a valid ?eraFilter= value', async () => {
+    renderPage('/baseball/league/create?eraFilter=modern');
+    const input = await submitAndGetInput();
+    expect(input.eraFilter).toBe('modern');
+  });
+
+  it('AC4: ignores an ?eraFilter= value not valid for the sport and falls back to "all"', async () => {
+    renderPage('/baseball/league/create?eraFilter=pioneer');
+    const input = await submitAndGetInput();
+    expect(input.eraFilter).toBe('all');
+  });
+
+  it('AC5: prefills scoringFormat from a valid ?scoringFormat= value on the football route', async () => {
+    renderPage('/football/league/create?scoringFormat=half_ppr');
+    const input = await submitAndGetInput();
+    expect(input.scoringFormat).toBe('half_ppr');
+  });
+
+  it('AC5: ?scoringFormat= has no effect on the baseball route', async () => {
+    renderPage('/baseball/league/create?scoringFormat=half_ppr');
+    const input = await submitAndGetInput();
+    expect(input.scoringFormat).toBeUndefined();
+  });
+
+  it('AC6: ignores an invalid ?scoringFormat= value (including "custom") and falls back to "ppr"', async () => {
+    renderPage('/football/league/create?scoringFormat=custom');
+    const input = await submitAndGetInput();
+    expect(input.scoringFormat).toBe('ppr');
+  });
+
+  it('AC7: existing ?name= prefill behavior is unchanged alongside the new params', async () => {
+    renderPage('/baseball/league/create?name=Deep+Link+League&teams=8');
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.leagueName).toBe('Deep Link League');
+    expect(input.numberOfTeams).toBe(8);
   });
 });
