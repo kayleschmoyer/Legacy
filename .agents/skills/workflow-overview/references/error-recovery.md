@@ -137,10 +137,22 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 4. If it fails again with a different error: likely infrastructure flake. Re-run one more time (max 2 re-runs total).
 5. After 2 failed re-runs: investigate the root cause. Read the test code, check for timing dependencies (`waitForTimeout` anti-pattern), network dependencies, or state leakage between tests.
 
+## Scenario 11: Wrong Commit Author (Cloud Sessions)
+
+**Symptom**: a cloud-session stop hook (or self-review) flags a commit's author as not matching the expected bot identity (e.g. not `noreply@anthropic.com`), or you notice a commit was authored under the wrong identity after a rebase/amend.
+
+**Decision tree**:
+
+1. Fix it in place with one call: `worktree_commit({ amend: true, resetAuthor: true })` — this sets `user.email`/`user.name` and runs `--reset-author` on the tip commit. Do **not** hand-roll `git config` + `git commit --amend --reset-author` via Bash, and do **not** create a separate local branch to stage the fix — amend the branch you're already on.
+2. Push it with `worktree_push()` — it already bakes in `--force-with-lease` and refuses only `main`. Pushing a corrected commit on your **own** unmerged draft-PR branch is the same risk tier as any other feature-branch force-push (see [When to Ask the User](#when-to-ask-the-user)): **inform, then proceed** — note it in the PR/checkpoint comment, do not stop and wait for explicit sign-off.
+3. If the branch has also diverged from `main` (conflicts), resolve those first per Scenario 3, then do the author fix as the last step before the final push so you only force-push once.
+
 ## When to Ask the User
 
 Use this heuristic when the scenarios above don't cover your situation:
 
 - **Reversible + low risk**: proceed without asking (edit files, run tests, create draft PRs).
-- **Reversible + high risk**: inform the user what you're about to do, then proceed unless they object (rebase, force-push feature branches).
+- **Reversible + high risk**: inform the user what you're about to do, then proceed unless they object (rebase, force-push feature branches, amending/fixing authorship on commits on your own unmerged draft-PR branch — see Scenario 11).
 - **Irreversible or product decision**: always ask first (delete branches, close PRs/tickets, push to shared branches, make architectural choices not specified in the ticket).
+
+**If you do decide a situation is genuinely irreversible-or-product-decision and must wait for the user**: ask once, clearly, with a concrete question and the exact action you're proposing. If you're then woken again by an unrelated event (a GitHub webhook, a CI status change) before the user has answered, do **not** re-explain the situation from scratch or repeat the same paragraph verbatim — that produces a wall of identical "still holding" messages with no new information, which is confusing and wastes the resume cycle. Instead: silently check whether anything relevant changed; if not, reply with a single short line ("No update — still waiting on `<the specific question>`.") or nothing at all if the event was purely mechanical (e.g. a label sync) and not addressed to you. Re-read the situation with fresh eyes each time, too — a "must wait" call made early in a session may turn out to have a fully pre-authorized path once you check (e.g. Scenario 11 above is a common case of an agent freezing on something that was actually already sanctioned).

@@ -141,4 +141,4 @@ Everything downstream of the ready PR is environment-neutral — see the machine
 - [debugging](../debugging/SKILL.md) -- investigate and fix CI failures and code defects.
 - [worktree-workflow](../worktree-workflow/SKILL.md) -- worktree creation and management.
 - [repo-tooling](../repo-tooling/SKILL.md) -- Make targets, Nx commands, migration scripts.
-- [error-recovery](references/error-recovery.md) -- decision trees for the top 10 failure scenarios.
+- [error-recovery](references/error-recovery.md) -- decision trees for the top 11 failure scenarios.
