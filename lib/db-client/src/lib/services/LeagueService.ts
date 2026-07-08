@@ -114,6 +114,15 @@ export interface CreateLeagueOptions {
    * user already has >= leagueLimit non-mock leagues.
    */
   leagueLimit?: number;
+  /**
+   * Client-generated idempotency key for this create attempt (LS-6063). Only
+   * consulted when `leagueLimit` is set (the free-tier path this dedup exists
+   * for). If a league already exists for (ownerId, idempotencyKey), that
+   * league is returned instead of creating a new one — protects against a
+   * duplicate request (double-click, retry, parallel tab) that reaches the
+   * server despite the client's in-flight guard.
+   */
+  idempotencyKey?: string;
 }
 
 export interface CreateLeagueResult {
@@ -212,6 +221,7 @@ export class LeagueService {
       gamesPerMatchup,
       pickTimeLimitSeconds = 120,
       leagueLimit,
+      idempotencyKey,
     } = input;
 
     const maxRosterSize =
@@ -254,6 +264,105 @@ export class LeagueService {
           await tx.execute(
             sql`SELECT pg_advisory_xact_lock(CAST(${ownerId} AS bigint))`,
           );
+
+          // Idempotent replay (LS-6063): a resubmission of the same create
+          // attempt (double-click past the client guard, retry, parallel
+          // tab) carries the same idempotencyKey. Since we hold the same
+          // per-owner advisory lock the count check below uses, this lookup
+          // and any concurrent insert of the same key can't race each other.
+          if (idempotencyKey) {
+            const [existingLeague] = await tx
+              .select({
+                id: PublicSchema.leagues.id,
+                name: PublicSchema.leagues.name,
+                owner: PublicSchema.leagues.owner,
+                sport: PublicSchema.leagues.sport,
+                maxRosterSize: PublicSchema.leagues.maxRosterSize,
+                currentMatchup: PublicSchema.leagues.currentMatchup,
+                currentWeek: PublicSchema.leagues.currentWeek,
+                draftStatus: PublicSchema.leagues.draftStatus,
+                leaguePhase: PublicSchema.leagues.leaguePhase,
+                inviteCode: PublicSchema.leagues.inviteCode,
+                playerPool: PublicSchema.leagues.playerPool,
+                eraFilter: PublicSchema.leagues.baseballEraFilter,
+                baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
+                customEraStartYear: PublicSchema.leagues.customEraStartYear,
+                customEraEndYear: PublicSchema.leagues.customEraEndYear,
+                waiverType: PublicSchema.leagues.waiverType,
+                waiverEnabled: PublicSchema.leagues.waiverEnabled,
+                faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
+                isPublic: PublicSchema.leagues.isPublic,
+                playoffEnabled: PublicSchema.leagues.playoffEnabled,
+              })
+              .from(PublicSchema.leagues)
+              .where(
+                and(
+                  eq(PublicSchema.leagues.owner, ownerId),
+                  eq(
+                    PublicSchema.leagues.creationIdempotencyKey,
+                    idempotencyKey,
+                  ),
+                ),
+              )
+              .limit(1);
+
+            if (existingLeague) {
+              const existingTeams = await tx
+                .select({
+                  id: PublicSchema.teams.id,
+                  name: PublicSchema.teams.name,
+                  leagueId: PublicSchema.teams.leagueId,
+                  divisionId: PublicSchema.teams.divisionId,
+                  createdAt: PublicSchema.teams.createdAt,
+                  updatedAt: PublicSchema.teams.updatedAt,
+                  waiverOrder: PublicSchema.teams.waiverOrder,
+                  faabBudget: PublicSchema.teams.faabBudget,
+                })
+                .from(PublicSchema.teams)
+                .where(eq(PublicSchema.teams.leagueId, existingLeague.id));
+
+              const [existingOwnerMember] = await tx
+                .select({
+                  leagueId: PublicSchema.leagueMembers.leagueId,
+                  userId: PublicSchema.leagueMembers.userId,
+                  teamId: PublicSchema.leagueMembers.teamId,
+                  permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+                })
+                .from(PublicSchema.leagueMembers)
+                .where(
+                  and(
+                    eq(PublicSchema.leagueMembers.leagueId, existingLeague.id),
+                    eq(PublicSchema.leagueMembers.userId, ownerId),
+                  ),
+                )
+                .limit(1);
+
+              if (!existingOwnerMember?.teamId) {
+                throw new Error(
+                  `Idempotent league ${existingLeague.id} is missing its owner membership/team`,
+                );
+              }
+
+              LOGGER.info(
+                'Idempotent createLeague resubmission detected, returning existing league',
+                { leagueId: existingLeague.id, ownerId },
+              );
+
+              return {
+                league: existingLeague,
+                teams: existingTeams,
+                leagueMembers: [
+                  {
+                    leagueId: existingOwnerMember.leagueId,
+                    userId: existingOwnerMember.userId,
+                    teamId: existingOwnerMember.teamId,
+                    permissionLevel: existingOwnerMember.permissionLevel,
+                  },
+                ],
+              };
+            }
+          }
+
           const [{ existingCount }] = await tx
             .select({
               existingCount: countDistinct(PublicSchema.leagues.id),
@@ -297,6 +406,11 @@ export class LeagueService {
             schedulingDivisionalWeightPct,
             numberOfDivisions,
             isPublic,
+            // Idempotency key for this create attempt (LS-6063). Only ever
+            // set when leagueLimit is defined (the free-tier path this
+            // dedup exists for) — see the lookup above.
+            creationIdempotencyKey:
+              leagueLimit !== undefined ? (idempotencyKey ?? null) : null,
             // Salary cap settings
             salaryCapEnabled,
             salaryCap,

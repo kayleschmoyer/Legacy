@@ -965,6 +965,92 @@ describe('LeagueCreatePage — unsaved-changes navigation guard (LS-6109)', () =
   });
 });
 
+describe('LeagueCreatePage — in-flight submit guard + idempotency key (LS-6063)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('fires the mutation only once when submit is triggered twice before the first attempt resolves', async () => {
+    let resolveMutation: (value: unknown) => void = () => {
+      throw new Error('resolveMutation called before mutation in-flight');
+    };
+    mockCreateLeague.mockReturnValue(
+      new Promise((resolve) => {
+        resolveMutation = resolve;
+      }),
+    );
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    const form = screen.getByTestId('create-league-submit').closest('form');
+    // Second submit fires while the first mutation is still in flight — the
+    // synchronous ref guard (not the async `loading` flag) must block it.
+    fireEvent.submit(form as HTMLFormElement);
+    fireEvent.submit(form as HTMLFormElement);
+
+    expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+
+    resolveMutation({
+      data: { createLeagueAndTeams: { league: { id: 42 } } },
+    });
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      'Test League is ready.',
+    );
+  });
+
+  it('allows a new submission after the previous attempt resolves', async () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: null } },
+    });
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    const form = screen
+      .getByTestId('create-league-submit')
+      .closest('form') as HTMLFormElement;
+    fireEvent.submit(form);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+
+    fireEvent.submit(form);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(2));
+  });
+
+  it('sends a stable idempotencyKey with the mutation and reuses it across resubmissions', async () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: null } },
+    });
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    const form = screen
+      .getByTestId('create-league-submit')
+      .closest('form') as HTMLFormElement;
+    fireEvent.submit(form);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+
+    const firstKey =
+      mockCreateLeague.mock.calls[0][0].variables.input.idempotencyKey;
+    expect(typeof firstKey).toBe('string');
+    expect(firstKey.length).toBeGreaterThan(0);
+
+    fireEvent.submit(form);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(2));
+
+    const secondKey =
+      mockCreateLeague.mock.calls[1][0].variables.input.idempotencyKey;
+    expect(secondKey).toBe(firstKey);
+  });
+});
+
 describe('LeagueCreatePage — Divisional vs 1 division (LS-6105)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

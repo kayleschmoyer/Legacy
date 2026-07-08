@@ -108,6 +108,15 @@ export const leagues = pgTable(
     /** True for ephemeral mock drafts created via initializeMockDraft (LS-470).
      *  Rosters are NOT persisted and matchups are NOT created when isMockDraft=true. */
     isMockDraft: boolean('is_mock_draft').notNull().default(false),
+    /** Client-generated key from a single create-league form submission attempt
+     *  (LS-6063). Lets createLeague dedupe a resubmission (double-click, retry,
+     *  parallel tab) against an already-created league instead of inserting a
+     *  duplicate. Null for leagues created before this field existed or via
+     *  paths that don't send one. Unique per owner when set — see the partial
+     *  unique index in migration 20260708_000000. */
+    creationIdempotencyKey: varchar('creation_idempotency_key', {
+      length: 64,
+    }),
     // League visibility
     isPublic: boolean('is_public').notNull().default(false),
     logoUrl: text('logo_url'),

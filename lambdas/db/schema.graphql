@@ -516,6 +516,7 @@ input CreateLeagueAndTeamsInput {
   eraFilter: String
   faabBudgetDefault: Int
   gamesPerMatchup: Int
+  idempotencyKey: String
   isPublic: Boolean
   leagueName: String!
   luxuryTaxThreshold: Int

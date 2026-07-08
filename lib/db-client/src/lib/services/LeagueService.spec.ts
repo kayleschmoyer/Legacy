@@ -147,3 +147,105 @@ describe('LeagueService.createLeague — atomicity (LS-6068)', () => {
     expect(mockDb.insert).not.toHaveBeenCalled();
   });
 });
+
+describe('LeagueService.createLeague — idempotent resubmission (LS-6063)', () => {
+  const options = { type: 'pg-local' } as DbOptions;
+  let service: LeagueService;
+  let mockTx: MockTx & { limit: jest.Mock };
+  let mockDb: MockDb;
+
+  const baseInput = {
+    name: 'Test League',
+    ownerId: 1,
+    ownerUsername: 'owner',
+    leagueLimit: 3,
+    idempotencyKey: 'client-generated-key-abc',
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new LeagueService(options);
+
+    mockTx = {
+      execute: jest.fn().mockResolvedValue(undefined),
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn(),
+      insert: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockResolvedValue([{ id: 1 }]),
+      limit: jest.fn(),
+    };
+
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([]),
+      insert: jest.fn(),
+      transaction: jest.fn((cb: (tx: MockTx) => Promise<unknown>) =>
+        cb(mockTx),
+      ),
+    };
+
+    mockedHelpers.runWithPublicClient.mockImplementation((_opts, handler) =>
+      handler(mockDb as never),
+    );
+  });
+
+  it('returns the already-created league instead of inserting a duplicate when a resubmission matches an existing idempotency key', async () => {
+    // Query order for a resubmission: (1) existingLeague lookup — `.where().limit(1)`,
+    // (2) existingTeams lookup — `.where()` awaited directly, (3) existingOwnerMember
+    // lookup — `.where().limit(1)`.
+    mockTx.where
+      .mockImplementationOnce(() => ({
+        limit: jest.fn().mockResolvedValue([{ id: 100, name: 'Test League' }]),
+      }))
+      .mockImplementationOnce(() =>
+        Promise.resolve([{ id: 200, leagueId: 100, name: 'Team 1' }]),
+      )
+      .mockImplementationOnce(() => ({
+        limit: jest
+          .fn()
+          .mockResolvedValue([
+            { leagueId: 100, userId: 1, teamId: 200, permissionLevel: 'owner' },
+          ]),
+      }));
+
+    const result = await service.createLeague(baseInput);
+
+    expect(result.league).toEqual(
+      expect.objectContaining({ id: 100, name: 'Test League' }),
+    );
+    expect(result.teams).toEqual([
+      expect.objectContaining({ id: 200, leagueId: 100 }),
+    ]);
+    expect(result.leagueMembers).toEqual([
+      expect.objectContaining({ leagueId: 100, userId: 1, teamId: 200 }),
+    ]);
+    // No new league/team/membership rows were inserted — the resubmission
+    // reused the result of the original attempt instead of creating a
+    // duplicate league.
+    expect(mockTx.insert).not.toHaveBeenCalled();
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it('falls through to the normal create flow when the idempotency key has no matching league', async () => {
+    mockTx.where
+      .mockImplementationOnce(() => ({
+        limit: jest.fn().mockResolvedValue([]),
+      })) // no existing league for this key
+      .mockResolvedValueOnce([{ existingCount: 0 }]); // league-limit count check
+
+    mockTx.returning
+      .mockResolvedValueOnce([{ id: 101 }]) // league insert
+      .mockResolvedValueOnce([{ id: 201 }]) // team insert(s)
+      .mockResolvedValueOnce([{ id: 301 }]); // scoring profile insert
+
+    await service.createLeague(baseInput);
+
+    expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+    expect(mockTx.insert).toHaveBeenCalledTimes(6);
+  });
+});

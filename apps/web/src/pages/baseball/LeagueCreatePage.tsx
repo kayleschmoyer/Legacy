@@ -1368,6 +1368,28 @@ export function LeagueCreatePage(): React.JSX.Element {
   // semantics — not re-synced on the sport-switch effect below.
   const initialFormDataRef = useRef(formData);
 
+  // In-flight submit guard (LS-6063). `loading` from useCreateLeagueAndTeamsMutation
+  // only flips to true on the *next* render, so a rapid double-click (or two
+  // events firing within the same tick) can call handleSubmit twice before
+  // `disabled={isFormDisabled}` takes effect. A ref updates synchronously, so
+  // checking-and-setting it at the top of handleSubmit closes that window
+  // completely, unlike state.
+  const submitInFlightRef = useRef(false);
+
+  // Client-generated idempotency key (LS-6063), stable for the lifetime of this
+  // page mount. Sent with every createLeagueAndTeams attempt so the server can
+  // recognize a resubmission (e.g. a duplicate request that slips past the
+  // in-flight guard) and return the already-created league instead of creating
+  // a second one. crypto.randomUUID() isn't available in every environment
+  // (e.g. jsdom in tests, older browsers), so fall back to a manual random
+  // token — this key only needs to be unique per submission attempt, not
+  // cryptographically strong.
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+  );
+
   // When the URL-derived sport changes, reset sport-keyed fields so eras /
   // pools / roster sizes track the active sport.
   const prevSportRef = useRef<SportId>(selectedSport);
@@ -1653,21 +1675,33 @@ export function LeagueCreatePage(): React.JSX.Element {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Synchronous reentry guard (LS-6063) — must run before any other check
+    // so a double-click can't fire two mutations while `loading` is still
+    // false from the first click's not-yet-rendered state update.
+    if (submitInFlightRef.current) {
+      return;
+    }
+    submitInFlightRef.current = true;
+
     setSubmitError(null);
     setSubmitErrorMeta(null);
 
     if (atLeagueLimit) {
       trackPremiumFeatureClick('Unlimited League Creation');
       setShowLeagueLimitModal(true);
+      submitInFlightRef.current = false;
       return;
     }
     if (errorCount > 0) {
       revealValidationErrors(validationErrors);
+      submitInFlightRef.current = false;
       return;
     }
     if ((!isPremium || premiumLoading) && formData.waiverType === 'faab') {
       trackPremiumFeatureClick('FAAB Waiver Settings');
       setShowWaiverUpgradeModal(true);
+      submitInFlightRef.current = false;
       return;
     }
     if (
@@ -1675,11 +1709,13 @@ export function LeagueCreatePage(): React.JSX.Element {
       !FREE_ERA_IDS_BY_SPORT[formData.sport].has(formData.baseballEraFilter)
     ) {
       openEraUpgradeModal();
+      submitInFlightRef.current = false;
       return;
     }
     if ((!isPremium || premiumLoading) && formData.baseballHofOnly) {
       trackPremiumFeatureClick('Hall of Fame Only');
       setShowHofUpgradeModal(true);
+      submitInFlightRef.current = false;
       return;
     }
 
@@ -1766,6 +1802,11 @@ export function LeagueCreatePage(): React.JSX.Element {
                 ? formData.pickTimeLimitSeconds
                 : undefined,
             gamesPerMatchup: formData.gamesPerMatchup,
+            // Idempotency key (LS-6063) — lets the server recognize a
+            // resubmission of this same in-progress attempt (e.g. a duplicate
+            // request that slips past submitInFlightRef) and return the
+            // already-created league instead of creating a second one.
+            idempotencyKey: idempotencyKeyRef.current,
           },
         },
       });
@@ -1799,6 +1840,8 @@ export function LeagueCreatePage(): React.JSX.Element {
       );
       setSubmitError(getSubmitErrorMessage(error));
       setSubmitErrorMeta({ code, correlationId });
+    } finally {
+      submitInFlightRef.current = false;
     }
   };
 

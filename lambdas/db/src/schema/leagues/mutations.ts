@@ -145,6 +145,11 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       auctionBudget: t.int({ required: false }),
       auctionMinBid: t.int({ required: false }),
       pickTimeLimitSeconds: t.int({ required: false }), // seconds per pick (default 120)
+      // Client-generated idempotency key for this create attempt (LS-6063).
+      // Lets the resolver recognize a resubmission (double-click, retry,
+      // parallel tab) and return the already-created league instead of
+      // creating a duplicate one.
+      idempotencyKey: t.string({ required: false }),
     }),
   },
 );
@@ -274,6 +279,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         startDate: inputStartDate,
         gamesPerMatchup: inputGamesPerMatchup,
         pickTimeLimitSeconds: inputPickTimeLimitSeconds,
+        idempotencyKey: inputIdempotencyKey,
       } = args.input;
       const userId = context.user.id;
       const username = context.user.username || 'User';
@@ -623,6 +629,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
             ? { pickTimeLimitSeconds: inputPickTimeLimitSeconds }
             : {}),
           leagueLimit,
+          idempotencyKey: inputIdempotencyKey ?? undefined,
         });
 
         return result;
