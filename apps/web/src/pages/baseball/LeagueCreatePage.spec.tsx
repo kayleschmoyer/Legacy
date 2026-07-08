@@ -748,6 +748,28 @@ describe('LeagueCreatePage — unsaved-changes navigation guard (LS-6109)', () =
       expect(dispatchBeforeUnload().defaultPrevented).toBe(false),
     );
   });
+
+  // LS-6064 — a mutation that resolves without a GraphQL error but with a
+  // null/missing league.id (server bug, partial failure) must not silently
+  // no-op: it should surface a submit error and skip navigation.
+  it('shows a submit error and does not navigate when the mutation resolves with no league id', async () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: null } },
+    });
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to save league. Your settings are still filled in — try again or come back later.',
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });
 
 describe('LeagueCreatePage — Divisional vs 1 division (LS-6105)', () => {

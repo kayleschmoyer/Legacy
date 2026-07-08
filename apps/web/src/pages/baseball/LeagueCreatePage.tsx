@@ -1520,6 +1520,8 @@ export function LeagueCreatePage(): React.JSX.Element {
         navigate(
           `/${formData.sport}/league/${result.data.createLeagueAndTeams.league.id}`,
         );
+      } else {
+        setSubmitError(LEAGUE_FORM_MESSAGES.submitFallback);
       }
     } catch (error) {
       LOGGER.error(
