@@ -1890,4 +1890,69 @@ describe('League Mutations', () => {
       );
     });
   });
+
+  describe('createLeague mutation — server-side name length validation (LS-6057)', () => {
+    function getField() {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeague;
+      const resolve = field?.resolve;
+      if (!resolve) {
+        throw new Error('createLeague resolver not found');
+      }
+      return resolve;
+    }
+
+    it('rejects a name shorter than 3 characters after trimming', async () => {
+      const resolve = getField();
+
+      await expect(
+        resolve({}, { name: '12' }, mockContext, undefined as never),
+      ).rejects.toThrow('League name must be at least 3 characters');
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a name that is only whitespace', async () => {
+      const resolve = getField();
+
+      await expect(
+        resolve({}, { name: '   ' }, mockContext, undefined as never),
+      ).rejects.toThrow('League name cannot be empty');
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a name over the max length', async () => {
+      const resolve = getField();
+
+      await expect(
+        resolve({}, { name: 'A'.repeat(51) }, mockContext, undefined as never),
+      ).rejects.toThrow('League name must be 50 characters or fewer');
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a name with exactly 3 characters', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 1,
+          name: 'Abc',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const resolve = getField();
+
+      await resolve({}, { name: 'Abc' }, mockContext, undefined as never);
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Abc' }),
+      );
+    });
+  });
 });

@@ -1289,6 +1289,19 @@ builder.mutationField('createLeague', (t) =>
         throw AuthenticationError();
       }
 
+      const trimmedName = args.name.trim();
+      if (trimmedName.length === 0) {
+        throw UserInputError('League name cannot be empty');
+      }
+      if (trimmedName.length < 3) {
+        throw UserInputError('League name must be at least 3 characters');
+      }
+      if (args.name.length > MAX_LEAGUE_NAME_LENGTH) {
+        throw UserInputError(
+          `League name must be ${MAX_LEAGUE_NAME_LENGTH} characters or fewer`,
+        );
+      }
+
       const userId = context.user.id;
 
       // ── Premium feature gating: max 3 leagues for free tier ──────────────
