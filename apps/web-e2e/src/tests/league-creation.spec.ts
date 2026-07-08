@@ -354,6 +354,25 @@ test.describe('League Creation @critical', () => {
     await leaguePage.text(/utc[+-]\d{2}:\d{2}/i).expectVisible();
   });
 
+  test('selecting a draft date/time reflects the choice in the form state (LS-5367)', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.gotoCreate();
+
+    await leaguePage.expandSection('draft');
+    await leaguePage.text('Draft Date & Time').expectVisible();
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    await leaguePage.selectDraftDate(tomorrow);
+
+    // Once applied, the placeholder timezone hint is replaced by the
+    // resolved Local/UTC timestamp lines — proof the picked date/time made
+    // it into `formData.draftDate`, not just a transient popover selection.
+    await leaguePage.text(/^Local:/).expectVisible();
+    await leaguePage.text(/^UTC:/).expectVisible();
+  });
+
   test('should display loading state during submission', async ({
     page,
     leaguePage,

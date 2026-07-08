@@ -278,6 +278,7 @@ export function DateTimePicker({
               pressStyle={{ opacity: 0.8 }}
               role="button"
               tabIndex={0}
+              testID="date-time-picker-trigger"
               onPress={() => {
                 setIsOpen(!isOpen);
               }}
@@ -479,6 +480,7 @@ export function DateTimePicker({
                           return (
                             <Button
                               key={`${weekIndex}-${dayIndex}`}
+                              testID={`date-time-picker-day-${date.toISOString().slice(0, 10)}`}
                               size="$2"
                               flex={1}
                               chromeless={!selected}
@@ -728,6 +730,7 @@ export function DateTimePicker({
                 </Text>
               </Button>
               <Button
+                testID="date-time-picker-apply"
                 size="$3"
                 backgroundColor="$brandNavy"
                 disabled={!selectedDate}

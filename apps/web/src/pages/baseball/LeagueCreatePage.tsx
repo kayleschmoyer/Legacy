@@ -769,6 +769,7 @@ function CollapsibleSection({
         {/* Collapsed summary */}
         {!open && summary && (
           <Text
+            data-testid={`section-summary-${id}`}
             fontFamily="$body"
             fontSize={13}
             color="$color11"

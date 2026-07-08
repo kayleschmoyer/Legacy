@@ -266,6 +266,23 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.placeholder('1').expectVisible();
   });
 
+  test('selecting Auction selection method is reflected in the Draft Settings summary (LS-5367)', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+
+    await leaguePage.expandSection('draft');
+    await leaguePage.clickButton('Auction');
+
+    // Collapse the section to reveal its one-line summary, which renders
+    // `formData.selectionMethod` verbatim — proves the selection persisted
+    // into form state, not just a visual toggle.
+    await leaguePage.collapseSection('draft');
+    const summary = await leaguePage.sectionSummary('draft').text();
+    expect(summary).toMatch(/auction/i);
+  });
+
   // ─── Draft Order ──────────────────────────────────────────────────────────
 
   test('should display Snake and Linear draft order options', async ({
@@ -280,6 +297,23 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.button('Snake', { exact: true }).expectVisible();
     await leaguePage.button('Linear', { exact: true }).expectVisible();
     await leaguePage.text('Snake order reverses each round').expectVisible();
+  });
+
+  test('selecting Linear draft order is reflected in the Draft Settings summary (LS-5367)', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+
+    await leaguePage.expandSection('draft');
+    await leaguePage.clickButton('Linear', { exact: true });
+
+    // Collapse the section to reveal its one-line summary, which renders
+    // `formData.draftOrder` verbatim — proves the selection persisted into
+    // form state, not just a visual toggle.
+    await leaguePage.collapseSection('draft');
+    const summary = await leaguePage.sectionSummary('draft').text();
+    expect(summary).toMatch(/linear/i);
   });
 
   // ─── Waiver System ────────────────────────────────────────────────────────

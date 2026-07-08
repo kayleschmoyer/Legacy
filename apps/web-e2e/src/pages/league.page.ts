@@ -71,6 +71,11 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId(id);
   }
 
+  /** The one-line collapsed summary for a create-form section (visible only when collapsed). */
+  sectionSummary(sectionId: string): UIElement {
+    return this.driver.byTestId(`section-summary-${sectionId}`);
+  }
+
   /** The current `role="alert"` (validation / error surface). */
   get alert(): UIElement {
     return this.driver.byRole('alert');
@@ -355,6 +360,19 @@ export class LeaguePage extends BaseScreen {
     }
   }
 
+  /**
+   * Collapse a collapsible create-form section by its id, revealing its
+   * collapsed one-line summary. No-op if already collapsed.
+   */
+  async collapseSection(sectionId: string): Promise<void> {
+    const toggle = this.driver.byTestId(`section-toggle-${sectionId}`);
+    await toggle.expectVisible();
+    if ((await toggle.attribute('aria-expanded')) === 'true') {
+      await toggle.tap();
+      await toggle.expectAttribute('aria-expanded', 'false');
+    }
+  }
+
   /** Type into the league-name input. */
   async fillLeagueName(name: string): Promise<void> {
     await this.leagueNameInput.fill(name);
@@ -415,6 +433,27 @@ export class LeaguePage extends BaseScreen {
   ): Promise<void> {
     const target = this.text(value, { exact: opts?.exact });
     await (opts?.first ? target.first() : target).tap();
+  }
+
+  /** The draft date/time picker trigger (Draft Settings section). */
+  get draftDatePickerTrigger(): UIElement {
+    return this.driver.byTestId('date-time-picker-trigger');
+  }
+
+  /** The "Apply" button inside the open draft date/time picker popover. */
+  get draftDatePickerApply(): UIElement {
+    return this.driver.byTestId('date-time-picker-apply');
+  }
+
+  /**
+   * Open the Draft Settings date/time picker, select `date` on the calendar
+   * (must be the currently-displayed month), and apply it.
+   */
+  async selectDraftDate(date: Date): Promise<void> {
+    await this.draftDatePickerTrigger.tap();
+    const dayId = `date-time-picker-day-${date.toISOString().slice(0, 10)}`;
+    await this.testId(dayId).tap();
+    await this.draftDatePickerApply.tap();
   }
 
   // ── Actions: detail tabs ─────────────────────────────────────────
