@@ -1,5 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import BaseballLeagueId from './[leagueId]';
@@ -30,13 +35,39 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// Controllable app-config: lets each test set the configured base URL (or leave
+// it undefined to exercise the `?? 'https://legacysports.app'` fallback baked
+// into the share-invite handler). Read lazily via a getter so the component
+// picks up the current value at render time.
+let mockAppBaseUrl: string | undefined = 'https://legacysports.app';
+jest.mock('@legacy-sports/app-config/native', () => ({
+  config: {
+    get appBaseUrl() {
+      return mockAppBaseUrl;
+    },
+    get websocketUrl() {
+      return undefined;
+    },
+  },
+}));
+
 jest.mock('react-native/Libraries/Alert/Alert', () => ({
   alert: jest.fn(),
 }));
 
+// The 'react-native' index exposes `Share` via `get Share() { return
+// require('./Libraries/Share/Share').default }`, so the mock must expose the
+// share object as the module's *default* export — a bare named-shape mock makes
+// `Share` resolve to undefined under test (the code path was never exercised
+// before GAP-002 / LS-7626). Controlled per-test via `mockShareFn`.
+const mockShareFn = jest.fn();
 jest.mock('react-native/Libraries/Share/Share', () => ({
-  share: jest.fn().mockResolvedValue({ action: 'dismissedAction' }),
-  dismissedAction: 'dismissedAction',
+  __esModule: true,
+  default: {
+    share: mockShareFn,
+    dismissedAction: 'dismissedAction',
+    sharedAction: 'sharedAction',
+  },
 }));
 
 jest.mock('tamagui', () => {
@@ -94,6 +125,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     isCommissioner,
     isMember,
     onTabChange,
+    onInvite,
     children,
   }: {
     tabs: ReadonlyArray<{
@@ -105,6 +137,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     isCommissioner: boolean;
     isMember: boolean;
     onTabChange: (id: string) => void;
+    onInvite?: () => void;
     children?: React.ReactNode;
     [key: string]: unknown;
   }) => (
@@ -125,6 +158,11 @@ jest.mock('@legacy-sports/shared-components', () => {
             </TouchableOpacity>
           ))}
       </View>
+      {onInvite ? (
+        <TouchableOpacity testID="invite-share-button" onPress={onInvite}>
+          <Text>Invite</Text>
+        </TouchableOpacity>
+      ) : null}
       {children}
     </View>
   );
@@ -304,6 +342,9 @@ jest.mock('@legacy-sports/graphql', () => ({
 describe('BaseballLeagueId', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Restore the default configured base URL — some tests override it (staging
+    // host, unset env) and the value survives clearAllMocks.
+    mockAppBaseUrl = 'https://legacysports.app';
     mockGetLeagueByIdQuery.mockReturnValue({
       data: { league: mockLeague },
       loading: false,
@@ -498,6 +539,111 @@ describe('BaseballLeagueId', () => {
       fireEvent.press(screen.getByText('Browse Free Agents & Submit Claim'));
       expect(mockNavigate).toHaveBeenCalledWith(
         expect.objectContaining({ pathname: '/FreeAgents' }),
+      );
+    });
+  });
+
+  // Native OS share-sheet invite (GAP-002 / LS-7626). The hero invite action
+  // launches react-native's `Share.share` with a message + title + invite URL.
+  // These tests cover URL correctness across environments, the
+  // EXPO_PUBLIC_APP_BASE_URL fallback (surfaced through config.appBaseUrl), and
+  // the dismissed / error branches of the handler.
+  describe('share invite', () => {
+    beforeEach(() => {
+      mockShareFn.mockReset();
+      mockShareFn.mockResolvedValue({ action: 'dismissedAction' });
+    });
+
+    const getLoggerMock = () =>
+      jest.requireMock<{
+        LOGGER: { debug: jest.Mock; error: jest.Mock };
+      }>('@legacy-sports/logging').LOGGER;
+
+    it('opens the OS share sheet with the invite message, title, and URL', async () => {
+      render(<BaseballLeagueId />);
+      fireEvent.press(screen.getByTestId('invite-share-button'));
+
+      await waitFor(() => expect(mockShareFn).toHaveBeenCalledTimes(1));
+      expect(mockShareFn).toHaveBeenCalledWith({
+        message:
+          'Join my league "Test Baseball League" on Legacy Sports!\n\n' +
+          'https://legacysports.app/baseball/league/join/TESTCODE',
+        title: 'Join Test Baseball League',
+        url: 'https://legacysports.app/baseball/league/join/TESTCODE',
+      });
+    });
+
+    it('builds the invite URL from the configured base URL (env-specific host)', async () => {
+      mockAppBaseUrl = 'https://staging.legacysports.app';
+      render(<BaseballLeagueId />);
+      fireEvent.press(screen.getByTestId('invite-share-button'));
+
+      await waitFor(() => expect(mockShareFn).toHaveBeenCalledTimes(1));
+      expect(mockShareFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://staging.legacysports.app/baseball/league/join/TESTCODE',
+        }),
+      );
+    });
+
+    it('falls back to https://legacysports.app when the base URL is unset', async () => {
+      // Mirrors a build where EXPO_PUBLIC_APP_BASE_URL is absent: config.appBaseUrl
+      // is undefined and the handler falls back to the production host. This
+      // asserts the cross-env leakage risk called out in GAP-002 rather than
+      // silently changing it.
+      mockAppBaseUrl = undefined;
+      render(<BaseballLeagueId />);
+      fireEvent.press(screen.getByTestId('invite-share-button'));
+
+      await waitFor(() => expect(mockShareFn).toHaveBeenCalledTimes(1));
+      expect(mockShareFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://legacysports.app/baseball/league/join/TESTCODE',
+        }),
+      );
+    });
+
+    it('shares an invite without a URL when the league has no invite code', async () => {
+      // An empty invite code (falsy) reproduces the "no code yet" state: the
+      // handler omits the URL from both the message body and the share payload.
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, inviteCode: '' } },
+        loading: false,
+      });
+      render(<BaseballLeagueId />);
+      fireEvent.press(screen.getByTestId('invite-share-button'));
+
+      await waitFor(() => expect(mockShareFn).toHaveBeenCalledTimes(1));
+      expect(mockShareFn).toHaveBeenCalledWith({
+        message: 'Join my league "Test Baseball League" on Legacy Sports!',
+        title: 'Join Test Baseball League',
+        url: undefined,
+      });
+    });
+
+    it('logs a debug line when the user dismisses the share sheet', async () => {
+      mockShareFn.mockResolvedValue({ action: 'dismissedAction' });
+      render(<BaseballLeagueId />);
+      fireEvent.press(screen.getByTestId('invite-share-button'));
+
+      await waitFor(() =>
+        expect(getLoggerMock().debug).toHaveBeenCalledWith(
+          'Share dismissed by user',
+        ),
+      );
+      expect(getLoggerMock().error).not.toHaveBeenCalled();
+    });
+
+    it('logs an error and does not throw when Share.share rejects', async () => {
+      mockShareFn.mockRejectedValue(new Error('share failed'));
+      render(<BaseballLeagueId />);
+      fireEvent.press(screen.getByTestId('invite-share-button'));
+
+      await waitFor(() =>
+        expect(getLoggerMock().error).toHaveBeenCalledWith(
+          'Error while sharing league invite',
+          expect.any(Error),
+        ),
       );
     });
   });
