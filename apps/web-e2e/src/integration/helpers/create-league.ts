@@ -14,9 +14,11 @@ function sleep(ms: number): Promise<void> {
 /**
  * Create a league via the browser UI with built-in retry and extended timeout.
  *
- * Navigates to `/baseball/league/create`, fills the form, submits, waits for
- * the redirect to `/baseball/league/{id}`, then extracts the invite code from
- * the overview page.
+ * Navigates to `/baseball/league/create`, fills the form, submits, confirms
+ * the post-create "League created!" invite-code interstitial (LS-6067) by
+ * clicking "Continue to League", waits for the redirect to
+ * `/baseball/league/{id}`, then extracts the invite code from the overview
+ * page.
  *
  * If the redirect does not happen within 45 s (commonly caused by Lambda cold
  * starts or API Gateway throttling), the page is reloaded and the form is
@@ -127,6 +129,23 @@ export async function createLeagueViaUI(
         // All errors are auth-related — fall through to the URL redirect wait
         // (45 s) so Apollo can retry after refreshing the JWT.
       }
+    }
+
+    // LS-6067: a successful createLeagueAndTeams mutation now opens a
+    // "League created!" invite-code interstitial instead of auto-navigating.
+    // Click "Continue to League" (the modal's confirmLabel) to proceed to the
+    // new league page. Guard the click so a missing modal (e.g. the mutation
+    // silently failed) falls through to the retry/redirect wait below rather
+    // than throwing out of the retry loop.
+    const continueButton = page.getByRole('button', {
+      name: /continue to league/i,
+    });
+    try {
+      await continueButton.waitFor({ state: 'visible', timeout: 15_000 });
+      await continueButton.click();
+    } catch {
+      // Interstitial never appeared — fall through; the redirect wait below
+      // will time out and trigger a retry.
     }
 
     // Wait for the client-side redirect

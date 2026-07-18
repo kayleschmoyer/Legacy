@@ -516,6 +516,12 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       });
 
       await page.getByRole('button', { name: /create league/i }).click();
+
+      // LS-6067: a successful create now opens a "League created!" invite-code
+      // interstitial instead of auto-navigating. mockLeague() includes an
+      // inviteCode, so the invite-code branch renders as it does in prod.
+      // Confirm it to proceed to the new league page.
+      await page.getByRole('button', { name: /continue to league/i }).click();
       await expect(page).toHaveURL(new RegExp(`/baseball/league/${LEAGUE_ID}`));
     });
   });
