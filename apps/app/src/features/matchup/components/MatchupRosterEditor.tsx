@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
@@ -11,11 +11,16 @@ import {
 import {
   MatchupStatus,
   type StatsLoadingStatus,
+  useGetMatchupByIdLazyQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
   useSwapMatchupPlayerPositionsMutation,
   useUpdateMatchupPlayerPositionMutation,
 } from '@legacy-sports/graphql';
+import {
+  handleRosterMutationError,
+  MATCHUP_LOCK_POLL_INTERVAL_MS,
+} from '../matchup-lock-refresh';
 
 const parseId = (id: string | null | undefined): number | null => {
   if (!id) return null;
@@ -53,6 +58,10 @@ export function MatchupRosterEditor({
   } = useGetMatchupPlayersQuery({
     variables: { matchupId },
     skip: !matchupId,
+    // LS-5895: keep roster data fresh so a matchup that locks server-side
+    // mid-session doesn't leave the mobile UI stale, mirroring the web
+    // precedent in apps/web/src/pages/baseball/matchup-lock-refresh.ts.
+    pollInterval: MATCHUP_LOCK_POLL_INTERVAL_MS,
   });
 
   const { data: positionsData } = useGetPositionsForLeagueQuery({
@@ -66,6 +75,31 @@ export function MatchupRosterEditor({
     useSwapMatchupPlayerPositionsMutation();
 
   const mutating = updateLoading || swapLoading;
+
+  const [fetchMatchupStatus] = useGetMatchupByIdLazyQuery({
+    fetchPolicy: 'network-only',
+  });
+  // Tracks a lock discovered by refetching matchup status after a rejected
+  // mutation — closes the race window described in LS-5895 without adding
+  // pre-flight latency to every swap/move (see LS-5894).
+  const [lockDiscovered, setLockDiscovered] = useState(false);
+  const effectiveLocked = locked || lockDiscovered;
+
+  const checkForLockAfterRejection = useCallback(async () => {
+    try {
+      const { data } = await fetchMatchupStatus({
+        variables: { id: matchupId },
+      });
+      if (data?.getMatchupById?.status !== MatchupStatus.Scheduled) {
+        setLockDiscovered(true);
+      }
+    } catch (statusError) {
+      LOGGER.error(
+        'Failed to refetch matchup status after rejected mutation',
+        statusError instanceof Error ? statusError : String(statusError),
+      );
+    }
+  }, [fetchMatchupStatus, matchupId]);
 
   const positionMap = useMemo(() => {
     const map = new Map<number, string>();
@@ -155,11 +189,17 @@ export function MatchupRosterEditor({
         });
         await refetchPlayers();
       } catch (err) {
-        LOGGER.error('Failed to swap positions', { err });
+        handleRosterMutationError({
+          error: err,
+          logger: LOGGER,
+          logPrefix: 'Failed to swap positions:',
+          refetchMatchupPlayers: refetchPlayers,
+        });
+        await checkForLockAfterRejection();
         Alert.alert('Error', 'Failed to swap positions. Please try again.');
       }
     },
-    [swapPositionsMutation, refetchPlayers],
+    [swapPositionsMutation, refetchPlayers, checkForLockAfterRejection],
   );
 
   const handleMoveToPosition = useCallback(
@@ -178,11 +218,17 @@ export function MatchupRosterEditor({
         });
         await refetchPlayers();
       } catch (err) {
-        LOGGER.error('Failed to update position', { err });
+        handleRosterMutationError({
+          error: err,
+          logger: LOGGER,
+          logPrefix: 'Failed to update position:',
+          refetchMatchupPlayers: refetchPlayers,
+        });
+        await checkForLockAfterRejection();
         Alert.alert('Error', 'Failed to update position. Please try again.');
       }
     },
-    [updatePositionMutation, refetchPlayers],
+    [updatePositionMutation, refetchPlayers, checkForLockAfterRejection],
   );
 
   if (
@@ -232,7 +278,7 @@ export function MatchupRosterEditor({
       players={players}
       positionMap={positionMap}
       positionOptions={positionOptions}
-      locked={locked}
+      locked={effectiveLocked}
       mutating={mutating}
       onSwapPositions={handleSwapPositions}
       onMoveToPosition={handleMoveToPosition}
