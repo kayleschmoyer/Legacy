@@ -10,13 +10,14 @@
  *   5. Error state: does not leak the raw error message to the user.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MatchupDetailPage } from './MatchupDetailPage';
 
 // --- router ------------------------------------------------------------------
+const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual<typeof import('react-router-dom')>('react-router-dom'),
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
   useParams: () => ({ leagueId: '100', matchupId: '1' }),
 }));
 
@@ -189,5 +190,34 @@ describe('MatchupDetailPage error state (LS-5901)', () => {
   it('does not leak the raw error message to the user', () => {
     render(<MatchupDetailPage />);
     expect(screen.queryByText(RAW_ERROR_MESSAGE)).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchupDetailPage "Back to League" navigation (LS-5893 / BMD-023)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: undefined,
+    });
+  });
+
+  it('navigates to the baseball league route for a baseball league', () => {
+    mockLeagueSport = 'baseball';
+    render(<MatchupDetailPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to League' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/100');
+  });
+
+  it('navigates to the football league route for a football league, not a hardcoded baseball route', () => {
+    mockLeagueSport = 'football';
+    render(<MatchupDetailPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to League' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/football/league/100');
   });
 });

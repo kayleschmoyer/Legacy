@@ -119,7 +119,7 @@ export function MatchupDetailPage() {
           color="white"
           pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
           hoverStyle={{ backgroundColor: BRAND_NAVY }}
-          onPress={() => navigate(`/baseball/league/${leagueId}`)}
+          onPress={() => navigate(`/${leagueSport}/league/${leagueId}`)}
         >
           Back to League
         </Button>
@@ -144,7 +144,7 @@ export function MatchupDetailPage() {
           color="white"
           pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
           hoverStyle={{ backgroundColor: BRAND_NAVY }}
-          onPress={() => navigate(`/baseball/league/${leagueId}`)}
+          onPress={() => navigate(`/${leagueSport}/league/${leagueId}`)}
         >
           Back to League
         </Button>
@@ -192,13 +192,15 @@ export function MatchupDetailPage() {
         onMatchupChange={(id) => {
           const numericId = parseInt(id, 10);
           if (!isNaN(numericId)) {
-            navigate(`/baseball/league/${leagueId}/matchups/${numericId}`);
+            navigate(
+              `/${leagueSport}/league/${leagueId}/matchups/${numericId}`,
+            );
           }
         }}
         onResetToDefault={() => {
           if (userCurrentMatchup?.id) {
             navigate(
-              `/baseball/league/${leagueId}/matchups/${userCurrentMatchup.id}`,
+              `/${leagueSport}/league/${leagueId}/matchups/${userCurrentMatchup.id}`,
             );
           }
         }}
@@ -213,7 +215,7 @@ export function MatchupDetailPage() {
             <H2>Matchup Details</H2>
             <Button
               theme="alt2"
-              onPress={() => navigate(`/baseball/league/${leagueId}`)}
+              onPress={() => navigate(`/${leagueSport}/league/${leagueId}`)}
             >
               Back to League
             </Button>
