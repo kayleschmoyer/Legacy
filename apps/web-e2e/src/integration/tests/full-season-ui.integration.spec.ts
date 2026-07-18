@@ -503,16 +503,30 @@ test.describe
     });
 
     await test.step('Switch to Pitchers view', async () => {
-      // After toggling Pitchers, assert at least one pitcher row is visible
-      // — that proves the filter applied without a fixed timeout. We use the
-      // same aria-label pattern the Add buttons emit (`Add <name>`); the
-      // first one rendering is the deterministic "filter applied" signal.
+      // Toggling Pitchers swaps the stat columns to the pitcher set
+      // (ERA / W / K / SV / WHIP). The pitcher-only "WHIP" column header is
+      // rendered synchronously by the Pitchers view — and never by the Hitters
+      // view (whose columns are AVG / HR / RBI / SB / oWAR) — so it is the
+      // deterministic "filter applied" signal for this step.
+      //
+      // The previous assertion keyed on the first `Add <name>` button, which
+      // conflated "filter applied" with "page 1 happens to hold a non-taken
+      // pitcher whose row finished hydrating". The free-agent list fetches a
+      // single server page ordered by pitchingAvgPointsPerGame DESC and then
+      // filters taken players client-side, so under nightly live-backend load
+      // the pitchers query plus the multi-team taken-player fetch can outrun a
+      // 15s row-visibility wait even though the pitcher pool is fully populated
+      // (LS-8433; same client-side-pagination class as the Phase 7 LS-4325
+      // workaround). Asserting the column header removes that data/timing
+      // dependency without a blind timeout bump — row-level browsability and
+      // claimability are exercised by Phase 7's real waiver claim below.
       const pitchersBtn = page
         .getByRole('button', { name: 'Pitchers' })
         .first();
       await pitchersBtn.click();
-      const anyAddBtn = page.locator('button[aria-label^="Add "]').first();
-      await expect(anyAddBtn).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('WHIP', { exact: true }).first()).toBeVisible(
+        { timeout: 15_000 },
+      );
     });
   });
 
