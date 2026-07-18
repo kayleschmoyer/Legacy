@@ -165,7 +165,10 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
-      mockDb.limit.mockResolvedValue([{ id: 1, owner: 999 }]);
+      // 1) league lookup, 2) checkAdminInDb's accessLevel lookup
+      mockDb.limit
+        .mockResolvedValueOnce([{ id: 1, owner: 999 }])
+        .mockResolvedValueOnce([{ accessLevel: 'admin' }]);
 
       // Mock delete operations
       mockDb.delete.mockReturnValue(mockDb);
@@ -859,9 +862,7 @@ describe('League Mutations', () => {
           mockContext,
           undefined as never,
         ),
-      ).rejects.toThrow(
-        'Only a general manager or commissioner can update league settings',
-      );
+      ).rejects.toThrow('Only a commissioner can update league settings');
     });
 
     it('should require salary_cap_leagues entitlement to change salaryCap on a cap-enabled league (LS-5197)', async () => {
@@ -994,9 +995,9 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
-      // 1) GM membership lookup, 2) current waiverType lookup
+      // 1) commissioner membership lookup, 2) current waiverType lookup
       mockDb.limit
-        .mockResolvedValueOnce([{ permissionLevel: 'general_manager' }])
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
         .mockResolvedValueOnce([{ waiverType: 'standard' }]);
 
       const mutationType = schema.getMutationType();
@@ -1015,13 +1016,13 @@ describe('League Mutations', () => {
       ).rejects.toThrow('FAAB budget can only be set on leagues using FAAB');
     });
 
-    it('should reject faabBudgetDefault on a FAAB league for a free-tier GM without the entitlement (LS-5175)', async () => {
+    it('should reject faabBudgetDefault on a FAAB league for a free-tier commissioner without the entitlement (LS-5175)', async () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
-      // 1) GM membership, 2) current waiverType=faab, 3) subscription tier=free
+      // 1) commissioner membership, 2) current waiverType=faab, 3) subscription tier=free
       mockDb.limit
-        .mockResolvedValueOnce([{ permissionLevel: 'general_manager' }])
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
         .mockResolvedValueOnce([{ waiverType: 'faab' }])
         .mockResolvedValueOnce([{ tier: 'free' }]);
 
