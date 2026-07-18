@@ -40,11 +40,13 @@ import { PremiumGate } from '../../../components/PremiumGate';
 function LeagueWSPageHandler({
   onDraftStarted,
   onSubscriptionUpdated,
+  onReconnect,
 }: {
   onDraftStarted: () => void;
   onSubscriptionUpdated: () => void;
+  onReconnect: () => void;
 }) {
-  useLeagueWebSocket({ onDraftStarted, onSubscriptionUpdated });
+  useLeagueWebSocket({ onDraftStarted, onSubscriptionUpdated, onReconnect });
   return null;
 }
 
@@ -356,6 +358,11 @@ export function LeagueDetailPageV2(): React.JSX.Element {
           void refetchLeague();
         }}
         onSubscriptionUpdated={() => {
+          void refetchLeague();
+        }}
+        // Refresh league data after a drop-and-reconnect so stale data that
+        // changed while the socket was down is refetched (LS-7625 / GAP-001).
+        onReconnect={() => {
           void refetchLeague();
         }}
       />

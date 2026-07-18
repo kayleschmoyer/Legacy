@@ -5,9 +5,20 @@ jest.mock('@legacy-sports/websocket-client', () => ({
   WebSocketClient: jest.fn(),
 }));
 
+// The factory must be a pure literal — `jest.mock` is hoisted above module
+// scope, so referencing an outer `const` from inside it hits a TDZ error.
+// We grab the same `env` object reference back via `jest.requireMock` and
+// mutate it per-test. The hook reads `env.websocketUrl` at effect-run time
+// (not module-load time), so flipping `websocketUrl` before rendering (e.g.
+// to '' for the disabled path) is observed by the hook. `beforeEach` resets
+// it to the default connected URL.
 jest.mock('../config/environment', () => ({
   env: { websocketUrl: 'wss://test.example.com' },
 }));
+
+const mockEnv: { websocketUrl: string } = jest.requireMock(
+  '../config/environment',
+).env;
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -42,6 +53,7 @@ describe('useLeagueWebSocketLifecycle', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    mockEnv.websocketUrl = 'wss://test.example.com';
     mockClient = makeMockClient();
     WebSocketClient.mockImplementation(() => mockClient);
   });
@@ -128,6 +140,56 @@ describe('useLeagueWebSocketLifecycle', () => {
       }),
     );
 
+    expect(result.current.client).toBeNull();
+    expect(result.current.connected).toBe(false);
+  });
+
+  // Reconnect-on-token-refresh: when the in-memory JWT rotates, the effect's
+  // dependency array ([leagueId, isAuthenticated, authToken]) re-runs — the
+  // cleanup disposes the old client and the body creates + connects a fresh
+  // one with the new token. See LS-7625 (GAP-001).
+  it('disposes the old client and creates + connects a new one with the updated token when authToken changes', () => {
+    const firstClient = mockClient;
+
+    const { rerender } = renderHook(
+      (props: typeof defaultOptions) => useLeagueWebSocketLifecycle(props),
+      { initialProps: defaultOptions },
+    );
+
+    expect(WebSocketClient).toHaveBeenCalledTimes(1);
+    expect(WebSocketClient).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ token: 'test-token' }),
+    );
+    expect(firstClient.connect).toHaveBeenCalledTimes(1);
+
+    // Hand out a distinct second client so we can assert a brand-new instance
+    // is created (not the disposed original).
+    const secondClient = makeMockClient();
+    WebSocketClient.mockImplementation(() => secondClient);
+
+    rerender({ ...defaultOptions, authToken: 'rotated-token' });
+
+    expect(firstClient.dispose).toHaveBeenCalledTimes(1);
+    expect(WebSocketClient).toHaveBeenCalledTimes(2);
+    expect(WebSocketClient).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ token: 'rotated-token' }),
+    );
+    expect(secondClient.connect).toHaveBeenCalledTimes(1);
+  });
+
+  // Disabled/misconfigured URL: when env.websocketUrl is empty the effect
+  // returns early — no client is constructed and `connected` stays false even
+  // though the user is authenticated. See LS-7625 (GAP-001).
+  it('does not create a client and stays disconnected when websocketUrl is empty (even when authenticated)', () => {
+    mockEnv.websocketUrl = '';
+
+    const { result } = renderHook(() =>
+      useLeagueWebSocketLifecycle(defaultOptions),
+    );
+
+    expect(WebSocketClient).not.toHaveBeenCalled();
     expect(result.current.client).toBeNull();
     expect(result.current.connected).toBe(false);
   });
