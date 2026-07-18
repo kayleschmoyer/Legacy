@@ -159,7 +159,7 @@ jobs:
       # self-hosted run (LS-4933).
       - name: Setup Java
         if: ${{ vars.CI_RUNNER_LABEL == '' }}
-        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
         with:
           distribution: "temurin"
           java-version: ${{ env.JAVA_VERSION }}
@@ -320,7 +320,7 @@ jobs:
              > "artifacts/legacy-sports-latest.apk.sha256"
 
       - name: Create Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: android-v${{ needs.build-android.outputs.version }}-${{ needs.build-android.outputs.build_number }}
           name: "Android Release v${{ needs.build-android.outputs.version }} (${{ needs.build-android.outputs.commit_sha }})"

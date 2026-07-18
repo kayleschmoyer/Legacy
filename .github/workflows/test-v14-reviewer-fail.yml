@@ -40,7 +40,7 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
       - name: Configure AWS credentials
         continue-on-error: true # telemetry is best-effort; don't block on auth failure
-        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6
+        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6
         with:
           role-to-assume: ${{ vars.AWS_CI_ARTIFACTS_ROLE_ARN || 'arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts' }}
           aws-region: us-east-1
