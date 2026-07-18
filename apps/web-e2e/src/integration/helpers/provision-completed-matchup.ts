@@ -74,6 +74,11 @@ async function pollAllMatchupStatsLoaded(
   timeoutMs: number,
 ): Promise<void> {
   const start = Date.now();
+  // Last-observed statuses, so a timeout can report *where* hydration stalled
+  // (queued vs loading vs retry) instead of an opaque "did not finish". Matches
+  // the diagnostic pattern in wait-for-stats-loaded.ts and the LS-4444 policy of
+  // never reinstating a diagnostic blindfold.
+  let lastStatuses: string[] = [];
   while (Date.now() - start < timeoutMs) {
     const data = await gqlFetch<{
       getMatchupsByWeek: Array<{ statsLoadingStatus: string }> | null;
@@ -87,6 +92,9 @@ async function pollAllMatchupStatsLoaded(
       { leagueId, weekNumber },
     ).catch(() => null);
     const matchups = data?.getMatchupsByWeek ?? [];
+    if (matchups.length > 0) {
+      lastStatuses = matchups.map((m) => m.statsLoadingStatus);
+    }
     if (matchups.some((m) => m.statsLoadingStatus === 'failed')) {
       throw new Error(
         `[provisionCompletedMatchup] stats loading failed for league ${leagueId} week ${weekNumber}`,
@@ -101,7 +109,9 @@ async function pollAllMatchupStatsLoaded(
     await delay(3_000);
   }
   throw new Error(
-    `[provisionCompletedMatchup] stats did not finish loading for league ${leagueId} week ${weekNumber} within ${timeoutMs}ms`,
+    `[provisionCompletedMatchup] stats did not finish loading for league ${leagueId} ` +
+      `week ${weekNumber} within ${timeoutMs}ms (last statuses: ` +
+      `[${lastStatuses.join(', ') || 'none observed'}])`,
   );
 }
 
@@ -238,7 +248,20 @@ export async function provisionCompletedMatchup(
     `mutation AutoSelect($leagueId: Int) { autoSelectGames(leagueId: $leagueId) { gamesTriggered } }`,
     { leagueId },
   );
-  await pollAllMatchupStatsLoaded(commissionerJwt, leagueId, 1, 120_000);
+  // Wait for the async stats-hydration pipeline that autoSelectGames enqueues
+  // (queued → game-selection lambda `loading` → stats-lambda downloads game logs
+  // → `completed`). A freshly-provisioned league has *no cached* player stats, so
+  // every player is downloaded from Baseball Reference under the bref-client's
+  // 15-req/min single-concurrency throttle (~4s/request × batting+pitching+
+  // fielding). Hydration always completes, but for an uncached roster it
+  // routinely runs past 120s under nightly load (concurrent shards contend for
+  // the single-concurrency stats-lambda) — the original 120s ceiling was below
+  // the pipeline's own single-pass budget and produced the LS-8432 timeout.
+  // Anchor the ceiling to the stats-lambda's PLAYER_PROCESSING_BUDGET_MS
+  // (lambdas/stats-lambda/src/load-game-types.ts = 240_000ms): one full
+  // processing pass. (The durable fix — a test-only seed that bypasses the
+  // download entirely — is tracked on LS-4513.)
+  await pollAllMatchupStatsLoaded(commissionerJwt, leagueId, 1, 240_000);
 
   await gqlFetch(
     commissionerJwt,
