@@ -126,8 +126,11 @@ export async function getFromProFootballReference(
 // given names), but a segment of dots alone (".", "..", "...") is rejected —
 // real PFR IDs always start with a surname letter, and pfrId is interpolated
 // between literal slashes in getPlayerGameLog, so an all-dots value could
-// otherwise traverse out of the /players/ path.
-const VALID_PFR_ID = /^[A-Za-z0-9.]{1,20}$/;
+// otherwise traverse out of the /players/ path. "-", "_", and "'" are also
+// allowed for hyphenated/compound surnames, underscored IDs, and
+// apostrophe'd names (e.g. "El-MHi20", "Cox_Mi20", "O'ShJa00") — none
+// introduces traversal risk since "/" remains excluded.
+const VALID_PFR_ID = /^[A-Za-z0-9._'-]{1,20}$/;
 const ALL_DOTS = /^\.+$/;
 const VALID_LETTER = /^[A-Za-z]$/;
 const VALID_TEAM_ABBR = /^[A-Za-z]{2,3}$/;

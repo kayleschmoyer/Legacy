@@ -142,3 +142,70 @@ describe('getPlayersByLetter — dotted PFR IDs (LS-8416)', () => {
     ]);
   });
 });
+
+describe('getPlayersByLetter — hyphenated/underscored/apostrophe PFR IDs (LS-8418)', () => {
+  // Compound surnames (hyphen), PFR's own ID-generation quirks for
+  // short/multi-part names (underscore), and apostrophe'd surnames like
+  // O'Shea produce PFR IDs containing "-", "_", and "'" — the greedy
+  // capture group must still backtrack to leave the trailing literal
+  // ".htm" unconsumed for each.
+  const buildHtml = (href: string, name: string, pos: string) => `
+    <html>
+      <body>
+        <div id="div_players">
+          <p>
+            <a href="${href}">${name}</a> (${pos}) 2020-2020
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  it('captures a hyphenated pfrId, leaving the trailing .htm unconsumed', async () => {
+    mockGetPlayersList.mockResolvedValue(
+      buildHtml('/players/E/El-MHi20.htm', 'Hitomi El-M', 'WR'),
+    );
+    const players = await getPlayersByLetter('E');
+
+    expect(players).toEqual([
+      {
+        pfrId: 'El-MHi20',
+        name: 'Hitomi El-M',
+        rawPosition: 'WR',
+        lastTeam: null,
+      },
+    ]);
+  });
+
+  it('captures an underscored pfrId, leaving the trailing .htm unconsumed', async () => {
+    mockGetPlayersList.mockResolvedValue(
+      buildHtml('/players/C/Cox_Mi20.htm', 'Mike Cox', 'RB'),
+    );
+    const players = await getPlayersByLetter('C');
+
+    expect(players).toEqual([
+      {
+        pfrId: 'Cox_Mi20',
+        name: 'Mike Cox',
+        rawPosition: 'RB',
+        lastTeam: null,
+      },
+    ]);
+  });
+
+  it("captures an apostrophe'd pfrId, leaving the trailing .htm unconsumed", async () => {
+    mockGetPlayersList.mockResolvedValue(
+      buildHtml("/players/O/O'ShJa00.htm", "James O'Shea", 'TE'),
+    );
+    const players = await getPlayersByLetter('O');
+
+    expect(players).toEqual([
+      {
+        pfrId: "O'ShJa00",
+        name: "James O'Shea",
+        rawPosition: 'TE',
+        lastTeam: null,
+      },
+    ]);
+  });
+});

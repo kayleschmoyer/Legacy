@@ -3,7 +3,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { getPlayerPage, getPlayersList } from './PFRSession';
 import type { IdpPosition, PfrPlayerInfo, PfrPlayerSummary } from './types';
 
-const PFR_ID_REGEX = /\/players\/[A-Z]\/([A-Za-z0-9.]+)\.htm$/;
+const PFR_ID_REGEX = /\/players\/[A-Z]\/([A-Za-z0-9._'-]+)\.htm$/;
 
 // Maps PFR raw position strings to our internal IDP position values.
 const POSITION_MAP: Record<string, IdpPosition> = {
@@ -70,7 +70,7 @@ export async function getPlayersByLetter(
     const match = href.match(PFR_ID_REGEX);
 
     if (!match) {
-      LOGGER.debug(`Could not parse pfrId from href: ${href}`);
+      LOGGER.warn(`Could not parse pfrId from href: ${href}`);
       continue;
     }
 
