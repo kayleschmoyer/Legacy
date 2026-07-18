@@ -10,6 +10,11 @@
  *
  * The fix is to honour the query's error state and fall back to the
  * matchup's server-stored `team1Score`/`team2Score` fields.
+ *
+ * Regression coverage for LS-5879 (BMD-009): once a matchup is `Completed`,
+ * the server-stored score must be used verbatim instead of being recomputed
+ * from raw per-player stats — recomputing is both a heavy hot path and a
+ * second source of truth that can diverge from the server.
  */
 import type {
   MatchupFragment,
@@ -18,6 +23,22 @@ import type {
 import { MatchupStatus, StatsLoadingStatus } from '@legacy-sports/graphql';
 import { computeMatchupScores } from './MatchupScoreboard';
 import type { ScoringSettings } from '../../lib/scoring';
+
+import { getEnvironmentConfig } from '../../config/environment';
+
+jest.mock('@legacy-sports/logging', () => ({
+  LOGGER: { info: jest.fn(), error: jest.fn(), warn: jest.fn() },
+}));
+
+jest.mock('../../config/environment', () => ({
+  getEnvironmentConfig: jest.fn(() => ({ isDev: false })),
+}));
+
+// Typing warn as jest.Mock (not the original method) sidesteps
+// @typescript-eslint/unbound-method; requireMock returns the live mock instance.
+const { LOGGER } = jest.requireMock<{ LOGGER: { warn: jest.Mock } }>(
+  '@legacy-sports/logging',
+);
 
 function makeMatchup(
   overrides: Partial<MatchupFragment> = {},
@@ -329,6 +350,186 @@ describe('computeMatchupScores', () => {
       });
 
       expect(result.team1Score).toBe(5);
+    });
+  });
+
+  describe('completed matchups defer to the server score (BMD-009)', () => {
+    const scoring: ScoringSettings = {
+      batting: { hr: 1 },
+      fielding: {},
+      pitching: {},
+    };
+
+    const makePlayer = (
+      id: string,
+      teamId: number,
+      playerId: number,
+      homeRuns: number,
+    ): MatchupPlayerFragment => ({
+      __typename: 'MatchupPlayer',
+      id,
+      matchupId: 1234,
+      playerId,
+      teamId,
+      positionId: 1,
+      season: 2023,
+      numberOfGames: 1,
+      player: null,
+      seasonBatting: null,
+      seasonPitching: null,
+      seasonFielding: null,
+      games: [
+        {
+          __typename: 'MatchupPlayerGame',
+          id: Number(id),
+          matchupPlayerId: Number(id),
+          gameNum: 1,
+          gameIdentifier: 'GAME1',
+          gamePosition: null,
+          statsLoadingStatus: null,
+          pitcherStartSkipped: false,
+          battingGame: {
+            __typename: 'GameBatting',
+            playerId,
+            season: 2023,
+            gameNum: 1,
+            gameIdentifier: 'GAME1',
+            plateAppearances: 4,
+            atBats: 4,
+            runs: 0,
+            hits: 1,
+            doubles: 0,
+            triples: 0,
+            homeRuns,
+            rbi: 0,
+            stolenBases: 0,
+            caughtStealing: 0,
+            baseOnBalls: 0,
+            strikeouts: 0,
+            groundedIntoDoublePlays: 0,
+            hitByPitch: 0,
+            sacrificeHits: 0,
+            sacrificeFlies: '0',
+            intentionalBaseOnBalls: 0,
+            battingAverage: 0.25,
+          },
+          pitchingGame: null,
+          fieldingGame: null,
+        },
+      ],
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      jest.mocked(getEnvironmentConfig).mockReturnValue({
+        isDev: false,
+      } as ReturnType<typeof getEnvironmentConfig>);
+    });
+
+    it('uses the server-stored score verbatim instead of recomputing from player games', () => {
+      // 3 HRs would compute to 3 client-side, but the completed matchup's
+      // server-stored score (87.5) must win.
+      const players: MatchupPlayerFragment[] = [makePlayer('1', 10, 100, 3)];
+
+      const result = computeMatchupScores({
+        matchup: makeMatchup({
+          status: MatchupStatus.Completed,
+          team1Score: 87.5,
+          team2Score: 138.0,
+        }),
+        players,
+        hasPlayersError: false,
+        scoringSettings: scoring,
+        seasonStatsMap: emptySeasonStatsMap,
+      });
+
+      expect(result.team1Score).toBe(87.5);
+      expect(result.team2Score).toBe(138.0);
+    });
+
+    it('returns null projections for completed matchups (not shown by the view)', () => {
+      const players: MatchupPlayerFragment[] = [makePlayer('1', 10, 100, 3)];
+
+      const result = computeMatchupScores({
+        matchup: makeMatchup({
+          status: MatchupStatus.Completed,
+          team1Score: 3,
+          team2Score: 0,
+        }),
+        players,
+        hasPlayersError: false,
+        scoringSettings: scoring,
+        seasonStatsMap: emptySeasonStatsMap,
+      });
+
+      expect(result.team1Projected).toBeNull();
+      expect(result.team2Projected).toBeNull();
+    });
+
+    it('does not warn in dev when the server score matches the client computation', () => {
+      jest.mocked(getEnvironmentConfig).mockReturnValue({
+        isDev: true,
+      } as ReturnType<typeof getEnvironmentConfig>);
+      const players: MatchupPlayerFragment[] = [makePlayer('1', 10, 100, 3)];
+
+      computeMatchupScores({
+        matchup: makeMatchup({
+          status: MatchupStatus.Completed,
+          team1Score: 3, // matches the 3 HRs computed client-side
+          team2Score: 0,
+        }),
+        players,
+        hasPlayersError: false,
+        scoringSettings: scoring,
+        seasonStatsMap: emptySeasonStatsMap,
+      });
+
+      expect(LOGGER.warn).not.toHaveBeenCalled();
+    });
+
+    it('warns in dev when the server score diverges from the client computation', () => {
+      jest.mocked(getEnvironmentConfig).mockReturnValue({
+        isDev: true,
+      } as ReturnType<typeof getEnvironmentConfig>);
+      const players: MatchupPlayerFragment[] = [makePlayer('1', 10, 100, 3)];
+
+      computeMatchupScores({
+        matchup: makeMatchup({
+          status: MatchupStatus.Completed,
+          team1Score: 145.91, // diverges from the 3 HRs computed client-side
+          team2Score: 0,
+        }),
+        players,
+        hasPlayersError: false,
+        scoringSettings: scoring,
+        seasonStatsMap: emptySeasonStatsMap,
+      });
+
+      expect(LOGGER.warn).toHaveBeenCalledWith(
+        'Matchup score parity drift: client-computed score diverges from server-stored score',
+        expect.objectContaining({
+          serverTeam1Score: 145.91,
+          clientTeam1Score: 3,
+        }),
+      );
+    });
+
+    it('does not warn outside of dev even when scores diverge', () => {
+      const players: MatchupPlayerFragment[] = [makePlayer('1', 10, 100, 3)];
+
+      computeMatchupScores({
+        matchup: makeMatchup({
+          status: MatchupStatus.Completed,
+          team1Score: 145.91,
+          team2Score: 0,
+        }),
+        players,
+        hasPlayersError: false,
+        scoringSettings: scoring,
+        seasonStatsMap: emptySeasonStatsMap,
+      });
+
+      expect(LOGGER.warn).not.toHaveBeenCalled();
     });
   });
 });

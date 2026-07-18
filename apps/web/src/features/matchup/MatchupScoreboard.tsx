@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   calculateMatchupProjection,
   computeScoring,
@@ -8,9 +9,11 @@ import { MatchupScoreboardView } from '@legacy-sports/shared-components/matchup'
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
+  MatchupStatus,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
+import { getEnvironmentConfig } from '../../config/environment';
 import {
   type ScoringSettings,
   useLeagueScoringSettings,
@@ -45,31 +48,28 @@ export interface ComputeMatchupScoresInput {
   seasonStatsMap: ReadonlyMap<number, SeasonStats>;
 }
 
-/**
- * Compute the team scores and projections shown by the MatchupScoreboard.
- *
- * When the players query errors, or when required inputs are missing, fall
- * back to the matchup's server-stored `team1Score`/`team2Score`. Without this
- * fallback a failing nested resolver (e.g. games / battingGame) collapses
- * both totals to zero and the widget renders "0.00 vs 0.00 Tied" even though
- * the scores are stored correctly on the matchup row. See LS-2937.
- */
-export function computeMatchupScores({
-  matchup,
-  players,
-  hasPlayersError,
-  scoringSettings,
-  seasonStatsMap,
-}: ComputeMatchupScoresInput): ComputedMatchupScores {
-  if (hasPlayersError || !players || !scoringSettings || !matchup) {
-    return {
-      team1Score: matchup?.team1Score ?? 0,
-      team2Score: matchup?.team2Score ?? 0,
-      team1Projected: null,
-      team2Projected: null,
-    };
-  }
+interface TeamTotals {
+  team1Total: number;
+  team2Total: number;
+  team1ProjTotal: number;
+  team2ProjTotal: number;
+}
 
+/** Tolerance for the dev-only client/server score parity check (BMD-009). */
+const SCORE_PARITY_EPSILON = 0.05;
+
+/**
+ * Sum per-player, per-game scores (and projections) onto each team. This is
+ * the expensive path — for a 24-player x 5-game matchup that's 360
+ * `computeScoring` invocations — so callers should only reach for it when the
+ * matchup is still live or a per-player breakdown is genuinely needed.
+ */
+function calculateTeamTotals(
+  matchup: MatchupFragment,
+  players: readonly MatchupPlayerFragment[],
+  scoringSettings: ScoringSettings,
+  seasonStatsMap: ReadonlyMap<number, SeasonStats>,
+): TeamTotals {
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
 
   const calculateGameScore = (
@@ -152,6 +152,97 @@ export function computeMatchupScores({
       team2ProjTotal += playerProjected;
     }
   });
+
+  return { team1Total, team2Total, team1ProjTotal, team2ProjTotal };
+}
+
+/**
+ * Dev-only safety net: warn when the server-stored score (authoritative for
+ * completed matchups, see `computeMatchupScores`) has drifted from what the
+ * client would compute from raw per-player stats — e.g. because scoring
+ * settings changed after the matchup finalized (BMD-009).
+ */
+function warnOnScoreParityDrift(
+  matchup: MatchupFragment,
+  players: readonly MatchupPlayerFragment[],
+  scoringSettings: ScoringSettings,
+  seasonStatsMap: ReadonlyMap<number, SeasonStats>,
+): void {
+  const { team1Total, team2Total } = calculateTeamTotals(
+    matchup,
+    players,
+    scoringSettings,
+    seasonStatsMap,
+  );
+  const serverTeam1Score = matchup.team1Score ?? 0;
+  const serverTeam2Score = matchup.team2Score ?? 0;
+
+  if (
+    Math.abs(team1Total - serverTeam1Score) > SCORE_PARITY_EPSILON ||
+    Math.abs(team2Total - serverTeam2Score) > SCORE_PARITY_EPSILON
+  ) {
+    LOGGER.warn(
+      'Matchup score parity drift: client-computed score diverges from server-stored score',
+      {
+        matchupId: matchup.id,
+        serverTeam1Score,
+        clientTeam1Score: team1Total,
+        serverTeam2Score,
+        clientTeam2Score: team2Total,
+      },
+    );
+  }
+}
+
+/**
+ * Compute the team scores and projections shown by the MatchupScoreboard.
+ *
+ * When the players query errors, or when required inputs are missing, fall
+ * back to the matchup's server-stored `team1Score`/`team2Score`. Without this
+ * fallback a failing nested resolver (e.g. games / battingGame) collapses
+ * both totals to zero and the widget renders "0.00 vs 0.00 Tied" even though
+ * the scores are stored correctly on the matchup row. See LS-2937.
+ *
+ * Once a matchup is `Completed`, the server-stored scores (Decimal columns)
+ * are the sole authority — recomputing from raw per-player stats is both a
+ * heavy hot path (see `calculateTeamTotals`) and a second source of truth
+ * that can silently diverge from the server if scoring settings change after
+ * the matchup finalizes. Projections aren't shown for completed matchups
+ * either (see `MatchupScoreboardView`'s `showProjections`), so there's
+ * nothing to compute them for. Live (`InProgress`) matchups still recompute
+ * client-side so the score can update ahead of the next server sync. See
+ * BMD-009.
+ */
+export function computeMatchupScores({
+  matchup,
+  players,
+  hasPlayersError,
+  scoringSettings,
+  seasonStatsMap,
+}: ComputeMatchupScoresInput): ComputedMatchupScores {
+  if (hasPlayersError || !players || !scoringSettings || !matchup) {
+    return {
+      team1Score: matchup?.team1Score ?? 0,
+      team2Score: matchup?.team2Score ?? 0,
+      team1Projected: null,
+      team2Projected: null,
+    };
+  }
+
+  if (matchup.status === MatchupStatus.Completed) {
+    if (getEnvironmentConfig().isDev) {
+      warnOnScoreParityDrift(matchup, players, scoringSettings, seasonStatsMap);
+    }
+    return {
+      team1Score: matchup.team1Score ?? 0,
+      team2Score: matchup.team2Score ?? 0,
+      team1Projected: null,
+      team2Projected: null,
+    };
+  }
+
+  const { team1Total, team2Total, team1ProjTotal, team2ProjTotal } =
+    calculateTeamTotals(matchup, players, scoringSettings, seasonStatsMap);
 
   return {
     team1Score: team1Total,
