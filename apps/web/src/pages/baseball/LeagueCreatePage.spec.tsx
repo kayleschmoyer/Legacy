@@ -630,6 +630,53 @@ describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
   });
 });
 
+describe('LeagueCreatePage — division reset notice (LS-6058)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+  });
+
+  it('shows the reset notice when team count flips odd and divisions were even', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+
+    expect(screen.getByTestId('division-reset-notice')).toHaveTextContent(
+      'Divisions reset to 1 to match team parity.',
+    );
+  });
+
+  it('dismisses the reset notice when the Dismiss button is clicked', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+    const notice = screen.getByTestId('division-reset-notice');
+    fireEvent.click(within(notice).getByRole('button', { name: /^Dismiss$/i }));
+
+    expect(
+      screen.queryByTestId('division-reset-notice'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('clears the reset notice when the user manually picks a new division count', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+    expect(screen.getByTestId('division-reset-notice')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+
+    expect(
+      screen.queryByTestId('division-reset-notice'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('LeagueCreatePage — Cancel discard confirmation (LS-6108)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

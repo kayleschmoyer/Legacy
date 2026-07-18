@@ -1608,6 +1608,13 @@ export function LeagueCreatePage(): React.JSX.Element {
               : nearest,
           validDivisionOptions[0] ?? 1,
         );
+        if (next.numberOfDivisions !== staleDivisions) {
+          setDivisionResetNotice(
+            `Divisions reset to ${next.numberOfDivisions} to match team parity.`,
+          );
+        }
+      } else if (field === 'numberOfDivisions') {
+        setDivisionResetNotice(null);
       }
       if (
         next.numberOfDivisions === 1 &&
@@ -1633,6 +1640,9 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [selectionResetNotice, setSelectionResetNotice] = useState<
     string | null
   >(null);
+  const [divisionResetNotice, setDivisionResetNotice] = useState<string | null>(
+    null,
+  );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Unsaved-changes navigation guard (LS-6109). Without this, a stray click on
@@ -2335,6 +2345,41 @@ export function LeagueCreatePage(): React.JSX.Element {
                       disabled={isFormDisabled}
                     />
                   </FieldRow>
+
+                  {/* Division reset notice */}
+                  {divisionResetNotice && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <XStack
+                        role="status"
+                        aria-live="polite"
+                        gap="$3"
+                        alignItems="center"
+                        backgroundColor={withAlpha(AMBER, 0.1)}
+                        borderWidth={1}
+                        borderColor={withAlpha(AMBER, 0.4)}
+                        borderRadius="$4"
+                        padding="$3"
+                        data-testid="division-reset-notice"
+                      >
+                        <AlertCircle size={16} color={AMBER} flexShrink={0} />
+                        <Text
+                          fontFamily="$body"
+                          fontSize={13}
+                          color="$color11"
+                          flex={1}
+                        >
+                          {divisionResetNotice}
+                        </Text>
+                        <Button
+                          size="$2"
+                          variant="outlined"
+                          onPress={() => setDivisionResetNotice(null)}
+                        >
+                          Dismiss
+                        </Button>
+                      </XStack>
+                    </div>
+                  )}
 
                   {/* Visibility — full width */}
                   <div style={{ gridColumn: '1 / -1' }}>
