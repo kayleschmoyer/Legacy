@@ -3454,7 +3454,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         open={showEraUpgradeModal}
         onOpenChange={setShowEraUpgradeModal}
         featureName="Historical Era Selection"
-        featureDescription="Unlock all historical eras to restrict your league's player pool — Dead Ball, Golden Age, Expansion, and more."
+        featureDescription="Unlock all historical eras — Dead Ball, Golden Age, Expansion, and more — or set a custom year range to restrict your league's player pool."
       />
       <UpgradeModal
         open={showHofUpgradeModal}

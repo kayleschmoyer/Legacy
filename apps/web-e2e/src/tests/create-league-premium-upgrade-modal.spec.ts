@@ -96,6 +96,20 @@ freeUserTest.describe(
     );
 
     freeUserTest(
+      'clicking the locked Custom Era tile opens an upgrade modal that mentions Custom Era (LS-6081)',
+      async ({ leaguePage }) => {
+        await leaguePage.expandSection('era-history');
+
+        // Custom Era is premium-gated, same as the preset historical eras —
+        // the modal copy must not read as if only bundled eras unlock.
+        await leaguePage.button('Custom Era').tap();
+
+        await leaguePage.expectUpgradeModalVisible('Historical Era Selection');
+        await leaguePage.text(/custom year range/i).expectVisible();
+      },
+    );
+
+    freeUserTest(
       'Salary Cap field is behind a premium gate; upgrading opens the upgrade modal',
       async ({ leaguePage }) => {
         await leaguePage.expandSection('waiver-budget');
