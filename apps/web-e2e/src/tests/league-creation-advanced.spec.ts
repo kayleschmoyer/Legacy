@@ -578,6 +578,38 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     },
   );
 
+  adminTest(
+    'should retain waiver type, FAAB budget, and salary cap amount after collapsing and re-expanding the section (LS-5373)',
+    async ({ page, leaguePage }) => {
+      // FAAB waivers and salary cap are both premium-gated.
+      await useTier(page, 'premium');
+      await leaguePage.gotoCreate();
+      await leaguePage.leagueNameInput.expectVisible();
+
+      await leaguePage.expandSection('waiver-budget');
+
+      // Select FAAB waiver type and a preset FAAB budget.
+      await leaguePage.clickButton(/FAAB/i, { exact: false });
+      await leaguePage.clickButton('$200', { exact: true });
+
+      // Enable salary cap and enter an amount.
+      await leaguePage.clickButton('On', { exact: true });
+      await leaguePage.fillSalaryCapAmount(20000000);
+
+      // Collapsing the section renders a summary derived from form state —
+      // the mechanism that proves the selections persisted, since the
+      // underlying option buttons carry no aria-pressed/aria-selected state.
+      const sectionToggle = leaguePage.testId('section-toggle-waiver-budget');
+      await sectionToggle.tap();
+      await sectionToggle.expectContainsText('FAAB · $200 · $20000000M cap');
+
+      // Re-expanding confirms the salary cap input itself retained its
+      // value and stayed visible (proving salaryCapEnabled stayed true).
+      await leaguePage.expandSection('waiver-budget');
+      await leaguePage.salaryCapAmountInput.expectValue('20000000');
+    },
+  );
+
   // ─── Form Validation (inline error card) ──────────────────────────────────
 
   test('submit button is enabled even with a short league name', async ({
