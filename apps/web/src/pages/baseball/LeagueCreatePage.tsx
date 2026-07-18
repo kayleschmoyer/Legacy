@@ -2984,27 +2984,38 @@ export function LeagueCreatePage(): React.JSX.Element {
                           label="Minimum Bid"
                           hint={`Lowest opening bid accepted. ${AUCTION_MIN_BID_RANGE.min}–${AUCTION_MIN_BID_RANGE.max}.`}
                         >
-                          <Input
-                            size="$3"
-                            value={String(formData.auctionMinBid)}
-                            onChangeText={(text: string) => {
-                              const n = parseInt(text, 10);
-                              if (isNaN(n)) return;
-                              const clamped = Math.min(
-                                Math.max(n, AUCTION_MIN_BID_RANGE.min),
-                                AUCTION_MIN_BID_RANGE.max,
-                              );
-                              handleInputChange('auctionMinBid', clamped);
-                            }}
-                            placeholder="1"
-                            keyboardType="numeric"
-                            borderColor={
-                              validationErrors.auctionMinBid
-                                ? '$red8'
-                                : '$borderColor'
-                            }
-                            disabled={isFormDisabled}
-                          />
+                          <XStack alignItems="center" gap="$3">
+                            <Input
+                              size="$3"
+                              value={String(formData.auctionMinBid)}
+                              onChangeText={(text: string) => {
+                                const n = parseInt(text, 10);
+                                if (isNaN(n)) return;
+                                const clamped = Math.min(
+                                  Math.max(n, AUCTION_MIN_BID_RANGE.min),
+                                  AUCTION_MIN_BID_RANGE.max,
+                                );
+                                handleInputChange('auctionMinBid', clamped);
+                              }}
+                              placeholder="1"
+                              keyboardType="numeric"
+                              borderColor={
+                                validationErrors.auctionMinBid
+                                  ? '$red8'
+                                  : '$borderColor'
+                              }
+                              disabled={isFormDisabled}
+                            />
+                            {validationErrors.auctionMinBid && (
+                              <Text
+                                fontFamily="$body"
+                                fontSize={12}
+                                color="$red10"
+                              >
+                                {validationErrors.auctionMinBid}
+                              </Text>
+                            )}
+                          </XStack>
                         </FieldRow>
                       </>
                     )}

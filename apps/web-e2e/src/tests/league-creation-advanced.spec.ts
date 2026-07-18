@@ -308,6 +308,26 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     expect(summary).toMatch(/auction/i);
   });
 
+  test('should show a validation error when minimum bid exceeds auction budget', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+
+    // Expand the Draft Settings section and select Auction
+    await leaguePage.expandSection('draft');
+    await leaguePage.clickButton('Auction');
+
+    // Set min bid above the budget (LS-6075: this used to be silently accepted)
+    await leaguePage.placeholder('200').fill('200');
+    await leaguePage.placeholder('1').fill('500');
+
+    await leaguePage
+      .text('Auction minimum bid cannot exceed auction budget.')
+      .first()
+      .expectVisible();
+  });
+
   // ─── Draft Order ──────────────────────────────────────────────────────────
 
   test('should display Snake and Linear draft order options', async ({
