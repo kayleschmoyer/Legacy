@@ -1,9 +1,21 @@
-import axios from 'axios';
-import { getPlayerGameLog, getPlayerPage } from './PFRSession';
+import axios, { AxiosError } from 'axios';
+import { getPlayerGameLog, getPlayerPage, getPlayersList } from './PFRSession';
 
 // Spy on axios.get only — do NOT jest.mock('axios') as that auto-mocks
 // isAxiosError to return undefined, which breaks the retry-logic branch.
 const mockAxiosGet = jest.spyOn(axios, 'get');
+
+function makeAxiosError(status: number): AxiosError {
+  const error = new AxiosError(`Request failed with status code ${status}`);
+  error.response = {
+    status,
+    data: '',
+    statusText: '',
+    headers: {},
+    config: {} as never,
+  };
+  return error;
+}
 
 // VALID_PFR_ID guards getPlayerPage/getPlayerGameLog path segments against
 // traversal (LS-8416). Widening the character class to allow "." must keep
@@ -109,4 +121,25 @@ describe('VALID_PFR_ID path-segment validation', () => {
     expect(() => getPlayerPage("El-M'Hi/20")).toThrow(/Invalid pfrId/);
     expect(mockAxiosGet).not.toHaveBeenCalled();
   });
+});
+
+// LS-8414: PFR returns 403 when the Cloudflare cf_clearance cookie is
+// missing/expired. Unlike 429/529, this should fail fast with an actionable
+// message instead of retrying a request that will never succeed.
+describe('403 handling (Cloudflare block)', () => {
+  beforeEach(() => {
+    mockAxiosGet.mockReset();
+  });
+
+  // Single request per test — the module-level rate limiter sleeps in real
+  // time between calls, and a second call here would risk exceeding the
+  // test timeout on top of leftover delay from earlier tests in this file.
+  it('throws an actionable error instead of the raw AxiosError, without retrying', async () => {
+    mockAxiosGet.mockRejectedValue(makeAxiosError(403));
+
+    await expect(getPlayersList('Z')).rejects.toThrow(
+      /cf_clearance cookie is likely missing or expired.*apps\/cli\/src\/commands\/queue-players\.md/,
+    );
+    expect(mockAxiosGet).toHaveBeenCalledTimes(1);
+  }, 20_000);
 });

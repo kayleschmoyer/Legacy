@@ -114,6 +114,22 @@ export async function getFromProFootballReference(
           `Got ${status} for ${url} after ${MAX_RETRIES} retries. Giving up.`,
         );
       }
+
+      // A 403 means Cloudflare blocked the request outright — retrying won't
+      // help (unlike 429/529, which clear on their own). This is almost
+      // always a missing/expired cf_clearance cookie (~30min TTL) rather than
+      // an application bug; surface the documented fix instead of a bare
+      // AxiosError. See apps/cli/src/commands/queue-players.md.
+      if (status === 403) {
+        throw new Error(
+          `PFR blocked the request with 403 (Cloudflare) for ${url}. The ` +
+            `cf_clearance cookie is likely missing or expired (~30min TTL) ` +
+            `— re-pull it from DevTools and set PFR_CF_CLEARANCE/` +
+            `PFR_USER_AGENT, then resume with --letter. See ` +
+            `apps/cli/src/commands/queue-players.md.`,
+        );
+      }
+
       throw error;
     }
   }
