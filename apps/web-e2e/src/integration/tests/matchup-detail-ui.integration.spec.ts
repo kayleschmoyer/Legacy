@@ -426,10 +426,15 @@ test.describe
     });
 
     await test.step('Previous-week button is inert at Week 1', async () => {
-      // The StepperButton is a Tamagui-styled div with aria-label.
-      // The "disabled" variant sets opacity:0.3 but not the HTML disabled
-      // attribute.  We verify inertness by clicking and confirming the
-      // displayed week does not change.
+      // The StepperButton is a Tamagui-styled div with aria-label.  The
+      // "disabled" variant sets opacity:0.3 and aria-disabled="true" but not
+      // the native HTML disabled attribute.  Playwright's default .click()
+      // actionability check treats aria-disabled="true" as not-enabled and
+      // waits for it to become actionable — which never happens at Week 1 —
+      // so a plain click() hangs until the test timeout (LS-8419).  We assert
+      // inertness directly instead: the control reports aria-disabled and the
+      // displayed week does not change.  Mirrors the hermetic pattern in
+      // matchup-week-navigation.spec.ts.
       const weekTextBefore = await page
         .getByText(/^Week \d+$/)
         .first()
@@ -437,11 +442,9 @@ test.describe
 
       const prevBtn = page.locator('[aria-label="Previous week"]');
       await expect(prevBtn).toBeVisible({ timeout: 10_000 });
-      await prevBtn.click();
-      // The week-text-after check below is the deterministic signal that
-      // the click either updated or no-op'd the week display; if the click
-      // had any UI effect it would render before textContent resolves
-      // (LS-4457).
+      await expect(prevBtn).toHaveAttribute('aria-disabled', 'true');
+
+      // Week display is unchanged (the disabled control is a no-op).
       const weekTextAfter = await page
         .getByText(/^Week \d+$/)
         .first()
