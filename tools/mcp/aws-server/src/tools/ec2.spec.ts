@@ -52,9 +52,9 @@ describe('ec2Instances', () => {
 
     const lines = out.split('\n');
     expect(lines[0]).toBe(
-      'instanceId|instanceType|state|name|publicIp|privateIp|launchTime|imageId|keyName',
+      'instanceId|instanceType|state|stateReason|instanceLifecycle|name|publicIp|privateIp|launchTime|imageId|keyName',
     );
-    expect(lines[1]).toBe('---|---|---|---|---|---|---|---|---');
+    expect(lines[1]).toBe('---|---|---|---|---|---|---|---|---|---|---');
     expect(lines[2]).toContain('i-0abc1234def567890');
     expect(lines[2]).toContain('runner-1');
     // Not pretty-printed JSON.

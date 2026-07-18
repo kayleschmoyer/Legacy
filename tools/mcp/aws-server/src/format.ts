@@ -21,6 +21,8 @@ export const EC2_INSTANCE_COLUMNS = [
   'instanceId',
   'instanceType',
   'state',
+  'stateReason',
+  'instanceLifecycle',
   'name',
   'publicIp',
   'privateIp',

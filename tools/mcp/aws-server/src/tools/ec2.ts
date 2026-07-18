@@ -27,6 +27,9 @@ interface Ec2Instance {
   InstanceId?: string;
   InstanceType?: string;
   State?: { Name?: string };
+  StateReason?: { Code?: string; Message?: string };
+  StateTransitionReason?: string;
+  InstanceLifecycle?: string;
   PublicIpAddress?: string;
   PrivateIpAddress?: string;
   LaunchTime?: string;
@@ -96,6 +99,8 @@ export async function ec2Instances(
       instanceId: i.InstanceId,
       instanceType: i.InstanceType,
       state: i.State?.Name,
+      stateReason: i.StateReason?.Message ?? i.StateTransitionReason ?? null,
+      instanceLifecycle: i.InstanceLifecycle ?? null,
       name: getTag(i.Tags, 'Name'),
       publicIp: i.PublicIpAddress ?? null,
       privateIp: i.PrivateIpAddress ?? null,

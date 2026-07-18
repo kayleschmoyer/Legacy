@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { apigatewayInspect } from './tools/apigateway-inspect.js';
 import { apigatewayV2Inspect } from './tools/apigatewayv2-inspect.js';
+import { cloudTrailLookup } from './tools/cloudtrail.js';
 import {
   ec2ConsoleOutput,
   ec2DescribeImage,
@@ -425,10 +426,49 @@ server.tool(
   async (params) => terraformOutput(params),
 );
 
+// --- aws_cloudtrail_lookup ---
+server.tool(
+  'aws_cloudtrail_lookup',
+  'Look up CloudTrail events to diagnose EC2 instance lifecycle transitions: spot eviction (BidEvictedEvent), scale-down termination, or manual terminate. Pass mode="death-verdict" with an instanceId to get a { verdict, events[] } summary (verdict: "spot" | "scale-down" | "manual" | "unknown"). Pass mode="events" (default) to get raw compact events. Capped at 50 events. Replaces shell fallback to `aws cloudtrail lookup-events`.',
+  {
+    instanceId: z
+      .string()
+      .optional()
+      .describe(
+        'EC2 instance ID (e.g. "i-0abc1234def56789a"). Required for mode="death-verdict". Used to filter events by ResourceName (TerminateInstances) and by CloudTrailEvent payload (BidEvictedEvent, which has an empty ResourceName).',
+      ),
+    eventName: z
+      .string()
+      .optional()
+      .describe(
+        'CloudTrail event name to look up (e.g. "BidEvictedEvent", "TerminateInstances", "RunInstances"). Must be alphanumeric only. If both eventName and instanceId are provided in events mode, the query is by eventName and filtered client-side by instanceId.',
+      ),
+    startTime: z
+      .string()
+      .optional()
+      .describe(
+        'Start of the lookup window as an ISO 8601 timestamp (e.g. "2024-01-15T12:00:00Z"). CloudTrail retains events for 90 days.',
+      ),
+    endTime: z
+      .string()
+      .optional()
+      .describe(
+        'End of the lookup window as an ISO 8601 timestamp (e.g. "2024-01-15T13:00:00Z").',
+      ),
+    mode: z
+      .enum(['events', 'death-verdict'])
+      .default('events')
+      .describe(
+        '"events" (default): returns compact events with { eventTime, eventName, username, instanceIds[], terminationReason }. "death-verdict": requires instanceId; runs two parallel lookups (ResourceName and BidEvictedEvent) and returns { verdict, events[] } where verdict is "spot" | "scale-down" | "manual" | "unknown".',
+      ),
+  },
+  async (params) => cloudTrailLookup(params),
+);
+
 // --- aws_ec2_instances ---
 server.tool(
   'aws_ec2_instances',
-  'List EC2 instances filtered by environment tag. Returns instanceId, type, state, name tag, IPs, launchTime, imageId, and keyName.',
+  'List EC2 instances filtered by environment tag. Returns instanceId, type, state, stateReason, instanceLifecycle, name tag, IPs, launchTime, imageId, and keyName.',
   {
     environment: z
       .enum(['dev', 'prod'])
