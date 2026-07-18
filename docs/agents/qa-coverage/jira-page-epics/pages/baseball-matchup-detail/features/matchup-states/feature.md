@@ -57,9 +57,25 @@ File: `apps/web-e2e/src/tests/matchup-detail.spec.ts`
 
 - Shows loading spinner while data is pending
 
-`describe('Matchup Detail – error state @regression')`:
+`describe('Matchup Detail – error state @regression')` — mocks
+`{ data: { getMatchupById: null }, errors: [{ message: 'Matchup not found' }] }`.
+Apollo's default `errorPolicy: 'none'` means any response carrying a
+top-level `errors` array always resolves to this branch, never the
+not-found branch below:
 
 - Shows error message when GraphQL returns an error
+- Shows Back to League button and navigates back
+
+`describe('Matchup Detail – not-found state @regression')` — mocks
+`{ data: { getMatchupById: null } }` with no `errors` array, independently
+exercising the `!matchup` branch (previously uncovered — the error-state
+test's mock always resolved to the error branch above):
+
+- Shows Matchup not found message
+- Shows Back to League button and navigates back
+
+All routes use `route.fulfill()` only (no `route.continue()`), per
+`.agents/skills/testing/references/e2e-determinism.md`.
 
 ## Related
 

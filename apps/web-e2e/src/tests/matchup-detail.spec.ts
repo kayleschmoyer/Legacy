@@ -288,15 +288,16 @@ test.describe('Matchup Detail – loading state @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – error state @regression', () => {
-  test('shows error message when GraphQL returns an error', async ({
-    page,
-  }) => {
+  test.beforeEach(async ({ page }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
       if (
         postData.includes('getmatchupbyid') ||
         postData.includes('matchupbyid')
       ) {
+        // GraphQL errors array present — Apollo's default errorPolicy
+        // ('none') always surfaces this as the `error` branch, regardless
+        // of `data.getMatchupById`.
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -313,12 +314,62 @@ test.describe('Matchup Detail – error state @regression', () => {
 
     await page.goto(MATCHUP_URL);
     await page.waitForLoadState('load');
+  });
 
-    // Either the error state or the not-found state should render
-    const errorOrNotFound = page
-      .getByText(/error loading matchup|matchup not found/i)
-      .first();
-    await expect(errorOrNotFound).toBeVisible();
+  test('shows error message when GraphQL returns an error', async ({
+    page,
+  }) => {
+    await expect(page.getByText(/error loading matchup/i)).toBeVisible();
+  });
+
+  test('shows Back to League button and navigates back', async ({ page }) => {
+    const backButton = page.getByRole('button', { name: /back to league/i });
+    await expect(backButton).toBeVisible();
+    await backButton.click();
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL(`/baseball/league/${LEAGUE_ID}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests – not-found state
+// ---------------------------------------------------------------------------
+
+test.describe('Matchup Detail – not-found state @regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const postData = route.request().postData()?.toLowerCase() ?? '';
+      if (
+        postData.includes('getmatchupbyid') ||
+        postData.includes('matchupbyid')
+      ) {
+        // No errors array — exercises the true `!matchup` not-found branch,
+        // distinct from the GraphQL-error branch above.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { getMatchupById: null } }),
+        });
+      } else {
+        // Stub all other operations so the test isolates the not-found path
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    await page.goto(MATCHUP_URL);
+    await page.waitForLoadState('load');
+  });
+
+  test('shows Matchup not found message', async ({ page }) => {
+    await expect(page.getByText('Matchup not found')).toBeVisible();
+  });
+
+  test('shows Back to League button and navigates back', async ({ page }) => {
+    const backButton = page.getByRole('button', { name: /back to league/i });
+    await expect(backButton).toBeVisible();
+    await backButton.click();
+    await page.waitForLoadState('load');
+    await expect(page).toHaveURL(`/baseball/league/${LEAGUE_ID}`);
   });
 });
 
