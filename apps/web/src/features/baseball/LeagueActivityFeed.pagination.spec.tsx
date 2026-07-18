@@ -1,13 +1,13 @@
 /**
- * Tests for LeagueActivityFeed pagination (LS-8060).
+ * Tests for LeagueActivityFeed server-driven pagination (LS-5950).
  *
- * The feed query returns up to 200 events. Before this fix the component
- * rendered every matching event at once, producing an unbounded panel on
- * the league overview page. The panel must now render a bounded first page
- * and reveal additional events via a "Show more" control.
+ * The feed now fetches PAGE_SIZE=20 events initially and re-queries with an
+ * increased limit on every "Load older" press. When the server returns fewer
+ * events than the current limit, no more pages exist and the button hides.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useGetLeagueActivityQuery } from '@legacy-sports/graphql';
 
 import { LeagueActivityFeed } from './LeagueActivityFeed';
 
@@ -18,6 +18,7 @@ interface WithChildren {
 }
 interface ButtonProps extends WithChildren {
   onPress?: () => void;
+  disabled?: boolean;
 }
 
 let mockActivity: unknown[] = [];
@@ -26,8 +27,10 @@ let mockActivity: unknown[] = [];
 
 jest.mock('tamagui', () => ({
   Card: ({ children }: WithChildren) => <div>{children}</div>,
-  Button: ({ children, onPress }: ButtonProps) => (
-    <button onClick={onPress}>{children}</button>
+  Button: ({ children, onPress, disabled }: ButtonProps) => (
+    <button onClick={onPress} disabled={disabled}>
+      {children}
+    </button>
   ),
   ScrollView: ({ children }: WithChildren) => <div>{children}</div>,
   Separator: () => <hr />,
@@ -60,11 +63,16 @@ jest.mock('@legacy-sports/graphql', () => ({
     DraftPickMade: 'DraftPickMade',
     LeagueAnnouncement: 'LeagueAnnouncement',
   },
-  useGetLeagueActivityQuery: jest.fn(() => ({
-    data: { leagueActivity: mockActivity },
-    loading: false,
-    error: undefined,
-  })),
+  // Simulate server-side limit: return up to variables.limit items.
+  useGetLeagueActivityQuery: jest.fn(
+    ({ variables }: { variables: { limit?: number } }) => ({
+      data: {
+        leagueActivity: mockActivity.slice(0, variables?.limit ?? 20),
+      },
+      loading: false,
+      error: undefined,
+    }),
+  ),
 }));
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -80,9 +88,8 @@ jest.mock('../../constants/colors', () => ({
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
 
-/** Build N trade-accepted events whose rendered detail text is unique. */
 function buildTradeEvents(count: number): unknown[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `evt-${i}`,
@@ -96,53 +103,84 @@ function buildTradeEvents(count: number): unknown[] {
 
 const detailFor = (i: number): string => `T${i}A and T${i}B completed a trade.`;
 
+const mockedQuery = useGetLeagueActivityQuery as jest.Mock;
+
 /* ── Tests ────────────────────────────────────────────────────────────────── */
 
-describe('LeagueActivityFeed – pagination (LS-8060)', () => {
+describe('LeagueActivityFeed – server-driven pagination (LS-5950)', () => {
   afterEach(() => {
     mockActivity = [];
+    mockedQuery.mockClear();
   });
 
-  it('renders only the first page of events when more exist', () => {
-    mockActivity = buildTradeEvents(12);
+  it('renders all events when they fit within one page', () => {
+    mockActivity = buildTradeEvents(PAGE_SIZE - 1);
     render(
       <LeagueActivityFeed leagueId={42} draftStatus="active" teamCount={10} />,
     );
 
-    // First PAGE_SIZE items are visible…
+    expect(screen.getByText(detailFor(0))).toBeInTheDocument();
+    expect(screen.getByText(detailFor(PAGE_SIZE - 2))).toBeInTheDocument();
+    expect(screen.queryByText('Load older')).not.toBeInTheDocument();
+  });
+
+  it('shows "Load older" when server returns exactly PAGE_SIZE events', () => {
+    mockActivity = buildTradeEvents(PAGE_SIZE + 10);
+    render(
+      <LeagueActivityFeed leagueId={42} draftStatus="active" teamCount={10} />,
+    );
+
+    // Only PAGE_SIZE items rendered (server sliced to limit)
     expect(screen.getByText(detailFor(0))).toBeInTheDocument();
     expect(screen.getByText(detailFor(PAGE_SIZE - 1))).toBeInTheDocument();
-    // …and the overflow items are not yet rendered.
     expect(screen.queryByText(detailFor(PAGE_SIZE))).not.toBeInTheDocument();
-    expect(screen.queryByText(detailFor(11))).not.toBeInTheDocument();
 
-    // Footer reflects the bounded count out of the full filtered total.
-    expect(screen.getByText('Showing 8 of 12 events')).toBeInTheDocument();
-    expect(screen.getByText('Show more')).toBeInTheDocument();
+    expect(screen.getByText('Load older')).toBeInTheDocument();
   });
 
-  it('reveals the next page when "Show more" is pressed', () => {
-    mockActivity = buildTradeEvents(12);
+  it('fetches the next page when "Load older" is pressed', () => {
+    mockActivity = buildTradeEvents(PAGE_SIZE + 5);
     render(
       <LeagueActivityFeed leagueId={42} draftStatus="active" teamCount={10} />,
     );
 
-    fireEvent.click(screen.getByText('Show more'));
+    fireEvent.click(screen.getByText('Load older'));
 
-    // All 12 events are now rendered and the control is gone.
+    // Re-queried with limit = PAGE_SIZE * 2, all events now visible
     expect(screen.getByText(detailFor(PAGE_SIZE))).toBeInTheDocument();
-    expect(screen.getByText(detailFor(11))).toBeInTheDocument();
-    expect(screen.getByText('Showing 12 of 12 events')).toBeInTheDocument();
-    expect(screen.queryByText('Show more')).not.toBeInTheDocument();
+    expect(screen.getByText(detailFor(PAGE_SIZE + 4))).toBeInTheDocument();
+    // No more pages — the second page has fewer than limit items
+    expect(screen.queryByText('Load older')).not.toBeInTheDocument();
   });
 
-  it('does not render "Show more" when events fit on one page', () => {
-    mockActivity = buildTradeEvents(PAGE_SIZE);
+  it('passes the initial limit to the query on mount', () => {
+    mockActivity = buildTradeEvents(5);
     render(
       <LeagueActivityFeed leagueId={42} draftStatus="active" teamCount={10} />,
     );
 
-    expect(screen.queryByText('Show more')).not.toBeInTheDocument();
-    expect(screen.getByText('Showing 8 of 8 events')).toBeInTheDocument();
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({ limit: PAGE_SIZE }),
+      }),
+    );
+  });
+
+  it('shows footer count matching loaded events', () => {
+    mockActivity = buildTradeEvents(3);
+    render(
+      <LeagueActivityFeed leagueId={42} draftStatus="active" teamCount={10} />,
+    );
+
+    expect(screen.getByText('3 events loaded')).toBeInTheDocument();
+  });
+
+  it('uses singular "event" for exactly one result', () => {
+    mockActivity = buildTradeEvents(1);
+    render(
+      <LeagueActivityFeed leagueId={42} draftStatus="active" teamCount={10} />,
+    );
+
+    expect(screen.getByText('1 event loaded')).toBeInTheDocument();
   });
 });

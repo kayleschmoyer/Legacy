@@ -394,7 +394,7 @@ test.describe('Activity feed shows multiple event types @regression', () => {
 
     // Verify the event count footer reflects the total
     await expect(
-      page.getByText('Showing 4 of 4 events', { exact: false }),
+      page.getByText('4 events loaded', { exact: false }),
     ).toBeVisible();
 
     // Verify filter chips appear for each type with events

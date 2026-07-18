@@ -301,13 +301,8 @@ const FILTER_TABS: { type: ActivityType; label: string }[] = [
   { type: 'commissioner', label: 'Commissioner' },
 ];
 
-/**
- * Number of activity items rendered per page. The feed query returns up to
- * 200 events, but rendering all of them at once produces an unbounded panel
- * (LS-8060). We render this many initially and reveal more in PAGE_SIZE
- * increments via the "Show more" control.
- */
-const PAGE_SIZE = 8;
+/** How many events to request initially and per "Show more" increment (LS-5950). */
+const PAGE_SIZE = 20;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -322,10 +317,10 @@ export function LeagueActivityFeed({
   leagueId,
 }: LeagueActivityFeedProps): React.JSX.Element {
   const [activeFilter, setActiveFilter] = useState<ActivityType>('all');
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [fetchLimit, setFetchLimit] = useState(PAGE_SIZE);
 
   const { data, loading, error } = useGetLeagueActivityQuery({
-    variables: { leagueId, limit: 200 },
+    variables: { leagueId, limit: fetchLimit },
     errorPolicy: 'all',
     // The feed aggregates events produced by many different mutations
     // (trades, waivers, announcements, draft picks) across multiple users'
@@ -353,19 +348,13 @@ export function LeagueActivityFeed({
     [activities, activeFilter],
   );
 
-  // Only ever render the first `visibleCount` items so the panel stays bounded
-  // even when the league has a long history (LS-8060).
-  const visible = useMemo(
-    () => filtered.slice(0, visibleCount),
-    [filtered, visibleCount],
-  );
-  const hasMore = filtered.length > visible.length;
+  // When the server returns exactly `fetchLimit` items there may be more to load.
+  const hasMore =
+    data?.leagueActivity != null && data.leagueActivity.length >= fetchLimit;
 
-  // Switching filters starts a fresh page so the new tab opens from the top
-  // instead of inheriting the previously expanded count.
   const selectFilter = (type: ActivityType): void => {
     setActiveFilter(type);
-    setVisibleCount(PAGE_SIZE);
+    setFetchLimit(PAGE_SIZE);
   };
 
   return (
@@ -473,7 +462,7 @@ export function LeagueActivityFeed({
             </Text>
           </YStack>
         ) : (
-          visible.map((activity, idx) => (
+          filtered.map((activity, idx) => (
             <React.Fragment key={activity.id}>
               <XStack
                 gap="$3"
@@ -543,7 +532,7 @@ export function LeagueActivityFeed({
                 </YStack>
               </XStack>
 
-              {idx < visible.length - 1 && (
+              {idx < filtered.length - 1 && (
                 <Separator borderColor="$outlineSubtle" marginLeft={44} />
               )}
             </React.Fragment>
@@ -551,7 +540,7 @@ export function LeagueActivityFeed({
         )}
       </YStack>
 
-      {/* Show more control — reveals the next page of activity */}
+      {/* Load older — fetches the next page from the server (LS-5950) */}
       {hasMore && (
         <XStack justifyContent="center" marginTop="$3">
           <Button
@@ -561,12 +550,13 @@ export function LeagueActivityFeed({
             backgroundColor="$surfaceSubtle"
             borderColor="$outlineSubtle"
             borderWidth={1}
+            disabled={loading}
             onPress={() => {
-              setVisibleCount((c) => c + PAGE_SIZE);
+              setFetchLimit((n) => n + PAGE_SIZE);
             }}
           >
             <Text fontSize="$2" fontWeight="600" color="$textMuted">
-              Show more
+              {loading ? 'Loading…' : 'Load older'}
             </Text>
           </Button>
         </XStack>
@@ -582,8 +572,7 @@ export function LeagueActivityFeed({
           borderColor="$outlineSubtle"
         >
           <Text fontSize="$2" color="$textMuted">
-            Showing {visible.length} of {filtered.length} event
-            {filtered.length !== 1 ? 's' : ''}
+            {filtered.length} event{filtered.length !== 1 ? 's' : ''} loaded
           </Text>
         </XStack>
       )}
