@@ -171,6 +171,11 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // Fill name and submit to verify the selection was accepted (form submits)
     await leaguePage.fillLeagueName('Round Robin League');
     await leaguePage.submitCreate();
+
+    // Confirm the post-create "League created!" dialog (LS-6067) before the
+    // page navigates to the new league.
+    await leaguePage.continueToLeague();
+
     await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
 

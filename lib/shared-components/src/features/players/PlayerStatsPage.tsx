@@ -37,6 +37,7 @@ import type {
   PlayerWithStats,
 } from './PlayerStatsTypes';
 import type { PlayerCareerStats } from './services/CareerStatsService';
+import { csp } from './crossPlatformStyle';
 import { Animated, Platform } from '../../platform-components';
 import {
   BRAND_GOLD,
@@ -83,14 +84,16 @@ const GOLD_ACCENT_BUTTON_STYLE = {
   minHeight: 40,
 };
 
-const GOLD_ACCENT_BUTTON_LABEL_STYLE = {
+// `letterSpacing: '0.08em'` is web-only (RN needs a numeric px); csp() keeps it
+// verbatim on web and drops it on native so the shared label never crashes RN.
+const GOLD_ACCENT_BUTTON_LABEL_STYLE = csp({
   color: BRAND_GOLD_LIGHT,
   fontSize: 12,
   fontFamily: FONT_DISPLAY,
   fontWeight: '700' as const,
   letterSpacing: '0.08em',
   textTransform: 'uppercase' as const,
-};
+});
 
 const POSITIONS = [
   'All Positions',
@@ -1304,7 +1307,7 @@ export function PlayerStatsPage({
   ]);
 
   return (
-    <YStack flex={1} style={{ backgroundColor: BG_PAGE }}>
+    <YStack flex={1} style={csp({ backgroundColor: BG_PAGE })}>
       {/* ── Web-only CSS: crossfade tab transitions, slider track, state shimmer ── */}
       {Platform.OS === 'web' && (
         <style>{`
@@ -1354,12 +1357,12 @@ export function PlayerStatsPage({
       {/* ── Page header ───────────────────────────────────────────── */}
       {showHeader && (
         <YStack
-          style={{
+          style={csp({
             maxWidth: 1280,
             width: '100%',
             padding: '32px 24px 0',
             margin: '0 auto',
-          }}
+          })}
         >
           <XStack
             justifyContent="space-between"
@@ -1368,22 +1371,22 @@ export function PlayerStatsPage({
             flexWrap="wrap"
           >
             {/* Left: editorial copy */}
-            <YStack gap="$2" style={{ flex: 1, minWidth: 240 }}>
+            <YStack gap="$2" style={csp({ flex: 1, minWidth: 240 })}>
               <Text
-                style={{
+                style={csp({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: '700',
                   fontSize: 11,
                   letterSpacing: '0.16em',
                   textTransform: 'uppercase',
                   color: BRAND_GOLD_LIGHT,
-                }}
+                })}
               >
                 Players · League Archive
               </Text>
               <Text
                 tag="h1"
-                style={{
+                style={csp({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: '800',
                   fontSize:
@@ -1398,12 +1401,12 @@ export function PlayerStatsPage({
                   letterSpacing: '-0.02em',
                   color: '#FFFFFF',
                   margin: 0,
-                }}
+                })}
               >
                 {title}
               </Text>
               <Text
-                style={{
+                style={csp({
                   fontFamily: FONT_BODY,
                   fontSize: 17,
                   lineHeight:
@@ -1411,7 +1414,7 @@ export function PlayerStatsPage({
                   color: FG3,
                   maxWidth: '64ch',
                   margin: 0,
-                }}
+                })}
               >
                 Every qualified hitter and pitcher across the archive. Draft
                 legends, compare seasons, and build your dynasty on the numbers
@@ -1421,7 +1424,7 @@ export function PlayerStatsPage({
               <XStack
                 alignItems="center"
                 gap="$2"
-                style={{
+                style={csp({
                   marginTop: 14,
                   padding: '8px 14px',
                   background: 'rgba(13,21,38,0.6)',
@@ -1429,10 +1432,10 @@ export function PlayerStatsPage({
                   borderRadius: 8,
                   maxWidth: '100%',
                   overflow: 'hidden',
-                }}
+                })}
               >
                 <Text
-                  style={{
+                  style={csp({
                     fontFamily: FONT_DISPLAY,
                     fontWeight: '700',
                     fontSize: 10,
@@ -1440,12 +1443,12 @@ export function PlayerStatsPage({
                     textTransform: 'uppercase',
                     color: FG4,
                     flexShrink: 0,
-                  }}
+                  })}
                 >
                   URL
                 </Text>
                 <Text
-                  style={{
+                  style={csp({
                     fontFamily: FONT_MONO,
                     fontSize: 12,
                     color: FG3,
@@ -1453,7 +1456,7 @@ export function PlayerStatsPage({
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                     minWidth: 0,
-                  }}
+                  })}
                   numberOfLines={1}
                 >
                   {urlPreview}
@@ -1465,7 +1468,7 @@ export function PlayerStatsPage({
             {showActions && (
               <XStack
                 gap="$2"
-                style={{ marginTop: Platform.OS === 'web' ? 8 : 0 }}
+                style={csp({ marginTop: Platform.OS === 'web' ? 8 : 0 })}
               >
                 <Pressable
                   onPress={handleShare}
@@ -1531,7 +1534,7 @@ export function PlayerStatsPage({
       {/* ── Main content area ──────────────────────────────────────── */}
       <YStack
         flex={1}
-        style={{
+        style={csp({
           maxWidth: 1280,
           width: '100%',
           padding: '24px 24px 96px',
@@ -1539,7 +1542,7 @@ export function PlayerStatsPage({
           gap: 24,
           display: 'flex',
           flexDirection: 'column',
-        }}
+        })}
       >
         {/* ── View mode tabs: Combined / Hitters / Pitchers ─────────── */}
         {/* Pill cluster (BRAND_NAVY selected fill) per design `.sp-tabs`.    */}
@@ -1548,14 +1551,14 @@ export function PlayerStatsPage({
           role="tablist"
           accessibilityRole="tablist"
           aria-label="Player stats view mode"
-          style={{
+          style={csp({
             alignSelf: 'flex-start',
             gap: 4,
             padding: 5,
             background: BG_PANEL,
             border: `1px solid ${STATS_BORDER}`,
             borderRadius: 9999,
-          }}
+          })}
         >
           {(
             [
@@ -1573,7 +1576,7 @@ export function PlayerStatsPage({
                 accessibilityRole="tab"
                 aria-selected={selected}
                 accessibilityState={{ selected }}
-                style={{
+                style={csp({
                   paddingVertical: 10,
                   paddingHorizontal: 18,
                   borderRadius: 9999,
@@ -1582,17 +1585,17 @@ export function PlayerStatsPage({
                   minWidth: 44,
                   justifyContent: 'center',
                   alignItems: 'center',
-                }}
+                })}
               >
                 <Text
-                  style={{
+                  style={csp({
                     fontFamily: FONT_DISPLAY,
                     fontWeight: '700',
                     fontSize: 12,
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
                     color: selected ? '#FFFFFF' : FG3,
-                  }}
+                  })}
                 >
                   {label}
                 </Text>
@@ -1605,7 +1608,7 @@ export function PlayerStatsPage({
         <XStack
           testID="filter-controls"
           className={Platform.OS === 'web' ? 'ps-toolbar' : undefined}
-          style={{
+          style={csp({
             display: Platform.OS === 'web' ? 'grid' : 'flex',
             flexDirection: 'column',
             gap: 10,
@@ -1613,11 +1616,11 @@ export function PlayerStatsPage({
             background: SURFACE_PANEL,
             border: `1px solid ${OUTLINE_SUBTLE}`,
             borderRadius: 16,
-          }}
+          })}
         >
           {/* Search */}
           <YStack
-            style={{
+            style={csp({
               position: 'relative',
               flexDirection: 'row',
               alignItems: 'center',
@@ -1627,7 +1630,7 @@ export function PlayerStatsPage({
               borderRadius: 6,
               padding: '0 12px 0 38px',
               minHeight: 44,
-            }}
+            })}
           >
             {Platform.OS === 'web' && (
               // pointerEvents: none — without it, mobile taps that land on the
@@ -1640,13 +1643,13 @@ export function PlayerStatsPage({
                 fill="none"
                 stroke={FG3}
                 strokeWidth="2"
-                style={{
+                style={csp({
                   position: 'absolute',
                   left: 12,
                   top: '50%',
                   transform: 'translateY(-50%)',
                   pointerEvents: 'none',
-                }}
+                })}
               >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.3-4.3" />
@@ -1658,7 +1661,7 @@ export function PlayerStatsPage({
               onSubmitEditing={applyFilters}
               placeholder={`Search player name · min ${MIN_SEARCH_LENGTH} chars`}
               placeholderTextColor={FG4}
-              style={{
+              style={csp({
                 flex: 1,
                 backgroundColor: 'transparent',
                 color: TEXT_PRIMARY,
@@ -1667,7 +1670,7 @@ export function PlayerStatsPage({
                 paddingVertical: 8,
                 borderWidth: 0,
                 outlineWidth: 0,
-              }}
+              })}
             />
             {search ? (
               <Pressable
@@ -1677,7 +1680,7 @@ export function PlayerStatsPage({
                 }}
                 accessibilityLabel="Clear search"
                 accessibilityRole="button"
-                style={{
+                style={csp({
                   backgroundColor: 'transparent',
                   width: 28,
                   height: 28,
@@ -1685,9 +1688,9 @@ export function PlayerStatsPage({
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
-                }}
+                })}
               >
-                <Text style={{ color: FG3, fontSize: 20, lineHeight: 20 }}>
+                <Text style={csp({ color: FG3, fontSize: 20, lineHeight: 20 })}>
                   ×
                 </Text>
               </Pressable>
@@ -1696,7 +1699,7 @@ export function PlayerStatsPage({
 
           {/* Position select */}
           <YStack
-            style={{
+            style={csp({
               position: 'relative',
               justifyContent: 'center',
               background: 'rgba(10,15,26,0.55)',
@@ -1704,17 +1707,17 @@ export function PlayerStatsPage({
               borderRadius: 6,
               padding: '6px 30px 6px 12px',
               minHeight: 44,
-            }}
+            })}
           >
             <Text
-              style={{
+              style={csp({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 10,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
                 color: FG3,
-              }}
+              })}
             >
               Position
             </Text>
@@ -1742,7 +1745,7 @@ export function PlayerStatsPage({
             )}
             {Platform.OS === 'web' && (
               <Text
-                style={{
+                style={csp({
                   position: 'absolute',
                   right: 12,
                   top: '50%',
@@ -1750,7 +1753,7 @@ export function PlayerStatsPage({
                   color: FG3,
                   fontSize: 12,
                   pointerEvents: 'none',
-                }}
+                })}
               >
                 ▾
               </Text>
@@ -1759,7 +1762,7 @@ export function PlayerStatsPage({
 
           {/* Team select */}
           <YStack
-            style={{
+            style={csp({
               position: 'relative',
               justifyContent: 'center',
               background: 'rgba(10,15,26,0.55)',
@@ -1767,17 +1770,17 @@ export function PlayerStatsPage({
               borderRadius: 6,
               padding: '6px 30px 6px 12px',
               minHeight: 44,
-            }}
+            })}
           >
             <Text
-              style={{
+              style={csp({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 10,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
                 color: FG3,
-              }}
+              })}
             >
               Team
             </Text>
@@ -1805,7 +1808,7 @@ export function PlayerStatsPage({
             )}
             {Platform.OS === 'web' && (
               <Text
-                style={{
+                style={csp({
                   position: 'absolute',
                   right: 12,
                   top: '50%',
@@ -1813,7 +1816,7 @@ export function PlayerStatsPage({
                   color: FG3,
                   fontSize: 12,
                   pointerEvents: 'none',
-                }}
+                })}
               >
                 ▾
               </Text>
@@ -1823,7 +1826,7 @@ export function PlayerStatsPage({
           {/* Rows per page */}
           <YStack
             testID="page-size-select"
-            style={{
+            style={csp({
               position: 'relative',
               justifyContent: 'center',
               background: 'rgba(10,15,26,0.55)',
@@ -1831,17 +1834,17 @@ export function PlayerStatsPage({
               borderRadius: 6,
               padding: '6px 30px 6px 12px',
               minHeight: 44,
-            }}
+            })}
           >
             <Text
-              style={{
+              style={csp({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 10,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
                 color: FG3,
-              }}
+              })}
             >
               Rows
             </Text>
@@ -1871,7 +1874,7 @@ export function PlayerStatsPage({
             )}
             {Platform.OS === 'web' && (
               <Text
-                style={{
+                style={csp({
                   position: 'absolute',
                   right: 12,
                   top: '50%',
@@ -1879,7 +1882,7 @@ export function PlayerStatsPage({
                   color: FG3,
                   fontSize: 12,
                   pointerEvents: 'none',
-                }}
+                })}
               >
                 ▾
               </Text>
@@ -1900,7 +1903,7 @@ export function PlayerStatsPage({
               accessibilityRole="button"
               accessibilityLabel="Apply filters"
               accessibilityState={{ disabled: !hasPendingChanges }}
-              style={{
+              style={csp({
                 paddingVertical: 10,
                 paddingHorizontal: 16,
                 borderRadius: 12,
@@ -1918,10 +1921,10 @@ export function PlayerStatsPage({
                 gap: 8,
                 minHeight: 44,
                 opacity: hasPendingChanges ? 1 : 0.55,
-              }}
+              })}
             >
               <Text
-                style={{
+                style={csp({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: '700',
                   fontSize: 12,
@@ -1929,7 +1932,7 @@ export function PlayerStatsPage({
                   textTransform: 'uppercase',
                   color: hasPendingChanges ? BRAND_GOLD_LIGHT : FG3,
                   whiteSpace: 'nowrap',
-                }}
+                })}
               >
                 Apply
               </Text>
@@ -1939,7 +1942,7 @@ export function PlayerStatsPage({
               onPress={() => setAdvancedOpen((v) => !v)}
               accessibilityRole="button"
               accessibilityState={{ expanded: advancedOpen }}
-              style={{
+              style={csp({
                 paddingVertical: 10,
                 paddingHorizontal: 16,
                 borderRadius: 12,
@@ -1953,7 +1956,7 @@ export function PlayerStatsPage({
                 alignItems: 'center',
                 gap: 8,
                 minHeight: 44,
-              }}
+              })}
             >
               {Platform.OS === 'web' && (
                 <svg
@@ -1968,7 +1971,7 @@ export function PlayerStatsPage({
                 </svg>
               )}
               <Text
-                style={{
+                style={csp({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: '700',
                   fontSize: 12,
@@ -1976,11 +1979,11 @@ export function PlayerStatsPage({
                   textTransform: 'uppercase',
                   color: advancedOpen ? TEXT_PRIMARY : FG3,
                   whiteSpace: 'nowrap',
-                }}
+                })}
               >
                 Advanced
               </Text>
-              <Text style={{ fontSize: 10, color: FG3 }}>
+              <Text style={csp({ fontSize: 10, color: FG3 })}>
                 {advancedOpen ? '▴' : '▾'}
               </Text>
             </Pressable>
@@ -1993,7 +1996,7 @@ export function PlayerStatsPage({
                 accessibilityLabel="Toggle column visibility"
                 accessibilityState={{ expanded: columnsOpen }}
                 testID="column-picker-toggle"
-                style={{
+                style={csp({
                   paddingVertical: 10,
                   paddingHorizontal: 16,
                   borderRadius: 12,
@@ -2013,7 +2016,7 @@ export function PlayerStatsPage({
                   alignItems: 'center',
                   gap: 8,
                   minHeight: 44,
-                }}
+                })}
               >
                 {Platform.OS === 'web' && (
                   <svg
@@ -2031,7 +2034,7 @@ export function PlayerStatsPage({
                   </svg>
                 )}
                 <Text
-                  style={{
+                  style={csp({
                     fontFamily: FONT_DISPLAY,
                     fontWeight: '700',
                     fontSize: 12,
@@ -2039,11 +2042,11 @@ export function PlayerStatsPage({
                     textTransform: 'uppercase',
                     color: columnsOpen ? TEXT_PRIMARY : FG3,
                     whiteSpace: 'nowrap',
-                  }}
+                  })}
                 >
                   Columns
                 </Text>
-                <Text style={{ fontSize: 10, color: FG3 }}>
+                <Text style={csp({ fontSize: 10, color: FG3 })}>
                   {columnsOpen ? '▴' : '▾'}
                 </Text>
               </Pressable>
@@ -2068,10 +2071,10 @@ export function PlayerStatsPage({
             gap={6}
             alignItems="center"
             flexWrap="wrap"
-            style={{ paddingTop: 4 }}
+            style={csp({ paddingTop: 4 })}
           >
             <Text
-              style={{
+              style={csp({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 11,
@@ -2079,7 +2082,7 @@ export function PlayerStatsPage({
                 textTransform: 'uppercase',
                 color: FG3,
                 whiteSpace: 'nowrap',
-              }}
+              })}
             >
               Availability
             </Text>
@@ -2097,7 +2100,7 @@ export function PlayerStatsPage({
                   onPress={() => setAvailabilityFilter(value)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
-                  style={{
+                  style={csp({
                     paddingVertical: 6,
                     paddingHorizontal: 12,
                     borderRadius: 9999,
@@ -2107,15 +2110,15 @@ export function PlayerStatsPage({
                     backgroundColor: active
                       ? 'rgba(27,58,92,0.45)'
                       : 'transparent',
-                  }}
+                  })}
                 >
                   <Text
-                    style={{
+                    style={csp({
                       fontFamily: FONT_BODY,
                       fontWeight: active ? '700' : '500',
                       fontSize: 13,
                       color: active ? TEXT_PRIMARY : FG3,
-                    }}
+                    })}
                   >
                     {label}
                   </Text>
@@ -2130,24 +2133,24 @@ export function PlayerStatsPage({
         {advancedOpen && (
           <YStack
             className={Platform.OS === 'web' ? 'ps-adv-panel' : undefined}
-            style={{
+            style={csp({
               padding: '18px 20px',
               background: SURFACE_CARD,
               border: `1px solid ${OUTLINE_SUBTLE}`,
               borderRadius: 16,
               gap: 14,
-            }}
+            })}
           >
             <XStack justifyContent="space-between" alignItems="center">
               <Text
-                style={{
+                style={csp({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: '700',
                   fontSize: 11,
                   letterSpacing: '0.16em',
                   textTransform: 'uppercase',
                   color: BRAND_GOLD_LIGHT,
-                }}
+                })}
               >
                 Stat Ranges
               </Text>
@@ -2168,20 +2171,20 @@ export function PlayerStatsPage({
                   applyFilters();
                 }}
                 accessibilityRole="button"
-                style={{
+                style={csp({
                   backgroundColor: 'transparent',
                   paddingVertical: 4,
                   paddingHorizontal: 8,
                   borderRadius: 6,
-                }}
+                })}
               >
                 <Text
-                  style={{
+                  style={csp({
                     color: BRAND_GOLD_LIGHT,
                     fontFamily: FONT_BODY,
                     fontSize: 13,
                     fontWeight: '500',
-                  }}
+                  })}
                 >
                   Reset ranges
                 </Text>
@@ -2189,11 +2192,11 @@ export function PlayerStatsPage({
             </XStack>
             <XStack
               className={Platform.OS === 'web' ? 'ps-adv-grid' : undefined}
-              style={{
+              style={csp({
                 display: Platform.OS === 'web' ? 'grid' : 'flex',
                 flexDirection: 'column',
                 gap: 20,
-              }}
+              })}
             >
               <StatSlider
                 label="Min Home Runs"
@@ -2326,7 +2329,7 @@ export function PlayerStatsPage({
           <div
             role="status"
             aria-live="polite"
-            style={{
+            style={csp({
               position: 'absolute',
               width: 1,
               height: 1,
@@ -2336,7 +2339,7 @@ export function PlayerStatsPage({
               clip: 'rect(0,0,0,0)',
               whiteSpace: 'nowrap',
               border: 0,
-            }}
+            })}
           >
             {state ? STATE_ANNOUNCEMENTS[state] : ''}
           </div>
@@ -2517,29 +2520,31 @@ function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
       testID="player-stats-loading-skeleton"
       role="presentation"
       aria-hidden={true}
-      style={{
+      style={csp({
         background: BG_ELEVATED,
         border: `1px solid ${STATS_BORDER}`,
         borderRadius: 12,
         padding: 18,
         gap: 14,
-      }}
+      })}
     >
       <XStack justifyContent="space-between" alignItems="center">
         <YStack gap={6}>
           <Text
-            style={{
+            style={csp({
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 11,
               letterSpacing: '0.16em',
               textTransform: 'uppercase',
               color: BRAND_GOLD_LIGHT,
-            }}
+            })}
           >
             Loading
           </Text>
-          <Text style={{ fontFamily: FONT_BODY, fontSize: 13, color: FG4 }}>
+          <Text
+            style={csp({ fontFamily: FONT_BODY, fontSize: 13, color: FG4 })}
+          >
             Fetching archived seasons…
           </Text>
         </YStack>
@@ -2549,11 +2554,11 @@ function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
           <XStack
             key={r}
             alignItems="center"
-            style={{
+            style={csp({
               gap: 12,
               padding: '10px 8px',
               borderBottom: `1px solid ${withAlpha(BRAND_GOLD, 0.06)}`,
-            }}
+            })}
           >
             <SkeletonBar width={140} />
             <SkeletonBar width={40} />
@@ -2579,12 +2584,12 @@ function SkeletonBar({ width }: { width: number }) {
   }
   return (
     <YStack
-      style={{
+      style={csp({
         width,
         height: 10,
         borderRadius: 3,
         backgroundColor: 'rgba(255,255,255,0.08)',
-      }}
+      })}
     />
   );
 }
@@ -2599,7 +2604,7 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
       testID="player-stats-error-card"
       role="alert"
       aria-live="assertive"
-      style={{
+      style={csp({
         alignSelf: 'center',
         maxWidth: 520,
         width: '100%',
@@ -2610,7 +2615,7 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
         borderRadius: 12,
         alignItems: 'center',
         gap: 12,
-      }}
+      })}
     >
       {Platform.OS === 'web' && (
         <svg
@@ -2629,19 +2634,19 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
       )}
       <Text
         tag="h3"
-        style={{
+        style={csp({
           fontFamily: FONT_DISPLAY,
           fontWeight: '800',
           fontSize: 24,
           color: TEXT_PRIMARY,
           margin: 0,
           textAlign: 'center',
-        }}
+        })}
       >
         Unable to load player stats
       </Text>
       <Text
-        style={{
+        style={csp({
           fontFamily: FONT_BODY,
           fontSize: 14,
           color: TEXT_MUTED,
@@ -2650,7 +2655,7 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
           lineHeight:
             Platform.OS === 'web' ? ('1.55' as unknown as number) : 22,
           margin: 0,
-        }}
+        })}
       >
         We couldn't reach the archive service. Your filters are safe — we'll
         restore them when the connection returns.
@@ -2660,7 +2665,7 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
           onPress={onRetry}
           accessibilityRole="button"
           accessibilityLabel="Retry loading player statistics"
-          style={{
+          style={csp({
             marginTop: 8,
             paddingVertical: 10,
             paddingHorizontal: 22,
@@ -2669,17 +2674,17 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
             minHeight: 44,
             justifyContent: 'center',
             alignItems: 'center',
-          }}
+          })}
         >
           <Text
-            style={{
+            style={csp({
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 12,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               color: '#FFFFFF',
-            }}
+            })}
           >
             Retry
           </Text>
@@ -2698,7 +2703,7 @@ function EmptyCard({ onClear }: EmptyCardProps) {
     <YStack
       testID="player-stats-empty-card"
       role="status"
-      style={{
+      style={csp({
         alignSelf: 'center',
         maxWidth: 520,
         width: '100%',
@@ -2709,7 +2714,7 @@ function EmptyCard({ onClear }: EmptyCardProps) {
         borderRadius: 12,
         alignItems: 'center',
         gap: 12,
-      }}
+      })}
     >
       {Platform.OS === 'web' && (
         <svg
@@ -2728,19 +2733,19 @@ function EmptyCard({ onClear }: EmptyCardProps) {
       )}
       <Text
         tag="h3"
-        style={{
+        style={csp({
           fontFamily: FONT_DISPLAY,
           fontWeight: '800',
           fontSize: 24,
           color: TEXT_PRIMARY,
           margin: 0,
           textAlign: 'center',
-        }}
+        })}
       >
         No players found
       </Text>
       <Text
-        style={{
+        style={csp({
           fontFamily: FONT_BODY,
           fontSize: 14,
           color: TEXT_MUTED,
@@ -2749,7 +2754,7 @@ function EmptyCard({ onClear }: EmptyCardProps) {
           lineHeight:
             Platform.OS === 'web' ? ('1.55' as unknown as number) : 22,
           margin: 0,
-        }}
+        })}
       >
         No players match the current filters. Try widening your search, relaxing
         a range, or clearing filters entirely.
@@ -2759,7 +2764,7 @@ function EmptyCard({ onClear }: EmptyCardProps) {
           onPress={onClear}
           accessibilityRole="button"
           accessibilityLabel="Clear all filters"
-          style={{
+          style={csp({
             marginTop: 8,
             paddingVertical: 10,
             paddingHorizontal: 22,
@@ -2768,17 +2773,17 @@ function EmptyCard({ onClear }: EmptyCardProps) {
             minHeight: 44,
             justifyContent: 'center',
             alignItems: 'center',
-          }}
+          })}
         >
           <Text
-            style={{
+            style={csp({
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 12,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               color: '#FFFFFF',
-            }}
+            })}
           >
             Clear all filters
           </Text>
@@ -2818,24 +2823,24 @@ function ColumnPickerPanel({
     <YStack
       testID="column-picker-panel"
       className={Platform.OS === 'web' ? 'ps-adv-panel' : undefined}
-      style={{
+      style={csp({
         padding: '18px 20px',
         background: SURFACE_CARD,
         border: `1px solid ${OUTLINE_SUBTLE}`,
         borderRadius: 16,
         gap: 14,
-      }}
+      })}
     >
       <XStack justifyContent="space-between" alignItems="center">
         <Text
-          style={{
+          style={csp({
             fontFamily: FONT_DISPLAY,
             fontWeight: '700',
             fontSize: 11,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
             color: BRAND_GOLD_LIGHT,
-          }}
+          })}
         >
           Visible Columns
         </Text>
@@ -2845,20 +2850,20 @@ function ColumnPickerPanel({
             accessibilityRole="button"
             accessibilityLabel="Reset columns to default"
             testID="column-picker-reset"
-            style={{
+            style={csp({
               backgroundColor: 'transparent',
               paddingVertical: 4,
               paddingHorizontal: 8,
               borderRadius: 6,
-            }}
+            })}
           >
             <Text
-              style={{
+              style={csp({
                 color: BRAND_GOLD_LIGHT,
                 fontFamily: FONT_BODY,
                 fontSize: 13,
                 fontWeight: '500',
-              }}
+              })}
             >
               Reset columns
             </Text>
@@ -2867,11 +2872,11 @@ function ColumnPickerPanel({
       </XStack>
       <XStack
         className={Platform.OS === 'web' ? 'ps-col-grid' : undefined}
-        style={{
+        style={csp({
           display: Platform.OS === 'web' ? 'grid' : 'flex',
           flexDirection: 'column',
           gap: 8,
-        }}
+        })}
       >
         {columns.map((col) => {
           const checked = visibleKeys.has(col.key);
@@ -2883,16 +2888,16 @@ function ColumnPickerPanel({
               accessibilityState={{ checked }}
               accessibilityLabel={`${col.label} column`}
               testID={`column-toggle-${col.key}`}
-              style={{
+              style={csp({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 10,
                 paddingVertical: 6,
                 minHeight: 36,
-              }}
+              })}
             >
               <YStack
-                style={{
+                style={csp({
                   width: 20,
                   height: 20,
                   borderRadius: 5,
@@ -2904,15 +2909,15 @@ function ColumnPickerPanel({
                     : 'transparent',
                   alignItems: 'center',
                   justifyContent: 'center',
-                }}
+                })}
               >
                 {checked && (
                   <Text
-                    style={{
+                    style={csp({
                       color: BRAND_GOLD_LIGHT,
                       fontSize: 13,
                       lineHeight: 14,
-                    }}
+                    })}
                   >
                     ✓
                   </Text>
@@ -2920,11 +2925,11 @@ function ColumnPickerPanel({
               </YStack>
               <Text
                 numberOfLines={1}
-                style={{
+                style={csp({
                   fontFamily: FONT_BODY,
                   fontSize: 14,
                   color: checked ? TEXT_PRIMARY : FG3,
-                }}
+                })}
               >
                 {col.label}
               </Text>
@@ -2993,26 +2998,26 @@ function StatSlider({
   }, [debouncedCommit, onCommit]);
 
   return (
-    <YStack style={{ gap: 8 }}>
+    <YStack style={csp({ gap: 8 })}>
       <XStack justifyContent="space-between" alignItems="baseline">
         <Text
-          style={{
+          style={csp({
             fontFamily: FONT_BODY,
             fontWeight: '500',
             fontSize: 13,
             color: TEXT_MUTED,
-          }}
+          })}
         >
           {label}
         </Text>
         <Text
-          style={{
+          style={csp({
             fontFamily: FONT_DISPLAY,
             fontWeight: '800',
             fontSize: 18,
             color: BRAND_GOLD_LIGHT,
             fontVariantNumeric: 'tabular-nums',
-          }}
+          })}
         >
           {format(value)}
         </Text>
@@ -3053,20 +3058,20 @@ function StatSlider({
       )}
       <XStack justifyContent="space-between">
         <Text
-          style={{
+          style={csp({
             fontFamily: FONT_MONO,
             fontSize: 10,
             color: FG4,
-          }}
+          })}
         >
           {format(min)}
         </Text>
         <Text
-          style={{
+          style={csp({
             fontFamily: FONT_MONO,
             fontSize: 10,
             color: FG4,
-          }}
+          })}
         >
           {format(max)}
         </Text>
@@ -3103,26 +3108,26 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${value}`}
-        style={{
+        style={csp({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 8,
           minHeight: 24,
-        }}
+        })}
       >
         <Text
           numberOfLines={1}
-          style={{
+          style={csp({
             flex: 1,
             fontFamily: FONT_BODY,
             fontSize: 14,
             color: TEXT_PRIMARY,
-          }}
+          })}
         >
           {value}
         </Text>
-        <Text style={{ color: FG3, fontSize: 12 }}>▾</Text>
+        <Text style={csp({ color: FG3, fontSize: 12 })}>▾</Text>
       </Pressable>
       <Modal
         visible={open}
@@ -3134,18 +3139,18 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
           onPress={close}
           accessibilityRole="button"
           accessibilityLabel={`Close ${label} picker`}
-          style={{
+          style={csp({
             flex: 1,
             backgroundColor: 'rgba(0,0,0,0.6)',
             justifyContent: 'flex-end',
-          }}
+          })}
         >
           {/* Inner Pressable absorbs taps so a tap on the sheet doesn't dismiss it. */}
           <Pressable
             onPress={() => {
               /* absorb tap — keep the sheet open */
             }}
-            style={{
+            style={csp({
               backgroundColor: SURFACE_PANEL,
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
@@ -3154,10 +3159,10 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
               paddingTop: 16,
               paddingBottom: 28,
               maxHeight: '60%',
-            }}
+            })}
           >
             <Text
-              style={{
+              style={csp({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 11,
@@ -3166,7 +3171,7 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
                 color: BRAND_GOLD_LIGHT,
                 paddingHorizontal: 20,
                 paddingBottom: 8,
-              }}
+              })}
             >
               {label}
             </Text>
@@ -3182,7 +3187,7 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
                     }}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    style={{
+                    style={csp({
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -3192,20 +3197,22 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
                       backgroundColor: selected
                         ? withAlpha(BRAND_NAVY, 0.35)
                         : 'transparent',
-                    }}
+                    })}
                   >
                     <Text
-                      style={{
+                      style={csp({
                         fontFamily: FONT_BODY,
                         fontSize: 16,
                         fontWeight: selected ? '700' : '400',
                         color: selected ? BRAND_GOLD_LIGHT : TEXT_PRIMARY,
-                      }}
+                      })}
                     >
                       {opt}
                     </Text>
                     {selected ? (
-                      <Text style={{ color: BRAND_GOLD_LIGHT, fontSize: 16 }}>
+                      <Text
+                        style={csp({ color: BRAND_GOLD_LIGHT, fontSize: 16 })}
+                      >
                         ✓
                       </Text>
                     ) : null}
@@ -3260,7 +3267,7 @@ function NativeRangeStepper({
   const pct = sliderFillPct(value, min, max);
 
   return (
-    <XStack style={{ gap: 12, alignItems: 'center' }}>
+    <XStack style={csp({ gap: 12, alignItems: 'center' })}>
       <StepperButton
         label="−"
         accessibilityLabel={`Decrease ${label}`}
@@ -3268,16 +3275,20 @@ function NativeRangeStepper({
         onPress={() => apply(-step)}
       />
       <YStack
-        style={{
+        style={csp({
           flex: 1,
           height: 4,
           borderRadius: 9999,
           backgroundColor: 'rgba(255,255,255,0.08)',
           overflow: 'hidden',
-        }}
+        })}
       >
         <YStack
-          style={{ width: `${pct}%`, height: 4, backgroundColor: BRAND_GOLD }}
+          style={csp({
+            width: `${pct}%`,
+            height: 4,
+            backgroundColor: BRAND_GOLD,
+          })}
         />
       </YStack>
       <StepperButton
@@ -3310,7 +3321,7 @@ function StepperButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
-      style={{
+      style={csp({
         width: 44,
         height: 44,
         borderRadius: 12,
@@ -3320,16 +3331,16 @@ function StepperButton({
         alignItems: 'center',
         justifyContent: 'center',
         opacity: disabled ? 0.4 : 1,
-      }}
+      })}
     >
       <Text
-        style={{
+        style={csp({
           fontFamily: FONT_DISPLAY,
           fontWeight: '800',
           fontSize: 22,
           lineHeight: 24,
           color: TEXT_PRIMARY,
-        }}
+        })}
       >
         {label}
       </Text>
