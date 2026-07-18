@@ -62,7 +62,10 @@ jest.mock('../graphql-errors', () => ({
   },
 }));
 
-import { assertLeagueMemberOrSystem } from './scheduled-mutations';
+import {
+  assertLeagueMemberOrSystem,
+  isLockWaitTimeout,
+} from './scheduled-mutations';
 import type { Context } from '../builder';
 
 // Minimal db mock — the real drizzle query builder is replaced with a jest.fn()
@@ -218,5 +221,45 @@ describe('assertLeagueMemberOrSystem', () => {
       const err = await assertLeagueMemberOrSystem(ctx, 42).catch((e) => e);
       expect(err).toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
     });
+  });
+});
+
+describe('isLockWaitTimeout (LS-8398)', () => {
+  /** A Postgres error carrying a SQLSTATE `code`, as postgres.js throws. */
+  function pgError(message: string, code: string): Error {
+    return Object.assign(new Error(message), { code });
+  }
+
+  it('recognizes a 57014 statement-timeout error from the drafts row lock', () => {
+    const err = pgError(
+      'canceling statement due to statement timeout',
+      '57014',
+    );
+    expect(isLockWaitTimeout(err)).toBe(true);
+  });
+
+  it('recognizes 57014 when Drizzle wraps the driver error in `.cause`', () => {
+    const driverError = pgError(
+      'canceling statement due to statement timeout',
+      '57014',
+    );
+    const wrapped = Object.assign(
+      new Error(
+        'Failed query: SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = $1 FOR NO KEY UPDATE\nparams: 7020',
+      ),
+      { cause: driverError },
+    );
+    expect(isLockWaitTimeout(wrapped)).toBe(true);
+  });
+
+  it('does not treat a deadlock (40P01) as a lock-wait timeout', () => {
+    const err = pgError('deadlock detected', '40P01');
+    expect(isLockWaitTimeout(err)).toBe(false);
+  });
+
+  it('does not treat a generic error with no SQLSTATE as a lock-wait timeout', () => {
+    expect(
+      isLockWaitTimeout(new Error('Team 5 roster is full in draft 100')),
+    ).toBe(false);
   });
 });

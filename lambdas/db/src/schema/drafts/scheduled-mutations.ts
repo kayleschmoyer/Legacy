@@ -32,6 +32,21 @@ import { selectAutoPickPlayer } from './auto-pick-scorer';
 import { executePickEffects } from './draft-pick-effects';
 import { builder, type Context } from '../builder';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import { describeDbError, formatDbError } from '../leagues/delete-resilience';
+
+/**
+ * True when `error` is the Postgres `57014` (`query_canceled`) raised by the
+ * `SET LOCAL statement_timeout` guard around the `drafts` row lock (LS-8398).
+ * EventBridge's every-minute tick and the LS-8107 makeDraftPick nudge can
+ * both invoke `autoProcessDraftPicks` for the same draft within milliseconds
+ * of each other; the mutation is documented as idempotent for exactly this
+ * reason, so the losing invocation timing out on the lock is an expected
+ * race, not an application defect — the winner (or the next EventBridge
+ * tick, ≤60 s later) already covers the pick.
+ */
+export function isLockWaitTimeout(error: unknown): boolean {
+  return describeDbError(error).code === '57014';
+}
 
 /**
  * Lighter auth check for the draft auto-pick nudge.
@@ -512,6 +527,26 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               draftError instanceof Error
                 ? draftError.message
                 : String(draftError);
+
+            // LS-8398: the row-lock wait on `drafts` timing out is an
+            // expected outcome of the dual-trigger design (EventBridge tick
+            // + LS-8107 nudge racing for the same draft), not a genuine
+            // failure — the concurrent invocation that won the lock (or the
+            // next tick) already covers this pick. Log it as a benign skip
+            // rather than an application error so it doesn't page/pollute
+            // Rollbar, and don't count it against the caller's result.
+            if (isLockWaitTimeout(draftError)) {
+              LOGGER.warn(
+                `[autoProcessDraftPicks] Draft ${draftId} lock wait timed out — likely a concurrent autoProcessDraftPicks invocation, skipping (will retry next cycle)`,
+                {
+                  draftId,
+                  leagueId: draftLeagueId,
+                  dbError: formatDbError(describeDbError(draftError)),
+                },
+              );
+              continue;
+            }
+
             LOGGER.error(
               `[autoProcessDraftPicks] Error processing draft ${draftId}`,
               draftError instanceof Error ? draftError : new Error(errMsg),
