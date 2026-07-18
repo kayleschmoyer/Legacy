@@ -72,6 +72,14 @@ export default function LeagueId(): React.JSX.Element {
   const initialTab =
     typeof params.initialTab === 'string' ? params.initialTab : undefined;
   const [selectedTab, setSelectedTab] = useState(initialTab ?? 'overview');
+  // Track which tabs have been opened so their subtrees stay mounted across
+  // switches instead of unmounting (which resets scroll position — LS-7563).
+  // Unvisited tabs are never rendered, so their data isn't fetched until first
+  // opened; visited-but-inactive tabs are hidden via `display` below, keeping
+  // their ScrollView offset intact for when the user returns.
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
+    () => new Set([initialTab ?? 'overview']),
+  );
   // View-as role preference (in-memory; mirrors web v2's derive-from-perms
   // logic). `null` means "follow the user's actual highest role".
   const [rolePref, setRolePref] = useState<LeagueRole | null>(null);
@@ -95,6 +103,15 @@ export default function LeagueId(): React.JSX.Element {
       active = false;
     };
   }, []);
+
+  // Record every tab the user opens (covers both the tab bar and imperative
+  // setSelectedTab callers) so the render blocks below can keep-alive visited
+  // tabs. LS-7563.
+  useEffect(() => {
+    setVisitedTabs((prev) =>
+      prev.has(selectedTab) ? prev : new Set(prev).add(selectedTab),
+    );
+  }, [selectedTab]);
 
   const leagueIdStr =
     typeof leagueId === 'string'
@@ -454,8 +471,8 @@ export default function LeagueId(): React.JSX.Element {
           />
         </YStack>
       )}
-      {selectedTab === 'overview' && (
-        <YStack flex={1}>
+      {visitedTabs.has('overview') && (
+        <YStack flex={1} display={selectedTab === 'overview' ? 'flex' : 'none'}>
           <LeagueOverviewTab
             league={league}
             leagueId={numLeagueId}
@@ -486,8 +503,8 @@ export default function LeagueId(): React.JSX.Element {
         </YStack>
       )}
 
-      {selectedTab === 'roster' && (
-        <YStack flex={1}>
+      {visitedTabs.has('roster') && (
+        <YStack flex={1} display={selectedTab === 'roster' ? 'flex' : 'none'}>
           <LeagueRosterManagement
             positions={positionsData?.leaguePositions || []}
             teamPlayers={
@@ -513,8 +530,8 @@ export default function LeagueId(): React.JSX.Element {
         </YStack>
       )}
 
-      {selectedTab === 'matchups' && (
-        <YStack flex={1}>
+      {visitedTabs.has('matchups') && (
+        <YStack flex={1} display={selectedTab === 'matchups' ? 'flex' : 'none'}>
           <MatchupList
             matchups={matchups}
             loading={matchupsLoading}
@@ -535,8 +552,8 @@ export default function LeagueId(): React.JSX.Element {
       )}
 
       {/* Trades Tab — full shared Trading Center (propose / history / veto) */}
-      {selectedTab === 'trades' && (
-        <YStack flex={1}>
+      {visitedTabs.has('trades') && (
+        <YStack flex={1} display={selectedTab === 'trades' ? 'flex' : 'none'}>
           <ScrollView>
             <YStack padding="$3" space="$4">
               {userTeamId ? (
@@ -563,8 +580,8 @@ export default function LeagueId(): React.JSX.Element {
         </YStack>
       )}
 
-      {selectedTab === 'waivers' && (
-        <YStack flex={1}>
+      {visitedTabs.has('waivers') && (
+        <YStack flex={1} display={selectedTab === 'waivers' ? 'flex' : 'none'}>
           <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
             <YStack padding="$3" gap="$4">
               {userTeamId ? (
@@ -594,8 +611,11 @@ export default function LeagueId(): React.JSX.Element {
         </YStack>
       )}
 
-      {selectedTab === 'standings' && (
-        <YStack flex={1}>
+      {visitedTabs.has('standings') && (
+        <YStack
+          flex={1}
+          display={selectedTab === 'standings' ? 'flex' : 'none'}
+        >
           <ScrollView>
             <YStack padding="$3" space="$4">
               <StandingsTable
@@ -612,20 +632,23 @@ export default function LeagueId(): React.JSX.Element {
         </YStack>
       )}
 
-      {selectedTab === 'history' && (
-        <YStack flex={1}>
+      {visitedTabs.has('history') && (
+        <YStack flex={1} display={selectedTab === 'history' ? 'flex' : 'none'}>
           <LeagueHistoryTab leagueId={numLeagueId} />
         </YStack>
       )}
 
-      {selectedTab === 'chat' && (
-        <YStack flex={1}>
+      {visitedTabs.has('chat') && (
+        <YStack flex={1} display={selectedTab === 'chat' ? 'flex' : 'none'}>
           <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
         </YStack>
       )}
 
-      {selectedTab === 'commissioner' && isCommissioner && (
-        <YStack flex={1}>
+      {visitedTabs.has('commissioner') && isCommissioner && (
+        <YStack
+          flex={1}
+          display={selectedTab === 'commissioner' ? 'flex' : 'none'}
+        >
           <CommissionerScreen
             leagueId={numLeagueId}
             league={league}

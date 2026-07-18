@@ -189,10 +189,19 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
+// Spy fired once per mount of the mocked roster subtree. Keep-alive means it
+// stays mounted across tab switches, so a re-visit must NOT re-fire it.
+const mockRosterMount = jest.fn();
 jest.mock('../../../../features/roster/LeagueRosterManagement', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
-    LeagueRosterManagement: () => <View testID="league-roster-management" />,
+    LeagueRosterManagement: () => {
+      ReactActual.useEffect(() => {
+        mockRosterMount();
+      }, []);
+      return <View testID="league-roster-management" />;
+    },
   };
 });
 
@@ -437,6 +446,36 @@ describe('BaseballLeagueId', () => {
     it('renders the shared scoring summary in the Overview tab', () => {
       render(<BaseballLeagueId />);
       expect(screen.getByTestId('league-scoring-summary')).toBeTruthy();
+    });
+
+    it('keeps a visited tab mounted across tab switches (preserves scroll position)', () => {
+      render(<BaseballLeagueId />);
+
+      // First visit to Roster mounts its subtree exactly once.
+      fireEvent.press(screen.getByTestId('tab-roster'));
+      expect(mockRosterMount).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('league-roster-management')).toBeTruthy();
+
+      // Switch away to Standings, then back to Roster. Because the Roster
+      // subtree is kept alive (hidden, not unmounted), it is never remounted —
+      // its ScrollView offset survives, so the user does not jump to the top.
+      fireEvent.press(screen.getByTestId('tab-standings'));
+      fireEvent.press(screen.getByTestId('tab-roster'));
+      expect(mockRosterMount).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('league-roster-management')).toBeTruthy();
+    });
+
+    it('does not mount a tab subtree until it is first visited (lazy mount)', () => {
+      render(<BaseballLeagueId />);
+
+      // History has never been selected, so its subtree — and its on-mount
+      // data fetch — must not be present yet.
+      expect(screen.queryByTestId('league-history-tab')).toBeNull();
+      expect(screen.queryByTestId('league-roster-management')).toBeNull();
+
+      // Selecting it renders it normally (and would trigger its fetch) as before.
+      fireEvent.press(screen.getByTestId('tab-history'));
+      expect(screen.getByTestId('league-history-tab')).toBeTruthy();
     });
   });
 
