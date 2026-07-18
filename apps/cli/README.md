@@ -16,3 +16,4 @@ pnpm exec nx run cli:<command>
 
 - [dev-environment skill — CLI command catalog](../../.agents/skills/dev-environment/references/cli-commands.md) — full command reference
 - [CLI Player Stats Commands](../../docs/guides/cli-player-stats-commands.md)
+- [NFL Player Import (`queue-players`)](src/commands/queue-players.md) — local dev setup for the football scrape + import workflow
