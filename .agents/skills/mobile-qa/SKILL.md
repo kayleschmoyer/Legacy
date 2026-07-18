@@ -9,6 +9,8 @@ metadata:
 
 Drive the Android dev build of `apps/app` through the Maestro flows under `maestro/flows/`, screenshot every meaningful state, judge the screenshots for real-user-visible bugs, deduplicate the findings, and file the survivors as Bug tickets under the QA coverage hierarchy. This is the mobile counterpart of the web Playwright QA coverage (see [testing](../testing/SKILL.md) and the [QA coverage model](../plan-ticket/references/qa-coverage-model.md)); flows are organized by the same page slugs as `docs/agents/qa-coverage/jira-page-epics/pages/`.
 
+> **Role boundary (ADR-0016):** this skill and the Maestro flows are the **visual/AI-judging sweep** — screenshot capture plus rubric judging, not functional regression. Functional native E2E coverage is owned by the **shared Playwright suite** running through a native `AppDriver` implementation (see [testing § Cross-Platform Suite Roles](../testing/SKILL.md#cross-platform-suite-roles-adr-0015--adr-0016) and [ADR-0016 §Native rollout blueprint](../../../docs/decisions/0016-test-dependency-injection.md)). Do not grow Maestro flows into assertion-heavy functional suites, and do not ticket per-feature Maestro flows to close functional coverage gaps — ticket `BaseScreen` page-object migration + native-driver enablement instead (epic LS-8444).
+
 ## Critical preconditions
 
 - **Before running any flow**, verify the harness end to end: `maestro --version` succeeds, `adb devices` lists a booted emulator, and the dev APK is installed (`adb shell pm list packages | grep com.legacysports.app`). Setup recipes: [maestro/README.md](../../../maestro/README.md).

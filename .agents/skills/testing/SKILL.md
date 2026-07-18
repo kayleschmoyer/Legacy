@@ -1,8 +1,8 @@
 ---
 name: testing
-description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests (hermetic, mocked), Playwright integration tests (real services), and DB integration tests (Jest + real PostgreSQL). Covers test type selection, which suites gate merge, surface-map registration, coverage reality, commands, tagging, API isolation, and CI pipeline. references/e2e-determinism.md is the 12-lever determinism checklist for every PR touching E2E or integration tests.'
+description: 'Write, run, and debug tests: Jest unit tests, Playwright E2E tests (hermetic, mocked), Playwright integration tests (real services), and DB integration tests (Jest + real PostgreSQL). Covers test type selection, which suites gate merge, surface-map registration, coverage reality, commands, tagging, API isolation, and CI pipeline — plus the cross-platform test architecture (ADR-0015 semantic page objects, ADR-0016 AppDriver/BaseScreen DI seams, dual-mode specs) and the suite-role split: functional native coverage comes from the shared Playwright suite via a native driver, Maestro is the visual QA sweep only, apps/app-e2e is the WDIO/Appium stack the native driver builds on. Load before any E2E test-strategy or coverage-planning work, not just when editing specs. references/e2e-determinism.md is the 12-lever determinism checklist for every PR touching E2E or integration tests.'
 metadata:
-  scope: 'apps/web-e2e/**, lib/shared-components/**'
+  scope: 'apps/web-e2e/**, apps/app-e2e/**, maestro/**, lib/shared-components/**'
 ---
 
 # Skill: Testing
@@ -13,6 +13,23 @@ metadata:
 - Running tests before committing changes
 - Debugging test failures locally or in CI
 - Deciding which test type to use for a feature
+- **Planning E2E test strategy or auditing coverage — read the suite-role map below first**
+
+## Cross-Platform Suite Roles (ADR-0015 / ADR-0016)
+
+The UI is built once in `lib/shared-components` (Tamagui) and rendered on web and native; the test architecture mirrors that. Source of truth: [ADR-0015 — Semantic Page Object Model](../../../docs/decisions/0015-semantic-page-objects.md) and [ADR-0016 — Test dependency injection](../../../docs/decisions/0016-test-dependency-injection.md) (this skill summarizes; the ADRs win on any disagreement).
+
+| Suite / workspace                                          | Role                                                                                                                                    | NOT its role                                                                           |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `apps/web-e2e/src/tests/` (hermetic)                       | Deterministic mocked-backend Playwright specs; gates PR merge via CI Gate                                                               | Live-backend validation                                                                |
+| `apps/web-e2e/src/integration/tests/` (integration)        | Live-backend Playwright specs; nightly backstop + opt-in `run:integration` label                                                        | Blocking merge                                                                         |
+| `apps/web-e2e/src/tests/shared/*.dual.spec.ts` (dual-mode) | ONE spec body running both mocked (PR CI) and live (`shared-live` project) via the ADR-0016 backend seam                                | —                                                                                      |
+| `maestro/` (Maestro flows)                                 | **Visual/AI-judging QA sweep only** (`/mobile-qa` — screenshot pairs judged by a vision rubric; see [mobile-qa](../mobile-qa/SKILL.md)) | **Functional native regression testing — do not build assertion-heavy Maestro suites** |
+| `apps/app-e2e/` (WDIO + Appium)                            | The runtime stack the future `AppiumNativeDriver` builds on (ADR-0016 §Native rollout blueprint)                                        | A parallel spec suite with its own vocabulary                                          |
+
+**The native principle:** functional native E2E coverage comes from running the **same shared Playwright suite** through a native `AppDriver` implementation (ADR-0016 §Native rollout blueprint — deferred until mobile e2e is a committed, watched suite; enablement tracked under epic LS-8444). It does **not** come from new Maestro suites or a separate native spec tree. When planning native coverage, ticket page-object migration to `BaseScreen` + driver enablement — never per-feature Maestro functional flows.
+
+**Authoring rules (details in [ADR-0016 section below](#test-dependency-injection-adr-0016)):** new page objects extend `BaseScreen` (take an `AppDriver`), not `BasePage` — unless genuinely web-only, documented in the object's doc comment; spec bodies speak page-object verbs only (selector ban, ESLint-enforced); capability-dependent tests gate with `test.skip(!driver.capabilities.X, …)`; no platform branches inside page/component objects.
 
 ## Test Type Selection Guide
 

@@ -18,8 +18,8 @@ Use this as the **first stop** before running Glob/Grep exploration. If the conc
 | CLI                            | `cli`              | `apps/cli/src/`          | Admin/ops commands — see [dev-environment](../dev-environment/SKILL.md) + its [CLI catalog](../dev-environment/references/cli-commands.md) |
 | GraphQL explorer (dev tool)    | `graphql-explorer` | `apps/graphql-explorer/` | Vite app for browsing the GraphQL API                                                                                                      |
 | Video (Remotion)               | —                  | `apps/video/`            | `@legacy-sports/video`; no `project.json` — not an Nx project                                                                              |
-| Web E2E tests (Playwright)     | `web-e2e`          | `apps/web-e2e/`          | Hermetic suite in `src/tests/`; live-backend suite in `src/integration/tests/`                                                             |
-| Mobile E2E tests (WebdriverIO) | `app-e2e`          | `apps/app-e2e/`          |                                                                                                                                            |
+| Web E2E tests (Playwright)     | `web-e2e`          | `apps/web-e2e/`          | Hermetic suite in `src/tests/`; live-backend suite in `src/integration/tests/`; dual-mode in `src/tests/shared/`                           |
+| Mobile E2E tests (WebdriverIO) | `app-e2e`          | `apps/app-e2e/`          | Skeletal WDIO + Appium scaffold — the runtime stack for the future `AppiumNativeDriver` (ADR-0016), not a parallel spec suite              |
 | CLI E2E tests                  | `cli-e2e`          | `apps/cli-e2e/`          |                                                                                                                                            |
 
 ## Lambdas (`lambdas/`)
@@ -125,6 +125,20 @@ Regenerate everything with `make codegen` — see [architecture SKILL](SKILL.md#
 | Nx target                       | `db:test:db`                                  |
 
 See `.agents/skills/testing/references/db-integration-tests.md` for patterns and rules.
+
+## Cross-Platform E2E Architecture (ADR-0015 / ADR-0016)
+
+| What                                                | Path                                                                          |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| ADR-0015 — Semantic Page Object Model               | `docs/decisions/0015-semantic-page-objects.md`                                |
+| ADR-0016 — Test DI (platform + backend seams)       | `docs/decisions/0016-test-dependency-injection.md`                            |
+| Platform driver seam (`AppDriver` / `UIElement`)    | `apps/web-e2e/src/driver/` (`types.ts` contract, `playwright-web.driver.ts`)  |
+| `BaseScreen` / `BasePage` base classes              | `apps/web-e2e/src/base/`                                                      |
+| Backend seam + `TestData` fixtures                  | `apps/web-e2e/src/fixtures/dual.ts`, `apps/web-e2e/src/fixtures/test-data.ts` |
+| Dual-mode specs (one body, mock + live)             | `apps/web-e2e/src/tests/shared/*.dual.spec.ts`                                |
+| Maestro visual-sweep workspace (NOT functional e2e) | `maestro/` — see [mobile-qa](../mobile-qa/SKILL.md)                           |
+
+Suite-role split and authoring rules: [testing § Cross-Platform Suite Roles](../testing/SKILL.md#cross-platform-suite-roles-adr-0015--adr-0016).
 
 ## Authentication
 
