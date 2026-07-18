@@ -154,6 +154,26 @@ test.describe('League Creation — Advanced Settings @regression', () => {
       .expectVisible();
   });
 
+  test('should select a scheduling strategy when clicked', async ({
+    page,
+    leaguePage,
+  }) => {
+    await mockCreateLeagueSuccess(page);
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+
+    // Expand the Roster & Schedule section
+    await leaguePage.expandSection('roster-schedule');
+
+    // Click Round Robin scheduling strategy
+    await leaguePage.clickButton('Round Robin');
+
+    // Fill name and submit to verify the selection was accepted (form submits)
+    await leaguePage.fillLeagueName('Round Robin League');
+    await leaguePage.submitCreate();
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+  });
+
   // ─── Number of Divisions ──────────────────────────────────────────────────
 
   test('should display division count section with heading and helper text', async ({
