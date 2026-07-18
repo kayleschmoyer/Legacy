@@ -12,6 +12,9 @@ import React from 'react';
 import { Input, Text, XStack, YStack } from 'tamagui';
 import { LeagueFieldRow, PillToggle } from './_controls';
 
+/** Illustrative per-roster-spot budget used to suggest a starting cap amount (LS-6118). */
+export const SUGGESTED_CAP_PER_ROSTER_SPOT = 1_000_000;
+
 export interface SalaryCapFieldProps {
   enabled: boolean;
   amount?: number;
@@ -24,6 +27,10 @@ export interface SalaryCapFieldProps {
   onUpgrade: () => void;
   /** Validation message for the cap amount, if any. */
   error?: string;
+  /** Number of teams already chosen earlier in the league-create form, used to phrase the suggested-cap hint. */
+  numberOfTeams?: number;
+  /** Max roster size already chosen earlier in the league-create form, used to compute the suggested cap. */
+  maxRosterSize?: number;
 
   /** Minimum total salary each team must spend. */
   salaryFloor?: number;
@@ -107,6 +114,8 @@ export function SalaryCapField({
   disabled = false,
   onUpgrade,
   error,
+  numberOfTeams,
+  maxRosterSize,
   salaryFloor,
   onSalaryFloorChange,
   salaryFloorError,
@@ -128,6 +137,10 @@ export function SalaryCapField({
   // events, so keyboard or programmatic activation could still reach these
   // controls if they weren't also disabled here (LS-6114).
   const gated = disabled || !isPremium;
+  const suggestedAmount =
+    maxRosterSize !== undefined
+      ? maxRosterSize * SUGGESTED_CAP_PER_ROSTER_SPOT
+      : undefined;
 
   return (
     <YStack gap="$3">
@@ -176,6 +189,18 @@ export function SalaryCapField({
               </Text>
             )}
           </XStack>
+          {suggestedAmount !== undefined && (
+            <Text
+              testID="create-league-salary-cap-suggestion"
+              fontFamily="$body"
+              fontSize={12}
+              color="$gray9"
+            >
+              {numberOfTeams !== undefined
+                ? `Suggested: $${suggestedAmount.toLocaleString()} based on your ${maxRosterSize}-man roster (${numberOfTeams} teams)`
+                : `Suggested: $${suggestedAmount.toLocaleString()} based on your ${maxRosterSize}-man roster`}
+            </Text>
+          )}
         </LeagueFieldRow>
       )}
 

@@ -3069,6 +3069,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                           setShowSalaryCapUpgradeModal(true);
                         }}
                         error={validationErrors.salaryCap}
+                        numberOfTeams={formData.numberOfTeams}
+                        maxRosterSize={formData.maxRosterSize}
                         salaryFloor={formData.salaryFloor}
                         onSalaryFloorChange={(v) =>
                           handleInputChange('salaryFloor', v)

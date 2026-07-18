@@ -942,6 +942,8 @@ export default function CreateLeagueScreen(): React.JSX.Element {
                     isPremium={canUsePremium}
                     disabled={loading}
                     onUpgrade={() => goToUpgrade('Salary Cap')}
+                    numberOfTeams={baseballForm.numberOfTeams}
+                    maxRosterSize={baseballForm.maxRosterSize}
                   />
                 </PremiumGate>
               </YStack>

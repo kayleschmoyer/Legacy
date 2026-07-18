@@ -381,6 +381,67 @@ describe('premium league-create fields (LS-5174)', () => {
       );
       expect(getByText('Minimum salary must be at least 1.')).toBeTruthy();
     });
+
+    it('does not show a suggested-cap hint when roster size is unknown', () => {
+      const { queryByText } = render(
+        <SalaryCapField {...baseProps} enabled isPremium />,
+      );
+      expect(queryByText(/Suggested:/)).toBeNull();
+    });
+
+    it('shows a suggested-cap hint derived from roster size and team count (LS-6118)', () => {
+      const { getByText } = render(
+        <SalaryCapField
+          {...baseProps}
+          enabled
+          isPremium
+          numberOfTeams={12}
+          maxRosterSize={25}
+        />,
+      );
+      expect(
+        getByText(
+          'Suggested: $25,000,000 based on your 25-man roster (12 teams)',
+        ),
+      ).toBeTruthy();
+    });
+
+    it('recalculates the suggested-cap hint when roster size or team count changes (LS-6118)', () => {
+      const { getByText, queryByText, rerender } = render(
+        <SalaryCapField
+          {...baseProps}
+          enabled
+          isPremium
+          numberOfTeams={12}
+          maxRosterSize={25}
+        />,
+      );
+      expect(
+        getByText(
+          'Suggested: $25,000,000 based on your 25-man roster (12 teams)',
+        ),
+      ).toBeTruthy();
+
+      rerender(
+        <SalaryCapField
+          {...baseProps}
+          enabled
+          isPremium
+          numberOfTeams={10}
+          maxRosterSize={30}
+        />,
+      );
+      expect(
+        queryByText(
+          'Suggested: $25,000,000 based on your 25-man roster (12 teams)',
+        ),
+      ).toBeNull();
+      expect(
+        getByText(
+          'Suggested: $30,000,000 based on your 30-man roster (10 teams)',
+        ),
+      ).toBeTruthy();
+    });
   });
 
   describe('CustomEraRange (LS-6083)', () => {
