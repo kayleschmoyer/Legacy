@@ -150,13 +150,15 @@ export const buildFreeAgentAriaLabel = (
 
 /**
  * Builds the set of player ids already on a roster in the league so they are
- * filtered out of the free-agent pool. Re-pulls on `refreshKey` changes (page /
- * filter / group) so pagination never surfaces a player rostered since mount
- * (LS-4032 / LS-4044). Ported from the web `useLeagueTakenPlayers` hook.
+ * filtered out of the free-agent pool. Keyed on leagueId only — the
+ * taken-player set is league-wide and does not depend on the active filter or
+ * page (LS-5923). Pass `refreshKey` only when you need to force a re-pull
+ * (e.g. after a successful waiver claim). Ported from the web
+ * `useLeagueTakenPlayers` hook.
  */
 function useLeagueTakenPlayers(
   leagueId: number,
-  refreshKey: unknown,
+  refreshKey?: unknown,
 ): { takenPlayerIds: Set<number>; loading: boolean } {
   const client = useApolloClient();
   const { data: teamsData, loading: teamsLoading } = useGetLeagueTeamsQuery({
@@ -562,10 +564,8 @@ export const LeagueDetailFreeAgentsTab: React.FC<
     fetchPolicy: 'cache-and-network',
   });
 
-  const { takenPlayerIds, loading: takenLoading } = useLeagueTakenPlayers(
-    leagueId,
-    `${page}|${group}|${pos}|${debouncedSearch}`,
-  );
+  const { takenPlayerIds, loading: takenLoading } =
+    useLeagueTakenPlayers(leagueId);
 
   const hasNextPage = (data?.players ?? []).length > PAGE_SIZE;
 

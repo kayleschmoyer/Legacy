@@ -10,12 +10,12 @@ import {
 
 /**
  * @param leagueId
- * @param refreshKey Bump to force a fresh roster fetch even when teamsData is
- *   unchanged. Callers that paginate a separate "available players" query
- *   should pass their page (or page+sort+filter) so the taken-player set is
- *   re-pulled on every page change — without this, the set stays frozen for
- *   the lifetime of the teams query and pagination can surface players who
- *   have already been rostered by another team since first mount (LS-4032).
+ * @param refreshKey Optional. Bump to force a fresh roster fetch when you
+ *   know the taken-player set has changed (e.g. after a successful waiver
+ *   claim). Do NOT pass filter/page state here — the taken-player set is
+ *   league-wide and does not vary by filter, so including filter state as the
+ *   key causes an unnecessary network round-trip on every filter change
+ *   (LS-5923).
  */
 export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
   const client = useApolloClient();
