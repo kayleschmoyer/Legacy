@@ -192,6 +192,86 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
     });
   });
 
+  // ── mixed-membership cap (BBH-034) ───────────────────────────────────────
+  // The cap counts ALL league_members rows regardless of role — both leagues the
+  // user created (commissioner) and leagues they joined (general_manager) count
+  // equally. These tests document that a leagueCount of 3 blocks the user no
+  // matter how those memberships were acquired.
+  describe('cap counts all memberships regardless of role (BBH-034)', () => {
+    it('blocks joinLeagueByCode when the cap is reached via mixed created+joined leagues', async () => {
+      // leagueCount = 3 represents any mix, e.g. 2 created (commissioner) + 1 joined
+      // (general_manager). The SQL queries league_members which records both.
+      const readQueue: unknown[] = [
+        [{ id: 7, name: 'Test League', owner: 99, faabBudgetDefault: 100 }],
+        [], // not already a member
+        [{ tier: 'free' }],
+        [{ leagueCount: 3 }], // 2 created + 1 joined
+      ];
+      const db = makeChainableDb(readQueue);
+      const resolve = resolverFor('joinLeagueByCode');
+      const context = { user: { id: 1, isAdmin: false }, db };
+      await expect(
+        resolve(
+          {},
+          { inviteCode: 'XYZ', teamName: 'T' },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/3-league limit/);
+    });
+
+    it('blocks joinPublicLeague when the cap is reached via mixed created+joined leagues', async () => {
+      // leagueCount = 3 represents any mix, e.g. 1 created (commissioner) + 2 joined
+      // (general_manager). The SQL queries league_members which records both.
+      const readQueue: unknown[] = [
+        [
+          {
+            id: 8,
+            name: 'Public League',
+            isPublic: true,
+            faabBudgetDefault: 100,
+          },
+        ],
+        [], // not already a member
+        [{ tier: 'free' }],
+        [{ leagueCount: 3 }], // 1 created + 2 joined
+      ];
+      const db = makeChainableDb(readQueue);
+      const resolve = resolverFor('joinPublicLeague');
+      const context = { user: { id: 1, isAdmin: false }, db };
+      await expect(
+        resolve(
+          {},
+          { leagueId: 8, teamName: 'T' },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/3-league limit/);
+    });
+
+    it('allows joinLeagueByCode when only 2 of 3 possible memberships are used (1 created + 1 joined)', async () => {
+      // leagueCount = 2 represents 1 created + 1 joined — still below cap.
+      const readQueue: unknown[] = [
+        [{ id: 7, name: 'Test League', owner: 99, faabBudgetDefault: 100 }],
+        [], // not already a member
+        [{ tier: 'free' }],
+        [{ leagueCount: 2 }], // 1 created + 1 joined
+      ];
+      const db = makeChainableDb(readQueue);
+      const resolve = resolverFor('joinLeagueByCode');
+      const context = { user: { id: 1, isAdmin: false }, db };
+      // Past the cap gate — proceeds to claim, fails with "league is full" (no team).
+      await expect(
+        resolve(
+          {},
+          { inviteCode: 'XYZ', teamName: 'T' },
+          context,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/league is full/i);
+    });
+  });
+
   // ── joinLeague ────────────────────────────────────────────────────────────
   describe('joinLeague', () => {
     function setup(tier: 'free' | 'premium', leagueCount: number) {

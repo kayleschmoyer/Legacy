@@ -1042,6 +1042,11 @@ export async function claimUnassignedTeamForUser(
  * counting owned leagues would not constrain joins at all. Callers verify the
  * user is not already a member of the target league before invoking this, so a
  * successful join would be their (count + 1)th active league.
+ *
+ * Critically, this counts ALL memberships regardless of role — both leagues the
+ * user created (commissioner) and leagues they joined (general_manager) count
+ * equally against the cap (BBH-034). A user with 2 self-created leagues + 1
+ * joined league is at the 3-league cap and cannot join a 4th.
  */
 async function requireJoinLeagueCapacity(
   context: Context,
