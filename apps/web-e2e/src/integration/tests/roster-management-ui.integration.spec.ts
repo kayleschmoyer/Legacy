@@ -537,6 +537,12 @@ test.describe
       name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
     });
 
+    // Captured just before the swap so the post-swap step can assert the
+    // filled-slot count is unchanged (a swap exchanges two positions, it
+    // never removes a slot). Replaces a brittle magic ">= 10" lower bound
+    // that flaked when a 4-team roster settled at 9 post-swap (LS-8428).
+    let preSwapFilledCount = 0;
+
     await test.step('Verify at least two filled roster slots exist', async () => {
       await expect(filledSlots.first()).toBeVisible({ timeout: 15000 });
       const count = await filledSlots.count();
@@ -565,6 +571,7 @@ test.describe
       // below auto-waits for the post-swap roster to render, so no fixed
       // wall-clock wait is needed (LS-4457).
       const slotCount = await filledSlots.count();
+      preSwapFilledCount = slotCount;
       if (slotCount >= 2) {
         await filledSlots.nth(1).click();
       }
@@ -574,13 +581,19 @@ test.describe
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
       );
-      // At least 10 player slots should still be visible after any swap
+      // A position swap is an exchange, not a removal: the number of filled
+      // roster slots must return to the pre-swap baseline once the post-swap
+      // refetch settles. Poll (rather than a one-shot count()) so a transient
+      // mid-refetch dip doesn't flake the assertion, and assert equality to
+      // the captured pre-swap count instead of a magic ">= 10" lower bound
+      // that was wrong for a 4-team roster (LS-8428; prior art LS-7918/LS-4309).
       const playerSlots = page.getByRole('button', {
         name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
       });
       await expect(playerSlots.first()).toBeVisible({ timeout: 10000 });
-      const count = await playerSlots.count();
-      expect(count).toBeGreaterThanOrEqual(10);
+      await expect
+        .poll(() => playerSlots.count(), { timeout: 10_000 })
+        .toBe(preSwapFilledCount);
     });
 
     await test.step('Clear selection and verify "Clear selection" button disappears', async () => {
