@@ -49,6 +49,7 @@ import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
+import { goBackToApp } from '../../../../common/utilities/leagueNavigation';
 import { setLastVisitedLeague } from '../../../../common/utilities/lastVisitedLeague';
 import { useSubscription } from '../../../../features/subscription/useSubscription';
 
@@ -434,7 +435,7 @@ export default function FootballLeagueId(): React.JSX.Element {
       tabs={leagueTabs}
       activeTab={selectedTab}
       onTabChange={setSelectedTab}
-      onBack={() => router.back()}
+      onBack={() => goBackToApp(router)}
       onInvite={() => void handleInviteShare()}
     >
       {userTeamId != null && (
