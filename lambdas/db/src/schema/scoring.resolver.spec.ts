@@ -282,7 +282,10 @@ describe('League scoring GraphQL resolvers', () => {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockResolvedValue([]),
+      // checkAdminInDb queries accessLevel via this same chain; since the
+      // admin context should short-circuit ensureLeagueCommissionerAccess,
+      // resolve an admin row rather than an empty membership result.
+      limit: jest.fn().mockResolvedValue([{ accessLevel: 'admin' }]),
       insert: jest.fn().mockReturnValue({
         values: jest.fn().mockReturnValue({
           returning: jest

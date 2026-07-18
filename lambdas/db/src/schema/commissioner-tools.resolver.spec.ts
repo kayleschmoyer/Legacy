@@ -139,6 +139,11 @@ describe('Commissioner Tools Resolver', () => {
           occurredAt: 'occurredAt',
         },
         leagueActivityEventType: { enumValues: [] },
+        // Needed by checkAdminInDb (admin systemWide path, LS-8240).
+        users: {
+          id: 'id',
+          accessLevel: 'accessLevel',
+        },
       },
       InternalSchema: {
         usersInAppInternal: {
@@ -206,7 +211,10 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('returns success: false when player already on same team', async () => {
-      mockDb.limit.mockResolvedValueOnce([{ id: 5, teamId: 2 }]);
+      // 1) checkAdminInDb's accessLevel lookup, 2) player-on-roster lookup
+      mockDb.limit
+        .mockResolvedValueOnce([{ accessLevel: 'admin' }])
+        .mockResolvedValueOnce([{ id: 5, teamId: 2 }]);
 
       const resolver = getMutation('forceAddPlayer');
       const result = (await resolver(
@@ -267,7 +275,10 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('drops player when on team', async () => {
-      mockDb.limit.mockResolvedValueOnce([{ id: 5 }]);
+      // 1) checkAdminInDb's accessLevel lookup, 2) player-on-team lookup
+      mockDb.limit
+        .mockResolvedValueOnce([{ accessLevel: 'admin' }])
+        .mockResolvedValueOnce([{ id: 5 }]);
 
       const resolver = getMutation('forceDropPlayer');
       const result = (await resolver(
@@ -365,13 +376,17 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('swaps teams between two matchups', async () => {
+      // swapMatchupTeams looks up both matchups before calling
+      // checkAdminInDb: 1) matchup 1, 2) matchup 2, 3) checkAdminInDb's
+      // accessLevel lookup
       mockDb.limit
         .mockResolvedValueOnce([
           { id: 1, leagueId: 1, team1Id: 1, team2Id: 2, weekNumber: 3 },
         ])
         .mockResolvedValueOnce([
-          { id: 2, leagueId: 1, team1Id: 3, team2Id: 4, weekNumber: 4 },
-        ]);
+          { id: 2, leagueId: 1, team1Id: 3, team2Id: 4, weekNumber: 3 },
+        ])
+        .mockResolvedValueOnce([{ accessLevel: 'admin' }]);
 
       const resolver = getMutation('swapMatchupTeams');
       const result = (await resolver(
@@ -458,7 +473,10 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('locks a team successfully', async () => {
-      mockDb.limit.mockResolvedValueOnce([{ id: 2 }]);
+      // 1) checkAdminInDb's accessLevel lookup, 2) team lookup
+      mockDb.limit
+        .mockResolvedValueOnce([{ accessLevel: 'admin' }])
+        .mockResolvedValueOnce([{ id: 2 }]);
 
       const resolver = getMutation('setTeamLock');
       const result = (await resolver(
@@ -473,7 +491,10 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('unlocks a team successfully', async () => {
-      mockDb.limit.mockResolvedValueOnce([{ id: 2 }]);
+      // 1) checkAdminInDb's accessLevel lookup, 2) team lookup
+      mockDb.limit
+        .mockResolvedValueOnce([{ accessLevel: 'admin' }])
+        .mockResolvedValueOnce([{ id: 2 }]);
 
       const resolver = getMutation('setTeamLock');
       const result = (await resolver(
@@ -504,8 +525,11 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('returns success: false when team has no players', async () => {
-      // bulkDropTeamPlayers selects without .limit() — where() is the terminal
-      mockDb.where.mockResolvedValueOnce([]);
+      // checkAdminInDb's own chain also calls .where() before .limit(), so
+      // the first .where() call must stay chainable; the second is terminal
+      // for bulkDropTeamPlayers's own query (no .limit()).
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
+      mockDb.where.mockReturnValueOnce(mockDb).mockResolvedValueOnce([]);
 
       const resolver = getMutation('bulkDropTeamPlayers');
       const result = (await resolver(
@@ -520,7 +544,8 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('drops all team players successfully', async () => {
-      mockDb.where.mockResolvedValueOnce([
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
+      mockDb.where.mockReturnValueOnce(mockDb).mockResolvedValueOnce([
         { id: 1, playerId: 10 },
         { id: 2, playerId: 11 },
       ]);
@@ -549,8 +574,11 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('returns zero when no matchups found', async () => {
-      // The mutation uses .where() without .limit() to fetch matchups
-      mockDb.where.mockResolvedValueOnce([]);
+      // checkAdminInDb's own chain also calls .where() before .limit(), so
+      // the first .where() call must stay chainable; the second is terminal
+      // for the mutation's own matchups query (no .limit()).
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
+      mockDb.where.mockReturnValueOnce(mockDb).mockResolvedValueOnce([]);
 
       const resolver = getMutation('recalculateLeagueMatchupScores');
       const result = (await resolver(
@@ -567,7 +595,8 @@ describe('Commissioner Tools Resolver', () => {
 
     it('recalculates all matchups for a league', async () => {
       // .where() returns matchups list
-      mockDb.where.mockResolvedValueOnce([
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
+      mockDb.where.mockReturnValueOnce(mockDb).mockResolvedValueOnce([
         { id: 1, team1Id: 10, team2Id: 20, gamesPerMatchup: 5, weekNumber: 1 },
         { id: 2, team1Id: 30, team2Id: 40, gamesPerMatchup: 5, weekNumber: 2 },
       ]);
@@ -587,8 +616,15 @@ describe('Commissioner Tools Resolver', () => {
     });
 
     it('recalculates matchups for a specific week', async () => {
-      mockDb.where.mockResolvedValueOnce([
-        { id: 3, team1Id: 10, team2Id: 20, gamesPerMatchup: 5, weekNumber: 3 },
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
+      mockDb.where.mockReturnValueOnce(mockDb).mockResolvedValueOnce([
+        {
+          id: 3,
+          team1Id: 10,
+          team2Id: 20,
+          gamesPerMatchup: 5,
+          weekNumber: 3,
+        },
       ]);
 
       const resolver = getMutation('recalculateLeagueMatchupScores');
@@ -643,7 +679,10 @@ describe('Commissioner Tools Resolver', () => {
           createdAt: new Date(),
         },
       ];
-      mockDb.limit.mockResolvedValueOnce(mockLogs);
+      // 1) checkAdminInDb's accessLevel lookup, 2) audit log query
+      mockDb.limit
+        .mockResolvedValueOnce([{ accessLevel: 'admin' }])
+        .mockResolvedValueOnce(mockLogs);
 
       const resolver = getQuery('commissionerAuditLogs');
       const result = (await resolver(
