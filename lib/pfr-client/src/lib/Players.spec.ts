@@ -111,3 +111,34 @@ describe('getPlayersByLetter — #div_players + parenthesized position', () => {
     expect(players).toEqual([]);
   });
 });
+
+describe('getPlayersByLetter — dotted PFR IDs (LS-8416)', () => {
+  // A.J./C.J./T.J./D.J.-prefixed given names produce dotted PFR IDs like
+  // "BrowC.20" — the greedy capture group must still backtrack to leave the
+  // trailing literal ".htm" unconsumed.
+  const DOTTED_ID_HTML = `
+    <html>
+      <body>
+        <div id="div_players">
+          <p>
+            <a href="/players/B/BrowC.20.htm">C.J. Brown</a> (WR) 2020-2020
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  it('captures a dotted pfrId, leaving the trailing .htm unconsumed', async () => {
+    mockGetPlayersList.mockResolvedValue(DOTTED_ID_HTML);
+    const players = await getPlayersByLetter('B');
+
+    expect(players).toEqual([
+      {
+        pfrId: 'BrowC.20',
+        name: 'C.J. Brown',
+        rawPosition: 'WR',
+        lastTeam: null,
+      },
+    ]);
+  });
+});

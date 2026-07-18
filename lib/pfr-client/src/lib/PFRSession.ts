@@ -121,14 +121,27 @@ export async function getFromProFootballReference(
   throw new Error(`Failed to fetch ${url} after ${MAX_RETRIES} retries`);
 }
 
-// Strict path-segment validators prevent path traversal in PFR URLs.
-const VALID_PFR_ID = /^[A-Za-z0-9]{1,20}$/;
+// Strict path-segment validators prevent path traversal in PFR URLs. "."
+// is allowed for dotted PFR IDs (e.g. "BrowC.20" from A.J./C.J./T.J./D.J.
+// given names), but a segment of dots alone (".", "..", "...") is rejected —
+// real PFR IDs always start with a surname letter, and pfrId is interpolated
+// between literal slashes in getPlayerGameLog, so an all-dots value could
+// otherwise traverse out of the /players/ path.
+const VALID_PFR_ID = /^[A-Za-z0-9.]{1,20}$/;
+const ALL_DOTS = /^\.+$/;
 const VALID_LETTER = /^[A-Za-z]$/;
 const VALID_TEAM_ABBR = /^[A-Za-z]{2,3}$/;
 
 function assertPathSegment(value: string, name: string, regex: RegExp): void {
   if (!regex.test(value)) {
     throw new Error(`Invalid ${name}: "${value}"`);
+  }
+}
+
+function assertPfrId(pfrId: string): void {
+  assertPathSegment(pfrId, 'pfrId', VALID_PFR_ID);
+  if (ALL_DOTS.test(pfrId)) {
+    throw new Error(`Invalid pfrId: "${pfrId}"`);
   }
 }
 
@@ -140,7 +153,7 @@ export function getPlayersList(letter: string): Promise<string> {
 }
 
 export function getPlayerPage(pfrId: string): Promise<string> {
-  assertPathSegment(pfrId, 'pfrId', VALID_PFR_ID);
+  assertPfrId(pfrId);
   const firstLetter = pfrId[0].toUpperCase();
   return getFromProFootballReference(
     `https://www.pro-football-reference.com/players/${firstLetter}/${pfrId}.htm`,
@@ -148,7 +161,7 @@ export function getPlayerPage(pfrId: string): Promise<string> {
 }
 
 export function getPlayerGameLog(pfrId: string, year: number): Promise<string> {
-  assertPathSegment(pfrId, 'pfrId', VALID_PFR_ID);
+  assertPfrId(pfrId);
   const firstLetter = pfrId[0].toUpperCase();
   return getFromProFootballReference(
     `https://www.pro-football-reference.com/players/${firstLetter}/${pfrId}/gamelog/${year}/`,
