@@ -1253,7 +1253,7 @@ describe('validateFormFull — gamesPerMatchup (LS-6102)', () => {
   });
 });
 
-describe('validateFormFull — auction budget/min bid (LS-6092)', () => {
+describe('validateFormFull — auction budget/min bid (LS-6092, upper bound LS-6074/CLB-027)', () => {
   const baseFormData: CreateLeagueFormData = {
     sport: 'baseball',
     leagueName: 'Test League',
@@ -1295,8 +1295,24 @@ describe('validateFormFull — auction budget/min bid (LS-6092)', () => {
     expect(errs.auctionBudget).toBeDefined();
   });
 
+  it('rejects an auctionBudget value exceeding the sane upper bound', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      auctionBudget: 99999999999,
+    });
+    expect(errs.auctionBudget).toBeDefined();
+  });
+
   it('rejects an auctionMinBid below 1 when selectionMethod is auction', () => {
     const errs = validateFormFull({ ...baseFormData, auctionMinBid: 0 });
+    expect(errs.auctionMinBid).toBeDefined();
+  });
+
+  it('rejects an auctionMinBid value exceeding the sane upper bound', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      auctionMinBid: 99999999999,
+    });
     expect(errs.auctionMinBid).toBeDefined();
   });
 
@@ -1313,8 +1329,8 @@ describe('validateFormFull — auction budget/min bid (LS-6092)', () => {
     const errs = validateFormFull({
       ...baseFormData,
       selectionMethod: 'standard',
-      auctionBudget: 0,
-      auctionMinBid: -5,
+      auctionBudget: 99999999999,
+      auctionMinBid: 99999999999,
     });
     expect(errs.auctionBudget).toBeUndefined();
     expect(errs.auctionMinBid).toBeUndefined();
@@ -1626,6 +1642,57 @@ describe('LeagueCreatePage — Games Per Matchup typing bounds (LS-6101)', () =>
     const input = screen.getByDisplayValue('5');
     fireEvent.change(input, { target: { value: '42' } });
     expect(input).toHaveValue('42');
+  });
+});
+
+describe('LeagueCreatePage — Auction Budget / Min Bid typing bounds (LS-6074 / CLB-027)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    // Auction is premium-gated (LS-6072) — the budget/min-bid fields only
+    // mount once selectionMethod actually switches to 'auction'.
+    mockIsPremium = true;
+  });
+
+  it('clamps auction budget to the sane max while typing an overflow value', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Auction$/i }));
+
+    const input = screen.getByDisplayValue('200');
+    fireEvent.change(input, { target: { value: '99999999999' } });
+    expect(input).toHaveValue('10000');
+  });
+
+  it('clamps auction budget to the min while typing a value below the bound', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Auction$/i }));
+
+    const input = screen.getByDisplayValue('200');
+    fireEvent.change(input, { target: { value: '-5' } });
+    expect(input).toHaveValue('1');
+  });
+
+  it('clamps minimum bid to the sane max while typing an overflow value', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Auction$/i }));
+
+    const input = screen.getByDisplayValue('1');
+    fireEvent.change(input, { target: { value: '99999999999' } });
+    expect(input).toHaveValue('10000');
+  });
+
+  it('accepts an in-range auction budget value unchanged while typing', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByRole('button', { name: /^Auction$/i }));
+
+    const input = screen.getByDisplayValue('200');
+    fireEvent.change(input, { target: { value: '500' } });
+    expect(input).toHaveValue('500');
   });
 });
 

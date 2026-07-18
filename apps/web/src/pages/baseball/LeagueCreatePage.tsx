@@ -291,6 +291,10 @@ const DRAFT_ORDER_OPTIONS = [
   { label: 'Linear', value: 'linear' },
 ] as const;
 
+// CLB-027: sane upper bound so values like 99999999999 (exceeds Pothos int32) can't be typed.
+const AUCTION_BUDGET_RANGE = { min: 1, max: 10000 };
+const AUCTION_MIN_BID_RANGE = { min: 1, max: 10000 };
+
 const SCHEDULING_STRATEGY_OPTIONS = [
   { label: 'Divisional', value: 'divisional' },
   { label: 'Round Robin', value: 'round-robin' },
@@ -532,10 +536,18 @@ export function validateFormFull(
   )
     errs.playerPool = `Player pool "${f.playerPool}" is not valid for ${f.sport} leagues.`;
   if (f.selectionMethod === 'auction') {
-    if (Number.isNaN(f.auctionBudget) || f.auctionBudget < 1)
-      errs.auctionBudget = 'Auction budget must be at least 1.';
-    if (Number.isNaN(f.auctionMinBid) || f.auctionMinBid < 1)
-      errs.auctionMinBid = 'Auction minimum bid must be at least 1.';
+    if (
+      Number.isNaN(f.auctionBudget) ||
+      f.auctionBudget < AUCTION_BUDGET_RANGE.min ||
+      f.auctionBudget > AUCTION_BUDGET_RANGE.max
+    )
+      errs.auctionBudget = `Auction budget must be ${AUCTION_BUDGET_RANGE.min}–${AUCTION_BUDGET_RANGE.max}.`;
+    if (
+      Number.isNaN(f.auctionMinBid) ||
+      f.auctionMinBid < AUCTION_MIN_BID_RANGE.min ||
+      f.auctionMinBid > AUCTION_MIN_BID_RANGE.max
+    )
+      errs.auctionMinBid = `Minimum bid must be ${AUCTION_MIN_BID_RANGE.min}–${AUCTION_MIN_BID_RANGE.max}.`;
     else if (f.auctionMinBid > f.auctionBudget)
       errs.auctionMinBid = 'Auction minimum bid cannot exceed auction budget.';
   }
@@ -2944,39 +2956,53 @@ export function LeagueCreatePage(): React.JSX.Element {
                       <>
                         <FieldRow
                           label="Auction Budget per Team"
-                          hint="Total dollars each manager has to fill a roster."
+                          hint={`Total dollars each manager has to fill a roster. ${AUCTION_BUDGET_RANGE.min}–${AUCTION_BUDGET_RANGE.max}.`}
                         >
                           <Input
                             size="$3"
                             value={String(formData.auctionBudget)}
                             onChangeText={(text: string) => {
                               const n = parseInt(text, 10);
-                              handleInputChange(
-                                'auctionBudget',
-                                isNaN(n) ? 200 : n,
+                              if (isNaN(n)) return;
+                              const clamped = Math.min(
+                                Math.max(n, AUCTION_BUDGET_RANGE.min),
+                                AUCTION_BUDGET_RANGE.max,
                               );
+                              handleInputChange('auctionBudget', clamped);
                             }}
                             placeholder="200"
                             keyboardType="numeric"
+                            borderColor={
+                              validationErrors.auctionBudget
+                                ? '$red8'
+                                : '$borderColor'
+                            }
                             disabled={isFormDisabled}
                           />
                         </FieldRow>
                         <FieldRow
                           label="Minimum Bid"
-                          hint="Lowest opening bid accepted."
+                          hint={`Lowest opening bid accepted. ${AUCTION_MIN_BID_RANGE.min}–${AUCTION_MIN_BID_RANGE.max}.`}
                         >
                           <Input
                             size="$3"
                             value={String(formData.auctionMinBid)}
                             onChangeText={(text: string) => {
                               const n = parseInt(text, 10);
-                              handleInputChange(
-                                'auctionMinBid',
-                                isNaN(n) ? 1 : n,
+                              if (isNaN(n)) return;
+                              const clamped = Math.min(
+                                Math.max(n, AUCTION_MIN_BID_RANGE.min),
+                                AUCTION_MIN_BID_RANGE.max,
                               );
+                              handleInputChange('auctionMinBid', clamped);
                             }}
                             placeholder="1"
                             keyboardType="numeric"
+                            borderColor={
+                              validationErrors.auctionMinBid
+                                ? '$red8'
+                                : '$borderColor'
+                            }
                             disabled={isFormDisabled}
                           />
                         </FieldRow>

@@ -93,6 +93,36 @@ export function validatePickTimeLimitSeconds(
 const MAX_LEAGUE_NAME_LENGTH = 50;
 const MIN_NUMBER_OF_TEAMS = 2;
 const MAX_NUMBER_OF_TEAMS = 30;
+// CLB-027: sane upper bound so a client bypass (e.g. 99999999999, which exceeds
+// Pothos int32) can't reach the database as auctionBudget/auctionMinBid.
+const AUCTION_BUDGET_MIN = 1;
+const AUCTION_BUDGET_MAX = 10000;
+const AUCTION_MIN_BID_MIN = 1;
+const AUCTION_MIN_BID_MAX = 10000;
+
+/** Throws a UserInputError when value is outside the 1–10000 range. */
+export function validateAuctionBudget(value: number | null | undefined): void {
+  if (
+    value != null &&
+    (value < AUCTION_BUDGET_MIN || value > AUCTION_BUDGET_MAX)
+  ) {
+    throw UserInputError(
+      `Auction budget must be between ${AUCTION_BUDGET_MIN} and ${AUCTION_BUDGET_MAX}`,
+    );
+  }
+}
+
+/** Throws a UserInputError when value is outside the 1–10000 range. */
+export function validateAuctionMinBid(value: number | null | undefined): void {
+  if (
+    value != null &&
+    (value < AUCTION_MIN_BID_MIN || value > AUCTION_MIN_BID_MAX)
+  ) {
+    throw UserInputError(
+      `Minimum bid must be between ${AUCTION_MIN_BID_MIN} and ${AUCTION_MIN_BID_MAX}`,
+    );
+  }
+}
 
 // ── Input / payload types ──────────────────────────────────────────────────
 
@@ -557,6 +587,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       ) {
         throw UserInputError('Salary decay must be between 0 and 100');
       }
+      validateAuctionBudget(inputAuctionBudget);
+      validateAuctionMinBid(inputAuctionMinBid);
 
       try {
         const result = await leagueService.createLeague({
@@ -2265,14 +2297,12 @@ builder.mutationField('updateLeagueSettings', (t) =>
         leagueUpdate.salaryDecayPct = salaryDecayPct;
       }
       if (auctionBudget !== null && auctionBudget !== undefined) {
-        if (auctionBudget < 1)
-          throw new Error('Auction budget must be a positive integer');
+        validateAuctionBudget(auctionBudget);
         leagueUpdate.auctionBudget = auctionBudget;
         changeDescriptions.push(`Auction budget set to $${auctionBudget}`);
       }
       if (auctionMinBid !== null && auctionMinBid !== undefined) {
-        if (auctionMinBid < 1)
-          throw new Error('Auction minimum bid must be at least 1');
+        validateAuctionMinBid(auctionMinBid);
         leagueUpdate.auctionMinBid = auctionMinBid;
       }
 
