@@ -15,7 +15,16 @@
 const { execFileSync } = require('child_process');
 const { readFileSync, existsSync } = require('fs');
 const { resolve, dirname, join } = require('path');
-const minimatch = require('minimatch');
+// minimatch's CJS surface changed across majors: v3 sets `module.exports` to the
+// function itself, while v5+ (incl. the v10 hoisted transitively via @nx/* v23)
+// exports it only as a named `minimatch` property and is not itself callable.
+// Support both call styles so a transitive-dependency bump can't silently break
+// this advisory linter (and its brace-glob unit tests). See LS nx-ecosystem bump.
+const minimatchModule = require('minimatch');
+const minimatch =
+  typeof minimatchModule === 'function'
+    ? minimatchModule
+    : minimatchModule.minimatch;
 
 const root = resolve(__dirname, '..');
 const TOUCH_MAP_REL =
