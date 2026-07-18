@@ -1,5 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
-import { clearCache } from '@legacy-sports/pfr-client';
+import { clearCache, isPfrForbiddenError } from '@legacy-sports/pfr-client';
 import { loadFootballCareerStats } from '@legacy-sports/data-loaders';
 import {
   PublicDb,
@@ -25,6 +25,31 @@ export interface HandleLoadFootballCareerArgs {
 }
 
 const CACHE_CLEAR_INTERVAL = 50;
+
+// Number of consecutive 403s (expired PFR_CF_CLEARANCE cookie) that trigger
+// an early abort instead of grinding through the rest of the player list.
+const AUTH_FAILURE_STREAK_THRESHOLD = 4;
+
+const AUTH_EXPIRED_MESSAGE =
+  'PFR auth appears to have expired — refresh PFR_CF_CLEARANCE and re-run.';
+
+/**
+ * Tracks consecutive 403 (auth-looking) failures across a loop of
+ * `loadSinglePlayer` calls. A single non-auth failure or a success resets the
+ * streak, so only a genuine run of auth failures — not scattered per-player
+ * errors — triggers an abort.
+ */
+class AuthFailureStreakTracker {
+  private consecutiveAuthFailures = 0;
+
+  /** Records a result; returns true once the abort threshold is reached. */
+  record(result: { isAuthError?: boolean }): boolean {
+    this.consecutiveAuthFailures = result.isAuthError
+      ? this.consecutiveAuthFailures + 1
+      : 0;
+    return this.consecutiveAuthFailures >= AUTH_FAILURE_STREAK_THRESHOLD;
+  }
+}
 
 async function getFootballPlayers(db: PublicDb) {
   return await db
@@ -57,7 +82,7 @@ async function loadSinglePlayer(
   db: PublicDb,
   playerId: number,
   startSeason?: number,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; isAuthError?: boolean }> {
   try {
     const result = await loadFootballCareerStats(db, playerId, startSeason);
     LOGGER.info(
@@ -70,7 +95,11 @@ async function loadSinglePlayer(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     LOGGER.error(`Player ${playerId} failed: ${message}`);
-    return { success: false, error: message };
+    return {
+      success: false,
+      error: message,
+      isAuthError: isPfrForbiddenError(err),
+    };
   }
 }
 
@@ -133,12 +162,19 @@ export async function handleLoadFootballCareer(
         `Loading football career stats for ${playerIds.length} players from ${batch}`,
       );
       const errors: Array<{ playerId: number; error: string }> = [];
+      const authTracker = new AuthFailureStreakTracker();
+      let authExpired = false;
 
       for (const [index, pid] of playerIds.entries()) {
         LOGGER.info(`[${index + 1}/${playerIds.length}] Player ${pid}`);
         const result = await loadSinglePlayer(db, pid, startSeason);
         if (!result.success) {
           errors.push({ playerId: pid, error: result.error ?? 'unknown' });
+        }
+        if (authTracker.record(result)) {
+          authExpired = true;
+          LOGGER.error(AUTH_EXPIRED_MESSAGE);
+          break;
         }
         if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
           clearCache();
@@ -153,6 +189,9 @@ export async function handleLoadFootballCareer(
           `${errors.length} player(s) failed:`,
           JSON.stringify(errors),
         );
+      }
+      if (authExpired) {
+        process.exit(1);
       }
       return;
     }
@@ -169,6 +208,8 @@ export async function handleLoadFootballCareer(
           '(never-fetched first, then oldest)',
       );
       const errors: Array<{ playerId: number; error: string }> = [];
+      const authTracker = new AuthFailureStreakTracker();
+      let authExpired = false;
 
       for (const [index, p] of batchPlayers.entries()) {
         LOGGER.info(
@@ -177,6 +218,11 @@ export async function handleLoadFootballCareer(
         const result = await loadSinglePlayer(db, p.id, startSeason);
         if (!result.success) {
           errors.push({ playerId: p.id, error: result.error ?? 'unknown' });
+        }
+        if (authTracker.record(result)) {
+          authExpired = true;
+          LOGGER.error(AUTH_EXPIRED_MESSAGE);
+          break;
         }
         if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
           clearCache();
@@ -192,10 +238,12 @@ export async function handleLoadFootballCareer(
           JSON.stringify(errors),
         );
       }
-      // Exit non-zero only when the entire batch failed (e.g. cookie/tunnel
-      // down) so callers/CI see the failure. Partial failures are expected for
-      // a resumable loader — failed players stay un-stamped and retry next run.
-      if (errors.length === batchPlayers.length) {
+      // Exit non-zero when the entire batch failed (e.g. cookie/tunnel down)
+      // or the loop aborted early on an auth-expiry streak — either way
+      // callers/CI must see the failure. Partial failures with no abort are
+      // expected for a resumable loader — failed players stay un-stamped and
+      // retry next run.
+      if (errors.length === batchPlayers.length || authExpired) {
         process.exit(1);
       }
       return;
@@ -207,6 +255,8 @@ export async function handleLoadFootballCareer(
       `Loading football career stats for all ${players.length} football players`,
     );
     const errors: Array<{ playerId: number; error: string }> = [];
+    const authTracker = new AuthFailureStreakTracker();
+    let authExpired = false;
 
     for (const [index, p] of players.entries()) {
       LOGGER.info(
@@ -222,6 +272,11 @@ export async function handleLoadFootballCareer(
       if (!result.success) {
         errors.push({ playerId: p.id, error: result.error ?? 'unknown' });
       }
+      if (authTracker.record(result)) {
+        authExpired = true;
+        LOGGER.error(AUTH_EXPIRED_MESSAGE);
+        break;
+      }
 
       if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
         clearCache();
@@ -236,6 +291,9 @@ export async function handleLoadFootballCareer(
         `${errors.length} player(s) failed:`,
         JSON.stringify(errors),
       );
+    }
+    if (authExpired) {
+      process.exit(1);
     }
   });
 }

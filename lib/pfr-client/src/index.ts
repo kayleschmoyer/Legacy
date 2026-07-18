@@ -8,4 +8,5 @@ export {
   clearCache,
   getCacheStats,
   getFromProFootballReference,
+  isPfrForbiddenError,
 } from './lib/PFRSession';

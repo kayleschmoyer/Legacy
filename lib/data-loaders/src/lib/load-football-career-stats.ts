@@ -1,4 +1,8 @@
-import { CareerStats, TeamDefense } from '@legacy-sports/pfr-client';
+import {
+  CareerStats,
+  isPfrForbiddenError,
+  TeamDefense,
+} from '@legacy-sports/pfr-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { sql } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
@@ -452,6 +456,11 @@ async function loadFootballCareerStatsInner(
           defenseSeasons.push(totals);
         }
       } catch (err) {
+        // A 403 means PFR auth has expired — every subsequent request for
+        // every player will also fail, so propagate it instead of grinding
+        // through the remaining seasons. Other errors (missing season page,
+        // etc.) are treated as "no data for this season" and swallowed.
+        if (isPfrForbiddenError(err)) throw err;
         LOGGER.warn(
           `Failed to fetch DST season ${season} for ${nflTeam}:`,
           err instanceof Error ? err : String(err),
@@ -492,6 +501,7 @@ async function loadFootballCareerStatsInner(
       defenseSeasons =
         await CareerStats.getAllDefenseSeasonTotalsFromMainPage(pfrPlayer);
     } catch (err) {
+      if (isPfrForbiddenError(err)) throw err;
       LOGGER.warn(
         `Failed to fetch main page for ${pfrId}:`,
         err instanceof Error ? err : String(err),
@@ -548,6 +558,7 @@ async function loadFootballCareerStatsInner(
     allSeasonTotals =
       await CareerStats.getAllSeasonTotalsFromMainPage(pfrPlayer);
   } catch (err) {
+    if (isPfrForbiddenError(err)) throw err;
     LOGGER.warn(
       `Failed to fetch main page for ${pfrId}:`,
       err instanceof Error ? err : String(err),

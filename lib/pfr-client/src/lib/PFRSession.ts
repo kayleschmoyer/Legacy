@@ -38,6 +38,35 @@ function pfrRequestConfig(): {
   return { headers, timeout: REQUEST_TIMEOUT_MS };
 }
 
+/**
+ * Thrown by getFromProFootballReference on an HTTP 403 — Cloudflare rejected
+ * the request outright, almost always a missing/expired `PFR_CF_CLEARANCE`
+ * cookie. A dedicated class (rather than a raw AxiosError) lets callers
+ * detect this specific failure via isPfrForbiddenError even though the
+ * message is rewritten to be actionable.
+ */
+export class PfrForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PfrForbiddenError';
+  }
+}
+
+/**
+ * True when `error` signals an expired/invalid `PFR_CF_CLEARANCE` cookie —
+ * either a PfrForbiddenError raised by getFromProFootballReference, or (for
+ * callers that see the raw axios error before it's wrapped) an axios error
+ * carrying an HTTP 403 response. Callers use this to distinguish "auth has
+ * expired, every future request will also fail" from an ordinary per-player
+ * fetch failure.
+ */
+export function isPfrForbiddenError(error: unknown): boolean {
+  return (
+    error instanceof PfrForbiddenError ||
+    (axios.isAxiosError(error) && error.response?.status === 403)
+  );
+}
+
 export async function getFromProFootballReference(
   url: string,
 ): Promise<string> {
@@ -121,7 +150,7 @@ export async function getFromProFootballReference(
       // an application bug; surface the documented fix instead of a bare
       // AxiosError. See apps/cli/src/commands/queue-players.md.
       if (status === 403) {
-        throw new Error(
+        throw new PfrForbiddenError(
           `PFR blocked the request with 403 (Cloudflare) for ${url}. The ` +
             `cf_clearance cookie is likely missing or expired (~30min TTL) ` +
             `— re-pull it from DevTools and set PFR_CF_CLEARANCE/` +

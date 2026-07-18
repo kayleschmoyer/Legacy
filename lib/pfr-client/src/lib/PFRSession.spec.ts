@@ -1,5 +1,10 @@
 import axios, { AxiosError } from 'axios';
-import { getPlayerGameLog, getPlayerPage, getPlayersList } from './PFRSession';
+import {
+  getPlayerGameLog,
+  getPlayerPage,
+  getPlayersList,
+  isPfrForbiddenError,
+} from './PFRSession';
 
 // Spy on axios.get only — do NOT jest.mock('axios') as that auto-mocks
 // isAxiosError to return undefined, which breaks the retry-logic branch.
@@ -142,4 +147,46 @@ describe('403 handling (Cloudflare block)', () => {
     );
     expect(mockAxiosGet).toHaveBeenCalledTimes(1);
   }, 20_000);
+});
+
+describe('isPfrForbiddenError', () => {
+  it('returns true for the PfrForbiddenError thrown by getFromProFootballReference on a 403', async () => {
+    mockAxiosGet.mockReset();
+    mockAxiosGet.mockRejectedValue(makeAxiosError(403));
+
+    let caught: unknown;
+    try {
+      await getPlayersList('Z');
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(isPfrForbiddenError(caught)).toBe(true);
+  }, 20_000);
+
+  it('returns true for an axios error with a 403 response', () => {
+    const error: AxiosError = Object.assign(new Error('Forbidden'), {
+      isAxiosError: true,
+      response: { status: 403 },
+    }) as AxiosError;
+    expect(isPfrForbiddenError(error)).toBe(true);
+  });
+
+  it('returns false for an axios error with a different status', () => {
+    const error: AxiosError = Object.assign(new Error('Too Many Requests'), {
+      isAxiosError: true,
+      response: { status: 429 },
+    }) as AxiosError;
+    expect(isPfrForbiddenError(error)).toBe(false);
+  });
+
+  it('returns false for a non-axios error', () => {
+    expect(isPfrForbiddenError(new Error('boom'))).toBe(false);
+  });
+
+  it('returns false for a non-error value', () => {
+    expect(isPfrForbiddenError('some string')).toBe(false);
+    expect(isPfrForbiddenError(undefined)).toBe(false);
+  });
 });

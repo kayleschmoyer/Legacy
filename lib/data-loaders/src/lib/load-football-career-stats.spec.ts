@@ -8,6 +8,15 @@ const mockTeamDefenseGetSeasonTotals = jest.fn();
 // Records the stats_last_fetched_at stamp (db.execute) calls.
 const mockDbExecute = jest.fn();
 
+// Marks an error as a simulated PFR 403 without depending on axios —
+// isPfrForbiddenError is mocked to recognize it directly.
+class FakeAuthError extends Error {
+  readonly isAuthError = true;
+  constructor() {
+    super('Request failed with status code 403');
+  }
+}
+
 jest.mock('@legacy-sports/pfr-client', () => ({
   CareerStats: {
     getAllSeasonTotalsFromMainPage: (...args: unknown[]): unknown =>
@@ -19,6 +28,7 @@ jest.mock('@legacy-sports/pfr-client', () => ({
     getSeasonTotals: (...args: unknown[]): unknown =>
       mockTeamDefenseGetSeasonTotals(...args),
   },
+  isPfrForbiddenError: (err: unknown): boolean => err instanceof FakeAuthError,
 }));
 
 const NO_SEASON_TOTALS = {
@@ -419,5 +429,65 @@ describe('loadFootballCareerStats — stat-group routing', () => {
     const result = await loadFootballCareerStats(db, 1, 2024);
 
     expect(result.groupsUpserted).toHaveLength(0);
+  });
+
+  describe('403 (expired PFR auth) propagation', () => {
+    it('rethrows a 403 from the offensive main-page fetch instead of swallowing it', async () => {
+      const db = makeDb({
+        id: 1,
+        pfrId: 'TestRb00',
+        isDst: false,
+        nflTeam: null,
+        position: 'RB',
+        sport: 'football',
+      });
+      mockCareerGetAllSeasonTotals.mockRejectedValue(new FakeAuthError());
+
+      await expect(loadFootballCareerStats(db, 1, 2024)).rejects.toThrow(
+        'Request failed with status code 403',
+      );
+      // A thrown error must leave the stats_last_fetched_at stamp untouched
+      // so the player is retried once auth is refreshed.
+      expect(mockDbExecute).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a 403 from the IDP main-page fetch instead of swallowing it', async () => {
+      const db = makeDb({
+        id: 1,
+        pfrId: 'TestLb00',
+        isDst: false,
+        nflTeam: null,
+        position: 'LB',
+        sport: 'football',
+      });
+      mockCareerGetAllDefenseSeasonTotals.mockRejectedValue(
+        new FakeAuthError(),
+      );
+
+      await expect(loadFootballCareerStats(db, 1, 2024)).rejects.toThrow(
+        'Request failed with status code 403',
+      );
+      expect(mockDbExecute).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a 403 from a DST per-season fetch instead of swallowing it', async () => {
+      const db = makeDb({
+        id: 1,
+        pfrId: 'KanDef00',
+        isDst: true,
+        nflTeam: 'kan',
+        position: null,
+        sport: 'football',
+      });
+      mockTeamDefenseGetSeasonTotals.mockRejectedValue(new FakeAuthError());
+
+      await expect(loadFootballCareerStats(db, 1, 2024)).rejects.toThrow(
+        'Request failed with status code 403',
+      );
+      expect(mockDbExecute).not.toHaveBeenCalled();
+      // Must stop at the first season's 403 rather than looping through
+      // every remaining season for this player.
+      expect(mockTeamDefenseGetSeasonTotals).toHaveBeenCalledTimes(1);
+    });
   });
 });
