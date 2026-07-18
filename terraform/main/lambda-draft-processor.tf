@@ -182,6 +182,8 @@ resource "aws_lambda_function" "draft_processor" {
   # S3-based deployment
   s3_bucket = aws_s3_bucket.lambda_deployments.bucket
   s3_key    = "draft-processor/draft-processor-${data.aws_ssm_parameter.draft_processor_lambda_version.value}.zip"
+  # Deployed version marker read by the drift-check auditor (LS-8434)
+  description = data.aws_ssm_parameter.draft_processor_lambda_version.value
 
   handler     = "index.handler"
   runtime     = "nodejs20.x"

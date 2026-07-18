@@ -143,6 +143,8 @@ resource "aws_lambda_function" "image_upload" {
   memory_size   = 512
 
   source_code_hash = aws_ssm_parameter.image_upload_lambda_version.value
+  # Deployed version marker read by the drift-check auditor (LS-8434)
+  description = aws_ssm_parameter.image_upload_lambda_version.value
 
   vpc_config {
     subnet_ids         = aws_subnet.private_lambda[*].id

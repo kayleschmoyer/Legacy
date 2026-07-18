@@ -149,6 +149,8 @@ resource "aws_lambda_function" "github_webhook" {
   memory_size   = 128
 
   source_code_hash = aws_ssm_parameter.github_webhook_lambda_version.value
+  # Deployed version marker read by the drift-check auditor (LS-8434)
+  description = aws_ssm_parameter.github_webhook_lambda_version.value
 
   environment {
     variables = {

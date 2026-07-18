@@ -185,6 +185,8 @@ resource "aws_lambda_function" "graphql" {
   memory_size   = var.environment == "dev" ? 512 : 1024
 
   source_code_hash = data.aws_ssm_parameter.graphql_lambda_version.value
+  # Deployed version marker read by the drift-check auditor (LS-8434)
+  description = data.aws_ssm_parameter.graphql_lambda_version.value
 
   vpc_config {
     subnet_ids         = aws_subnet.private_lambda[*].id

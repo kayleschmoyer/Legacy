@@ -85,6 +85,9 @@ resource "aws_lambda_function" "mcp_rollbar" {
   memory_size   = 256
 
   source_code_hash = data.aws_ssm_parameter.mcp_rollbar_lambda_version.value
+  # Deployed version marker read by the drift-check auditor (LS-8434) — this
+  # Lambda's missing description was why LS-8426's 12-day staleness went undetected.
+  description = data.aws_ssm_parameter.mcp_rollbar_lambda_version.value
 
   environment {
     variables = {

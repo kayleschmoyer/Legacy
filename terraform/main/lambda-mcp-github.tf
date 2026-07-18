@@ -83,6 +83,8 @@ resource "aws_lambda_function" "mcp_github" {
   memory_size   = 256
 
   source_code_hash = data.aws_ssm_parameter.mcp_github_lambda_version.value
+  # Deployed version marker read by the drift-check auditor (LS-8434)
+  description = data.aws_ssm_parameter.mcp_github_lambda_version.value
 
   environment {
     variables = {

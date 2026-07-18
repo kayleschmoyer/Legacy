@@ -224,6 +224,8 @@ resource "aws_lambda_function" "websocket" {
 
   s3_bucket = aws_s3_bucket.lambda_deployments.bucket
   s3_key    = "websocket/websocket-${data.aws_ssm_parameter.websocket_lambda_version.value}.zip"
+  # Deployed version marker read by the drift-check auditor (LS-8434)
+  description = data.aws_ssm_parameter.websocket_lambda_version.value
 
   handler     = "index.handler"
   runtime     = "nodejs20.x"
