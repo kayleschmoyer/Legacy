@@ -8,6 +8,7 @@ describe('myLeagues query (LS-255 AC12)', () => {
     innerJoin: jest.Mock;
     where: jest.Mock;
     orderBy: jest.Mock;
+    limit: jest.Mock;
     then: jest.Mock;
   };
   let mockContext: {
@@ -24,6 +25,7 @@ describe('myLeagues query (LS-255 AC12)', () => {
       innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
       then: jest.fn((resolve) => resolve([])),
     };
 
