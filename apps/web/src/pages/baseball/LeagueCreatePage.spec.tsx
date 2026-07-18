@@ -1130,6 +1130,23 @@ describe('LeagueCreatePage — Divisional vs 1 division (LS-6105)', () => {
     expect(screen.getByRole('button', { name: /^Divisional$/i })).toBeEnabled();
   });
 
+  it('auto-snaps a stale odd division count when returning to an even team count (LS-6060)', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    // 9 teams only allows odd division counts — pick a valid non-1 odd value.
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    expect(screen.getByRole('button', { name: /^Divisional$/i })).toBeEnabled();
+
+    // Switching back to an even team count without touching divisions
+    // manually must not strand the odd division count — it should
+    // auto-snap to a valid even option (Divisional stays enabled).
+    fireEvent.click(screen.getByRole('button', { name: '12' }));
+
+    expect(screen.getByRole('button', { name: /^Divisional$/i })).toBeEnabled();
+  });
+
   it('falls back to round-robin in the mutation when 1 division forced Divisional off', async () => {
     renderPage('/baseball/league/create');
     expandAllSections();

@@ -1578,10 +1578,24 @@ export function LeagueCreatePage(): React.JSX.Element {
       if (
         field === 'numberOfTeams' &&
         typeof value === 'number' &&
-        value % 2 === 1 &&
-        next.numberOfDivisions % 2 === 0
+        next.numberOfDivisions % 2 !== value % 2
       ) {
-        next.numberOfDivisions = 1;
+        // Team-count parity changed (in either direction), stranding the
+        // current division count on the wrong parity — the ButtonGroup
+        // filters its options to matching parity, so the stale value would
+        // render with nothing highlighted. Snap to the nearest same-parity
+        // option instead of hardcoding 1 (LS-6060).
+        const validDivisionOptions = ALL_DIVISION_COUNT_OPTIONS.filter(
+          (d) => d <= value && d % 2 === value % 2,
+        );
+        const staleDivisions = next.numberOfDivisions;
+        next.numberOfDivisions = validDivisionOptions.reduce(
+          (nearest, d) =>
+            Math.abs(d - staleDivisions) < Math.abs(nearest - staleDivisions)
+              ? d
+              : nearest,
+          validDivisionOptions[0] ?? 1,
+        );
       }
       if (
         next.numberOfDivisions === 1 &&
