@@ -1295,6 +1295,31 @@ export function MatchupRosterComparison({
     // Zebra stripe: alternate row background
     const isEvenRow = rowIndex % 2 === 0;
 
+    // Matchup stats modal is only reachable when the player has an actual
+    // score to show — keep keyboard focus/activation in sync with that.
+    const team1Clickable = team1HasPlayed && Boolean(team1Player);
+    const team2Clickable = team2HasPlayed && Boolean(team2Player);
+
+    const openMatchupStatsModal = (player: MatchupPlayerFragment) => {
+      if (!player.player) return;
+      setSelectedMatchupPlayer(player);
+      setSelectedMatchupPlayerName(
+        `${player.player.firstName} ${player.player.lastName}`,
+      );
+      setMatchupStatsModalOpen(true);
+    };
+
+    const handleMatchupStatsKeyDown = (
+      clickable: boolean,
+      player: MatchupPlayerFragment | undefined,
+      event: React.KeyboardEvent,
+    ) => {
+      if (!clickable || !player) return;
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openMatchupStatsModal(player);
+    };
+
     return (
       <XStack
         key={index}
@@ -1462,21 +1487,27 @@ export function MatchupRosterComparison({
               fontSize="$4"
               fontWeight="600"
               color={team1ScoreColor}
-              cursor={team1HasPlayed && team1Player ? 'pointer' : 'default'}
+              cursor={team1Clickable ? 'pointer' : 'default'}
               hoverStyle={
-                team1HasPlayed && team1Player
+                team1Clickable
                   ? { textDecoration: 'underline', opacity: 0.8 }
                   : {}
               }
               onPress={() => {
-                if (team1HasPlayed && team1Player && team1Player.player) {
-                  setSelectedMatchupPlayer(team1Player);
-                  setSelectedMatchupPlayerName(
-                    `${team1Player.player.firstName} ${team1Player.player.lastName}`,
-                  );
-                  setMatchupStatsModalOpen(true);
+                if (team1Clickable && team1Player) {
+                  openMatchupStatsModal(team1Player);
                 }
               }}
+              role={team1Clickable ? 'button' : undefined}
+              tabIndex={team1Clickable ? 0 : undefined}
+              aria-label={
+                team1Clickable
+                  ? `View ${team1Player?.player?.firstName} ${team1Player?.player?.lastName} matchup stats`
+                  : undefined
+              }
+              onKeyDown={(event: React.KeyboardEvent) =>
+                handleMatchupStatsKeyDown(team1Clickable, team1Player, event)
+              }
             >
               {team1Player
                 ? team1HasPlayed
@@ -1508,21 +1539,27 @@ export function MatchupRosterComparison({
               fontSize="$4"
               fontWeight="600"
               color={team2ScoreColor}
-              cursor={team2HasPlayed && team2Player ? 'pointer' : 'default'}
+              cursor={team2Clickable ? 'pointer' : 'default'}
               hoverStyle={
-                team2HasPlayed && team2Player
+                team2Clickable
                   ? { textDecoration: 'underline', opacity: 0.8 }
                   : {}
               }
               onPress={() => {
-                if (team2HasPlayed && team2Player && team2Player.player) {
-                  setSelectedMatchupPlayer(team2Player);
-                  setSelectedMatchupPlayerName(
-                    `${team2Player.player.firstName} ${team2Player.player.lastName}`,
-                  );
-                  setMatchupStatsModalOpen(true);
+                if (team2Clickable && team2Player) {
+                  openMatchupStatsModal(team2Player);
                 }
               }}
+              role={team2Clickable ? 'button' : undefined}
+              tabIndex={team2Clickable ? 0 : undefined}
+              aria-label={
+                team2Clickable
+                  ? `View ${team2Player?.player?.firstName} ${team2Player?.player?.lastName} matchup stats`
+                  : undefined
+              }
+              onKeyDown={(event: React.KeyboardEvent) =>
+                handleMatchupStatsKeyDown(team2Clickable, team2Player, event)
+              }
             >
               {team2Player
                 ? team2HasPlayed
