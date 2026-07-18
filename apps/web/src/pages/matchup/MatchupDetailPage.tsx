@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   MatchupDetailLayout,
@@ -29,6 +30,14 @@ import {
   BRAND_NAVY_LIGHT,
 } from '../../constants/colors';
 import { trackMatchupViewed } from '../../utils/analytics';
+
+/** True when `error` is a GraphQL FORBIDDEN response (no league access) rather than a generic failure. */
+function isForbiddenError(error: unknown): boolean {
+  return (
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some((e) => e.extensions?.['code'] === 'FORBIDDEN')
+  );
+}
 
 export function MatchupDetailPage() {
   const { leagueId, matchupId } = useParams<{
@@ -95,6 +104,31 @@ export function MatchupDetailPage() {
         <Text marginTop="$2" color="$gray11">
           Loading matchup details...
         </Text>
+      </YStack>
+    );
+  }
+
+  if (error && isForbiddenError(error)) {
+    return (
+      <YStack
+        padding="$4"
+        alignItems="center"
+        justifyContent="center"
+        minHeight={400}
+      >
+        <Text color="$gray11" fontSize="$4">
+          You no longer have access to this league
+        </Text>
+        <Button
+          marginTop="$4"
+          backgroundColor={BRAND_NAVY_LIGHT}
+          color="white"
+          pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+          hoverStyle={{ backgroundColor: BRAND_NAVY }}
+          onPress={() => navigate('/')}
+        >
+          Back to Leagues
+        </Button>
       </YStack>
     );
   }

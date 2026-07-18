@@ -17,6 +17,7 @@ import {
 } from './types';
 import { builder } from '../builder';
 import { AuthenticationError } from '../graphql-errors';
+import { verifyLeagueMembership } from '../authorization';
 
 // Query: getMatchupById
 builder.queryField('getMatchupById', (t) =>
@@ -37,7 +38,22 @@ builder.queryField('getMatchupById', (t) =>
         .where(eq(PublicSchema.matchups.id, args.id))
         .limit(1);
 
-      return results[0] || null;
+      const matchup = results[0];
+      if (!matchup) {
+        return null;
+      }
+
+      // Distinguish "no access" (FORBIDDEN) from genuine "not found" (null) so
+      // the client can tell a user who lost league access apart from a
+      // matchup that was actually deleted, instead of collapsing both into
+      // the same "Matchup not found" message (LS-5900).
+      await verifyLeagueMembership(
+        context.db,
+        matchup.leagueId,
+        context.user.id,
+      );
+
+      return matchup;
     },
   }),
 );

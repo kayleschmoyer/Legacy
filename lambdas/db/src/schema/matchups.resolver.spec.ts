@@ -67,6 +67,12 @@ describe('Matchup Queries', () => {
           currentWeek: 'currentWeek',
           currentMatchup: 'currentMatchup',
         },
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          teamId: 'teamId',
+          permissionLevel: 'permissionLevel',
+        },
         teamMembers: {
           playerId: 'playerId',
           positionId: 'positionId',
@@ -139,6 +145,25 @@ describe('Matchup Queries', () => {
       }
     `;
 
+    it('throws UNAUTHENTICATED when user is null', async () => {
+      const queryType = schema.getQueryType();
+      const getMatchupByIdField = queryType?.getFields().getMatchupById;
+      if (!getMatchupByIdField?.resolve) {
+        throw new Error('getMatchupById resolver not found');
+      }
+
+      await expect(
+        getMatchupByIdField.resolve(
+          {},
+          { matchupId: 1 },
+          { ...mockContext, user: null },
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'UNAUTHENTICATED' },
+      });
+    });
+
     it('should return matchup when it exists', async () => {
       const mockMatchup = {
         id: 1,
@@ -196,6 +221,45 @@ describe('Matchup Queries', () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    it('should throw a FORBIDDEN error (not null) when the matchup exists but the user is not a league member (LS-5900)', async () => {
+      const mockMatchup = {
+        id: 1,
+        leagueId: 1,
+        weekNumber: 1,
+        status: 'scheduled',
+        team1Id: 1,
+        team2Id: 2,
+        team1Score: null,
+        team2Score: null,
+      };
+
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // First .limit() resolves the matchup lookup; second resolves the
+      // league-membership lookup performed by verifyLeagueMembership.
+      mockDb.limit
+        .mockResolvedValueOnce([mockMatchup])
+        .mockResolvedValueOnce([]);
+
+      const queryType = schema.getQueryType();
+      const getMatchupByIdField = queryType?.getFields().getMatchupById;
+      if (!getMatchupByIdField?.resolve) {
+        throw new Error('getMatchupById resolver not found');
+      }
+
+      await expect(
+        getMatchupByIdField.resolve(
+          {},
+          { matchupId: 1 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+      });
     });
   });
 

@@ -14,6 +14,7 @@
  * successful sync must commit both sides together.
  */
 import { and, eq } from 'drizzle-orm';
+import { syncCurrentMatchupPositions } from './mutations';
 import {
   cleanupTestData,
   getTestDatabase,
@@ -21,7 +22,6 @@ import {
   integrationTestSchema,
 } from '../../../integration-test-setup';
 import { getLeague, getUser } from '../../__fixtures__';
-import { syncCurrentMatchupPositions } from './mutations';
 
 const {
   leagues,

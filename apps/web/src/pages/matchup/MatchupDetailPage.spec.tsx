@@ -11,6 +11,7 @@
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { MatchupDetailPage } from './MatchupDetailPage';
 
 // --- router ------------------------------------------------------------------
@@ -219,5 +220,52 @@ describe('MatchupDetailPage "Back to League" navigation (LS-5893 / BMD-023)', ()
     fireEvent.click(screen.getByRole('button', { name: 'Back to League' }));
 
     expect(mockNavigate).toHaveBeenCalledWith('/football/league/100');
+  });
+});
+
+describe('MatchupDetailPage forbidden vs not-found state (LS-5900)', () => {
+  afterEach(() => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: undefined,
+    });
+  });
+
+  it('shows a distinct message when the server returns FORBIDDEN (lost league access)', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: undefined,
+      loading: false,
+      error: new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'User is not a member of this league',
+            extensions: { code: 'FORBIDDEN' },
+          },
+        ],
+      }) as unknown as Error,
+    });
+
+    render(<MatchupDetailPage />);
+
+    expect(
+      screen.getByText('You no longer have access to this league'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Matchup not found')).not.toBeInTheDocument();
+  });
+
+  it('shows "Matchup not found" when the matchup genuinely does not exist (no error, null result)', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: undefined,
+      loading: false,
+      error: undefined,
+    });
+
+    render(<MatchupDetailPage />);
+
+    expect(screen.getByText('Matchup not found')).toBeInTheDocument();
+    expect(
+      screen.queryByText('You no longer have access to this league'),
+    ).not.toBeInTheDocument();
   });
 });
