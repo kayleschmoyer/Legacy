@@ -40,4 +40,12 @@ export const CLIENT_FACING_CODES = new Set([
   // for server-side Rollbar/CloudWatch, so nothing is hidden — the client-side
   // Rollbar occurrence just becomes self-diagnosing (LS-8287).
   'DRAFT_AUTO_PICK_STATUS_FAILED',
+  // getDraftPicks re-throws a DB failure that survived its bounded
+  // transient retry with this stable code (carrying the SQLSTATE, not the
+  // raw SQL) instead of letting the formatter mask it as a generic
+  // "Internal server error". The resolver still LOGGER.errors the real
+  // cause for server-side Rollbar/CloudWatch, so nothing is hidden — the
+  // client-side Rollbar occurrence just becomes self-diagnosing (LS-8397,
+  // mirroring LS-8287).
+  'DRAFT_PICKS_LOAD_FAILED',
 ]);

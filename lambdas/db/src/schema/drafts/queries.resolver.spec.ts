@@ -437,3 +437,246 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
     });
   });
 });
+
+/**
+ * Resolver-level tests for `getDraftPicks` resilience (LS-8397).
+ *
+ * This query refetches after every pick event on the live draft board, so it
+ * races the concurrent `makeDraftPick` write to `draft_picks`. A single
+ * production occurrence (Rollbar #180) surfaced as a masked "Internal server
+ * error" ~6s after a `player_selected` event. These tests assert the same
+ * two-part fix applied to `getDraftTeamAutoPickStatuses` in LS-8287:
+ *   1. A transient Postgres failure (deadlock / serialization / lock-timeout)
+ *      is retried and recovers silently — no error reaches the client.
+ *   2. A non-transient DB failure is re-thrown with the stable, client-facing
+ *      `DRAFT_PICKS_LOAD_FAILED` code (carrying the SQLSTATE) instead of the
+ *      formatter's opaque generic 500, so occurrences are self-diagnosing.
+ *   3. Typed client-facing errors (auth / not-found / forbidden) are preserved.
+ */
+describe('getDraftPicks resolver — LS-8397 resilience', () => {
+  let schema: GraphQLSchema;
+  let mockDb: {
+    select: jest.Mock;
+    from: jest.Mock;
+    where: jest.Mock;
+    limit: jest.Mock;
+    orderBy: jest.Mock;
+  };
+  let mockContext: {
+    user: { id: number; isAdmin: boolean } | null;
+    db: typeof mockDb;
+  };
+
+  beforeEach(() => {
+    jest.resetModules();
+
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+    };
+
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      ...jest.requireActual('@legacy-sports/utils/node'),
+      getDbOptions: jest.fn(() => ({})),
+    }));
+
+    jest.doMock('@legacy-sports/db-client', () => ({
+      createDatabaseService: jest.fn(),
+      runWithPublicClient: jest.fn(
+        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+      ),
+      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
+      PublicSchema: {
+        drafts: { id: 'id', leagueId: 'leagueId' },
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          teamId: 'teamId',
+          permissionLevel: 'permissionLevel',
+        },
+        draftPicks: {
+          draftId: 'draftId',
+          overallPick: 'overallPick',
+        },
+      },
+      InternalSchema: {
+        usersInAppInternal: {
+          id: 'app_internal.users.id',
+          subscriptionTier: 'app_internal.users.subscription_tier',
+        },
+      },
+      BADGE_DEFINITIONS: [],
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
+    const schemaModule = require('../../schema') as { schema: GraphQLSchema };
+    schema = schemaModule.schema;
+
+    mockContext = {
+      user: { id: 42, isAdmin: false },
+      db: mockDb,
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function getResolver() {
+    const queryType = schema.getQueryType();
+    const field = queryType?.getFields().getDraftPicks;
+    if (!field?.resolve) {
+      throw new Error('getDraftPicks resolver not found');
+    }
+    return field.resolve;
+  }
+
+  /** A Postgres error carrying a SQLSTATE `code`, as postgres.js throws. */
+  function pgError(message: string, code: string): Error {
+    return Object.assign(new Error(message), { code });
+  }
+
+  it('returns draft picks on the happy path', async () => {
+    const rows = [
+      { id: 1, draftId: 100, overallPick: 1, teamId: 11, playerId: 5 },
+      { id: 2, draftId: 100, overallPick: 2, teamId: 12, playerId: 9 },
+    ];
+    // draft lookup → chain; membership lookup → chain; picks read → terminal.
+    mockDb.where
+      .mockReturnValueOnce(mockDb)
+      .mockReturnValueOnce(mockDb)
+      .mockReturnValueOnce(mockDb);
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([
+        { teamId: 11, permissionLevel: 'general_manager' },
+      ]);
+    mockDb.orderBy.mockResolvedValueOnce(rows);
+
+    const resolve = getResolver();
+
+    const result = await resolve(
+      {},
+      { draftId: 100 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toEqual(rows);
+  });
+
+  it('retries a transient DB error and recovers without surfacing an error', async () => {
+    const rows = [{ id: 1, draftId: 100, overallPick: 1 }];
+    // draft where → chain; membership where → chain; picks where → chain;
+    // picks orderBy attempt 1 → deadlock (40P01, retryable); attempt 2 →
+    // success.
+    mockDb.where
+      .mockReturnValueOnce(mockDb)
+      .mockReturnValueOnce(mockDb)
+      .mockReturnValueOnce(mockDb);
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([
+        { teamId: 11, permissionLevel: 'general_manager' },
+      ]);
+    mockDb.orderBy
+      .mockRejectedValueOnce(pgError('deadlock detected', '40P01'))
+      .mockResolvedValueOnce(rows);
+
+    const resolve = getResolver();
+
+    const result = await resolve(
+      {},
+      { draftId: 100 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toEqual(rows);
+    // The picks read was attempted twice: initial failure + successful retry.
+    expect(mockDb.orderBy).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-throws a non-transient DB error with a diagnosable client-facing code (no mask)', async () => {
+    // picks read fails with a statement timeout (57014) — not retryable.
+    mockDb.where
+      .mockReturnValueOnce(mockDb)
+      .mockReturnValueOnce(mockDb)
+      .mockReturnValueOnce(mockDb);
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([
+        { teamId: 11, permissionLevel: 'general_manager' },
+      ]);
+    mockDb.orderBy.mockRejectedValueOnce(
+      pgError('canceling statement due to statement timeout', '57014'),
+    );
+
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { draftId: 100 }, mockContext, undefined as never),
+    ).rejects.toMatchObject({
+      message: 'Failed to load draft picks (database error 57014)',
+      extensions: { code: 'DRAFT_PICKS_LOAD_FAILED' },
+    });
+    // Non-transient error must NOT be retried.
+    expect(mockDb.orderBy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects unauthenticated callers with UNAUTHENTICATED', async () => {
+    const resolve = getResolver();
+    const unauthContext = { user: null, db: mockDb };
+
+    await expect(
+      resolve({}, { draftId: 100 }, unauthContext, undefined as never),
+    ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
+  });
+
+  it('preserves BAD_USER_INPUT when the draft does not exist', async () => {
+    mockDb.where.mockReturnValueOnce(mockDb);
+    mockDb.limit.mockResolvedValueOnce([]);
+
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { draftId: 999 }, mockContext, undefined as never),
+    ).rejects.toMatchObject({
+      message: 'Draft not found',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  });
+
+  it('preserves FORBIDDEN when the caller is not a league member', async () => {
+    mockDb.where.mockReturnValueOnce(mockDb).mockReturnValueOnce(mockDb);
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([]);
+
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { draftId: 100 }, mockContext, undefined as never),
+    ).rejects.toMatchObject({
+      message: 'User is not a member of this league',
+      extensions: { code: 'FORBIDDEN' },
+    });
+  });
+});

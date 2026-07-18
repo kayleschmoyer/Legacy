@@ -18,11 +18,6 @@ import {
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from './helpers';
 import {
-  describeDbError,
-  formatDbError,
-  withTransientRetry,
-} from '../leagues/delete-resilience';
-import {
   CurrentDraftPick,
   Draft,
   DraftPick,
@@ -33,6 +28,11 @@ import {
   DraftTeamOrderEntry,
   MockDraftUsage,
 } from './types';
+import {
+  describeDbError,
+  formatDbError,
+  withTransientRetry,
+} from '../leagues/delete-resilience';
 import {
   hasEntitlement,
   isCommissionerOrOwner,
@@ -154,26 +154,84 @@ builder.queryField('getDraftPicks', (t) =>
         throw AuthenticationError();
       }
 
-      // Verify user is a member of the league owning this draft
-      const [draft] = await context.db
-        .select({ leagueId: PublicSchema.drafts.leagueId })
-        .from(PublicSchema.drafts)
-        .where(eq(PublicSchema.drafts.id, args.draftId))
-        .limit(1);
+      const { draftId } = args;
+      const userId = context.user.id;
 
-      if (!draft) {
-        throw UserInputError('Draft not found');
+      try {
+        // This query refetches after every pick event on the live draft
+        // board, so it races the concurrent makeDraftPick write to
+        // draft_picks. Wrap the reads in a bounded retry so a transient
+        // Postgres failure (deadlock / serialization / lock-timeout)
+        // recovers silently instead of surfacing a generic error toast to
+        // drafting users (LS-8397, mirroring getDraftTeamAutoPickStatuses
+        // from LS-8287).
+        const [draft] = await withTransientRetry(
+          () =>
+            context.db
+              .select({ leagueId: PublicSchema.drafts.leagueId })
+              .from(PublicSchema.drafts)
+              .where(eq(PublicSchema.drafts.id, draftId))
+              .limit(1),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn('Retrying draft lookup after transient DB error', {
+                draftId,
+                attempt,
+                dbError: formatDbError(detail),
+              }),
+          },
+        );
+
+        if (!draft) {
+          throw UserInputError('Draft not found');
+        }
+
+        await verifyLeagueMembership(context.db, draft.leagueId, userId);
+
+        const picks = await withTransientRetry(
+          () =>
+            context.db
+              .select()
+              .from(PublicSchema.draftPicks)
+              .where(eq(PublicSchema.draftPicks.draftId, draftId))
+              .orderBy(asc(PublicSchema.draftPicks.overallPick)),
+          {
+            onRetry: (attempt, detail) =>
+              LOGGER.warn(
+                'Retrying draft picks read after transient DB error',
+                { draftId, attempt, dbError: formatDbError(detail) },
+              ),
+          },
+        );
+
+        return picks;
+      } catch (error) {
+        // Preserve typed client-facing errors (UNAUTHENTICATED / BAD_USER_INPUT
+        // / FORBIDDEN) so the client still receives the intended code.
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        // A DB failure that survived the bounded retry above (e.g. a
+        // connection drop or statement timeout) would otherwise be masked
+        // by the formatter as a generic "Internal server error", diagnosable
+        // only via a manual CloudWatch hunt (LS-8397, mirroring LS-8287).
+        // Log the real cause for Rollbar/CloudWatch and re-throw with a
+        // stable, client-facing code carrying the SQLSTATE so the
+        // browser-side Rollbar occurrence is self-diagnosing.
+        const detail = describeDbError(error);
+        const err = error instanceof Error ? error : new Error(String(error));
+        LOGGER.error('Failed to load draft picks', err, {
+          draftId,
+          userId,
+          dbError: formatDbError(detail),
+        });
+        throw new GraphQLError(
+          detail.code
+            ? `Failed to load draft picks (database error ${detail.code})`
+            : 'Failed to load draft picks',
+          { extensions: { code: 'DRAFT_PICKS_LOAD_FAILED' } },
+        );
       }
-
-      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
-
-      const picks = await context.db
-        .select()
-        .from(PublicSchema.draftPicks)
-        .where(eq(PublicSchema.draftPicks.draftId, args.draftId))
-        .orderBy(asc(PublicSchema.draftPicks.overallPick));
-
-      return picks;
     },
   }),
 );
