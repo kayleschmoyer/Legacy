@@ -101,9 +101,7 @@ export function BaseballScreen() {
       ? {
           count: activeLeagueCount,
           limit: FREE_TIER_LEAGUE_LIMIT,
-          // Web never hard-gates league creation (LS-5869); atLimit is always
-          // false so the create button stays enabled while the upgrade CTA shows.
-          atLimit: false as const,
+          atLimit: activeLeagueCount >= FREE_TIER_LEAGUE_LIMIT,
           onUpgrade: () => navigate('/pricing'),
         }
       : undefined;

@@ -17,6 +17,7 @@ import { expect, test } from '../fixtures/auth-enhanced';
 import { myLeaguesResponse } from '../mocks/graphql';
 import {
   joinLeagueByCodeResponse,
+  mockLeague,
   validateInviteCodeResponse,
 } from '../mocks/graphql/league.mocks';
 import {
@@ -39,8 +40,16 @@ async function mockBaseballHub(
     if (op === 'getmyleagues') {
       const leagues = options.withLeagues
         ? [
-            { id: 1, name: 'Sluggers United', draftStatus: 'completed' },
-            { id: 2, name: 'Diamond Rivals', draftStatus: 'not-started' },
+            mockLeague({
+              id: 1,
+              name: 'Sluggers United',
+              draftStatus: 'completed',
+            }),
+            mockLeague({
+              id: 2,
+              name: 'Diamond Rivals',
+              draftStatus: 'not-started',
+            }),
           ]
         : [];
       await fulfillJson(route, myLeaguesResponse(leagues));

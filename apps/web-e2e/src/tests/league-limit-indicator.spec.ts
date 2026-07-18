@@ -4,14 +4,15 @@
  * The shared `MLBHome` component renders a `leagueCap` indicator ("Your leagues: X/Y")
  * for free-tier users (LS-5869), and an "Unlimited leagues" badge (LS-5870) for premium
  * users via the `isPremium` prop. The web wrapper (`BaseballScreen`) passes `leagueCap`
- * for authenticated free-tier users — always with `atLimit: false` so the Create button
- * stays enabled — and `isPremium` for premium users.
+ * for authenticated free-tier users — with `atLimit` computed from the actual league count
+ * (LS-5817) so the Create button is disabled when the cap is reached — and `isPremium`
+ * for premium users.
  *
  * These tests cover the web surface for the league-slots context:
  *   - The baseball hub renders all mocked leagues for both free and premium users
  *   - Premium users see the "Unlimited leagues" badge
- *   - The "Create" button is present and enabled regardless of league count on web
- *     (web never hard-gates creation even when the free-tier cap is reached)
+ *   - The "Create" button is disabled on web when a free-tier user is at the cap (LS-5817)
+ *     (web gates creation at the free-tier limit via atLimit)
  *   - The "Your leagues" section heading is always visible
  *   - The league-cap indicator and upgrade CTA are visible for free-tier users
  *
@@ -110,21 +111,23 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
     ).toBeVisible();
   });
 
-  test('Create button is present and enabled on web for free-tier user at the cap limit (LS-5869)', async ({
+  test('Create button is replaced by Upgrade CTA on web for free-tier user at the cap limit (LS-5817)', async ({
     page,
   }) => {
-    // Web passes leagueCap to MLBHome with atLimit: false so the button is never
-    // disabled — web does not hard-gate creation (LS-5869).
+    // LS-5817: BaseballScreen computes atLimit from the real league count.
+    // MLBHome swaps the Create button for an "Upgrade" CTA when atCap is true —
+    // the Create button is not disabled, it is simply not rendered.
     await useTier(page, 'free');
     await mockThreeLeagues(page);
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    const createBtn = page
-      .getByRole('button', { name: /create a new baseball league/i })
-      .first();
-    await expect(createBtn).toBeVisible();
-    await expect(createBtn).toBeEnabled();
+    await expect(
+      page.getByRole('button', { name: /create a new baseball league/i }),
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /upgrade/i }).first(),
+    ).toBeVisible();
   });
 
   test('baseball hub renders all three mocked leagues for a premium user', async ({

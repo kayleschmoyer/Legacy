@@ -25,6 +25,12 @@ interface LeaguesQueryResult {
   error?: Error;
   refetch: () => void;
 }
+interface MyLeaguesQueryResult {
+  data?: { myLeagues: HarnessLeague[] };
+  loading: boolean;
+  error?: Error;
+  refetch: () => void;
+}
 
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
@@ -115,6 +121,9 @@ const mockRefetch = jest.fn();
 const mockUseGetUserLeaguesQuery: jest.MockedFunction<
   (opts: { skip?: boolean; fetchPolicy?: string }) => LeaguesQueryResult
 > = jest.fn();
+const mockUseGetMyLeaguesQuery: jest.MockedFunction<
+  (opts?: { skip?: boolean; fetchPolicy?: string }) => MyLeaguesQueryResult
+> = jest.fn();
 
 type CacheUpdateFn = (
   cache: { readQuery: jest.Mock; writeQuery: jest.Mock },
@@ -125,6 +134,8 @@ let capturedCacheUpdate: CacheUpdateFn | undefined;
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeaguesQuery: (opts: { skip?: boolean; fetchPolicy?: string }) =>
     mockUseGetUserLeaguesQuery(opts),
+  useGetMyLeaguesQuery: (opts?: { skip?: boolean; fetchPolicy?: string }) =>
+    mockUseGetMyLeaguesQuery(opts),
   useCreateLeagueAndTeamsMutation: (opts?: { update?: CacheUpdateFn }) => {
     capturedCacheUpdate = opts?.update;
     return [mockCreateLeague, { loading: false }];
@@ -161,6 +172,14 @@ beforeEach(() => {
   mockUseGetUserLeaguesQuery.mockReturnValue({
     data: {
       userLeagues: [{ id: 1, name: 'Saturday Sluggers', sport: 'baseball' }],
+    },
+    loading: false,
+    error: undefined,
+    refetch: mockRefetch,
+  });
+  mockUseGetMyLeaguesQuery.mockReturnValue({
+    data: {
+      myLeagues: [{ id: 1, name: 'Saturday Sluggers', sport: 'baseball' }],
     },
     loading: false,
     error: undefined,
@@ -302,9 +321,7 @@ describe('BaseballScreen (web MLBHome wrapper)', () => {
   });
 });
 
-// LS-5806: leagueCap gating is mobile-only on web; BaseballScreen does not
-// pass the leagueCap prop to MLBHome so atLimit is always false on web.
-describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () => {
+describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5817)', () => {
   function leaguesOfCount(n: number) {
     return Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `L${i}` }));
   }
@@ -320,7 +337,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
   });
 
-  it('never sets atLimit on web (web does not hard-gate creation) but upgrade CTA navigates to /pricing', () => {
+  it('sets atLimit when free user reaches the cap and upgrade CTA navigates to /pricing (LS-5817)', () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: { userLeagues: leaguesOfCount(3) },
       loading: false,
@@ -328,9 +345,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
       refetch: mockRefetch,
     });
     render(<BaseballScreen />);
-    // Web always passes atLimit: false so the create button stays enabled (LS-5869).
-    expect(screen.getByTestId('at-limit').textContent).toBe('false');
-    // The upgrade CTA is still present and navigates to /pricing.
+    expect(screen.getByTestId('at-limit').textContent).toBe('true');
     fireEvent.click(screen.getByText('upgrade'));
     expect(mockNavigate).toHaveBeenCalledWith('/pricing');
   });
@@ -365,7 +380,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
     expect(screen.getByTestId('at-limit').textContent).toBe('false');
   });
 
-  it('counts baseball leagues from myLeagues toward the cap count display (LS-5795)', () => {
+  it('sets atLimit when baseball league count reaches the cap (LS-5817)', () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: {
         userLeagues: [
@@ -379,9 +394,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5806)', () 
       refetch: mockRefetch,
     });
     render(<BaseballScreen />);
-    // atLimit is always false on web even when the baseball count hits the cap.
-    expect(screen.getByTestId('at-limit').textContent).toBe('false');
-    // The upgrade CTA appears once the cap is reached.
+    expect(screen.getByTestId('at-limit').textContent).toBe('true');
     expect(screen.getByText('upgrade')).toBeInTheDocument();
   });
 });
