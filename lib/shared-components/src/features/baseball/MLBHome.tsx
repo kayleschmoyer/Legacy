@@ -371,9 +371,14 @@ export function MLBHome({
     setShowCreateDialog(true);
   };
 
+  // Redirect to upgrade instead of navigating to the join screen when the user
+  // is at their free-tier league limit (LS-5863). Uses count >= limit directly
+  // rather than atLimit so web (which sets atLimit: false for create) is also
+  // covered.
+  const joinAtCap = leagueCap != null && leagueCap.count >= leagueCap.limit;
   const handleJoinPress = () => {
-    if (atCap) {
-      leagueCap?.onUpgrade();
+    if (joinAtCap) {
+      leagueCap.onUpgrade();
       return;
     }
     onJoinLeague();
@@ -453,12 +458,12 @@ export function MLBHome({
                 borderRadius="$5"
                 onPress={handleJoinPress}
                 accessibilityLabel={
-                  atCap
+                  joinAtCap
                     ? "You're at your 3-league limit. Upgrade to join more leagues."
                     : 'Join an existing baseball league'
                 }
                 aria-label={
-                  atCap
+                  joinAtCap
                     ? "You're at your 3-league limit. Upgrade to join more leagues."
                     : 'Join an existing baseball league'
                 }
@@ -596,12 +601,12 @@ export function MLBHome({
                   borderRadius="$6"
                   onPress={handleJoinPress}
                   accessibilityLabel={
-                    atCap
+                    joinAtCap
                       ? "You're at your 3-league limit. Upgrade to join more leagues."
                       : 'Join an existing baseball league'
                   }
                   aria-label={
-                    atCap
+                    joinAtCap
                       ? "You're at your 3-league limit. Upgrade to join more leagues."
                       : 'Join an existing baseball league'
                   }
@@ -1220,12 +1225,12 @@ export function MLBHome({
                       borderRadius="$6"
                       onPress={handleJoinPress}
                       accessibilityLabel={
-                        atCap
+                        joinAtCap
                           ? "You're at your 3-league limit. Upgrade to join more leagues."
                           : 'Join a baseball league with a code'
                       }
                       aria-label={
-                        atCap
+                        joinAtCap
                           ? "You're at your 3-league limit. Upgrade to join more leagues."
                           : 'Join a baseball league with a code'
                       }

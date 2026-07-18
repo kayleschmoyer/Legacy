@@ -583,6 +583,41 @@ describe('MLBHome', () => {
     expect(screen.queryByText('Unlimited mock drafts')).not.toBeInTheDocument();
   });
 
+  it('redirects to upgrade when Join is clicked at the league cap', () => {
+    const onUpgrade = jest.fn();
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        leagueCap={{ count: 3, limit: 3, atLimit: true, onUpgrade }}
+      />,
+    );
+    // At cap the a11y label changes to the cap message
+    const joinBtn = screen.getAllByRole('button', {
+      name: "You're at your 3-league limit. Upgrade to join more leagues.",
+    })[0];
+    fireEvent.click(joinBtn);
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
+    expect(baseProps.onJoinLeague).not.toHaveBeenCalled();
+  });
+
+  it('navigates to join screen when Join is clicked under the cap', () => {
+    const onUpgrade = jest.fn();
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        leagueCap={{ count: 2, limit: 3, atLimit: false, onUpgrade }}
+      />,
+    );
+    const joinBtn = screen.getByRole('button', {
+      name: 'Join an existing baseball league',
+    });
+    fireEvent.click(joinBtn);
+    expect(baseProps.onJoinLeague).toHaveBeenCalledTimes(1);
+    expect(onUpgrade).not.toHaveBeenCalled();
+  });
+
   it('renders an Invite Friends action only when onInviteFriends is provided', () => {
     const { rerender } = render(<MLBHome {...baseProps} leagues={LEAGUES} />);
     expect(screen.queryByText('Invite Friends')).not.toBeInTheDocument();
