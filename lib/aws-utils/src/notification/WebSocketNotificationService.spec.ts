@@ -191,4 +191,71 @@ describe('WebSocketNotificationService — DynamoDB pagination', () => {
       expect(mockApiGatewaySend).toHaveBeenCalledTimes(4);
     });
   });
+
+  describe('sendToConnection — signature-expired retry (LS-8388)', () => {
+    const logging = jest.requireMock<{
+      LOGGER: { error: jest.Mock; warn: jest.Mock };
+    }>('@legacy-sports/logging');
+
+    const signatureExpiredError = Object.assign(
+      new Error(
+        'Signature expired: 20260707T212942Z is now earlier than 20260707T213035Z (20260707T213535Z - 5 min.)',
+      ),
+      { name: 'InvalidSignatureException' },
+    );
+
+    beforeEach(() => {
+      mockDynamoSend.mockReset().mockResolvedValue({
+        Items: makeConnectionItems(['c1']),
+      });
+    });
+
+    it('retries once with a freshly signed request and succeeds', async () => {
+      mockApiGatewaySend
+        .mockReset()
+        .mockRejectedValueOnce(signatureExpiredError)
+        .mockResolvedValueOnce({});
+
+      await service.notifyDirectMessage(123, {
+        messageId: 1,
+        fromUserId: 7,
+        fromUsername: 'sender',
+        toUserId: 123,
+        leagueId: null,
+        messageText: 'hi',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      expect(mockApiGatewaySend).toHaveBeenCalledTimes(2);
+      expect(logging.LOGGER.error).not.toHaveBeenCalled();
+      expect(logging.LOGGER.warn).toHaveBeenCalledWith(
+        'Signature expired sending to connection, retrying with a freshly signed request',
+        { connectionId: 'c1' },
+      );
+    });
+
+    it('logs a warning (not an error) when the retry also fails', async () => {
+      mockApiGatewaySend
+        .mockReset()
+        .mockRejectedValueOnce(signatureExpiredError)
+        .mockRejectedValueOnce(signatureExpiredError);
+
+      await service.notifyDirectMessage(123, {
+        messageId: 1,
+        fromUserId: 7,
+        fromUsername: 'sender',
+        toUserId: 123,
+        leagueId: null,
+        messageText: 'hi',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      expect(mockApiGatewaySend).toHaveBeenCalledTimes(2);
+      expect(logging.LOGGER.error).not.toHaveBeenCalled();
+      expect(logging.LOGGER.warn).toHaveBeenCalledWith(
+        'Error sending message to connection after signature-expiry retry',
+        { connectionId: 'c1', error: signatureExpiredError },
+      );
+    });
+  });
 });

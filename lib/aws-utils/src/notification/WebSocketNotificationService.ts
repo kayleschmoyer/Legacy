@@ -284,6 +284,7 @@ export class WebSocketNotificationService {
   private async sendToConnection(
     connectionId: string,
     data: NotificationMessage,
+    isRetry = false,
   ): Promise<boolean> {
     if (!this.apiGatewayClient) {
       LOGGER.warn('WebSocket endpoint not configured, skipping notification');
@@ -301,6 +302,24 @@ export class WebSocketNotificationService {
       LOGGER.debug('Message sent to connection', { connectionId });
       return true;
     } catch (error) {
+      // The SigV4 signature can expire before the request reaches API
+      // Gateway (e.g. a Lambda execution-environment freeze between signing
+      // and send). A fresh PostToConnectionCommand gets a fresh signature
+      // with the current clock, so one retry clears most occurrences.
+      const isSignatureExpired =
+        (error as { name?: string }).name === 'InvalidSignatureException' &&
+        /signature expired/i.test(
+          (error as { message?: string }).message ?? '',
+        );
+
+      if (isSignatureExpired && !isRetry) {
+        LOGGER.warn(
+          'Signature expired sending to connection, retrying with a freshly signed request',
+          { connectionId },
+        );
+        return this.sendToConnection(connectionId, data, true);
+      }
+
       // Connection might be stale (410 Gone)
       // Check multiple error shapes for AWS SDK v3
       const isGone =
@@ -346,6 +365,17 @@ export class WebSocketNotificationService {
           }
         }
 
+        return false;
+      }
+
+      if (isSignatureExpired) {
+        // Retry also failed — a single connection missing one push is
+        // non-fatal (clients refetch state), so this doesn't warrant
+        // error-level Rollbar noise.
+        LOGGER.warn(
+          'Error sending message to connection after signature-expiry retry',
+          { connectionId, error },
+        );
         return false;
       }
 
