@@ -70,6 +70,16 @@ export class UpdateCheckError extends Error {
   }
 }
 
+// GitHub returns 404 for /releases/latest whenever the repo has no
+// non-draft, non-prerelease release yet (e.g. only debug builds have been
+// published so far) — this is an expected state, not a failure.
+export class NoReleaseAvailableError extends UpdateCheckError {
+  constructor() {
+    super('No published Android release was found yet');
+    this.name = 'NoReleaseAvailableError';
+  }
+}
+
 interface FetchLatestReleaseDeps {
   installedVersion: string;
   fetchFn?: typeof fetch;
@@ -86,6 +96,10 @@ export async function fetchLatestRelease({
     });
   } catch (error) {
     throw new UpdateCheckError('Could not reach GitHub Releases', error);
+  }
+
+  if (response.status === 404) {
+    throw new NoReleaseAvailableError();
   }
 
   if (!response.ok) {
@@ -139,5 +153,11 @@ export async function fetchLatestRelease({
 
 export function logUpdateCheckError(context: string, error: unknown): void {
   const err = error instanceof Error ? error : new Error(String(error));
+  // A missing release is an expected state (see NoReleaseAvailableError), not
+  // a bug — log it at warn so it isn't forwarded to Rollbar as an error.
+  if (err instanceof NoReleaseAvailableError) {
+    LOGGER.warn(`update-check: ${context}`, err);
+    return;
+  }
   LOGGER.error(`update-check: ${context}`, err);
 }

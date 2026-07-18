@@ -24,12 +24,14 @@ import {
   fetchLatestRelease,
   type LatestReleaseInfo,
   logUpdateCheckError,
+  NoReleaseAvailableError,
 } from '../../features/updates/checkForUpdate';
 
 type Phase =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'checked'; info: LatestReleaseInfo }
+  | { kind: 'no-release' }
   | { kind: 'downloading'; written: number; expected: number }
   | { kind: 'verifying' }
   | { kind: 'installing'; fileUri: string }
@@ -62,6 +64,10 @@ export default function UpdateCheckScreen(): React.JSX.Element {
       setPhase({ kind: 'checked', info });
     } catch (error) {
       logUpdateCheckError('fetchLatestRelease', error);
+      if (error instanceof NoReleaseAvailableError) {
+        setPhase({ kind: 'no-release' });
+        return;
+      }
       setPhase({
         kind: 'error',
         message:
@@ -234,6 +240,28 @@ export default function UpdateCheckScreen(): React.JSX.Element {
             </Button>
             <Button
               chromeless
+              testID="update-recheck-button"
+              onPress={() => void handleCheck()}
+            >
+              Check again
+            </Button>
+          </YStack>
+        ) : null}
+
+        {phase.kind === 'no-release' ? (
+          <YStack
+            borderWidth={1}
+            borderColor="$borderColor"
+            borderRadius="$5"
+            padding="$5"
+            gap="$3"
+          >
+            <H3>No release available yet</H3>
+            <Paragraph color="$colorPress">
+              No Android build has been published to GitHub Releases yet. Check
+              back later.
+            </Paragraph>
+            <Button
               testID="update-recheck-button"
               onPress={() => void handleCheck()}
             >

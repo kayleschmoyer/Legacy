@@ -1,13 +1,22 @@
 import {
   compareSemver,
   fetchLatestRelease,
+  logUpdateCheckError,
+  NoReleaseAvailableError,
   parseAndroidReleaseTag,
   UpdateCheckError,
 } from './checkForUpdate';
 
 jest.mock('@legacy-sports/logging', () => ({
-  LOGGER: { error: jest.fn() },
+  LOGGER: { error: jest.fn(), warn: jest.fn() },
 }));
+
+// Access via requireMock to avoid triggering unbound-method on the module import.
+const mockedLogging = jest.requireMock('@legacy-sports/logging') as unknown as {
+  LOGGER: { error: jest.Mock; warn: jest.Mock };
+};
+const mockLoggerError = mockedLogging.LOGGER.error;
+const mockLoggerWarn = mockedLogging.LOGGER.warn;
 
 describe('parseAndroidReleaseTag', () => {
   it('parses a valid Android release tag', () => {
@@ -150,5 +159,34 @@ describe('fetchLatestRelease', () => {
     await expect(
       fetchLatestRelease({ installedVersion: '1.0.0', fetchFn }),
     ).rejects.toThrow(/legacy-sports-latest\.apk/);
+  });
+
+  it('throws NoReleaseAvailableError on a 404 response', async () => {
+    const fetchFn = mockFetch({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
+    await expect(
+      fetchLatestRelease({ installedVersion: '1.0.0', fetchFn }),
+    ).rejects.toThrow(NoReleaseAvailableError);
+  });
+});
+
+describe('logUpdateCheckError', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('logs NoReleaseAvailableError at warn (not forwarded to Rollbar)', () => {
+    logUpdateCheckError('fetchLatestRelease', new NoReleaseAvailableError());
+    expect(mockLoggerWarn).toHaveBeenCalled();
+    expect(mockLoggerError).not.toHaveBeenCalled();
+  });
+
+  it('logs other errors at error', () => {
+    logUpdateCheckError('fetchLatestRelease', new UpdateCheckError('boom'));
+    expect(mockLoggerError).toHaveBeenCalled();
+    expect(mockLoggerWarn).not.toHaveBeenCalled();
   });
 });
