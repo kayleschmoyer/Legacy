@@ -26,7 +26,12 @@ import {
   verifyCommissionerAccess,
 } from '../authorization';
 import { MatchupService } from '../../services/matchup-service';
-import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  NotFoundError,
+  UserInputError,
+} from '../graphql-errors';
 
 export { createAllMatchupsForLeague };
 
@@ -369,6 +374,132 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
   }),
 );
 
+/**
+ * Atomically swap two matchup players' positions within the same matchup.
+ *
+ * Clears both rows first, then evicts any third row that may still hold one
+ * of the target slots (e.g. left behind by a concurrent roster-tab sync)
+ * before assigning the new positions — otherwise the assignment can collide
+ * with the `matchup_players_unique_slot_idx` partial unique index (LS-8412).
+ *
+ * Exported standalone (rather than inlined in the resolver) so it can be
+ * exercised directly against a real Postgres instance in integration tests.
+ */
+export async function performMatchupPlayerPositionSwap(
+  db: GenericDatabase<typeof PublicSchema>,
+  params: {
+    matchupIdA: number;
+    teamIdA: number;
+    matchupPlayerIdA: number;
+    positionIdA: number | null;
+    matchupIdB: number;
+    teamIdB: number;
+    matchupPlayerIdB: number;
+    positionIdB: number | null;
+  },
+): Promise<
+  Array<{
+    id: number;
+    matchupId: number;
+    playerId: number;
+    teamId: number;
+    positionId: number | null;
+  }>
+> {
+  const {
+    matchupIdA,
+    teamIdA,
+    matchupPlayerIdA,
+    positionIdA,
+    matchupIdB,
+    teamIdB,
+    matchupPlayerIdB,
+    positionIdB,
+  } = params;
+
+  return db.transaction(async (tx) => {
+    // Clear both positions first to avoid unique constraint violations
+    await tx
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: null })
+      .where(
+        inArray(PublicSchema.matchupPlayers.id, [
+          matchupPlayerIdA,
+          matchupPlayerIdB,
+        ]),
+      );
+
+    // A third row (e.g. from a concurrent roster-tab sync) may still hold
+    // one of the target slots even though it isn't part of this swap —
+    // evict it first so the assignments below can't collide with
+    // matchup_players_unique_slot_idx (LS-8412).
+    if (positionIdA != null) {
+      await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: null })
+        .where(
+          and(
+            eq(PublicSchema.matchupPlayers.matchupId, matchupIdA),
+            eq(PublicSchema.matchupPlayers.teamId, teamIdA),
+            eq(PublicSchema.matchupPlayers.positionId, positionIdA),
+            not(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdA)),
+            not(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdB)),
+          ),
+        );
+    }
+    if (positionIdB != null) {
+      await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: null })
+        .where(
+          and(
+            eq(PublicSchema.matchupPlayers.matchupId, matchupIdB),
+            eq(PublicSchema.matchupPlayers.teamId, teamIdB),
+            eq(PublicSchema.matchupPlayers.positionId, positionIdB),
+            not(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdA)),
+            not(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdB)),
+          ),
+        );
+    }
+
+    // Assign new positions and mark both as manually edited so future
+    // roster-tab propagation does not overwrite these intentional choices.
+    const updatedA = await tx
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: positionIdA ?? null, manuallyEdited: true })
+      .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdA))
+      .returning({
+        id: PublicSchema.matchupPlayers.id,
+        matchupId: PublicSchema.matchupPlayers.matchupId,
+        playerId: PublicSchema.matchupPlayers.playerId,
+        teamId: PublicSchema.matchupPlayers.teamId,
+        positionId: PublicSchema.matchupPlayers.positionId,
+      });
+
+    const updatedB = await tx
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: positionIdB ?? null, manuallyEdited: true })
+      .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdB))
+      .returning({
+        id: PublicSchema.matchupPlayers.id,
+        matchupId: PublicSchema.matchupPlayers.matchupId,
+        playerId: PublicSchema.matchupPlayers.playerId,
+        teamId: PublicSchema.matchupPlayers.teamId,
+        positionId: PublicSchema.matchupPlayers.positionId,
+      });
+
+    if (updatedA.length === 0 || updatedB.length === 0) {
+      throw NotFoundError(
+        `Failed to swap matchup player positions: matchup player ${
+          updatedA.length === 0 ? matchupPlayerIdA : matchupPlayerIdB
+        } no longer exists`,
+      );
+    }
+
+    return [updatedA[0], updatedB[0]];
+  });
+}
+
 // Mutation: swapMatchupPlayerPositions
 // Atomically swaps two matchup players' positions within the same matchup
 builder.mutationField('swapMatchupPlayerPositions', (t) =>
@@ -389,71 +520,32 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
         args;
 
       // Verify ownership of both players
-      const { matchup: matchupA } = await verifyMatchupTeamOwnership(
-        context,
-        matchupPlayerIdA,
-      );
-      const { matchup: matchupB } = await verifyMatchupTeamOwnership(
-        context,
-        matchupPlayerIdB,
-      );
+      const { matchup: matchupA, matchupPlayer: playerA } =
+        await verifyMatchupTeamOwnership(context, matchupPlayerIdA);
+      const { matchup: matchupB, matchupPlayer: playerB } =
+        await verifyMatchupTeamOwnership(context, matchupPlayerIdB);
 
       if (matchupA.id !== matchupB.id) {
-        throw new Error('Both players must be in the same matchup');
+        throw UserInputError('Both players must be in the same matchup');
       }
 
       if (matchupA.status !== 'scheduled') {
-        throw new Error(
+        throw UserInputError(
           'Cannot modify roster after the matchup has started or completed',
         );
       }
 
       const db = context.db;
 
-      // Perform atom swap in a transaction
-      const results = await db.transaction(async (tx) => {
-        // Clear both positions first to avoid unique constraint violations
-        await tx
-          .update(PublicSchema.matchupPlayers)
-          .set({ positionId: null })
-          .where(
-            inArray(PublicSchema.matchupPlayers.id, [
-              matchupPlayerIdA,
-              matchupPlayerIdB,
-            ]),
-          );
-
-        // Assign new positions and mark both as manually edited so future
-        // roster-tab propagation does not overwrite these intentional choices.
-        const updatedA = await tx
-          .update(PublicSchema.matchupPlayers)
-          .set({ positionId: positionIdA ?? null, manuallyEdited: true })
-          .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdA))
-          .returning({
-            id: PublicSchema.matchupPlayers.id,
-            matchupId: PublicSchema.matchupPlayers.matchupId,
-            playerId: PublicSchema.matchupPlayers.playerId,
-            teamId: PublicSchema.matchupPlayers.teamId,
-            positionId: PublicSchema.matchupPlayers.positionId,
-          });
-
-        const updatedB = await tx
-          .update(PublicSchema.matchupPlayers)
-          .set({ positionId: positionIdB ?? null, manuallyEdited: true })
-          .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerIdB))
-          .returning({
-            id: PublicSchema.matchupPlayers.id,
-            matchupId: PublicSchema.matchupPlayers.matchupId,
-            playerId: PublicSchema.matchupPlayers.playerId,
-            teamId: PublicSchema.matchupPlayers.teamId,
-            positionId: PublicSchema.matchupPlayers.positionId,
-          });
-
-        if (updatedA.length === 0 || updatedB.length === 0) {
-          throw new Error('Failed to swap matchup player positions');
-        }
-
-        return [updatedA[0], updatedB[0]];
+      const results = await performMatchupPlayerPositionSwap(db, {
+        matchupIdA: matchupA.id,
+        teamIdA: playerA.teamId,
+        matchupPlayerIdA,
+        positionIdA: positionIdA ?? null,
+        matchupIdB: matchupB.id,
+        teamIdB: playerB.teamId,
+        matchupPlayerIdB,
+        positionIdB: positionIdB ?? null,
       });
 
       // Resolve seasons for response
