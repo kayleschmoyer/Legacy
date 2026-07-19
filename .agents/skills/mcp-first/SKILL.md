@@ -334,7 +334,7 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 
 > **Note:** Built-in `mcp__github__*` tools are NOT available on Copilot Coding Agent — use the custom `legacy-sports-github` MCP server there. See [cloud-agent-mode](../cloud-agent-mode/SKILL.md) for the full cloud review lifecycle workflow.
 
-> **`mcp__github__subscribe_pr_activity` is a Claude Code built-in tool only** — it is NOT part of the custom `legacy-sports-github` MCP server and will not be available in cloud/headless environments (Copilot Coding Agent, CI). In those environments follow [Waiting on CI](#waiting-on-ci-no-polling-no-sleep) — `ci_dispatch_workflow({ waitForCompletion: true })` for dispatched runs, one-shot `github_view_pr`/`ci_view_run` lookups otherwise.
+> **`mcp__github__subscribe_pr_activity` is a Claude Code built-in tool only** — it is NOT part of the custom `legacy-sports-github` MCP server and will not be available in cloud/headless environments (Copilot Coding Agent, CI). It is also absent from most current Claude Code sessions — PR events arrive automatically without it, so its absence is not a monitoring failure and never justifies polling. In those environments follow [Waiting on CI](#waiting-on-ci-no-polling-no-sleep) — `ci_dispatch_workflow({ waitForCompletion: true })` for dispatched runs, one-shot `github_view_pr`/`ci_view_run` lookups otherwise.
 
 ## CI Operations
 
