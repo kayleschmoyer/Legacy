@@ -5,6 +5,7 @@
 import DataLoader from 'dataloader';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
+import { withTransientRetry } from '../leagues/delete-resilience';
 
 /**
  * DataLoader for locked team members by leagueId (LS-5955).
@@ -134,6 +135,12 @@ export const createLockedTeamMembersLoader = (
  * DataLoader for matchup player games
  * Key: matchupPlayerId (number)
  * Returns: Array of games for that matchup player
+ *
+ * Wrapped in withTransientRetry (LS-8477): this batch query fires alongside
+ * every other per-request DataLoader against a 3-connection Lambda pool, so a
+ * burst of concurrent nested-field resolution can transiently exhaust it
+ * (`timeout exceeded when trying to connect`) even though each loader itself
+ * issues a single batched query.
  */
 export const createMatchupPlayerGamesLoader = (
   db: GenericDatabase<typeof PublicSchema>,
@@ -143,10 +150,12 @@ export const createMatchupPlayerGamesLoader = (
     Array<typeof PublicSchema.matchupPlayerGames.$inferSelect>
   >(async (keys) => {
     const ids = [...new Set(keys)] as number[];
-    const allGames = await db
-      .select()
-      .from(PublicSchema.matchupPlayerGames)
-      .where(inArray(PublicSchema.matchupPlayerGames.matchupPlayerId, ids));
+    const allGames = await withTransientRetry(() =>
+      db
+        .select()
+        .from(PublicSchema.matchupPlayerGames)
+        .where(inArray(PublicSchema.matchupPlayerGames.matchupPlayerId, ids)),
+    );
 
     const gamesMap = new Map<
       number,

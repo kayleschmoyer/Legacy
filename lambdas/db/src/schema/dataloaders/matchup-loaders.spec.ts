@@ -33,7 +33,10 @@ jest.mock('@legacy-sports/db-client', () => ({
   },
 }));
 
-import { createLockedTeamMembersLoader } from './matchup-loaders';
+import {
+  createLockedTeamMembersLoader,
+  createMatchupPlayerGamesLoader,
+} from './matchup-loaders';
 
 type QueryResult = Record<string, unknown>[];
 
@@ -159,5 +162,32 @@ describe('createLockedTeamMembersLoader (LS-5955)', () => {
     expect(queryCalls).toHaveLength(2);
     expect(r10.has('1:100')).toBe(true);
     expect(r11.has('2:200')).toBe(true);
+  });
+});
+
+describe('createMatchupPlayerGamesLoader (LS-8477)', () => {
+  it('retries once on a transient pg-pool connection timeout, then succeeds', async () => {
+    const games = [{ id: 1, matchupPlayerId: 42, gameNum: 1 }];
+    let attempt = 0;
+    const where = jest.fn(() => {
+      attempt += 1;
+      if (attempt === 1) {
+        return Promise.reject(
+          new Error('timeout exceeded when trying to connect'),
+        );
+      }
+      return Promise.resolve(games);
+    });
+    const db = {
+      select: () => ({
+        from: () => ({ where }),
+      }),
+    } as unknown as Parameters<typeof createMatchupPlayerGamesLoader>[0];
+
+    const loader = createMatchupPlayerGamesLoader(db);
+    const result = await loader.load(42);
+
+    expect(where).toHaveBeenCalledTimes(2);
+    expect(result).toEqual(games);
   });
 });

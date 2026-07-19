@@ -16,6 +16,16 @@
  */
 export const RETRYABLE_PG_CODES = new Set(['40P01', '40001', '55P03']);
 
+/**
+ * node-postgres pool.connect() throws this exact message (no SQLSTATE code —
+ * it's a client-side pool-exhaustion timeout, not a server error) when every
+ * pooled connection is busy for longer than `connectionTimeoutMillis`. Lambda
+ * instances run a 3-connection pool (see PgDbConnection.ts), so a burst of
+ * concurrent DataLoader batches on one instance can exhaust it transiently
+ * (LS-8477).
+ */
+const RETRYABLE_CONNECTION_MESSAGE = 'timeout exceeded when trying to connect';
+
 export interface DbErrorDetail {
   message: string;
   code?: string;
@@ -58,7 +68,11 @@ export function describeDbError(error: unknown): DbErrorDetail {
 
 /** True when the error is a transient Postgres failure worth retrying. */
 export function isRetryablePgError(error: unknown): boolean {
-  return RETRYABLE_PG_CODES.has(describeDbError(error).code ?? '');
+  const detail = describeDbError(error);
+  return (
+    RETRYABLE_PG_CODES.has(detail.code ?? '') ||
+    detail.message.includes(RETRYABLE_CONNECTION_MESSAGE)
+  );
 }
 
 /** Render a DbErrorDetail into a single, log/throw-friendly line. */

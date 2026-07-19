@@ -90,6 +90,12 @@ describe('isRetryablePgError', () => {
   it('does not retry an error with no SQLSTATE', () => {
     expect(isRetryablePgError(new Error('nope'))).toBe(false);
   });
+
+  it('treats a pg-pool connection-timeout error as retryable (LS-8477)', () => {
+    expect(
+      isRetryablePgError(new Error('timeout exceeded when trying to connect')),
+    ).toBe(true);
+  });
 });
 
 describe('formatDbError', () => {
