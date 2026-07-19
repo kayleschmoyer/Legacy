@@ -2911,6 +2911,11 @@ type Player {
   eligiblePositions: [String!]
   firstName: String
   id: Int
+
+  """
+  Current injury/roster status (e.g. "IL-10", "IL-60", "DTD"). Null when the player is active or no status has been synced.
+  """
+  injuryStatus: String
   lastName: String
 
   """

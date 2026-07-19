@@ -77,3 +77,33 @@ export function getPositionColors(position: string | null | undefined): {
     return { bg: '$red7', text: '$red12' };
   return { bg: '$gray4', text: '$gray11' };
 }
+
+/**
+ * Returns true when a player's injuryStatus indicates they are NOT active
+ * (Injured List, Day-to-Day, Suspended, etc.) — used to badge and dim players
+ * in roster comparisons so they aren't mistaken for active players (LS-5905).
+ */
+export function isInactiveInjuryStatus(
+  injuryStatus: string | null | undefined,
+): boolean {
+  return !!injuryStatus && injuryStatus.trim().length > 0;
+}
+
+/** Returns Tamagui color tokens for an injury-status badge. Uses only design-system tokens. */
+export function getInjuryStatusColors(status: string | null | undefined): {
+  bg: string;
+  text: string;
+} {
+  const normalized = (status ?? '').toUpperCase();
+  if (
+    normalized.startsWith('IL') ||
+    normalized === 'OUT' ||
+    normalized === 'SUSPENDED'
+  ) {
+    return { bg: '$red3', text: '$red11' };
+  }
+  if (normalized === 'DTD' || normalized === 'DAY-TO-DAY') {
+    return { bg: '$amber3', text: '$amber11' };
+  }
+  return { bg: '$gray4', text: '$gray11' };
+}

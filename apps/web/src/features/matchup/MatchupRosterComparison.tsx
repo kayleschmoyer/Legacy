@@ -8,6 +8,7 @@ import {
   type SeasonStats,
 } from '@legacy-sports/scoring';
 import {
+  getInjuryStatusColors,
   getPositionColors,
   isPitcherPositionType,
   isStatsLoading,
@@ -103,6 +104,27 @@ const skeletonPulseStyle = {
   animationIterationCount: 'infinite',
   animationTimingFunction: 'ease-in-out',
 } as React.CSSProperties;
+
+/** Compact badge showing a player's injury status (e.g. "IL-10", "DTD") (LS-5905). */
+function InjuryBadge({ status }: { status: string }) {
+  const colors = getInjuryStatusColors(status);
+  return (
+    <Text
+      fontSize="$1"
+      fontWeight="700"
+      color={colors.text}
+      backgroundColor={colors.bg}
+      paddingHorizontal="$1.5"
+      paddingVertical={1}
+      borderRadius="$2"
+      textTransform="uppercase"
+      letterSpacing={0.3}
+      flexShrink={0}
+    >
+      {status}
+    </Text>
+  );
+}
 
 function SkeletonPulse(props: React.ComponentProps<typeof YStack>) {
   const { style, backgroundColor, ...rest } = props;
@@ -1288,6 +1310,10 @@ export function MatchupRosterComparison({
     const team1Stats = formatAccumulatedStats(team1Player);
     const team2Stats = formatAccumulatedStats(team2Player);
 
+    // Injury status (IL/DTD/Suspended) — badge next to name, dimmed projected score (LS-5905)
+    const team1InjuryStatus = team1Player?.player?.injuryStatus ?? null;
+    const team2InjuryStatus = team2Player?.player?.injuryStatus ?? null;
+
     // Position colors — same badge for both sides of a slot row, independent for bench rows
     const team1PosBadge = getPositionColors(team1Position ?? slotType);
     const team2PosBadge = getPositionColors(team2Position ?? slotType);
@@ -1362,28 +1388,33 @@ export function MatchupRosterComparison({
             >
               {team1Player ? (
                 <>
-                  <Text
-                    fontSize="$3"
-                    fontWeight="600"
-                    color="$gray12"
-                    cursor="pointer"
-                    hoverStyle={{
-                      color: BRAND_GOLD_LIGHT,
-                      textDecoration: 'underline',
-                    }}
-                    onPress={() => {
-                      if (team1Player?.playerId && team1Player?.player) {
-                        setSelectedPlayer({
-                          id: team1Player.playerId,
-                          name: `${team1Player.player.firstName} ${team1Player.player.lastName}`,
-                        });
-                        setSeasonStatsModalOpen(true);
-                      }
-                    }}
-                  >
-                    {team1Player.player?.firstName}{' '}
-                    {team1Player.player?.lastName}
-                  </Text>
+                  <XStack alignItems="center" gap="$1.5" flexWrap="wrap">
+                    <Text
+                      fontSize="$3"
+                      fontWeight="600"
+                      color="$gray12"
+                      cursor="pointer"
+                      hoverStyle={{
+                        color: BRAND_GOLD_LIGHT,
+                        textDecoration: 'underline',
+                      }}
+                      onPress={() => {
+                        if (team1Player?.playerId && team1Player?.player) {
+                          setSelectedPlayer({
+                            id: team1Player.playerId,
+                            name: `${team1Player.player.firstName} ${team1Player.player.lastName}`,
+                          });
+                          setSeasonStatsModalOpen(true);
+                        }
+                      }}
+                    >
+                      {team1Player.player?.firstName}{' '}
+                      {team1Player.player?.lastName}
+                    </Text>
+                    {team1InjuryStatus && (
+                      <InjuryBadge status={team1InjuryStatus} />
+                    )}
+                  </XStack>
                   <Text fontSize="$1" color="$gray10">
                     Season {team1Player.season}
                     {team1Player.games && team1Player.games.length > 0 ? (
@@ -1471,7 +1502,12 @@ export function MatchupRosterComparison({
             alignItems="center"
             justifyContent="center"
           >
-            <Text fontSize="$2" fontWeight="500" color="$gray10">
+            <Text
+              fontSize="$2"
+              fontWeight="500"
+              color="$gray10"
+              opacity={team1InjuryStatus ? 0.5 : 1}
+            >
               {team1Player ? team1Proj.toFixed(1) : '—'}
             </Text>
           </YStack>
@@ -1576,7 +1612,12 @@ export function MatchupRosterComparison({
             alignItems="center"
             justifyContent="center"
           >
-            <Text fontSize="$2" fontWeight="500" color="$gray10">
+            <Text
+              fontSize="$2"
+              fontWeight="500"
+              color="$gray10"
+              opacity={team2InjuryStatus ? 0.5 : 1}
+            >
               {team2Player ? team2Proj.toFixed(1) : '—'}
             </Text>
           </YStack>
@@ -1598,29 +1639,39 @@ export function MatchupRosterComparison({
             >
               {team2Player ? (
                 <>
-                  <Text
-                    fontSize="$3"
-                    fontWeight="600"
-                    color="$gray12"
-                    textAlign="right"
-                    cursor="pointer"
-                    hoverStyle={{
-                      color: BRAND_GOLD_LIGHT,
-                      textDecoration: 'underline',
-                    }}
-                    onPress={() => {
-                      if (team2Player?.playerId && team2Player?.player) {
-                        setSelectedPlayer({
-                          id: team2Player.playerId,
-                          name: `${team2Player.player.firstName} ${team2Player.player.lastName}`,
-                        });
-                        setSeasonStatsModalOpen(true);
-                      }
-                    }}
+                  <XStack
+                    alignItems="center"
+                    justifyContent="flex-end"
+                    gap="$1.5"
+                    flexWrap="wrap"
                   >
-                    {team2Player.player?.firstName}{' '}
-                    {team2Player.player?.lastName}
-                  </Text>
+                    {team2InjuryStatus && (
+                      <InjuryBadge status={team2InjuryStatus} />
+                    )}
+                    <Text
+                      fontSize="$3"
+                      fontWeight="600"
+                      color="$gray12"
+                      textAlign="right"
+                      cursor="pointer"
+                      hoverStyle={{
+                        color: BRAND_GOLD_LIGHT,
+                        textDecoration: 'underline',
+                      }}
+                      onPress={() => {
+                        if (team2Player?.playerId && team2Player?.player) {
+                          setSelectedPlayer({
+                            id: team2Player.playerId,
+                            name: `${team2Player.player.firstName} ${team2Player.player.lastName}`,
+                          });
+                          setSeasonStatsModalOpen(true);
+                        }
+                      }}
+                    >
+                      {team2Player.player?.firstName}{' '}
+                      {team2Player.player?.lastName}
+                    </Text>
+                  </XStack>
                   <Text fontSize="$1" color="$gray10" textAlign="right">
                     Season {team2Player.season}
                     {team2Player.games && team2Player.games.length > 0 ? (

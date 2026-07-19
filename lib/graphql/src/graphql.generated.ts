@@ -2776,6 +2776,8 @@ export type Player = {
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  /** Current injury/roster status (e.g. "IL-10", "IL-60", "DTD"). Null when the player is active or no status has been synced. */
+  injuryStatus?: Maybe<Scalars['String']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
   /** MLB Stats API player ID for cross-referencing with the external data provider. Null for players without a known mapping. */
   mlbPlayerId?: Maybe<Scalars['Int']['output']>;
@@ -6344,6 +6346,7 @@ export type GetMatchupRosterQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -6549,6 +6552,7 @@ export type UpdateMatchupPlayerPositionMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -6719,6 +6723,7 @@ export type SwapMatchupPlayerPositionsMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -10007,6 +10012,7 @@ export type GetMatchupPlayersQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -11349,6 +11355,7 @@ export type MatchupPlayerFragment = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
+    injuryStatus?: string | null;
   } | null;
   seasonBatting?: {
     __typename?: 'SeasonBatting';
@@ -14333,6 +14340,7 @@ export const MatchupPlayerFragmentDoc = gql`
       lastName
       brefId
       eligiblePositions
+      injuryStatus
     }
     seasonBatting {
       games
