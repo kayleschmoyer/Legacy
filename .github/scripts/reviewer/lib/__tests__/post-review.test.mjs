@@ -5,8 +5,12 @@ import {
   formatReviewBody,
   buildInlineComments,
   buildKnownFailureBody,
+  parseCommentableLineRanges,
+  isPositionInDiff,
+  partitionFindingsForInline,
 } from '../post-review.mjs';
 import { INFRA_ERROR_MARKER } from '../cycle-counter.mjs';
+import { parseTitlesFromReviewBody } from '../cycle-protocol.mjs';
 
 describe('generateUlid', () => {
   it('returns a 26-character string', () => {
@@ -350,5 +354,227 @@ describe('buildInlineComments', () => {
       },
     ];
     assert.deepEqual(buildInlineComments(findings), []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Diff position validation (LS-8499)
+// One out-of-diff inline comment position used to 422 the whole review
+// submission, and the retry dropped EVERY inline thread. These helpers
+// pre-validate positions against the diff so only individually-invalid
+// comments are demoted to the review body.
+// ---------------------------------------------------------------------------
+
+/** Build a minimal unified diff for a single modified file with given hunks. */
+function diffFor(path, hunkHeaders) {
+  return [
+    `diff --git a/${path} b/${path}`,
+    'index 1111111..2222222 100644',
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    ...hunkHeaders.flatMap((h) => [h, ' context line']),
+  ].join('\n');
+}
+
+describe('parseCommentableLineRanges', () => {
+  it('returns null for empty or missing diff', () => {
+    assert.strictEqual(parseCommentableLineRanges(undefined), null);
+    assert.strictEqual(parseCommentableLineRanges(null), null);
+    assert.strictEqual(parseCommentableLineRanges(''), null);
+    assert.strictEqual(parseCommentableLineRanges('   \n'), null);
+  });
+
+  it('parses RIGHT-side ranges from hunk headers', () => {
+    const ranges = parseCommentableLineRanges(
+      diffFor('src/app.js', ['@@ -10,4 +12,6 @@', '@@ -40,2 +44,3 @@']),
+    );
+    assert.deepEqual(ranges.get('src/app.js'), [
+      [12, 17],
+      [44, 46],
+    ]);
+  });
+
+  it('handles a new file (-0,0 +1,N)', () => {
+    const diff = [
+      'diff --git a/scripts/new.mjs b/scripts/new.mjs',
+      'new file mode 100644',
+      'index 0000000..3333333',
+      '--- /dev/null',
+      '+++ b/scripts/new.mjs',
+      '@@ -0,0 +1,200 @@',
+      '+line one',
+    ].join('\n');
+    const ranges = parseCommentableLineRanges(diff);
+    assert.deepEqual(ranges.get('scripts/new.mjs'), [[1, 200]]);
+  });
+
+  it('produces no ranges for a deleted file (+++ /dev/null)', () => {
+    const diff = [
+      'diff --git a/old.js b/old.js',
+      'deleted file mode 100644',
+      '--- a/old.js',
+      '+++ /dev/null',
+      '@@ -1,10 +0,0 @@',
+      '-gone',
+    ].join('\n');
+    const ranges = parseCommentableLineRanges(diff);
+    assert.strictEqual(ranges.size, 0);
+  });
+
+  it('treats an omitted count as 1 (@@ -5 +7 @@)', () => {
+    const ranges = parseCommentableLineRanges(diffFor('a.js', ['@@ -5 +7 @@']));
+    assert.deepEqual(ranges.get('a.js'), [[7, 7]]);
+  });
+
+  it('skips deletion-only hunks (+N,0)', () => {
+    const ranges = parseCommentableLineRanges(
+      diffFor('a.js', ['@@ -10,3 +9,0 @@']),
+    );
+    assert.strictEqual(ranges.has('a.js'), false);
+  });
+
+  it('does not mistake an added content line starting with ++ for a file header', () => {
+    const diff = [
+      'diff --git a/a.js b/a.js',
+      'index 1111111..2222222 100644',
+      '--- a/a.js',
+      '+++ b/a.js',
+      '@@ -1,2 +1,3 @@',
+      ' context',
+      '+++ evil-looking added line',
+      ' context',
+      '@@ -10,2 +11,2 @@',
+      ' context',
+    ].join('\n');
+    const ranges = parseCommentableLineRanges(diff);
+    // Both hunks must be attributed to a.js, not to "evil-looking added line".
+    assert.deepEqual(ranges.get('a.js'), [
+      [1, 3],
+      [11, 12],
+    ]);
+    assert.strictEqual(ranges.size, 1);
+  });
+
+  it('tracks multiple files independently', () => {
+    const diff = [
+      diffFor('first.js', ['@@ -1,2 +1,4 @@']),
+      diffFor('second.js', ['@@ -30,5 +33,7 @@']),
+    ].join('\n');
+    const ranges = parseCommentableLineRanges(diff);
+    assert.deepEqual(ranges.get('first.js'), [[1, 4]]);
+    assert.deepEqual(ranges.get('second.js'), [[33, 39]]);
+  });
+});
+
+describe('isPositionInDiff', () => {
+  const ranges = parseCommentableLineRanges(
+    diffFor('src/app.js', ['@@ -10,4 +12,6 @@']),
+  );
+
+  it('accepts a line inside a hunk range', () => {
+    assert.strictEqual(isPositionInDiff(ranges, 'src/app.js', 12), true);
+    assert.strictEqual(isPositionInDiff(ranges, 'src/app.js', 17), true);
+  });
+
+  it('rejects a line outside every hunk range', () => {
+    assert.strictEqual(isPositionInDiff(ranges, 'src/app.js', 11), false);
+    assert.strictEqual(isPositionInDiff(ranges, 'src/app.js', 18), false);
+    assert.strictEqual(isPositionInDiff(ranges, 'src/app.js', 1), false);
+  });
+
+  it('rejects a file not present in the diff', () => {
+    assert.strictEqual(isPositionInDiff(ranges, 'src/other.js', 12), false);
+  });
+});
+
+describe('partitionFindingsForInline', () => {
+  const ranges = parseCommentableLineRanges(
+    diffFor('src/app.js', ['@@ -10,4 +12,6 @@']),
+  );
+  const mk = (over) => ({
+    issueId: generateUlid(),
+    severity: 'medium',
+    title: 'finding',
+    body: 'desc',
+    file: 'src/app.js',
+    line: 12,
+    ...over,
+  });
+
+  it('splits anchorable / unanchored / unlocated', () => {
+    const inDiff = mk({ title: 'in diff' });
+    const outOfDiff = mk({ title: 'out of diff', line: 999 });
+    const wrongFile = mk({ title: 'wrong file', file: 'src/other.js' });
+    const noLine = mk({ title: 'no line', line: null });
+    const noFile = mk({ title: 'no file', file: null, line: null });
+    const { anchorable, unanchored, unlocated } = partitionFindingsForInline(
+      [inDiff, outOfDiff, wrongFile, noLine, noFile],
+      ranges,
+    );
+    assert.deepEqual(anchorable, [inDiff]);
+    assert.deepEqual(unanchored, [outOfDiff, wrongFile]);
+    assert.deepEqual(unlocated, [noLine, noFile]);
+  });
+
+  it('treats every located finding as anchorable when ranges is null (no diff)', () => {
+    const outOfDiff = mk({ line: 999 });
+    const noLine = mk({ line: null });
+    const { anchorable, unanchored, unlocated } = partitionFindingsForInline(
+      [outOfDiff, noLine],
+      null,
+    );
+    assert.deepEqual(anchorable, [outOfDiff]);
+    assert.deepEqual(unanchored, []);
+    assert.deepEqual(unlocated, [noLine]);
+  });
+});
+
+describe('formatReviewBody unanchored section', () => {
+  const unanchored = [
+    {
+      issueId: generateUlid(),
+      severity: 'medium',
+      title: 'Unanchorable finding',
+      body: 'The cited line is not in the diff.',
+      file: 'src/app.js',
+      line: 999,
+    },
+  ];
+
+  it('appends the section with location and severity', () => {
+    const body = formatReviewBody([], 'APPROVE', [], { unanchored });
+    assert.match(body, /## Non-blocking findings \(no inline thread\)/);
+    assert.match(body, /Unanchorable finding/);
+    assert.match(body, /`src\/app\.js:999`/);
+    assert.match(body, /_\(medium\)_/);
+  });
+
+  it('embeds no issue-id markers for unanchored findings', () => {
+    const body = formatReviewBody([], 'APPROVE', [], { unanchored });
+    assert.ok(!body.includes('<!-- issue-id:'));
+  });
+
+  it('unanchored titles are not tracked by parseTitlesFromReviewBody', () => {
+    const blocking = [
+      {
+        issueId: generateUlid(),
+        severity: 'high',
+        title: 'Tracked blocking finding',
+        body: 'desc',
+        file: 'src/db.js',
+        line: 42,
+      },
+    ];
+    const body = formatReviewBody(blocking, 'REQUEST_CHANGES', [], {
+      unanchored,
+    });
+    assert.deepEqual(parseTitlesFromReviewBody(body), [
+      'Tracked blocking finding',
+    ]);
+  });
+
+  it('omits the section when there are no unanchored findings', () => {
+    const body = formatReviewBody([], 'APPROVE', [], { unanchored: [] });
+    assert.ok(!body.includes('## Non-blocking findings'));
   });
 });

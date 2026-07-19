@@ -1179,6 +1179,9 @@ async function main() {
       await postRealReview(prNumber, {
         ...gated,
         fallbackModel: usedFallbackModel ?? undefined,
+        // Enables pre-validation of inline comment positions against the diff
+        // hunks so one bad position no longer drops every thread (LS-8499).
+        diff,
       });
     } catch (err) {
       process.stderr.write(

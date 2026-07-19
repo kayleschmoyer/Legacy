@@ -187,17 +187,23 @@ export async function addLabelAsApp(prNumber, label) {
  * They are intentionally excluded from the cycle-protocol title regex so they
  * are not tracked across review cycles.
  *
+ * Unanchored non-blocking findings (whose cited position is not part of the
+ * PR diff, so no inline thread can be created) are appended as a
+ * "## Non-blocking findings (no inline thread)" section. Like observations,
+ * they carry no issue-id markers and no **[SEVERITY]** tag, so they are not
+ * tracked by the cycle protocol and require no FIX/JUSTIFY responses.
+ *
  * @param {Array<import('./findings.mjs').Finding & { issueId: string }>} blockingWithIds
  * @param {'REQUEST_CHANGES'|'APPROVE'} event
  * @param {import('./findings.mjs').Finding[]} [observations]
- * @param {{ fallbackModel?: string }} [opts]
+ * @param {{ fallbackModel?: string, unanchored?: import('./findings.mjs').Finding[] }} [opts]
  * @returns {string}
  */
 export function formatReviewBody(
   blockingWithIds,
   event,
   observations = [],
-  { fallbackModel } = {},
+  { fallbackModel, unanchored = [] } = {},
 ) {
   const banner = fallbackModel
     ? `> [!NOTE]\n> This review was generated using **${fallbackModel}** (fallback) because the primary model was temporarily unavailable. Quality may differ slightly.\n\n`
@@ -218,6 +224,24 @@ export function formatReviewBody(
       parts.push(
         `<!-- issue-id: ${f.issueId} -->\n**[${f.severity.toUpperCase()}]** ${f.title} — ${loc}\n\n${f.body}`,
       );
+    }
+  }
+
+  if (unanchored.length > 0) {
+    parts.push('## Non-blocking findings (no inline thread)\n');
+    parts.push(
+      "_The cited locations are not part of this PR's diff, so these findings could not be posted as inline review threads. They are advisory and do not require FIX/JUSTIFY responses._",
+    );
+    for (const f of unanchored) {
+      const loc = f.file
+        ? f.line != null
+          ? `\`${f.file}:${f.line}\``
+          : `\`${f.file}\``
+        : '_PR-level_';
+      // Observation-style formatting: no issue-id marker and no **[SEVERITY]**
+      // tag, so parseTitlesFromReviewBody does not track these titles across
+      // cycles and the author protocol does not demand thread replies for them.
+      parts.push(`**${f.title}** — ${loc} _(${f.severity})_\n\n${f.body}`);
     }
   }
 
@@ -259,15 +283,124 @@ export function buildInlineComments(findingsWithIds) {
     }));
 }
 
+// Matches a unified-diff hunk header and captures the RIGHT-side start line and
+// (optional) line count, e.g. `@@ -12,7 +12,9 @@` or `@@ -5 +7 @@`.
+const HUNK_HEADER_RE = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/;
+
+/**
+ * Parse a unified diff into the RIGHT-side line ranges that GitHub accepts for
+ * inline review comments (`side: 'RIGHT'`): for each file, every line covered
+ * by a hunk on the new side (context + added lines). Lines outside these
+ * ranges cause `POST /pulls/{n}/reviews` to reject the whole submission with
+ * HTTP 422 ("line must be part of the diff").
+ *
+ * File paths are taken from `+++ b/<path>` headers, which are only recognized
+ * between a `diff --git` line and that file's first hunk — an added content
+ * line starting with `++ ` (rendered as `+++ ...` in the diff) cannot be
+ * mistaken for a file header.
+ *
+ * @param {string | null | undefined} diff  Unified diff (e.g. from `gh pr diff`)
+ * @returns {Map<string, Array<[number, number]>> | null}  Inclusive
+ *   [start, end] ranges keyed by repo-relative path, or null when no diff was
+ *   provided (caller should then skip position validation).
+ */
+export function parseCommentableLineRanges(diff) {
+  if (typeof diff !== 'string' || !diff.trim()) return null;
+
+  /** @type {Map<string, Array<[number, number]>>} */
+  const ranges = new Map();
+  let currentPath = null;
+  let inFileHeader = false;
+
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      inFileHeader = true;
+      currentPath = null;
+      continue;
+    }
+    if (inFileHeader && line.startsWith('+++ ')) {
+      const target = line.slice(4).trim();
+      currentPath = target === '/dev/null' ? null : target.replace(/^b\//, '');
+      continue;
+    }
+    const m = line.match(HUNK_HEADER_RE);
+    if (m) {
+      inFileHeader = false;
+      if (currentPath !== null) {
+        const start = Number(m[1]);
+        const count = m[2] === undefined ? 1 : Number(m[2]);
+        // A deletion-only hunk has a zero RIGHT-side count — nothing to anchor.
+        if (count > 0) {
+          if (!ranges.has(currentPath)) ranges.set(currentPath, []);
+          ranges.get(currentPath).push([start, start + count - 1]);
+        }
+      }
+    }
+  }
+
+  return ranges;
+}
+
+/**
+ * Whether an inline comment at (path, line) on the RIGHT side would be
+ * accepted by GitHub for the diff described by `ranges`.
+ *
+ * @param {Map<string, Array<[number, number]>>} ranges  From parseCommentableLineRanges
+ * @param {string} path
+ * @param {number} line
+ * @returns {boolean}
+ */
+export function isPositionInDiff(ranges, path, line) {
+  const fileRanges = ranges.get(path);
+  if (!fileRanges) return false;
+  return fileRanges.some(([start, end]) => line >= start && line <= end);
+}
+
+/**
+ * Split findings by whether they can become inline review comments on this
+ * diff. Findings without a file+line can never be inline (`unlocated`);
+ * findings whose position falls outside the diff's RIGHT-side hunk ranges are
+ * `unanchored`. When `ranges` is null (no diff available), every located
+ * finding is treated as anchorable and the 422 body-only retry in
+ * postRealReview remains the safety net.
+ *
+ * @param {Array<import('./findings.mjs').Finding & { issueId: string }>} findingsWithIds
+ * @param {Map<string, Array<[number, number]>> | null} ranges
+ * @returns {{ anchorable: typeof findingsWithIds, unanchored: typeof findingsWithIds, unlocated: typeof findingsWithIds }}
+ */
+export function partitionFindingsForInline(findingsWithIds, ranges) {
+  const anchorable = [];
+  const unanchored = [];
+  const unlocated = [];
+  for (const f of findingsWithIds) {
+    if (f.file == null || f.line == null) {
+      unlocated.push(f);
+    } else if (ranges === null || isPositionInDiff(ranges, f.file, f.line)) {
+      anchorable.push(f);
+    } else {
+      unanchored.push(f);
+    }
+  }
+  return { anchorable, unanchored, unlocated };
+}
+
 /**
  * Post a real GitHub PR review as the Code Reviewer Bot.
  *
  * - critical/high findings → REQUEST_CHANGES (review body lists findings;
  *                            those with file+line also become inline threads)
  * - no blocking findings   → APPROVE
- * - medium/low findings    → inline comments on the same review submission
+ * - medium/low findings    → inline comments on the same review submission;
+ *                            those whose position cannot be anchored to the
+ *                            diff are appended to the review body instead
  * - observation findings   → appended to the review body as "## Observations";
  *                            no inline threads, no issue-id markers
+ *
+ * When `diff` is provided, each inline comment's (path, line) is validated
+ * against the diff's hunk ranges BEFORE posting, and only the individually
+ * invalid comments are demoted to the review body. Without this, a single
+ * out-of-diff position makes GitHub 422 the whole submission and the retry
+ * drops every inline thread (LS-8499).
  *
  * Requires env vars:
  *   REVIEWER_BOT_APP_ID          — GitHub App numeric ID (public variable)
@@ -278,11 +411,12 @@ export function buildInlineComments(findingsWithIds) {
  * @param {{ blocking: import('./findings.mjs').Finding[],
  *            nonBlocking: import('./findings.mjs').Finding[],
  *            observations?: import('./findings.mjs').Finding[],
- *            fallbackModel?: string }} gated
+ *            fallbackModel?: string,
+ *            diff?: string }} gated
  */
 export async function postRealReview(
   prNumber,
-  { blocking, nonBlocking, observations = [], fallbackModel },
+  { blocking, nonBlocking, observations = [], fallbackModel, diff },
 ) {
   const appId = process.env.REVIEWER_BOT_APP_ID;
   const privateKeyPem = process.env.REVIEWER_BOT_APP_PRIVATE_KEY;
@@ -313,12 +447,39 @@ export async function postRealReview(
   }));
 
   const event = blockingWithIds.length > 0 ? 'REQUEST_CHANGES' : 'APPROVE';
+
+  const ranges = parseCommentableLineRanges(diff);
+  const blockingSplit = partitionFindingsForInline(blockingWithIds, ranges);
+  const nonBlockingSplit = partitionFindingsForInline(
+    nonBlockingWithIds,
+    ranges,
+  );
+
+  for (const f of [
+    ...blockingSplit.unanchored,
+    ...nonBlockingSplit.unanchored,
+  ]) {
+    process.stderr.write(
+      `[reviewer] Inline position outside diff — no thread for ${f.file}:${f.line} ("${f.title}")\n`,
+    );
+  }
+
+  // Blocking findings are always in the review body, so an unanchorable
+  // blocking finding loses only its thread. Non-blocking findings exist ONLY
+  // as inline comments — demote the ones that cannot anchor (or have no
+  // location at all) into the body so they are not silently lost.
+  const unanchoredNonBlocking = [
+    ...nonBlockingSplit.unanchored,
+    ...nonBlockingSplit.unlocated,
+  ];
+
   const body = formatReviewBody(blockingWithIds, event, observations, {
     fallbackModel,
+    unanchored: unanchoredNonBlocking,
   });
   const comments = buildInlineComments([
-    ...blockingWithIds,
-    ...nonBlockingWithIds,
+    ...blockingSplit.anchorable,
+    ...nonBlockingSplit.anchorable,
   ]);
 
   const jwt = mintAppJwt(appId, privateKeyPem);
@@ -335,6 +496,7 @@ export async function postRealReview(
   const ghEnv = { ...process.env, GH_TOKEN: installToken };
 
   const payload = JSON.stringify({ body, event, comments });
+  let postedInline = comments.length;
   try {
     execFileSync('gh', ghArgs, {
       encoding: 'utf8',
@@ -347,21 +509,32 @@ export async function postRealReview(
       err.stdout?.includes('Unprocessable Entity') ||
       err.stderr?.includes('Unprocessable Entity');
     if (!is422 || comments.length === 0) throw err;
-    // Inline comment positions are invalid for this diff (e.g. LLM cited a line
-    // not present in the diff, or missing side). Retry with body-only so the
-    // blocking findings are still posted.
+    // Last-resort safety net: pre-validation above should have caught bad
+    // positions, but GitHub can still 422 on cases the hunk parser does not
+    // model (renames with unusual paths, stale head, ...). Log the API detail
+    // (gh prints the response body to stdout) so the offending comment is
+    // identifiable, then retry body-only so the blocking findings still land.
+    const detail = [err.stdout, err.stderr]
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 600);
     process.stderr.write(
-      '[reviewer] Inline comment positions rejected (422); retrying without inline comments\n',
+      `[reviewer] Inline comments rejected (422) despite pre-validation; retrying body-only. Detail: ${detail}\n`,
     );
     execFileSync('gh', ghArgs, {
       encoding: 'utf8',
       input: JSON.stringify({ body, event, comments: [] }),
       env: ghEnv,
     });
+    postedInline = 0;
   }
 
+  const demoted =
+    blockingSplit.unanchored.length + unanchoredNonBlocking.length;
   process.stdout.write(
-    `[reviewer] Real review posted (${event}): ${blockingWithIds.length} blocking, ${nonBlockingWithIds.length} non-blocking, ${comments.length} total inline threads\n`,
+    `[reviewer] Real review posted (${event}): ${blockingWithIds.length} blocking, ${nonBlockingWithIds.length} non-blocking, ${postedInline} inline thread(s) posted${demoted > 0 ? `, ${demoted} finding(s) demoted to body (no diff anchor)` : ''}\n`,
   );
 }
 
