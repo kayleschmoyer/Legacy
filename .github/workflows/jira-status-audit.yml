@@ -33,7 +33,11 @@ name: "Jira Status Audit"
 #   the repository_dispatch event to GitHub.
 #
 #   This fires the audit immediately when a ticket is manually transitioned
-#   in Jira, rather than waiting for the weekly backstop cron.
+#   in Jira. The webhook is the sole automatic trigger: the former weekly
+#   backstop cron was removed (CI is schedule-free by policy) — every
+#   dispatch runs the FULL audit (all open/recently-merged PRs + all epics),
+#   so any single webhook delivery self-heals drift accumulated during an
+#   earlier webhook outage. Use workflow_dispatch for an on-demand sweep.
 #
 #   Direct POSTs to GitHub's /dispatches endpoint are also supported, but
 #   the sender login must be in the JIRA_DISPATCH_ALLOWED_SENDERS repo var
@@ -44,8 +48,6 @@ name: "Jira Status Audit"
 on:
   repository_dispatch:
     types: [jira-issue-updated]
-  schedule:
-    - cron: "0 6 * * 1" # Weekly on Monday at 06:00 UTC (backstop for webhook gaps)
   workflow_dispatch:
 
 # Debounce rapid-fire dispatch events (e.g. Jira bulk transitions / retries).

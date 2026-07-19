@@ -825,8 +825,7 @@ jobs:
           # Next Scan Schedule
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📅 Next Security Scan" >> $GITHUB_STEP_SUMMARY
-          echo "- **Scheduled**: Every Monday at 2 AM UTC" >> $GITHUB_STEP_SUMMARY
-          echo "- **Automatic**: On every PR and main branch push" >> $GITHUB_STEP_SUMMARY
+          echo "- **Automatic**: On every PR and main branch push (CI is schedule-free — no cron scans)" >> $GITHUB_STEP_SUMMARY
           echo "- **Manual**: Available via workflow dispatch" >> $GITHUB_STEP_SUMMARY
 
   # ======================================================================

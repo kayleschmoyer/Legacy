@@ -56,8 +56,10 @@ merge queue on integration runs. LS-7880 is rejected (Won't Do).
 Instead:
 
 - **The nightly full Playwright run is the backstop.** It runs the complete
-  integration suite against `main` every night (`run-playwright-tests.yml`,
-  03:00 UTC) and catches any integration regression that merged that day.
+  integration suite against `main` roughly once per day
+  (`run-playwright-tests.yml`; see the 2026-07-18 amendment below — originally
+  a 03:00 UTC cron, now a debounced post-deploy `workflow_run`) and catches
+  any integration regression that merged that day.
 - **On a nightly integration failure, bisect the day's merges** to attribute
   the regression (runbook below).
 - **Agent guidance:** when a `run:integration` result matters to a merge
@@ -127,3 +129,20 @@ When a nightly integration run fails on `main`:
   via LS-4937 / LS-7848 — revisiting is explicitly reasonable then).
 - The per-merge half of integration-safety Phase 2 is rejected; stop-the-line
   automation on nightly failure remains open design space.
+
+## Amendment (2026-07-18): trigger changed from cron to debounced post-deploy
+
+The repo adopted a schedule-free CI policy (no `schedule:` triggers in any
+workflow). The nightly's `0 3 * * *` cron was replaced with a `workflow_run`
+trigger on Deploy completing on `main`, debounced by a `gate` job in
+`run-playwright-tests.yml` to at most one full-suite attempt per
+`FULL_SUITE_MIN_INTERVAL_HOURS` (repo var, default 20h), with a concurrency
+group serializing automated runs so two full suites never hit the live
+backend concurrently.
+
+**The decision above is unchanged** — this is still once-a-day amortization,
+not per-merge validation. The economics are identical on active days (bursts
+of merges collapse into one run), strictly cheaper on idle days (no merges →
+no run → nothing new to regress), and the ~24h regression window is
+preserved. The term "nightly" is retained throughout the docs and tooling to
+mean this automated full-suite run.

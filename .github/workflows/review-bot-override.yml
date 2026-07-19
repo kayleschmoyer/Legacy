@@ -7,7 +7,14 @@ name: Review Bot Override (W5)
 # Two override paths:
 #   1. Human review (primary) — a maintainer/CODEOWNER submits an APPROVE review
 #      on the PR. This is the real signal: a human with admin/maintain permission
-#      vouching for the change. Flips bot-review to success + audit comment.
+#      vouching for the change. Flips bot-review to success + audit comment,
+#      dismisses any active bot CHANGES_REQUESTED review (so GitHub's
+#      reviewDecision no longer blocks the merge queue), and applies
+#      merge-when-ready so the PR proceeds to merge with no further human
+#      action — a human APPROVE fully replaces the bot review (LS pipeline
+#      automation policy). The reviewer itself also stands down when a human
+#      maintainer approval exists (see reviewer/index.mjs
+#      findHumanMaintainerApproval), so no bot cycle clobbers this override.
 #   2. review-bot-override label (fallback) — a maintainer applies the label.
 #      Kept for cases where flipping the status without a formal review is
 #      preferable. Same effect as the human-review path.
@@ -45,10 +52,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # App token (reviewer bot identity): labels applied with the default
+      # GITHUB_TOKEN do not emit `labeled` events to other workflows, so the
+      # merge-when-ready label added on the human-APPROVE path below would
+      # never wake the merge queue. The app token also lets the dismissal and
+      # audit comment carry the bot identity used everywhere else.
+      - name: Generate reviewer app token
+        id: reviewer-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
       - name: Apply or remove bot-review override
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.reviewer-token.outputs.token }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
@@ -102,6 +120,49 @@ jobs:
 
               await setBotReview('success', `Bot review overridden by human APPROVE from @${reviewer}`);
 
+              // Dismiss any ACTIVE bot CHANGES_REQUESTED review: GitHub's
+              // reviewDecision stays CHANGES_REQUESTED while one exists (a
+              // human APPROVE does not clear it), and the merge queue gates
+              // on reviewDecision — without this the PR stays blocked even
+              // with bot-review green.
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner,
+                repo,
+                pull_number: prNumber,
+                per_page: 100,
+              });
+              const activeBotBlocks = reviews.filter(
+                (r) => r.user?.type === 'Bot' && r.state === 'CHANGES_REQUESTED',
+              );
+              for (const r of activeBotBlocks) {
+                try {
+                  await github.rest.pulls.dismissReview({
+                    owner,
+                    repo,
+                    pull_number: prNumber,
+                    review_id: r.id,
+                    message: `Superseded by human maintainer APPROVE from @${reviewer}`,
+                  });
+                  core.info(`Dismissed bot CHANGES_REQUESTED review ${r.id}.`);
+                } catch (err) {
+                  core.warning(`Could not dismiss bot review ${r.id}: ${err.message || err}`);
+                }
+              }
+
+              // Human approval is a merge signal: queue the PR exactly as the
+              // reviewer bot does on its own APPROVE, so no further human
+              // action is needed to reach merge.
+              try {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  labels: ['merge-when-ready'],
+                });
+              } catch (err) {
+                core.warning(`Could not add merge-when-ready: ${err.message || err}`);
+              }
+
               await github.rest.issues.createComment({
                 owner,
                 repo,
@@ -109,9 +170,10 @@ jobs:
                 body: [
                   '> [!NOTE]',
                   '> **Bot Review Override — Human Approval**',
-                  `> @${reviewer} (maintainer) submitted an APPROVE review, so the \`bot-review\` required check has been set to \`success\`.`,
+                  `> @${reviewer} (maintainer) submitted an APPROVE review, so the \`bot-review\` required check has been set to \`success\`,` +
+                  ' any active bot `CHANGES_REQUESTED` review has been dismissed, and `merge-when-ready` has been applied.',
                   '>',
-                  '> This human approval supersedes the reviewer bot\'s blocking findings. If the approval is later' +
+                  '> This human approval supersedes the reviewer bot\'s blocking findings — no bot review is needed. If the approval is later' +
                   ' dismissed or the PR is updated, re-run the reviewer (apply `bot:ready-for-review`) to re-evaluate.',
                 ].join('\n'),
               });

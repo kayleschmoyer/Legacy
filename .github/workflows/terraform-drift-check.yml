@@ -1,9 +1,10 @@
 name: "Terraform Drift Check"
 
 # =============================================================================
-# Scheduled drift detection for terraform/main infrastructure.
+# Event-driven drift detection for terraform/main infrastructure.
 #
-# Runs a speculative plan weekly (and on-demand) against the live AWS state and
+# Runs a speculative plan after every workflow that mutates the terraform/main
+# state completes (and on-demand) against the live AWS state and
 # fails if it detects any changes to NON-Lambda resources.  Lambda function
 # version updates are expected and skipped; anything else — a missing EC2
 # instance, a security-group diff, an IAM policy change — indicates state drift
@@ -13,12 +14,23 @@ name: "Terraform Drift Check"
 # resource addresses so the on-call engineer can manually reconcile before the
 # next deploy.
 #
+# Trigger note (schedule-free CI policy): the former weekly Monday cron was
+# removed. Post-apply verification catches drift at the moment the state is
+# freshest and before the NEXT apply can trip over it — every merge to main
+# re-checks. The residual gap (out-of-band console edits during a week with
+# zero deploys) is accepted: it is detected by the next apply-triggered check
+# or an on-demand workflow_dispatch.
+#
 # LS-4871
 # =============================================================================
 
 on:
-  schedule:
-    - cron: "0 9 * * 1" # Every Monday at 09:00 UTC
+  # Both workflows below operate on the terraform/main state this check plans.
+  # Runs on success AND failure conclusions — a failed apply is when orphaned
+  # partial state is most likely.
+  workflow_run:
+    workflows: ["Apply Lambda Infrastructure", "Deployment Rollback"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:

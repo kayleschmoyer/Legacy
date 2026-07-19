@@ -1,8 +1,8 @@
 name: "Lambda Drift Check"
 
 # =============================================================================
-# Scheduled auditor for silent Lambda deploy staleness (LS-8434, follow-up from
-# LS-8426).
+# Event-driven auditor for silent Lambda deploy staleness (LS-8434, follow-up
+# from LS-8426).
 #
 # LS-8426: the mcp-rollbar-server Lambda ran pre-fix code for 12 days because
 # the Deploy run for its merge commit failed at `Upload Lambdas / Verify CI
@@ -13,10 +13,17 @@ name: "Lambda Drift Check"
 #
 # The existing Post-Apply Version Verification step in
 # lambda-terraform-apply.yml only runs when `terraform apply` actually made a
-# change — so it never fires on the far more common no-op day, which is
-# exactly when a lambda that was never re-uploaded (SSM version never bumped)
-# would otherwise go unnoticed forever. This workflow is independent of any
-# deploy event and runs on its own schedule.
+# change — so it never fires when the apply is a no-op. This workflow instead
+# audits ALL registered lambdas after every Apply Lambda Infrastructure run
+# completes (success or failure — a failed deploy chain is exactly when a
+# skip-chain leaves a lambda stale), so persistent drift is re-detected on
+# every merge to main.
+#
+# Trigger note (schedule-free CI policy): the former daily cron was removed.
+# The workflow_run trigger gives equal-or-better detection latency on active
+# days (multiple merges/day); on a fully idle repo nothing deploys, nothing
+# changes, and there is nothing new to drift — out-of-band console edits on an
+# idle week are caught by the next Deploy or an on-demand workflow_dispatch.
 #
 # Two independent signals:
 #   1. Version drift — for every registered lambda, compare the SSM
@@ -33,8 +40,14 @@ name: "Lambda Drift Check"
 # =============================================================================
 
 on:
-  schedule:
-    - cron: "0 13 * * *" # Daily at 13:00 UTC
+  # Anchored on Apply Lambda Infrastructure (not Deploy): the terraform apply
+  # itself only starts AFTER Deploy completes (see lambda-terraform-apply.yml's
+  # workflow_run trigger), so auditing on Deploy completion would race the
+  # apply and report transient SSM-vs-Description drift.
+  workflow_run:
+    workflows: ["Apply Lambda Infrastructure"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

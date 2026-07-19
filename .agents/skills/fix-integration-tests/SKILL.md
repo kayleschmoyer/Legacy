@@ -74,7 +74,7 @@ Before touching any code, verify:
 
 Integration tests **do not run on PRs**. They run only:
 
-- **Nightly** via `.github/workflows/run-playwright-tests.yml` on cron `0 3 * * *`
+- **Nightly** via `.github/workflows/run-playwright-tests.yml` — an automated post-deploy `workflow_run`, debounced to ~one full-suite run per day (the former `0 3 * * *` cron was removed; see the workflow's `gate` job)
 - **Manual `workflow_dispatch`** from the Actions tab
 
 A local `--grep` reproduction differs materially from the nightly profile. Even a fully green local single-spec run cannot prove that a fix holds under nightly conditions.

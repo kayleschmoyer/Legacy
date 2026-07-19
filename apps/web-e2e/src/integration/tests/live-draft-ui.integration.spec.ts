@@ -384,8 +384,8 @@ test.describe
       let lastKnownCurrentPick = 0;
       // Tracks consecutive failures of the managerJwt1 currentPick query with
       // "not a member" / FORBIDDEN. After 3 consecutive failures we check
-      // whether the league still exists — if it was deleted by CI nightly
-      // global-setup (cron: "0 3 * * *") we fail fast with a clear message
+      // whether the league still exists — if it was deleted by the automated
+      // full-suite run's global-setup we fail fast with a clear message
       // instead of waiting for the generic 101-miss bail-out (LS-4379).
       let consecutiveCurrentPickMembershipErrors = 0;
 
@@ -808,7 +808,7 @@ test.describe
                           .catch(() => false);
                         if (!leagueExists) {
                           throw new Error(
-                            `[live-draft] League ${state.leagueId} no longer exists — likely deleted by CI nightly global-setup (cron: "0 3 * * *"). ` +
+                            `[live-draft] League ${state.leagueId} no longer exists — likely deleted by a concurrent automated full-suite run's global-setup. ` +
                               `Phase 5 interrupted by external cleanup at pick ${pickCount}.`,
                           );
                         }

@@ -174,3 +174,25 @@ indefinite hold seen in LS-4526.
   added, its filename must be appended to the `WORKFLOWS` array in
   `terraform-lock-watchdog.yml` or it will be ignored when evaluating active
   runs.
+
+## Amendment (2026-07-18): trigger changed from cron to post-apply workflow_run
+
+The repo adopted a schedule-free CI policy (no `schedule:` triggers in any
+workflow). The watchdog's `*/15 * * * *` cron was replaced with a
+`workflow_run` trigger on the completion (any conclusion, including failure
+and cancellation) of the three lock-holding workflows — the exact moment an
+orphaned lock can come into existence. Consequences of the change:
+
+- Recovery is now near-immediate after the apply run completes, instead of
+  bounded by a cron tick (~35 minutes worst case before).
+- The 96-runs/day idle cost is gone; the watchdog runs only when an apply ran.
+- `workflow_run`-triggered runs use a **0-minute stale threshold**: the
+  triggering apply has completed, so any lock still present with no active
+  apply runs is orphaned regardless of age. Manual dispatches keep the
+  20-minute default to protect in-flight applies. The "apply timeout ≤ stale
+  threshold" lockstep constraint above now applies only to the manual-dispatch
+  path.
+- Residual corner (unchanged in spirit from the cron design): a run that dies
+  so hard GitHub never emits its completion event leaves the lock until the
+  next apply completion or a manual dispatch. The trigger list must stay in
+  lockstep with the `WORKFLOWS` array, same as the active-run check.

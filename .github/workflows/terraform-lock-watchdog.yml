@@ -13,9 +13,14 @@ name: Terraform Lock Watchdog
 #
 # Why a separate workflow on GitHub-hosted runners:
 #   - The existing "Clear Stale Locks" step inside lambda-terraform-apply.yml
-#     only fires when a new run is triggered. If no Lambda upload arrives for
-#     hours, the orphaned lock sits there. This watchdog runs on a schedule
-#     so recovery happens within the cron interval regardless of triggers.
+#     only fires when a new run is triggered. This watchdog instead fires the
+#     moment ANY lock-holding apply workflow completes (success, failure, or
+#     cancellation — workflow_run fires on all conclusions), which is exactly
+#     when an orphaned lock comes into existence. Recovery is therefore
+#     near-immediate instead of waiting out the former 15-minute cron tick
+#     (the cron was removed under the schedule-free CI policy). Residual
+#     corner — a run that dies so hard GitHub never emits its completion
+#     event — clears on the next apply completion or a manual dispatch.
 #   - Independent of any VPC infrastructure. ubuntu-latest has full direct
 #     internet egress, so the watchdog can always reach S3 and the GitHub API
 #     even if the dev VPC's NAT instance — or any other in-VPC service — is
@@ -25,9 +30,17 @@ name: Terraform Lock Watchdog
 #     specific LS-4526 incident's runner path.)
 #
 # Safety model:
-#   - Only acts on locks older than STALE_THRESHOLD_MINUTES (default 20m;
-#     comfortably greater than the apply workflow's 20-minute timeout-minutes,
-#     so a healthy long-running apply is never interrupted).
+#   - workflow_run-triggered runs use a 0-minute stale threshold: the
+#     triggering apply has already completed, so any lock still present is
+#     orphaned unless another apply is active — which the active-run check
+#     below catches. (Caveat: a human running terraform locally at that exact
+#     moment holds a lock the GitHub API can't see; local applies against the
+#     dev state are rare and discouraged, and the old 20-minute cron had the
+#     same blind spot for long local applies.)
+#   - Manual dispatch runs act only on locks older than
+#     STALE_THRESHOLD_MINUTES (default 20m; comfortably greater than the
+#     apply workflow's 20-minute timeout-minutes, so a healthy long-running
+#     apply is never interrupted).
 #   - Before removing, queries the GitHub Actions API for any in_progress or
 #     queued run of lambda-terraform-apply / runner-terraform-apply / rollback.
 #     If any is active, hands off — the active run will manage the lock itself.
@@ -35,11 +48,15 @@ name: Terraform Lock Watchdog
 #     action is auditable after the fact.
 
 on:
-  schedule:
-    # Every 15 minutes. Pairs with the 20-minute stale threshold to bound
-    # recovery time to roughly one cron tick after the apply workflow's own
-    # 20-minute timeout would have fired.
-    - cron: "*/15 * * * *"
+  # Fire whenever a workflow that can hold the terraform state lock completes.
+  # Must stay in lockstep with the WORKFLOWS array in the active-run check
+  # below.
+  workflow_run:
+    workflows:
+      - "Apply Lambda Infrastructure"
+      - "Apply Runner Infrastructure"
+      - "Deployment Rollback"
+    types: [completed]
   workflow_dispatch:
     inputs:
       dry-run:
@@ -68,7 +85,10 @@ permissions:
 env:
   AWS_REGION: us-east-1
   STATE_BUCKET: legacy-sports-terraform-state
-  STALE_THRESHOLD_MINUTES: ${{ inputs.stale-threshold-minutes || '20' }}
+  # workflow_run: the triggering apply already completed, so any lock present
+  # with no active applies is orphaned regardless of age — threshold 0.
+  # Manual dispatch: honor the input (default 20m) to protect in-flight applies.
+  STALE_THRESHOLD_MINUTES: ${{ github.event_name == 'workflow_run' && '0' || inputs.stale-threshold-minutes || '20' }}
   DRY_RUN: ${{ inputs.dry-run || 'false' }}
 
 jobs:

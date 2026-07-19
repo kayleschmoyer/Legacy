@@ -26,6 +26,102 @@ export function isRepoAdmin(login) {
 }
 
 /**
+ * Check whether a GitHub user has maintainer-level (admin or maintain)
+ * permission on this repository. Mirrors the permission bar used by the
+ * Review Bot Override workflow (W5) for its human-APPROVE path.
+ * Returns false for non-collaborators and on API errors (safe default).
+ *
+ * @param {string} login  GitHub login to check
+ * @returns {boolean}
+ */
+export function isRepoMaintainer(login) {
+  try {
+    const result = execFileSync(
+      'gh',
+      [
+        'api',
+        `repos/{owner}/{repo}/collaborators/${encodeURIComponent(login)}/permission`,
+      ],
+      { encoding: 'utf8' },
+    );
+    const role = JSON.parse(result).role_name;
+    return role === 'admin' || role === 'maintain';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetch the current reviews on a PR via REST (fresh, not the batched GraphQL
+ * snapshot from run start). Used to re-check for a human maintainer APPROVE
+ * immediately before writing a failure bot-review status, closing the race
+ * where a human approves while a review run is in flight.
+ *
+ * @param {number} prNumber
+ * @param {typeof execFileSync} [exec]
+ * @returns {{ userLogin: string | null, userType: string | null, state: string }[]}
+ */
+export function listPrReviewsFresh(prNumber, exec = execFileSync) {
+  const raw = exec(
+    'gh',
+    ['api', `repos/{owner}/{repo}/pulls/${prNumber}/reviews`, '--paginate'],
+    { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+  );
+  // --paginate emits one JSON array per page, newline-separated (same parse
+  // idiom as findLatestLabelActor above).
+  const reviews = raw
+    .trim()
+    .split(/\n(?=\[)/)
+    .flatMap((chunk) => JSON.parse(chunk));
+  return reviews.map((r) => ({
+    userLogin: r.user?.login ?? null,
+    userType: r.user?.type ?? null,
+    state: r.state,
+  }));
+}
+
+/**
+ * Find a live (non-dismissed) APPROVE review authored by a human with
+ * maintainer-level repo permission. With dismiss_stale_reviews_on_push active
+ * in the branch ruleset, any review still in state APPROVED vouches for the
+ * current head SHA — approvals on earlier SHAs are auto-dismissed on push.
+ *
+ * A human maintainer approval supersedes the bot review entirely (pipeline
+ * automation policy): callers stand down / suppress failure status writes
+ * when this returns a login. Permission bar (admin/maintain) mirrors the
+ * Review Bot Override workflow (W5).
+ *
+ * Bots are excluded by REST `user.type === 'Bot'` and by the `[bot]` login
+ * suffix (which the GraphQL normalizer guarantees for Bot authors).
+ *
+ * @param {{ userLogin?: string | null, userType?: string | null, state: string }[]} reviews
+ * @param {(login: string) => boolean} [checkPermission]
+ * @returns {string | null}  approver login, or null
+ */
+export function findHumanMaintainerApproval(
+  reviews,
+  checkPermission = isRepoMaintainer,
+) {
+  const candidates = [
+    ...new Set(
+      reviews
+        .filter(
+          (r) =>
+            r.state === 'APPROVED' &&
+            r.userLogin &&
+            !r.userLogin.endsWith('[bot]') &&
+            r.userType !== 'Bot',
+        )
+        .map((r) => r.userLogin),
+    ),
+  ];
+  for (const login of candidates) {
+    if (checkPermission(login)) return login;
+  }
+  return null;
+}
+
+/**
  * Add a label to a PR/issue.
  *
  * @param {number} prNumber

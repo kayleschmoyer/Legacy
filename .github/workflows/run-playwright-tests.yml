@@ -1,8 +1,16 @@
 # =============================================================================
 # Run Playwright Tests
 # =============================================================================
-# Nightly schedule (03:00 UTC): integration suite (real server, 3 shards) and
-# full E2E suite including @slow tests (3 shards) — no grep filters.
+# Automated full-suite run (post-deploy, debounced): integration suite (real
+# server, 3 shards) and full E2E suite including @slow tests (3 shards) —
+# no grep filters. Fires when Deploy completes on main, at most once per
+# FULL_SUITE_MIN_INTERVAL_HOURS (repo var, default 20h) — see the `gate` job.
+# This replaces the former 03:00 UTC nightly cron (schedule-free CI policy):
+# every merge to main re-arms detection, bursts collapse into ~one run/day
+# (cost parity with the old nightly, per ADR-0014 economics), and a fully idle
+# repo runs nothing. "nightly-*" naming (report dirs, job names, Discord
+# threads) is retained for continuity with existing tooling and docs — read
+# "nightly" as "automated full-suite run".
 #
 # Manual dispatch: run any suite/browser/grep combination on demand.
 # Trigger: Actions → "Run Playwright Tests" → Run workflow → fill parameters
@@ -11,8 +19,13 @@
 name: "Run Playwright Tests"
 
 on:
-  schedule:
-    - cron: "0 3 * * *" # Nightly: integration (real server) + full E2E with @slow
+  # Automated full suite: fires after the umbrella Deploy workflow completes on
+  # main (success or failure — a red deploy still merged code worth testing).
+  # The `gate` job debounces to at most one attempt per interval.
+  workflow_run:
+    workflows: ["Deploy"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       test-suite:
@@ -114,8 +127,75 @@ on:
 permissions:
   contents: read
   id-token: write # required for OIDC auth to AWS (S3 CI artifacts)
+  actions: read # gate job inspects prior runs of this workflow for debouncing
+
+# Serialize automated (workflow_run-triggered) full-suite runs: the integration
+# suite hits the SHARED live backend, and two overlapping automated runs would
+# double the concurrency the LS-7867 shard ceiling was validated against.
+# cancel-in-progress:false keeps one active + at most one pending run (GitHub
+# replaces older pending entries), and the pending run's gate then debounces
+# it. Manual dispatches keep their own unique group (unchanged behavior).
+concurrency:
+  group: playwright-suite-${{ github.event_name == 'workflow_run' && 'post-deploy' || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Post-deploy debounce gate (schedule-free CI policy).
+  # workflow_dispatch: always runs.
+  # workflow_run (Deploy completed on main): runs the full suite at most once
+  # per FULL_SUITE_MIN_INTERVAL_HOURS (repo var, default 20). One ATTEMPT per
+  # interval regardless of outcome — matching the former nightly cron's
+  # one-shot-per-day semantics and its cost profile.
+  # A debounced run skips every downstream job, so its own run conclusion is
+  # "success" with all jobs skipped; the debounce check therefore inspects the
+  # "Prepare Matrix" job of prior automated runs (non-skipped = real attempt)
+  # rather than run-level conclusions, which would re-arm the debounce forever
+  # on a busy repo.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: "Full-Suite Gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      should-run: ${{ steps.decide.outputs.should-run }}
+    steps:
+      - name: "Decide whether to run"
+        id: decide
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIN_INTERVAL_HOURS: ${{ vars.FULL_SUITE_MIN_INTERVAL_HOURS || '20' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
+          # All automated runs of this workflow created since the cutoff,
+          # excluding this run itself.
+          RUN_IDS=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/run-playwright-tests.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=30" \
+            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
+
+          for id in $RUN_IDS; do
+            # Non-skipped, completed "Prepare Matrix" = a real full-suite
+            # attempt (in-flight attempts are excluded here but already
+            # serialized by the concurrency group above).
+            PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
+              --jq '[.jobs[] | select(.name == "Prepare Matrix" and .conclusion != null and .conclusion != "skipped")] | length')
+            if [ "$PREPARED" -gt 0 ]; then
+              echo "should-run=false" >> "$GITHUB_OUTPUT"
+              echo "Debounced — automated full-suite attempt (run ${id}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+
+          echo "should-run=true" >> "$GITHUB_OUTPUT"
+          echo "No automated full-suite attempt in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
   # ---------------------------------------------------------------------------
   # Compute the test matrix.
   # Nightly: integration (INTEGRATION_SHARD_CEILING shards) + e2e (3 shards),
@@ -125,6 +205,8 @@ jobs:
   # ---------------------------------------------------------------------------
   prepare:
     name: "Prepare Matrix"
+    needs: [gate]
+    if: needs.gate.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 1
     outputs:
@@ -176,8 +258,8 @@ jobs:
             done
           }
 
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.test-suite }}" = "all" ]; then
-            # Nightly or manual "all": integration (ceiling shards) + e2e
+          if [ "${{ github.event_name }}" = "workflow_run" ] || [ "${{ inputs.test-suite }}" = "all" ]; then
+            # Automated full suite or manual "all": integration (ceiling shards) + e2e
             # (3 shards) + shared-live (1 shard), all tests, no filters.
             #
             # shared-live (LS-8296) runs the ADR-0016 dual-mode specs
@@ -224,12 +306,12 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Discord notification — fires before tests start (schedule + manual dispatch)
+  # Discord notification — fires before tests start (automated + manual runs)
   # ---------------------------------------------------------------------------
   notify-nightly-start:
     name: "Nightly Start"
     needs: [prepare]
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -242,7 +324,7 @@ jobs:
         id: params
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
             echo "title=Nightly Playwright Suite" >> "$GITHUB_OUTPUT"
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
@@ -303,7 +385,7 @@ jobs:
     # E2E is hermetic and stays at 60.
     timeout-minutes: ${{ matrix.suite == 'integration' && 120 || 60 }}
     env:
-      # Per-test source-coverage collection (LS-7849): nightly schedule, plus the
+      # Per-test source-coverage collection (LS-7849): automated full-suite runs, plus the
       # on-demand "repopulate coverage map" lever (manual dispatch with
       # collect-coverage=true). Set at job scope so it reaches both the e2e
       # "Build Web Application" step (instruments the served build via
@@ -311,7 +393,7 @@ jobs:
       # _coverage fixture). Left empty (and therefore falsy) on ordinary manual
       # dispatch and on PR CI so those builds are never instrumented — coverage
       # collection is intentionally OFF the per-PR path (keeps PRs fast).
-      COLLECT_COVERAGE: ${{ (github.event_name == 'schedule' || inputs['collect-coverage']) && '1' || '' }}
+      COLLECT_COVERAGE: ${{ (github.event_name == 'workflow_run' || inputs['collect-coverage']) && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -337,7 +419,7 @@ jobs:
         shell: bash
         run: |
           # Nightly-like runs always use chromium; manual dispatch respects the browser input.
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
+          if [ "${{ github.event_name }}" = "workflow_run" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
             BROWSER_ENGINE="chromium"
           else
             BROWSER="${{ inputs.browser }}"
@@ -440,7 +522,7 @@ jobs:
         if: matrix.suite == 'e2e'
         shell: bash
         env:
-          # The nightly schedule instruments this build for coverage
+          # Automated full-suite runs instrument this build for coverage
           # (COLLECT_COVERAGE=1 → vite-plugin-istanbul), which pushes build-time
           # heap past V8's default ~2 GB cap and OOMs (LS: nightly e2e build).
           # Match the 4 GB heap every other web build in the repo already uses
@@ -540,9 +622,9 @@ jobs:
           GOOGLE_TEST_PASSWORD: ${{ matrix.suite == 'integration' && secrets.GOOGLE_TEST_PASSWORD || '' }}
         run: |
           SUITE="${{ matrix.suite }}"
-          IS_SCHEDULE="${{ github.event_name == 'schedule' }}"
+          IS_AUTOMATED="${{ github.event_name == 'workflow_run' }}"
           IS_NIGHTLY_LIKE="false"
-          if [ "$IS_SCHEDULE" = "true" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
+          if [ "$IS_AUTOMATED" = "true" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
             IS_NIGHTLY_LIKE="true"
           fi
 
@@ -751,12 +833,12 @@ jobs:
 
       # Per-shard spec→source-file coverage fragment (LS-7849). Mirrors the blob
       # upload above: one artifact per shard (e2e + integration), namespaced by
-      # job index. Runs on the nightly schedule and on the on-demand repopulate
+      # job index. Runs on automated full-suite runs and on the on-demand repopulate
       # lever (manual dispatch with collect-coverage=true) — the same conditions
       # that set COLLECT_COVERAGE. On other runs no fragment is produced and the
       # upload is skipped anyway (if-no-files-found: ignore).
       - name: "Upload Coverage Fragment to S3"
-        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs['collect-coverage']) }}
+        if: ${{ !cancelled() && (github.event_name == 'workflow_run' || inputs['collect-coverage']) }}
         uses: ./.github/actions/s3-artifact
         with:
           mode: upload
@@ -857,7 +939,7 @@ jobs:
         if: steps.merge.outputs.has-report == 'true'
         env:
           DEPLOY_TOKEN: ${{ steps.app-token.outputs.token }}
-          DEST_DIR: playwright-report/${{ github.event_name == 'schedule' && format('nightly-{0}', github.run_id) || format('manual-{0}', github.run_number) }}
+          DEST_DIR: playwright-report/${{ github.event_name == 'workflow_run' && format('nightly-{0}', github.run_id) || format('manual-{0}', github.run_number) }}
         run: |
           set -euo pipefail
           REPO_URL="https://x-access-token:${DEPLOY_TOKEN}@github.com/bkrupa/legacy-sports-deploys.git"
@@ -937,7 +1019,7 @@ jobs:
       - name: "Print Report URL"
         if: steps.merge.outputs.has-report == 'true'
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
             DEST="nightly-${{ github.run_id }}"
           else
             DEST="manual-${{ github.run_number }}"
@@ -960,11 +1042,11 @@ jobs:
   #     a per-glob miss counter persisted in S3 across runs.
   # Report-only: never mutates a map, never fails a PR (auto-remediation is the
   # downstream LS-7851). Runs on the same conditions that produce fragments:
-  # nightly schedule, or manual dispatch with collect-coverage=true.
+  # automated full-suite runs, or manual dispatch with collect-coverage=true.
   audit-coverage:
     name: "Audit Surface-Map Coverage"
     needs: [run-tests, notify-nightly-start]
-    if: ${{ !cancelled() && needs.run-tests.result != 'skipped' && (github.event_name == 'schedule' || inputs['collect-coverage']) }}
+    if: ${{ !cancelled() && needs.run-tests.result != 'skipped' && (github.event_name == 'workflow_run' || inputs['collect-coverage']) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -1194,12 +1276,14 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Discord notification — fires after tests finish (schedule + manual dispatch)
+  # Discord notification — fires after tests finish (automated + manual runs)
   # ---------------------------------------------------------------------------
   notify-nightly-finish:
     name: "Nightly Results"
-    needs: [run-tests, deploy-report, notify-nightly-start]
-    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    needs: [gate, run-tests, deploy-report, notify-nightly-start]
+    # Gate-aware: a debounced automated run must not post a spurious "failure"
+    # (run-tests is skipped by design when the gate says no).
+    if: always() && needs.gate.outputs.should-run == 'true' && (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -1227,7 +1311,7 @@ jobs:
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
 
           # Build test run summary
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
+          if [ "${{ github.event_name }}" = "workflow_run" ] || [ "${{ inputs['test-suite'] }}" = "all" ]; then
             SUMMARY_LINE1="**Suite:** Integration (real server, sharded) + E2E (3 shards) + Shared-live (1 shard)"
             SUMMARY_LINE2="**Browser:** chromium · **Workers:** e2e 4 / integration 1 / shared-live 1 · **Retries:** e2e 2 / integration 0 / shared-live 0"
             SUMMARY_LINE3="**Filters:** none — all tests including @slow"
@@ -1248,7 +1332,7 @@ jobs:
           HAS_REPORT="${{ needs.deploy-report.outputs.has-report }}"
           REPORT_BASE="https://bkrupa.github.io/legacy-sports-deploys"
           if [ "$HAS_REPORT" = "true" ]; then
-            if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event_name }}" = "workflow_run" ]; then
               DEST="nightly-${{ github.run_id }}"
             else
               DEST="manual-${{ github.run_number }}"
@@ -1284,7 +1368,7 @@ jobs:
         with:
           webhook-url: ${{ secrets.DISCORD_PLAYWRIGHT_WEBHOOK_URL }}
           status: ${{ steps.status.outputs.status }}
-          title: "${{ github.event_name == 'schedule' && 'Nightly Playwright Suite — Results' || 'Manual Playwright Suite — Results' }}"
+          title: "${{ github.event_name == 'workflow_run' && 'Nightly Playwright Suite — Results' || 'Manual Playwright Suite — Results' }}"
           description: ${{ steps.status.outputs.description }}
           content: ${{ steps.status.outputs.content }}
           thread-id: ${{ needs.notify-nightly-start.outputs.thread-id }}

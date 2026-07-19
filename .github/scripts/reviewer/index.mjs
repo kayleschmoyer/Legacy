@@ -4,6 +4,8 @@ import {
   removeLabel,
   setCommitStatus,
   isRepoAdmin,
+  listPrReviewsFresh,
+  findHumanMaintainerApproval,
   findLatestLabelActor,
   dismissReview,
 } from './lib/github.mjs';
@@ -117,6 +119,50 @@ const NEEDS_HUMAN_SECURITY_REVIEW_LABEL = 'needs-human-security-review';
 const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review';
 const CYCLE_RESET_LABEL = 'bot:reset-cycle-counter';
 
+/**
+ * Write a failure bot-review status UNLESS a human maintainer APPROVE now
+ * exists on the PR (re-checked fresh at write time). Closes the race where a
+ * human approves — and W5 sets bot-review=success — while this run is in
+ * flight: the run's terminal failure write must not clobber the human
+ * override. On the override path the status is written as success instead so
+ * the required check reflects the human approval even if W5's write lost the
+ * race entirely.
+ *
+ * @param {number} prNumber
+ * @param {string} sha
+ * @param {string} description  failure description
+ * @returns {boolean}  true if the human override suppressed the failure write
+ */
+function setFailureStatusUnlessHumanApproved(prNumber, sha, description) {
+  let approver = null;
+  try {
+    approver = findHumanMaintainerApproval(listPrReviewsFresh(prNumber));
+  } catch (err) {
+    process.stderr.write(
+      `[reviewer] Fresh review re-check failed (writing failure as planned): ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+  if (approver) {
+    process.stdout.write(
+      `[reviewer] Human maintainer @${approver} approved mid-run — suppressing bot-review failure ("${description}")\n`,
+    );
+    try {
+      setCommitStatus(
+        sha,
+        'success',
+        `Human review by @${approver} supersedes bot review`,
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to set bot-review success: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    return true;
+  }
+  setCommitStatus(sha, 'failure', description);
+  return false;
+}
+
 function maybeThrowForceFailError() {
   if (process.env.REVIEWER_FORCE_FAIL !== 'true') return;
   const err = new Error(
@@ -181,6 +227,37 @@ async function main() {
   const isBotAuthor = ctx.author?.is_bot ?? authorLogin.endsWith('[bot]');
   const authorType = isBotAuthor ? 'bot' : 'human';
   process.stdout.write(`[reviewer] Author: ${authorLogin} (${authorType})\n`);
+
+  // --- Human-review override: a human maintainer APPROVE supersedes the bot
+  // review entirely (fully-automated pipeline policy). Checked BEFORE the
+  // pending write so a run triggered after a human approval never clobbers
+  // the bot-review=success that W5 (review-bot-override.yml) set. The label
+  // and status handling mirror the auto-approve path; no LLM review runs.
+  const humanApprover = findHumanMaintainerApproval(allReviews);
+  if (humanApprover) {
+    process.stdout.write(
+      `[reviewer] Standing down: human maintainer @${humanApprover} has approved — human review supersedes bot review\n`,
+    );
+    try {
+      setCommitStatus(
+        sha,
+        'success',
+        `Human review by @${humanApprover} supersedes bot review`,
+      );
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to set bot-review success: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    try {
+      cleanupOperationalLabels(prNumber, { preserveReadyLabel: true });
+    } catch (err) {
+      process.stderr.write(
+        `[reviewer] Failed to clean up operational labels: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+    return;
+  }
 
   // Set bot-review to pending — reviewer is starting
   try {
@@ -1018,15 +1095,19 @@ async function main() {
   );
   verdict = gated.blocking.length === 0 ? 'APPROVED' : 'REQUEST_CHANGES';
 
-  // Set bot-review commit status based on verdict
+  // Set bot-review commit status based on verdict. Failure writes re-check
+  // for a mid-run human maintainer APPROVE (which supersedes the bot verdict)
+  // so W5's override is never clobbered by a slower in-flight review.
   try {
-    setCommitStatus(
-      sha,
-      verdict === 'APPROVED' ? 'success' : 'failure',
-      verdict === 'APPROVED'
-        ? 'Review passed'
-        : 'Blocking findings require changes',
-    );
+    if (verdict === 'APPROVED') {
+      setCommitStatus(sha, 'success', 'Review passed');
+    } else {
+      setFailureStatusUnlessHumanApproved(
+        prNumber,
+        sha,
+        'Blocking findings require changes',
+      );
+    }
   } catch (err) {
     process.stderr.write(
       `[reviewer] Failed to set bot-review status: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -1187,7 +1268,11 @@ async function escalateToHumanArbitration(
     );
   }
   try {
-    setCommitStatus(sha, 'failure', 'Escalated to human arbitration');
+    setFailureStatusUnlessHumanApproved(
+      prNumber,
+      sha,
+      'Escalated to human arbitration',
+    );
   } catch (err) {
     process.stderr.write(
       `[reviewer] Failed to set bot-review failure: ${err instanceof Error ? err.message : String(err)}\n`,
@@ -1405,7 +1490,11 @@ async function handleLlmFailure(prNumber, err, ctx = null) {
   const kind = classifyProviderError(err);
 
   try {
-    setCommitStatus(sha, 'failure', statusDescriptionForFailure(kind));
+    setFailureStatusUnlessHumanApproved(
+      prNumber,
+      sha,
+      statusDescriptionForFailure(kind),
+    );
   } catch (statusErr) {
     process.stderr.write(
       `[reviewer] Failed to set bot-review failure: ${statusErr instanceof Error ? statusErr.message : String(statusErr)}\n`,

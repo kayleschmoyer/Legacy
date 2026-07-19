@@ -9,7 +9,7 @@ metadata:
 
 The campaign layer for the repo's hardest live problem: keeping the nightly Playwright run — the full live-backend integration suite (every `*.integration.spec.ts` under `apps/web-e2e/src/integration/tests/`; ~186 tests as of run [27216379406](https://github.com/bkrupa/legacy-sports/actions/runs/27216379406)) plus the full hermetic e2e suite — at **0 failed / 0 flaked**. This skill is the triage-and-decision playbook. It does NOT teach test-writing: [testing](../testing/SKILL.md) is the how-to home, [fix-integration-tests](../fix-integration-tests/SKILL.md) is the per-ticket fix workflow, and [e2e-determinism.md](../testing/references/e2e-determinism.md) owns the determinism levers and the class-of-bug catalog.
 
-**Glossary** (defined once): _nightly_ = the `schedule` (cron `0 3 * * *` UTC) run of `.github/workflows/run-playwright-tests.yml` against `main`, running both suites sharded. _Shard_ = one parallel Playwright process in that run; integration shards each hammer the one shared live backend (`api.legacy-fantasy.com`). _0/0_ = a nightly report showing 0 failed and 0 flaked (flakes count the same as failures). _Bisect_ = attributing a nightly regression to one of the day's merge commits.
+**Glossary** (defined once): _nightly_ = the automated full-suite run of `.github/workflows/run-playwright-tests.yml` against `main` — a `workflow_run` fired when Deploy completes on main, debounced by the workflow's `gate` job to at most one attempt per `FULL_SUITE_MIN_INTERVAL_HOURS` (repo var, default 20h); the former `0 3 * * *` cron was removed under the schedule-free CI policy, and the name "nightly" is retained because the cadence on an active repo is still ~one run per day. Runs both suites sharded. _Shard_ = one parallel Playwright process in that run; integration shards each hammer the one shared live backend (`api.legacy-fantasy.com`). _0/0_ = a nightly report showing 0 failed and 0 flaked (flakes count the same as failures). _Bisect_ = attributing a nightly regression to one of the day's merge commits.
 
 **Scope note:** `run:integration` PR-label runs (`run-integration-tests.yml`) execute the same specs against the same shared backend, so their failures triage with THIS skill's phases too — with two differences: (1) evidence comes from raw CI logs, not a report — those runs publish no `pr-<N>` GH-Pages report (see [read-playwright-report § Report Location](../read-playwright-report/SKILL.md#report-location)); use `ci_get_logs(jobName: "Run Integration Suite", errorSummary: true)`. (2) The bisect window is the PR's base..head against the last green run's actual tested SHA. Verify candidate commits with `git merge-base --is-ancestor <sha> <passing-head>` before naming them — a candidate already contained in the passing run is exonerated by construction (LS-8310's original window made exactly this error).
 
@@ -41,7 +41,7 @@ Run these in order. Each phase states the expected observation and where to bran
 ci_list_runs(workflow: "run-playwright-tests.yml", limit: 5)
 ```
 
-**Expect:** one `schedule`-event run per day on `main`; note the failing run's `run_id` and head SHA, and the most recent green nightly's SHA (you need both for Phase 4).
+**Expect:** roughly one `workflow_run`-event full-suite run per day on `main` (none on days with no merges); note the failing run's `run_id` and head SHA, and the most recent green nightly's SHA (you need both for Phase 4).
 
 ```
 ci_get_playwright_report(runId: <run_id>)   # auto-expands to the "nightly-<run_id>" report
@@ -166,7 +166,7 @@ Structural fixes that would shrink the whole failure surface. Each is OPEN — c
 Created 2026-07-02 from the skills audit (`scratch/skills-audit/synthesis.json`, hardest-problem candidate #1: nightly live-backend integration determinism — doctrine existed across 6+ documents with no operational campaign playbook). Re-verify volatile facts:
 
 - Shard ceiling + raise protocol: `grep -n "INTEGRATION_SHARD_CEILING" .github/workflows/run-playwright-tests.yml`
-- Nightly cron + suites: `grep -n "cron\|Nightly" .github/workflows/run-playwright-tests.yml | head`
+- Nightly trigger + suites: `grep -n "workflow_run\|FULL_SUITE_MIN_INTERVAL_HOURS\|Nightly" .github/workflows/run-playwright-tests.yml | head`
 - Report naming/pruning: search `DEST_DIR: playwright-report/` and `Pruning old` in the same workflow
 - Retries policy: `grep -n -B2 "retries" apps/web-e2e/playwright.integration.config.ts`
 - Spec inventory: `ls apps/web-e2e/src/integration/tests/`
