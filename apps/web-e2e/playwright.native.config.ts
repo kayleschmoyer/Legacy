@@ -58,10 +58,13 @@ export default defineConfig<BackendOptions & PlatformOptions>({
 
   use: {
     /* Native has no in-process network interception (`networkMock: false`), so
-     * native projects run against the live backend — the same identity path as
-     * the `shared-live` project. A hermetic-native backend (per-worker GraphQL
-     * mock server) arrives with LS-8448. */
-    backend: 'live',
+     * hermetic native runs use the per-worker out-of-process GraphQL mock server
+     * (ADR-0017 — LS-8448): the emulator app is pointed at it via env
+     * (`EXPO_PUBLIC_GRAPHQL_HOST` + `adb reverse`) and it serves the same
+     * operation-name-keyed factory payloads the web mocks serve. Switch a native
+     * project to `backend: 'live'` for flows that need the real backend (e.g.
+     * WebSocket-driven live draft — see `realtimeUnavailable`, AC4). */
+    backend: 'mock',
     trace: 'off',
   },
 

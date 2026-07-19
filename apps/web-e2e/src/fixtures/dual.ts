@@ -7,6 +7,12 @@ import {
 
 import { withApiIsolation } from './api-isolation';
 import { attributePageCoverage, snapshotCoverageBaseline } from './coverage';
+import {
+  clearReverseForward,
+  createNativeMockServer,
+  NativeMockTestData,
+  reverseForwardToDevice,
+} from './native-mock';
 import { LiveTestData, MockTestData, type TestData } from './test-data';
 import {
   buildIntegrationStorageState,
@@ -21,6 +27,7 @@ import {
   PlaywrightWebDriver,
 } from '../driver';
 import { isNativeEmulatorConfigured } from '../driver/appium-env';
+import type { GraphQLMockServer } from '../mocks/graphql/server/native-mock-server';
 
 /**
  * Dual-mode fixtures (ADR-0016 §backend seam) — ONE spec, selectable backend.
@@ -83,11 +90,43 @@ export interface DualFixtures {
   _coverage: void;
 }
 
+/** Worker-scoped fixtures (one per Playwright worker process). */
+export interface DualWorkerFixtures {
+  /**
+   * The per-worker hermetic-native GraphQL mock server (ADR-0017 — LS-8448).
+   * Created once per worker but only *started* when a native + mock spec asks
+   * for `testData`; a no-op resource for web/live workers. The emulator reaches
+   * it via `adb reverse` (see `native-mock.ts`).
+   */
+  nativeMockServer: GraphQLMockServer;
+}
+
 export const test = base.extend<
-  BackendOptions & PlatformOptions & DualFixtures
+  BackendOptions & PlatformOptions & DualFixtures,
+  DualWorkerFixtures
 >({
   backend: ['mock', { option: true }],
   platform: ['web', { option: true }],
+
+  /**
+   * One mock server per worker. Constructed unconditionally (cheap — no socket
+   * until `.start()`), started lazily by the native-mock `testData` branch, and
+   * torn down here. Web/live workers never start it, so it stays inert there.
+   */
+  nativeMockServer: [
+    async ({}, use: (server: GraphQLMockServer) => Promise<void>) => {
+      const server = createNativeMockServer();
+      try {
+        await use(server);
+      } finally {
+        await server.stop();
+        if (isNativeEmulatorConfigured()) {
+          await clearReverseForward();
+        }
+      }
+    },
+    { scope: 'worker' },
+  ],
 
   /**
    * Live mode authenticates the default context against the live web app;
@@ -110,13 +149,44 @@ export const test = base.extend<
     await use(backend === 'live' ? WEB_BASE : baseURL);
   },
 
-  /** Hermetic API isolation — mock mode only (live specs must hit the API). */
+  /**
+   * Per-test backend environment (`auto`, so it runs for every test).
+   *
+   *   • Web mock: install hermetic `page.route()` API isolation.
+   *   • Native mock: start the per-worker mock server, point the emulator at it
+   *     via `adb reverse` (when an emulator harness is configured), and `reset()`
+   *     it so per-test overrides never leak between specs — the native analogue
+   *     of web's fresh-page-per-test isolation. Runs here (not in `testData`) so
+   *     the reset happens even for a native spec that declares no preconditions.
+   *   • Live (either platform): no isolation — specs hit the real API.
+   */
   _backendEnv: [
     async (
-      { backend, page }: { backend: BackendMode; page: Page },
+      {
+        backend,
+        platform,
+        page,
+        nativeMockServer,
+      }: {
+        backend: BackendMode;
+        platform: PlatformMode;
+        page: Page;
+        nativeMockServer: GraphQLMockServer;
+      },
       use: () => Promise<void>,
       testInfo: TestInfo,
     ) => {
+      if (platform === 'native') {
+        if (backend === 'mock') {
+          await nativeMockServer.start();
+          if (isNativeEmulatorConfigured()) {
+            await reverseForwardToDevice(nativeMockServer.port);
+          }
+          nativeMockServer.reset();
+        }
+        await use();
+        return;
+      }
       if (backend === 'mock') {
         await withApiIsolation(page, testInfo, use);
       } else {
@@ -149,9 +219,31 @@ export const test = base.extend<
   ],
 
   testData: async (
-    { backend, page }: { backend: BackendMode; page: Page },
+    {
+      backend,
+      platform,
+      page,
+      nativeMockServer,
+    }: {
+      backend: BackendMode;
+      platform: PlatformMode;
+      page: Page;
+      nativeMockServer: GraphQLMockServer;
+    },
     use: (testData: TestData) => Promise<void>,
   ) => {
+    if (platform === 'native') {
+      // Native + live: same identity path as the web `shared-live` project.
+      if (backend !== 'mock') {
+        await use(new LiveTestData());
+        return;
+      }
+      // Native + mock: the per-worker server is started, wired via adb reverse,
+      // and reset for this test by the `_backendEnv` auto-fixture above; hand the
+      // spec a TestData seam that registers overrides in-process on it.
+      await use(new NativeMockTestData(nativeMockServer));
+      return;
+    }
     await use(backend === 'mock' ? new MockTestData(page) : new LiveTestData());
   },
 

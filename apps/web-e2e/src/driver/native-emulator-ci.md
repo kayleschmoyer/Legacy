@@ -7,12 +7,13 @@ watched job before generalizing."_ This is that job — the piece that finally
 
 ## What runs where
 
-| Piece                                   | Owner       | Where                                                                                                                                                |
-| --------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AppiumNativeDriver` (wdio adapter)     | LS-8447     | `appium-native.driver.ts`                                                                                                                            |
-| `createAndroidSession()` (wdio session) | LS-8447     | `appium-session.ts`                                                                                                                                  |
-| `platform: 'native'` fixture seam       | LS-8449     | `../fixtures/dual.ts`, `playwright.native.config.ts`                                                                                                 |
-| **Emulator provisioning + wiring**      | **LS-8450** | `.github/workflows/e2e-native-android.yml`, `scripts/ci/native-e2e-run.sh`, the real-session branch of the `driver` fixture in `../fixtures/dual.ts` |
+| Piece                                   | Owner       | Where                                                                                                                                                    |
+| --------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppiumNativeDriver` (wdio adapter)     | LS-8447     | `appium-native.driver.ts`                                                                                                                                |
+| `createAndroidSession()` (wdio session) | LS-8447     | `appium-session.ts`                                                                                                                                      |
+| `platform: 'native'` fixture seam       | LS-8449     | `../fixtures/dual.ts`, `playwright.native.config.ts`                                                                                                     |
+| **Per-worker hermetic mock server**     | LS-8448     | `../mocks/graphql/server/native-mock-server.ts`, `../fixtures/native-mock.ts`, ADR [0017](../../../../docs/decisions/0017-native-graphql-mock-server.md) |
+| **Emulator provisioning + wiring**      | **LS-8450** | `.github/workflows/e2e-native-android.yml`, `scripts/ci/native-e2e-run.sh`, the real-session branch of the `driver` fixture in `../fixtures/dual.ts`     |
 
 Before this ticket the `driver` fixture resolved the throwing placeholder
 (`pending-native.driver.ts`) for `platform: 'native'`. LS-8450 wires it to the
@@ -53,13 +54,27 @@ Schedule-free (LS-8487): `workflow_dispatch` + `workflow_run` after "Build
 Android App" on `main`. A failing job reddens the run (the "watched" red check).
 Screenshots/logs, the Appium log, and the Playwright report upload as artifacts.
 
+## Hermetic backend (LS-8448 / ADR-0017)
+
+The native project runs `backend: 'mock'`: the `nativeMockServer` worker fixture
+(`../fixtures/native-mock.ts`) boots a per-worker HTTP GraphQL mock server that
+serves the same operation-name-keyed factory payloads the web mocks serve, and
+runs `adb reverse tcp:$E2E_NATIVE_GRAPHQL_PORT tcp:<hostPort>` so the emulator
+reaches it. The bypass APK must be built with
+`EXPO_PUBLIC_GRAPHQL_HOST=http://localhost:$E2E_NATIVE_GRAPHQL_PORT/graphql`
+(default device port `8083`). WebSocket-driven flows (live draft) stay live-only
+on native — the HTTP server rejects subscriptions loudly; specs gate via
+`realtimeUnavailable` (AC4).
+
 ## Run it locally
 
 Requires a booted Android emulator + Appium (UiAutomator2) on `127.0.0.1:4723`
-and a bypass APK. Export the harness env, then run the native project:
+and a bypass APK built with the mock-server host baked in (see above). Export the
+harness env, then run the native project:
 
 ```bash
 export E2E_NATIVE_APP=/abs/path/to/bypass-app-release.apk
+export E2E_NATIVE_GRAPHQL_PORT=8083   # must match the APK's baked EXPO_PUBLIC_GRAPHQL_HOST
 pnpm exec playwright test --config=apps/web-e2e/playwright.native.config.ts \
   --project=native-android league-discovery-search.dual.spec.ts
 ```

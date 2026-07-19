@@ -45,6 +45,16 @@ export APPIUM_HOST="127.0.0.1"
 export APPIUM_PORT
 echo "🔧 Native harness APK: $E2E_NATIVE_APP"
 
+# Hermetic backend (ADR-0017 — LS-8448): the per-worker GraphQL mock server is
+# booted in-process by the Playwright `nativeMockServer` fixture, which also runs
+# `adb reverse tcp:${E2E_NATIVE_GRAPHQL_PORT} tcp:<dynamicHostPort>`. The bypass
+# APK must be built with
+# EXPO_PUBLIC_GRAPHQL_HOST=http://localhost:${E2E_NATIVE_GRAPHQL_PORT}/graphql so
+# the emulator app reaches the mapped server. Keep this port in sync with the APK
+# build (build-android-app.yml).
+export E2E_NATIVE_GRAPHQL_PORT="${E2E_NATIVE_GRAPHQL_PORT:-8083}"
+echo "🔧 Native GraphQL device port (adb reverse target): $E2E_NATIVE_GRAPHQL_PORT"
+
 # ── 2. Start Appium (UiAutomator2) ────────────────────────────────────
 echo "🔌 Ensuring Appium UiAutomator2 driver is installed"
 pnpm exec appium driver install uiautomator2 2>/dev/null \

@@ -27,3 +27,4 @@ for authoring guidance and the immutability rule.
 | [0014](0014-integration-nightly-bisect.md)               | Integration regression detection via nightly + bisection    | Accepted |
 | [0015](0015-semantic-page-objects.md)                    | Semantic Page Object Model for Playwright e2e tests         | Proposed |
 | [0016](0016-test-dependency-injection.md)                | Test dependency injection: platform driver + backend seam   | Proposed |
+| [0017](0017-native-graphql-mock-server.md)               | Per-worker GraphQL mock server for hermetic native E2E runs | Proposed |
