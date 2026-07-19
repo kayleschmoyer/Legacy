@@ -1,0 +1,288 @@
+# =============================================================================
+# Run Maestro Sweep
+# =============================================================================
+# Automated Android visual/AI-judging sweep (post-deploy, debounced). Boots an
+# x86_64 Android emulator, builds + installs the Expo dev APK, runs the Maestro
+# flows in maestro/flows/ selected by tag, and uploads the NN-before / NN-after
+# screenshot artifacts the /mobile-qa AI judge consumes (LS-8445).
+#
+# This is the visual/screenshot-capture sweep only (ADR-0016): functional native
+# regression is owned by the shared Playwright suite via the native AppDriver
+# (epic LS-8444). This workflow captures + uploads screenshots and turns a failed
+# flow into a red check; downstream AI judging + Jira filing stays the human/agent
+# /mobile-qa step (see .agents/skills/mobile-qa/references/ci-sweep.md).
+#
+# Two matrix variants, each needing its own APK because EXPO_PUBLIC_BYPASS_AUTH
+# is inlined at build time:
+#   - authenticated:   bypass build (fake LOCAL_USER), runs the `authenticated` tag
+#   - unauthenticated: plain build (login screen renders), runs the `login` tag
+#
+# Schedule-free CI policy (LS-8487): no `schedule:` cron. Fires after the Deploy
+# workflow completes on main, debounced to at most one attempt per
+# MAESTRO_SWEEP_MIN_INTERVAL_HOURS (repo var, default 156h ≈ weekly) — see the
+# `gate` job, which mirrors run-playwright-tests.yml. Manual dispatch always runs.
+# =============================================================================
+
+name: "Run Maestro Sweep"
+
+on:
+  # Automated sweep: fires after the umbrella Deploy workflow completes on main
+  # (success or failure — a red deploy still merged UI code worth screenshotting).
+  # The `gate` job debounces to at most one attempt per interval.
+  workflow_run:
+    workflows: ["Deploy"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      variants:
+        description: "Which variant(s) to sweep"
+        required: false
+        default: "both"
+        type: choice
+        options:
+          - both
+          - authenticated
+          - unauthenticated
+
+permissions:
+  contents: read
+  actions: read # gate job inspects prior runs of this workflow for debouncing
+
+# Serialize automated (workflow_run-triggered) sweeps; manual dispatches keep
+# their own unique group. cancel-in-progress:false keeps one active + at most one
+# pending run, and the pending run's gate then debounces it.
+concurrency:
+  group: maestro-sweep-${{ github.event_name == 'workflow_run' && 'post-deploy' || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  # Version matrix — mirrors build-android-app.yml so the APK build behaves
+  # identically to the shipped Android pipeline.
+  JAVA_VERSION: "17" # LTS, compatible with RN 0.81.5
+  NODE_VERSION: "22"
+  ANDROID_API_LEVEL: "35" # compileSdk for the build (emulator boots api 34, below)
+  NDK_VERSION: "27.1.12297006" # stable NDK for RN 0.81.5
+  GRADLE_OPTS: >-
+    -Dorg.gradle.internal.http.connectionTimeout=120000
+    -Dorg.gradle.internal.http.socketTimeout=120000
+  # 2GB is sufficient for Metro; higher + Gradle workers risks OOM (LS-4933 notes).
+  NODE_OPTIONS: "--max-old-space-size=2048"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Post-deploy debounce gate (schedule-free CI policy). Mirrors the `gate` job
+  # in run-playwright-tests.yml.
+  # workflow_dispatch: always runs.
+  # workflow_run (Deploy completed on main): runs at most once per
+  # MAESTRO_SWEEP_MIN_INTERVAL_HOURS. A debounced run skips every downstream job,
+  # so its own run conclusion is "success" with all jobs skipped; the debounce
+  # check therefore inspects the "Prepare Sweep" job of prior automated runs
+  # (non-skipped = real attempt) rather than run-level conclusions, which would
+  # re-arm the debounce forever on a busy repo.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: "Maestro Sweep Gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      should-run: ${{ steps.decide.outputs.should-run }}
+    steps:
+      - name: "Decide whether to run"
+        id: decide
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIN_INTERVAL_HOURS: ${{ vars.MAESTRO_SWEEP_MIN_INTERVAL_HOURS || '156' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
+          # All automated runs of this workflow created since the cutoff,
+          # excluding this run itself.
+          RUN_IDS=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/run-maestro-sweep.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=30" \
+            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
+
+          for id in $RUN_IDS; do
+            # Non-skipped, completed "Prepare Sweep" = a real sweep attempt.
+            PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
+              --jq '[.jobs[] | select(.name == "Prepare Sweep" and .conclusion != null and .conclusion != "skipped")] | length')
+            if [ "$PREPARED" -gt 0 ]; then
+              echo "should-run=false" >> "$GITHUB_OUTPUT"
+              echo "Debounced — automated Maestro sweep (run ${id}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+
+          echo "should-run=true" >> "$GITHUB_OUTPUT"
+          echo "No automated Maestro sweep in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Marker + matrix computation. Runs only on a real (non-debounced) attempt, so
+  # the gate above keys its debounce off this job's name ("Prepare Sweep").
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: "Prepare Sweep"
+    needs: [gate]
+    if: needs.gate.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      variants: ${{ steps.matrix.outputs.variants }}
+    steps:
+      - name: "Compute variant matrix"
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          SEL="${{ github.event.inputs.variants || 'both' }}"
+          case "$SEL" in
+            authenticated)   echo 'variants=["authenticated"]' >> "$GITHUB_OUTPUT" ;;
+            unauthenticated) echo 'variants=["unauthenticated"]' >> "$GITHUB_OUTPUT" ;;
+            *)               echo 'variants=["authenticated","unauthenticated"]' >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  # ---------------------------------------------------------------------------
+  # Build the variant's APK, boot an x86_64 emulator, and run the tagged sweep.
+  # GH-hosted ubuntu-latest is forced (not the self-hosted runner var) because
+  # reactivecircus/android-emulator-runner needs KVM, exposed only on GH-hosted
+  # Linux — so JDK/SDK setup steps always run here (no self-hosted AMI to lean on).
+  # ---------------------------------------------------------------------------
+  sweep:
+    name: "Maestro Sweep (${{ matrix.variant }})"
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ${{ fromJSON(needs.prepare.outputs.variants) }}
+    # EXPO_PUBLIC_* values are inlined into the JS bundle by Metro during the
+    # Gradle assemble inside the build-android composite action, so they MUST be
+    # at JOB scope to reach composite-action steps (actions/runner#1483).
+    # BYPASS_AUTH is the only value that differs per variant: 'true' fakes a
+    # signed-in LOCAL_USER for the authenticated flows; empty leaves real auth on
+    # so the login screen renders for the unauthenticated flow. A DEBUG build (see
+    # the build step) keeps NODE_ENV=development, so the bypass path does not throw
+    # (AuthHooks.ts guards BYPASS_AUTH against production builds).
+    env:
+      EXPO_PUBLIC_BYPASS_AUTH: ${{ matrix.variant == 'authenticated' && 'true' || '' }}
+      EXPO_PUBLIC_OAUTH_PROXY: ${{ secrets.OAUTH_PROXY_URL }}
+      EXPO_PUBLIC_GRAPHQL_HOST: ${{ secrets.GRAPHQL_HOST }}
+      EXPO_PUBLIC_WEBSOCKET_URL: ${{ secrets.WEBSOCKET_URL }}
+      EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
+      EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_MONTHLY_PRICE_ID }}
+      EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_ANNUAL_PRICE_ID }}
+      EXPO_PUBLIC_GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+      EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY: ${{ secrets.GROWTHBOOK_CLIENT_KEY }}
+      EXPO_PUBLIC_APP_BASE_URL: https://legacy-fantasy.com
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          install-dependencies: true
+          set-nx-shas: false
+          skip-system-deps: true
+
+      # This job always runs on GH-hosted ubuntu-latest (KVM requirement), which
+      # has no baked JDK/SDK, so — unlike build-android-app.yml — these are not
+      # gated on CI_RUNNER_LABEL.
+      - name: Setup Java
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: "temurin"
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: "gradle"
+          cache-dependency-path: |
+            apps/app/app.json
+            pnpm-lock.yaml
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
+
+      - name: Build dev APK (x86_64 for the emulator)
+        id: build
+        uses: ./.github/actions/build-android
+        with:
+          # DEBUG build so NODE_ENV=development and the auth bypass is honored (a
+          # release build sets NODE_ENV=production and AuthHooks.ts throws). Debug
+          # normally ships arm64-v8a only; override the ABI to add x86_64 so the
+          # x86_64 CI emulator can boot the APK. The composite action appends
+          # extra-gradle-flags AFTER its own -PreactNativeArchitectures, and Gradle
+          # honors the last -P value for a given property.
+          build-type: debug
+          extra-gradle-flags: "-PreactNativeArchitectures=arm64-v8a,x86_64"
+        timeout-minutes: 40
+
+      - name: Resolve APK path + tag for the emulator script
+        shell: bash
+        run: |
+          # Publish to $GITHUB_ENV so the values reliably reach the child process
+          # the emulator-runner action spawns for its `script:` step. The Maestro
+          # tag equals the matrix variant name (authenticated / unauthenticated).
+          echo "APK_PATH=apps/app/android/${{ steps.build.outputs.apk-path }}" >> "$GITHUB_ENV"
+          echo "TAGS=${{ matrix.variant }}" >> "$GITHUB_ENV"
+
+      - name: Install Maestro
+        shell: bash
+        env:
+          # Optional pin for reproducibility; empty = latest (installer default).
+          MAESTRO_VERSION: ${{ vars.MAESTRO_VERSION }}
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: AVD Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api34-x86_64-google_apis
+
+      - name: Boot emulator and run Maestro sweep
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6G
+          force-avd-creation: false
+          emulator-options: -no-window -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect -noaudio -accel on
+          disable-animations: true
+          # Invoke the script as a single command — the action splits multi-line
+          # inline `script:` blocks across separate `sh -c` calls, which breaks
+          # multi-line shell constructs (LS-4755). Logic lives in the file.
+          script: bash scripts/ci/maestro-sweep.sh
+
+      - name: Upload screenshot artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maestro-screenshots-${{ matrix.variant }}
+          path: |
+            maestro/artifacts/**
+          retention-days: 14
+          if-no-files-found: warn

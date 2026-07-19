@@ -32,6 +32,17 @@ Transcribe these into TaskCreate entries at the start of a sweep:
 6. **Update coverage docs** — record the Maestro flow in the affected `feature.md` platform-coverage table (see the [QA coverage model](../plan-ticket/references/qa-coverage-model.md) § Platform coverage).
 7. **Report** — summary table (flow → steps run → issues found → tickets filed) plus paths to `report.json` and the screenshots.
 
+## Running in CI
+
+The screenshot-capture half of this sweep runs automatically in CI as
+`.github/workflows/run-maestro-sweep.yml` (post-deploy, debounced; schedule-free per
+LS-8487). It boots an x86_64 emulator, builds + installs the dev APK per variant
+(`authenticated` bypass build + `unauthenticated` login build), runs the tagged flows,
+and uploads the `NN-before` / `NN-after` screenshots as artifacts; a failed flow is a red
+check. CI does **not** judge or file tickets — download the artifacts and run steps 3–5
+above locally. Full runbook (trigger, cadence knobs, build-shape rationale, local
+judging): [references/ci-sweep.md](references/ci-sweep.md).
+
 ## Interaction pattern (ported interactor concept)
 
 Web QA captured before/after DOM state around each interaction; the mobile equivalent lives **inside the flows**: each key interaction takes a `NN-before-<action>` / `NN-after-<action>` screenshot pair, and the judge receives both images for that step so it can detect no-op taps, stuck spinners, and broken transitions. When authoring a new flow, interact with each key element (tap, scroll, dialog step) and bracket every interaction with such a pair — see `maestro/flows/trade-center/trade-center.yaml` for the worked example.
@@ -58,3 +69,4 @@ Web QA captured before/after DOM state around each interaction; the mobile equiv
 - Verify auth bypass still exists: `grep -rn "EXPO_PUBLIC_BYPASS_AUTH" apps/app/src/common/auth/AuthHooks.ts`
 - Verify flow inventory: `ls maestro/flows/*/`
 - Verify script CLIs: `node scripts/mobile-qa/judge.mjs` and `node scripts/mobile-qa/bug-filter.mjs` (both print usage errors)
+- 2026-07-18 (LS-8445): added the CI Maestro sweep (`.github/workflows/run-maestro-sweep.yml` + `scripts/ci/maestro-sweep.sh`); runbook at [references/ci-sweep.md](references/ci-sweep.md).
