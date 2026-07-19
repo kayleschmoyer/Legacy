@@ -131,6 +131,32 @@ describe('cleanupOperationalLabels', () => {
   });
 });
 
+// Static-source regression guard for LS-8489. Stacked PRs merge base-first:
+// a child waits for its parent to land, then the merge queue's
+// retargetDependentPRs re-targets it to main and it proceeds through the
+// normal queue path. `merge-to-parent` is a deliberate manual escape hatch
+// (merge a child into its parent branch ahead of the parent) and must never
+// be applied by the reviewer — auto-applying it on APPROVE would merge
+// approved children into their parent branches, mutating the parent PR's
+// diff after its review and bypassing the base-first flow.
+describe('reviewer never applies merge-to-parent (LS-8489)', () => {
+  it('index.mjs contains no merge-to-parent label application', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+    const indexPath = join(here, '..', '..', 'index.mjs');
+    const src = await readFile(indexPath, 'utf8');
+
+    assert.doesNotMatch(
+      src,
+      /addLabel(?:AsApp)?\([^)]*merge-to-parent/,
+      'Reviewer must never apply merge-to-parent — stacked PRs merge ' +
+        'base-first via the merge queue retargetDependentPRs flow (LS-8489).',
+    );
+  });
+});
+
 // Regression guard for LS-4678. The terminal-verdict cleanup in index.mjs
 // must pass `preserveReadyLabel: true` unconditionally — including on
 // APPROVED — so post-approval pushes re-trigger Reviewer (W1) instead of

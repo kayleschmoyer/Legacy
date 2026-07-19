@@ -1187,6 +1187,13 @@ async function main() {
       process.exit(0);
     }
     if (verdict === 'APPROVED') {
+      // Note: only `merge-when-ready` is applied here — including on stacked
+      // (non-main-base) PRs. Stacked PRs merge base-first: the child waits for
+      // its parent to land, at which point the merge queue's
+      // retargetDependentPRs re-bases it onto main and it proceeds through the
+      // normal queue path. `merge-to-parent` is a deliberate manual escape
+      // hatch for collapsing a child into its parent branch, never applied by
+      // the bot (LS-8489).
       try {
         addLabel(prNumber, 'merge-when-ready');
         process.stdout.write(

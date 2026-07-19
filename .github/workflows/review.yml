@@ -14,6 +14,14 @@ name: Reviewer (W1)
 # that label — the only review trigger — fires this workflow through its
 # normal path. Labels stay single-purpose: bot:ready-for-review = review,
 # merge-when-ready = merge.
+#
+# Stacked PRs (LS-8489): on APPROVE the reviewer applies only
+# merge-when-ready, regardless of base branch. Stacked PRs merge base-first —
+# the child waits for its parent to land, then the merge queue's
+# retargetDependentPRs re-targets it to main and it proceeds through the
+# normal queue path. merge-to-parent is a manual escape hatch (merge a child
+# into its parent branch ahead of the parent landing) and is never applied by
+# automation.
 
 on:
   pull_request:

@@ -42,6 +42,10 @@
   color: "0e8a16"
   description: "Signals that the PR should enter the merge queue when all checks pass"
 
+# Manual escape hatch — never applied by automation (LS-8489). Stacked PRs
+# normally merge base-first and are re-targeted to main by the merge queue's
+# retargetDependentPRs after the parent lands; hand-apply this only to merge
+# a child into its parent branch ahead of the parent.
 - name: merge-to-parent
   color: "1d76db"
   description: "PR targets a parent feature branch rather than main"

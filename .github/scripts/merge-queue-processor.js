@@ -257,7 +257,13 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       return { canMerge: false, reason: 'PR is in draft state' };
     }
 
-    // For non-main targets, require the merge-to-parent label
+    // For non-main targets, require the merge-to-parent label. This label is
+    // a deliberate manual escape hatch and is never applied by automation
+    // (LS-8489): the normal stacked-PR path is base-first — the child waits
+    // for its parent to merge, retargetDependentPRs (below) re-targets it to
+    // main, and it then flows through the standard main-base queue path.
+    // Hand-apply merge-to-parent only to collapse a child into its parent
+    // branch ahead of the parent landing.
     if (pr.base.ref !== 'main') {
       const hasMergeToParent = pr.labels.some(
         (l) => l.name === 'merge-to-parent',
@@ -1031,10 +1037,15 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         '4. If a reviewer already requested changes, address them and re-request review';
     } else if (validation.reason.includes('merge-to-parent')) {
       comment +=
-        '\n1. Add the `merge-to-parent` label to this PR\n' +
-        '2. This PR targets `' +
+        '\n1. This PR targets `' +
         pr.base.ref +
-        '` (non-main), so both `merge-when-ready` and `merge-to-parent` labels are required';
+        '` (non-main). Stacked PRs normally merge **base-first**: wait for the parent PR to merge, ' +
+        'and this PR will be re-targeted to `main` automatically and proceed through the normal queue\n' +
+        '2. To instead merge this PR into `' +
+        pr.base.ref +
+        '` directly (before the parent lands), add the `merge-to-parent` label — it is a deliberate ' +
+        'manual escape hatch and is never applied by automation, so both `merge-when-ready` and ' +
+        '`merge-to-parent` must be present';
     } else if (validation.unresolvedThreads) {
       comment +=
         '\n1. Resolve all open review comment threads on the PR\n' +
