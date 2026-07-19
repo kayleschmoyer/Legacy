@@ -1,0 +1,340 @@
+# =============================================================================
+# Cross-Browser E2E (Firefox + WebKit)
+# =============================================================================
+# The post-deploy "nightly" (run-playwright-tests.yml) only ever runs the E2E
+# suite on chromium, so Firefox/WebKit-only regressions — e.g. the WebKit
+# localStorage capability skips in auth-flows.spec.ts — go undetected (LS-8458).
+#
+# This workflow runs the hermetic E2E @critical set on BOTH Firefox and WebKit
+# on a WEEKLY cadence. Schedule-free CI policy (LS-8487): there is NO cron. Like
+# the nightly, it fires after the umbrella Deploy workflow completes on main and
+# a `gate` job debounces it to at most one attempt per
+# CROSS_BROWSER_MIN_INTERVAL_HOURS (repo var, default 168 = weekly). Every merge
+# to main re-arms detection; bursts collapse into ~one run/week; a fully idle
+# repo runs nothing.
+#
+# Manual dispatch: run either or both engines on demand with a custom grep.
+# Trigger: Actions -> "Cross-Browser E2E" -> Run workflow.
+# =============================================================================
+
+name: "Cross-Browser E2E"
+
+on:
+  # Weekly cross-browser run: fires after the umbrella Deploy workflow completes
+  # on main (success or failure — a red deploy still merged code worth testing).
+  # The `gate` job debounces to at most one attempt per interval.
+  workflow_run:
+    workflows: ["Deploy"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      browsers:
+        description: "Which engine(s) to run"
+        required: false
+        default: "firefox+webkit"
+        type: choice
+        options:
+          - firefox+webkit
+          - firefox
+          - webkit
+      test-grep:
+        description: "Filter tests by tag (Playwright --grep)"
+        required: false
+        default: "@critical"
+        type: choice
+        options:
+          - "@critical"
+          - "@smoke"
+          - "@regression"
+          - "(all)"
+
+permissions:
+  contents: read
+  actions: read # gate job inspects prior runs of this workflow for debouncing
+
+# Serialize automated (workflow_run-triggered) cross-browser runs so a burst of
+# Deploy completions collapses into one active + at most one pending run (the
+# pending run's gate then debounces it). Manual dispatches keep their own unique
+# group so an owner can always run on demand.
+concurrency:
+  group: cross-browser-e2e-${{ github.event_name == 'workflow_run' && 'post-deploy' || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Weekly debounce gate (schedule-free CI policy — mirrors the nightly's gate).
+  # workflow_dispatch: always runs.
+  # workflow_run (Deploy completed on main): runs at most once per
+  # CROSS_BROWSER_MIN_INTERVAL_HOURS (repo var, default 168 = weekly). One
+  # ATTEMPT per interval regardless of outcome.
+  # A debounced run skips every downstream job, so its own run conclusion is
+  # "success" with all jobs skipped; the debounce check therefore inspects the
+  # "Prepare Matrix" job of prior automated runs (non-skipped = real attempt)
+  # rather than run-level conclusions, which would re-arm the debounce forever
+  # on a busy repo.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: "Cross-Browser Gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      should-run: ${{ steps.decide.outputs.should-run }}
+    steps:
+      - name: "Decide whether to run"
+        id: decide
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIN_INTERVAL_HOURS: ${{ vars.CROSS_BROWSER_MIN_INTERVAL_HOURS || '168' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
+          # All automated runs of this workflow created since the cutoff,
+          # excluding this run itself.
+          RUN_IDS=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/cross-browser-e2e.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=30" \
+            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
+
+          for id in $RUN_IDS; do
+            # Non-skipped, completed "Prepare Matrix" = a real cross-browser
+            # attempt (in-flight attempts are excluded here but already
+            # serialized by the concurrency group above).
+            PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
+              --jq '[.jobs[] | select(.name == "Prepare Matrix" and .conclusion != null and .conclusion != "skipped")] | length')
+            if [ "$PREPARED" -gt 0 ]; then
+              echo "should-run=false" >> "$GITHUB_OUTPUT"
+              echo "Debounced — cross-browser attempt (run ${id}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+
+          echo "should-run=true" >> "$GITHUB_OUTPUT"
+          echo "No cross-browser attempt in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Compute the engine matrix.
+  # Automated (workflow_run): both engines.
+  # Manual: honor the `browsers` input (firefox+webkit / firefox / webkit).
+  # This job doubles as the debounce sentinel above — its non-skipped
+  # conclusion marks a real attempt.
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: "Prepare Matrix"
+    needs: [gate]
+    if: needs.gate.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        shell: bash
+        run: |
+          # Automated runs always exercise both engines; manual dispatch honors
+          # the `browsers` choice.
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            BROWSERS="firefox+webkit"
+          else
+            BROWSERS="${{ inputs.browsers }}"
+          fi
+
+          case "$BROWSERS" in
+            "firefox") MATRIX='["firefox"]' ;;
+            "webkit") MATRIX='["webkit"]' ;;
+            *) MATRIX='["firefox","webkit"]' ;;
+          esac
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Cross-browser engines: $MATRIX"
+
+  run-tests:
+    name: "Cross-Browser ${{ matrix.browser }}"
+    needs: [prepare]
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # The hermetic E2E suite is not backed by a live server, so it stays at the
+    # nightly's 60-min E2E cap. @critical is a subset, so this is headroom.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false # a Firefox failure must not cancel the WebKit job
+      matrix:
+        browser: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Verify AMI-baked Playwright browsers"
+        shell: bash
+        env:
+          BROWSER_ENGINE: ${{ matrix.browser }}
+        run: |
+          # The self-hosted runner AMI bakes Playwright browsers at
+          # /opt/playwright-browsers (see LS-2429). Set PLAYWRIGHT_BROWSERS_PATH
+          # for the rest of the job — the AMI does NOT set it globally, and
+          # without it Playwright falls back to ~/.cache/ms-playwright (empty on
+          # the runner) and fails to launch (LS-4465). This step is a tripwire:
+          # when the Playwright pin is bumped to a version wanting newer browser
+          # revisions than the AMI provides, it fails with an actionable message
+          # before tests run. The fix is to rebake the AMI (LS-2429), not to
+          # re-introduce a runtime `playwright install` (races the dpkg lock).
+          echo "PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers" >> "$GITHUB_ENV"
+          REVISION=$(node -e "
+            const path = require('path');
+            const fs = require('fs');
+            const pkg = require.resolve('playwright-core/package.json');
+            const file = path.join(path.dirname(pkg), 'browsers.json');
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            const name = process.argv[1];
+            const b = data.browsers.find((x) => x.name === name);
+            if (!b) {
+              console.error('No browsers.json entry for ' + name);
+              process.exit(1);
+            }
+            process.stdout.write(String(b.revision));
+          " "$BROWSER_ENGINE")
+          EXPECTED="/opt/playwright-browsers/${BROWSER_ENGINE}-${REVISION}"
+          echo "    Expected AMI-baked browser: $EXPECTED"
+          if [ ! -d "$EXPECTED" ]; then
+            echo "::error::AMI-baked Playwright browser missing: $EXPECTED"
+            echo ""
+            echo "The runner AMI is missing the ${BROWSER_ENGINE} build. This usually"
+            echo "means the project's Playwright pin was bumped to a version that wants"
+            echo "newer browser revisions than the AMI provides."
+            echo ""
+            echo "Fix: rebake the AMI via the Packer pipeline (see LS-2429). Do NOT"
+            echo "re-add a runtime 'playwright install' here — that races"
+            echo "unattended-upgrades for the dpkg lock and was the steady-state"
+            echo "cause of CI flake the tripwire is here to prevent."
+            echo ""
+            echo "AMI cache contents at /opt/playwright-browsers:"
+            if [ -d /opt/playwright-browsers ]; then
+              ls -la /opt/playwright-browsers 2>&1
+            else
+              echo "    (directory does not exist — AMI may be misconfigured)"
+            fi
+            exit 1
+          fi
+          echo "    OK: $EXPECTED is present."
+
+      - name: "Build Web Application"
+        shell: bash
+        env:
+          # Match the 4 GB heap every other web build in the repo uses.
+          NODE_OPTIONS: "--max-old-space-size=4096"
+          VITE_JIRA_PROXY_URL: "https://e2e-placeholder.test/jira"
+          VITE_GIPHY_API_KEY: "e2e-placeholder-key"
+          # Placeholder so the conditional "Continue with Discord" CTA on
+          # PublicLandingPage renders in hermetic E2E builds (LS-3537, LS-3541).
+          VITE_DISCORD_CLIENT_ID: "e2e-placeholder-discord-id"
+          # Required at build time so the TeamDetailPage upload handler doesn't
+          # throw before ever calling fetch — the upload endpoint is always
+          # mocked by Playwright (LS-8349).
+          VITE_IMAGE_UPLOAD_URL: "https://e2e-placeholder.test/images"
+        run: |
+          export NX_NO_CLOUD=true
+          pnpm exec nx build web
+
+      - name: "Start Dev Server"
+        shell: bash
+        run: |
+          export NX_NO_CLOUD=true
+
+          if [ -d "dist/apps/web" ]; then
+            echo "Serving pre-built web artifact..."
+            if command -v serve >/dev/null 2>&1; then
+              serve -s dist/apps/web -l 4200 --no-clipboard &
+            else
+              pnpm dlx serve@14.2.4 -s dist/apps/web -l 4200 --no-clipboard &
+            fi
+          else
+            echo "Falling back to nx serve..."
+            pnpm exec nx serve web --port=4200 --host=localhost &
+          fi
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
+          echo "Waiting for dev server on http://localhost:4200 ..."
+          for i in {1..90}; do
+            if curl -sf http://localhost:4200 >/dev/null 2>&1; then
+              echo "Dev server ready"
+              break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "Dev server crashed"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if ! curl -sf http://localhost:4200 >/dev/null 2>&1; then
+            echo "Dev server did not start within 90 seconds"
+            exit 1
+          fi
+
+      - name: "Run Playwright Tests"
+        id: tests
+        shell: bash
+        env:
+          CI: "true"
+        run: |
+          # Resolve the grep filter. Automated runs always use @critical (the
+          # AC1 set); manual dispatch honors the `test-grep` input, where
+          # "(all)" means no filter.
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            GREP="@critical"
+          else
+            GREP="${{ inputs['test-grep'] }}"
+          fi
+
+          # Build Playwright arguments as an array to avoid command injection.
+          # --project selects the engine (firefox/webkit map 1:1 to config
+          # project names). Existing runtime capability skips
+          # (test.skip(browserName === 'webkit', ...)) are honored automatically
+          # by Playwright — no override here (LS-8458 AC2).
+          PLAYWRIGHT_ARGS=(
+            "--config=apps/web-e2e/playwright.config.ts"
+            "--project=${{ matrix.browser }}"
+          )
+          if [ "$GREP" != "(all)" ]; then
+            PLAYWRIGHT_ARGS+=( "--grep=$GREP" )
+          fi
+          # HTML report for the uploaded artifact + line for live console.
+          PLAYWRIGHT_ARGS+=( "--reporter=html,line" )
+
+          echo "Running: pnpm exec playwright test ${PLAYWRIGHT_ARGS[*]}"
+          pnpm exec playwright test "${PLAYWRIGHT_ARGS[@]}"
+
+      - name: "Stop Dev Server"
+        if: always()
+        shell: bash
+        run: kill $SERVER_PID 2>/dev/null || true
+
+      # Report upload (AC1): the browsable HTML report per engine, retained as a
+      # workflow artifact. Uploaded even on failure so a red cross-browser run is
+      # triageable. The default HTML reporter writes to playwright-report/ at the
+      # repo root (where playwright runs).
+      - name: "Upload Playwright HTML Report"
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: cross-browser-report-${{ matrix.browser }}
+          path: playwright-report/
+          if-no-files-found: warn
+          retention-days: 14

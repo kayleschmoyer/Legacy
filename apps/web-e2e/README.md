@@ -33,6 +33,14 @@ make e2e-scope  # detect minimum scope based on changed files
 
 See [`.agents/skills/testing/references/e2e-testing.md`](../../.agents/skills/testing/references/e2e-testing.md) for the full mock architecture.
 
+#### Cross-browser cadence (LS-8458)
+
+The post-deploy nightly ([`run-playwright-tests.yml`](../../.github/workflows/run-playwright-tests.yml)) runs the E2E suite on **chromium only**, so Firefox/WebKit-specific regressions go undetected. A separate workflow, [`cross-browser-e2e.yml`](../../.github/workflows/cross-browser-e2e.yml), runs the hermetic `@critical` set on **Firefox and WebKit** and uploads a per-engine HTML report as a workflow artifact (`cross-browser-report-firefox` / `cross-browser-report-webkit`).
+
+- **Cadence:** weekly. Per the schedule-free CI policy (LS-8487) there is **no cron** — the workflow fires on `workflow_run` after `Deploy` completes on `main`, and a `gate` job debounces it to at most one run per `CROSS_BROWSER_MIN_INTERVAL_HOURS` (repo var, default `168` = weekly), mirroring the nightly's debounce. To change the cadence, set that repo var — do **not** add a `schedule:` trigger.
+- **On demand:** Actions → **Cross-Browser E2E** → _Run workflow_ (choose `firefox`, `webkit`, or both, and a grep tag). Or dispatch the nightly workflow with `browser=firefox`/`webkit`.
+- **Browser-specific failures:** existing runtime capability skips (e.g. `test.skip(browserName === 'webkit', …)` for WebKit's `localStorage` `SecurityError` in [`auth-flows.spec.ts`](src/tests/auth-flows.spec.ts)) are honored automatically — the run passes `--project=<engine>` and never overrides skips. A genuinely new cross-browser failure surfaced by this run should be **triaged and ticketed** (add a scoped `test.skip(browserName === …, 'LS-####: <reason>')` if the gap is a known engine limitation, or fix the underlying bug), never blanket-skipped.
+
 ### Integration suite — `src/integration/tests/`
 
 Runs against the live backend. Uses test-user credentials auto-linked from the main repo's `.env` by the worktree bootstrap script.
