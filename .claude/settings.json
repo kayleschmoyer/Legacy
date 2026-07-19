@@ -28,6 +28,7 @@
       "Read(resources/dev.dump)"
     ],
     "allow": [
+      "RemoteTrigger",
       "mcp__legacy-sports-aws__aws_apigateway_inspect",
       "mcp__legacy-sports-aws__aws_lambda_status",
       "mcp__legacy-sports-aws__aws_logs_tail",
