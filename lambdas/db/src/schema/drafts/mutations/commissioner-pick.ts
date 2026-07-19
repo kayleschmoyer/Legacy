@@ -14,6 +14,7 @@ import { GraphQLError } from 'graphql';
 
 import { DraftPick } from '../types';
 import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
+import { isLockWaitTimeout } from '../scheduled-mutations';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { logDraftPickActivity } from '../../../services/activity-log';
@@ -23,6 +24,27 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../../graphql-errors';
+import {
+  describeDbError,
+  formatDbError,
+} from '../../leagues/delete-resilience';
+
+/**
+ * Max attempts (including the first) for the Phase-2 locked transaction.
+ * EventBridge's every-minute autoProcessDraftPicks tick and the LS-8107
+ * makeDraftPick nudge can both acquire the `drafts` row lock at the same
+ * moment a commissioner submits a pick on behalf of another team, tripping
+ * the `SET LOCAL statement_timeout` guard (SQLSTATE 57014) on whichever
+ * statement in this transaction runs while the lock is held elsewhere
+ * (LS-8480). Unlike autoProcessDraftPicks — which can just skip and let the
+ * next tick retry (LS-8398) — a human is waiting on this response, so retry
+ * the whole transaction a couple of times instead of surfacing a transient
+ * lock race as a hard failure (mirrors the makeDraftPick fix, LS-8476).
+ */
+const MAX_PICK_LOCK_ATTEMPTS = 3;
+
+const lockRetryDelay = (attempt: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, 50 * attempt));
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -141,110 +163,137 @@ builder.mutationField('commissionerPick', (t) =>
         }
 
         // ── LS-4692: Phase 2 — Short locked write transaction ─────────────
-        const result = await context.db.transaction(async (tx) => {
-          // Surface lock waits as errors rather than silent hangs
-          await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+        const runLockedTx = () =>
+          context.db.transaction(async (tx) => {
+            // Surface lock waits as errors rather than silent hangs
+            await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-          // FOR NO KEY UPDATE serializes concurrent writers without blocking
-          // FK-referencing draft_picks INSERTs from other transactions.
-          const draftRows = await tx.execute(
-            sql`SELECT id, league_id, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
-          );
-          const draft = draftRows.rows[0] as
-            | {
-                id: number;
-                league_id: number;
-                pick_time_limit_seconds: number;
-                selection_method: string;
-              }
-            | undefined;
-
-          if (!draft) {
-            throw UserInputError('Draft not found');
-          }
-
-          // TOCTOU re-verify league status — could have flipped between
-          // Phase 1 and Phase 2.
-          const [league] = await tx
-            .select()
-            .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, draft.league_id))
-            .limit(1);
-
-          if (!league) {
-            throw UserInputError('League not found');
-          }
-
-          if (
-            league.draftStatus !== 'in-progress' &&
-            league.draftStatus !== 'paused'
-          ) {
-            throw UserInputError(
-              `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
+            // FOR NO KEY UPDATE serializes concurrent writers without blocking
+            // FK-referencing draft_picks INSERTs from other transactions.
+            const draftRows = await tx.execute(
+              sql`SELECT id, league_id, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
             );
-          }
+            const draft = draftRows.rows[0] as
+              | {
+                  id: number;
+                  league_id: number;
+                  pick_time_limit_seconds: number;
+                  selection_method: string;
+                }
+              | undefined;
 
-          const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+            if (!draft) {
+              throw UserInputError('Draft not found');
+            }
 
-          if (!currentPickInfo || currentPickInfo.isComplete) {
-            throw UserInputError('Draft is already complete');
-          }
+            // TOCTOU re-verify league status — could have flipped between
+            // Phase 1 and Phase 2.
+            const [league] = await tx
+              .select()
+              .from(PublicSchema.leagues)
+              .where(eq(PublicSchema.leagues.id, draft.league_id))
+              .limit(1);
 
-          // Check player availability (race-sensitive)
-          const existingPick = await tx
-            .select()
-            .from(PublicSchema.draftPicks)
-            .where(
-              and(
-                eq(PublicSchema.draftPicks.draftId, draftId),
-                eq(PublicSchema.draftPicks.playerId, playerId),
-              ),
-            )
-            .limit(1);
+            if (!league) {
+              throw UserInputError('League not found');
+            }
 
-          if (existingPick.length > 0) {
-            throw UserInputError('Player has already been drafted');
-          }
+            if (
+              league.draftStatus !== 'in-progress' &&
+              league.draftStatus !== 'paused'
+            ) {
+              throw UserInputError(
+                `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
+              );
+            }
 
-          // Validate roster limit — count existing team members
-          const { isFull: rosterFull } = await checkRosterCapacity(
-            tx,
-            currentPickInfo.teamId,
-            draft.league_id,
-            league.maxRosterSize,
-          );
+            const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
 
-          if (rosterFull) {
-            throw UserInputError(
-              `Team roster is full (${league.maxRosterSize} players maximum)`,
-            );
-          }
+            if (!currentPickInfo || currentPickInfo.isComplete) {
+              throw UserInputError('Draft is already complete');
+            }
 
-          // Commit the pick: insert pick row, advance draft state, and add player to roster.
-          // commitDraftPick is the single source of truth for all draft-pick DB writes.
-          const { draftPick, isDraftComplete, nextDeadline, nextPickInfo } =
-            await commitDraftPick({
+            // Check player availability (race-sensitive)
+            const existingPick = await tx
+              .select()
+              .from(PublicSchema.draftPicks)
+              .where(
+                and(
+                  eq(PublicSchema.draftPicks.draftId, draftId),
+                  eq(PublicSchema.draftPicks.playerId, playerId),
+                ),
+              )
+              .limit(1);
+
+            if (existingPick.length > 0) {
+              throw UserInputError('Player has already been drafted');
+            }
+
+            // Validate roster limit — count existing team members
+            const { isFull: rosterFull } = await checkRosterCapacity(
               tx,
-              draftId,
-              leagueId: draft.league_id,
-              pickInfo: currentPickInfo,
-              playerId,
-              maxRosterSize: league.maxRosterSize,
-              pickTimeLimitSeconds: draft.pick_time_limit_seconds,
-              isMockDraft: league.isMockDraft,
-            });
+              currentPickInfo.teamId,
+              draft.league_id,
+              league.maxRosterSize,
+            );
 
-          return {
-            draftPick,
-            isDraftComplete,
-            leagueId: draft.league_id,
-            isMockDraft: league.isMockDraft,
-            selectionMethod: draft.selection_method,
-            currentPickInfo,
-            nextPickInfo,
-            nextDeadline,
-          };
-        });
+            if (rosterFull) {
+              throw UserInputError(
+                `Team roster is full (${league.maxRosterSize} players maximum)`,
+              );
+            }
+
+            // Commit the pick: insert pick row, advance draft state, and add player to roster.
+            // commitDraftPick is the single source of truth for all draft-pick DB writes.
+            const { draftPick, isDraftComplete, nextDeadline, nextPickInfo } =
+              await commitDraftPick({
+                tx,
+                draftId,
+                leagueId: draft.league_id,
+                pickInfo: currentPickInfo,
+                playerId,
+                maxRosterSize: league.maxRosterSize,
+                pickTimeLimitSeconds: draft.pick_time_limit_seconds,
+                isMockDraft: league.isMockDraft,
+              });
+
+            return {
+              draftPick,
+              isDraftComplete,
+              leagueId: draft.league_id,
+              isMockDraft: league.isMockDraft,
+              selectionMethod: draft.selection_method,
+              currentPickInfo,
+              nextPickInfo,
+              nextDeadline,
+            };
+          });
+
+        let result: Awaited<ReturnType<typeof runLockedTx>>;
+        for (let attempt = 1; ; attempt++) {
+          try {
+            result = await runLockedTx();
+            break;
+          } catch (txError) {
+            if (
+              attempt < MAX_PICK_LOCK_ATTEMPTS &&
+              isLockWaitTimeout(txError)
+            ) {
+              LOGGER.warn(
+                '[LS-8480] Draft row lock wait timed out — retrying commissionerPick transaction',
+                {
+                  draftId,
+                  playerId,
+                  attempt,
+                  dbError: formatDbError(describeDbError(txError)),
+                },
+              );
+              await lockRetryDelay(attempt);
+              continue;
+            }
+            throw txError;
+          }
+        }
 
         LOGGER.info('Commissioner pick made', {
           draftId,
