@@ -65,6 +65,15 @@ class WebRollbarImplementation implements RollbarInterface {
         //   from Google's own script, not actionable from our side. Auth still
         //   completes via postMessage fallback. Without this filter, the COOP
         //   spam exhausts maxItems/itemsPerMinute and silently drops real errors.
+        // - "Failed to fetch dynamically imported module": a lazy-route chunk
+        //   404 caused by a long-lived tab outliving a deploy (content-hashed
+        //   chunk URLs change on every release) (LS-8472). `lazyWithRetry`
+        //   (apps/web/src/utils/lazyWithRetry.ts) already recovers from this:
+        //   it auto-reloads the page once to pick up fresh chunk URLs, and
+        //   falls back to a friendly "Refresh" screen if the chunk is still
+        //   missing after that. By the time this message reaches Rollbar the
+        //   user has already been handled gracefully — reporting it as a
+        //   production error is noise, not a bug.
         checkIgnore: (_isUncaught: boolean, args: unknown[]) => {
           // Client-side sampling: drop (1 - captureRate) of items before they
           // reach Rollbar. Rollbar.js has no built-in sample-rate option, so
@@ -99,6 +108,12 @@ class WebRollbarImplementation implements RollbarInterface {
           if (
             err instanceof Error &&
             err.message.includes('Cross-Origin-Opener-Policy')
+          ) {
+            return true;
+          }
+          if (
+            err instanceof Error &&
+            err.message.includes('Failed to fetch dynamically imported module')
           ) {
             return true;
           }
