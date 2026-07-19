@@ -9,6 +9,16 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// Typing error as jest.Mock (not the original method) sidesteps
+// @typescript-eslint/unbound-method; requireMock returns the live mock instance.
+const { LOGGER } = jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
+  '@legacy-sports/logging',
+);
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
 describe('redirectSystemPath', () => {
   it('rewrites the web-style invite path to the native route + query param', () => {
     expect(
@@ -110,5 +120,43 @@ describe('redirectSystemPath', () => {
     expect(redirectSystemPath({ path: '/players/123', initial: true })).toBe(
       '/players/123',
     );
+  });
+
+  it('rewrites trade-center deep links, passing leagueId and tradeOfferId through', () => {
+    expect(
+      redirectSystemPath({
+        path: '/trade-center?leagueId=123&tradeOfferId=456',
+        initial: true,
+      }),
+    ).toBe('/TradeCenterPage?leagueId=123&tradeOfferId=456');
+  });
+
+  it('rewrites a bare trade-center path with no query params', () => {
+    expect(redirectSystemPath({ path: '/trade-center', initial: false })).toBe(
+      '/TradeCenterPage',
+    );
+  });
+
+  it('rewrites a trade-center path with a trailing slash', () => {
+    expect(
+      redirectSystemPath({
+        path: '/trade-center/?leagueId=123&tradeOfferId=456',
+        initial: true,
+      }),
+    ).toBe('/TradeCenterPage?leagueId=123&tradeOfferId=456');
+  });
+
+  it('passes through non-trade-center paths that merely start with the prefix', () => {
+    expect(
+      redirectSystemPath({ path: '/trade-center-history', initial: true }),
+    ).toBe('/trade-center-history');
+  });
+
+  it('returns the original path and logs when rewriting throws', () => {
+    // A malformed percent-encoding makes decodeURIComponent throw, exercising
+    // the try/catch fallback: the original path is returned and the error logged.
+    const path = '/season-draft/join/%E0%A4%A';
+    expect(redirectSystemPath({ path, initial: true })).toBe(path);
+    expect(LOGGER.error).toHaveBeenCalledTimes(1);
   });
 });
