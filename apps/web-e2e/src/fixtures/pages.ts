@@ -11,9 +11,11 @@ import { test as leagueDataBase } from './auth';
 import {
   DiscordCallbackScreen,
   DraftPage,
+  ForgotPasswordPage,
   LeaguePage,
   PlayersPage,
   ProfileSettingsScreen,
+  ResetPasswordPage,
 } from '../pages';
 import { NavHeader } from '../components';
 import { PlaywrightWebDriver } from '../driver';
@@ -37,6 +39,8 @@ import { PlaywrightWebDriver } from '../driver';
  */
 export interface PageObjectFixtures {
   draftPage: DraftPage;
+  forgotPasswordPage: ForgotPasswordPage;
+  resetPasswordPage: ResetPasswordPage;
   leaguePage: LeaguePage;
   playersPage: PlayersPage;
   /** The Discord OAuth callback screen (/auth/discord/callback). */
@@ -65,6 +69,18 @@ const pageObjects = {
     // it is constructed with the Playwright driver adapter. Unmigrated page
     // objects below still take the raw `page`.
     await use(new DraftPage(new PlaywrightWebDriver(page)));
+  },
+  forgotPasswordPage: async (
+    { page }: { page: Page },
+    use: (pageObject: ForgotPasswordPage) => Promise<void>,
+  ) => {
+    await use(new ForgotPasswordPage(new PlaywrightWebDriver(page)));
+  },
+  resetPasswordPage: async (
+    { page }: { page: Page },
+    use: (pageObject: ResetPasswordPage) => Promise<void>,
+  ) => {
+    await use(new ResetPasswordPage(new PlaywrightWebDriver(page)));
   },
   leaguePage: async (
     { page }: { page: Page },
