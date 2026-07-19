@@ -15,7 +15,11 @@ import {
 } from '../integration/fixtures/ui';
 import { DraftPage, LeaguePage, PlayersPage } from '../pages';
 import { NavHeader } from '../components';
-import { type AppDriver, PlaywrightWebDriver } from '../driver';
+import {
+  type AppDriver,
+  createNativeDriver,
+  PlaywrightWebDriver,
+} from '../driver';
 
 /**
  * Dual-mode fixtures (ADR-0016 §backend seam) — ONE spec, selectable backend.
@@ -48,6 +52,23 @@ export interface BackendOptions {
   backend: BackendMode;
 }
 
+/**
+ * The platform seam (ADR-0016 native rollout blueprint, step 3 — LS-8449),
+ * orthogonal to {@link BackendMode}. It selects which {@link AppDriver}
+ * migrated page objects are constructed with, so ONE shared spec body runs on
+ * web or native without change (ADR-0016 §platform seam).
+ */
+export type PlatformMode = 'web' | 'native';
+
+export interface PlatformOptions {
+  /**
+   * Which platform driver this spec runs against. Set per project via
+   * `use: { platform: 'native' }` (see `playwright.native.config.ts`);
+   * defaults to web so the hermetic and integration configs are unchanged.
+   */
+  platform: PlatformMode;
+}
+
 export interface DualFixtures {
   /** Backend-appropriate data-precondition seam. */
   testData: TestData;
@@ -61,8 +82,11 @@ export interface DualFixtures {
   _coverage: void;
 }
 
-export const test = base.extend<BackendOptions & DualFixtures>({
+export const test = base.extend<
+  BackendOptions & PlatformOptions & DualFixtures
+>({
   backend: ['mock', { option: true }],
+  platform: ['web', { option: true }],
 
   /**
    * Live mode authenticates the default context against the live web app;
@@ -101,13 +125,21 @@ export const test = base.extend<BackendOptions & DualFixtures>({
     { auto: true },
   ],
 
-  /** Per-test source-coverage collection — mirrors auth-enhanced (LS-7849). */
+  /**
+   * Per-test source-coverage collection — mirrors auth-enhanced (LS-7849).
+   * V8 coverage is a Playwright/CDP web-only concern, so native runs skip it
+   * (the native driver has no `page` to instrument).
+   */
   _coverage: [
     async (
-      { page }: { page: Page },
+      { page, platform }: { page: Page; platform: PlatformMode },
       use: () => Promise<void>,
       testInfo: TestInfo,
     ) => {
+      if (platform === 'native') {
+        await use();
+        return;
+      }
       const baseline = await snapshotCoverageBaseline(page);
       await use();
       await attributePageCoverage(page, testInfo, baseline);
@@ -122,11 +154,22 @@ export const test = base.extend<BackendOptions & DualFixtures>({
     await use(backend === 'mock' ? new MockTestData(page) : new LiveTestData());
   },
 
+  /**
+   * Platform driver — a *project* decision (ADR-0016), not a spec decision.
+   * Web mode adapts the Playwright `page`; native mode injects the native
+   * driver (`playwright.native.config.ts` projects set `platform: 'native'`).
+   * Page objects are identical in both modes — they speak only the AppDriver
+   * contract.
+   */
   driver: async (
-    { page }: { page: Page },
+    { page, platform }: { page: Page; platform: PlatformMode },
     use: (driver: AppDriver) => Promise<void>,
   ) => {
-    await use(new PlaywrightWebDriver(page));
+    await use(
+      platform === 'native'
+        ? createNativeDriver()
+        : new PlaywrightWebDriver(page),
+    );
   },
 
   // Page objects — identical instances in both modes (ADR-0015 §5, §6).
