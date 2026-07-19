@@ -90,6 +90,14 @@ function setupResolver(options: {
    * the LS-8107 offload path (deadline expiry + autoProcessDraftPicks nudge).
    */
   nextTeamAutoPick?: boolean;
+  /**
+   * Number of leading `context.db.transaction` invocations that should reject
+   * with `transactionError` (default: a 57014 lock-wait timeout) before the
+   * transaction is allowed to succeed. Used to test the LS-8476 retry loop.
+   */
+  transactionFailures?: number;
+  /** Error thrown by the failing attempts above. Defaults to a 57014 SQLSTATE error. */
+  transactionError?: Error;
 }) {
   jest.resetModules();
 
@@ -258,6 +266,20 @@ function setupResolver(options: {
     getUnfilledPositionTypes: jest.fn().mockResolvedValue([]),
   }));
 
+  // Avoid pulling in scheduled-mutations.ts's own heavy dependency graph
+  // (candidate-pool, auto-pick-scorer, draft-pick-effects, builder) — reuse
+  // the real describeDbError so the LS-8476 retry test exercises the actual
+  // SQLSTATE-matching logic isLockWaitTimeout relies on in production.
+  jest.doMock('../scheduled-mutations', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy require inside a jest.doMock factory keeps the real (unmocked) delete-resilience helpers out of the hoisting path
+    const { describeDbError } =
+      require('../../leagues/delete-resilience') as typeof import('../../leagues/delete-resilience');
+    return {
+      isLockWaitTimeout: (error: unknown) =>
+        describeDbError(error).code === '57014',
+    };
+  });
+
   jest.doMock('../../../services/roster-service', () => ({
     checkRosterCapacity: jest.fn().mockResolvedValue({ isFull: false }),
   }));
@@ -371,6 +393,16 @@ function setupResolver(options: {
     transaction: jest
       .fn()
       .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const callNumber = mockDb.transaction.mock.calls.length;
+        if (callNumber <= (options.transactionFailures ?? 0)) {
+          throw (
+            options.transactionError ??
+            Object.assign(
+              new Error('canceling statement due to statement timeout'),
+              { code: '57014' },
+            )
+          );
+        }
         return fn(mockTx);
       }),
     update: jest.fn().mockReturnValue({
@@ -534,5 +566,59 @@ describe('makeDraftPick — asynchronous auto-pick offload (LS-8107)', () => {
     await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
 
     expect(mockTriggerAutoProcessDraftPicks).not.toHaveBeenCalled();
+  });
+});
+
+describe('makeDraftPick — draft row lock-wait retry (LS-8476 / LS-8475)', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('retries the transaction after a transient 57014 lock-wait timeout and succeeds', async () => {
+    const { resolve, ctx, mockCommitDraftPick, mockNotifyDraftPickMade } =
+      setupResolver({
+        existingOwnPick: null,
+        nextTeamAutoPick: false,
+        transactionFailures: 1,
+      });
+
+    await resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined);
+
+    expect(ctx.db.transaction).toHaveBeenCalledTimes(2);
+    expect(mockCommitDraftPick).toHaveBeenCalledTimes(1);
+    expect(mockNotifyDraftPickMade).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry a non-lock-wait transaction error', async () => {
+    const { resolve, ctx, mockCommitDraftPick } = setupResolver({
+      existingOwnPick: null,
+      nextTeamAutoPick: false,
+      transactionFailures: 1,
+      transactionError: Object.assign(new Error('deadlock detected'), {
+        code: '40P01',
+      }),
+    });
+
+    await expect(
+      resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined),
+    ).rejects.toThrow('deadlock detected');
+
+    expect(ctx.db.transaction).toHaveBeenCalledTimes(1);
+    expect(mockCommitDraftPick).not.toHaveBeenCalled();
+  });
+
+  it('gives up and throws once lock-wait retries are exhausted', async () => {
+    const { resolve, ctx, mockCommitDraftPick } = setupResolver({
+      existingOwnPick: null,
+      nextTeamAutoPick: false,
+      transactionFailures: 3, // exceeds MAX_PICK_LOCK_ATTEMPTS (3 total attempts)
+    });
+
+    await expect(
+      resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined),
+    ).rejects.toThrow('canceling statement due to statement timeout');
+
+    expect(ctx.db.transaction).toHaveBeenCalledTimes(3);
+    expect(mockCommitDraftPick).not.toHaveBeenCalled();
   });
 });

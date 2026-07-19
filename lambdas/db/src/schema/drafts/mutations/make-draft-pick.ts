@@ -14,6 +14,7 @@ import { GraphQLError } from 'graphql';
 
 import { DraftPick } from '../types';
 import { commitDraftPick, getCurrentDraftPickInfo } from '../helpers';
+import { isLockWaitTimeout } from '../scheduled-mutations';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { logDraftPickActivity } from '../../../services/activity-log';
@@ -24,6 +25,27 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../../graphql-errors';
+import {
+  describeDbError,
+  formatDbError,
+} from '../../leagues/delete-resilience';
+
+/**
+ * Max attempts (including the first) for the Phase-2 locked transaction.
+ * EventBridge's every-minute autoProcessDraftPicks tick and the LS-8107
+ * makeDraftPick nudge can both acquire the `drafts` row lock at the same
+ * moment a human submits a pick, tripping the `SET LOCAL statement_timeout`
+ * guard (SQLSTATE 57014) on whichever statement in this transaction runs
+ * while the lock is held elsewhere (LS-8475: the initial locking SELECT;
+ * LS-8476: the commitDraftPick UPDATE). Unlike autoProcessDraftPicks — which
+ * can just skip and let the next tick retry (LS-8398) — a human is waiting
+ * on this response, so retry the whole transaction a couple of times instead
+ * of surfacing a transient lock race as a hard failure.
+ */
+const MAX_PICK_LOCK_ATTEMPTS = 3;
+
+const lockRetryDelay = (attempt: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, 50 * attempt));
 
 const badgeService = createBadgeService(getDbOptions());
 
@@ -177,182 +199,209 @@ builder.mutationField('makeDraftPick', (t) =>
         // FOR NO KEY UPDATE serializes concurrent writers to this draft row
         // without blocking concurrent FK-referencing inserts on draft_picks
         // from other transactions (those only need FOR KEY SHARE on drafts).
-        const result = await context.db.transaction(async (tx) => {
-          // Surface lock waits as errors rather than silent hangs
-          await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+        const runLockedTx = () =>
+          context.db.transaction(async (tx) => {
+            // Surface lock waits as errors rather than silent hangs
+            await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-          const draftRows = await tx.execute(
-            sql`SELECT id, league_id, current_pick, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
-          );
-          const draft = draftRows.rows[0] as
-            | {
-                id: number;
-                league_id: number;
-                current_pick: number;
-                pick_time_limit_seconds: number;
-                selection_method: string;
-              }
-            | undefined;
-
-          if (!draft) {
-            throw UserInputError('Draft not found');
-          }
-
-          // TOCTOU re-verify league status — could have flipped to paused
-          // between Phase 1 and Phase 2.
-          const [league] = await tx
-            .select()
-            .from(PublicSchema.leagues)
-            .where(eq(PublicSchema.leagues.id, draft.league_id))
-            .limit(1);
-
-          if (!league) {
-            throw UserInputError('League not found');
-          }
-
-          if (league.draftStatus === 'paused') {
-            throw UserInputError(
-              'Draft is currently paused. Wait for the commissioner to resume.',
+            const draftRows = await tx.execute(
+              sql`SELECT id, league_id, current_pick, pick_time_limit_seconds, selection_method FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
             );
-          }
+            const draft = draftRows.rows[0] as
+              | {
+                  id: number;
+                  league_id: number;
+                  current_pick: number;
+                  pick_time_limit_seconds: number;
+                  selection_method: string;
+                }
+              | undefined;
 
-          if (league.draftStatus !== 'in-progress') {
-            throw UserInputError(
-              `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
-            );
-          }
+            if (!draft) {
+              throw UserInputError('Draft not found');
+            }
 
-          // Authoritative pick info from the locked draft row
-          const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+            // TOCTOU re-verify league status — could have flipped to paused
+            // between Phase 1 and Phase 2.
+            const [league] = await tx
+              .select()
+              .from(PublicSchema.leagues)
+              .where(eq(PublicSchema.leagues.id, draft.league_id))
+              .limit(1);
 
-          if (!currentPickInfo) {
-            throw UserInputError('Could not determine current pick');
-          }
+            if (!league) {
+              throw UserInputError('League not found');
+            }
 
-          if (currentPickInfo.isComplete) {
-            throw UserInputError('Draft is already complete');
-          }
+            if (league.draftStatus === 'paused') {
+              throw UserInputError(
+                'Draft is currently paused. Wait for the commissioner to resume.',
+              );
+            }
 
-          // TOCTOU guard: if the pick advanced between Phase 1 and Phase 2,
-          // the user's request is stale (auth was checked against a different
-          // team/slot). Surface as a user error so the client refetches and
-          // retries against the new state.
-          if (
-            currentPickInfo.teamId !== currentPickInfoPre.teamId ||
-            currentPickInfo.overallPick !== currentPickInfoPre.overallPick
-          ) {
-            throw UserInputError(
-              'Draft state changed during pick submission — please refresh and retry',
-            );
-          }
+            if (league.draftStatus !== 'in-progress') {
+              throw UserInputError(
+                `Draft is not in progress (current status: ${league.draftStatus ?? 'unknown'})`,
+              );
+            }
 
-          // Idempotency: if this exact pick was already made, return it.
-          // Re-check inside the lock to cover duplicate submits that raced
-          // through Phase 1 in parallel.
-          const [existingOwnPick] = await tx
-            .select()
-            .from(PublicSchema.draftPicks)
-            .where(
-              and(
-                eq(PublicSchema.draftPicks.draftId, draftId),
-                eq(PublicSchema.draftPicks.playerId, playerId),
-                eq(PublicSchema.draftPicks.teamId, currentPickInfo.teamId),
-                eq(
-                  PublicSchema.draftPicks.overallPick,
-                  currentPickInfo.overallPick,
+            // Authoritative pick info from the locked draft row
+            const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+
+            if (!currentPickInfo) {
+              throw UserInputError('Could not determine current pick');
+            }
+
+            if (currentPickInfo.isComplete) {
+              throw UserInputError('Draft is already complete');
+            }
+
+            // TOCTOU guard: if the pick advanced between Phase 1 and Phase 2,
+            // the user's request is stale (auth was checked against a different
+            // team/slot). Surface as a user error so the client refetches and
+            // retries against the new state.
+            if (
+              currentPickInfo.teamId !== currentPickInfoPre.teamId ||
+              currentPickInfo.overallPick !== currentPickInfoPre.overallPick
+            ) {
+              throw UserInputError(
+                'Draft state changed during pick submission — please refresh and retry',
+              );
+            }
+
+            // Idempotency: if this exact pick was already made, return it.
+            // Re-check inside the lock to cover duplicate submits that raced
+            // through Phase 1 in parallel.
+            const [existingOwnPick] = await tx
+              .select()
+              .from(PublicSchema.draftPicks)
+              .where(
+                and(
+                  eq(PublicSchema.draftPicks.draftId, draftId),
+                  eq(PublicSchema.draftPicks.playerId, playerId),
+                  eq(PublicSchema.draftPicks.teamId, currentPickInfo.teamId),
+                  eq(
+                    PublicSchema.draftPicks.overallPick,
+                    currentPickInfo.overallPick,
+                  ),
                 ),
-              ),
-            )
-            .limit(1);
+              )
+              .limit(1);
 
-          if (existingOwnPick) {
-            LOGGER.info('Idempotent pick detected, returning existing pick', {
-              draftId,
-              playerId,
-              pickId: existingOwnPick.id,
-            });
-            // Fetch the actual next-pick info so that re-sending the WS
-            // notification includes a valid nextPick payload. Previously,
-            // nextPickInfo was hardcoded to null here, which caused the outer
-            // heuristic (!isDraftComplete && nextPickInfo === null) to suppress
-            // the notification entirely. Observers who missed the original
-            // broadcast then never received the pick via WebSocket (LS-7977).
-            // With a real nextPickInfo, the notification IS re-sent, and the
-            // frontend de-dupes via notifiedPicksRef so no duplicate toasts appear.
-            const idempotentNextPickInfo = await getCurrentDraftPickInfo(
+            if (existingOwnPick) {
+              LOGGER.info('Idempotent pick detected, returning existing pick', {
+                draftId,
+                playerId,
+                pickId: existingOwnPick.id,
+              });
+              // Fetch the actual next-pick info so that re-sending the WS
+              // notification includes a valid nextPick payload. Previously,
+              // nextPickInfo was hardcoded to null here, which caused the outer
+              // heuristic (!isDraftComplete && nextPickInfo === null) to suppress
+              // the notification entirely. Observers who missed the original
+              // broadcast then never received the pick via WebSocket (LS-7977).
+              // With a real nextPickInfo, the notification IS re-sent, and the
+              // frontend de-dupes via notifiedPicksRef so no duplicate toasts appear.
+              const idempotentNextPickInfo = await getCurrentDraftPickInfo(
+                tx,
+                draftId,
+              );
+              return {
+                draftPick: existingOwnPick,
+                isDraftComplete: false,
+                leagueId: draft.league_id,
+                isMockDraft: league.isMockDraft,
+                selectionMethod: draft.selection_method,
+                currentPickInfo,
+                nextPickInfo: idempotentNextPickInfo,
+                nextDeadline: null,
+                isIdempotentPick: true,
+              };
+            }
+
+            // Check if player has already been drafted (race-sensitive)
+            const existingPick = await tx
+              .select()
+              .from(PublicSchema.draftPicks)
+              .where(
+                and(
+                  eq(PublicSchema.draftPicks.draftId, draftId),
+                  eq(PublicSchema.draftPicks.playerId, playerId),
+                ),
+              )
+              .limit(1);
+
+            if (existingPick.length > 0) {
+              throw UserInputError('Player has already been drafted');
+            }
+
+            // Validate roster limit (race-sensitive)
+            const { isFull: rosterFull } = await checkRosterCapacity(
               tx,
-              draftId,
+              currentPickInfo.teamId,
+              draft.league_id,
+              league.maxRosterSize,
             );
+
+            if (rosterFull) {
+              throw UserInputError(
+                `Team roster is full (${league.maxRosterSize} players maximum)`,
+              );
+            }
+
+            // Commit the pick: insert pick row, advance draft state, and add player to roster.
+            // commitDraftPick is the single source of truth for all draft-pick DB writes.
+            const { draftPick, isDraftComplete, nextDeadline, nextPickInfo } =
+              await commitDraftPick({
+                tx,
+                draftId,
+                leagueId: draft.league_id,
+                pickInfo: currentPickInfo,
+                playerId,
+                maxRosterSize: league.maxRosterSize,
+                pickTimeLimitSeconds: draft.pick_time_limit_seconds,
+                setStartedAt: draft.current_pick === 0,
+                isMockDraft: league.isMockDraft,
+              });
+
             return {
-              draftPick: existingOwnPick,
-              isDraftComplete: false,
+              draftPick,
+              isDraftComplete,
               leagueId: draft.league_id,
               isMockDraft: league.isMockDraft,
               selectionMethod: draft.selection_method,
               currentPickInfo,
-              nextPickInfo: idempotentNextPickInfo,
-              nextDeadline: null,
-              isIdempotentPick: true,
+              nextPickInfo,
+              nextDeadline,
+              isIdempotentPick: false,
             };
+          });
+
+        let result: Awaited<ReturnType<typeof runLockedTx>>;
+        for (let attempt = 1; ; attempt++) {
+          try {
+            result = await runLockedTx();
+            break;
+          } catch (txError) {
+            if (
+              attempt < MAX_PICK_LOCK_ATTEMPTS &&
+              isLockWaitTimeout(txError)
+            ) {
+              LOGGER.warn(
+                '[LS-8476] Draft row lock wait timed out — retrying transaction',
+                {
+                  draftId,
+                  playerId,
+                  attempt,
+                  dbError: formatDbError(describeDbError(txError)),
+                },
+              );
+              await lockRetryDelay(attempt);
+              continue;
+            }
+            throw txError;
           }
-
-          // Check if player has already been drafted (race-sensitive)
-          const existingPick = await tx
-            .select()
-            .from(PublicSchema.draftPicks)
-            .where(
-              and(
-                eq(PublicSchema.draftPicks.draftId, draftId),
-                eq(PublicSchema.draftPicks.playerId, playerId),
-              ),
-            )
-            .limit(1);
-
-          if (existingPick.length > 0) {
-            throw UserInputError('Player has already been drafted');
-          }
-
-          // Validate roster limit (race-sensitive)
-          const { isFull: rosterFull } = await checkRosterCapacity(
-            tx,
-            currentPickInfo.teamId,
-            draft.league_id,
-            league.maxRosterSize,
-          );
-
-          if (rosterFull) {
-            throw UserInputError(
-              `Team roster is full (${league.maxRosterSize} players maximum)`,
-            );
-          }
-
-          // Commit the pick: insert pick row, advance draft state, and add player to roster.
-          // commitDraftPick is the single source of truth for all draft-pick DB writes.
-          const { draftPick, isDraftComplete, nextDeadline, nextPickInfo } =
-            await commitDraftPick({
-              tx,
-              draftId,
-              leagueId: draft.league_id,
-              pickInfo: currentPickInfo,
-              playerId,
-              maxRosterSize: league.maxRosterSize,
-              pickTimeLimitSeconds: draft.pick_time_limit_seconds,
-              setStartedAt: draft.current_pick === 0,
-              isMockDraft: league.isMockDraft,
-            });
-
-          return {
-            draftPick,
-            isDraftComplete,
-            leagueId: draft.league_id,
-            isMockDraft: league.isMockDraft,
-            selectionMethod: draft.selection_method,
-            currentPickInfo,
-            nextPickInfo,
-            nextDeadline,
-            isIdempotentPick: false,
-          };
-        });
+        }
 
         LOGGER.info('Draft pick made successfully', {
           draftId,
