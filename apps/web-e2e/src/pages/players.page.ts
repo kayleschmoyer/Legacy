@@ -20,28 +20,42 @@ import { PremiumGate } from '../components/premium-gate.component';
  * hermetic and integration suites (ADR-0015 §6). Specs keep their `page.route`
  * mocks; navigation and element access live here.
  *
- * ADR-0016 migration status (LS-8304 stage 1, LS-8305 stages 4-5):
+ * ADR-0016 migration status (LS-8304 stage 1, LS-8305 stages 4-5, LS-8452):
  *   • The container and every surface (`stats`, `detail`, `compare`) are
  *     driver-typed (platform neutral). Navigation to stats/compare goes
  *     through `driver.open()`.
- *   • `detail` keeps only a slim, DOCUMENTED web-only remainder reached via the
- *     escape hatch below: `page.keyboard` (Escape-to-close), bfcache-aware
+ *   • Construction no longer REQUIRES the web driver (LS-8452): the object and
+ *     its portable surfaces build on any {@link AppDriver}, so the two player
+ *     `*.dual.spec.ts` (player-stats-search, player-compare-search) — which
+ *     speak only the portable `stats`/`compare` verbs and `driver.open()`
+ *     navigation — run on the native project the day an Appium driver lands
+ *     (LS-8449). The Playwright `Page` is now an OPTIONAL escape hatch,
+ *     resolved only when constructed with the web driver; the web-only
+ *     remainders below throw a descriptive error if reached off-web rather than
+ *     blocking construction of the whole object.
+ *
+ *   Inventory of remaining web-only surfaces (AC3 — each unavailable on native,
+ *   each with no portable driver verb yet):
+ *   • `premiumGate` — composed from a raw `Locator` root (the shared
+ *     premium-overlay component still extends `BaseComponent`); web-only.
+ *   • `gotoDetail` / `gotoBrefId` — `page.goto` + `waitForLoadState(waitUntil)`;
+ *     `waitUntil` is a browser navigation semantic (specs freeze the loading
+ *     state), so these stay on the Page until the detail surface migrates.
+ *   • `detail` — the player-detail modal is exercised only by web specs; its
+ *     web-only remainder is `page.keyboard` (Escape-to-close), bfcache-aware
  *     `waitForURL(…, { waitUntil: 'commit' })`, the filter-by-descendant
  *     sort-table helpers, and the raw-`Locator` `dialog` / position-badge
- *     getters a few specs use for compound or `toHaveCSS` assertions.
- *   • `compare` is driver-typed with a slim, DOCUMENTED web-only remainder:
- *     `force: true` (the intentional premium-gate overlay bypass), `blur()` /
- *     `focus()` / `toBeFocused()`, `toHaveText(RegExp)`, and a negated
- *     contains-text cell assertion — none of which have a portable driver verb.
- *     The chip slot-color regression moved out of the spec entirely to
+ *     getters a few specs use for compound or `toHaveCSS` assertions. Its
+ *     driver-typed reads/actions still work on any driver.
+ *   • `compare` — driver-typed with a slim web-only remainder: `force: true`
+ *     (the intentional premium-gate overlay bypass), `blur()` / `focus()` /
+ *     `toBeFocused()`, `toHaveText(RegExp)`, and a negated contains-text cell
+ *     assertion — none of which have a portable driver verb. The chip
+ *     slot-color regression moved out of the spec entirely to
  *     PlayerComparison.stories.tsx (Chromatic); slot *identity* stays here as a
  *     platform-neutral `aria-label="Slot N"` check (LS-8352 stage 5).
- *   Constructing this object still REQUIRES the web driver because both
- *   `detail` and `compare` keep the web-only remainders above.
  */
 export class PlayersPage {
-  /** The blurred premium-gate overlay shared across premium-gated pages. */
-  readonly premiumGate: PremiumGate;
   /** `/players/stats` surface (driver-typed — platform neutral). */
   readonly stats: PlayerStatsSurface;
   /** Player-detail modal surface (`/players/:id` and `/players/:brefId`). */
@@ -50,25 +64,51 @@ export class PlayersPage {
   readonly compare: PlayerCompareSurface;
 
   readonly #driver: AppDriver;
-  /** Web escape hatch for the unmigrated surfaces + waitUntil navigation. */
-  readonly #page: Page;
+  /**
+   * OPTIONAL web escape hatch for the documented web-only remainders +
+   * `waitUntil` navigation (see class doc). `undefined` when constructed with a
+   * non-web driver — the object still builds and its portable surfaces work.
+   */
+  readonly #page: Page | undefined;
+  /** Lazily built — its `Locator` root is unavailable without the web page. */
+  #premiumGate: PremiumGate | undefined;
 
   constructor(driver: AppDriver) {
     this.#driver = driver;
-    if (!(driver instanceof PlaywrightWebDriver)) {
-      throw new Error(
-        'PlayersPage requires the web driver: its detail/compare surfaces ' +
-          'keep documented web-only remainders reached via the Page escape ' +
-          'hatch (LS-8305 stages 4-5).',
-      );
-    }
-    this.#page = driver.page;
-    this.premiumGate = new PremiumGate(
-      this.#page.getByTestId('premium-feature-gate'),
-    );
+    // Web-only surfaces reach the Page through this hatch; on a native driver
+    // it stays undefined and those surfaces throw when invoked (see class doc).
+    this.#page =
+      driver instanceof PlaywrightWebDriver ? driver.page : undefined;
     this.stats = new PlayerStatsSurface(driver);
     this.detail = new PlayerDetailSurface(driver, this.#page);
     this.compare = new PlayerCompareSurface(this.#driver, this.#page);
+  }
+
+  /** Resolve the web `Page`, or throw a descriptive web-only error on native. */
+  #requireWebPage(): Page {
+    if (!this.#page) {
+      throw new Error(
+        'PlayersPage: this is a web-only surface reached via the Playwright ' +
+          'Page escape hatch (see class doc); it is unavailable on the native ' +
+          'driver. The portable stats/compare verbs and navigation work on ' +
+          'any driver.',
+      );
+    }
+    return this.#page;
+  }
+
+  /**
+   * The blurred premium-gate overlay shared across premium-gated pages.
+   * WEB-ONLY: the shared {@link PremiumGate} component is scoped to a raw
+   * `Locator` root, so it needs the web page — throws on the native driver.
+   */
+  get premiumGate(): PremiumGate {
+    if (!this.#premiumGate) {
+      this.#premiumGate = new PremiumGate(
+        this.#requireWebPage().getByTestId('premium-feature-gate'),
+      );
+    }
+    return this.#premiumGate;
   }
 
   // ── Navigation ────────────────────────────────────────────────────
@@ -89,8 +129,9 @@ export class PlayersPage {
     playerId: number,
     waitUntil: 'load' | 'domcontentloaded' | 'networkidle' = 'load',
   ): Promise<void> {
-    await this.#page.goto(`/players/${playerId}`);
-    await this.#page.waitForLoadState(waitUntil);
+    const page = this.#requireWebPage();
+    await page.goto(`/players/${playerId}`);
+    await page.waitForLoadState(waitUntil);
   }
 
   /** Navigate to a player-detail brefId deep link (`/players/:brefId`). */
@@ -98,8 +139,9 @@ export class PlayersPage {
     brefId: string,
     waitUntil: 'load' | 'domcontentloaded' | 'networkidle' = 'load',
   ): Promise<void> {
-    await this.#page.goto(`/players/${brefId}`);
-    await this.#page.waitForLoadState(waitUntil);
+    const page = this.#requireWebPage();
+    await page.goto(`/players/${brefId}`);
+    await page.waitForLoadState(waitUntil);
   }
 
   /** Navigate to `/players/compare`. */
@@ -456,16 +498,32 @@ const TAB_TEST_IDS = {
  */
 class PlayerDetailSurface {
   readonly #driver: AppDriver;
-  /** Web escape hatch for the documented web-only remainder (see class doc). */
-  readonly #page: Page;
+  /**
+   * OPTIONAL web escape hatch for the documented web-only remainder (see class
+   * doc). `undefined` on a non-web driver — the driver-typed reads/actions
+   * below still work; only the web-only remainder throws.
+   */
+  readonly #page: Page | undefined;
   readonly #dialog: UIElement;
   readonly #loading: UIElement;
 
-  constructor(driver: AppDriver, page: Page) {
+  constructor(driver: AppDriver, page: Page | undefined) {
     this.#driver = driver;
     this.#page = page;
     this.#dialog = driver.byTestId('player-detail-modal');
     this.#loading = driver.byTestId('player-detail-loading');
+  }
+
+  /** Resolve the web `Page`, or throw a descriptive web-only error on native. */
+  #requireWebPage(): Page {
+    if (!this.#page) {
+      throw new Error(
+        'PlayerDetailSurface: this web-only remainder (keyboard/bfcache/CSS ' +
+          'assertions) has no portable driver verb and is unavailable on the ' +
+          'native driver.',
+      );
+    }
+    return this.#page;
   }
 
   // ── Actions ──────────────────────────────────────────────────────
@@ -494,7 +552,7 @@ class PlayerDetailSurface {
    * portable driver verb (a native driver dismisses via a back gesture).
    */
   async pressEscape(): Promise<void> {
-    await this.#page.keyboard.press('Escape');
+    await this.#requireWebPage().keyboard.press('Escape');
   }
 
   /** Click the "Open full page" external-link button to navigate to /players/:id. */
@@ -520,7 +578,9 @@ class PlayerDetailSurface {
    * event the default condition waits for — a browser navigation semantic.
    */
   async waitForStatsList(): Promise<void> {
-    await this.#page.waitForURL(/\/players\/stats/, { waitUntil: 'commit' });
+    await this.#requireWebPage().waitForURL(/\/players\/stats/, {
+      waitUntil: 'commit',
+    });
   }
 
   // ── Reads ────────────────────────────────────────────────────────
@@ -532,7 +592,7 @@ class PlayerDetailSurface {
    * `player-detail-modal` test id the driver-typed reads use.
    */
   get dialog(): Locator {
-    return this.#page.getByTestId('player-detail-modal');
+    return this.#requireWebPage().getByTestId('player-detail-modal');
   }
 
   // ── Assertions ───────────────────────────────────────────────────
@@ -695,7 +755,7 @@ class PlayerDetailSurface {
   /** The `columnheader` cell that wraps the sort button for `column` (WEB-ONLY). */
   columnHeader(column: string): Locator {
     return this.dialog.getByRole('columnheader').filter({
-      has: this.#page.getByRole('button', {
+      has: this.#requireWebPage().getByRole('button', {
         name: `Sort by ${column}`,
         exact: true,
       }),
@@ -772,20 +832,36 @@ class PlayerDetailSurface {
  */
 class PlayerCompareSurface {
   readonly #driver: AppDriver;
-  /** Web escape hatch for the documented web-only remainder (see class doc). */
-  readonly #page: Page;
+  /**
+   * OPTIONAL web escape hatch for the documented web-only remainder (see class
+   * doc). `undefined` on a non-web driver — the driver-typed verbs the dual
+   * specs use still work; only the web-only remainder throws.
+   */
+  readonly #page: Page | undefined;
   readonly #search: UIElement;
   readonly #suggestions: UIElement;
   readonly #selectedPlayers: UIElement;
   readonly #table: UIElement;
 
-  constructor(driver: AppDriver, page: Page) {
+  constructor(driver: AppDriver, page: Page | undefined) {
     this.#driver = driver;
     this.#page = page;
     this.#search = driver.byLabel('Search players to compare');
     this.#suggestions = driver.byLabel('Player suggestions');
     this.#selectedPlayers = driver.byLabel('Selected players');
     this.#table = driver.byRole('table', { name: 'Player comparison' });
+  }
+
+  /** Resolve the web `Page`, or throw a descriptive web-only error on native. */
+  #requireWebPage(): Page {
+    if (!this.#page) {
+      throw new Error(
+        'PlayerCompareSurface: this web-only remainder (force-through-gate, ' +
+          'blur/focus, anchored-regex/negated assertions) has no portable ' +
+          'driver verb and is unavailable on the native driver.',
+      );
+    }
+    return this.#page;
   }
 
   /**
@@ -795,7 +871,7 @@ class PlayerCompareSurface {
    * label the driver-typed `#search` uses.
    */
   #searchInput(): Locator {
-    return this.#page.getByLabel('Search players to compare');
+    return this.#requireWebPage().getByLabel('Search players to compare');
   }
 
   // ── Actions ──────────────────────────────────────────────────────
@@ -825,16 +901,15 @@ class PlayerCompareSurface {
    * driver verb, so this stays on the raw `Locator`.
    */
   async addPlayerForce(searchTerm: string, fullName: string): Promise<void> {
+    const page = this.#requireWebPage();
     const search = this.#searchInput();
     await expect(async () => {
       await search.clear({ force: true });
       await search.fill(searchTerm, { force: true });
-      await expect(this.#page.getByText(fullName)).toBeVisible({
+      await expect(page.getByText(fullName)).toBeVisible({
         timeout: 5000,
       });
-      await this.#page
-        .getByText(fullName)
-        .click({ force: true, timeout: 5000 });
+      await page.getByText(fullName).click({ force: true, timeout: 5000 });
     }).toPass({ timeout: 15000 });
   }
 
@@ -877,7 +952,7 @@ class PlayerCompareSurface {
    * `focus()` has no portable driver verb.
    */
   async focusEmptySlot(slotNumber: number): Promise<void> {
-    await this.#page
+    await this.#requireWebPage()
       .getByRole('button', { name: `Slot ${slotNumber} empty — add a player` })
       .focus();
   }
@@ -1283,7 +1358,7 @@ class PlayerCompareSurface {
     value: string,
   ): Promise<void> {
     await expect(
-      this.#page
+      this.#requireWebPage()
         .getByRole('row')
         .filter({ hasText: label })
         .getByRole('cell')
@@ -1404,7 +1479,9 @@ class PlayerCompareSurface {
    * anchored regex — so this stays on the raw `Locator`.
    */
   async expectSeasonExpandText(playerId: number, text: RegExp): Promise<void> {
-    const toggle = this.#page.getByTestId(`season-expand-${playerId}`);
+    const toggle = this.#requireWebPage().getByTestId(
+      `season-expand-${playerId}`,
+    );
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveText(text);
   }
