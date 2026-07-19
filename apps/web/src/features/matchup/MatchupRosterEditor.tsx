@@ -32,6 +32,13 @@ const parseId = (id: string | null | undefined): number => {
   return typeof id === 'string' ? parseInt(id, 10) : 0;
 };
 
+/**
+ * Max age (ms) of a confirmed-Scheduled pre-flight check before the next
+ * swap/move re-verifies over the network (BMD-024). Within this window the
+ * server-side check at mutation time remains the authoritative gate.
+ */
+const PREFLIGHT_CACHE_TTL_MS = 5_000;
+
 export interface MatchupRosterEditorProps {
   matchup: MatchupFragment;
   userTeamId: number;
@@ -92,6 +99,10 @@ export function MatchupRosterEditor({
   });
   // Tracks whether a pre-flight check revealed the matchup is no longer Scheduled.
   const [lockDiscovered, setLockDiscovered] = useState(false);
+  // Timestamp (ms) of the last pre-flight check that confirmed Scheduled;
+  // 0 until the first check. Skips redundant network round-trips within
+  // PREFLIGHT_CACHE_TTL_MS of a confirmed-fresh check.
+  const lastVerifiedScheduledAtRef = useRef(0);
 
   // ── Derived data ────────────────────────────────────────────────────────
   const positionMap = useMemo(() => {
@@ -154,6 +165,36 @@ export function MatchupRosterEditor({
     lockedRef.current = effectiveLocked;
   }, [effectiveLocked]);
 
+  // Pre-flight check shared by swap/move: verifies the matchup is still
+  // Scheduled before mutating. Skips the network round-trip when the last
+  // confirmed-Scheduled check is still within PREFLIGHT_CACHE_TTL_MS — the
+  // server enforces the authoritative lock check at mutation time regardless.
+  const ensureMatchupStillScheduled =
+    useCallback(async (): Promise<boolean> => {
+      const cacheIsFresh =
+        Date.now() - lastVerifiedScheduledAtRef.current <
+        PREFLIGHT_CACHE_TTL_MS;
+      if (cacheIsFresh) return true;
+      try {
+        const { data } = await fetchMatchupStatus({
+          variables: { id: matchupId },
+        });
+        if (data?.getMatchupById?.status !== MatchupStatus.Scheduled) {
+          setLockDiscovered(true);
+          return false;
+        }
+        lastVerifiedScheduledAtRef.current = Date.now();
+        return true;
+      } catch (error) {
+        LOGGER.error(
+          'Failed to fetch matchup status before roster mutation',
+          error instanceof Error ? error : String(error),
+        );
+        setLockDiscovered(true);
+        return false;
+      }
+    }, [fetchMatchupStatus, matchupId]);
+
   const handleSwapPositions = useCallback(
     async (
       player1Id: string,
@@ -162,22 +203,7 @@ export function MatchupRosterEditor({
       newPosition2Id: number | null,
     ) => {
       if (lockedRef.current) return;
-      try {
-        const { data } = await fetchMatchupStatus({
-          variables: { id: matchupId },
-        });
-        if (data?.getMatchupById?.status !== MatchupStatus.Scheduled) {
-          setLockDiscovered(true);
-          return;
-        }
-      } catch (error) {
-        LOGGER.error(
-          'Failed to fetch matchup status before swap',
-          error instanceof Error ? error : String(error),
-        );
-        setLockDiscovered(true);
-        return;
-      }
+      if (!(await ensureMatchupStillScheduled())) return;
       try {
         await swapPositions(
           parseId(player1Id),
@@ -193,28 +219,13 @@ export function MatchupRosterEditor({
         );
       }
     },
-    [swapPositions, refetchPlayers, fetchMatchupStatus, matchupId],
+    [swapPositions, refetchPlayers, ensureMatchupStillScheduled],
   );
 
   const handleMoveToPosition = useCallback(
     async (playerId: string, positionId: number | null) => {
       if (lockedRef.current) return;
-      try {
-        const { data } = await fetchMatchupStatus({
-          variables: { id: matchupId },
-        });
-        if (data?.getMatchupById?.status !== MatchupStatus.Scheduled) {
-          setLockDiscovered(true);
-          return;
-        }
-      } catch (error) {
-        LOGGER.error(
-          'Failed to fetch matchup status before move',
-          error instanceof Error ? error : String(error),
-        );
-        setLockDiscovered(true);
-        return;
-      }
+      if (!(await ensureMatchupStillScheduled())) return;
       try {
         await updatePosition(parseId(playerId), positionId);
         await refetchPlayers();
@@ -225,7 +236,7 @@ export function MatchupRosterEditor({
         );
       }
     },
-    [updatePosition, refetchPlayers, fetchMatchupStatus, matchupId],
+    [updatePosition, refetchPlayers, ensureMatchupStillScheduled],
   );
 
   // ── Guard states ────────────────────────────────────────────────────────

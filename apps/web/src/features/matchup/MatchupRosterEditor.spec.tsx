@@ -10,6 +10,10 @@
  * (network-only) to verify the matchup is still Scheduled. If the server
  * reports a non-Scheduled status, the mutation must be skipped and the UI
  * must transition to locked state.
+ *
+ * LS-5894 (BMD-024): the pre-flight check must skip the network round-trip
+ * when the last confirmed-Scheduled check is under 5s old, and must re-check
+ * over the network once that window has elapsed.
  */
 import React from 'react';
 import { act, render } from '@testing-library/react';
@@ -405,5 +409,101 @@ describe('MatchupRosterEditor — server-side lock re-check (LS-4051)', () => {
 
     expect(updatePosition).toHaveBeenCalledTimes(1);
     expect(viewPropsRef.current?.locked).toBe(false);
+  });
+});
+
+describe('MatchupRosterEditor — pre-flight cache TTL (LS-5894 / BMD-024)', () => {
+  const swapPositions = jest.fn().mockResolvedValue(undefined);
+  const updatePosition = jest.fn().mockResolvedValue(undefined);
+  const fetchMatchupStatus = jest
+    .fn()
+    .mockResolvedValue(scheduledStatusResponse);
+
+  beforeEach(() => {
+    swapPositions.mockClear();
+    updatePosition.mockClear();
+    fetchMatchupStatus.mockClear();
+    fetchMatchupStatus.mockResolvedValue(scheduledStatusResponse);
+    playersResponse.refetch.mockClear();
+    viewPropsRef.current = null;
+
+    (useGetMatchupByIdLazyQuery as jest.Mock).mockReturnValue([
+      fetchMatchupStatus,
+      {},
+    ]);
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue(playersResponse);
+    (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue(
+      positionsResponse,
+    );
+    (useSwapMatchupPlayerPositions as jest.Mock).mockReturnValue({
+      swapPositions,
+      loading: false,
+    });
+    (useUpdateMatchupPlayerPosition as jest.Mock).mockReturnValue({
+      updatePosition,
+      loading: false,
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('skips the network pre-flight on a second swap within 5s of a confirmed check', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    const swap = viewPropsRef.current?.onSwapPositions;
+    if (!swap) throw new Error('expected onSwapPositions to be set');
+
+    await act(async () => {
+      await swap('101', null, '102', 1);
+    });
+    expect(fetchMatchupStatus).toHaveBeenCalledTimes(1);
+
+    nowSpy.mockReturnValue(1_000_000 + 4_000); // 4s later — still within TTL
+    await act(async () => {
+      await swap('101', null, '102', 1);
+    });
+
+    expect(fetchMatchupStatus).toHaveBeenCalledTimes(1);
+    expect(swapPositions).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-checks over the network once the 5s TTL has elapsed', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(2_000_000);
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    const move = viewPropsRef.current?.onMoveToPosition;
+    if (!move) throw new Error('expected onMoveToPosition to be set');
+
+    await act(async () => {
+      await move('101', 1);
+    });
+    expect(fetchMatchupStatus).toHaveBeenCalledTimes(1);
+
+    nowSpy.mockReturnValue(2_000_000 + 5_001); // just past the TTL
+    await act(async () => {
+      await move('101', 1);
+    });
+
+    expect(fetchMatchupStatus).toHaveBeenCalledTimes(2);
+    expect(updatePosition).toHaveBeenCalledTimes(2);
   });
 });
