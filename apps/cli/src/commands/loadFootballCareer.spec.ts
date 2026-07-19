@@ -242,3 +242,101 @@ describe('handleLoadFootballCareer — consecutive-403 streak detection', () => 
     });
   });
 });
+
+describe('handleLoadFootballCareer — auth-failure Rollbar noise reduction', () => {
+  const AUTH_EXPIRED_MESSAGE =
+    'PFR auth appears to have expired — refresh PFR_CF_CLEARANCE and re-run.';
+  let exitSpy: jest.SpyInstance;
+  const loadStats = loadFootballCareerStats as jest.Mock;
+  const { LOGGER }: { LOGGER: { warn: jest.Mock; error: jest.Mock } } =
+    jest.requireMock('@legacy-sports/logging');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    exitSpy = jest
+      .spyOn(process, 'exit')
+      .mockImplementation(() => undefined as never);
+  });
+
+  afterEach(() => {
+    exitSpy.mockRestore();
+  });
+
+  it('logs individual 403s at warn (not error) so they are not forwarded to Rollbar', async () => {
+    const players = makePlayers(3);
+    currentFakeDb = makeFakeDb(players);
+    loadStats.mockRejectedValue(new FakeAuthError());
+
+    await handleLoadFootballCareer({ limit: 3 });
+
+    expect(LOGGER.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Player 1 failed'),
+    );
+    expect(LOGGER.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('Player 1 failed'),
+    );
+  });
+
+  it('still logs non-auth failures at error so they remain individually actionable', async () => {
+    const players = makePlayers(1);
+    currentFakeDb = makeFakeDb(players);
+    loadStats.mockRejectedValue(new Error('Player not found'));
+
+    await handleLoadFootballCareer({ limit: 1 });
+
+    expect(LOGGER.error).toHaveBeenCalledWith(
+      expect.stringContaining('Player 1 failed'),
+    );
+  });
+
+  it('raises exactly one actionable alert when auth failures never form a streak', async () => {
+    const players = makePlayers(4);
+    currentFakeDb = makeFakeDb(players);
+    loadStats
+      .mockRejectedValueOnce(new FakeAuthError())
+      .mockResolvedValueOnce({
+        playerId: 2,
+        pfrId: 'Player200',
+        groupsUpserted: [],
+      })
+      .mockRejectedValueOnce(new FakeAuthError())
+      .mockResolvedValueOnce({
+        playerId: 4,
+        pfrId: 'Player400',
+        groupsUpserted: [],
+      });
+
+    await handleLoadFootballCareer({ limit: 4 });
+
+    const authAlertCalls = LOGGER.error.mock.calls.filter(
+      (call: unknown[]) => call[0] === AUTH_EXPIRED_MESSAGE,
+    );
+    expect(authAlertCalls).toHaveLength(1);
+  });
+
+  it('does not double-alert when the streak abort already raised the summary', async () => {
+    const players = makePlayers(6);
+    currentFakeDb = makeFakeDb(players);
+    loadStats.mockRejectedValue(new FakeAuthError());
+
+    await handleLoadFootballCareer({ limit: 6 });
+
+    const authAlertCalls = LOGGER.error.mock.calls.filter(
+      (call: unknown[]) => call[0] === AUTH_EXPIRED_MESSAGE,
+    );
+    expect(authAlertCalls).toHaveLength(1);
+  });
+
+  it('does not raise the auth alert when no auth failures occurred', async () => {
+    const players = makePlayers(2);
+    currentFakeDb = makeFakeDb(players);
+    loadStats.mockRejectedValue(new Error('some transient error'));
+
+    await handleLoadFootballCareer({ limit: 2 });
+
+    const authAlertCalls = LOGGER.error.mock.calls.filter(
+      (call: unknown[]) => call[0] === AUTH_EXPIRED_MESSAGE,
+    );
+    expect(authAlertCalls).toHaveLength(0);
+  });
+});

@@ -37,17 +37,45 @@ const AUTH_EXPIRED_MESSAGE =
  * Tracks consecutive 403 (auth-looking) failures across a loop of
  * `loadSinglePlayer` calls. A single non-auth failure or a success resets the
  * streak, so only a genuine run of auth failures — not scattered per-player
- * errors — triggers an abort.
+ * errors — triggers an abort. Also tracks whether *any* auth failure was seen
+ * across the whole run (independent of streaks resetting), so callers can
+ * raise one actionable alert even when auth failures never chain into a
+ * streak (e.g. a small --limit run, or 403s interleaved with successes).
  */
 class AuthFailureStreakTracker {
   private consecutiveAuthFailures = 0;
+  private sawAuthFailure = false;
 
   /** Records a result; returns true once the abort threshold is reached. */
   record(result: { isAuthError?: boolean }): boolean {
-    this.consecutiveAuthFailures = result.isAuthError
-      ? this.consecutiveAuthFailures + 1
-      : 0;
+    if (result.isAuthError) {
+      this.consecutiveAuthFailures++;
+      this.sawAuthFailure = true;
+    } else {
+      this.consecutiveAuthFailures = 0;
+    }
     return this.consecutiveAuthFailures >= AUTH_FAILURE_STREAK_THRESHOLD;
+  }
+
+  get hasAuthFailures(): boolean {
+    return this.sawAuthFailure;
+  }
+}
+
+/**
+ * Emits the actionable auth-expiry alert exactly once per run. Individual
+ * per-player 403s are logged at `warn` (see loadSinglePlayer) so a run of
+ * many auth failures doesn't flood Rollbar with duplicate `error`-level
+ * occurrences for what is really one root cause — this is the single
+ * `error`-level signal that reaches Rollbar. Skipped when the streak abort
+ * already logged AUTH_EXPIRED_MESSAGE, so a run never double-alerts.
+ */
+function logAuthFailureSummaryIfNeeded(
+  authTracker: AuthFailureStreakTracker,
+  alreadyAborted: boolean,
+): void {
+  if (!alreadyAborted && authTracker.hasAuthFailures) {
+    LOGGER.error(AUTH_EXPIRED_MESSAGE);
   }
 }
 
@@ -94,11 +122,21 @@ async function loadSinglePlayer(
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    LOGGER.error(`Player ${playerId} failed: ${message}`);
+    const isAuthError = isPfrForbiddenError(err);
+    // Auth failures are a single known root cause (expired cf_clearance)
+    // repeated per-player, not independent errors — log at `warn` so a run
+    // of many 403s doesn't flood Rollbar with duplicate occurrences. The
+    // caller raises one `error`-level alert for the whole run instead (see
+    // logAuthFailureSummaryIfNeeded).
+    if (isAuthError) {
+      LOGGER.warn(`Player ${playerId} failed: ${message}`);
+    } else {
+      LOGGER.error(`Player ${playerId} failed: ${message}`);
+    }
     return {
       success: false,
       error: message,
-      isAuthError: isPfrForbiddenError(err),
+      isAuthError,
     };
   }
 }
@@ -181,6 +219,7 @@ export async function handleLoadFootballCareer(
         }
       }
 
+      logAuthFailureSummaryIfNeeded(authTracker, authExpired);
       LOGGER.info(
         `Batch complete: ${playerIds.length - errors.length}/${playerIds.length} succeeded`,
       );
@@ -229,6 +268,7 @@ export async function handleLoadFootballCareer(
         }
       }
 
+      logAuthFailureSummaryIfNeeded(authTracker, authExpired);
       LOGGER.info(
         `Batch complete: ${batchPlayers.length - errors.length}/${batchPlayers.length} succeeded — run again to continue.`,
       );
@@ -283,6 +323,7 @@ export async function handleLoadFootballCareer(
       }
     }
 
+    logAuthFailureSummaryIfNeeded(authTracker, authExpired);
     LOGGER.info(
       `All-players load complete: ${players.length - errors.length}/${players.length} succeeded`,
     );
