@@ -7,7 +7,7 @@
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
-	android ios build-android build-ios maestro \
+	android ios app-dev build-android build-ios maestro \
 	db-migrate db-studio db-reset db-tunnel db-dump db-restore db-dump-dev db-restore-dev db-check-connections codegen \
 	deploy-lambdas terraform-init terraform-plan terraform-apply terraform-apply-auto terraform-destroy gen-tfvars rebuild-tfvars tfvars-from-aws \
 	runner-apply ami-build ami-list runner-secrets-rotate runner-lambdas-sync \
@@ -444,6 +444,10 @@ docker-up: ## Start Docker Compose services in detached mode
 	docker compose up -d --build
 
 # Mobile Development
+app-dev: ## One-command Android dev: boot emulator if needed, then expo run:android (CHECK=1 = preflight only)
+	@$(call echo_blue,Starting Android dev environment...)
+	node scripts/run-android-dev.mjs $(if $(CHECK),--check)
+
 android: ## Run Android application
 	@$(call echo_blue,Running Android application...)
 	pnpm run android

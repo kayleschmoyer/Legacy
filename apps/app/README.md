@@ -1,6 +1,6 @@
-# Mobile App (React Native CLI)
+# Mobile App (Expo / React Native)
 
-The Legacy Sports mobile application built with React Native CLI for Android platform.
+The Legacy Sports mobile application built with Expo (prebuilt `android/` project committed) targeting Android.
 
 > **Note**: iOS builds are currently disabled as we are not actively using the iOS platform.
 
@@ -8,37 +8,36 @@ The Legacy Sports mobile application built with React Native CLI for Android pla
 
 ### Prerequisites
 
-- **Node.js**: v18+
-- **React Native CLI**: `pnpm install -g react-native-cli`
-- **Android Studio**: For Android development
+- **Node.js**: v18+ (must be on the PATH of whatever launches Gradle — the Android build shells out to `node` to resolve React Native and Expo)
+- **Android Studio**: For SDK/AVD management and native debugging
 - **Xcode**: For iOS development (macOS only)
 
 ### Development Setup
 
 ```bash
-# From project root
-cd apps/app
+# One command from repo root: boots an emulator if none is running,
+# then Gradle debug build + install + Metro with Fast Refresh
+make app-dev
 
-# Start Metro bundler
-pnpm run start
-# or
-pnpm exec react-native start
+# Preflight only — verify SDK/emulator/AVD setup without launching anything
+make app-dev CHECK=1
 
-# Run on Android (in another terminal)
-pnpm run android
-# or
-pnpm exec react-native run-android
+# Or without the emulator-boot step (device/emulator must already be running):
+pnpm run android          # from repo root, or apps/app
 
-# iOS builds are currently disabled
+# Metro alone (after the app is already installed)
+pnpm --filter @legacy-sports/app start
 ```
+
+Environment variables (`EXPO_PUBLIC_*`) are loaded from the repo root `.env` by `app.config.js` — make sure it exists before starting Metro or the app will build but fail to reach the backend.
 
 ## 📱 Platform Requirements
 
 ### Android
 
 - **Android Studio**: Latest version
-- **Android SDK**: API 29+ (Android 10+)
-- **Java**: JDK 11 or newer
+- **Android SDK**: compileSdk comes from the Expo version catalog (currently API 36) — see [docs/mobile/android-version-matrix.md](../../docs/mobile/android-version-matrix.md)
+- **Java**: JDK 17 (Temurin recommended; Android Studio's bundled JBR also works)
 - **Android device or emulator**
 
 ### iOS
@@ -64,14 +63,11 @@ No environment variables needed for basic development. GraphQL endpoint is confi
 ## 🧪 Testing
 
 ```bash
-# Run unit tests
-npm test
+# Unit tests for changed files, from repo root
+make test
 
-# Run tests in watch mode
-pnpm run test:watch
-
-# Run E2E tests
-pnpm run test:e2e
+# Mobile E2E (Maestro flows against a running emulator)
+make maestro
 ```
 
 ## 📦 Building
@@ -79,25 +75,20 @@ pnpm run test:e2e
 ### Android
 
 ```bash
-# Debug build
-pnpm run build:android:debug
+# From repo root
+pnpm run build-android-debug   # debug APK
+pnpm run build-android         # release APK (unsigned by default — see LS-4960)
 
-# Release build (requires signing configuration)
-pnpm run build:android:release
-
-# Build APK directly
-cd android
-./gradlew assembleRelease
+# Or build with Gradle directly
+cd apps/app/android
+./gradlew assembleDebug
 ```
 
 ### iOS
 
 ```bash
-# Debug build
-pnpm run build:ios:debug
-
-# Release build (requires provisioning profile)
-pnpm run build:ios:release
+# From repo root (currently disabled/unused)
+pnpm run build-ios
 ```
 
 ## 🛠️ Development
@@ -110,18 +101,14 @@ pnpm run build:ios:release
 
 ### Debugging
 
-- **Flipper**: Network debugging and device logs
-- **React DevTools**: Component inspection
-- **Chrome DevTools**: JavaScript debugging
+- **React Native DevTools**: press `j` in the Metro terminal
+- **Android Studio**: logcat and native debugging
 
 ### Common Commands
 
 ```bash
-# Clean build artifacts
-pnpm run clean
-
 # Reset Metro cache
-pnpm run start:reset
+npx expo start --clear
 
 # Install iOS dependencies (macOS only)
 cd ios && pod install
