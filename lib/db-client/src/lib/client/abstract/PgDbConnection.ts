@@ -44,11 +44,24 @@ export class PgDbConnection<
       // Connection pool limits to prevent exhaustion
       // In Lambda: Each instance should use minimal connections
       // db.t3.micro has ~87 max_connections, AWS reserves ~10
-      // With 10 concurrent Lambdas, each can safely use 3-4 connections
-      max: 3, // Maximum connections per Lambda instance
+      // With 10 concurrent Lambdas, each can safely use 3-4 connections.
+      //
+      // A single GraphQL request legitimately issues several concurrent
+      // queries against the shared context.db pool — e.g. resolving
+      // player/seasonBatting/seasonPitching/seasonFielding/games for a
+      // matchup player all fire in parallel, each hitting a different
+      // DataLoader batch query. With max: 3 that fan-out routinely queued
+      // more than 3 deep, and the 5s connectionTimeoutMillis was too tight
+      // to ride out that queueing, surfacing as spurious
+      // "timeout exceeded when trying to connect" errors (LS-8479) even
+      // though the underlying queries were healthy. Raised to max: 5
+      // (10 Lambdas x 5 = 50, still well under the ~77 available) and
+      // connectionTimeoutMillis: 10000 to give legitimate bursts of
+      // concurrent resolver queries room to wait for a free connection.
+      max: 5, // Maximum connections per Lambda instance
       min: 0, // Don't keep idle connections (Lambda is ephemeral)
       idleTimeoutMillis: 30000, // Release idle connections after 30s
-      connectionTimeoutMillis: 5000, // Fail fast if pool is exhausted
+      connectionTimeoutMillis: 10000, // Fail fast if pool is exhausted
     };
 
     // Use SSL configuration from database config
