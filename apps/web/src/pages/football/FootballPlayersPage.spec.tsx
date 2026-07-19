@@ -166,7 +166,7 @@ function makePlayersResult(
       footballPlayers: { nodes, pageInfo },
     } as unknown as PlayersQueryResult['data'],
     loading: opts.loading ?? false,
-    error: opts.error as PlayersQueryResult['error'],
+    error: opts.error,
     networkStatus: 7,
   } as PlayersQueryResult;
 }
@@ -219,14 +219,11 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof useGetNflTeamSeasonMetadataQuery>);
   mockUseHasEntitlement.mockReturnValue(false);
   mockUseFootballPlayersQuery.mockReturnValue(loadingResult());
-  MockFootballPlayerCard.mockImplementation(
-    ({ player }) =>
-      (
-        <div data-testid={`player-${player.id}`}>
-          {player.firstName} {player.lastName}
-        </div>
-      ) as React.ReactElement,
-  );
+  MockFootballPlayerCard.mockImplementation(({ player }) => (
+    <div data-testid={`player-${player.id}`}>
+      {player.firstName} {player.lastName}
+    </div>
+  ));
 });
 
 // ── Tests ──────────────────────────────────────────────────────────────────

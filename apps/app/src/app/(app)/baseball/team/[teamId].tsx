@@ -49,7 +49,7 @@ function getMatchupPlayers(data: unknown): readonly MatchupPlayerStats[] {
     data != null &&
     typeof data === 'object' &&
     'getMatchupPlayers' in data &&
-    Array.isArray((data as { getMatchupPlayers: unknown }).getMatchupPlayers)
+    Array.isArray(data.getMatchupPlayers)
   ) {
     return (data as { getMatchupPlayers: MatchupPlayerStats[] })
       .getMatchupPlayers;

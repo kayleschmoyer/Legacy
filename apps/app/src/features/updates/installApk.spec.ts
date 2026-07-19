@@ -307,7 +307,7 @@ function mockFetch(status: number, body: string): typeof fetch {
     ok: status >= 200 && status < 300,
     status,
     text: () => Promise.resolve(body),
-  }) as unknown as typeof fetch;
+  });
 }
 
 describe('verifyApkIntegrity', () => {

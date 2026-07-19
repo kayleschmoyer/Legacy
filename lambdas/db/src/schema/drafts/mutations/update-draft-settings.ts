@@ -203,10 +203,7 @@ builder.mutationField('updateDraftSettings', (t) =>
         let updatedPlayerPool = league.playerPool;
         const leagueEligibilityUpdates: Record<string, unknown> = {};
         if (playerPool) {
-          leagueEligibilityUpdates['playerPool'] = playerPool as
-            | 'all'
-            | 'nl'
-            | 'al';
+          leagueEligibilityUpdates['playerPool'] = playerPool;
         }
         if (eraFilter != null) {
           leagueEligibilityUpdates['baseballEraFilter'] = eraFilter;
@@ -256,16 +253,13 @@ builder.mutationField('updateDraftSettings', (t) =>
           updatedAt: new Date(),
         };
         if (draftMode) {
-          draftUpdates['draftMode'] = draftMode as 'live' | 'automated';
+          draftUpdates['draftMode'] = draftMode;
         }
         if (selectionMethod) {
-          draftUpdates['selectionMethod'] = selectionMethod as
-            | 'standard'
-            | 'auction'
-            | 'random';
+          draftUpdates['selectionMethod'] = selectionMethod;
         }
         if (draftOrder) {
-          draftUpdates['draftOrder'] = draftOrder as 'snake' | 'linear';
+          draftUpdates['draftOrder'] = draftOrder;
         }
         if (
           pickTimeLimitSeconds !== undefined &&

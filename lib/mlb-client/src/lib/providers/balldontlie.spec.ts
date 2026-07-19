@@ -15,11 +15,17 @@ import {
 // isAxiosError to return undefined, which breaks all retry-logic assertions.
 const mockedAxiosGet = jest.spyOn(axios, 'get');
 
+// The lint and build TS programs disagree on setTimeout's return type, so a
+// direct assertion is stripped by eslint --fix under one yet required by the
+// other. Route through `unknown` in a helper so the assertion survives --fix.
+const asTimeoutHandle = (value: unknown): ReturnType<typeof setTimeout> =>
+  value as ReturnType<typeof setTimeout>;
+
 // Make setTimeout instant so retry tests don't slow the suite.
 beforeAll(() => {
-  jest.spyOn(global, 'setTimeout').mockImplementation((fn) => {
-    (fn as () => void)();
-    return 0 as unknown as ReturnType<typeof setTimeout>;
+  jest.spyOn(global, 'setTimeout').mockImplementation((fn: () => void) => {
+    fn();
+    return asTimeoutHandle(0);
   });
 });
 

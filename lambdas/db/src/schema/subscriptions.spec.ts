@@ -383,7 +383,7 @@ function makeStripeWithPrices(monthly: number, annual: number) {
     .mockResolvedValueOnce({ unit_amount: annual });
   (getStripeClient as jest.Mock).mockResolvedValue({
     prices: { retrieve },
-  } as unknown as import('stripe').default);
+  });
   return retrieve;
 }
 

@@ -211,7 +211,7 @@ describe('useDraftData', () => {
       ok: true,
       status: 200,
       json: () => Promise.reject(new SyntaxError('Unexpected token')),
-    } as unknown as Response);
+    });
 
     const { result } = renderHook(() =>
       useDraftData('mlb', 'league-1', 'team-1'),

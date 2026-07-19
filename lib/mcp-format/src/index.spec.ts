@@ -35,10 +35,8 @@ describe('pick / pickFields', () => {
   });
 
   it('skips absent keys rather than emitting undefined', () => {
-    const result = pick({ id: 1 } as { id: number; missing?: string }, [
-      'id',
-      'missing',
-    ]);
+    const obj: { id: number; missing?: string } = { id: 1 };
+    const result = pick(obj, ['id', 'missing']);
     expect(result).toEqual({ id: 1 });
     expect('missing' in result).toBe(false);
   });

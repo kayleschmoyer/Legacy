@@ -459,7 +459,7 @@ describe('Draft Picks - DB Integration Tests', () => {
       } = await seedDraftFixture(2);
 
       await commitDraftPick({
-        tx: db as unknown as PublicDb,
+        tx: db,
         draftId: draft.id,
         leagueId: league.id,
         pickInfo: {
@@ -497,7 +497,7 @@ describe('Draft Picks - DB Integration Tests', () => {
       } = await seedDraftFixture(2);
 
       await executePickEffects({
-        db: db as unknown as PublicDb,
+        db: db,
         notificationService: null,
         draftLeagueId: league.id,
         draftId: draft.id,
@@ -542,7 +542,7 @@ describe('Draft Picks - DB Integration Tests', () => {
       } = await seedDraftFixture(2);
 
       await commitDraftPick({
-        tx: db as unknown as PublicDb,
+        tx: db,
         draftId: draft.id,
         leagueId: league.id,
         pickInfo: {
@@ -579,7 +579,7 @@ describe('Draft Picks - DB Integration Tests', () => {
       } = await seedDraftFixture(2);
 
       await commitDraftPick({
-        tx: db as unknown as PublicDb,
+        tx: db,
         draftId: draft.id,
         leagueId: league.id,
         pickInfo: {

@@ -117,7 +117,7 @@ jest.mock('tamagui', () => {
       onPress?: () => void;
       [key: string]: unknown;
     }) => (
-      <button type="button" onClick={onPress} {...(rest as object)}>
+      <button type="button" onClick={onPress} {...rest}>
         {children}
       </button>
     ),
@@ -133,7 +133,7 @@ jest.mock('tamagui', () => {
       testID?: string;
       [key: string]: unknown;
     }) => (
-      <span onClick={onPress} data-testid={testID} {...(rest as object)}>
+      <span onClick={onPress} data-testid={testID} {...rest}>
         {children}
       </span>
     ),

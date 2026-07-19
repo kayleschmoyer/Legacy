@@ -853,10 +853,7 @@ function TeamManagementSection({
             size="$3"
             onPress={() => requireStepUp(() => void handleLock(true))}
             disabled={
-              lockLoading ||
-              !lockTeamId ||
-              (selectedTeam as { isLocked?: boolean | null } | undefined)
-                ?.isLocked === true
+              lockLoading || !lockTeamId || selectedTeam?.isLocked === true
             }
             icon={lockLoading ? <Spinner size="small" /> : <Lock size={14} />}
             backgroundColor="$orange9"
@@ -868,10 +865,7 @@ function TeamManagementSection({
             size="$3"
             onPress={() => requireStepUp(() => void handleLock(false))}
             disabled={
-              lockLoading ||
-              !lockTeamId ||
-              (selectedTeam as { isLocked?: boolean | null } | undefined)
-                ?.isLocked === false
+              lockLoading || !lockTeamId || selectedTeam?.isLocked === false
             }
             icon={lockLoading ? <Spinner size="small" /> : <Unlock size={14} />}
             backgroundColor="$green9"

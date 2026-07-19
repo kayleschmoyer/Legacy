@@ -202,7 +202,7 @@ function makePlayer(id: number): SelectedPlayer {
     id,
     name: `Player ${id}`,
     position: 'SP',
-    summary: {} as SelectedPlayer['summary'],
+    summary: {},
   };
 }
 
@@ -295,14 +295,14 @@ function battingRow(
   season: number | null,
   atBats: number | null,
 ): SeasonBattingRow {
-  return { season, atBats } as SeasonBattingRow;
+  return { season, atBats };
 }
 
 function pitchingRow(
   season: number | null,
   inningsPitched: number | null,
 ): SeasonPitchingRow {
-  return { season, inningsPitched } as SeasonPitchingRow;
+  return { season, inningsPitched };
 }
 
 function seasonData(

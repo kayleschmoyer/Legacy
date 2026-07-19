@@ -1041,8 +1041,8 @@ export class SeasonDraftGameService {
       params.season,
       params.position,
       game.statKey,
-      game.playerType as PlayerType,
-      game.gameMode as GameMode,
+      game.playerType,
+      game.gameMode,
       params.team,
     );
 

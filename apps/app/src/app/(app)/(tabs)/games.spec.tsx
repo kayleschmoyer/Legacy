@@ -32,14 +32,14 @@ jest.mock('tamagui', () => {
     }: {
       children?: React.ReactNode;
       [key: string]: unknown;
-    }) => <Text {...(rest as object)}>{children}</Text>,
+    }) => <Text {...rest}>{children}</Text>,
     XStack: ({
       children,
       ...rest
     }: {
       children?: React.ReactNode;
       [key: string]: unknown;
-    }) => <View {...(rest as object)}>{children}</View>,
+    }) => <View {...rest}>{children}</View>,
     YStack: ({
       children,
       onPress,
@@ -52,11 +52,11 @@ jest.mock('tamagui', () => {
       [key: string]: unknown;
     }) =>
       onPress ? (
-        <TouchableOpacity onPress={onPress} {...(rest as object)}>
+        <TouchableOpacity onPress={onPress} {...rest}>
           {children}
         </TouchableOpacity>
       ) : (
-        <View {...(rest as object)}>{children}</View>
+        <View {...rest}>{children}</View>
       ),
   };
 });

@@ -192,7 +192,10 @@ function scheduleIdle(fn: () => void): IdleHandle {
       window as unknown as { requestIdleCallback: (cb: () => void) => number }
     ).requestIdleCallback(fn);
   }
-  return setTimeout(fn, 0) as unknown as number;
+  // setTimeout resolves to a number handle on web/native (and jsdom); the
+  // build TS program types it as NodeJS.Timeout, so normalise via Number()
+  // instead of an assertion that the lint TS program flags as unnecessary.
+  return Number(setTimeout(fn, 0));
 }
 function cancelIdle(h: IdleHandle | null): void {
   if (h == null) return;
@@ -206,7 +209,7 @@ function cancelIdle(h: IdleHandle | null): void {
     ).cancelIdleCallback(h);
     return;
   }
-  clearTimeout(h as unknown as ReturnType<typeof setTimeout>);
+  clearTimeout(h);
 }
 
 // ---------------------------------------------------------------------------

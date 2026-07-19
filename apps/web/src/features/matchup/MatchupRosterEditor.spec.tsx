@@ -81,7 +81,7 @@ const matchup: MatchupFragment = {
   endTime: null,
   team1: { __typename: 'Team', id: 10, name: 'Team A' },
   team2: { __typename: 'Team', id: 20, name: 'Team B' },
-} as MatchupFragment;
+};
 
 const playersResponse = {
   data: {

@@ -87,7 +87,7 @@ function makeParams(
     refetchAutoPickStatuses: jest.fn(),
     autoPickTeamIds: new Set<string>(),
     ...overrides,
-  } as Parameters<typeof useDraftActions>[0];
+  };
 }
 
 describe('useDraftActions re-entry guards (LS-2681)', () => {

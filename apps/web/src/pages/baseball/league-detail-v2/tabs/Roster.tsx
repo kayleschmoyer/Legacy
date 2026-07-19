@@ -50,7 +50,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
     skip: !myTeamId,
   });
   const teamPlayers = useMemo<readonly TeamMemberFragment[]>(
-    () => (teamMembersData?.teamMembers ?? []) as readonly TeamMemberFragment[],
+    () => teamMembersData?.teamMembers ?? [],
     [teamMembersData?.teamMembers],
   );
 

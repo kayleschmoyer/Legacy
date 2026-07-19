@@ -246,7 +246,7 @@ describe('PlayerStatsScreen', () => {
   it('opens the native share sheet with a fully-qualified deep link on share', () => {
     const shareSpy = jest
       .spyOn(Share, 'share')
-      .mockResolvedValue({ action: Share.sharedAction } as never);
+      .mockResolvedValue({ action: Share.sharedAction });
     render(<PlayerStatsScreen />);
 
     // The handler invokes Share.share synchronously (before its internal await),
@@ -266,7 +266,7 @@ describe('PlayerStatsScreen', () => {
   it('exports the active filter snapshot as JSON through the share sheet', () => {
     const shareSpy = jest
       .spyOn(Share, 'share')
-      .mockResolvedValue({ action: Share.sharedAction } as never);
+      .mockResolvedValue({ action: Share.sharedAction });
     render(<PlayerStatsScreen />);
 
     capturedOnExport?.({ position: 'SS', minHomeRuns: 20 }, 'hitters');

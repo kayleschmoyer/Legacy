@@ -367,12 +367,12 @@ test.describe('Help Page — contact and support @regression', () => {
   }) => {
     await page.evaluate(() => {
       (window as unknown as Record<string, string>).__openedUrl = '';
-      window.open = ((url?: string | URL) => {
+      window.open = (url?: string | URL) => {
         (window as unknown as Record<string, string>).__openedUrl = String(
           url ?? '',
         );
         return null;
-      }) as typeof window.open;
+      };
     });
     await page.getByText('Suggest a Feature').click();
     const openedUrl = await page.evaluate(
@@ -386,12 +386,12 @@ test.describe('Help Page — contact and support @regression', () => {
   }) => {
     await page.evaluate(() => {
       (window as unknown as Record<string, string>).__openedUrl = '';
-      window.open = ((url?: string | URL) => {
+      window.open = (url?: string | URL) => {
         (window as unknown as Record<string, string>).__openedUrl = String(
           url ?? '',
         );
         return null;
-      }) as typeof window.open;
+      };
     });
     await page.getByText('Community Discussions').click();
     const openedUrl = await page.evaluate(
@@ -414,12 +414,12 @@ test.describe('Help Page — contact and support @regression', () => {
     // window.open to capture the intended URL instead.
     await page.evaluate(() => {
       (window as unknown as Record<string, string>).__openedUrl = '';
-      window.open = ((url?: string | URL) => {
+      window.open = (url?: string | URL) => {
         (window as unknown as Record<string, string>).__openedUrl = String(
           url ?? '',
         );
         return null;
-      }) as typeof window.open;
+      };
     });
     await page.getByText('Join our Discord', { exact: true }).click();
     const openedUrl = await page.evaluate(

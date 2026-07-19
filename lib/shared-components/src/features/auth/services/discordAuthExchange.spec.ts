@@ -26,7 +26,7 @@ describe('exchangeDiscordCode', () => {
           JSON.stringify({ jwt: 'jwt-token', csrfToken: 'csrf-123' }),
         ),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const result = await exchangeDiscordCode(PROXY, PAYLOAD);
 
@@ -47,7 +47,7 @@ describe('exchangeDiscordCode', () => {
       status: 200,
       text: () => Promise.resolve(JSON.stringify({ jwt: 'jwt-token' })),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     await exchangeDiscordCode(PROXY, PAYLOAD, { signal: undefined });
 
@@ -65,7 +65,7 @@ describe('exchangeDiscordCode', () => {
         Promise.resolve(
           JSON.stringify({ error: 'Discord authentication failed' }),
         ),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     const error = await exchangeDiscordCode(PROXY, PAYLOAD).catch(
       (e: unknown) => e,
@@ -83,7 +83,7 @@ describe('exchangeDiscordCode', () => {
       ok: false,
       status: 400,
       text: () => Promise.resolve(''),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     const error = await exchangeDiscordCode(PROXY, PAYLOAD).catch(
       (e: unknown) => e,
@@ -100,7 +100,7 @@ describe('exchangeDiscordCode', () => {
       ok: true,
       status: 200,
       text: () => Promise.resolve(JSON.stringify({ csrfToken: 'csrf-123' })),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     await expect(exchangeDiscordCode(PROXY, PAYLOAD)).rejects.toThrow(
       'Discord OAuth did not return JWT',

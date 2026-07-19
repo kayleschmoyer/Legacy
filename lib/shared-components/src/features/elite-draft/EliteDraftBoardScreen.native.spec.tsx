@@ -248,16 +248,8 @@ beforeEach(() => {
     .mockReturnValue(
       undefined as unknown as ReturnType<typeof useDraftWebSocket>,
     );
-  jest
-    .mocked(useDraftTimer)
-    .mockReturnValue({ timeRemaining: 90 } as unknown as ReturnType<
-      typeof useDraftTimer
-    >);
-  jest
-    .mocked(useDraftEffects)
-    .mockReturnValue(
-      undefined as unknown as ReturnType<typeof useDraftEffects>,
-    );
+  jest.mocked(useDraftTimer).mockReturnValue({ timeRemaining: 90 });
+  jest.mocked(useDraftEffects).mockReturnValue(undefined);
 });
 
 // LS-8108 mirrors the LS-8067 web fix on the native draft board. The native

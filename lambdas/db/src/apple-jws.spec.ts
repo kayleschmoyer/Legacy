@@ -89,9 +89,7 @@ beforeEach(() => {
 
 describe('decodeAndVerifyJwsTransaction', () => {
   it('throws when the JWS header has no x5c field', async () => {
-    mockDecodeProtectedHeader.mockReturnValue({ alg: 'ES256' } as ReturnType<
-      typeof decodeProtectedHeader
-    >);
+    mockDecodeProtectedHeader.mockReturnValue({ alg: 'ES256' });
 
     await expect(
       decodeAndVerifyJwsTransaction('header.payload.sig'),
@@ -102,7 +100,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     await expect(
       decodeAndVerifyJwsTransaction('header.payload.sig'),
@@ -113,7 +111,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCert('CN=Rogue Root');
     leafCert.checkIssued.mockReturnValue(false);
@@ -131,10 +129,10 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCert();
-    (leafCert.verify as jest.Mock).mockReturnValue(false);
+    leafCert.verify.mockReturnValue(false);
     const rootCert = makeRootCert();
     MockX509Certificate.mockReturnValueOnce(leafCert).mockReturnValueOnce(
       rootCert,
@@ -151,7 +149,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCert();
     const rootCert = makeRootCert();
@@ -175,7 +173,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCert();
     const rootCert = makeRootCert();
@@ -206,7 +204,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCert();
     const rootCert = makeRootCert();
@@ -234,7 +232,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const rogueLeafCert = makeLeafCert('CN=Rogue Issuer');
     rogueLeafCert.checkIssued.mockReturnValue(false);
@@ -255,7 +253,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCertWithWindow(-60, -3);
     const rootCert = makeRootCert();
@@ -282,7 +280,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCertWithWindow(3, 60 * 24 * 365);
     const rootCert = makeRootCert();
@@ -308,7 +306,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCertWithWindow(-60, -10);
     const rootCert = makeRootCert();
@@ -326,7 +324,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCertWithWindow(10, 60 * 24 * 365);
     const rootCert = makeRootCert();
@@ -348,7 +346,7 @@ describe('decodeAndVerifyJwsTransaction', () => {
     mockDecodeProtectedHeader.mockReturnValue({
       alg: 'ES256',
       x5c: [STUB_DER, STUB_DER],
-    } as unknown as ReturnType<typeof decodeProtectedHeader>);
+    });
 
     const leafCert = makeLeafCert(
       'CN=Apple Worldwide Developer Relations CA, O=Apple Inc., C=US',

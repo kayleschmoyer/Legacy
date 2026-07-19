@@ -294,14 +294,8 @@ describe('leagueSlice', () => {
         state,
         setLeagueData({ id: 123, name: 'League 1' }),
       );
-      state = leagueReducer(
-        state,
-        setLeaguePositions([{ id: 1 } as LeaguePositionFragment]),
-      );
-      state = leagueReducer(
-        state,
-        setTeamMembers([{ id: 1 } as TeamMemberFragment]),
-      );
+      state = leagueReducer(state, setLeaguePositions([{ id: 1 }]));
+      state = leagueReducer(state, setTeamMembers([{ id: 1 }]));
       state = leagueReducer(state, setUserTeamId(456));
       state = leagueReducer(state, setIsCommissioner(true));
 

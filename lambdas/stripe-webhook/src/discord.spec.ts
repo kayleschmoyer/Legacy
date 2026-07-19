@@ -210,9 +210,7 @@ describe('notifyStripeEvent', () => {
     // re-initialised from the new env var configuration rather than any
     // value cached by prior tests.
     jest.resetModules();
-    const { notifyStripeEvent: fresh } = (await import('./discord')) as {
-      notifyStripeEvent: typeof notifyStripeEvent;
-    };
+    const { notifyStripeEvent: fresh } = await import('./discord');
 
     await fresh({
       eventType: 'checkout.session.completed',
@@ -230,9 +228,7 @@ describe('notifyStripeEvent', () => {
       'https://discord.com/api/webhooks/test/secret-name-wins';
 
     jest.resetModules();
-    const { notifyStripeEvent: fresh } = (await import('./discord')) as {
-      notifyStripeEvent: typeof notifyStripeEvent;
-    };
+    const { notifyStripeEvent: fresh } = await import('./discord');
 
     await fresh({
       eventType: 'checkout.session.completed',

@@ -717,10 +717,7 @@ function KeyboardAvoidingView({
 }: KeyboardAvoidingViewProps) {
   // For web, we can just render a div since keyboard handling is different
   return (
-    <div
-      style={flattenStyles(style as StyleProp) as React.CSSProperties}
-      {...props}
-    >
+    <div style={flattenStyles(style as StyleProp)} {...props}>
       {children}
     </div>
   );
@@ -834,10 +831,7 @@ function View({
   style?: React.CSSProperties | React.CSSProperties[];
 }) {
   return (
-    <div
-      style={flattenStyles(style as StyleProp) as React.CSSProperties}
-      {...props}
-    >
+    <div style={flattenStyles(style as StyleProp)} {...props}>
       {children}
     </div>
   );
@@ -852,10 +846,7 @@ function Text({
   style?: React.CSSProperties | React.CSSProperties[];
 }) {
   return (
-    <span
-      style={flattenStyles(style as StyleProp) as React.CSSProperties}
-      {...props}
-    >
+    <span style={flattenStyles(style as StyleProp)} {...props}>
       {children}
     </span>
   );

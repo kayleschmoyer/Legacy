@@ -91,7 +91,7 @@ function makeContext(
     notificationService: null,
     db: makeMockDb(),
     ...overrides,
-  } as unknown as Context;
+  };
 }
 
 describe('assertLeagueMemberOrSystem', () => {

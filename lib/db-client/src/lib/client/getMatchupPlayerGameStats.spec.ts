@@ -42,7 +42,7 @@ function createMockDb(results: MockRow[][]): PublicDb {
       then: jest.fn((onFulfilled: (value: MockRow[]) => MockRow[]) =>
         onFulfilled(result),
       ),
-    } as unknown as DrizzleMockChain;
+    };
   };
 
   return {

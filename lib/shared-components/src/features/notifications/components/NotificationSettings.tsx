@@ -45,7 +45,7 @@ export function NotificationSettings({
     key: UpdatableNotificationKey,
     value: boolean,
   ) => {
-    await onUpdate({ [key]: value } as NotificationPreferenceInput);
+    await onUpdate({ [key]: value });
   };
 
   return (

@@ -189,12 +189,10 @@ jest.mock('tamagui', () => {
 describe('PreferencesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    global.requestAnimationFrame = ((
-      callback: FrameRequestCallback,
-    ): number => {
+    global.requestAnimationFrame = (callback: FrameRequestCallback): number => {
       callback(0);
       return 0;
-    }) as typeof requestAnimationFrame;
+    };
     mockSecureHasItem.mockResolvedValue(false);
     mockSecureGetItem.mockResolvedValue(null);
     mockSecureSetItem.mockResolvedValue(undefined);

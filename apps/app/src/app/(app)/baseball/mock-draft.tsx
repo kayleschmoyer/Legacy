@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import { Lock } from '@tamagui/lucide-icons';
@@ -205,7 +204,7 @@ export function MockDraftPage(): React.JSX.Element {
       router.navigate({
         pathname: '/DraftBoardPage',
         params: { leagueId: String(leagueId) },
-      } as Href);
+      });
     } else {
       setMissingLeagueIdError("Couldn't start mock draft — please try again.");
     }

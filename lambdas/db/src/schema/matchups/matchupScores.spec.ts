@@ -90,7 +90,7 @@ function makeDefenseRow(overrides: Partial<DefenseRow> = {}): DefenseRow {
     gameNum: 1,
     gameIdentifier: 'G1',
     ...overrides,
-  } as DefenseRow;
+  };
 }
 
 function makeIdpRow(overrides: Partial<IdpRow> = {}): IdpRow {
@@ -109,7 +109,7 @@ function makeIdpRow(overrides: Partial<IdpRow> = {}): IdpRow {
     gameNum: 1,
     gameIdentifier: 'G1',
     ...overrides,
-  } as IdpRow;
+  };
 }
 
 /** Build a unified offense row. Pass only the fields relevant to a given test. */
@@ -158,7 +158,7 @@ function makeOffenseRow(overrides: Partial<OffenseRow> = {}): OffenseRow {
     xpa: null,
     kLng: null,
     ...overrides,
-  } as OffenseRow;
+  };
 }
 
 function makeGameStats(
@@ -249,7 +249,7 @@ describe('computeFootballGamePoints — IDP branch', () => {
     const pts = computeFootballGamePoints(
       makeGameStats({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        idpDefense: makeIdpRow({ sacks: '1.5' as any, soloTkl: 1 }),
+        idpDefense: makeIdpRow({ sacks: '1.5', soloTkl: 1 }),
       }),
       false,
       true,

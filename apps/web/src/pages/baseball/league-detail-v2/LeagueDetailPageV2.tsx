@@ -8,7 +8,6 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import './styles.css';
 import {
-  type LeagueFragment,
   type TeamFragment,
   useGetLeagueByIdQuery,
   useGetLeagueTeamsLazyQuery,
@@ -104,10 +103,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   });
   // Fall back to previousData during refetches so CommishTab stays mounted and
   // in-flight success state (e.g. the "saved successfully" toast) isn't lost.
-  const league = (leagueData?.league ?? leaguePreviousData?.league) as
-    | LeagueFragment
-    | null
-    | undefined;
+  const league = leagueData?.league ?? leaguePreviousData?.league;
 
   // Persist this league as the user's most recently opened one so the next
   // login can redirect them straight here instead of the generic `/` route

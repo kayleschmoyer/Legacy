@@ -97,8 +97,6 @@ export function useGrowthBookAttributes(
   attributes: Record<string, unknown>,
 ): void {
   useEffect(() => {
-    void growthbook.setAttributes(
-      attributes as Parameters<typeof growthbook.setAttributes>[0],
-    );
+    void growthbook.setAttributes(attributes);
   }, [attributes]);
 }

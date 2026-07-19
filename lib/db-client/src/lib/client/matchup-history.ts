@@ -149,7 +149,7 @@ export async function getHeadToHeadRecord(
             eq(Schema.matchups.team1Id, team2Id),
             eq(Schema.matchups.team2Id, team1Id),
           ),
-        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
+        ), // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
       ),
     );
 
@@ -255,7 +255,7 @@ export function calculateStandings(
   db: PublicDb,
   leagueId: number,
 ): Promise<TeamStanding[]> {
-  const cache = getInFlightCache(db as object);
+  const cache = getInFlightCache(db);
   const existing = cache.get(leagueId);
   if (existing) return existing;
 
@@ -474,26 +474,17 @@ async function _computeStandings(
 
         const batting = battingLookup.get(key);
         if (batting) {
-          totalScore += applyScoring(
-            batting as unknown as Record<string, unknown>,
-            scoringWeights.batting,
-          );
+          totalScore += applyScoring(batting, scoringWeights.batting);
         }
 
         const pitching = pitchingLookup.get(key);
         if (pitching) {
-          totalScore += applyScoring(
-            pitching as unknown as Record<string, unknown>,
-            scoringWeights.pitching,
-          );
+          totalScore += applyScoring(pitching, scoringWeights.pitching);
         }
 
         const fielding = fieldingLookup.get(key);
         if (fielding) {
-          totalScore += applyScoring(
-            fielding as unknown as Record<string, unknown>,
-            scoringWeights.fielding,
-          );
+          totalScore += applyScoring(fielding, scoringWeights.fielding);
         }
       }
     }
@@ -670,7 +661,7 @@ export async function getRecentMatchupsForTeam(
         or(
           eq(Schema.matchups.team1Id, teamId),
           eq(Schema.matchups.team2Id, teamId),
-        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
+        ), // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
         eq(Schema.matchups.status, 'completed'),
       ),
     )
@@ -715,7 +706,7 @@ export async function getWinStreakMatchupsForTeam(
         or(
           eq(Schema.matchups.team1Id, teamId),
           eq(Schema.matchups.team2Id, teamId),
-        ) as any, // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
+        ), // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
         eq(Schema.matchups.status, 'completed'),
       ),
     )

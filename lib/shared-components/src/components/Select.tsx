@@ -27,6 +27,14 @@ export interface SelectProps {
   leading?: React.ReactNode;
 }
 
+// The Tamagui media-query typing ('sm') is unavailable in this project, so the
+// Adapt `when` prop rejects the string under the build TS program, while the
+// lint TS program treats AdaptWhen as an error type (tripping no-unsafe-*).
+// Casting through `unknown` to `never` is assignable to the prop under build
+// and stays a clean (non-error) type under lint; keeping it in a helper (whose
+// source is `unknown`) prevents eslint --fix from stripping the assertion.
+const asAdaptWhen = (value: unknown): never => value as never;
+
 /**
  * Single-select dropdown styled to match the brand input contract.
  * Uses the Tamagui Select primitive (which adapts to a Sheet on mobile).
@@ -83,7 +91,7 @@ export function Select({
           </XStack>
         </TamaguiSelect.Trigger>
 
-        <Adapt when={'sm' as never} platform="touch">
+        <Adapt when={asAdaptWhen('sm')} platform="touch">
           <Sheet modal dismissOnSnapToBottom snapPointsMode="fit">
             <Sheet.Frame>
               <Sheet.ScrollView>

@@ -227,7 +227,7 @@ builder.mutationFields((t) => ({
         context.db,
         input.gameId,
         context.user.id,
-        input.category as QuestionCategory,
+        input.category,
         parameter,
       );
       const state = await TwentyQuestionsService.getGameState(

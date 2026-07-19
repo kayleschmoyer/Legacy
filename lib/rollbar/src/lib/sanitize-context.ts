@@ -84,7 +84,10 @@ function sanitizeValue(
     }
   }
 
-  return typeof value === 'symbol' ? value.toString() : String(value as string);
+  if (typeof value === 'symbol') return value.toString();
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'function') return '[Function]';
+  return '[Unserializable]';
 }
 
 export function sanitizeContext(

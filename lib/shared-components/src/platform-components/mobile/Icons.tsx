@@ -105,7 +105,7 @@ const NativeIcons: React.FC<IconProps> = ({
         name={name}
         size={size}
         color={color ?? 'black'}
-        style={style as StyleProp<ViewStyle>}
+        style={style}
       />
     );
   }

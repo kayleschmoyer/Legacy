@@ -15,14 +15,13 @@ jest.mock('@legacy-sports/graphql');
 // team1Id, team2Id) matter for this test.
 const createMatchup = (
   overrides: Partial<MatchupFragment> = {},
-): MatchupFragment =>
-  ({
-    id: '1',
-    weekNumber: 2,
-    team1Id: 1,
-    team2Id: 2,
-    ...overrides,
-  }) as unknown as MatchupFragment;
+): MatchupFragment => ({
+  id: '1',
+  weekNumber: 2,
+  team1Id: 1,
+  team2Id: 2,
+  ...overrides,
+});
 
 // Week 3 has no matchups (deleted/cancelled), matching the reported bug.
 const WEEK2_MATCHUP = createMatchup({ id: '2', weekNumber: 2 });

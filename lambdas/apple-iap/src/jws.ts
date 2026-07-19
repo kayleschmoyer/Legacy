@@ -154,7 +154,7 @@ async function decodeNestedJws(
     algorithms: ['ES256'],
   });
 
-  return payload as Record<string, unknown>;
+  return payload;
 }
 
 /**

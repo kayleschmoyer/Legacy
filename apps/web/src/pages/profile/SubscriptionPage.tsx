@@ -270,11 +270,7 @@ function PastDueBanner({
       >
         <AlertTriangle size={20} color={AMBER} flexShrink={0} marginTop={2} />
         <YStack flex={1} gap="$1">
-          <Paragraph
-            size="$4"
-            fontWeight="600"
-            style={{ color: AMBER } as React.CSSProperties}
-          >
+          <Paragraph size="$4" fontWeight="600" style={{ color: AMBER }}>
             Payment Past Due
           </Paragraph>
           <Paragraph size="$3" color="$colorPress">
@@ -305,7 +301,7 @@ function ActivatingState() {
         <Paragraph
           size="$5"
           fontWeight="700"
-          style={{ color: BRAND_GOLD_LIGHT } as React.CSSProperties}
+          style={{ color: BRAND_GOLD_LIGHT }}
         >
           Activating your subscription…
         </Paragraph>
@@ -347,7 +343,7 @@ function PricingToggle({
             fontWeight={billingCycle === 'monthly' ? '600' : '400'}
             style={
               billingCycle === 'monthly'
-                ? ({ color: BRAND_GOLD_LIGHT } as React.CSSProperties)
+                ? { color: BRAND_GOLD_LIGHT }
                 : undefined
             }
           >
@@ -364,7 +360,7 @@ function PricingToggle({
               fontWeight={billingCycle === 'annual' ? '600' : '400'}
               style={
                 billingCycle === 'annual'
-                  ? ({ color: BRAND_GOLD_LIGHT } as React.CSSProperties)
+                  ? { color: BRAND_GOLD_LIGHT }
                   : undefined
               }
             >
@@ -376,11 +372,7 @@ function PricingToggle({
               paddingHorizontal="$2"
               paddingVertical={2}
             >
-              <Paragraph
-                size="$1"
-                fontWeight="600"
-                style={{ color: GREEN } as React.CSSProperties}
-              >
+              <Paragraph size="$1" fontWeight="600" style={{ color: GREEN }}>
                 Save {annualSavingsPct}
               </Paragraph>
             </BadgeTag>
@@ -420,7 +412,7 @@ function FeatureComparisonTable() {
           fontWeight="700"
           width={80}
           textAlign="center"
-          style={{ color: BRAND_GOLD_LIGHT } as React.CSSProperties}
+          style={{ color: BRAND_GOLD_LIGHT }}
         >
           Premium
         </Paragraph>
@@ -827,9 +819,7 @@ const SubscriptionPage: React.FC = () => {
                         <Paragraph
                           size="$5"
                           fontWeight="700"
-                          style={
-                            { color: BRAND_GOLD_LIGHT } as React.CSSProperties
-                          }
+                          style={{ color: BRAND_GOLD_LIGHT }}
                         >
                           {getTierLabel(subscription?.tier ?? '')}
                         </Paragraph>
@@ -868,15 +858,9 @@ const SubscriptionPage: React.FC = () => {
                       <Paragraph
                         size="$3"
                         fontWeight="600"
-                        style={
-                          {
-                            color: isPastDue
-                              ? AMBER
-                              : isCanceled
-                                ? RED
-                                : EMERALD,
-                          } as React.CSSProperties
-                        }
+                        style={{
+                          color: isPastDue ? AMBER : isCanceled ? RED : EMERALD,
+                        }}
                       >
                         {getStatusLabel(subscription?.status ?? '')}
                       </Paragraph>
@@ -1045,13 +1029,11 @@ const SubscriptionPage: React.FC = () => {
                     <Paragraph
                       size="$10"
                       fontWeight="800"
-                      style={
-                        {
-                          fontSize: 48,
-                          lineHeight: 52,
-                          color: BRAND_GOLD_LIGHT,
-                        } as React.CSSProperties
-                      }
+                      style={{
+                        fontSize: 48,
+                        lineHeight: 52,
+                        color: BRAND_GOLD_LIGHT,
+                      }}
                     >
                       {billingCycle === 'annual'
                         ? ANNUAL_PRICE_DISPLAY
@@ -1062,10 +1044,7 @@ const SubscriptionPage: React.FC = () => {
                     </Paragraph>
                   </XStack>
                   {billingCycle === 'annual' && (
-                    <Paragraph
-                      size="$3"
-                      style={{ color: GREEN } as React.CSSProperties}
-                    >
+                    <Paragraph size="$3" style={{ color: GREEN }}>
                       {ANNUAL_MONTHLY_EQUIVALENT}/month — save{' '}
                       {ANNUAL_SAVINGS_PCT} vs monthly
                     </Paragraph>
@@ -1105,10 +1084,7 @@ const SubscriptionPage: React.FC = () => {
                       flexShrink={0}
                       marginTop={2}
                     />
-                    <Paragraph
-                      size="$3"
-                      style={{ color: RED } as React.CSSProperties}
-                    >
+                    <Paragraph size="$3" style={{ color: RED }}>
                       {checkoutError}
                     </Paragraph>
                   </XStack>

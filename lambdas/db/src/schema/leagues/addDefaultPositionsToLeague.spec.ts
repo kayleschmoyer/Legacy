@@ -52,7 +52,7 @@ describe('addDefaultPositionsToLeague authorization (LS-5137)', () => {
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
       returning: jest.fn().mockReturnThis(),
-    } as typeof mockDb;
+    };
 
     const mockPositions = ['C', 'SP', 'RP', 'OF', '1B'];
     const mockRosterPositionsBySport = {

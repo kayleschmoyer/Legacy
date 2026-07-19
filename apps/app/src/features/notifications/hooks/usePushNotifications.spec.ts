@@ -93,9 +93,7 @@ function setupListeners() {
   mockedAddResponse.mockImplementation(
     (handler: (r: NotificationResponse) => void) => {
       tapHandler = handler;
-      return { remove: jest.fn() } as ReturnType<
-        typeof expoNotifications.addNotificationResponseReceivedListener
-      >;
+      return { remove: jest.fn() };
     },
   );
 

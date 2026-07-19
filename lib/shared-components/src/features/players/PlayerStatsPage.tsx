@@ -1046,7 +1046,7 @@ export function PlayerStatsPage({
       onPlayerDetails({
         id: player.playerId,
         name: player.displayName || `Player ${player.playerId}`,
-      } as PlayerWithStats);
+      });
     },
     [onPlayerDetails],
   );
@@ -1062,7 +1062,7 @@ export function PlayerStatsPage({
           firstName && lastName
             ? `${firstName} ${lastName}`
             : `Player ${player.playerId}`,
-      } as PlayerWithStats);
+      });
     },
     [onPlayerDetails],
   );
@@ -1726,7 +1726,7 @@ export function PlayerStatsPage({
                 className="ps-select-native"
                 value={position}
                 onChange={(e) => {
-                  setPosition((e.target as HTMLSelectElement).value);
+                  setPosition(e.target.value);
                 }}
               >
                 {POSITIONS.map((p) => (
@@ -1789,7 +1789,7 @@ export function PlayerStatsPage({
                 className="ps-select-native"
                 value={team}
                 onChange={(e) => {
-                  setTeam((e.target as HTMLSelectElement).value);
+                  setTeam(e.target.value);
                 }}
               >
                 {MLB_TEAMS.map((t) => (
@@ -1853,7 +1853,7 @@ export function PlayerStatsPage({
                 className="ps-select-native"
                 value={pageSize}
                 onChange={(e) => {
-                  setPageSize(Number((e.target as HTMLSelectElement).value));
+                  setPageSize(Number(e.target.value));
                 }}
               >
                 {pageSizeOptions.map((n) => (
@@ -2575,12 +2575,7 @@ function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
 
 function SkeletonBar({ width }: { width: number }) {
   if (Platform.OS === 'web') {
-    return (
-      <span
-        className="ps-sk-bar"
-        style={{ width, flex: '0 0 auto' } as React.CSSProperties}
-      />
-    );
+    return <span className="ps-sk-bar" style={{ width, flex: '0 0 auto' }} />;
   }
   return (
     <YStack
@@ -3033,7 +3028,7 @@ function StatSlider({
           value={value}
           style={{ '--pct': `${pct}%` } as React.CSSProperties}
           onChange={(e) => {
-            const next = parseSliderValue((e.target as HTMLInputElement).value);
+            const next = parseSliderValue(e.target.value);
             // Reject NaN/±Infinity at the setter boundary so corrupted input
             // never reaches filter state (LS-7137).
             if (next !== null) {

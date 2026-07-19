@@ -542,7 +542,7 @@ export function buildExportPayload(
     viewMode,
     filters,
     exportedAt,
-    totalFilters: Object.keys(filters as Record<string, unknown>).length,
+    totalFilters: Object.keys(filters).length,
     rowCount: batting.length + pitching.length,
     players: {
       batting,

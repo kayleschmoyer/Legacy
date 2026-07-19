@@ -138,7 +138,7 @@ function expandBorderShorthand(value: unknown): LooseStyle {
   if (!m) return {};
   return {
     borderWidth: Number(m[1]),
-    borderStyle: m[2] as 'solid' | 'dashed' | 'dotted',
+    borderStyle: m[2],
     borderColor: m[3],
   };
 }
@@ -147,7 +147,7 @@ function expandBorderShorthand(value: unknown): LooseStyle {
 // (web-only) are dropped.
 function expandBackgroundShorthand(value: unknown): LooseStyle {
   if (typeof value === 'string' && /(gradient|url\()/i.test(value)) return {};
-  return { backgroundColor: value as string };
+  return { backgroundColor: value };
 }
 
 /**

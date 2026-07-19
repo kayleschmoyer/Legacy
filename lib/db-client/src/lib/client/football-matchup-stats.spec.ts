@@ -4,7 +4,6 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- test mocks use any for DB interactions */
 
-import type { PublicDb } from './PublicDbClient';
 import { getMatchupFootballPlayerGameStats } from './PublicDbClient';
 
 function createMockDbWithMultipleQueries(results: any[]): any {
@@ -237,19 +236,13 @@ const idpDefenseStats = {
 describe('getMatchupFootballPlayerGameStats', () => {
   it('returns empty array when matchup not found', async () => {
     const db = createMockDbWithMultipleQueries([[]]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toEqual([]);
   });
 
   it('returns empty array when no matchup players', async () => {
     const db = createMockDbWithMultipleQueries([matchupInfoResult, []]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toEqual([]);
   });
 
@@ -261,10 +254,7 @@ describe('getMatchupFootballPlayerGameStats', () => {
       [qbGame],
       [qbOffenseStats],
     ]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toHaveLength(1);
     const row = result[0];
     expect(row.playerId).toBe(1001);
@@ -283,10 +273,7 @@ describe('getMatchupFootballPlayerGameStats', () => {
       [rbGame],
       [rbOffenseStats],
     ]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toHaveLength(1);
     const row = result[0];
     expect(row.playerId).toBe(1002);
@@ -307,10 +294,7 @@ describe('getMatchupFootballPlayerGameStats', () => {
       [dstGame],
       [defenseStats],
     ]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toHaveLength(1);
     const row = result[0];
     expect(row.playerId).toBe(1003);
@@ -327,10 +311,7 @@ describe('getMatchupFootballPlayerGameStats', () => {
       [dlGame],
       [idpDefenseStats],
     ]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toHaveLength(1);
     const row = result[0];
     expect(row.playerId).toBe(1004);
@@ -346,10 +327,7 @@ describe('getMatchupFootballPlayerGameStats', () => {
       [qbMatchupPlayer],
       [gameWithNullId],
     ]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toEqual([]);
   });
 
@@ -360,10 +338,7 @@ describe('getMatchupFootballPlayerGameStats', () => {
       [playerNoSeason],
       [qbGame],
     ]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toEqual([]);
   });
 
@@ -377,10 +352,7 @@ describe('getMatchupFootballPlayerGameStats', () => {
       [defenseStats], // DST defense
       [idpDefenseStats], // DL idpDefense
     ]);
-    const result = await getMatchupFootballPlayerGameStats(
-      db as unknown as PublicDb,
-      MATCHUP_ID,
-    );
+    const result = await getMatchupFootballPlayerGameStats(db, MATCHUP_ID);
     expect(result).toHaveLength(3);
 
     const qbRow = result.find((r) => r.playerId === 1001);

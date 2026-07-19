@@ -31,7 +31,7 @@ function fakeNotification(
   overrides: Partial<AppStoreNotification> = {},
 ): AppStoreNotification {
   return {
-    notificationType: 'TEST' as NotificationType,
+    notificationType: 'TEST',
     notificationUUID: 'uuid-test-123',
     data: {
       bundleId: 'com.legacy.sports',

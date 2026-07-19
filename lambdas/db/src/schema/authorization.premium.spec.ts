@@ -313,7 +313,7 @@ describe('Premium authorization helpers', () => {
       // context.user.subscriptionTier — only getSubscriptionTier()'s live
       // DB read.
       const staleJwtUser = { ...premiumUser, subscriptionTier: 'premium' };
-      const ctx = makeContext(staleJwtUser as any, 'free');
+      const ctx = makeContext(staleJwtUser, 'free');
       const selectSpy = jest.spyOn(ctx.db, 'select');
 
       await expect(

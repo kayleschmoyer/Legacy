@@ -328,12 +328,10 @@ export function GifPicker({
                 }}
                 onMouseEnter={(e) => {
                   if (!failed)
-                    (e.currentTarget as HTMLButtonElement).style.borderColor =
-                      BRAND_NAVY_LIGHT;
+                    e.currentTarget.style.borderColor = BRAND_NAVY_LIGHT;
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor =
-                    'transparent';
+                  e.currentTarget.style.borderColor = 'transparent';
                 }}
                 aria-label={
                   failed

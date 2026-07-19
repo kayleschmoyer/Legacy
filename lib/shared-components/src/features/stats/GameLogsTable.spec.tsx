@@ -32,8 +32,7 @@ global.fetch = jest.fn();
 };
 (
   global as unknown as { cancelIdleCallback: (h: number) => void }
-).cancelIdleCallback = (h: number) =>
-  clearTimeout(h as unknown as ReturnType<typeof setTimeout>);
+).cancelIdleCallback = (h: number) => clearTimeout(h);
 
 function mockInteractionManagerSync(): void {
   if (typeof InteractionManager?.runAfterInteractions !== 'function') return;

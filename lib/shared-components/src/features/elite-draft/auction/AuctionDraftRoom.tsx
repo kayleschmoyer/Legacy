@@ -653,14 +653,14 @@ export function AuctionDraftRoom({
             <YStack flex={2} minWidth={320} gap="$4">
               {hasActiveNomination ? (
                 <ActiveNomination
-                  state={auctionState as AuctionStateFragmentFragment}
+                  state={auctionState}
                   myTeamId={myTeamId}
                   draftId={draftId}
                   onBidPlaced={refetchAll}
                 />
               ) : (
                 <NominationWaiting
-                  state={auctionState as AuctionStateFragmentFragment}
+                  state={auctionState}
                   myTeamId={myTeamId}
                   draftId={draftId}
                   onNominated={refetchAll}

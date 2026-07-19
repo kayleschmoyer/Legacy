@@ -810,7 +810,7 @@ describe('authorized() wrapper', () => {
           {
             permissionLevel: 'viewer',
             teamId: 99,
-          } as unknown as LeagueMembership,
+          },
         ]);
         return {
           from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),

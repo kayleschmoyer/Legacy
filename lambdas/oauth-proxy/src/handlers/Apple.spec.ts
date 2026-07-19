@@ -99,7 +99,7 @@ describe('handleSecureAppleAuth', () => {
         Promise.resolve({
           keys: [{ kid: 'test-kid', kty: 'RSA', alg: 'RS256', n: 'n', e: 'e' }],
         }),
-    }) as unknown as typeof fetch;
+    });
   });
 
   afterEach(() => {

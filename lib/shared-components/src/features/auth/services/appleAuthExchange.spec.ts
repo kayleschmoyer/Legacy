@@ -21,7 +21,7 @@ describe('exchangeAppleCode', () => {
           JSON.stringify({ jwt: 'jwt-token', csrfToken: 'csrf-123' }),
         ),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const result = await exchangeAppleCode(PROXY, {
       identityToken: 'apple-id-token',
@@ -48,7 +48,7 @@ describe('exchangeAppleCode', () => {
       status: 200,
       text: () => Promise.resolve(JSON.stringify({ jwt: 'jwt-token' })),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     await exchangeAppleCode(
       PROXY,
@@ -68,7 +68,7 @@ describe('exchangeAppleCode', () => {
       status: 403,
       json: () =>
         Promise.resolve({ error: 'forbidden', message: 'Not authorized' }),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     await expect(
       exchangeAppleCode(PROXY, { identityToken: 'apple-id-token' }),
@@ -84,7 +84,7 @@ describe('exchangeAppleCode', () => {
       ok: false,
       status: 500,
       text: () => Promise.resolve(''),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     const error = await exchangeAppleCode(PROXY, {
       identityToken: 'apple-id-token',
@@ -102,7 +102,7 @@ describe('exchangeAppleCode', () => {
       ok: true,
       status: 200,
       text: () => Promise.resolve(JSON.stringify({ csrfToken: 'csrf-123' })),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     await expect(
       exchangeAppleCode(PROXY, { identityToken: 'apple-id-token' }),

@@ -694,12 +694,9 @@ export function TradeCenterPage(): React.JSX.Element {
                       transition: 'opacity 120ms',
                     }}
                     onMouseEnter={(e) =>
-                      ((e.currentTarget as HTMLDivElement).style.opacity =
-                        '0.8')
+                      (e.currentTarget.style.opacity = '0.8')
                     }
-                    onMouseLeave={(e) =>
-                      ((e.currentTarget as HTMLDivElement).style.opacity = '1')
-                    }
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
                   >
                     <div
                       style={{

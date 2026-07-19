@@ -131,7 +131,7 @@ export async function updateLeagueDraftStatus(
         .update(PublicSchema.leagues)
         .set({
           draftStatus: status,
-        } as Partial<typeof PublicSchema.leagues.$inferInsert>)
+        })
         .where(eq(PublicSchema.leagues.id, leagueId))
         .returning();
 
@@ -781,9 +781,7 @@ export async function finalizeDraftCompletion(
 
   await db
     .update(PublicSchema.leagues)
-    .set({ draftStatus: 'completed', leaguePhase: 'active' } as Partial<
-      typeof PublicSchema.leagues.$inferInsert
-    >)
+    .set({ draftStatus: 'completed', leaguePhase: 'active' })
     .where(eq(PublicSchema.leagues.id, leagueId));
 
   LOGGER.info(

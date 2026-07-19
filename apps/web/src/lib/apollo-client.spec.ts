@@ -12,12 +12,7 @@
 // jest.mock is hoisted above imports by Babel, so this factory runs before
 // apollo-client.ts is evaluated — providing a stub `createHttpLink` that
 // doesn't require global fetch.
-import {
-  ApolloLink,
-  CombinedGraphQLErrors,
-  Observable,
-  ServerError,
-} from '@apollo/client';
+import { CombinedGraphQLErrors, Observable, ServerError } from '@apollo/client';
 import { captureError } from '@legacy-sports/rollbar/web';
 import {
   decodeJwtPayload,
@@ -228,10 +223,7 @@ function runWithError(
   return new Promise<void>((resolve) => {
     // `errorLink.request` is the handler registered in the ErrorLink constructor.
     // We call it directly with our mock operation and forward function.
-    const result = (errorLink as ApolloLink).request(
-      op as never,
-      forward as never,
-    );
+    const result = errorLink.request(op as never, forward as never);
     if (result) {
       result.subscribe({
         next: () => {

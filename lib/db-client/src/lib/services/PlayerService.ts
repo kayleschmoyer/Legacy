@@ -178,9 +178,7 @@ export class PlayerService {
   async getPlayers(queryOptions: PlayerQueryOptions = {}): Promise<Player[]> {
     // Always go through the scoring path so scoring data (PTS, BAT, FLD, etc.)
     // is populated regardless of which column is being sorted.
-    return (await this.getPlayersWithScoringSort(
-      queryOptions,
-    )) as unknown as Player[];
+    return await this.getPlayersWithScoringSort(queryOptions);
   }
 
   /**

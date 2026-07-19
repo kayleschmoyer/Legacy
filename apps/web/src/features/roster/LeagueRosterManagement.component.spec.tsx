@@ -60,7 +60,7 @@ type Children = { children?: React.ReactNode; [key: string]: unknown };
 
 jest.mock('@legacy-sports/shared-components/ui', () => {
   const Pass = ({ children, ...rest }: Children) => (
-    <div {...(rest as any)}>{children}</div>
+    <div {...rest}>{children}</div>
   );
   return {
     Button: ({
@@ -68,7 +68,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
       onPress,
       ...rest
     }: Children & { onPress?: () => void }) => (
-      <button type="button" onClick={onPress} {...(rest as any)}>
+      <button type="button" onClick={onPress} {...rest}>
         {children}
       </button>
     ),
@@ -102,7 +102,7 @@ jest.mock('@legacy-sports/shared-components/utils', () => ({
 
 jest.mock('tamagui', () => {
   const Pass = ({ children, ...rest }: Children) => (
-    <div {...(rest as any)}>{children}</div>
+    <div {...rest}>{children}</div>
   );
   return {
     H4: ({ children }: Children) => <h4>{children}</h4>,
@@ -112,7 +112,7 @@ jest.mock('tamagui', () => {
       onPress,
       ...rest
     }: Children & { onPress?: () => void }) => (
-      <span onClick={onPress} {...(rest as any)}>
+      <span onClick={onPress} {...rest}>
         {children}
       </span>
     ),

@@ -197,7 +197,7 @@ export class WebSocketClient {
     if (eventType === 'connected' || eventType === 'disconnected') {
       const wrappedHandler = (state: ConnectionState) => {
         if (state === eventType) {
-          (handler as EventHandler<void>)(undefined as unknown as void);
+          (handler as EventHandler<void>)(undefined);
         }
       };
       this.connectionHandlers.add(wrappedHandler);

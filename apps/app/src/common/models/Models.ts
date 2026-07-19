@@ -107,5 +107,5 @@ export function canPlayerPlayPosition(
   const eligible = player.player?.eligiblePositions ?? [];
   // If no eligibility data yet, allow placement
   if (eligible.length === 0) return true;
-  return eligible.some((pos) => allowedPositions.includes(pos as Position));
+  return eligible.some((pos) => allowedPositions.includes(pos));
 }

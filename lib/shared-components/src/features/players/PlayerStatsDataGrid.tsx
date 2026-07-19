@@ -981,7 +981,7 @@ export function PlayerStatsDataGrid({
                     ? () => {
                         const currentDirection =
                           isActiveSortColumn && isDescending ? 'asc' : 'desc';
-                        handleSort(column.key as string, currentDirection);
+                        handleSort(column.key, currentDirection);
                       }
                     : undefined
                 }

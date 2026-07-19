@@ -108,15 +108,13 @@ const DonatePage: React.FC = () => {
               <Heart size={26} color={BRAND_GOLD} />
             </XStack>
             <Paragraph
-              style={
-                {
-                  fontSize: 32,
-                  fontWeight: '700',
-                  color: BRAND_GOLD_LIGHT,
-                  letterSpacing: -0.5,
-                  fontFamily: "'Big Shoulders Display', system-ui, sans-serif",
-                } as React.CSSProperties
-              }
+              style={{
+                fontSize: 32,
+                fontWeight: '700',
+                color: BRAND_GOLD_LIGHT,
+                letterSpacing: -0.5,
+                fontFamily: "'Big Shoulders Display', system-ui, sans-serif",
+              }}
             >
               Support Legacy Sports
             </Paragraph>
@@ -143,7 +141,7 @@ const DonatePage: React.FC = () => {
                   <Paragraph
                     size="$4"
                     fontWeight="600"
-                    style={{ color: BRAND_GOLD_LIGHT } as React.CSSProperties}
+                    style={{ color: BRAND_GOLD_LIGHT }}
                   >
                     Thank you for your support!
                   </Paragraph>
@@ -210,9 +208,7 @@ const DonatePage: React.FC = () => {
                   >
                     <Paragraph
                       size="$3"
-                      style={
-                        { color: BRAND_SEAM_RED_LIGHT } as React.CSSProperties
-                      }
+                      style={{ color: BRAND_SEAM_RED_LIGHT }}
                     >
                       Could not load donation link — please try again later.
                     </Paragraph>

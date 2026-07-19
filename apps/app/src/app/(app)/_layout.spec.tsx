@@ -78,7 +78,7 @@ jest.mock('@legacy-sports/shared-components', () => {
 // Mock auth hooks
 const mockCurrentUser = { id: 1, name: 'Test User' };
 const mockUseCurrentUserInfo = jest.fn(() => ({
-  data: mockCurrentUser as { id: number; name: string } | null,
+  data: mockCurrentUser,
   loading: false,
 }));
 jest.mock('../../common/auth/AuthHooks', () => ({

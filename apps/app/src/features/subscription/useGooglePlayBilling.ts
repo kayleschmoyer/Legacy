@@ -27,11 +27,7 @@ import {
   purchaseUpdatedListener,
   requestPurchase,
 } from 'react-native-iap';
-import type {
-  ProductSubscription,
-  Purchase,
-  PurchaseError,
-} from 'react-native-iap';
+import type { Purchase, PurchaseError } from 'react-native-iap';
 import { Platform } from 'react-native';
 import {
   useRestoreGooglePurchasesMutation,
@@ -149,7 +145,7 @@ export function useGooglePlayBilling(): UseGooglePlayBillingResult {
         });
 
         if (mounted) {
-          const subs = (result ?? []) as unknown as ProductSubscription[];
+          const subs = result ?? [];
           setProducts(
             subs.map((sub) => ({
               productId: sub.id as GooglePlayProductId,

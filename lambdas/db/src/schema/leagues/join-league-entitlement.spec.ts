@@ -49,10 +49,7 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
         return () => proxy;
       },
     };
-    const proxy: Record<string, unknown> = new Proxy({}, handler) as Record<
-      string,
-      unknown
-    >;
+    const proxy: Record<string, unknown> = new Proxy({}, handler);
     return proxy;
   }
 

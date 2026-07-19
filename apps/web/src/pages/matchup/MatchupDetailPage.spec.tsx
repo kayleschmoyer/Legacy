@@ -243,7 +243,7 @@ describe('MatchupDetailPage forbidden vs not-found state (LS-5900)', () => {
             extensions: { code: 'FORBIDDEN' },
           },
         ],
-      }) as unknown as Error,
+      }),
     });
 
     render(<MatchupDetailPage />);

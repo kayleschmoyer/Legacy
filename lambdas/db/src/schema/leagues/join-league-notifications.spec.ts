@@ -40,10 +40,7 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
         return () => proxy;
       },
     };
-    const proxy: Record<string, unknown> = new Proxy({}, handler) as Record<
-      string,
-      unknown
-    >;
+    const proxy: Record<string, unknown> = new Proxy({}, handler);
     return proxy;
   }
 

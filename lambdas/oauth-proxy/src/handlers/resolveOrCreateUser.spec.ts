@@ -81,7 +81,7 @@ function makeUser(overrides: Partial<InternalUser> = {}): InternalUser {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
-  } as InternalUser;
+  };
 }
 
 function makeIdentity(
@@ -99,7 +99,7 @@ function makeIdentity(
     linkedAt: new Date(),
     lastLoginAt: null,
     ...overrides,
-  } as InternalUserIdentity;
+  };
 }
 
 beforeEach(() => {

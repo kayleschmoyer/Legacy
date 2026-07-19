@@ -24,23 +24,11 @@ export function GlobalAnnouncer() {
       setAssertiveSeq((s) => s + 1);
       setAssertiveMessage(String(detail));
     };
-    window.addEventListener(
-      'app-announce-polite',
-      politeHandler as EventListener,
-    );
-    window.addEventListener(
-      'app-announce-assertive',
-      assertiveHandler as EventListener,
-    );
+    window.addEventListener('app-announce-polite', politeHandler);
+    window.addEventListener('app-announce-assertive', assertiveHandler);
     return () => {
-      window.removeEventListener(
-        'app-announce-polite',
-        politeHandler as EventListener,
-      );
-      window.removeEventListener(
-        'app-announce-assertive',
-        assertiveHandler as EventListener,
-      );
+      window.removeEventListener('app-announce-polite', politeHandler);
+      window.removeEventListener('app-announce-assertive', assertiveHandler);
     };
   }, []);
 

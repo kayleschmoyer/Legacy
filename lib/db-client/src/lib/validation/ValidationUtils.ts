@@ -164,7 +164,7 @@ export function extractCount(result: unknown): number {
     typeof result === 'object' &&
     result !== null &&
     'count' in result &&
-    typeof (result as { count: unknown }).count === 'number'
+    typeof result.count === 'number'
   ) {
     return (result as { count: number }).count;
   }

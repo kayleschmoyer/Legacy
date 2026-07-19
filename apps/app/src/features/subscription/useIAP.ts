@@ -86,9 +86,7 @@ const iapFinish = finishTransaction as unknown as (p: {
   purchase: IAPPurchaseEvent;
   isConsumable: boolean;
 }) => Promise<void>;
-const iapUpdateListener = purchaseUpdatedListener as unknown as (
-  cb: (e: Purchase) => void,
-) => PurchaseListenerHandle;
+const iapUpdateListener = purchaseUpdatedListener;
 const iapErrorListener = purchaseErrorListener as unknown as (
   cb: (e: IAPPurchaseError) => void,
 ) => PurchaseListenerHandle;

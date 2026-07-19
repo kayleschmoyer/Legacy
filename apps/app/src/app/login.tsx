@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
-import type { Href } from 'expo-router';
 import { Button, Spinner, Text, Theme, YStack } from 'tamagui';
 import { LoginPage, useAuth } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
@@ -89,7 +88,7 @@ const Login: React.FC = () => {
   const redirectAfterLogin = useCallback(async () => {
     const deepLink = resolvePostLoginDestination(pathname);
     if (deepLink !== '/') {
-      router.replace(deepLink as Href);
+      router.replace(deepLink);
       return;
     }
     const last = await getLastVisitedLeague();

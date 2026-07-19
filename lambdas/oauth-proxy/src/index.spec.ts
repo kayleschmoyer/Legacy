@@ -131,7 +131,7 @@ describe('OAuth proxy CORS headers', () => {
   beforeAll(async () => {
     // Import after mocks are registered so all jest.mock() stubs are active
     const mod = await import('./index');
-    handler = mod.handler as typeof handler;
+    handler = mod.handler;
   });
 
   beforeEach(() => {
@@ -341,7 +341,7 @@ describe('Discord route rate limiting', () => {
 
   beforeAll(async () => {
     const mod = await import('./index');
-    handler = mod.handler as typeof handler;
+    handler = mod.handler;
   });
 
   beforeEach(() => {

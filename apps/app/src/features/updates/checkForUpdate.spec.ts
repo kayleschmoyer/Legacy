@@ -89,7 +89,7 @@ describe('fetchLatestRelease', () => {
       statusText: 'OK',
       json: () => Promise.resolve(body ?? mockRelease),
       ...response,
-    }) as unknown as typeof fetch;
+    });
   }
 
   it('returns updateAvailable=true when latest version is newer', async () => {

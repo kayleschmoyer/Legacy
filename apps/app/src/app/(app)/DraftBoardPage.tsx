@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import type { Href } from 'expo-router';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Text, YStack } from 'tamagui';
 import { EliteDraftBoardScreen } from '@legacy-sports/shared-components';
@@ -38,7 +37,7 @@ export default function DraftBoardPage() {
     <YStack flex={1} testID="elite-draft-board-screen">
       <EliteDraftBoardScreen
         leagueId={leagueId}
-        onNavigate={(path) => router.navigate(path as Href)}
+        onNavigate={(path) => router.navigate(path)}
         websocketUrl={websocketUrl}
       />
     </YStack>

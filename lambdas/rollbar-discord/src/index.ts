@@ -107,7 +107,7 @@ export function redactMessage(message: string): Record<string, unknown> {
     ) {
       return {
         length: message.length,
-        keys: Object.keys(parsed as Record<string, unknown>),
+        keys: Object.keys(parsed),
       };
     }
   } catch {

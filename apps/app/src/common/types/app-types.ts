@@ -53,7 +53,7 @@ export function toSafeTeamMember(
     ...member,
     id: member.id,
     playerId: member.playerId,
-  } as SafeTeamMember;
+  };
 }
 
 export function toSafeLeaguePosition(
@@ -72,7 +72,7 @@ export function toSafeLeaguePosition(
     ...position,
     id: position.id,
     positionType: position.positionType,
-  } as SafeLeaguePosition;
+  };
 }
 
 // Error handling utility

@@ -97,7 +97,7 @@ describe('PublicLandingPage Discord callback — oauthProxyUrl guard (LS-7782)',
 
   it('shows a configuration error and does not call fetch when oauthProxyUrl is unset', async () => {
     const fetchSpy = jest.fn();
-    global.fetch = fetchSpy as unknown as typeof fetch;
+    global.fetch = fetchSpy;
     // No oauthProxyUrl — the guard must short-circuit before any network call.
     mockAuthConfig = {
       googleClientId: 'test-client-id',
@@ -116,7 +116,7 @@ describe('PublicLandingPage Discord callback — oauthProxyUrl guard (LS-7782)',
 
   it('shows an invalid-state error and does not call fetch when code/state are missing', async () => {
     const fetchSpy = jest.fn();
-    global.fetch = fetchSpy as unknown as typeof fetch;
+    global.fetch = fetchSpy;
     // Land on the callback route without the code/state query params.
     window.history.replaceState({}, '', '/auth/discord/callback');
 

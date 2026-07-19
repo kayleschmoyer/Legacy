@@ -18,7 +18,7 @@ jest.mock('@legacy-sports/logging', () => ({
 /** Build a minimal context that simulates a free-tier commissioner. */
 function makeCtx({
   userId = 1,
-  tier = 'free' as 'free' | 'premium',
+  tier = 'free',
   leagueOwner = 1,
   leagueSport = 'baseball',
 } = {}) {

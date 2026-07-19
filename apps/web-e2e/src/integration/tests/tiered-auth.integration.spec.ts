@@ -32,7 +32,7 @@ interface DecodedClaims {
 }
 
 function decode(jwt: string): DecodedClaims {
-  return E2EJwtUtil.decodeJwtPayload(jwt) as DecodedClaims;
+  return E2EJwtUtil.decodeJwtPayload(jwt);
 }
 
 // A premium-gated query used as the gating probe. `footballPlayerLeagueAvailability`

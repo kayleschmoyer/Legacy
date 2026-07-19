@@ -458,9 +458,9 @@ export default function FootballLeagueId(): React.JSX.Element {
             inviteCode={inviteCode}
             onJoinDraft={() =>
               router.navigate({
-                pathname: '/DraftBoardPage' as never,
+                pathname: '/DraftBoardPage',
                 params: { leagueId: String(numLeagueId) },
-              } as never)
+              })
             }
             onViewAllStandings={() => setSelectedTab('standings')}
             onInviteShare={() => void handleInviteShare()}
@@ -563,9 +563,9 @@ export default function FootballLeagueId(): React.JSX.Element {
                     size="$4"
                     onPress={() =>
                       router.navigate({
-                        pathname: '/FreeAgents' as never,
+                        pathname: '/FreeAgents',
                         params: { leagueId: String(numLeagueId) },
-                      } as never)
+                      })
                     }
                     icon={<ShoppingCart size={18} />}
                     accessibilityRole="button"

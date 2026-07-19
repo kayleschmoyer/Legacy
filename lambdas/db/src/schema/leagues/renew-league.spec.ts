@@ -151,10 +151,7 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
       },
     };
 
-    const proxy: Record<string, unknown> = new Proxy({}, handler) as Record<
-      string,
-      unknown
-    >;
+    const proxy: Record<string, unknown> = new Proxy({}, handler);
 
     return {
       db: proxy,

@@ -36,7 +36,7 @@ function idFromWhereClause(clause: unknown): number {
       chunk &&
       typeof chunk === 'object' &&
       'value' in chunk &&
-      typeof (chunk as { value: unknown }).value === 'number'
+      typeof chunk.value === 'number'
     ) {
       return (chunk as { value: number }).value;
     }

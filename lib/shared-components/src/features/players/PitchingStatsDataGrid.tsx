@@ -175,7 +175,7 @@ function computePitchingFantasyPoints(
 // Additional non-spec columns (CG, H, ER, WAR, FPTS) follow at the end.
 export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
   {
-    key: 'playerName' as unknown as string,
+    key: 'playerName',
     label: 'Player',
     sortable: true,
     width: '200px',
@@ -905,7 +905,7 @@ export function PitchingStatsDataGrid({
               padding="$6"
               gap="$3"
             >
-              <Spinner size="large" color={BRAND_NAVY_LIGHT as never} />
+              <Spinner size="large" color={BRAND_NAVY_LIGHT} />
               <Text style={{ color: TEXT_MUTED }}>
                 Loading pitching statistics...
               </Text>

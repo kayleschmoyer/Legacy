@@ -20,7 +20,7 @@ export function createFC<T>(
 export function compatFC<T>(
   component: (props: T) => React.ReactElement | null,
 ): React.FC<T> {
-  return component as unknown as React.FC<T>;
+  return component;
 }
 
 // Default export for easier usage

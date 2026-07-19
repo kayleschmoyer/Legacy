@@ -50,7 +50,7 @@ function GameCard({ game }: { game: GameEntry }) {
 
   function handlePress() {
     trackMinigameTap(game.id);
-    router.push(game.route as Parameters<typeof router.push>[0]);
+    router.push(game.route);
   }
 
   return (

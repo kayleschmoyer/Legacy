@@ -37,7 +37,7 @@ jest.mock('tamagui', () => {
     }: {
       children: React.ReactNode;
       [key: string]: unknown;
-    }) => <Text {...(rest as object)}>{children}</Text>,
+    }) => <Text {...rest}>{children}</Text>,
     YStack: ({ children }: { children: React.ReactNode }) => (
       <View>{children}</View>
     ),

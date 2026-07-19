@@ -108,9 +108,7 @@ describe('FootballLeagueRosterScreen', () => {
     jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
       data: undefined,
       loading: false,
-      error: new Error('Query failed') as ReturnType<
-        typeof graphqlLib.useGetTeamMembersQuery
-      >['error'],
+      error: new Error('Query failed'),
     } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
     render(<FootballLeagueRosterScreen teamId={1} />);
     expect(screen.getByText(/Failed to load roster\./)).toBeTruthy();

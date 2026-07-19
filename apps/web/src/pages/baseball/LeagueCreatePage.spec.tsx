@@ -945,7 +945,7 @@ describe('LeagueCreatePage — unsaved-changes navigation guard (LS-6109)', () =
   function dispatchBeforeUnload() {
     const event = new Event('beforeunload', {
       cancelable: true,
-    }) as BeforeUnloadEvent;
+    });
     window.dispatchEvent(event);
     return event;
   }

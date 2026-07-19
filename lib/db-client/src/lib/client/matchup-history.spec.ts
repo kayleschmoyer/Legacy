@@ -5,7 +5,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- test mocks use any for DB interactions */
 // Test file uses any for mocking database interactions
 
-import type { PublicDb } from './PublicDbClient';
 import {
   calculateStandings,
   getHeadToHeadRecord,
@@ -227,7 +226,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockData);
       const filters: MatchupHistoryFilters = {
         leagueId: 1,
       };
@@ -248,7 +247,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockData);
       const filters: MatchupHistoryFilters = {
         leagueId: 1,
         season: 2023,
@@ -270,7 +269,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockData);
       const filters: MatchupHistoryFilters = {
         leagueId: 1,
         season: null,
@@ -299,7 +298,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockData);
       const filters: MatchupHistoryFilters = {
         leagueId: 1,
         teamId: 5,
@@ -319,7 +318,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockData) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockData);
       const filters: MatchupHistoryFilters = {
         leagueId: 1,
         status: 'completed',
@@ -364,7 +363,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockMatchups);
 
       const record = await getHeadToHeadRecord(mockDb, 1, 1, 2);
 
@@ -391,7 +390,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockMatchups);
 
       const record = await getHeadToHeadRecord(mockDb, 1, 1, 2);
 
@@ -413,7 +412,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockMatchups);
 
       const record = await getHeadToHeadRecord(mockDb, 1, 1, 2);
 
@@ -446,7 +445,7 @@ describe('Matchup History', () => {
         },
       ];
 
-      mockDb = createMockDbChain(mockMatchups) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockMatchups);
 
       const record = await getHeadToHeadRecord(mockDb, 1, 1, 2);
 
@@ -890,7 +889,7 @@ describe('Matchup History', () => {
         { status: 'cancelled', count: 1 },
       ];
 
-      mockDb = createMockDbChain(mockRows) as unknown as PublicDb;
+      mockDb = createMockDbChain(mockRows);
 
       const counts = await getMatchupStatusCounts(mockDb, 1);
 
@@ -902,7 +901,7 @@ describe('Matchup History', () => {
     });
 
     it('should return zeros when no matchups exist', async () => {
-      mockDb = createMockDbChain([]) as unknown as PublicDb;
+      mockDb = createMockDbChain([]);
 
       const counts = await getMatchupStatusCounts(mockDb, 1);
 

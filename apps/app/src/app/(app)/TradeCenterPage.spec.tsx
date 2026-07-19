@@ -105,7 +105,7 @@ jest.mock('tamagui', () => {
       onPress?: () => void;
       [key: string]: unknown;
     }) => (
-      <Pressable onPress={onPress} {...(rest as object)}>
+      <Pressable onPress={onPress} {...rest}>
         <Text>{children}</Text>
       </Pressable>
     ),
@@ -118,7 +118,7 @@ jest.mock('tamagui', () => {
       onPress?: () => void;
       [key: string]: unknown;
     }) => (
-      <Pressable onPress={onPress} {...(rest as object)}>
+      <Pressable onPress={onPress} {...rest}>
         {children}
       </Pressable>
     ),
@@ -132,7 +132,7 @@ jest.mock('tamagui', () => {
       onPress?: () => void;
       [key: string]: unknown;
     }) => (
-      <Text onPress={onPress} {...(rest as object)}>
+      <Text onPress={onPress} {...rest}>
         {children}
       </Text>
     ),

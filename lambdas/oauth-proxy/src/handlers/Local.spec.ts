@@ -403,9 +403,7 @@ describe('handleLogin', () => {
     });
 
     it('records a failed attempt when the account does not exist', async () => {
-      mockGetUserByEmail.mockResolvedValue(
-        null as unknown as Awaited<ReturnType<typeof getUserByEmail>>,
-      );
+      mockGetUserByEmail.mockResolvedValue(null);
 
       const result = await handleLogin(makeEvent(validBody));
 

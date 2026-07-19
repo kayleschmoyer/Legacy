@@ -67,9 +67,9 @@ export default function LeagueDiscoveryScreen() {
           const joinedLeagueId = result.data.joinPublicLeague.leagueId;
           if (joinedLeagueId) {
             router.navigate({
-              pathname: '/baseball/league/[leagueId]' as never,
+              pathname: '/baseball/league/[leagueId]',
               params: { leagueId: String(joinedLeagueId) },
-            } as never);
+            });
           }
         } else {
           const errorMessage =

@@ -24,6 +24,14 @@ interface MockRecognition {
 
 let mockRecognition: MockRecognition;
 
+// Capture the constructed instance without aliasing `this` to a variable
+// (forbidden by @typescript-eslint/no-this-alias). Passing `this` as a
+// function argument is permitted by the rule; the mock class is not
+// structurally a MockRecognition, so assert through `unknown` here.
+function registerMockRecognition(instance: unknown) {
+  mockRecognition = instance as MockRecognition;
+}
+
 function createMockSpeechRecognition() {
   return class MockSR {
     continuous = false;
@@ -36,7 +44,7 @@ function createMockSpeechRecognition() {
     stop = jest.fn();
 
     constructor() {
-      mockRecognition = this as unknown as MockRecognition;
+      registerMockRecognition(this);
     }
   };
 }

@@ -20,12 +20,8 @@ jest.mock('../../components/PageMeta', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/ui', () => ({
-  XStack: ({ children, ...rest }: MockProps) => (
-    <div {...(rest as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
-  ),
-  YStack: ({ children, ...rest }: MockProps) => (
-    <div {...(rest as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
-  ),
+  XStack: ({ children, ...rest }: MockProps) => <div {...rest}>{children}</div>,
+  YStack: ({ children, ...rest }: MockProps) => <div {...rest}>{children}</div>,
 }));
 
 jest.mock('@legacy-sports/shared-components', () => ({

@@ -149,10 +149,7 @@ export const handleDecodeJwt = (args: DecodeJwtArgs): void => {
       }
     } else {
       console.log('❌ Picture field is NOT present in JWT payload');
-      console.log(
-        'Available fields:',
-        Object.keys(payload as Record<string, unknown>).join(', '),
-      );
+      console.log('Available fields:', Object.keys(payload).join(', '));
     }
 
     LOGGER.info('JWT token decoded successfully');

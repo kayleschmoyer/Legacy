@@ -20,7 +20,7 @@ import {
 // shared-components mock below) so these tests still assert the actual POST URL
 // (`${base}/google`) and payload assembly.
 const mockFetch = jest.fn();
-global.fetch = mockFetch as unknown as typeof fetch;
+global.fetch = mockFetch;
 
 /** Build a successful `fetch` Response stub for the shared exchange helper. */
 function okJsonResponse(body: unknown): unknown {

@@ -1115,7 +1115,7 @@ const PITCHING_ROW = {
 
 describe('buildCsvExport (PST-014 / LS-7112)', () => {
   const DATA: PlayerStatsExportData = {
-    batting: [BATTING_ROW as unknown as PlayerStatsExportData['batting'][0]],
+    batting: [BATTING_ROW],
     pitching: [PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0]],
   };
 
@@ -1131,7 +1131,7 @@ describe('buildCsvExport (PST-014 / LS-7112)', () => {
 
   it('includes player name in batting section', () => {
     const csv = buildCsvExport({
-      batting: [BATTING_ROW as unknown as PlayerStatsExportData['batting'][0]],
+      batting: [BATTING_ROW],
       pitching: [],
     });
     expect(csv).toContain('Aaron Judge');
@@ -1158,7 +1158,7 @@ describe('buildCsvExport (PST-014 / LS-7112)', () => {
       displayName: 'Judge, Aaron',
     };
     const csv = buildCsvExport({
-      batting: [rowWithComma as unknown as PlayerStatsExportData['batting'][0]],
+      batting: [rowWithComma],
       pitching: [],
     });
     expect(csv).toContain('"Judge, Aaron"');
@@ -1191,7 +1191,7 @@ function parseZipEntries(bytes: Uint8Array): Map<string, string> {
 
 describe('buildXlsxExport (PST-014 / LS-7112)', () => {
   const DATA: PlayerStatsExportData = {
-    batting: [BATTING_ROW as unknown as PlayerStatsExportData['batting'][0]],
+    batting: [BATTING_ROW],
     pitching: [PITCHING_ROW as unknown as PlayerStatsExportData['pitching'][0]],
   };
 
@@ -1247,7 +1247,7 @@ describe('buildXlsxExport (PST-014 / LS-7112)', () => {
     // header row should contain Name column (first header)
     expect(sheet1).toContain('Name');
     // data row should reference the batting row's displayName
-    expect(sheet1).toContain(BATTING_ROW.displayName as string);
+    expect(sheet1).toContain(BATTING_ROW.displayName);
   });
 
   it('sheet2.xml (Pitching) contains pitcher data row', () => {

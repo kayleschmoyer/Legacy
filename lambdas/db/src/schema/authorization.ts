@@ -291,7 +291,7 @@ export function requireAuth(context: Context): AuthenticatedUser {
   if (!context.user) {
     throw AuthenticationError();
   }
-  return context.user as AuthenticatedUser;
+  return context.user;
 }
 
 /**

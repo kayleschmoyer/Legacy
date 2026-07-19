@@ -80,7 +80,7 @@ describe('exchangeGoogleCode', () => {
           JSON.stringify({ jwt: 'jwt-token', csrfToken: 'csrf-123' }),
         ),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     const result = await exchangeGoogleCode(PROXY, { code: 'abc' });
 
@@ -101,7 +101,7 @@ describe('exchangeGoogleCode', () => {
       status: 200,
       text: () => Promise.resolve(JSON.stringify({ jwt: 'jwt-token' })),
     });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     await exchangeGoogleCode(
       PROXY,
@@ -123,7 +123,7 @@ describe('exchangeGoogleCode', () => {
       status: 403,
       json: () =>
         Promise.resolve({ error: 'forbidden', message: 'Not authorized' }),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     await expect(
       exchangeGoogleCode(PROXY, { code: 'abc' }),
@@ -139,7 +139,7 @@ describe('exchangeGoogleCode', () => {
       ok: false,
       status: 500,
       text: () => Promise.resolve(''),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     const error = await exchangeGoogleCode(PROXY, { code: 'abc' }).catch(
       (e: unknown) => e,
@@ -157,7 +157,7 @@ describe('exchangeGoogleCode', () => {
       ok: true,
       status: 200,
       text: () => Promise.resolve(JSON.stringify({ csrfToken: 'csrf-123' })),
-    } as unknown as Partial<Response> & { status: number });
+    });
 
     await expect(exchangeGoogleCode(PROXY, { code: 'abc' })).rejects.toThrow(
       'Secure OAuth did not return JWT',

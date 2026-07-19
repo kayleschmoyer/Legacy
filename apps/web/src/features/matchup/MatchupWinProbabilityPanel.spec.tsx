@@ -97,7 +97,7 @@ function makeMatchup(
     team1: { __typename: 'Team', id: 101, name: 'Aces' },
     team2: { __typename: 'Team', id: 102, name: 'Bolts' },
     ...overrides,
-  } as MatchupFragment;
+  };
 }
 
 // One starter per team, no games played yet -> projection drives the totals.

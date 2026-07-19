@@ -146,7 +146,7 @@ describe('EditMatchupScoresSection — LS-4040 double-submit guard', () => {
     const teams: Teams = [
       { id: 1, name: 'Team A' },
       { id: 2, name: 'Team B' },
-    ] as unknown as Teams;
+    ];
 
     render(
       <EditMatchupScoresSection
@@ -223,7 +223,7 @@ describe('SwapMatchupTeamsSection — LS-4055 same-week validation', () => {
     { id: 4, name: 'Team D' },
     { id: 5, name: 'Team E' },
     { id: 6, name: 'Team F' },
-  ] as unknown as Teams;
+  ];
 
   beforeEach(() => {
     mockSwap.mockReset();

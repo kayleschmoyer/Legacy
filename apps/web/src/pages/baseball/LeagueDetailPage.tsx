@@ -1455,7 +1455,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         });
         const updated = result.data?.updateTeamMemberPosition;
         if (updated) {
-          dispatch(updateTeamMember(updated as TeamMemberFragment));
+          dispatch(updateTeamMember(updated));
         }
       } catch (error) {
         handleRosterMutationError({
@@ -1496,7 +1496,7 @@ export function LeagueDetailPage(): React.JSX.Element {
           });
           const updated = result.data?.updateTeamMemberPosition;
           if (updated) {
-            dispatch(updateTeamMember(updated as TeamMemberFragment));
+            dispatch(updateTeamMember(updated));
           }
         }
       } catch (error) {
@@ -1571,7 +1571,7 @@ export function LeagueDetailPage(): React.JSX.Element {
         const swapped = result.data?.swapTeamMemberPositions;
         if (swapped) {
           for (const member of swapped) {
-            dispatch(updateTeamMember(member as TeamMemberFragment));
+            dispatch(updateTeamMember(member));
           }
         }
       } catch (error) {

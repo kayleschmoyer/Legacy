@@ -24,10 +24,7 @@ type FetchFn = typeof globalThis.fetch;
 
 /** Build a stub fetch that always returns the given Response. */
 function stubFetchWith(body: unknown, init: ResponseInit): FetchFn {
-  return (() =>
-    Promise.resolve(
-      new Response(JSON.stringify(body), init),
-    )) as unknown as FetchFn;
+  return () => Promise.resolve(new Response(JSON.stringify(body), init));
 }
 
 test.describe('awsRequestContext (LS-4444)', () => {

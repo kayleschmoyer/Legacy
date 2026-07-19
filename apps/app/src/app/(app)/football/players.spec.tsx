@@ -340,10 +340,7 @@ const mockUseMyRosterPlayerIds = jest.fn(() => ({
 }));
 jest.mock('./hooks/useMyRosterPlayerIds', () => ({
   useMyRosterPlayerIds: (...args: unknown[]) =>
-    mockUseMyRosterPlayerIds(...args) as {
-      playerIds: Set<number>;
-      loading: boolean;
-    },
+    mockUseMyRosterPlayerIds(...args),
 }));
 
 // Convenience alias so tests can call mockUseHasEntitlement.mockReturnValue(...)

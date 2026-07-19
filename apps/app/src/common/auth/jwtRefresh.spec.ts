@@ -33,7 +33,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
 }));
 
 const mockFetch = jest.fn();
-global.fetch = mockFetch as unknown as typeof fetch;
+global.fetch = mockFetch;
 
 // Re-imported fresh per test (see beforeEach) so the module-level in-flight
 // dedup promise cannot leak across tests.

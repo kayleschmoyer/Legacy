@@ -331,12 +331,10 @@ export const UserProfileDropdown: React.FC = () => {
                   size="$3"
                   color="$color"
                   fontWeight="600"
-                  style={
-                    {
-                      fontFamily: FONT_DISPLAY,
-                      letterSpacing: '0.01em',
-                    } as React.CSSProperties
-                  }
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    letterSpacing: '0.01em',
+                  }}
                 >
                   Profile Settings
                 </Paragraph>
@@ -358,12 +356,10 @@ export const UserProfileDropdown: React.FC = () => {
                   size="$3"
                   color="$color"
                   fontWeight="600"
-                  style={
-                    {
-                      fontFamily: FONT_DISPLAY,
-                      letterSpacing: '0.01em',
-                    } as React.CSSProperties
-                  }
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    letterSpacing: '0.01em',
+                  }}
                 >
                   Preferences
                 </Paragraph>
@@ -385,12 +381,10 @@ export const UserProfileDropdown: React.FC = () => {
                   size="$3"
                   color="$color"
                   fontWeight="600"
-                  style={
-                    {
-                      fontFamily: FONT_DISPLAY,
-                      letterSpacing: '0.01em',
-                    } as React.CSSProperties
-                  }
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    letterSpacing: '0.01em',
+                  }}
                 >
                   Subscription
                 </Paragraph>
@@ -412,12 +406,10 @@ export const UserProfileDropdown: React.FC = () => {
                   size="$3"
                   color="$color"
                   fontWeight="600"
-                  style={
-                    {
-                      fontFamily: FONT_DISPLAY,
-                      letterSpacing: '0.01em',
-                    } as React.CSSProperties
-                  }
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    letterSpacing: '0.01em',
+                  }}
                 >
                   Help &amp; Support
                 </Paragraph>
@@ -441,12 +433,10 @@ export const UserProfileDropdown: React.FC = () => {
                   size="$3"
                   color="$color"
                   fontWeight="600"
-                  style={
-                    {
-                      fontFamily: FONT_DISPLAY,
-                      letterSpacing: '0.01em',
-                    } as React.CSSProperties
-                  }
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    letterSpacing: '0.01em',
+                  }}
                 >
                   League Management
                 </Paragraph>
@@ -469,12 +459,10 @@ export const UserProfileDropdown: React.FC = () => {
                     size="$3"
                     color="$color"
                     fontWeight="600"
-                    style={
-                      {
-                        fontFamily: FONT_DISPLAY,
-                        letterSpacing: '0.01em',
-                      } as React.CSSProperties
-                    }
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: '0.01em',
+                    }}
                   >
                     Admin
                   </Paragraph>
@@ -496,12 +484,10 @@ export const UserProfileDropdown: React.FC = () => {
                   size="$3"
                   color="$red10"
                   fontWeight="700"
-                  style={
-                    {
-                      fontFamily: FONT_DISPLAY,
-                      letterSpacing: '0.01em',
-                    } as React.CSSProperties
-                  }
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    letterSpacing: '0.01em',
+                  }}
                 >
                   Sign Out
                 </Paragraph>

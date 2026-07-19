@@ -78,7 +78,7 @@ function makeUser(overrides: Partial<InternalUser> = {}): InternalUser {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
-  } as InternalUser;
+  };
 }
 
 const mockGetUserByEmail = getUserByEmail as jest.MockedFunction<

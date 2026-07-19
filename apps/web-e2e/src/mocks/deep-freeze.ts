@@ -10,7 +10,7 @@ export function deepFreeze<T>(value: T): T {
     return value;
   }
   Object.freeze(value);
-  for (const key of Object.keys(value as object)) {
+  for (const key of Object.keys(value)) {
     deepFreeze((value as Record<string, unknown>)[key]);
   }
   return value;

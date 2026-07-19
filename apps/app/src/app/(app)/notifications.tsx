@@ -12,29 +12,29 @@ export default function NotificationsScreen(): React.JSX.Element {
       userId={userInfo.id}
       onNavigateToMatchup={(matchupId, leagueId) =>
         router.push({
-          pathname: '/baseball/matchup' as never,
+          pathname: '/baseball/matchup',
           params: {
             matchupId: String(matchupId),
             leagueId: String(leagueId),
           },
-        } as never)
+        })
       }
       onNavigateToLeague={(leagueId) =>
         router.push({
-          pathname: '/baseball/league/[leagueId]' as never,
+          pathname: '/baseball/league/[leagueId]',
           params: { leagueId: String(leagueId) },
-        } as never)
+        })
       }
       onNavigateToTrades={(leagueId, tradeOfferId) =>
         router.push({
-          pathname: '/TradeCenterPage' as never,
+          pathname: '/TradeCenterPage',
           params: {
             leagueId: String(leagueId),
             ...(tradeOfferId != null && {
               tradeOfferId: String(tradeOfferId),
             }),
           },
-        } as never)
+        })
       }
     />
   );

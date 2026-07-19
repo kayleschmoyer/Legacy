@@ -190,10 +190,7 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
                 flexShrink={0}
                 marginTop={2}
               />
-              <Paragraph
-                size="$2"
-                style={{ color: AMBER } as React.CSSProperties}
-              >
+              <Paragraph size="$2" style={{ color: AMBER }}>
                 {error}
               </Paragraph>
             </XStack>
@@ -209,7 +206,7 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
                 setValue('');
                 setError(null);
               }}
-              style={{ color: BRAND_GOLD } as React.CSSProperties}
+              style={{ color: BRAND_GOLD }}
             >
               {mode === 'totp'
                 ? 'Use password instead'
@@ -233,13 +230,11 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
                 onPress={() => void handleSubmit()}
                 disabled={loading || !value.trim()}
                 icon={loading ? <Spinner size="small" /> : undefined}
-                style={
-                  {
-                    background: `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_GOLD}cc 100%)`,
-                    color: '#0A0F1A',
-                    fontWeight: '700',
-                  } as React.CSSProperties
-                }
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_GOLD}cc 100%)`,
+                  color: '#0A0F1A',
+                  fontWeight: '700',
+                }}
               >
                 {loading ? 'Verifying…' : 'Verify'}
               </Button>

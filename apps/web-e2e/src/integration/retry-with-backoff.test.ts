@@ -144,10 +144,10 @@ void test('fetchWithBackoff: retries 429 honouring Retry-After, returns the 200'
     'https://api.test/graphql',
     {},
     {
-      fetchImpl: ((..._args: Parameters<typeof fetch>) =>
+      fetchImpl: (..._args: Parameters<typeof fetch>) =>
         Promise.resolve(
           makeResponse(statuses[i], statuses[i++] === 429 ? '2' : undefined),
-        )) as typeof fetch,
+        ),
       sleep: (ms) => (sleeps.push(ms), Promise.resolve()),
       jitter: () => 1,
     },
@@ -163,10 +163,10 @@ void test('fetchWithBackoff: non-429 status returned immediately (no retry)', as
     'https://api.test/graphql',
     {},
     {
-      fetchImpl: (() => {
+      fetchImpl: () => {
         calls += 1;
         return Promise.resolve(makeResponse(400));
-      }) as typeof fetch,
+      },
       sleep: () => Promise.resolve(),
     },
   );
@@ -181,8 +181,7 @@ void test('fetchWithBackoff: retries transient 5xx then returns the 200', async 
     'https://api.test/graphql',
     {},
     {
-      fetchImpl: (() =>
-        Promise.resolve(makeResponse(statuses[i++]))) as typeof fetch,
+      fetchImpl: () => Promise.resolve(makeResponse(statuses[i++])),
       sleep: () => Promise.resolve(),
       jitter: () => 1,
     },
@@ -198,10 +197,10 @@ void test('fetchWithBackoff: gives up after maxAttempts of 429', async () => {
     {},
     {
       maxAttempts: 3,
-      fetchImpl: (() => {
+      fetchImpl: () => {
         calls += 1;
         return Promise.resolve(makeResponse(429));
-      }) as typeof fetch,
+      },
       sleep: () => Promise.resolve(),
       jitter: () => 1,
     },

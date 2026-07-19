@@ -122,9 +122,7 @@ describe('FootballMatchupScreen', () => {
     jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
       data: undefined,
       loading: false,
-      error: new Error('Fetch error') as ReturnType<
-        typeof graphqlLib.useGetMatchupByIdQuery
-      >['error'],
+      error: new Error('Fetch error'),
     } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
     render(<FootballMatchupScreen matchupId={1} />);
     expect(screen.getByText(/Failed to load matchup\./)).toBeTruthy();

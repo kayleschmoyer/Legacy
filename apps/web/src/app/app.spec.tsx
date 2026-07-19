@@ -16,51 +16,35 @@ jest.mock('@legacy-sports/shared-components', () => {
     }: {
       children: React.ReactNode;
       [key: string]: unknown;
-    }) => (
-      <button {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
-        {children}
-      </button>
-    ),
+    }) => <button {...props}>{children}</button>,
     H1: ({
       children,
       ...props
     }: {
       children: React.ReactNode;
       [key: string]: unknown;
-    }) => (
-      <h1 {...(props as React.HTMLAttributes<HTMLHeadingElement>)}>
-        {children}
-      </h1>
-    ),
+    }) => <h1 {...props}>{children}</h1>,
     XStack: ({
       children,
       ...props
     }: {
       children: React.ReactNode;
       [key: string]: unknown;
-    }) => (
-      <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
-    ),
+    }) => <div {...props}>{children}</div>,
     YStack: ({
       children,
       ...props
     }: {
       children: React.ReactNode;
       [key: string]: unknown;
-    }) => (
-      <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
-    ),
+    }) => <div {...props}>{children}</div>,
     Paragraph: ({
       children,
       ...props
     }: {
       children: React.ReactNode;
       [key: string]: unknown;
-    }) => (
-      <p {...(props as React.HTMLAttributes<HTMLParagraphElement>)}>
-        {children}
-      </p>
-    ),
+    }) => <p {...props}>{children}</p>,
     Separator: () => <hr />,
     BaseballScreen: () => <div>Baseball Screen</div>,
     FootballScreen: () => <div>Football Screen</div>,
@@ -86,38 +70,28 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
   }: {
     children: React.ReactNode;
     [key: string]: unknown;
-  }) => (
-    <button {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
-      {children}
-    </button>
-  ),
+  }) => <button {...props}>{children}</button>,
   XStack: ({
     children,
     ...props
   }: {
     children: React.ReactNode;
     [key: string]: unknown;
-  }) => (
-    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
-  ),
+  }) => <div {...props}>{children}</div>,
   YStack: ({
     children,
     ...props
   }: {
     children: React.ReactNode;
     [key: string]: unknown;
-  }) => (
-    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
-  ),
+  }) => <div {...props}>{children}</div>,
   Paragraph: ({
     children,
     ...props
   }: {
     children: React.ReactNode;
     [key: string]: unknown;
-  }) => (
-    <p {...(props as React.HTMLAttributes<HTMLParagraphElement>)}>{children}</p>
-  ),
+  }) => <p {...props}>{children}</p>,
   Separator: () => <hr />,
   UnifiedLoadingPanel: () => <div data-testid="unified-loading-panel" />,
 }));

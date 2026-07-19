@@ -63,9 +63,9 @@ export default function WaiversPage() {
           size="$4"
           onPress={() =>
             router.navigate({
-              pathname: '/FreeAgents' as never,
+              pathname: '/FreeAgents',
               params: { leagueId: String(leagueId) },
-            } as never)
+            })
           }
           icon={<ShoppingCart size={18} />}
           accessibilityRole="button"

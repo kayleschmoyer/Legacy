@@ -190,9 +190,7 @@ export const MyLeaguesDropdown: React.FC = () => {
             <XStack justifyContent="center" alignItems="center" padding="$4">
               <Paragraph
                 marginBottom={0}
-                style={
-                  { fontSize: 13, color: '$color10' } as React.CSSProperties
-                }
+                style={{ fontSize: 13, color: '$color10' }}
               >
                 Loading…
               </Paragraph>
@@ -204,14 +202,12 @@ export const MyLeaguesDropdown: React.FC = () => {
               <Paragraph
                 marginBottom={0}
                 color="$color"
-                style={
-                  {
-                    fontSize: 12,
-                    textAlign: 'center',
-                    fontFamily: FONT_DISPLAY,
-                    opacity: 0.6,
-                  } as React.CSSProperties
-                }
+                style={{
+                  fontSize: 12,
+                  textAlign: 'center',
+                  fontFamily: FONT_DISPLAY,
+                  opacity: 0.6,
+                }}
               >
                 No leagues yet
               </Paragraph>
@@ -223,15 +219,13 @@ export const MyLeaguesDropdown: React.FC = () => {
                 <MenuItem role="menuitem">
                   <Paragraph
                     marginBottom={0}
-                    style={
-                      {
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: '600',
-                        fontSize: 12,
-                        letterSpacing: '0.04em',
-                        textTransform: 'uppercase',
-                      } as React.CSSProperties
-                    }
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: '600',
+                      fontSize: 12,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}
                   >
                     Browse Leagues
                   </Paragraph>
@@ -245,15 +239,13 @@ export const MyLeaguesDropdown: React.FC = () => {
                 <MenuItem role="menuitem">
                   <Paragraph
                     marginBottom={0}
-                    style={
-                      {
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: '600',
-                        fontSize: 12,
-                        letterSpacing: '0.04em',
-                        textTransform: 'uppercase',
-                      } as React.CSSProperties
-                    }
+                    style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontWeight: '600',
+                      fontSize: 12,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}
                   >
                     Create a League
                   </Paragraph>
@@ -305,17 +297,15 @@ export const MyLeaguesDropdown: React.FC = () => {
                             numberOfLines={1}
                             ellipsizeMode="tail"
                             color={isLeagueActive ? '#C5A55A' : '$color'}
-                            style={
-                              {
-                                fontFamily: FONT_DISPLAY,
-                                fontWeight: '600',
-                                fontSize: 13,
-                                flex: 1,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              } as React.CSSProperties
-                            }
+                            style={{
+                              fontFamily: FONT_DISPLAY,
+                              fontWeight: '600',
+                              fontSize: 13,
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
                           >
                             {league.name ?? `League ${league.id}`}
                           </Paragraph>
@@ -329,15 +319,13 @@ export const MyLeaguesDropdown: React.FC = () => {
                             >
                               <Paragraph
                                 marginBottom={0}
-                                style={
-                                  {
-                                    fontFamily: FONT_DISPLAY,
-                                    fontWeight: '700',
-                                    fontSize: 9,
-                                    color: '#FFFFFF',
-                                    letterSpacing: '0.08em',
-                                  } as React.CSSProperties
-                                }
+                                style={{
+                                  fontFamily: FONT_DISPLAY,
+                                  fontWeight: '700',
+                                  fontSize: 9,
+                                  color: '#FFFFFF',
+                                  letterSpacing: '0.08em',
+                                }}
                               >
                                 LIVE
                               </Paragraph>

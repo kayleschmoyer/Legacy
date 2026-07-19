@@ -70,7 +70,7 @@ beforeEach(() => {
     id: 7,
     email: 'user@example.com',
   } as unknown as ReturnType<typeof verify>);
-  mockGetUserById.mockResolvedValue(mockUser as never);
+  mockGetUserById.mockResolvedValue(mockUser);
 });
 
 describe('handleStepUpVerify', () => {
@@ -195,7 +195,7 @@ describe('handleStepUpVerify', () => {
     });
 
     it('returns 401 when the user is not found', async () => {
-      mockGetUserById.mockResolvedValue(null as never);
+      mockGetUserById.mockResolvedValue(null);
 
       const result = await handleStepUpVerify(
         makeEvent({ password: 'any-password' }),

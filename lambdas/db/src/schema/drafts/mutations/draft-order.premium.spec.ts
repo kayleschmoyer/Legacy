@@ -75,7 +75,7 @@ function captureResolvers(): {
  * and requirePremium to throw PremiumRequiredError.
  * Returning [{ tier: 'premium' }] lets the call proceed.
  */
-function makeCtx({ subscriptionTier = 'free' as 'free' | 'premium' } = {}) {
+function makeCtx({ subscriptionTier = 'free' } = {}) {
   const tierRows = subscriptionTier === 'premium' ? [{ tier: 'premium' }] : [];
 
   return {

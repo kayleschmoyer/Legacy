@@ -1504,14 +1504,12 @@ function SkeletonBar({ width, height = 12, radius = 4 }: SkeletonBarProps) {
     return (
       <span
         className="pp-sk-bar"
-        style={
-          {
-            width,
-            height,
-            borderRadius: radius,
-            flex: '0 0 auto',
-          } as React.CSSProperties
-        }
+        style={{
+          width,
+          height,
+          borderRadius: radius,
+          flex: '0 0 auto',
+        }}
       />
     );
   }

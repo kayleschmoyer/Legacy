@@ -427,11 +427,7 @@ export function useCareerStatsService(
   // Transform raw data from connection format (using edges instead of nodes)
   const transformedData: PlayerCareerStats[] =
     data?.careerBattingStats?.edges
-      ?.map((edge) =>
-        edge
-          ? transformCareerStats(edge.node || ({} as CareerBattingFragment))
-          : null,
-      )
+      ?.map((edge) => (edge ? transformCareerStats(edge.node || {}) : null))
       .filter((item): item is PlayerCareerStats => item !== null) ?? [];
 
   // Extract pagination metadata from connection
@@ -486,9 +482,7 @@ export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
 
     return statsData.careerBattingStats.edges
       .map((edge) => {
-        return edge
-          ? transformCareerStats(edge.node || ({} as CareerBattingFragment))
-          : null;
+        return edge ? transformCareerStats(edge.node || {}) : null;
       })
       .filter((item): item is PlayerCareerStats => item !== null);
   }, [statsData]);

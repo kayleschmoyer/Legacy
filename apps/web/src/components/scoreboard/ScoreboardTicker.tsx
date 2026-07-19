@@ -61,7 +61,7 @@ const TickerStrip = styled(XStack, {
   overflow: 'hidden',
   alignItems: 'center',
   zIndex: TICKER_Z_INDEX,
-} as never);
+});
 
 // Container that provides the right border separating the label from the scroll area
 const TickerLabelContainer = styled(XStack, {
@@ -71,7 +71,7 @@ const TickerLabelContainer = styled(XStack, {
   flexShrink: 0,
   borderRightWidth: 1,
   borderRightColor: '$borderColor',
-} as never);
+});
 
 const TickerLabel = styled(Text, {
   fontSize: '$2',
@@ -83,14 +83,14 @@ const TickerLabel = styled(Text, {
   $sm: {
     fontSize: '$3',
   },
-} as never);
+});
 
 const ScrollOuter = styled(XStack, {
   flex: 1,
   overflow: 'hidden',
   alignItems: 'center',
   height: TICKER_HEIGHT_PX,
-} as never);
+});
 
 // ─── Status text ──────────────────────────────────────────────────────────────
 
@@ -341,7 +341,7 @@ export function ScoreboardTicker() {
     };
   }, [refetch]);
 
-  const games: TickerGame[] = (data?.scoreboard?.games ?? []) as TickerGame[];
+  const games: TickerGame[] = data?.scoreboard?.games ?? [];
   const isAnyGameLive = games.some((g) => g.status === 'Live');
   // Also poll while upcoming games exist — games can transition from Upcoming
   // → Live without triggering a re-fetch otherwise. The ticker always shows

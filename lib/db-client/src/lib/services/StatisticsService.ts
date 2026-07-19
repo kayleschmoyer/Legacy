@@ -256,8 +256,11 @@ export class StatisticsService {
             // Extract the career_batting data from the joined result
             return (result as { career_batting: CareerBatting }).career_batting;
           }
-          // For non-joined queries, the result is already in the correct format
-          return result as CareerBatting;
+          // For non-joined queries, the result is already in the correct
+          // format. The lint and build TS programs disagree on Drizzle's row
+          // type, so route the assertion through `unknown` to satisfy both.
+          const batting: unknown = result;
+          return batting as CareerBatting;
         });
       },
     );
@@ -353,7 +356,7 @@ export class StatisticsService {
               : withLimit;
 
           const results = await withOffset.execute();
-          return results.map((r) => r.career_pitching as CareerPitching);
+          return results.map((r) => r.career_pitching);
         }
 
         const conditions = queryOptions.filters
@@ -417,7 +420,8 @@ export class StatisticsService {
               return (result as unknown as { career_pitching: CareerPitching })
                 .career_pitching;
             }
-            return result as unknown as CareerPitching;
+            const pitching: unknown = result;
+            return pitching as CareerPitching;
           });
         }
 

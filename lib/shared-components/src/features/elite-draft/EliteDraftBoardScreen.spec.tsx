@@ -239,11 +239,7 @@ beforeEach(() => {
     .mockReturnValue({ timeRemaining: null } as unknown as ReturnType<
       typeof useDraftTimer
     >);
-  jest
-    .mocked(useDraftEffects)
-    .mockReturnValue(
-      undefined as unknown as ReturnType<typeof useDraftEffects>,
-    );
+  jest.mocked(useDraftEffects).mockReturnValue(undefined);
 });
 
 describe('AutomatedDraftScreen', () => {
