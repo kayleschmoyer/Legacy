@@ -29,6 +29,7 @@ import { MatchupService } from '../../services/matchup-service';
 import {
   AuthenticationError,
   ForbiddenError,
+  MatchupLockedError,
   NotFoundError,
   UserInputError,
 } from '../graphql-errors';
@@ -289,9 +290,7 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
 
       // Only allow edits when matchup is scheduled (not yet locked)
       if (matchup.status !== 'scheduled') {
-        throw new Error(
-          'Cannot modify roster after the matchup has started or completed',
-        );
+        throw MatchupLockedError(matchup.status);
       }
 
       const db = context.db;

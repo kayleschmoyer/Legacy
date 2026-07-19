@@ -96,3 +96,21 @@ export function NotFoundError(message: string): GraphQLError {
     extensions: { code: 'NOT_FOUND' },
   });
 }
+
+/**
+ * Throw when a matchup roster edit is rejected because the matchup is no
+ * longer in the `scheduled` state (e.g. `in_progress`, `completed`, or
+ * `cancelled`).
+ *
+ * Maps to Apollo code `MATCHUP_LOCKED`. The triggering `status` is included
+ * in `extensions` so the client can distinguish "still in progress" from
+ * "already completed" / "cancelled" instead of showing one generic message.
+ */
+export function MatchupLockedError(
+  status: string,
+  message = `Cannot modify roster because this matchup is currently ${status}`,
+): GraphQLError {
+  return new GraphQLError(message, {
+    extensions: { code: 'MATCHUP_LOCKED', status },
+  });
+}
