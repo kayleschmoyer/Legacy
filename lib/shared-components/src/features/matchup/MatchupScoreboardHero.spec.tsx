@@ -135,4 +135,30 @@ describe('MatchupScoreboardHero', () => {
     render(<MatchupScoreboardHero {...baseProps({ status: undefined })} />);
     expect(screen.getByText('Status unknown · Week 5')).toBeTruthy();
   });
+
+  it('announces the leading team and score via a live region', () => {
+    render(<MatchupScoreboardHero {...baseProps()} />);
+    expect(screen.getByText('Team B now leads 138.00 to 87.50')).toBeTruthy();
+  });
+
+  it('announces a tie via the live region', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({
+          team1: { id: 10, name: 'Team A', score: 100 },
+          team2: { id: 20, name: 'Team B', score: 100 },
+        })}
+      />,
+    );
+    expect(screen.getByText('Team A and Team B tied at 100.00')).toBeTruthy();
+  });
+
+  it('exposes each score as a polite live region labelled with the team name', () => {
+    render(<MatchupScoreboardHero {...baseProps()} />);
+    const score1 = screen.getByLabelText('Team A score 87.50');
+    const score2 = screen.getByLabelText('Team B score 138.00');
+    expect(score1.getAttribute('aria-live')).toBe('polite');
+    expect(score1.getAttribute('aria-atomic')).toBe('true');
+    expect(score2.getAttribute('aria-live')).toBe('polite');
+  });
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Text, XStack, YStack } from 'tamagui';
+import { Card, Text, VisuallyHidden, XStack, YStack } from 'tamagui';
 import { MatchupStatus } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,
@@ -307,7 +307,14 @@ function TeamPanel({
       <Text fontFamily={FONT_MONO} fontSize="$2" color={TEXT_MUTED}>
         {team.record ?? '—'}
       </Text>
-      <ScoreText fontSize={52} $sm={{ fontSize: 40 }} color={scoreColor}>
+      <ScoreText
+        fontSize={52}
+        $sm={{ fontSize: 40 }}
+        color={scoreColor}
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label={`${team.name ?? 'Team'} score ${score.toFixed(2)}`}
+      >
         {score.toFixed(2)}
       </ScoreText>
       {team.projectedScore != null && (
@@ -351,8 +358,22 @@ export function MatchupScoreboardHero({
   const team1Leading = score1 >= score2;
   const chip = statusConfigFor(status);
 
+  const team1Name = team1.name ?? 'Team 1';
+  const team2Name = team2.name ?? 'Team 2';
+  const scoreAnnouncement =
+    score1 === score2
+      ? `${team1Name} and ${team2Name} tied at ${score1.toFixed(2)}`
+      : `${team1Leading ? team1Name : team2Name} now leads ${Math.max(score1, score2).toFixed(2)} to ${Math.min(score1, score2).toFixed(2)}`;
+
   return (
     <HeroCard role="region" aria-label={`Week ${weekNumber ?? 1} scoreboard`}>
+      {/* Screen-reader-only status node: announces score changes without a
+          visible duplicate of the on-screen score (WCAG 4.1.3, LS-5881). */}
+      <VisuallyHidden>
+        <Text role="status" aria-live="polite" aria-atomic="true">
+          {scoreAnnouncement}
+        </Text>
+      </VisuallyHidden>
       <TopBand>
         <XStack alignItems="center" gap="$2" flexWrap="wrap">
           <StatusChip backgroundColor={chip.bg} borderColor={chip.border}>
