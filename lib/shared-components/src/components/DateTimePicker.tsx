@@ -400,6 +400,7 @@ export function DateTimePicker({
                 <Button
                   size="$2"
                   chromeless
+                  testID="date-time-picker-prev-month"
                   onPress={() => {
                     navigateMonth('prev');
                   }}
@@ -427,6 +428,7 @@ export function DateTimePicker({
                 <Button
                   size="$2"
                   chromeless
+                  testID="date-time-picker-next-month"
                   onPress={() => {
                     navigateMonth('next');
                   }}

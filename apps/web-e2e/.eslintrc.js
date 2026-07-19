@@ -184,6 +184,7 @@ module.exports = {
       // migrated, widen `files` to `src/tests/**/*.spec.ts` and delete
       // the per-file list.
       files: [
+        'create-league-form-validation.spec.ts',
         'draft-selection-workflow.spec.ts',
         'join-league.spec.ts',
         'league-creation-advanced.spec.ts',
