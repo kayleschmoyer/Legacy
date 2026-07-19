@@ -28,6 +28,8 @@
       "Read(resources/dev.dump)"
     ],
     "allow": [
+      "Bash(git push --force-with-lease*)",
+      "Bash(git -C * push --force-with-lease*)",
       "RemoteTrigger",
       "mcp__legacy-sports-aws__aws_apigateway_inspect",
       "mcp__legacy-sports-aws__aws_lambda_status",

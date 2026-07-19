@@ -131,12 +131,12 @@ if (command) {
       'Deleting a .git directory destroys repository history. If a worktree needs cleanup, use `twig worktree clean`.',
     ],
     [
-      /git\s+push\b(?=[^\n]*(--force(?!-with-lease)\b|\s-f\b))/,
+      /git\s+(?:-C\s+\S+\s+)*push\b(?=[^\n]*(--force(?!-with-lease)\b|\s-f\b))/,
       'force-push',
       'Bare force pushes can destroy remote history. Use --force-with-lease on a feature branch if a rewrite is genuinely required — and never on main.',
     ],
     [
-      /git\s+push\b[^\n]*\s(origin|upstream)\s+(\S+:)?(main|master)(?![\w\-/])/,
+      /git\s+(?:-C\s+\S+\s+)*push\b[^\n]*\s(origin|upstream)\s+(\S+:)?(main|master)(?![\w\-/])/,
       'push-to-main',
       'Pushing directly to main is forbidden (AGENTS.md Tier 1). All changes land through a PR from a feature branch.',
     ],
