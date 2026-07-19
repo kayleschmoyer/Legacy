@@ -19,11 +19,40 @@ jest.mock('@legacy-sports/db-client', () => ({
       leagueId: 'teamMembers.leagueId',
       salary: 'teamMembers.salary',
     },
+    leaguePosition: {
+      id: 'leaguePosition.id',
+      leagueId: 'leaguePosition.leagueId',
+      positionType: 'leaguePosition.positionType',
+    },
+  },
+  // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
+  // up to 2x on the pool's connection-timeout message) so the loader-level
+  // regression test below (LS-8478) exercises the same retry contract without
+  // pulling in the real Helpers module (and its pg/drizzle dependencies).
+  withPoolTimeoutRetry: async (queryFn: () => Promise<unknown>) => {
+    const POOL_TIMEOUT_MESSAGE = 'timeout exceeded when trying to connect';
+    const isPoolTimeout = (err: unknown): boolean => {
+      let current: unknown = err;
+      while (current instanceof Error) {
+        if (current.message === POOL_TIMEOUT_MESSAGE) return true;
+        current = (current as Error & { cause?: unknown }).cause;
+      }
+      return false;
+    };
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      try {
+        return await queryFn();
+      } catch (err) {
+        if (isPoolTimeout(err) && attempt < 2) continue;
+        throw err;
+      }
+    }
   },
 }));
 
 import {
   createLeaguePayrollConfigLoader,
+  createLeaguePositionByIdLoader,
   createTeamPayrollLoader,
 } from './entity-loaders';
 
@@ -177,5 +206,41 @@ describe('createTeamPayrollLoader (LS-2506)', () => {
     ]);
 
     expect(calls).toHaveLength(2);
+  });
+});
+
+// LS-8478: the league_positions batch query intermittently failed with
+// "timeout exceeded when trying to connect" when the per-request connection
+// pool was exhausted by concurrent DataLoader batches. The loader now wraps
+// its query in `withPoolTimeoutRetry` so a transient pool timeout is retried
+// instead of propagating and crashing the resolving field.
+describe('createLeaguePositionByIdLoader (LS-8478)', () => {
+  it('retries and succeeds after a pool connection-timeout error', async () => {
+    let call = 0;
+    const rows = [{ id: 5, leagueId: 1, positionType: 'C' }];
+    const { db, calls } = makeMockDb(() => {
+      call += 1;
+      if (call === 1) {
+        throw new Error('timeout exceeded when trying to connect');
+      }
+      return rows;
+    });
+    const loader = createLeaguePositionByIdLoader(db);
+
+    await expect(loader.load(5)).resolves.toEqual(rows[0]);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('does not retry and rejects on a non-pool-timeout error', async () => {
+    const dbErr = new Error('syntax error at or near "SELECT"');
+    const { db, calls } = makeMockDb(() => {
+      throw dbErr;
+    });
+    const loader = createLeaguePositionByIdLoader(db);
+
+    await expect(loader.load(5)).rejects.toThrow(
+      'syntax error at or near "SELECT"',
+    );
+    expect(calls).toHaveLength(1);
   });
 });

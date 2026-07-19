@@ -1,4 +1,4 @@
-import { runWithClient } from './Helpers';
+import { runWithClient, withPoolTimeoutRetry } from './Helpers';
 
 jest.mock('drizzle-orm', () => ({
   sql: jest.fn().mockReturnValue({}),
@@ -210,5 +210,76 @@ describe('runWithClient', () => {
       );
       expect(callback).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+// LS-8478: pg-pool throws a plain Error (no SQLSTATE code) when
+// connectionTimeoutMillis elapses waiting for a free client. `withPoolTimeoutRetry`
+// catches that specific case (unlike `runWithClient`'s SQLSTATE-based retry).
+describe('withPoolTimeoutRetry', () => {
+  beforeEach(() => {
+    jest.spyOn(global, 'setTimeout').mockImplementation((fn) => {
+      if (typeof fn === 'function') {
+        (fn as () => void)();
+      }
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('returns the result on first attempt when there is no error', async () => {
+    const queryFn = jest.fn().mockResolvedValue('rows');
+    await expect(withPoolTimeoutRetry(queryFn)).resolves.toBe('rows');
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries when the pool connection-timeout error is thrown directly', async () => {
+    const poolTimeoutErr = new Error('timeout exceeded when trying to connect');
+    const queryFn = jest
+      .fn()
+      .mockRejectedValueOnce(poolTimeoutErr)
+      .mockResolvedValueOnce('rows');
+
+    await expect(withPoolTimeoutRetry(queryFn)).resolves.toBe('rows');
+    expect(queryFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries when the pool timeout is wrapped in a DrizzleQueryError-style cause chain', async () => {
+    const poolTimeoutErr = new Error('timeout exceeded when trying to connect');
+    const drizzleErr = Object.assign(
+      new Error('Failed query: select "id" from "league_positions" where ...'),
+      { cause: poolTimeoutErr },
+    );
+    const queryFn = jest
+      .fn()
+      .mockRejectedValueOnce(drizzleErr)
+      .mockResolvedValueOnce('rows');
+
+    await expect(withPoolTimeoutRetry(queryFn)).resolves.toBe('rows');
+    expect(queryFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('exhausts retries and throws when every attempt hits the pool timeout', async () => {
+    const poolTimeoutErr = new Error('timeout exceeded when trying to connect');
+    const queryFn = jest.fn().mockRejectedValue(poolTimeoutErr);
+
+    await expect(withPoolTimeoutRetry(queryFn)).rejects.toThrow(
+      'timeout exceeded when trying to connect',
+    );
+    // 1 initial + 2 retries = 3 total attempts
+    expect(queryFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws immediately without retrying on an unrelated error', async () => {
+    const appErr = new Error('some business logic error');
+    const queryFn = jest.fn().mockRejectedValue(appErr);
+
+    await expect(withPoolTimeoutRetry(queryFn)).rejects.toThrow(
+      'some business logic error',
+    );
+    expect(queryFn).toHaveBeenCalledTimes(1);
   });
 });

@@ -225,6 +225,63 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
   );
 }
 
+// node-postgres's pool throws this plain Error (no SQLSTATE code) when
+// `connectionTimeoutMillis` elapses waiting for a free client — i.e. the pool
+// is exhausted by concurrent queries within a single request (e.g. several
+// DataLoader batches resolving in parallel). Drizzle wraps it in a
+// DrizzleQueryError with the original error preserved on `.cause`. See LS-8478.
+const POOL_CONNECTION_TIMEOUT_MESSAGE =
+  'timeout exceeded when trying to connect';
+
+const MAX_POOL_TIMEOUT_RETRIES = 2;
+const POOL_TIMEOUT_RETRY_DELAY_BASE_MS = 150;
+
+// Walk err → err.cause → … looking for the pool's connection-timeout message.
+function isPoolTimeoutError(err: unknown): boolean {
+  let current: unknown = err;
+  const seen = new Set<unknown>();
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if (current.message === POOL_CONNECTION_TIMEOUT_MESSAGE) return true;
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
+ * Run `queryFn`, retrying with backoff if it fails solely because the pool's
+ * `connectionTimeoutMillis` elapsed before a client became free. This is a
+ * transient condition caused by a burst of concurrent queries sharing a
+ * small per-request connection pool — a short delay gives in-flight queries
+ * time to release their connection, after which a retry typically succeeds.
+ *
+ * Any other error (including real Postgres failures) is rethrown immediately.
+ */
+export async function withPoolTimeoutRetry<T>(
+  queryFn: () => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt <= MAX_POOL_TIMEOUT_RETRIES; attempt++) {
+    try {
+      return await queryFn();
+    } catch (err) {
+      if (isPoolTimeoutError(err) && attempt < MAX_POOL_TIMEOUT_RETRIES) {
+        const delayMs = POOL_TIMEOUT_RETRY_DELAY_BASE_MS * (attempt + 1);
+        LOGGER.warn(
+          `DB pool connection timeout (pool exhausted), retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_POOL_TIMEOUT_RETRIES})`,
+          err instanceof Error ? err : new Error(String(err)),
+        );
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+  // Unreachable: every iteration either returns or throws.
+  throw new Error(
+    'withPoolTimeoutRetry: retry loop exhausted without return or throw',
+  );
+}
+
 export function runWithPublicClient<T>(
   options: DbOptions,
   callback: (client: PublicDb) => Promise<T>,

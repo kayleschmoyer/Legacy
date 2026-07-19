@@ -8,6 +8,7 @@ import {
   type GenericDatabase,
   inArrayAny,
   PublicSchema,
+  withPoolTimeoutRetry,
 } from '@legacy-sports/db-client';
 
 // ---------------------------------------------------------------------------
@@ -254,10 +255,12 @@ export const createLeaguePositionByIdLoader = (
     typeof PublicSchema.leaguePosition.$inferSelect | null
   >(async (keys) => {
     const ids = [...new Set(keys)] as number[];
-    const allPositions = await db
-      .select()
-      .from(PublicSchema.leaguePosition)
-      .where(inArray(PublicSchema.leaguePosition.id, ids));
+    const allPositions = await withPoolTimeoutRetry(() =>
+      db
+        .select()
+        .from(PublicSchema.leaguePosition)
+        .where(inArray(PublicSchema.leaguePosition.id, ids)),
+    );
 
     const posMap = new Map<
       number,
