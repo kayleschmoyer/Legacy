@@ -537,16 +537,24 @@ test.describe
       name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
     });
 
-    // Captured just before the swap so the post-swap step can assert the
-    // filled-slot count is unchanged (a swap exchanges two positions, it
-    // never removes a slot). Replaces a brittle magic ">= 10" lower bound
-    // that flaked when a 4-team roster settled at 9 post-swap (LS-8428).
+    // Baseline filled-slot count, captured with NO player selected so the
+    // count is not perturbed by selection-driven relabeling. Selecting a player
+    // rewrites every eligible swap target's accessible name from
+    // "{name} at {POS}" to "Swap {name} into {POS}" (RosterBoard SlotRow), which
+    // drops those slots out of the `filledSlots` locator below. Capturing the
+    // baseline pre-selection — and re-measuring post-swap only after the swap
+    // clears the selection — is what makes the "a swap never removes a slot"
+    // invariant measurable. The earlier capture-while-selected produced a
+    // phantom −1 (LS-8496); it replaced a magic ">= 10" lower bound (LS-8428).
     let preSwapFilledCount = 0;
 
     await test.step('Verify at least two filled roster slots exist', async () => {
       await expect(filledSlots.first()).toBeVisible({ timeout: 15000 });
       const count = await filledSlots.count();
       expect(count).toBeGreaterThanOrEqual(2);
+      // Snapshot the baseline here, before any slot is selected, so it reflects
+      // the true number of filled slots rather than a selection-relabeled view.
+      preSwapFilledCount = count;
     });
 
     await test.step('Click first filled slot to select a player', async () => {
@@ -563,30 +571,43 @@ test.describe
       );
     });
 
-    await test.step('Click a second slot to trigger a position swap', async () => {
-      // After selecting a player the second clicked slot either:
-      //   a) swaps the selected player into that slot (both now filled), or
-      //   b) deselects if clicking the same slot
-      // We click a different filled slot to execute a swap. The verify-step
-      // below auto-waits for the post-swap roster to render, so no fixed
-      // wall-clock wait is needed (LS-4457).
-      const slotCount = await filledSlots.count();
-      preSwapFilledCount = slotCount;
-      if (slotCount >= 2) {
-        await filledSlots.nth(1).click();
+    await test.step('Click an eligible swap target to execute a real position swap', async () => {
+      // With a player selected, only slots that player is ELIGIBLE to swap into
+      // are relabeled "Swap {name} into {POS}" and become live swap targets;
+      // clicking one fires `swapTeamMemberPositions`. Clicking a still-"{name}
+      // at {POS}" slot is not a swap — the selected player is ineligible for it,
+      // so RosterBoard just re-selects that occupant (handleSlotPress:
+      // `if (assigned) setSelected(assigned)`). The prior gesture clicked
+      // filledSlots.nth(1), which — because eligible targets are relabeled out
+      // of that locator — is by construction an ineligible slot, so it never
+      // swapped and its post-count was pure selection drift (LS-8496).
+      const swapTargets = page.getByRole('button', {
+        name: /^Swap .+ into (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
+      });
+      if ((await swapTargets.count()) > 0) {
+        // A completed swap clears the selection (setSelected(null)).
+        await swapTargets.first().click();
+      } else {
+        // The selected player is eligible for no other occupied slot, so there
+        // is no valid same-or-cross-position exchange to perform. Deselect (not
+        // a blind skip — the invariant assertion below still runs) so the
+        // post-swap count is measured with no selection perturbing the locator.
+        await filledSlots.first().click();
       }
     });
 
-    await test.step('Verify roster page still renders without errors after swap', async () => {
+    await test.step('Verify roster page still renders without errors and no slot was dropped', async () => {
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
       );
       // A position swap is an exchange, not a removal: the number of filled
       // roster slots must return to the pre-swap baseline once the post-swap
-      // refetch settles. Poll (rather than a one-shot count()) so a transient
-      // mid-refetch dip doesn't flake the assertion, and assert equality to
-      // the captured pre-swap count instead of a magic ">= 10" lower bound
-      // that was wrong for a 4-team roster (LS-8428; prior art LS-7918/LS-4309).
+      // refetch settles. The swap has cleared the selection, so every filled
+      // slot has reverted to its "{name} at {POS}" label and the locator is no
+      // longer perturbed by selection relabeling. Poll (rather than a one-shot
+      // count()) so a transient mid-refetch dip doesn't flake the assertion,
+      // and assert equality to the pre-selection baseline captured above
+      // (LS-8428; prior art LS-7918/LS-4309).
       const playerSlots = page.getByRole('button', {
         name: / at (SP|RP|C|1B|2B|3B|SS|OF|DH|LF|CF|RF)$/i,
       });
