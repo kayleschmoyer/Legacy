@@ -213,6 +213,8 @@ After fixing all known issues, Claude Code will surface PR events natively — n
 > **Precondition for waiting on PR events**: continue to the next workflow step after pushing — Claude Code surfaces CI failures, review threads, and comment events as push notifications. Treat `github_view_pr` and `ci_view_run` as one-shot lookups (e.g. to fetch a `runId` after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal than the native notification. See the [mcp-first CI Operations section](../../mcp-first/SKILL.md#ci-operations).
 >
 > **Not everything arrives as an event**: CI _success_, merges, and **merge-conflict transitions are never delivered** — a PR that goes conflicting because main advanced will not wake the session. On every wake-up (any event, or a scheduled check-in), re-check conflict state via `github_pr_why_blocked` or the `CI: Conflicts` label before assuming the last known state still holds.
+>
+> **And events only reach a bound session** — see the `worktree_set` gotcha below. If this session never completed Step 4 (PR-branch checkout + `worktree_set`) — e.g. it is a chip or cloud session still on its auto-generated `claude/<name>` branch — this loop will never wake: re-arm `bot:ready-for-review`, report the hand-off, and stop instead of entering the loop.
 
 React to each event as it arrives. Handle each event:
 

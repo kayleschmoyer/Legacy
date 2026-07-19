@@ -19,7 +19,7 @@ Unified single-PR remediation. Takes one PR number and drives it toward mergeabl
 
 1. **GitHub auth**: `github_auth_status()` must return `configured: true`. If not, stop and prompt.
 2. **Jira auth** (optional but recommended): `jira_auth_status()` — used to fetch ticket context before applying review fixes.
-3. **Worktree**: you must be in a worktree for the PR's branch. If not, use `worktree_attach({ branch: "<branch>" })` or create one.
+3. **Worktree**: you must be in a worktree for the PR's branch. If not, use `worktree_attach({ branch: "<branch>" })` or create one. This is also what binds PR event notifications to the session: a session spawned on an auto-generated `claude/<name>` branch (chip or launcher worktree) is **not** connected to the PR. Either check out the PR's head branch and call `worktree_set` (see [drive.md Step 4](./drive.md#step-4-enter-worktree-local-only)), or treat the session as fire-and-forget — fix → push → re-arm `bot:ready-for-review` → report — and never end the turn "waiting for the next event": an unbound session is never woken (branch binding is cached at session start — anthropics/claude-code#18690).
 
 ## Workflow
 
@@ -90,7 +90,7 @@ Build a triage list:
 7. **Validate locally**: `make pc` — the whole point is to catch issues before pushing, not after.
 8. **Self-review fix code**: re-read changed files in full and check against `./common-review-patterns.md` before pushing.
 9. **Commit + push once for the round**.
-10. **Wait for CI**: continue to the next workflow step after pushing — Claude Code surfaces CI pass/fail as push notifications, so `github_view_pr` / `ci_view_run` are one-shot lookups (e.g. after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal. See [mcp-first CI Operations](../../mcp-first/SKILL.md#ci-operations).
+10. **Wait for CI**: continue to the next workflow step after pushing — Claude Code surfaces CI pass/fail as push notifications, so `github_view_pr` / `ci_view_run` are one-shot lookups (e.g. after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal. See [mcp-first CI Operations](../../mcp-first/SKILL.md#ci-operations). **Binding caveat**: those notifications only reach a session bound to the PR branch (Prerequisite 3). If this session started on a different branch and never completed the checkout + `worktree_set` binding, do not wait — re-arm `bot:ready-for-review`, report the hand-off, and stop; the next `/sweep-prs` pass (or the PR's author session) owns the next event.
 
 ### Step 4: Final Verification
 

@@ -11,6 +11,7 @@ This skill is the single reference point for a cloud agent session that has been
 
 Before responding to any event:
 
+0. **Confirm this session can actually receive the _next_ event** — PR events route only to a session bound to the PR's head branch: it started on that branch, or checked it out and called `worktree_set` ([drive.md Step 4](drive.md#step-4-enter-worktree-local-only)). A fix session on an auto-generated `claude/<name>` branch that pushes to the PR branch by refspec is **not** bound — for it, "keep watching" (precondition 5) does not apply: after acting, re-arm `bot:ready-for-review`, report the hand-off explicitly, and stop rather than waiting for an event that will never arrive. Branch binding is cached at session start (anthropics/claude-code#18690), so a mid-session checkout without `worktree_set` does not re-bind.
 1. **Identify the event type** — the incoming notification tells you whether this is a check failure, a review comment, a PR comment update, or a status change. Start there, not with logs.
 2. **Identify the check or actor** — the check name or comment author determines which triage branch to follow.
 3. **Read state once, act once** — use `github_view_pr` and `github_get_review_threads` as one-shot lookups. Do not call them in a loop. See Critical Rule #11 in [pr-lifecycle](../SKILL.md).
