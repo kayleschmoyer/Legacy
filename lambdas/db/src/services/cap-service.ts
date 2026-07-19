@@ -10,6 +10,35 @@ import { and, eq, inArray, notInArray, sql, sum } from 'drizzle-orm';
 
 import { UserInputError } from '../schema/graphql-errors';
 
+// ── fetchTradeDisplaySalaries ──────────────────────────────────────────────
+
+/**
+ * Resolve per-player salaries for trade-card display within a single league.
+ *
+ * Returns a map of playerId → salary (dollars) when the league has a salary
+ * cap enabled, mirroring the authoritative source used when a trade is accepted
+ * (`player_salaries`, with a `minSalary` fallback for players lacking a record).
+ * Returns an empty map when the cap is disabled, so callers surface no salary
+ * context for non-cap leagues.
+ */
+export async function fetchTradeDisplaySalaries(
+  db: GenericDatabase<typeof PublicSchema>,
+  leagueId: number,
+  playerIds: number[],
+): Promise<Map<number, number>> {
+  if (playerIds.length === 0) return new Map();
+  const [league] = await db
+    .select({
+      salaryCapEnabled: PublicSchema.leagues.salaryCapEnabled,
+      minSalary: PublicSchema.leagues.minSalary,
+    })
+    .from(PublicSchema.leagues)
+    .where(eq(PublicSchema.leagues.id, leagueId))
+    .limit(1);
+  if (!league?.salaryCapEnabled) return new Map();
+  return fetchPlayerSalaries(db, leagueId, playerIds, league.minSalary);
+}
+
 // ── computeTeamPayroll ─────────────────────────────────────────────────────
 
 /**

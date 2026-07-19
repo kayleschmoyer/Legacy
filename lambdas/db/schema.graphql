@@ -4487,6 +4487,11 @@ type TradeOfferPlayer {
   playerId: Int
   playerName: String
   playerPosition: String
+
+  """
+  This player's salary (dollars) in a salary-cap league — the authoritative cap hit used when the trade is accepted. Null in leagues without a salary cap.
+  """
+  salary: Int
   tradeOfferId: Int
 }
 

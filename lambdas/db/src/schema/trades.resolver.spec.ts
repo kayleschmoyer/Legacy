@@ -154,6 +154,7 @@ describe('Trades Resolver', () => {
       computeTeamPayroll: jest.fn().mockResolvedValue(0),
       computeTeamPayrollExcluding: jest.fn().mockResolvedValue(0),
       fetchPlayerSalaries: jest.fn().mockResolvedValue(new Map()),
+      fetchTradeDisplaySalaries: jest.fn().mockResolvedValue(new Map()),
     }));
 
     // Mock activity-log service

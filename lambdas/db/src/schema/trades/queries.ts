@@ -13,6 +13,7 @@ import { TradeOffer } from './types';
 import { requireAuth, verifyLeagueMembership } from '../authorization';
 import { builder, type Context } from '../builder';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
+import { fetchTradeDisplaySalaries } from '../../services/cap-service';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,29 @@ async function hydrateTrades(
     )
     .where(inArray(PublicSchema.tradeOfferPlayers.tradeOfferId, tradeIds));
 
+  // Resolve per-player cap-hit salaries per league so a salary-cap preview can
+  // be rendered on the trade card (LS-5971). Trades in a single hydrate share a
+  // league in practice, but group by league defensively. `tradeLeagueId` maps
+  // each trade to its league so the correct salary map is consulted below.
+  const tradeLeagueId = new Map<number, number>(
+    rawTrades.map((t) => [t.id, t.leagueId]),
+  );
+  const playerIdsByLeague = new Map<number, Set<number>>();
+  for (const p of rawPlayers) {
+    const leagueId = tradeLeagueId.get(p.tradeOfferId);
+    if (leagueId == null) continue;
+    const set = playerIdsByLeague.get(leagueId) ?? new Set<number>();
+    set.add(p.playerId);
+    playerIdsByLeague.set(leagueId, set);
+  }
+  const salaryByLeague = new Map<number, Map<number, number>>();
+  for (const [leagueId, ids] of playerIdsByLeague) {
+    salaryByLeague.set(
+      leagueId,
+      await fetchTradeDisplaySalaries(context.db, leagueId, [...ids]),
+    );
+  }
+
   // Group players by trade offer id
   const playersByTrade: Record<
     number,
@@ -71,6 +95,7 @@ async function hydrateTrades(
       fromTeamId: number;
       playerName: string;
       playerPosition: string | null;
+      salary: number | null;
     }>
   > = {};
 
@@ -78,6 +103,11 @@ async function hydrateTrades(
     if (!playersByTrade[p.tradeOfferId]) {
       playersByTrade[p.tradeOfferId] = [];
     }
+    const leagueId = tradeLeagueId.get(p.tradeOfferId);
+    const salary =
+      leagueId != null
+        ? (salaryByLeague.get(leagueId)?.get(p.playerId) ?? null)
+        : null;
     playersByTrade[p.tradeOfferId].push({
       id: p.id,
       tradeOfferId: p.tradeOfferId,
@@ -87,6 +117,7 @@ async function hydrateTrades(
       // older rows that predate this column.
       playerName: p.playerName ?? `${p.firstName} ${p.lastName}`.trim(),
       playerPosition: null,
+      salary,
     });
   }
 

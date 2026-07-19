@@ -33,6 +33,7 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
+  DollarSign,
   Filter,
   History,
   MessageSquare,
@@ -56,6 +57,7 @@ import {
   useGetLeagueByIdQuery,
   useGetLeagueTeamsQuery,
   useGetLeagueTradeOffersQuery,
+  useGetTeamByIdQuery,
   useGetTeamMembersLazyQuery,
   useGetTeamTradeOffersQuery,
   useProposeTradeMutation,
@@ -63,6 +65,11 @@ import {
   useVetoTradeMutation,
 } from '@legacy-sports/graphql';
 import { PremiumTradeTools } from './PremiumTradeTools';
+import {
+  computeTradeCapPreview,
+  formatSalary,
+  formatSalaryDelta,
+} from './tradeCapPreview';
 import { Button } from '../../Button';
 import { Dropdown } from '../../Dropdown';
 import { LeagueTradeBlock } from '../matchup/LeagueTradeBlock';
@@ -217,6 +224,12 @@ interface TradeOfferCardProps {
   onCancel?: (id: number) => void;
   onVeto?: (id: number) => void;
   actionLoading?: number | null;
+  /** Whether the league enforces a salary cap (premium). Enables the cap preview. */
+  salaryCapEnabled?: boolean;
+  /** The league's salary cap ceiling in dollars. */
+  salaryCap?: number | null;
+  /** The viewing team's current total payroll in dollars, for the over-cap warning. */
+  viewerCurrentPayroll?: number | null;
 }
 
 function TradeOfferCard({
@@ -229,6 +242,9 @@ function TradeOfferCard({
   onCancel,
   onVeto,
   actionLoading,
+  salaryCapEnabled = false,
+  salaryCap,
+  viewerCurrentPayroll,
 }: TradeOfferCardProps) {
   const badge = statusBadge(trade.status ?? 'pending');
   const isIncoming =
@@ -243,6 +259,17 @@ function TradeOfferCard({
   const requestingPlayers = (trade.players ?? []).filter(
     (p) => p.fromTeamId === trade.receivingTeamId,
   );
+
+  // Salary-cap preview (LS-5971): in a cap-enabled league, show the salary the
+  // viewing team takes on / sheds and warn when accepting would exceed the cap.
+  const capPreview = salaryCapEnabled
+    ? computeTradeCapPreview({
+        players: trade.players ?? [],
+        viewerTeamId: userTeamId,
+        salaryCap,
+        currentPayroll: viewerCurrentPayroll,
+      })
+    : null;
 
   const isLoading = actionLoading === trade.id;
 
@@ -466,6 +493,86 @@ function TradeOfferCard({
           />
           <Text fontSize="$2" color="$textMuted" fontStyle="italic" flex={1}>
             "{trade.message}"
+          </Text>
+        </XStack>
+      )}
+
+      {/* Salary-cap preview — per-side salary delta + over-cap warning (LS-5971) */}
+      {capPreview && (
+        <YStack
+          data-testid={`trade-cap-preview-${trade.id}`}
+          borderTopWidth={1}
+          borderTopColor="$outlineSubtle"
+          paddingHorizontal="$3"
+          paddingVertical="$2"
+          gap="$1.5"
+        >
+          <XStack alignItems="center" justifyContent="space-between" gap="$2">
+            <XStack alignItems="center" gap="$1.5">
+              <DollarSign size={12} color="$textMuted" />
+              <Text fontSize="$1" color="$textMuted" fontWeight="600">
+                You take on
+              </Text>
+              <Text
+                fontSize="$2"
+                color="$color"
+                fontWeight="700"
+                fontVariant={['tabular-nums']}
+              >
+                {formatSalary(capPreview.incomingSalary)}
+              </Text>
+              <Text fontSize="$1" color="$textMuted" fontWeight="600">
+                · shed
+              </Text>
+              <Text
+                fontSize="$2"
+                color="$color"
+                fontWeight="700"
+                fontVariant={['tabular-nums']}
+              >
+                {formatSalary(capPreview.outgoingSalary)}
+              </Text>
+            </XStack>
+            <XStack alignItems="center" gap="$1.5">
+              <Text fontSize="$1" color="$textMuted" fontWeight="600">
+                Net
+              </Text>
+              <Text
+                fontSize="$2"
+                color={
+                  capPreview.netSalaryDelta > 0
+                    ? '$red11'
+                    : capPreview.netSalaryDelta < 0
+                      ? '$green11'
+                      : '$textMuted'
+                }
+                fontWeight="700"
+                fontVariant={['tabular-nums']}
+              >
+                {formatSalaryDelta(capPreview.netSalaryDelta)}
+              </Text>
+            </XStack>
+          </XStack>
+        </YStack>
+      )}
+
+      {/* Over-cap warning — accepting would exceed the league salary cap */}
+      {capPreview?.exceedsCap && (
+        <XStack
+          data-testid={`trade-cap-warning-${trade.id}`}
+          backgroundColor="$red2"
+          borderTopWidth={1}
+          borderTopColor="$red6"
+          paddingHorizontal="$3"
+          paddingVertical="$2"
+          gap="$1.5"
+          alignItems="center"
+        >
+          <AlertTriangle size={12} color="$red11" />
+          <Text color="$red11" fontSize="$2" flex={1}>
+            This trade would put your team {formatSalary(capPreview.overCapBy)}{' '}
+            over the salary cap
+            {salaryCap != null ? ` (cap: ${formatSalary(salaryCap)})` : ''}.
           </Text>
         </XStack>
       )}
@@ -1350,6 +1457,19 @@ export function TradingCenter({
     return currentWeekNumber >= tradeDeadlineWeek;
   }, [leagueData]);
 
+  // Salary-cap settings drive the TradeOfferCard cap preview (LS-5971).
+  const salaryCapEnabled = leagueData?.league?.salaryCapEnabled ?? false;
+  const salaryCap = leagueData?.league?.salaryCap ?? null;
+
+  // The viewer's current payroll powers the over-cap warning. Only fetched for
+  // cap-enabled leagues; skipped otherwise so non-premium leagues pay no cost.
+  const { data: viewerTeamData } = useGetTeamByIdQuery({
+    variables: { teamId: userTeamId },
+    fetchPolicy: 'cache-and-network',
+    skip: !salaryCapEnabled,
+  });
+  const viewerCurrentPayroll = viewerTeamData?.team?.totalPayroll ?? null;
+
   // Pending trades for the user's team
   const {
     data: pendingData,
@@ -1716,6 +1836,9 @@ export function TradingCenter({
                 )
               }
               actionLoading={actionLoading}
+              salaryCapEnabled={salaryCapEnabled}
+              salaryCap={salaryCap}
+              viewerCurrentPayroll={viewerCurrentPayroll}
             />
           ))
         )}
@@ -1779,6 +1902,9 @@ export function TradingCenter({
                 )
               }
               actionLoading={actionLoading}
+              salaryCapEnabled={salaryCapEnabled}
+              salaryCap={salaryCap}
+              viewerCurrentPayroll={viewerCurrentPayroll}
             />
           ))
         )}
@@ -2021,6 +2147,9 @@ export function TradingCenter({
                         : undefined
                     }
                     actionLoading={actionLoading}
+                    salaryCapEnabled={salaryCapEnabled}
+                    salaryCap={salaryCap}
+                    viewerCurrentPayroll={viewerCurrentPayroll}
                   />
                 ))}
                 {hasMoreHistory && (

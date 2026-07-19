@@ -4450,6 +4450,8 @@ export type TradeOfferPlayer = {
   playerId?: Maybe<Scalars['Int']['output']>;
   playerName?: Maybe<Scalars['String']['output']>;
   playerPosition?: Maybe<Scalars['String']['output']>;
+  /** This player's salary (dollars) in a salary-cap league — the authoritative cap hit used when the trade is accepted. Null in leagues without a salary cap. */
+  salary?: Maybe<Scalars['Int']['output']>;
   tradeOfferId?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -12729,6 +12731,7 @@ export type TradeOfferPlayerFragment = {
   fromTeamId?: number | null;
   playerName?: string | null;
   playerPosition?: string | null;
+  salary?: number | null;
 };
 
 export type TradeOfferFragment = {
@@ -12754,6 +12757,7 @@ export type TradeOfferFragment = {
     fromTeamId?: number | null;
     playerName?: string | null;
     playerPosition?: string | null;
+    salary?: number | null;
   }> | null;
 };
 
@@ -12789,6 +12793,7 @@ export type GetTeamTradeOffersQuery = {
       fromTeamId?: number | null;
       playerName?: string | null;
       playerPosition?: string | null;
+      salary?: number | null;
     }> | null;
   }> | null;
 };
@@ -12825,6 +12830,7 @@ export type GetLeagueTradeOffersQuery = {
       fromTeamId?: number | null;
       playerName?: string | null;
       playerPosition?: string | null;
+      salary?: number | null;
     }> | null;
   }> | null;
 };
@@ -12863,6 +12869,7 @@ export type ProposeTradeMutation = {
       fromTeamId?: number | null;
       playerName?: string | null;
       playerPosition?: string | null;
+      salary?: number | null;
     }> | null;
   } | null;
 };
@@ -12896,6 +12903,7 @@ export type AcceptTradeMutation = {
       fromTeamId?: number | null;
       playerName?: string | null;
       playerPosition?: string | null;
+      salary?: number | null;
     }> | null;
   } | null;
 };
@@ -12929,6 +12937,7 @@ export type RejectTradeMutation = {
       fromTeamId?: number | null;
       playerName?: string | null;
       playerPosition?: string | null;
+      salary?: number | null;
     }> | null;
   } | null;
 };
@@ -12962,6 +12971,7 @@ export type CancelTradeMutation = {
       fromTeamId?: number | null;
       playerName?: string | null;
       playerPosition?: string | null;
+      salary?: number | null;
     }> | null;
   } | null;
 };
@@ -12995,6 +13005,7 @@ export type VetoTradeMutation = {
       fromTeamId?: number | null;
       playerName?: string | null;
       playerPosition?: string | null;
+      salary?: number | null;
     }> | null;
   } | null;
 };
@@ -14730,6 +14741,7 @@ export const TradeOfferPlayerFragmentDoc = gql`
     fromTeamId
     playerName
     playerPosition
+    salary
   }
 `;
 export const TradeOfferFragmentDoc = gql`

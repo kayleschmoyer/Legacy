@@ -60,10 +60,16 @@ let mockLeagueByIdReturn: {
         league: {
           tradeDeadlineWeek?: number | null;
           currentWeekNumber?: number | null;
+          salaryCapEnabled?: boolean | null;
+          salaryCap?: number | null;
         };
       }
     | undefined;
 };
+
+let mockViewerTeamReturn: {
+  data: { team: { totalPayroll?: number | null } | null } | undefined;
+} = { data: undefined };
 
 let mockProposeTradeFn: jest.Mock;
 
@@ -81,6 +87,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   ),
   useGetLeagueTradeOffersQuery: jest.fn(() => mockLeagueTradesReturn),
   useGetLeagueTeamsQuery: jest.fn(() => mockLeagueTeamsReturn),
+  useGetTeamByIdQuery: jest.fn(() => mockViewerTeamReturn),
   useGetTeamMembersLazyQuery: jest.fn(() => [
     mockLoadProposerRoster,
     mockProposerRosterReturn,
@@ -516,6 +523,128 @@ describe('TradingCenter — stale player detection', () => {
 
     // Should NOT have fetched roster (not an incoming offer for this user)
     expect(mockLoadProposerRoster).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Salary-cap awareness (LS-5971 / BLD-038)
+// ---------------------------------------------------------------------------
+
+describe('TradingCenter — salary-cap awareness', () => {
+  // Incoming offer where the viewer receives a $2,000,000 player (from the
+  // proposing team) and sends a $500,000 player (from their own team).
+  const capOffer = makeOffer({
+    id: 700,
+    players: [
+      {
+        __typename: 'TradeOfferPlayer' as const,
+        id: 1,
+        tradeOfferId: 700,
+        playerId: 100,
+        fromTeamId: PROPOSING_TEAM_ID,
+        playerName: 'Mike Trout',
+        playerPosition: 'CF',
+        salary: 2000000,
+      },
+      {
+        __typename: 'TradeOfferPlayer' as const,
+        id: 2,
+        tradeOfferId: 700,
+        playerId: 200,
+        fromTeamId: USER_TEAM_ID,
+        playerName: 'Utility Guy',
+        playerPosition: '2B',
+        salary: 500000,
+      },
+    ],
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProposerRosterReturn = { data: undefined };
+    mockLeagueTradesReturn = {
+      data: undefined,
+      loading: false,
+      refetch: jest.fn(),
+    };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockViewerTeamReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
+    setPendingOffers([capOffer]);
+    // Roster still contains the offered player so no stale warning interferes.
+    setProposerRoster([100]);
+  });
+
+  it('does not render the cap preview when the league has no salary cap', async () => {
+    mockLeagueByIdReturn = { data: { league: { salaryCapEnabled: false } } };
+
+    const { findByText, queryByTestId } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    // Card renders (player visible) but no cap preview.
+    await findByText('Mike Trout');
+    expect(queryByTestId('trade-cap-preview-700')).toBeNull();
+  });
+
+  it('renders the salary delta preview when the league has a salary cap', async () => {
+    mockLeagueByIdReturn = {
+      data: { league: { salaryCapEnabled: true, salaryCap: 50000000 } },
+    };
+    mockViewerTeamReturn = { data: { team: { totalPayroll: 10000000 } } };
+
+    const { findByTestId, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(await findByTestId('trade-cap-preview-700')).toBeTruthy();
+    // Incoming $2,000,000 and net +$1,500,000 appear.
+    expect(getByText('$2,000,000')).toBeTruthy();
+    expect(getByText('+$1,500,000')).toBeTruthy();
+  });
+
+  it('warns when accepting the trade would exceed the salary cap', async () => {
+    // Cap 11,000,000; payroll 10,000,000 → cap space 1,000,000. Net +1,500,000
+    // pushes payroll to 11,500,000, i.e. 500,000 over the cap.
+    mockLeagueByIdReturn = {
+      data: { league: { salaryCapEnabled: true, salaryCap: 11000000 } },
+    };
+    mockViewerTeamReturn = { data: { team: { totalPayroll: 10000000 } } };
+
+    const { findByTestId, getByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    expect(await findByTestId('trade-cap-warning-700')).toBeTruthy();
+    expect(getByText(/over the salary cap/i)).toBeTruthy();
+  });
+
+  it('does not warn when the trade stays within the cap', async () => {
+    mockLeagueByIdReturn = {
+      data: { league: { salaryCapEnabled: true, salaryCap: 50000000 } },
+    };
+    mockViewerTeamReturn = { data: { team: { totalPayroll: 10000000 } } };
+
+    const { findByTestId, queryByTestId } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByTestId('trade-cap-preview-700');
+    expect(queryByTestId('trade-cap-warning-700')).toBeNull();
+  });
+
+  it('shows the salary delta but no over-cap warning when payroll is unknown', async () => {
+    mockLeagueByIdReturn = {
+      data: { league: { salaryCapEnabled: true, salaryCap: 11000000 } },
+    };
+    mockViewerTeamReturn = { data: undefined };
+
+    const { findByTestId, queryByTestId } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    await findByTestId('trade-cap-preview-700');
+    expect(queryByTestId('trade-cap-warning-700')).toBeNull();
   });
 });
 

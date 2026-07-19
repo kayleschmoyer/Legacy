@@ -18,6 +18,7 @@ import {
   computeTeamPayroll,
   computeTeamPayrollExcluding,
   fetchPlayerSalaries,
+  fetchTradeDisplaySalaries,
 } from '../../services/cap-service';
 import { builder, type Context } from '../builder';
 import { insertActivityLog } from '../../services/activity-log';
@@ -85,6 +86,14 @@ async function enrichTrade(tradeId: number, context: Context) {
     )
     .where(eq(PublicSchema.tradeOfferPlayers.tradeOfferId, tradeId));
 
+  // Cap-hit salaries for the salary-cap trade preview (LS-5971) — empty map in
+  // leagues without a cap, so `salary` stays null there.
+  const salaryMap = await fetchTradeDisplaySalaries(
+    context.db,
+    trade.leagueId,
+    rawPlayers.map((p) => p.playerId),
+  );
+
   return {
     ...trade,
     // Use snapshot captured at proposal time; fall back to current name for
@@ -107,6 +116,7 @@ async function enrichTrade(tradeId: number, context: Context) {
         fromTeamId: p.fromTeamId,
         playerName: p.playerName ?? `${p.firstName} ${p.lastName}`.trim(),
         playerPosition: null,
+        salary: salaryMap.get(p.playerId) ?? null,
       }),
     ),
   };

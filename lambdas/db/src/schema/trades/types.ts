@@ -15,6 +15,7 @@ export const TradeOfferPlayer = builder.objectRef<{
   fromTeamId: number;
   playerName?: string | null;
   playerPosition?: string | null;
+  salary?: number | null;
 }>('TradeOfferPlayer');
 
 TradeOfferPlayer.implement({
@@ -31,6 +32,14 @@ TradeOfferPlayer.implement({
     playerPosition: t.string({
       nullable: true,
       resolve: (parent) => parent.playerPosition ?? null,
+    }),
+    salary: t.int({
+      nullable: true,
+      description:
+        "This player's salary (dollars) in a salary-cap league — the " +
+        'authoritative cap hit used when the trade is accepted. Null in ' +
+        'leagues without a salary cap.',
+      resolve: (parent) => parent.salary ?? null,
     }),
   }),
 });
@@ -64,6 +73,7 @@ export const TradeOffer = builder.objectRef<{
     fromTeamId: number;
     playerName?: string | null;
     playerPosition?: string | null;
+    salary?: number | null;
   }>;
 }>('TradeOffer');
 

@@ -5,6 +5,7 @@ fragment TradeOfferPlayer on TradeOfferPlayer {
   fromTeamId
   playerName
   playerPosition
+  salary
 }
 
 fragment TradeOffer on TradeOffer {
