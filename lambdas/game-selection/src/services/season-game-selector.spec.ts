@@ -730,6 +730,89 @@ describe('season-game-selector', () => {
       );
     });
 
+    it('skips gracefully when the matchup is deleted before scores can be persisted (LS-8427)', async () => {
+      // Reproduces the race where the matchup is deleted between the initial
+      // existence check at the top of selectGamesForMatchup and the later
+      // updateMatchupScore call in the all-cached path. updateMatchupScore
+      // throws `Matchup ${matchupId} not found` when its UPDATE matches zero
+      // rows; the function must treat this as a non-retriable skip (like the
+      // whole-matchup case in LS-8145 and the matchup_player case in
+      // LS-8244) instead of throwing and failing the batch.
+      jest.clearAllMocks();
+      mockGetMatchupPlayerGameStats.mockResolvedValue([]);
+      mockGetScoringMultipliersForLeague.mockResolvedValue({
+        batting: {},
+        pitching: {},
+        fielding: {},
+      });
+      mockCalculateMatchupScore.mockReturnValue({
+        matchupId: 1,
+        team1Score: { totalScore: 12.5, gamesSelected: 2 },
+        team2Score: { totalScore: 9.0, gamesSelected: 2 },
+        gamesPerMatchup: 2,
+      });
+      mockUpdateMatchupScore.mockRejectedValue(
+        new Error('Matchup 1 not found'),
+      );
+
+      let selectIndex = 0;
+      const mockUpdateSet = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+      const mockUpdate = jest.fn().mockReturnValue({ set: mockUpdateSet });
+
+      const selectResults = [
+        [
+          {
+            id: 1,
+            leagueId: 10,
+            weekNumber: 2,
+            team1Id: 5,
+            team2Id: 6,
+            pitcherStartsPerMatchup: 1,
+            gamesPerMatchup: 2,
+          },
+        ],
+        [{ sport: 'baseball' }],
+        [{ id: 200, playerId: 99, matchupId: 1 }],
+        [{ playerId: 99, season: 2020 }],
+        [],
+        [{ gameNum: 1, matchupPlayerId: 200 }],
+      ];
+
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue(result),
+                then: (cb: (rows: unknown[]) => unknown) =>
+                  Promise.resolve(cb(result)),
+                ...result,
+              }),
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue(result),
+              }),
+            }),
+          };
+        }),
+        update: mockUpdate,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+      } as unknown as PublicDb;
+
+      const { playersNeedingStatsLoading } = await selectGamesForMatchup(
+        mockDb,
+        1,
+        1,
+      );
+
+      expect(playersNeedingStatsLoading).toHaveLength(0);
+      expect(mockUpdateMatchupScore).toHaveBeenCalledWith(mockDb, 1, 12.5, 9.0);
+    });
+
     it('skips a player when the insert fails with matchup_player FK violation (LS-8244)', async () => {
       // Reproduces the race condition where a matchup_player row is deleted
       // (via waiver/trade) between the initial SELECT and the INSERT into

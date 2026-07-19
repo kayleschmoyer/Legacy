@@ -178,6 +178,23 @@ async function computeAndPersistMatchupScores(
       },
     );
   } catch (err) {
+    // The matchup can be deleted concurrently between the existence check at
+    // the top of selectGamesForMatchup and this later write (the same class of
+    // race already handled non-retriably for the whole-matchup case in
+    // LS-8145 and the matchup_player case in LS-8244). updateMatchupScore
+    // throws a plain Error with this exact message when its UPDATE matches
+    // zero rows — treat it as a graceful skip rather than failing the batch
+    // and spamming Rollbar (LS-8427).
+    if (
+      err instanceof Error &&
+      err.message === `Matchup ${matchupId} not found`
+    ) {
+      LOGGER.warn(
+        `Matchup ${matchupId} was deleted before scores could be persisted — skipping (LS-8427)`,
+      );
+      return;
+    }
+
     LOGGER.error(
       `Failed to calculate scores for matchup ${matchupId} (all-cached path)`,
       err instanceof Error ? err : new Error(String(err)),
