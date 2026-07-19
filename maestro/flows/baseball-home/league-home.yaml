@@ -16,14 +16,22 @@ tags:
         id: "home-hero-card"
     commands:
       - takeScreenshot: maestro/artifacts/baseball-home/02-hero-card
+# Core navigation (LS-8446): the baseball sport card is a static element of the
+# home sport-switcher (below the fold), so reveal it with scrollUntilVisible —
+# Maestro tapOn does not auto-scroll — then tapping it and landing on the
+# baseball home screen are mandatory. A broken switcher fails the flow loudly
+# instead of emitting a home-screen screenshot mislabelled as baseball home.
+- scrollUntilVisible:
+    element:
+      id: "sport-card-title-baseball"
+    direction: DOWN
+    timeout: 15000
 - tapOn:
     id: "sport-card-title-baseball"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "baseball-home-screen"
     timeout: 20000
-    optional: true
 - takeScreenshot: maestro/artifacts/baseball-home/03-baseball-home
 - tapOn: "Leagues"
 - extendedWaitUntil:

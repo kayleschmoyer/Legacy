@@ -19,11 +19,12 @@ tags:
       - takeScreenshot: maestro/artifacts/live-draft-board/02-before-open-draft
       - tapOn:
           id: "draft-status-chip"
+      # Inside the draft-exists guard, landing on the board is mandatory
+      # (LS-8446): tapping the chip must open the draft board or the flow fails.
       - extendedWaitUntil:
           visible:
             id: "elite-draft-board-screen"
           timeout: 30000
-          optional: true
       - takeScreenshot: maestro/artifacts/live-draft-board/03-after-open-draft-board
       - scroll
       - takeScreenshot: maestro/artifacts/live-draft-board/04-draft-board-scrolled

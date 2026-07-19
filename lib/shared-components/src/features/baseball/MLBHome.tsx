@@ -101,6 +101,12 @@ export interface MLBHomeProps {
   onSwitchSport?: (sport: 'football') => void;
   /** Called when a non-premium viewer tries to enable a premium-gated feature in the dialog. */
   onUpgrade?: () => void;
+  /**
+   * Optional testID applied to the screen root (every render state), used as a
+   * mandatory navigation-landing anchor by the native Maestro baseball-home flow
+   * (LS-8446). Web callers omit it.
+   */
+  testID?: string;
 }
 
 interface LeagueBadge {
@@ -279,6 +285,7 @@ export function MLBHome({
   isPremium,
   onSwitchSport,
   onUpgrade,
+  testID,
 }: MLBHomeProps) {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -387,6 +394,7 @@ export function MLBHome({
   if (loading) {
     return (
       <YStack
+        testID={testID}
         flex={1}
         backgroundColor="$background"
         alignItems="center"
@@ -399,7 +407,7 @@ export function MLBHome({
   }
 
   return (
-    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView testID={testID} contentContainerStyle={{ flexGrow: 1 }}>
       <YStack
         backgroundColor="$background"
         flexGrow={1}

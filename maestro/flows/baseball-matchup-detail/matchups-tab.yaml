@@ -9,11 +9,14 @@ tags:
 - runFlow:
     file: ../../subflows/open-first-league.yaml
 - tapOn: "Matchups"
+# Mandatory landing (LS-8446): the matchup-list container renders on the Matchups
+# tab regardless of matchup data (pre-season shows an empty-state message inside
+# the same container), so a broken tab fails the flow. The matchup-CARD drill-in
+# below stays when:-guarded because card presence is genuinely data-dependent.
 - extendedWaitUntil:
     visible:
       id: "matchup-list"
     timeout: 20000
-    optional: true # pre-season leagues have no matchups yet
 - takeScreenshot: maestro/artifacts/baseball-matchup-detail/01-matchups-tab
 - runFlow:
     when:

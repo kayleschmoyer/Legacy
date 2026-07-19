@@ -32,11 +32,16 @@ export default function DraftBoardPage() {
   }
 
   return (
-    <EliteDraftBoardScreen
-      leagueId={leagueId}
-      onNavigate={(path) => router.navigate(path as Href)}
-      websocketUrl={websocketUrl}
-    />
+    // Mandatory navigation-landing anchor for the Maestro live-draft-board flow
+    // (LS-8446): a stable container present across every draft state so tapping
+    // the draft-status chip fails the flow loudly if the board never mounts.
+    <YStack flex={1} testID="elite-draft-board-screen">
+      <EliteDraftBoardScreen
+        leagueId={leagueId}
+        onNavigate={(path) => router.navigate(path as Href)}
+        websocketUrl={websocketUrl}
+      />
+    </YStack>
   );
 }
 export { ScreenErrorBoundary as ErrorBoundary } from './_screenErrorBoundary';

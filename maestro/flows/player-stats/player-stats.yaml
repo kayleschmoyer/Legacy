@@ -7,9 +7,12 @@ tags:
 - runFlow:
     file: ../../subflows/launch-authenticated.yaml
 - tapOn: "Players"
+# Mandatory landing (LS-8446): anchor on the real segmented-control testID
+# (players-segment-control) so a broken Players tab fails the flow rather than
+# asserting against a non-existent id.
 - extendedWaitUntil:
     visible:
-      id: "players-segment"
+      id: "players-segment-control"
     timeout: 20000
 - takeScreenshot: maestro/artifacts/player-stats/01-players-tab
 - tapOn:

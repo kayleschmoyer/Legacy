@@ -187,7 +187,12 @@ export default function BaseballHome() {
 
   return (
     <>
+      {/* testID="baseball-home-screen" is the mandatory navigation-landing anchor
+          for the Maestro baseball-home flow (LS-8446): passed through to MLBHome's
+          root so a broken switcher fails the flow instead of emitting a blank
+          screenshot. */}
       <MLBHome
+        testID="baseball-home-screen"
         leagues={leagues}
         loading={loadingLeagues}
         error={leaguesLoadFailed}

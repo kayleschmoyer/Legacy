@@ -531,7 +531,15 @@ export default function LeagueId(): React.JSX.Element {
       )}
 
       {visitedTabs.has('matchups') && (
-        <YStack flex={1} display={selectedTab === 'matchups' ? 'flex' : 'none'}>
+        <YStack
+          flex={1}
+          display={selectedTab === 'matchups' ? 'flex' : 'none'}
+          // Mandatory navigation-landing anchor for the Maestro matchups flow
+          // (LS-8446). On the Matchups tab regardless of matchup data (pre-season
+          // included), so a broken tab fails the flow instead of emitting an
+          // empty screenshot; the matchup-card drill-in stays when:-guarded.
+          testID="matchup-list"
+        >
           <MatchupList
             matchups={matchups}
             loading={matchupsLoading}
