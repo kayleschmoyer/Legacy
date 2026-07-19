@@ -33,7 +33,13 @@ setNotificationHandler({
     }),
 });
 
-type NotificationData = {
+// Sport prefixes that may be interpolated into a navigation path. `sport`
+// arrives from an untrusted notification payload, so anything outside this
+// allowlist (e.g. '../../') falls back to the default sport rather than being
+// placed into the route.
+const ALLOWED_SPORT_PREFIXES: readonly string[] = ['baseball', 'football'];
+
+export type NotificationData = {
   notificationType?: string;
   leagueId?: number;
   matchupId?: number;
@@ -221,12 +227,13 @@ function isNotificationData(value: unknown): value is NotificationData {
   return true;
 }
 
-function navigateFromNotification(
+export function navigateFromNotification(
   router: ReturnType<typeof useRouter>,
   data: NotificationData,
 ) {
   const { notificationType, leagueId, matchupId, tradeOfferId, sport } = data;
-  const sportPrefix = sport ?? 'baseball';
+  const sportPrefix =
+    sport && ALLOWED_SPORT_PREFIXES.includes(sport) ? sport : 'baseball';
 
   if (
     (notificationType === 'DRAFT_STARTED' ||

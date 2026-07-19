@@ -1,5 +1,5 @@
 import type { NotificationResponse } from 'expo-notifications';
-import { renderHook } from '@testing-library/react-native';
+import { renderHook, waitFor } from '@testing-library/react-native';
 
 // ── Import under test (after mocks) ──────────────────────────────────────────
 
@@ -57,11 +57,14 @@ jest.mock('@legacy-sports/logging', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeResponse(data: Record<string, unknown>): NotificationResponse {
+function makeResponse(
+  data: Record<string, unknown>,
+  identifier = 'test-id',
+): NotificationResponse {
   return {
     notification: {
       request: {
-        identifier: 'test-id',
+        identifier,
         content: {
           data,
           title: 'Test',
@@ -103,8 +106,24 @@ function setupListeners() {
   renderHook(() => usePushNotifications(1));
 
   return {
-    tap: (data: Record<string, unknown>) => tapHandler?.(makeResponse(data)),
+    tap: (data: Record<string, unknown>, identifier?: string) =>
+      tapHandler?.(makeResponse(data, identifier)),
   };
+}
+
+/**
+ * Renders the hook with a pending cold-start response so the mount-time
+ * `getLastNotificationResponseAsync` branch drives navigation. Returns a
+ * promise that resolves once the async cold-start handling has run.
+ */
+async function setupColdStart(data: Record<string, unknown>) {
+  jest
+    .mocked(expoNotifications.getLastNotificationResponseAsync)
+    .mockResolvedValue(makeResponse(data));
+
+  renderHook(() => usePushNotifications(1));
+
+  await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -207,5 +226,43 @@ describe('usePushNotifications — navigateFromNotification', () => {
     tap({ notificationType: 'UNKNOWN_TYPE' });
 
     expect(mockNavigate).toHaveBeenCalledWith('/notifications');
+  });
+});
+
+describe('usePushNotifications — cold-start tap routing', () => {
+  it('routes from the notification that cold-started the app', async () => {
+    await setupColdStart({
+      notificationType: 'TRADE_OFFER',
+      leagueId: 7,
+      tradeOfferId: 42,
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/TradeCenterPage',
+      params: { leagueId: '7', tradeOfferId: '42' },
+    });
+  });
+});
+
+describe('usePushNotifications — tap deduplication', () => {
+  it('navigates only once when the same notification is delivered twice', () => {
+    const { tap } = setupListeners();
+
+    const data = { notificationType: 'DRAFT_STARTED', leagueId: 3 };
+    tap(data, 'dup-id');
+    tap(data, 'dup-id');
+
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates again for a distinct notification id', () => {
+    const { tap } = setupListeners();
+
+    tap({ notificationType: 'DRAFT_STARTED', leagueId: 3 }, 'id-1');
+    tap({ notificationType: 'DRAFT_STARTED', leagueId: 4 }, 'id-2');
+
+    expect(mockNavigate).toHaveBeenCalledTimes(2);
+    expect(mockNavigate).toHaveBeenNthCalledWith(1, '/baseball/league/3');
+    expect(mockNavigate).toHaveBeenNthCalledWith(2, '/baseball/league/4');
   });
 });
