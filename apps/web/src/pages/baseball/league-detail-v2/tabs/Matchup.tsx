@@ -77,19 +77,45 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   const myMatchup = useMemo(() => {
     if (!matchups || matchups.length === 0) return null;
     if (myTeamId) {
-      const found = matchups.find(
-        (m) => m?.team1Id === myTeamId || m?.team2Id === myTeamId,
+      // The user has a team in this league — only ever show *their* matchup.
+      // Do not fall back to matchups[0]: that would silently show a
+      // stranger's matchup with no indication (LS-5902).
+      return (
+        matchups.find(
+          (m) => m?.team1Id === myTeamId || m?.team2Id === myTeamId,
+        ) ?? null
       );
-      if (found) return found;
     }
+    // Observer mode (no team in this league): defaulting to the first
+    // matchup is the intended browsing experience.
     return matchups[0];
   }, [matchups, myTeamId]);
 
+  const [browseMatchupId, setBrowseMatchupId] = useState<number | null>(null);
+  // Discard a browsed matchup selection whenever the viewed week changes —
+  // it belongs to the week it was picked in, not the next one.
+  useEffect(() => {
+    setBrowseMatchupId(null);
+  }, [week]);
+
+  // True when the user has a team in this league, isn't viewing an explicit
+  // matchup link, hasn't chosen to browse another matchup, and their team
+  // isn't playing this week (bye or a dropped team) — matchups exist for the
+  // week, just not one with `myTeamId` in it.
+  const isMyTeamOnByeThisWeek =
+    !initialMatchupId &&
+    browseMatchupId == null &&
+    Boolean(myTeamId) &&
+    matchups.length > 0 &&
+    myMatchup == null;
+
   const matchupId = initialMatchupId
     ? parseInt(initialMatchupId, 10)
-    : myMatchup?.id != null
-      ? Number(myMatchup.id)
-      : null;
+    : browseMatchupId != null
+      ? browseMatchupId
+      : myMatchup?.id != null
+        ? Number(myMatchup.id)
+        : null;
 
   const {
     matchup,
@@ -170,7 +196,11 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
   const percentComplete =
     totalGames > 0 ? Math.round((gamesPlayed / totalGames) * 100) : 0;
 
-  const hasNoMatchup = !matchupLoading && !matchupError && matchupId == null;
+  const hasNoMatchup =
+    !matchupLoading &&
+    !matchupError &&
+    matchupId == null &&
+    !isMyTeamOnByeThisWeek;
 
   if (matchupLoading && !matchup) {
     return (
@@ -207,6 +237,82 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
         <strong>Failed to load matchup.</strong>
         <div style={{ fontSize: 13, marginTop: 4, color: 'var(--fg2)' }}>
           {matchupError.message}
+        </div>
+      </div>
+    );
+  }
+
+  if (isMyTeamOnByeThisWeek) {
+    return (
+      <div
+        data-testid="matchup-bye"
+        style={{
+          padding: 32,
+          borderRadius: 8,
+          background: 'var(--surface2)',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg1)' }}>
+          Your team is on a bye this week
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--fg3)', maxWidth: 320 }}>
+          Browse other matchups below.
+        </div>
+        <button
+          type="button"
+          data-testid="bye-next-week"
+          onClick={() => setWeek((w) => w + 1)}
+          style={{
+            marginTop: 4,
+            padding: '6px 16px',
+            borderRadius: 6,
+            background: 'transparent',
+            color: 'var(--fg1)',
+            border: '1px solid var(--surfacePanelBorder, currentColor)',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: 13,
+          }}
+        >
+          Jump to next week
+        </button>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            width: '100%',
+            maxWidth: 360,
+            marginTop: 8,
+          }}
+        >
+          {matchups.map((m) =>
+            m ? (
+              <button
+                key={m.id}
+                type="button"
+                data-testid="bye-browse-matchup"
+                onClick={() => setBrowseMatchupId(Number(m.id))}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 6,
+                  background: 'var(--surface1, transparent)',
+                  color: 'var(--fg1)',
+                  border: '1px solid var(--surfacePanelBorder, currentColor)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  textAlign: 'left',
+                }}
+              >
+                {m.team1?.name ?? 'Team 1'} vs {m.team2?.name ?? 'Team 2'}
+              </button>
+            ) : null,
+          )}
         </div>
       </div>
     );

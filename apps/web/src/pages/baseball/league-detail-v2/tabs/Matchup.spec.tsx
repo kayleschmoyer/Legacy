@@ -10,6 +10,8 @@
  *   6. Commissioner shortcut: "Go to Commissioner tab" button shown to commissioners.
  *   7. Schedule card: rendered when matchup has startTime / endTime.
  *   8. Schedule card: NOT rendered when matchup has no startTime / endTime.
+ *   9. Bye/no-team empty state (LS-5902): shown instead of a stranger's
+ *      matchup when the user's team isn't in this week's matchups.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -27,9 +29,15 @@ const mockUseMatchupById = jest.fn<
   [number | null]
 >();
 
+const mockUseMatchupsByWeek = jest.fn<
+  { matchups: object[]; refetch: jest.Mock },
+  [number | null, number | null]
+>();
+
 jest.mock('../../../../hooks/useMatchup', () => ({
   useCurrentWeek: () => ({ currentWeek: 1 }),
-  useMatchupsByWeek: () => ({ matchups: [], refetch: jest.fn() }),
+  useMatchupsByWeek: (leagueId: number | null, week: number | null) =>
+    mockUseMatchupsByWeek(leagueId, week),
   useMatchupById: (matchupId: number | null) => mockUseMatchupById(matchupId),
 }));
 jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
@@ -113,6 +121,7 @@ function renderTab(
     onCommish?: jest.Mock;
     /** Pass null to test the no-matchup state (matchupId=null path). */
     initialMatchupId?: string | null;
+    myTeamId?: number | null;
   } = {},
 ) {
   const initialMatchupId =
@@ -120,7 +129,7 @@ function renderTab(
   return render(
     <MatchupTab
       league={{ ...baseLeague, ...leagueOverrides }}
-      myTeamId={10}
+      myTeamId={'myTeamId' in extra ? (extra.myTeamId ?? null) : 10}
       initialMatchupId={initialMatchupId ?? null}
       onTeam={jest.fn()}
       isCommissioner={extra.isCommissioner}
@@ -136,6 +145,7 @@ beforeEach(() => {
     error: null,
     refetch: jest.fn(),
   });
+  mockUseMatchupsByWeek.mockReturnValue({ matchups: [], refetch: jest.fn() });
 });
 
 describe('MatchupTab — football-awareness', () => {
@@ -283,5 +293,81 @@ describe('MatchupTab — schedule card', () => {
     expect(
       screen.queryByTestId('matchup-schedule-card'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchupTab — bye / no-team-in-week empty state (LS-5902)', () => {
+  const strangerMatchup = {
+    ...baseMatchup,
+    id: 2,
+    team1Id: 30,
+    team2Id: 40,
+    team1: { id: 30, name: 'Charlie' },
+    team2: { id: 40, name: 'Delta' },
+  };
+
+  beforeEach(() => {
+    mockUseMatchupsByWeek.mockReturnValue({
+      matchups: [strangerMatchup],
+      refetch: jest.fn(),
+    });
+    mockUseMatchupById.mockReturnValue({
+      matchup: null,
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+  });
+
+  it('shows the bye empty state instead of a stranger matchup when the user has no team this week', () => {
+    renderTab({}, { initialMatchupId: null, myTeamId: 10 });
+    expect(screen.getByTestId('matchup-bye')).toBeInTheDocument();
+    expect(
+      screen.getByText('Your team is on a bye this week'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Browse other matchups below.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('matchup-empty')).not.toBeInTheDocument();
+  });
+
+  it('does not show the bye empty state when an explicit matchup id is requested', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: strangerMatchup,
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab({}, { initialMatchupId: '2', myTeamId: 10 });
+    expect(screen.queryByTestId('matchup-bye')).not.toBeInTheDocument();
+  });
+
+  it('does not show the bye empty state for observer-mode users (no team)', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: strangerMatchup,
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab({}, { initialMatchupId: null, myTeamId: null });
+    expect(screen.queryByTestId('matchup-bye')).not.toBeInTheDocument();
+  });
+
+  it('lets the user browse another matchup from the bye empty state', () => {
+    renderTab({}, { initialMatchupId: null, myTeamId: 10 });
+    mockUseMatchupById.mockReturnValue({
+      matchup: strangerMatchup,
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    fireEvent.click(screen.getByTestId('bye-browse-matchup'));
+    expect(mockUseMatchupById).toHaveBeenLastCalledWith(2);
+  });
+
+  it('jumps to the next week from the bye empty state', () => {
+    renderTab({}, { initialMatchupId: null, myTeamId: 10 });
+    fireEvent.click(screen.getByTestId('bye-next-week'));
+    expect(mockUseMatchupsByWeek).toHaveBeenLastCalledWith(1, 2);
   });
 });
