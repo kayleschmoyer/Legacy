@@ -1,4 +1,5 @@
 import type { PublicDb } from '@legacy-sports/db-client';
+import { getTableName, type Table } from 'drizzle-orm';
 import { loadFootballCareerStats } from './load-football-career-stats';
 
 // Mock pfr-client at the package level
@@ -105,10 +106,11 @@ function makeDb(
     position: 'QB',
     sport: 'football',
   },
-): PublicDb {
+): PublicDb & { upserted: Record<string, unknown[]> } {
   const upserted: Record<string, unknown[]> = {};
 
   return {
+    upserted,
     select: () => ({
       from: () => ({
         where: () => Promise.resolve([player]),
@@ -119,10 +121,10 @@ function makeDb(
         where: () => Promise.resolve([]),
       }),
     }),
-    insert: (table: { _: { name: string } }) => ({
+    insert: (table: Table) => ({
       values: (row: unknown) => ({
         onConflictDoUpdate: () => {
-          const name = table._?.name ?? 'unknown';
+          const name = getTableName(table);
           if (!upserted[name]) upserted[name] = [];
           upserted[name].push(row);
           return Promise.resolve();
@@ -132,7 +134,7 @@ function makeDb(
     // The loader stamps players.stats_last_fetched_at via db.execute after a
     // successful load; record the call so tests can assert it happened.
     execute: (...args: unknown[]): unknown => mockDbExecute(...args),
-  } as unknown as PublicDb;
+  } as unknown as PublicDb & { upserted: Record<string, unknown[]> };
 }
 
 describe('loadFootballCareerStats — stat-group routing', () => {
@@ -397,6 +399,165 @@ describe('loadFootballCareerStats — stat-group routing', () => {
 
     expect(result.groupsUpserted).toContain('passing');
     expect(result.groupsUpserted).not.toContain('rushing');
+  });
+
+  it('persists each parsed season row to football_season_passing (LS-8513)', async () => {
+    const db = makeDb({
+      id: 1,
+      pfrId: 'TestQb00',
+      isDst: false,
+      nflTeam: null,
+      position: 'QB',
+      sport: 'football',
+    });
+    mockCareerGetAllSeasonTotals.mockResolvedValue([PASSING_SEASON]);
+
+    await loadFootballCareerStats(db, 1, 2024);
+
+    expect(db.upserted['football_season_passing']).toEqual([
+      {
+        playerId: 1,
+        season: 2024,
+        team: 'KAN',
+        pfrRowId: '1',
+        g: 17,
+        cmp: 380,
+        att: 560,
+        yds: 4200,
+        td: 32,
+        int: 10,
+        rating: '97.5',
+      },
+    ]);
+    // Career aggregate is still written alongside the season rows.
+    expect(db.upserted['career_football_passing']).toHaveLength(1);
+  });
+
+  it('persists season rows for every stat group present on a season (LS-8513)', async () => {
+    const db = makeDb({
+      id: 1,
+      pfrId: 'TestRb00',
+      isDst: false,
+      nflTeam: null,
+      position: 'RB',
+      sport: 'football',
+    });
+    const rushing = {
+      playerId: 1,
+      season: 2023,
+      team: 'DET',
+      pfrRowId: 'r1',
+      g: 16,
+      att: 250,
+      yds: 1100,
+      td: 12,
+      fumbles: 2,
+    };
+    const receiving = {
+      playerId: 1,
+      season: 2023,
+      team: 'DET',
+      pfrRowId: 'r1',
+      g: 16,
+      rec: 45,
+      tgt: 60,
+      yds: 380,
+      td: 3,
+      fumbles: 0,
+    };
+    mockCareerGetAllSeasonTotals.mockResolvedValue([
+      { passing: null, rushing, receiving, kicking: null },
+    ]);
+
+    await loadFootballCareerStats(db, 1, 2024);
+
+    expect(db.upserted['football_season_rushing']).toEqual([
+      {
+        playerId: 1,
+        season: 2023,
+        team: 'DET',
+        pfrRowId: 'r1',
+        g: 16,
+        att: 250,
+        yds: 1100,
+        td: 12,
+        fumbles: 2,
+      },
+    ]);
+    expect(db.upserted['football_season_receiving']).toEqual([
+      {
+        playerId: 1,
+        season: 2023,
+        team: 'DET',
+        pfrRowId: 'r1',
+        g: 16,
+        rec: 45,
+        tgt: 60,
+        yds: 380,
+        td: 3,
+        fumbles: 0,
+      },
+    ]);
+  });
+
+  it('persists kicking season rows (LS-8513)', async () => {
+    const db = makeDb({
+      id: 1,
+      pfrId: 'TestKk00',
+      isDst: false,
+      nflTeam: null,
+      position: 'K',
+      sport: 'football',
+    });
+    const kicking = {
+      playerId: 1,
+      season: 2024,
+      team: 'BAL',
+      pfrRowId: 'k1',
+      g: 17,
+      fgm: 30,
+      fga: 34,
+      xpm: 40,
+      xpa: 41,
+    };
+    mockCareerGetAllSeasonTotals.mockResolvedValue([
+      { passing: null, rushing: null, receiving: null, kicking },
+    ]);
+
+    await loadFootballCareerStats(db, 1, 2024);
+
+    expect(db.upserted['football_season_kicking']).toEqual([
+      {
+        playerId: 1,
+        season: 2024,
+        team: 'BAL',
+        pfrRowId: 'k1',
+        g: 17,
+        fgm: 30,
+        fga: 34,
+        xpm: 40,
+        xpa: 41,
+      },
+    ]);
+  });
+
+  it('writes no season rows when the main page has no data (LS-8513)', async () => {
+    const db = makeDb({
+      id: 1,
+      pfrId: 'TestWr00',
+      isDst: false,
+      nflTeam: null,
+      position: 'WR',
+      sport: 'football',
+    });
+    mockCareerGetAllSeasonTotals.mockResolvedValue([NO_SEASON_TOTALS]);
+
+    await loadFootballCareerStats(db, 1, 2024);
+
+    expect(db.upserted['football_season_passing']).toBeUndefined();
+    expect(db.upserted['football_season_rushing']).toBeUndefined();
+    expect(db.upserted['football_season_receiving']).toBeUndefined();
+    expect(db.upserted['football_season_kicking']).toBeUndefined();
   });
 
   it('returns empty groupsUpserted when all season fetches return null', async () => {

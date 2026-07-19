@@ -340,6 +340,105 @@ async function upsertCareerDefense(
     });
 }
 
+async function upsertSeasonPassing(
+  db: PublicDb,
+  row: typeof PublicSchema.footballSeasonPassing.$inferInsert,
+): Promise<void> {
+  await db
+    .insert(PublicSchema.footballSeasonPassing)
+    .values(row)
+    .onConflictDoUpdate({
+      target: [
+        PublicSchema.footballSeasonPassing.playerId,
+        PublicSchema.footballSeasonPassing.season,
+        PublicSchema.footballSeasonPassing.team,
+        PublicSchema.footballSeasonPassing.pfrRowId,
+      ],
+      set: {
+        g: sql`excluded.g`,
+        cmp: sql`excluded.cmp`,
+        att: sql`excluded.att`,
+        yds: sql`excluded.yds`,
+        td: sql`excluded.td`,
+        int: sql`excluded.int`,
+        rating: sql`excluded.rating`,
+      },
+    });
+}
+
+async function upsertSeasonRushing(
+  db: PublicDb,
+  row: typeof PublicSchema.footballSeasonRushing.$inferInsert,
+): Promise<void> {
+  await db
+    .insert(PublicSchema.footballSeasonRushing)
+    .values(row)
+    .onConflictDoUpdate({
+      target: [
+        PublicSchema.footballSeasonRushing.playerId,
+        PublicSchema.footballSeasonRushing.season,
+        PublicSchema.footballSeasonRushing.team,
+        PublicSchema.footballSeasonRushing.pfrRowId,
+      ],
+      set: {
+        g: sql`excluded.g`,
+        att: sql`excluded.att`,
+        yds: sql`excluded.yds`,
+        td: sql`excluded.td`,
+        fumbles: sql`excluded.fumbles`,
+      },
+    });
+}
+
+async function upsertSeasonReceiving(
+  db: PublicDb,
+  row: typeof PublicSchema.footballSeasonReceiving.$inferInsert,
+): Promise<void> {
+  await db
+    .insert(PublicSchema.footballSeasonReceiving)
+    .values(row)
+    .onConflictDoUpdate({
+      target: [
+        PublicSchema.footballSeasonReceiving.playerId,
+        PublicSchema.footballSeasonReceiving.season,
+        PublicSchema.footballSeasonReceiving.team,
+        PublicSchema.footballSeasonReceiving.pfrRowId,
+      ],
+      set: {
+        g: sql`excluded.g`,
+        rec: sql`excluded.rec`,
+        tgt: sql`excluded.tgt`,
+        yds: sql`excluded.yds`,
+        td: sql`excluded.td`,
+        fumbles: sql`excluded.fumbles`,
+      },
+    });
+}
+
+async function upsertSeasonKicking(
+  db: PublicDb,
+  row: typeof PublicSchema.footballSeasonKicking.$inferInsert,
+): Promise<void> {
+  await db
+    .insert(PublicSchema.footballSeasonKicking)
+    .values(row)
+    .onConflictDoUpdate({
+      target: [
+        PublicSchema.footballSeasonKicking.playerId,
+        PublicSchema.footballSeasonKicking.season,
+        PublicSchema.footballSeasonKicking.team,
+        PublicSchema.footballSeasonKicking.pfrRowId,
+      ],
+      set: {
+        g: sql`excluded.g`,
+        fgm: sql`excluded.fgm`,
+        fga: sql`excluded.fga`,
+        xpm: sql`excluded.xpm`,
+        xpa: sql`excluded.xpa`,
+      },
+    });
+}
+
 async function upsertSeasonDefenseIdp(
   db: PublicDb,
   row: typeof PublicSchema.footballSeasonDefenseIdp.$inferInsert,
@@ -570,11 +669,74 @@ async function loadFootballCareerStatsInner(
   const receivingSeasons: FootballSeasonReceiving[] = [];
   const kickingSeasons: FootballSeasonKicking[] = [];
 
+  // Persist each parsed season row (LS-8513) — previously these were only
+  // aggregated into career totals and the season detail was discarded,
+  // leaving football_season_* empty. Mirrors upsertSeasonDefenseIdp on the
+  // IDP path and the season-level persistence in the baseball loader.
   for (const totals of allSeasonTotals) {
-    if (totals.passing) passingSeasons.push(totals.passing);
-    if (totals.rushing) rushingSeasons.push(totals.rushing);
-    if (totals.receiving) receivingSeasons.push(totals.receiving);
-    if (totals.kicking) kickingSeasons.push(totals.kicking);
+    if (totals.passing) {
+      passingSeasons.push(totals.passing);
+      const s = totals.passing;
+      await upsertSeasonPassing(db, {
+        playerId,
+        season: s.season,
+        team: s.team,
+        pfrRowId: s.pfrRowId,
+        g: s.g,
+        cmp: s.cmp,
+        att: s.att,
+        yds: s.yds,
+        td: s.td,
+        int: s.int,
+        rating: s.rating !== null ? String(s.rating) : null,
+      });
+    }
+    if (totals.rushing) {
+      rushingSeasons.push(totals.rushing);
+      const s = totals.rushing;
+      await upsertSeasonRushing(db, {
+        playerId,
+        season: s.season,
+        team: s.team,
+        pfrRowId: s.pfrRowId,
+        g: s.g,
+        att: s.att,
+        yds: s.yds,
+        td: s.td,
+        fumbles: s.fumbles,
+      });
+    }
+    if (totals.receiving) {
+      receivingSeasons.push(totals.receiving);
+      const s = totals.receiving;
+      await upsertSeasonReceiving(db, {
+        playerId,
+        season: s.season,
+        team: s.team,
+        pfrRowId: s.pfrRowId,
+        g: s.g,
+        rec: s.rec,
+        tgt: s.tgt,
+        yds: s.yds,
+        td: s.td,
+        fumbles: s.fumbles,
+      });
+    }
+    if (totals.kicking) {
+      kickingSeasons.push(totals.kicking);
+      const s = totals.kicking;
+      await upsertSeasonKicking(db, {
+        playerId,
+        season: s.season,
+        team: s.team,
+        pfrRowId: s.pfrRowId,
+        g: s.g,
+        fgm: s.fgm,
+        fga: s.fga,
+        xpm: s.xpm,
+        xpa: s.xpa,
+      });
+    }
   }
 
   const careerPassing = aggregatePassingSeasons(passingSeasons, playerId);
