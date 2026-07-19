@@ -205,8 +205,13 @@ export function MatchupNavigationControls({
   // empty state — instead of being silently skipped.
   const minWeek = availableWeeks[0] ?? 1;
   const maxWeek = availableWeeks[availableWeeks.length - 1] ?? 1;
-  const canGoPrev = selectedWeek > minWeek;
-  const canGoNext = selectedWeek < maxWeek;
+  // allMatchups may still be loading (e.g. fetched separately from
+  // currentMatchup) — block stepping until it arrives so we never advance
+  // selectedWeek past a week we have no matchup data for, which would leave
+  // a stale matchupId in the route. See LS-5889.
+  const hasMatchupData = allMatchups.length > 0;
+  const canGoPrev = hasMatchupData && selectedWeek > minWeek;
+  const canGoNext = hasMatchupData && selectedWeek < maxWeek;
   const totalWeeks = maxWeek - minWeek + 1;
   const isCurrentWeek = selectedWeek === currentLeagueWeek;
   const isFutureWeek =

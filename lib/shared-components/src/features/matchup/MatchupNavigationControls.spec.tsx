@@ -102,3 +102,36 @@ describe('MatchupNavigationControls — week stepping (LS-5887)', () => {
     expect(onMatchupChange).not.toHaveBeenCalled();
   });
 });
+
+describe('MatchupNavigationControls — blocks stepping while allMatchups is empty (LS-5889)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupMocks();
+  });
+
+  it('disables Prev/Next and does not advance the week when allMatchups has not loaded yet', () => {
+    const onMatchupChange = jest.fn();
+    render(
+      <MatchupNavigationControls
+        currentMatchup={WEEK2_MATCHUP}
+        leagueId={10}
+        allMatchups={[]}
+        onMatchupChange={onMatchupChange}
+      />,
+    );
+
+    expect(screen.getByText('Week 2')).toBeTruthy();
+
+    const nextButton = screen.getByLabelText('Next week');
+    const prevButton = screen.getByLabelText('Previous week');
+    expect(nextButton.getAttribute('tabIndex')).toBe('-1');
+    expect(prevButton.getAttribute('tabIndex')).toBe('-1');
+
+    fireEvent.click(nextButton);
+    fireEvent.click(prevButton);
+
+    // Week is unchanged and no stale matchupId was ever selected.
+    expect(screen.getByText('Week 2')).toBeTruthy();
+    expect(onMatchupChange).not.toHaveBeenCalled();
+  });
+});
