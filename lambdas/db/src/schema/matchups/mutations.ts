@@ -26,6 +26,7 @@ import {
   verifyCommissionerAccess,
 } from '../authorization';
 import { MatchupService } from '../../services/matchup-service';
+import { writeAuditLog } from '../commissioner-tools';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -182,8 +183,15 @@ builder.mutationField('updateMatchupStatus', (t) =>
 /**
  * Helper: Verify that the calling user owns the team in this matchup.
  * Returns the matchup row so callers can check status.
+ *
+ * Exported (LS-5897) only so the `isCommissionerBypass`/audit-log behavior
+ * can be exercised directly by `commissioner-bypass-audit.db.spec.ts` —
+ * mirrors the existing `performMatchupPlayerPositionSwap` export in this
+ * file. This function was module-private before LS-5897 with no callers
+ * outside this file, so exporting it and adding `isCommissionerBypass` to
+ * its return shape has no impact on existing consumers — there are none.
  */
-async function verifyMatchupTeamOwnership(
+export async function verifyMatchupTeamOwnership(
   context: Context,
   matchupPlayerId: number,
 ): Promise<{
@@ -200,6 +208,13 @@ async function verifyMatchupTeamOwnership(
     weekNumber: number;
     status: string;
   };
+  /**
+   * True when the caller does not own `matchupPlayer.teamId` and is only
+   * permitted to edit it via the commissioner/GM/assistant_manager bypass
+   * (LS-5897 / BMD-027). Callers use this to audit-log and notify the
+   * affected team owner on writes that go through this path.
+   */
+  isCommissionerBypass: boolean;
 }> {
   if (!context.user) {
     throw AuthenticationError();
@@ -270,7 +285,87 @@ async function verifyMatchupTeamOwnership(
     throw ForbiddenError('You can only modify your own team roster');
   }
 
-  return { matchupPlayer, matchup };
+  const isCommissionerBypass =
+    isCommissioner && memberResult[0].teamId !== matchupPlayer.teamId;
+
+  return { matchupPlayer, matchup, isCommissionerBypass };
+}
+
+/**
+ * Audit-log and notify the affected team's GM when a commissioner/GM/
+ * assistant_manager edits a roster slot on a team they don't own
+ * (LS-5897 / BMD-027). Never throws — failures are logged and swallowed so
+ * the underlying roster edit, which has already succeeded, is not rolled
+ * back by a notification/audit failure.
+ */
+export async function auditAndNotifyCommissionerBypass(
+  context: Context,
+  params: {
+    leagueId: number;
+    targetTeamId: number;
+    matchupPlayerId: number;
+    playerId: number;
+    before: { positionId: number | null };
+    after: { positionId: number | null };
+  },
+): Promise<void> {
+  if (!context.user) return;
+
+  const { leagueId, targetTeamId, matchupPlayerId, playerId, before, after } =
+    params;
+
+  await writeAuditLog(context.db, {
+    leagueId,
+    userId: context.user.id,
+    action: 'lineup_modified_by_admin',
+    targetType: 'matchup_player',
+    targetId: matchupPlayerId,
+    details: { targetTeamId, playerId, before, after },
+  });
+
+  LOGGER.info('Commissioner bypass: modified roster slot on another team', {
+    leagueId,
+    targetTeamId,
+    matchupPlayerId,
+    playerId,
+    commissionerId: context.user.id,
+  });
+
+  if (!context.notificationPublisher) return;
+
+  try {
+    const owners = await context.db
+      .select({ userId: PublicSchema.leagueMembers.userId })
+      .from(PublicSchema.leagueMembers)
+      .where(
+        and(
+          eq(PublicSchema.leagueMembers.leagueId, leagueId),
+          eq(PublicSchema.leagueMembers.teamId, targetTeamId),
+          eq(PublicSchema.leagueMembers.permissionLevel, 'general_manager'),
+        ),
+      );
+
+    const ownerUserIds = owners
+      .map((o) => o.userId)
+      .filter((userId) => userId !== context.user?.id);
+
+    if (ownerUserIds.length > 0) {
+      await context.notificationPublisher.publishToMany(ownerUserIds, {
+        notificationType: 'LINEUP_MODIFIED_BY_ADMIN',
+        title: 'Roster Edited by League Manager',
+        body: 'A league manager modified your roster.',
+        data: { leagueId, targetTeamId, matchupPlayerId, playerId },
+      });
+    }
+  } catch (pushErr) {
+    const error =
+      pushErr instanceof Error ? pushErr : new Error(String(pushErr));
+    LOGGER.warn(
+      'Failed to send commissioner-bypass roster edit notification (non-fatal)',
+      error,
+      { leagueId, targetTeamId, matchupPlayerId },
+    );
+  }
 }
 
 // Mutation: updateMatchupPlayerPosition
@@ -283,10 +378,8 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
       positionId: t.arg.int({ required: false }),
     },
     resolve: async (_parent, args, context) => {
-      const { matchup } = await verifyMatchupTeamOwnership(
-        context,
-        args.matchupPlayerId,
-      );
+      const { matchup, matchupPlayer, isCommissionerBypass } =
+        await verifyMatchupTeamOwnership(context, args.matchupPlayerId);
 
       // Only allow edits when matchup is scheduled (not yet locked)
       if (matchup.status !== 'scheduled') {
@@ -341,6 +434,17 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
 
       if (updated.length === 0) {
         throw new Error('Failed to update matchup player position');
+      }
+
+      if (isCommissionerBypass) {
+        await auditAndNotifyCommissionerBypass(context, {
+          leagueId: matchup.leagueId,
+          targetTeamId: matchupPlayer.teamId,
+          matchupPlayerId: updated[0].id,
+          playerId: updated[0].playerId,
+          before: { positionId: matchupPlayer.positionId },
+          after: { positionId: updated[0].positionId ?? null },
+        });
       }
 
       // Resolve season for response
@@ -519,10 +623,16 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
         args;
 
       // Verify ownership of both players
-      const { matchup: matchupA, matchupPlayer: playerA } =
-        await verifyMatchupTeamOwnership(context, matchupPlayerIdA);
-      const { matchup: matchupB, matchupPlayer: playerB } =
-        await verifyMatchupTeamOwnership(context, matchupPlayerIdB);
+      const {
+        matchup: matchupA,
+        matchupPlayer: playerA,
+        isCommissionerBypass: isBypassA,
+      } = await verifyMatchupTeamOwnership(context, matchupPlayerIdA);
+      const {
+        matchup: matchupB,
+        matchupPlayer: playerB,
+        isCommissionerBypass: isBypassB,
+      } = await verifyMatchupTeamOwnership(context, matchupPlayerIdB);
 
       if (matchupA.id !== matchupB.id) {
         throw UserInputError('Both players must be in the same matchup');
@@ -546,6 +656,27 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
         matchupPlayerIdB,
         positionIdB: positionIdB ?? null,
       });
+
+      if (isBypassA) {
+        await auditAndNotifyCommissionerBypass(context, {
+          leagueId: matchupA.leagueId,
+          targetTeamId: playerA.teamId,
+          matchupPlayerId: results[0].id,
+          playerId: results[0].playerId,
+          before: { positionId: playerA.positionId },
+          after: { positionId: results[0].positionId ?? null },
+        });
+      }
+      if (isBypassB) {
+        await auditAndNotifyCommissionerBypass(context, {
+          leagueId: matchupB.leagueId,
+          targetTeamId: playerB.teamId,
+          matchupPlayerId: results[1].id,
+          playerId: results[1].playerId,
+          before: { positionId: playerB.positionId },
+          after: { positionId: results[1].positionId ?? null },
+        });
+      }
 
       // Resolve seasons for response
       const seasonsResults = await db

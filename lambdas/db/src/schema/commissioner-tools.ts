@@ -34,7 +34,7 @@ import { addPlayerToRoster } from '../services/roster-service';
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 /** Insert a row into commissioner_audit_log. Never throws — errors are logged. */
-async function writeAuditLog(
+export async function writeAuditLog(
   db: Parameters<typeof verifyCommissionerAccess>[0],
   params: {
     leagueId: number;
@@ -57,10 +57,8 @@ async function writeAuditLog(
       reason: params.reason ?? null,
     });
   } catch (err) {
-    LOGGER.error('Failed to write commissioner audit log', {
-      params,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    const error = err instanceof Error ? err : new Error(String(err));
+    LOGGER.error('Failed to write commissioner audit log', error, { params });
   }
 }
 
