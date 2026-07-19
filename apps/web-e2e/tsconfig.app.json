@@ -8,6 +8,7 @@
     "playwright.config.ts",
     "playwright.integration.config.ts",
     "playwright.native.config.ts",
+    "playwright.contract.config.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.js",

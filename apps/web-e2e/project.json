@@ -48,12 +48,26 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsx --test apps/web-e2e/src/integration/**/*.test.ts"
+        "command": "tsx --test apps/web-e2e/src/**/*.test.ts"
       },
       "configurations": {
         "full": {
           "command": "playwright test"
         }
+      }
+    },
+    "contract": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --config=playwright.contract.config.ts --project=web-driver-contract",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "contract:native": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "playwright test --config=playwright.contract.config.ts --project=native-driver-contract",
+        "cwd": "{projectRoot}"
       }
     },
     "integration": {
