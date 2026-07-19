@@ -8,7 +8,13 @@ import {
   expect,
 } from './auth-enhanced';
 import { test as leagueDataBase } from './auth';
-import { DraftPage, LeaguePage, PlayersPage } from '../pages';
+import {
+  DiscordCallbackScreen,
+  DraftPage,
+  LeaguePage,
+  PlayersPage,
+  ProfileSettingsScreen,
+} from '../pages';
 import { NavHeader } from '../components';
 import { PlaywrightWebDriver } from '../driver';
 
@@ -33,6 +39,10 @@ export interface PageObjectFixtures {
   draftPage: DraftPage;
   leaguePage: LeaguePage;
   playersPage: PlayersPage;
+  /** The Discord OAuth callback screen (/auth/discord/callback). */
+  discordCallbackScreen: DiscordCallbackScreen;
+  /** The Profile Settings screen (/profile/settings) — the callback redirect target. */
+  profileSettingsScreen: ProfileSettingsScreen;
   /**
    * The persistent header / nav bar. A component (not a page object) composed
    * here scoped to the `banner` landmark — present on every authenticated
@@ -67,6 +77,18 @@ const pageObjects = {
     use: (pageObject: PlayersPage) => Promise<void>,
   ) => {
     await use(new PlayersPage(new PlaywrightWebDriver(page)));
+  },
+  discordCallbackScreen: async (
+    { page }: { page: Page },
+    use: (pageObject: DiscordCallbackScreen) => Promise<void>,
+  ) => {
+    await use(new DiscordCallbackScreen(new PlaywrightWebDriver(page)));
+  },
+  profileSettingsScreen: async (
+    { page }: { page: Page },
+    use: (pageObject: ProfileSettingsScreen) => Promise<void>,
+  ) => {
+    await use(new ProfileSettingsScreen(new PlaywrightWebDriver(page)));
   },
   navHeader: async (
     { page }: { page: Page },
