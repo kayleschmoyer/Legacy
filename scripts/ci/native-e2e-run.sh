@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Native (Android/Appium) E2E runner — LS-8450 / ADR-0016 native blueprint step 4.
+#
+# Invoked by `.github/workflows/e2e-native-android.yml` inside
+# reactivecircus/android-emulator-runner's `script:` block (emulator already
+# booted, adb on PATH, node/pnpm/node_modules ready from prior job steps).
+#
+# Kept as a single bash file invoked with `bash <path>` because the
+# emulator-runner splits inline multi-line `script:` blocks across separate
+# `sh -c` calls, breaking if/then/fi and background-process continuity (LS-4755,
+# same reason as scripts/ci/android-boot-smoke.sh).
+#
+# It exports the native harness env the shared suite gates on
+# (E2E_NATIVE_APP + Appium coordinates — see apps/web-e2e/src/driver/appium-env.ts),
+# starts an Appium (UiAutomator2) server, and runs the ONE proof flow
+# (login → league list) through the existing native `AppDriver` seam. Appium
+# installs + launches the APK itself via the `appium:app` capability that
+# createAndroidSession() derives from E2E_NATIVE_APP. A non-zero exit reddens
+# the job = the "watched" red check.
+set -uo pipefail
+
+ARTIFACT_DIR="${ARTIFACT_DIR:-./artifacts}"
+APPIUM_PORT="${APPIUM_PORT:-4723}"
+APPIUM_LOG="${APPIUM_LOG:-$ARTIFACT_DIR/appium.log}"
+PW_CONFIG="apps/web-e2e/playwright.native.config.ts"
+# The single "login → league list" proof flow (bypass build lands authenticated,
+# then the shared LeaguePage drives the league-discovery / list surface).
+PROOF_SPEC="league-discovery-search.dual.spec.ts"
+
+mkdir -p "$ARTIFACT_DIR"
+
+# ── 1. Locate the bypass APK and export the native harness env ────────
+APK=$(ls "$ARTIFACT_DIR"/*.apk 2>/dev/null | head -1 || true)
+if [ -z "$APK" ] || [ ! -f "$APK" ]; then
+  echo "❌ No APK found in $ARTIFACT_DIR/"
+  ls -la "$ARTIFACT_DIR/" || true
+  exit 1
+fi
+# appium-env.ts treats the presence of E2E_NATIVE_APP as the "emulator harness
+# configured" signal; createAndroidSession installs it via appium:app.
+export E2E_NATIVE_APP
+E2E_NATIVE_APP="$(readlink -f "$APK")"
+export E2E_NATIVE_APP_PACKAGE="${E2E_NATIVE_APP_PACKAGE:-com.legacysports.app}"
+export APPIUM_HOST="127.0.0.1"
+export APPIUM_PORT
+echo "🔧 Native harness APK: $E2E_NATIVE_APP"
+
+# ── 2. Start Appium (UiAutomator2) ────────────────────────────────────
+echo "🔌 Ensuring Appium UiAutomator2 driver is installed"
+pnpm exec appium driver install uiautomator2 2>/dev/null \
+  || pnpm exec appium driver list --installed || true
+
+echo "🚀 Starting Appium server on port $APPIUM_PORT (log: $APPIUM_LOG)"
+pnpm exec appium --address 127.0.0.1 --port "$APPIUM_PORT" \
+  --relaxed-security --log-timestamp --log "$APPIUM_LOG" &
+APPIUM_PID=$!
+trap 'kill "$APPIUM_PID" 2>/dev/null || true' EXIT
+
+echo "⏳ Waiting for Appium to become ready..."
+READY=""
+for _ in $(seq 1 60); do
+  if curl -sf "http://127.0.0.1:${APPIUM_PORT}/status" >/dev/null 2>&1; then
+    READY="yes"
+    break
+  fi
+  sleep 2
+done
+if [ -z "$READY" ]; then
+  echo "❌ Appium did not become ready within ~120s"
+  echo "=== Appium log ==="
+  cat "$APPIUM_LOG" 2>/dev/null || true
+  exit 1
+fi
+echo "✅ Appium ready"
+
+# ── 3. Run the one proof flow through the native project ──────────────
+echo "🧪 Running native E2E: $PW_CONFIG (--project=native-android, $PROOF_SPEC)"
+pnpm exec playwright test --config="$PW_CONFIG" \
+  --project=native-android "$PROOF_SPEC"
+TEST_EXIT=$?
+
+if [ "$TEST_EXIT" -ne 0 ]; then
+  echo "❌ Native E2E failed (exit $TEST_EXIT)"
+  echo "=== Tail of Appium log ==="
+  tail -100 "$APPIUM_LOG" 2>/dev/null || true
+else
+  echo "✅ Native E2E passed"
+fi
+
+exit "$TEST_EXIT"

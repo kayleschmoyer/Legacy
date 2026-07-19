@@ -1,0 +1,208 @@
+name: E2E Native (Android)
+
+# ADR-0016 §"Native rollout blueprint" step 4 / LS-8450: prove ONE flow
+# (login → league list) on a watched Android-emulator job before generalizing
+# native coverage. This is the emulator-provisioning piece that finally EXECUTES
+# the native scaffold siblings landed — the `AppiumNativeDriver` (LS-8447), the
+# `platform: 'native'` fixture seam (LS-8449), and playwright.native.config.ts —
+# by wiring the fixture's real wdio session (see apps/web-e2e/src/fixtures/dual.ts)
+# to a booted emulator.
+#
+# Schedule-free per the repo CI policy (LS-8487): no cron — manual dispatch plus
+# an automated run after each "Build Android App" on main.
+#
+# ── Auth strategy (AC3) ───────────────────────────────────────────────
+# Real OAuth is not automatable on native (OAuth-only app, LS-6656). The
+# `build-bypass-apk` job builds a release APK with EXPO_PUBLIC_BYPASS_AUTH=true —
+# test-only session injection (apps/app/src/common/auth/AuthHooks.ts): the app
+# cold-launches already authenticated as LOCAL_USER, so THAT injection is the
+# "login" step and the flow then proves the league-list surface renders. The
+# shipped build-android-app.yml release APK leaves the flag unset; bypass throws
+# under NODE_ENV=production so it can never reach a shipped build. Full detail:
+# apps/web-e2e/src/driver/native-emulator-ci.md.
+on:
+  workflow_dispatch: {}
+  workflow_run:
+    workflows: ["Build Android App"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: "17"
+  NODE_VERSION: "22"
+  ANDROID_API_LEVEL: "35"
+  NDK_VERSION: "27.1.12297006"
+  GRADLE_OPTS: >-
+    -Dorg.gradle.internal.http.connectionTimeout=120000
+    -Dorg.gradle.internal.http.socketTimeout=120000
+  NODE_OPTIONS: "--max-old-space-size=2048"
+
+jobs:
+  # ── Build an automatable (bypass) APK ───────────────────────────────
+  build-bypass-apk:
+    name: Build Bypass APK
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    env:
+      # AC3: test-only session injection — the automatable native auth strategy.
+      EXPO_PUBLIC_BYPASS_AUTH: "true"
+      # Backend + integration config (mirrors build-android-app.yml so the
+      # bypass build reaches the real backend to load the league list).
+      EXPO_PUBLIC_OAUTH_PROXY: ${{ secrets.OAUTH_PROXY_URL }}
+      EXPO_PUBLIC_GRAPHQL_HOST: ${{ secrets.GRAPHQL_HOST }}
+      EXPO_PUBLIC_WEBSOCKET_URL: ${{ secrets.WEBSOCKET_URL }}
+      EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
+      EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_MONTHLY_PRICE_ID }}
+      EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_ANNUAL_PRICE_ID }}
+      EXPO_PUBLIC_GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+      EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY: ${{ secrets.GROWTHBOOK_CLIENT_KEY }}
+      EXPO_PUBLIC_APP_BASE_URL: https://legacy-fantasy.com
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Java
+        if: ${{ vars.CI_RUNNER_LABEL == '' }}
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: "temurin"
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: "gradle"
+          cache-dependency-path: |
+            apps/app/app.json
+            pnpm-lock.yaml
+
+      - name: Setup Android SDK
+        if: ${{ vars.CI_RUNNER_LABEL == '' }}
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
+
+      - name: Ensure ANDROID_HOME (self-hosted fallback)
+        if: ${{ vars.CI_RUNNER_LABEL != '' }}
+        shell: bash
+        run: |
+          if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
+            echo "✅ ANDROID_HOME already set: $ANDROID_HOME"
+            exit 0
+          fi
+          SDK_DIR="/opt/android-sdk"
+          if [ ! -d "$SDK_DIR" ]; then
+            echo "❌ ANDROID_HOME unset and $SDK_DIR missing on this runner."
+            exit 1
+          fi
+          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "$SDK_DIR/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$SDK_DIR/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          install-dependencies: true
+          set-nx-shas: false
+          skip-system-deps: true
+          # Appium not needed to build; skip optional deps for a faster build job.
+          include-optional-deps: false
+
+      - name: Build Android APK (bypass release)
+        id: build
+        uses: ./.github/actions/build-android
+        with:
+          build-type: release
+          extra-gradle-flags: "--configuration-cache --configuration-cache-problems=warn"
+        timeout-minutes: 40
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-apk-native-e2e
+          path: apps/app/android/${{ steps.build.outputs.apk-path }}
+          retention-days: 3
+
+  # ── Boot the emulator and run the one proof flow ────────────────────
+  native-e2e:
+    name: Native E2E (Emulator)
+    needs: build-bypass-apk
+    # GH-hosted ubuntu-latest exposes KVM (required by android-emulator-runner);
+    # non-metal self-hosted EC2 does not. Same rationale as build-android-app's
+    # smoke-android job.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Download APK Artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: android-apk-native-e2e
+          path: ./artifacts
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          install-dependencies: true
+          set-nx-shas: false
+          # Appium (optional dep) IS needed here to drive the emulator.
+          include-optional-deps: true
+
+      - name: AVD Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api35-x86_64-google_apis
+
+      - name: Run native E2E on emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          # Match the build's ANDROID_API_LEVEL (35) so the emulator OS equals the
+          # APK's target SDK — no build/device API skew.
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6G
+          force-avd-creation: false
+          emulator-options: -no-window -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect -noaudio -accel on
+          disable-animations: true
+          # Single-command invocation — the action splits multi-line inline
+          # scripts across separate `sh -c` calls (LS-4755).
+          script: bash scripts/ci/native-e2e-run.sh
+
+      - name: Upload E2E Artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: native-e2e-artifacts
+          path: |
+            apps/web-e2e/test-results
+            artifacts/appium.log
+          retention-days: 7
+          if-no-files-found: warn

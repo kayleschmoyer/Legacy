@@ -20,6 +20,7 @@ import {
   createNativeDriver,
   PlaywrightWebDriver,
 } from '../driver';
+import { isNativeEmulatorConfigured } from '../driver/appium-env';
 
 /**
  * Dual-mode fixtures (ADR-0016 §backend seam) — ONE spec, selectable backend.
@@ -165,11 +166,29 @@ export const test = base.extend<
     { page, platform }: { page: Page; platform: PlatformMode },
     use: (driver: AppDriver) => Promise<void>,
   ) => {
-    await use(
-      platform === 'native'
-        ? createNativeDriver()
-        : new PlaywrightWebDriver(page),
-    );
+    if (platform !== 'native') {
+      await use(new PlaywrightWebDriver(page));
+      return;
+    }
+    // Native: drive a real Appium/UiAutomator2 session when an emulator harness
+    // is configured (`E2E_NATIVE_APP` set — the scheduled, watched login →
+    // league-list job of LS-8450). The `webdriverio` runtime is pulled in via a
+    // dynamic import ONLY on this path, so the hermetic web PR-CI collection of
+    // these shared specs never loads wdio (ADR-0016; see appium-session.ts).
+    if (!isNativeEmulatorConfigured()) {
+      // No emulator harness in this environment — inject the capability-only
+      // placeholder so capability-gated specs skip cleanly. An ungated native
+      // interaction throws loudly rather than silently passing.
+      await use(createNativeDriver());
+      return;
+    }
+    const { createAndroidSession } = await import('../driver/appium-session');
+    const { driver, dispose } = await createAndroidSession();
+    try {
+      await use(driver);
+    } finally {
+      await dispose();
+    }
   },
 
   // Page objects — identical instances in both modes (ADR-0015 §5, §6).
