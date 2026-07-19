@@ -34,11 +34,18 @@ const mockUseMatchupsByWeek = jest.fn<
   [number | null, number | null]
 >();
 
+const mockUseMatchupsForLeague = jest.fn<
+  { matchups: Array<{ weekNumber: number }> },
+  [number | null]
+>(() => ({ matchups: [] }));
+
 jest.mock('../../../../hooks/useMatchup', () => ({
   useCurrentWeek: () => ({ currentWeek: 1 }),
   useMatchupsByWeek: (leagueId: number | null, week: number | null) =>
     mockUseMatchupsByWeek(leagueId, week),
   useMatchupById: (matchupId: number | null) => mockUseMatchupById(matchupId),
+  useMatchupsForLeague: (leagueId: number | null) =>
+    mockUseMatchupsForLeague(leagueId),
 }));
 jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
   useLeagueWebSocket: () => undefined,
@@ -146,6 +153,7 @@ beforeEach(() => {
     refetch: jest.fn(),
   });
   mockUseMatchupsByWeek.mockReturnValue({ matchups: [], refetch: jest.fn() });
+  mockUseMatchupsForLeague.mockReturnValue({ matchups: [] });
 });
 
 describe('MatchupTab — football-awareness', () => {
@@ -269,6 +277,35 @@ describe('MatchupTab — games-remaining dots clamping (LS-5882)', () => {
     const overflow = screen.getByTestId('games-dots-overflow');
     expect(overflow).toBeInTheDocument();
     expect(overflow.textContent).toBe('3/100000');
+  });
+});
+
+describe('MatchupTab — week stepper Next-button bound (LS-5888)', () => {
+  it('disables Next once week reaches totalMatchups when totalMatchups is set', () => {
+    renderTab({ totalMatchups: 1, currentWeekNumber: 1 });
+    expect(screen.getByLabelText('Next week')).toBeDisabled();
+  });
+
+  it('falls back to the max week number from allMatchups when totalMatchups is null', () => {
+    mockUseMatchupsForLeague.mockReturnValue({
+      matchups: [{ weekNumber: 1 }, { weekNumber: 3 }, { weekNumber: 2 }],
+    });
+    renderTab({ totalMatchups: null, currentWeekNumber: 3 });
+    expect(screen.getByLabelText('Next week')).toBeDisabled();
+  });
+
+  it('keeps Next enabled when the current week is below the max week fallback', () => {
+    mockUseMatchupsForLeague.mockReturnValue({
+      matchups: [{ weekNumber: 1 }, { weekNumber: 3 }, { weekNumber: 2 }],
+    });
+    renderTab({ totalMatchups: null, currentWeekNumber: 2 });
+    expect(screen.getByLabelText('Next week')).not.toBeDisabled();
+  });
+
+  it('disables Next when totalMatchups is null and no matchups exist yet for the league', () => {
+    mockUseMatchupsForLeague.mockReturnValue({ matchups: [] });
+    renderTab({ totalMatchups: null, currentWeekNumber: 1 });
+    expect(screen.getByLabelText('Next week')).toBeDisabled();
   });
 });
 

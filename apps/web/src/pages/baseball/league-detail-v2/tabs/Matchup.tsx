@@ -15,6 +15,7 @@ import {
   useCurrentWeek,
   useMatchupById,
   useMatchupsByWeek,
+  useMatchupsForLeague,
 } from '../../../../hooks/useMatchup';
 import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
 import { MatchupRosterComparison } from '../../../../features/matchup/MatchupRosterComparison';
@@ -73,6 +74,14 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     league.id ?? null,
     week,
   );
+
+  // Used only as a fallback cap for the week stepper when league.totalMatchups
+  // is null (e.g. mid-rollover state) — see the disabled condition below.
+  const { matchups: allMatchups } = useMatchupsForLeague(league.id ?? null);
+  const maxWeekNumber = useMemo(() => {
+    if (allMatchups.length === 0) return null;
+    return Math.max(...allMatchups.map((m) => m?.weekNumber ?? 0));
+  }, [allMatchups]);
 
   const myMatchup = useMemo(() => {
     if (!matchups || matchups.length === 0) return null;
@@ -384,7 +393,9 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
             disabled={
               league.totalMatchups != null
                 ? week >= league.totalMatchups
-                : !matchups || matchups.length === 0
+                : maxWeekNumber != null
+                  ? week >= maxWeekNumber
+                  : !matchups || matchups.length === 0
             }
             onClick={() => setWeek((w) => w + 1)}
             aria-label="Next week"
