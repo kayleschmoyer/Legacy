@@ -4242,6 +4242,15 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/roster-section.spec.ts": [
+      "apps/web/src/pages/baseball/TeamDetailPage.tsx",
+      "apps/web/src/features/baseball/**",
+      "apps/web/src/constants/**",
+      "apps/web/src/config/**",
+      "apps/web/src/utils/**",
+      "apps/web/src/lib/csrf.ts",
+      "lib/graphql/src/**"
+    ],
     "apps/web-e2e/src/tests/scoreboard.spec.ts": [
       "apps/web/src/pages/scoreboard/**",
       "apps/web/src/components/scoreboard/**",
