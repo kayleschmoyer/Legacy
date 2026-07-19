@@ -188,6 +188,31 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(mockCalculateMatchupWinProbability).toHaveBeenCalledWith(100, 100);
   });
 
+  it('renders a tie-probability hint when the tie probability exceeds 1%', () => {
+    primeProjectionMocks();
+    mockCalculateMatchupWinProbability.mockReturnValue({
+      team1WinProbability: 0.49,
+      team2WinProbability: 0.49,
+      tiesProbability: 0.02,
+      team1ProjectedScore: 100.5,
+      team2ProjectedScore: 100.4,
+      simulationCount: 5000,
+    });
+
+    render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
+
+    expect(screen.getAllByText('49%')).toHaveLength(2);
+    expect(screen.getByText('2% tie')).toBeInTheDocument();
+  });
+
+  it('does not render a tie-probability hint when the tie probability is negligible', () => {
+    primeProjectionMocks();
+
+    render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
+
+    expect(screen.queryByText(/% tie/)).not.toBeInTheDocument();
+  });
+
   it('renders the category breakdown and simulation footnote', () => {
     primeProjectionMocks();
 

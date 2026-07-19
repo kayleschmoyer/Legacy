@@ -44,17 +44,21 @@ export interface MatchupWinProbabilityPanelProps {
 
 function ProbabilityBar({
   team1Prob,
+  team2Prob,
+  tieProb,
   team1Name,
   team2Name,
 }: {
   team1Prob: number;
+  team2Prob: number;
+  tieProb: number;
   team1Name: string;
   team2Name: string;
 }) {
   const t1Pct = Math.round(team1Prob * 100);
-  // Always complement so displayed values sum to exactly 100 (ties are excluded
-  // from the win-probability display).
-  const t2Pct = 100 - t1Pct;
+  const t2Pct = Math.round(team2Prob * 100);
+  const tiePct = Math.round(tieProb * 100);
+  const showTieHint = tieProb > 0.01;
 
   return (
     <YStack gap="$2">
@@ -82,6 +86,11 @@ function ProbabilityBar({
           >
             WIN PROBABILITY
           </Text>
+          {showTieHint && (
+            <Text fontSize="$1" color="$textMuted" opacity={0.8}>
+              {tiePct}% tie
+            </Text>
+          )}
         </YStack>
 
         <YStack alignItems="flex-end">
@@ -391,6 +400,8 @@ export function MatchupWinProbabilityPanel({
         {/* Split probability bar */}
         <ProbabilityBar
           team1Prob={winProb.team1WinProbability}
+          team2Prob={winProb.team2WinProbability}
+          tieProb={winProb.tiesProbability}
           team1Name={team1Name}
           team2Name={team2Name}
         />
