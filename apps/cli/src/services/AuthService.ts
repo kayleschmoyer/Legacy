@@ -258,7 +258,7 @@ export class CLIAuthService {
     try {
       // Decode JWT to get user info (without verification since we trust our stored tokens)
       const payload = JSON.parse(
-        Buffer.from(token.split('.')[1], 'base64').toString(),
+        Buffer.from(token.split('.')[1], 'base64url').toString(),
       ) as JWTPayload;
       return {
         email: payload.email,
@@ -349,7 +349,7 @@ export class CLIAuthService {
     let expiresAt = Date.now() + 60 * 60 * 1000; // Default 1 hour
     try {
       const payload = JSON.parse(
-        Buffer.from(tokenResponse.jwt.split('.')[1], 'base64').toString(),
+        Buffer.from(tokenResponse.jwt.split('.')[1], 'base64url').toString(),
       ) as JWTPayload;
       LOGGER.debug('Decoded JWT payload:', {
         exp: payload.exp,

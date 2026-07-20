@@ -56,7 +56,7 @@ export const handleGenerateJwt = async (
 
     // Decode JWT payload for metadata display (no verification — we trust our stored tokens)
     const payload = JSON.parse(
-      Buffer.from(jwt.split('.')[1], 'base64').toString(),
+      Buffer.from(jwt.split('.')[1], 'base64url').toString(),
     ) as JWTPayload;
 
     const expirationDate = payload.exp

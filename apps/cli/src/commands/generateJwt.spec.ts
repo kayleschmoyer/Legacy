@@ -135,6 +135,25 @@ describe('generate-jwt', () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
+  it('decodes a payload whose base64url encoding contains "-"/"_" (JWT segments are base64url, not base64)', async () => {
+    // accessLevel value chosen so the encoded payload segment contains a
+    // base64url-only character ('-'), regressions to plain 'base64' decoding
+    // would corrupt bytes at this position rather than skip it.
+    const payload = { ...validPayload, accessLevel: 'adminx~' };
+    const jwt = makeJwt(payload);
+    expect(jwt.split('.')[1]).toContain('-');
+    const { stream } = makeStdoutCapture();
+    const exit = jest.fn() as unknown as (code: number) => never;
+
+    await handleGenerateJwt(
+      {},
+      { authService: makeAuthService(jwt), stdout: stream, exit },
+    );
+
+    const allLogs = loggedLines.join('\n');
+    expect(allLogs).toContain('adminx~');
+  });
+
   it('--reveal does NOT leak the JWT through LOGGER (so --log-file stays clean)', async () => {
     const jwt = makeJwt(validPayload);
     const { stream } = makeStdoutCapture();
