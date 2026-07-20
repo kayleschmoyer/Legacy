@@ -36,6 +36,30 @@ broken before 2026-07-04). In cloud sandboxes `gh` is usually NOT
 installed, so the GitHub-API artifact download is not a fallback there —
 raw CI logs are the fallback of record. (Canary finding, 2026-07-04.)
 
+## 404s from `ci_get_playwright_report` may be a credentials gap (LS-8546)
+
+`bkrupa/legacy-sports-deploys` is **private**. The CI MCP server reads it with
+a token minted from `PREVIEW_APP_PRIVATE_KEY`/`PREVIEW_APP_ID` — but those
+vars are provisioned **nowhere** for the MCP server (they exist only as
+GitHub Actions secrets consumed by workflows). Every session therefore uses
+the fallback token, and whether reports fetch depends on what that fallback
+is:
+
+| Session class                            | Fallback token                                                 | Result                    |
+| ---------------------------------------- | -------------------------------------------------------------- | ------------------------- |
+| Local (stdio `legacy-sports-ci-local`)   | `gh` CLI user token — can read the deploys repo                | ✅ works                  |
+| Hosted connector Lambda / cloud sessions | agent-author App token — scoped to `bkrupa/legacy-sports` only | ❌ 404 on **every** fetch |
+
+So in connector/cloud sessions, a `ci_get_playwright_report` /
+`ci_get_playwright_test_result` 404 usually means **the token cannot see the
+repo, not that the report is missing**. The tool error says "credentials gap"
+when this is the case — trust it and do not burn time re-checking whether the
+deploy happened. Instead:
+
+- Confirm the deploy once via the "Deploy Playwright Report" job in CI logs if in doubt.
+- For nightly/integration runs, use `ci_get_playwright_test_result(source: "s3")` with the numeric run ID (S3 access does not use the deploys-repo token).
+- Or fetch the report from a local session, where the `gh` CLI fallback works.
+
 ## Preferred: `summary.md` (LS-7838)
 
 Every report published after LS-7838 includes a compact, agent-targeted **`summary.md`** next to `index.html`:

@@ -267,4 +267,28 @@ describe('getPlaywrightReport — runId resolution', () => {
     expect(mockSummary).toHaveBeenNthCalledWith(2, 'nightly-99999');
     expect(result.content[0].text).toContain('nightly');
   });
+
+  it('surfaces the last fetch error when every name variant fails (LS-8546)', async () => {
+    mockSummary.mockResolvedValue(null);
+    // fetchFileContent appends this hint on 404s issued with the broad
+    // fallback token; the multi-name path must not swallow it.
+    mockFetch.mockResolvedValue({
+      error:
+        'Failed to fetch report "manual-99999": GitHub API 404 fetching ' +
+        'playwright-report/manual-99999/index.html: Not Found ' +
+        '(PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID are not configured in this ' +
+        'session, so the request used the broad fallback token, which typically ' +
+        'lacks read access to the private bkrupa/legacy-sports-deploys repo — ' +
+        'this 404 is a credentials gap, not necessarily a missing/undeployed report.)',
+    });
+
+    const result = await getPlaywrightReport({ runId: 99999 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'Tried: 99999, nightly-99999, manual-99999',
+    );
+    expect(result.content[0].text).toContain('credentials gap');
+    expect(result.content[0].text).toContain('PREVIEW_APP_PRIVATE_KEY');
+  });
 });

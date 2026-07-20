@@ -57,6 +57,7 @@ export async function getPlaywrightReport(params: {
     namesToTry.push(`nightly-${reportName}`, `manual-${reportName}`);
   }
 
+  let lastError = 'unknown fetch error';
   for (const name of namesToTry) {
     const url = reportUrlFor(name);
 
@@ -92,15 +93,20 @@ export async function getPlaywrightReport(params: {
         content: [{ type: 'text', text: report.error }],
       };
     }
+    lastError = report.error;
   }
 
+  // Include the last per-name fetch error: it carries the
+  // credentials-gap explanation from fetchFileContent when the request used
+  // the broad fallback token (PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID unset),
+  // in which case a 404 here does NOT mean the report is missing (LS-8546).
   const triedNames = namesToTry.join(', ');
   return {
     isError: true,
     content: [
       {
         type: 'text',
-        text: `Report not found. Tried: ${triedNames}. If this is an integration nightly run, pass source="s3" to ci_get_playwright_test_result with the numeric run ID to fetch from S3 instead.`,
+        text: `Report not found. Tried: ${triedNames}. Last error: ${lastError} If this is an integration nightly run, pass source="s3" to ci_get_playwright_test_result with the numeric run ID to fetch from S3 instead.`,
       },
     ],
   };
