@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { useThemeName } from 'tamagui';
 import { PlayerStatsPage } from './PlayerStatsPage';
 import { Platform } from '../../platform-components';
 import { MockedProvider } from '../../test-utils/MockedProvider';
@@ -32,11 +33,24 @@ describeNative('PlayerStatsPage native render (LS-8440)', () => {
     expect(Platform.OS).toBe('ios');
   });
 
-  it('renders the stats page without crashing', () => {
-    expect(() => renderPage()).not.toThrow();
-    // Header copy proves the render tree mounted past the web-only style props.
-    expect(screen.getAllByText('Player Statistics').length).toBeGreaterThan(0);
+  // LS-8437: useThemeColors() reads useThemeName(), so the crash-guard above
+  // must be verified under both themes — the mock defaults to 'dark' but is
+  // reconfigurable per test to catch light-theme-only regressions.
+  afterEach(() => {
+    (useThemeName as jest.Mock).mockReturnValue('dark');
   });
+
+  it.each(['dark', 'light'] as const)(
+    'renders the stats page without crashing (%s theme)',
+    (theme) => {
+      (useThemeName as jest.Mock).mockReturnValue(theme);
+      expect(() => renderPage()).not.toThrow();
+      // Header copy proves the render tree mounted past the web-only style props.
+      expect(screen.getAllByText('Player Statistics').length).toBeGreaterThan(
+        0,
+      );
+    },
+  );
 
   // Premium and non-premium differ only by the app-side PremiumGate wrapper and
   // the column-preset props (statsFormat / isPremiumPageSize); the shared page

@@ -15,6 +15,7 @@ import {
   useGetArchivedUserLeagueSummariesQuery,
   useGetUserLeagueSummariesQuery,
 } from '@legacy-sports/graphql';
+import { colors } from '@legacy-sports/design-tokens';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import BaseballHomeScreen from '../baseball/index';
@@ -41,18 +42,19 @@ function SportBackBar({
   topInset: number;
   onBack: () => void;
 }) {
+  // The XStack/Text below resolve `$token` props against the active Tamagui
+  // theme. ChevronLeft is a non-Tamagui icon, so it needs a resolved hex value
+  // — read from the design-token package (the theme's source of truth) keyed
+  // by the active light/dark theme.
   const { resolvedTheme } = useThemeContext();
-  const isDark = resolvedTheme === 'dark';
-  const bg = isDark ? '#0A0F1A' : '#f5f5f5';
-  const border = isDark ? '#1E2D45' : '#E2E8F0';
-  const textColor = isDark ? '#DEE6FF' : '#1B3A5C';
+  const iconColor = colors[resolvedTheme].text.fg1;
 
   return (
     <XStack
       alignItems="center"
-      backgroundColor={bg}
+      backgroundColor="$background"
       borderBottomWidth={1}
-      borderBottomColor={border}
+      borderBottomColor="$surfacePanelBorder"
       paddingTop={topInset}
       paddingHorizontal="$4"
       paddingVertical="$3"
@@ -64,8 +66,8 @@ function SportBackBar({
         accessibilityLabel="Back to Sports"
         style={{ flexDirection: 'row', alignItems: 'center' }}
       >
-        <ChevronLeft size={24} color={textColor} />
-        <Text color={textColor} fontSize="$4">
+        <ChevronLeft size={24} color={iconColor} />
+        <Text color="$color" fontSize="$4">
           Sports
         </Text>
       </Pressable>
@@ -73,7 +75,7 @@ function SportBackBar({
         flex={1}
         textAlign="center"
         fontWeight="600"
-        color={textColor}
+        color="$color"
         fontSize="$5"
         marginRight="$8"
       >
@@ -98,6 +100,7 @@ export default function HomeTab() {
   const router = useRouter();
   const { top: topInset } = useSafeAreaInsets();
   const userInfo = useAuthorizedUserInfo();
+  const { resolvedTheme } = useThemeContext();
   const [showArchived, setShowArchived] = useState(false);
 
   // Active sport is tracked locally; no router navigation is used for sport
@@ -200,6 +203,7 @@ export default function HomeTab() {
       >
         <HomeScreen
           userName={userName}
+          isLight={resolvedTheme === 'light'}
           leagues={leagues}
           archivedLeagues={archivedLeagues}
           archivedCount={archivedCount}

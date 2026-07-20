@@ -10,22 +10,17 @@ import {
   BRAND_NAVY,
   BRAND_NAVY_DARK,
   BRAND_SEAM_RED_LIGHT,
-  OUTLINE_SUBTLE,
-  PANEL_BORDER,
   type Sport,
-  SURFACE_CARD,
-  SURFACE_PANEL,
   WHITE,
   withAlpha,
 } from '../../utils/colors';
 
 // ─── Foreground tokens (mirror the web league-detail-v2 CSS variables so the
 // extracted chrome renders identically on desktop) ───────────────────────────
-const FG1 = '#F8FAFC';
-const FG1_STRONG = '#FFFFFF';
-const FG2 = '#DEE6FF';
+// FG3 is retained because it is passed to `BrandIcon` (SVG stroke/fill), which
+// cannot resolve Tamagui `$token` strings. Tamagui text/surface props below use
+// tokens directly so they flip with the active light/dark theme.
 const FG3 = '#9CAAC5';
-const FG4 = '#6C80BA';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -208,9 +203,9 @@ export function LeagueDetailHero({
 
   return (
     <YStack
-      backgroundColor={SURFACE_CARD}
+      backgroundColor="$surfaceCard"
       borderWidth={1}
-      borderColor={withAlpha(WHITE, 0.08)}
+      borderColor="$glassBorder"
       borderRadius={20}
       paddingVertical={28}
       paddingHorizontal={32}
@@ -244,12 +239,12 @@ export function LeagueDetailHero({
             fontSize={12}
             letterSpacing={0.96}
             textTransform="uppercase"
-            color={FG3}
+            color="$textMuted"
           >
             Leagues
           </Text>
         </XStack>
-        <Text color={FG4}>·</Text>
+        <Text color="$color10">·</Text>
         <XStack alignItems="center" gap={6}>
           <BrandIcon
             name={sportIcon}
@@ -314,14 +309,14 @@ export function LeagueDetailHero({
             lineHeight={40}
             letterSpacing={-0.8}
             margin={0}
-            color={FG1_STRONG}
+            color="$color"
           >
             {league.name}
           </Text>
           <XStack gap={8} flexWrap="wrap" alignItems="center">
             <LeagueDraftStatusChip status={league.draftStatus} />
             {league.era ? (
-              <Text fontFamily="$body" fontSize={13} color={FG3}>
+              <Text fontFamily="$body" fontSize={13} color="$textMuted">
                 {league.era}
               </Text>
             ) : null}
@@ -331,7 +326,7 @@ export function LeagueDetailHero({
               <HeroMetaItem label="Week">
                 {String(league.currentWeek)}
                 {league.totalMatchups != null ? (
-                  <Text color={FG3} fontWeight="400">
+                  <Text color="$textMuted" fontWeight="400">
                     {' '}
                     / {league.totalMatchups}
                   </Text>
@@ -395,7 +390,7 @@ export function LeagueDetailHero({
 function HeroMetaItem({
   label,
   children,
-  valueColor = FG1,
+  valueColor = '$color',
 }: {
   label: string;
   children: React.ReactNode;
@@ -409,7 +404,7 @@ function HeroMetaItem({
         fontSize={10}
         letterSpacing={1.4}
         textTransform="uppercase"
-        color={FG4}
+        color="$color10"
       >
         {label}
       </Text>
@@ -471,7 +466,7 @@ function InviteCodeMetaItem({
         fontSize={10}
         letterSpacing={1.4}
         textTransform="uppercase"
-        color={FG4}
+        color="$color10"
       >
         Invite
       </Text>
@@ -577,7 +572,7 @@ function RoleButton({
         fontSize={11}
         letterSpacing={1.1}
         textTransform="uppercase"
-        color={color}
+        color={active ? '$color' : '$textMuted'}
       >
         {ROLE_LABEL[leagueRole]}
       </Text>
@@ -606,9 +601,9 @@ export function LeagueRoleBar({
 }): React.JSX.Element {
   return (
     <XStack
-      backgroundColor={withAlpha('#0A0F1A', 0.86)}
+      backgroundColor="$glassSurface"
       borderBottomWidth={1}
-      borderBottomColor={PANEL_BORDER}
+      borderBottomColor="$surfacePanelBorder"
       zIndex={60}
       // Sticky-below-nav treatment is web-only; native renders it inline.
       style={
@@ -648,9 +643,9 @@ export function LeagueRoleBar({
             fontFamily="$heading"
             fontSize={10}
             letterSpacing={1.8}
-            color={FG3}
+            color="$textMuted"
             borderLeftWidth={1}
-            borderLeftColor={OUTLINE_SUBTLE}
+            borderLeftColor="$outlineSubtle"
             paddingLeft={10}
             marginLeft={4}
           >
@@ -673,9 +668,9 @@ export function LeagueRoleBar({
 
         <XStack
           padding={3}
-          backgroundColor={SURFACE_PANEL}
+          backgroundColor="$surfacePanel"
           borderWidth={1}
-          borderColor={OUTLINE_SUBTLE}
+          borderColor="$outlineSubtle"
           borderRadius={9999}
           role="tablist"
           aria-label="View role"
@@ -739,8 +734,8 @@ function TabButton({
           fontSize={13}
           letterSpacing={1.04}
           textTransform="uppercase"
-          color={active ? FG1 : FG3}
-          hoverStyle={active ? undefined : { color: FG2 }}
+          color={active ? '$color' : '$textMuted'}
+          hoverStyle={active ? undefined : { color: '$color' }}
         >
           {label}
         </Text>
@@ -755,7 +750,7 @@ function TabButton({
           >
             <Text
               fontSize={10}
-              color={active ? BRAND_GOLD_LIGHT : FG4}
+              color={active ? BRAND_GOLD_LIGHT : '$color10'}
               fontFamily="$mono"
             >
               {badge}
@@ -799,7 +794,7 @@ export function LeagueTabBar({
     <YStack
       marginVertical={24}
       borderBottomWidth={1}
-      borderBottomColor={OUTLINE_SUBTLE}
+      borderBottomColor="$outlineSubtle"
     >
       <ScrollView
         horizontal

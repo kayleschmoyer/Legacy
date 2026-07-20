@@ -45,28 +45,13 @@ import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
-  STATS_BORDER,
-  STATS_PAGE_TOKENS,
-  SURFACE_CARD,
-  SURFACE_PANEL,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
   withAlpha,
 } from '../../utils/colors';
+import { useThemeColors } from '../../utils/themeColors';
 
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const FONT_BODY = "'Literata', serif";
 const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
-
-const OUTLINE_SUBTLE = '#1C2740';
-const OUTLINE_DEFAULT = '#2F3B53';
-const FG3 = '#9CAAC5';
-const FG4 = '#6C80BA';
-
-// Stats Page surfaces (LS-4612 tokens). Re-exported here for clarity at call sites.
-const BG_PAGE = STATS_PAGE_TOKENS.BG_PAGE;
-const BG_PANEL = STATS_PAGE_TOKENS.BG_PANEL;
-const BG_ELEVATED = STATS_PAGE_TOKENS.BG_ELEVATED;
 
 // Export / Share gold-accent button — matches the BRAND_GOLD heritage treatment
 // from the Stats Page design (project/stats.css `.sp-btn-ghost` + toast border).
@@ -750,6 +735,7 @@ export function PlayerStatsPage({
   showAvailabilityFilter = false,
   rosteredPlayerIds,
 }: PlayerStatsPageProps) {
+  const theme = useThemeColors();
   // ── View mode ─────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<'combined' | 'hitters' | 'pitchers'>(
     () => normalizeViewMode(initialViewMode),
@@ -1307,7 +1293,7 @@ export function PlayerStatsPage({
   ]);
 
   return (
-    <YStack flex={1} style={csp({ backgroundColor: BG_PAGE })}>
+    <YStack flex={1} style={csp({ backgroundColor: theme.background })}>
       {/* ── Web-only CSS: crossfade tab transitions, slider track, state shimmer ── */}
       {Platform.OS === 'web' && (
         <style>{`
@@ -1328,12 +1314,12 @@ export function PlayerStatsPage({
             background: linear-gradient(to right, ${BRAND_GOLD} 0%, ${BRAND_GOLD} var(--pct,0%), rgba(255,255,255,0.08) var(--pct,0%), rgba(255,255,255,0.08) 100%);
             border-radius: 9999px; outline: 0; cursor: pointer; }
           .ps-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px;
-            border-radius: 50%; background: ${BRAND_GOLD}; border: 2px solid ${BG_PAGE}; cursor: pointer; }
+            border-radius: 50%; background: ${BRAND_GOLD}; border: 2px solid ${theme.background}; cursor: pointer; }
           .ps-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%;
-            background: ${BRAND_GOLD}; border: 2px solid ${BG_PAGE}; cursor: pointer; }
+            background: ${BRAND_GOLD}; border: 2px solid ${theme.background}; cursor: pointer; }
           .ps-select-native { appearance: none; background: transparent; border: 0; outline: 0;
-            color: ${TEXT_PRIMARY}; font-family: ${FONT_BODY}; font-size: 14px; padding: 0; cursor: pointer; width: 100%; }
-          .ps-select-native option { background: ${SURFACE_PANEL}; color: ${TEXT_PRIMARY}; }
+            color: ${theme.color}; font-family: ${FONT_BODY}; font-size: 14px; padding: 0; cursor: pointer; width: 100%; }
+          .ps-select-native option { background: ${theme.surfacePanel}; color: ${theme.color}; }
           .ps-sk-bar { display: inline-block; height: 10px; border-radius: 3px;
             background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.04) 100%);
             background-size: 400px 100%; animation: ps-shimmer 1.4s linear infinite; }
@@ -1399,7 +1385,7 @@ export function PlayerStatsPage({
                   lineHeight:
                     Platform.OS === 'web' ? ('1' as unknown as number) : 48,
                   letterSpacing: '-0.02em',
-                  color: '#FFFFFF',
+                  color: theme.color,
                   margin: 0,
                 })}
               >
@@ -1411,7 +1397,7 @@ export function PlayerStatsPage({
                   fontSize: 17,
                   lineHeight:
                     Platform.OS === 'web' ? ('1.55' as unknown as number) : 26,
-                  color: FG3,
+                  color: theme.textMuted,
                   maxWidth: '64ch',
                   margin: 0,
                 })}
@@ -1427,8 +1413,8 @@ export function PlayerStatsPage({
                 style={csp({
                   marginTop: 14,
                   padding: '8px 14px',
-                  background: 'rgba(13,21,38,0.6)',
-                  border: `1px solid ${OUTLINE_SUBTLE}`,
+                  background: theme.glassSurface,
+                  border: `1px solid ${theme.outlineSubtle}`,
                   borderRadius: 8,
                   maxWidth: '100%',
                   overflow: 'hidden',
@@ -1441,7 +1427,7 @@ export function PlayerStatsPage({
                     fontSize: 10,
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
-                    color: FG4,
+                    color: theme.color10,
                     flexShrink: 0,
                   })}
                 >
@@ -1451,7 +1437,7 @@ export function PlayerStatsPage({
                   style={csp({
                     fontFamily: FONT_MONO,
                     fontSize: 12,
-                    color: FG3,
+                    color: theme.textMuted,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -1555,8 +1541,8 @@ export function PlayerStatsPage({
             alignSelf: 'flex-start',
             gap: 4,
             padding: 5,
-            background: BG_PANEL,
-            border: `1px solid ${STATS_BORDER}`,
+            background: theme.surfacePanel,
+            border: `1px solid ${theme.surfacePanelBorder}`,
             borderRadius: 9999,
           })}
         >
@@ -1594,7 +1580,7 @@ export function PlayerStatsPage({
                     fontSize: 12,
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
-                    color: selected ? '#FFFFFF' : FG3,
+                    color: selected ? '#FFFFFF' : theme.textMuted,
                   })}
                 >
                   {label}
@@ -1613,8 +1599,8 @@ export function PlayerStatsPage({
             flexDirection: 'column',
             gap: 10,
             padding: 14,
-            background: SURFACE_PANEL,
-            border: `1px solid ${OUTLINE_SUBTLE}`,
+            background: theme.surfacePanel,
+            border: `1px solid ${theme.outlineSubtle}`,
             borderRadius: 16,
           })}
         >
@@ -1625,8 +1611,8 @@ export function PlayerStatsPage({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              background: 'rgba(10,15,26,0.55)',
-              border: `1px solid ${OUTLINE_SUBTLE}`,
+              background: theme.glassSurfaceLight,
+              border: `1px solid ${theme.outlineSubtle}`,
               borderRadius: 6,
               padding: '0 12px 0 38px',
               minHeight: 44,
@@ -1641,7 +1627,7 @@ export function PlayerStatsPage({
                 height="16"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke={FG3}
+                stroke={theme.textMuted}
                 strokeWidth="2"
                 style={csp({
                   position: 'absolute',
@@ -1660,11 +1646,11 @@ export function PlayerStatsPage({
               onChangeText={setSearch}
               onSubmitEditing={applyFilters}
               placeholder={`Search player name · min ${MIN_SEARCH_LENGTH} chars`}
-              placeholderTextColor={FG4}
+              placeholderTextColor={theme.color10}
               style={csp({
                 flex: 1,
                 backgroundColor: 'transparent',
-                color: TEXT_PRIMARY,
+                color: theme.color,
                 fontFamily: FONT_BODY,
                 fontSize: 14,
                 paddingVertical: 8,
@@ -1690,7 +1676,13 @@ export function PlayerStatsPage({
                   flexShrink: 0,
                 })}
               >
-                <Text style={csp({ color: FG3, fontSize: 20, lineHeight: 20 })}>
+                <Text
+                  style={csp({
+                    color: theme.textMuted,
+                    fontSize: 20,
+                    lineHeight: 20,
+                  })}
+                >
                   ×
                 </Text>
               </Pressable>
@@ -1702,8 +1694,8 @@ export function PlayerStatsPage({
             style={csp({
               position: 'relative',
               justifyContent: 'center',
-              background: 'rgba(10,15,26,0.55)',
-              border: `1px solid ${OUTLINE_SUBTLE}`,
+              background: theme.glassSurfaceLight,
+              border: `1px solid ${theme.outlineSubtle}`,
               borderRadius: 6,
               padding: '6px 30px 6px 12px',
               minHeight: 44,
@@ -1716,7 +1708,7 @@ export function PlayerStatsPage({
                 fontSize: 10,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: FG3,
+                color: theme.textMuted,
               })}
             >
               Position
@@ -1750,7 +1742,7 @@ export function PlayerStatsPage({
                   right: 12,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: FG3,
+                  color: theme.textMuted,
                   fontSize: 12,
                   pointerEvents: 'none',
                 })}
@@ -1765,8 +1757,8 @@ export function PlayerStatsPage({
             style={csp({
               position: 'relative',
               justifyContent: 'center',
-              background: 'rgba(10,15,26,0.55)',
-              border: `1px solid ${OUTLINE_SUBTLE}`,
+              background: theme.glassSurfaceLight,
+              border: `1px solid ${theme.outlineSubtle}`,
               borderRadius: 6,
               padding: '6px 30px 6px 12px',
               minHeight: 44,
@@ -1779,7 +1771,7 @@ export function PlayerStatsPage({
                 fontSize: 10,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: FG3,
+                color: theme.textMuted,
               })}
             >
               Team
@@ -1813,7 +1805,7 @@ export function PlayerStatsPage({
                   right: 12,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: FG3,
+                  color: theme.textMuted,
                   fontSize: 12,
                   pointerEvents: 'none',
                 })}
@@ -1829,8 +1821,8 @@ export function PlayerStatsPage({
             style={csp({
               position: 'relative',
               justifyContent: 'center',
-              background: 'rgba(10,15,26,0.55)',
-              border: `1px solid ${OUTLINE_SUBTLE}`,
+              background: theme.glassSurfaceLight,
+              border: `1px solid ${theme.outlineSubtle}`,
               borderRadius: 6,
               padding: '6px 30px 6px 12px',
               minHeight: 44,
@@ -1843,7 +1835,7 @@ export function PlayerStatsPage({
                 fontSize: 10,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: FG3,
+                color: theme.textMuted,
               })}
             >
               Rows
@@ -1879,7 +1871,7 @@ export function PlayerStatsPage({
                   right: 12,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: FG3,
+                  color: theme.textMuted,
                   fontSize: 12,
                   pointerEvents: 'none',
                 })}
@@ -1911,7 +1903,7 @@ export function PlayerStatsPage({
                 borderStyle: 'solid',
                 borderColor: hasPendingChanges
                   ? withAlpha(BRAND_GOLD, 0.5)
-                  : OUTLINE_DEFAULT,
+                  : theme.outlineStrong,
                 backgroundColor: hasPendingChanges
                   ? withAlpha(BRAND_GOLD, 0.12)
                   : 'transparent',
@@ -1930,7 +1922,7 @@ export function PlayerStatsPage({
                   fontSize: 12,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: hasPendingChanges ? BRAND_GOLD_LIGHT : FG3,
+                  color: hasPendingChanges ? BRAND_GOLD_LIGHT : theme.textMuted,
                   whiteSpace: 'nowrap',
                 })}
               >
@@ -1948,7 +1940,9 @@ export function PlayerStatsPage({
                 borderRadius: 12,
                 borderWidth: 1,
                 borderStyle: 'solid',
-                borderColor: advancedOpen ? BRAND_NAVY_LIGHT : OUTLINE_DEFAULT,
+                borderColor: advancedOpen
+                  ? BRAND_NAVY_LIGHT
+                  : theme.outlineStrong,
                 backgroundColor: advancedOpen
                   ? 'rgba(27,58,92,0.35)'
                   : 'transparent',
@@ -1964,7 +1958,7 @@ export function PlayerStatsPage({
                   height="14"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke={advancedOpen ? TEXT_PRIMARY : FG3}
+                  stroke={advancedOpen ? theme.color : theme.textMuted}
                   strokeWidth="2"
                 >
                   <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -1977,13 +1971,13 @@ export function PlayerStatsPage({
                   fontSize: 12,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: advancedOpen ? TEXT_PRIMARY : FG3,
+                  color: advancedOpen ? theme.color : theme.textMuted,
                   whiteSpace: 'nowrap',
                 })}
               >
                 Advanced
               </Text>
-              <Text style={csp({ fontSize: 10, color: FG3 })}>
+              <Text style={csp({ fontSize: 10, color: theme.textMuted })}>
                 {advancedOpen ? '▴' : '▾'}
               </Text>
             </Pressable>
@@ -2006,7 +2000,7 @@ export function PlayerStatsPage({
                     ? BRAND_NAVY_LIGHT
                     : isColumnCustomized
                       ? withAlpha(BRAND_GOLD, 0.5)
-                      : OUTLINE_DEFAULT,
+                      : theme.outlineStrong,
                   backgroundColor: columnsOpen
                     ? 'rgba(27,58,92,0.35)'
                     : isColumnCustomized
@@ -2024,7 +2018,7 @@ export function PlayerStatsPage({
                     height="14"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke={columnsOpen ? TEXT_PRIMARY : FG3}
+                    stroke={columnsOpen ? theme.color : theme.textMuted}
                     strokeWidth="2"
                   >
                     <line x1="3" y1="3" x2="3" y2="21" />
@@ -2040,13 +2034,13 @@ export function PlayerStatsPage({
                     fontSize: 12,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    color: columnsOpen ? TEXT_PRIMARY : FG3,
+                    color: columnsOpen ? theme.color : theme.textMuted,
                     whiteSpace: 'nowrap',
                   })}
                 >
                   Columns
                 </Text>
-                <Text style={csp({ fontSize: 10, color: FG3 })}>
+                <Text style={csp({ fontSize: 10, color: theme.textMuted })}>
                   {columnsOpen ? '▴' : '▾'}
                 </Text>
               </Pressable>
@@ -2080,7 +2074,7 @@ export function PlayerStatsPage({
                 fontSize: 11,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
-                color: FG3,
+                color: theme.textMuted,
                 whiteSpace: 'nowrap',
               })}
             >
@@ -2106,7 +2100,9 @@ export function PlayerStatsPage({
                     borderRadius: 9999,
                     borderWidth: 1,
                     borderStyle: 'solid',
-                    borderColor: active ? BRAND_NAVY_LIGHT : OUTLINE_DEFAULT,
+                    borderColor: active
+                      ? BRAND_NAVY_LIGHT
+                      : theme.outlineStrong,
                     backgroundColor: active
                       ? 'rgba(27,58,92,0.45)'
                       : 'transparent',
@@ -2117,7 +2113,7 @@ export function PlayerStatsPage({
                       fontFamily: FONT_BODY,
                       fontWeight: active ? '700' : '500',
                       fontSize: 13,
-                      color: active ? TEXT_PRIMARY : FG3,
+                      color: active ? theme.color : theme.textMuted,
                     })}
                   >
                     {label}
@@ -2135,8 +2131,8 @@ export function PlayerStatsPage({
             className={Platform.OS === 'web' ? 'ps-adv-panel' : undefined}
             style={csp({
               padding: '18px 20px',
-              background: SURFACE_CARD,
-              border: `1px solid ${OUTLINE_SUBTLE}`,
+              background: theme.surfaceCard,
+              border: `1px solid ${theme.outlineSubtle}`,
               borderRadius: 16,
               gap: 14,
             })}
@@ -2514,6 +2510,7 @@ interface LoadingSkeletonProps {
 }
 
 function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
+  const theme = useThemeColors();
   const colCount = SKELETON_COLS_BY_MODE[viewMode];
   return (
     <YStack
@@ -2521,8 +2518,8 @@ function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
       role="presentation"
       aria-hidden={true}
       style={csp({
-        background: BG_ELEVATED,
-        border: `1px solid ${STATS_BORDER}`,
+        background: theme.surfaceCard,
+        border: `1px solid ${theme.surfacePanelBorder}`,
         borderRadius: 12,
         padding: 18,
         gap: 14,
@@ -2543,7 +2540,11 @@ function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
             Loading
           </Text>
           <Text
-            style={csp({ fontFamily: FONT_BODY, fontSize: 13, color: FG4 })}
+            style={csp({
+              fontFamily: FONT_BODY,
+              fontSize: 13,
+              color: theme.color10,
+            })}
           >
             Fetching archived seasons…
           </Text>
@@ -2594,6 +2595,7 @@ interface ErrorCardProps {
 }
 
 function ErrorCard({ onRetry }: ErrorCardProps) {
+  const theme = useThemeColors();
   return (
     <YStack
       testID="player-stats-error-card"
@@ -2605,7 +2607,7 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
         width: '100%',
         margin: '32px auto',
         padding: '40px 28px',
-        background: BG_ELEVATED,
+        background: theme.surfaceCard,
         border: `1px solid ${BRAND_SEAM_RED}`,
         borderRadius: 12,
         alignItems: 'center',
@@ -2633,7 +2635,7 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
           fontFamily: FONT_DISPLAY,
           fontWeight: '800',
           fontSize: 24,
-          color: TEXT_PRIMARY,
+          color: theme.color,
           margin: 0,
           textAlign: 'center',
         })}
@@ -2644,7 +2646,7 @@ function ErrorCard({ onRetry }: ErrorCardProps) {
         style={csp({
           fontFamily: FONT_BODY,
           fontSize: 14,
-          color: TEXT_MUTED,
+          color: theme.textMuted,
           textAlign: 'center',
           maxWidth: '60ch',
           lineHeight:
@@ -2694,6 +2696,7 @@ interface EmptyCardProps {
 }
 
 function EmptyCard({ onClear }: EmptyCardProps) {
+  const theme = useThemeColors();
   return (
     <YStack
       testID="player-stats-empty-card"
@@ -2704,8 +2707,8 @@ function EmptyCard({ onClear }: EmptyCardProps) {
         width: '100%',
         margin: '32px auto',
         padding: '40px 28px',
-        background: BG_ELEVATED,
-        border: `1px solid ${STATS_BORDER}`,
+        background: theme.surfaceCard,
+        border: `1px solid ${theme.surfacePanelBorder}`,
         borderRadius: 12,
         alignItems: 'center',
         gap: 12,
@@ -2717,7 +2720,7 @@ function EmptyCard({ onClear }: EmptyCardProps) {
           height="48"
           viewBox="0 0 24 24"
           fill="none"
-          stroke={FG4}
+          stroke={theme.color10}
           strokeWidth="1.4"
           aria-hidden="true"
         >
@@ -2732,7 +2735,7 @@ function EmptyCard({ onClear }: EmptyCardProps) {
           fontFamily: FONT_DISPLAY,
           fontWeight: '800',
           fontSize: 24,
-          color: TEXT_PRIMARY,
+          color: theme.color,
           margin: 0,
           textAlign: 'center',
         })}
@@ -2743,7 +2746,7 @@ function EmptyCard({ onClear }: EmptyCardProps) {
         style={csp({
           fontFamily: FONT_BODY,
           fontSize: 14,
-          color: TEXT_MUTED,
+          color: theme.textMuted,
           textAlign: 'center',
           maxWidth: '60ch',
           lineHeight:
@@ -2814,14 +2817,15 @@ function ColumnPickerPanel({
   onToggle,
   onReset,
 }: ColumnPickerPanelProps) {
+  const theme = useThemeColors();
   return (
     <YStack
       testID="column-picker-panel"
       className={Platform.OS === 'web' ? 'ps-adv-panel' : undefined}
       style={csp({
         padding: '18px 20px',
-        background: SURFACE_CARD,
-        border: `1px solid ${OUTLINE_SUBTLE}`,
+        background: theme.surfaceCard,
+        border: `1px solid ${theme.outlineSubtle}`,
         borderRadius: 16,
         gap: 14,
       })}
@@ -2898,7 +2902,7 @@ function ColumnPickerPanel({
                   borderRadius: 5,
                   borderWidth: 1,
                   borderStyle: 'solid',
-                  borderColor: checked ? BRAND_GOLD : OUTLINE_DEFAULT,
+                  borderColor: checked ? BRAND_GOLD : theme.outlineStrong,
                   backgroundColor: checked
                     ? withAlpha(BRAND_GOLD, 0.2)
                     : 'transparent',
@@ -2923,7 +2927,7 @@ function ColumnPickerPanel({
                 style={csp({
                   fontFamily: FONT_BODY,
                   fontSize: 14,
-                  color: checked ? TEXT_PRIMARY : FG3,
+                  color: checked ? theme.color : theme.textMuted,
                 })}
               >
                 {col.label}
@@ -2979,6 +2983,7 @@ function StatSlider({
   onChange,
   onCommit,
 }: StatSliderProps) {
+  const theme = useThemeColors();
   const pct = sliderFillPct(value, min, max);
 
   // Debounce the keyboard commit path: onKeyUp fires once per arrow-key press,
@@ -3000,7 +3005,7 @@ function StatSlider({
             fontFamily: FONT_BODY,
             fontWeight: '500',
             fontSize: 13,
-            color: TEXT_MUTED,
+            color: theme.textMuted,
           })}
         >
           {label}
@@ -3056,7 +3061,7 @@ function StatSlider({
           style={csp({
             fontFamily: FONT_MONO,
             fontSize: 10,
-            color: FG4,
+            color: theme.color10,
           })}
         >
           {format(min)}
@@ -3065,7 +3070,7 @@ function StatSlider({
           style={csp({
             fontFamily: FONT_MONO,
             fontSize: 10,
-            color: FG4,
+            color: theme.color10,
           })}
         >
           {format(max)}
@@ -3094,6 +3099,7 @@ interface NativeSelectProps {
  * the picker (LS-7806).
  */
 function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
+  const theme = useThemeColors();
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
 
@@ -3117,12 +3123,12 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
             flex: 1,
             fontFamily: FONT_BODY,
             fontSize: 14,
-            color: TEXT_PRIMARY,
+            color: theme.color,
           })}
         >
           {value}
         </Text>
-        <Text style={csp({ color: FG3, fontSize: 12 })}>▾</Text>
+        <Text style={csp({ color: theme.textMuted, fontSize: 12 })}>▾</Text>
       </Pressable>
       <Modal
         visible={open}
@@ -3146,11 +3152,11 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
               /* absorb tap — keep the sheet open */
             }}
             style={csp({
-              backgroundColor: SURFACE_PANEL,
+              backgroundColor: theme.surfacePanel,
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
               borderWidth: 1,
-              borderColor: STATS_BORDER,
+              borderColor: theme.surfacePanelBorder,
               paddingTop: 16,
               paddingBottom: 28,
               maxHeight: '60%',
@@ -3199,7 +3205,7 @@ function NativeSelect({ label, value, options, onChange }: NativeSelectProps) {
                         fontFamily: FONT_BODY,
                         fontSize: 16,
                         fontWeight: selected ? '700' : '400',
-                        color: selected ? BRAND_GOLD_LIGHT : TEXT_PRIMARY,
+                        color: selected ? BRAND_GOLD_LIGHT : theme.color,
                       })}
                     >
                       {opt}
@@ -3309,6 +3315,7 @@ function StepperButton({
   disabled,
   onPress,
 }: StepperButtonProps) {
+  const theme = useThemeColors();
   return (
     <Pressable
       onPress={onPress}
@@ -3321,8 +3328,8 @@ function StepperButton({
         height: 44,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: OUTLINE_DEFAULT,
-        backgroundColor: SURFACE_CARD,
+        borderColor: theme.outlineStrong,
+        backgroundColor: theme.surfaceCard,
         alignItems: 'center',
         justifyContent: 'center',
         opacity: disabled ? 0.4 : 1,
@@ -3334,7 +3341,7 @@ function StepperButton({
           fontWeight: '800',
           fontSize: 22,
           lineHeight: 24,
-          color: TEXT_PRIMARY,
+          color: theme.color,
         })}
       >
         {label}

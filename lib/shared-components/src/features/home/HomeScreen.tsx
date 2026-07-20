@@ -24,11 +24,6 @@ import {
   GREEN,
   GREEN_DEEP,
   GREEN_LIGHTER,
-  PANEL_BORDER,
-  SURFACE_CARD,
-  SURFACE_PANEL,
-  TEXT_INTERFACE,
-  TEXT_SECONDARY,
   WHITE,
   withAlpha,
 } from '../../utils/colors';
@@ -38,11 +33,7 @@ export { formatDisplayName } from './homeSummaryFormatters';
 
 /* ─── Home-only color constants (mirror apps/web/src/constants/colors) ─── */
 
-const SURFACE_DEEP = '#0F1A2D';
-const SURFACE_HOVER = '#1C2A47';
 const TEXT_TERTIARY = '#6C80BA';
-const BORDER_STRONG = '#2F3B53';
-const BORDER_INTERACTIVE = '#4D5D80';
 const SCORE_LOSS = '#E07A8C';
 const AMBER_WARM = '#E3B870';
 
@@ -221,7 +212,7 @@ function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
         fontWeight="800"
         fontSize={32}
         lineHeight={35}
-        color={TEXT_INTERFACE}
+        color="$color"
       >
         {title}
       </H2>
@@ -252,8 +243,8 @@ function ActionButton({
     navy: { bg: BRAND_NAVY, color: WHITE, border: BRAND_NAVY_LIGHT },
     outline: {
       bg: 'transparent',
-      color: TEXT_INTERFACE,
-      border: BORDER_STRONG,
+      color: '$color',
+      border: '$outlineStrong',
     },
   };
   const s = styles[variant];
@@ -357,7 +348,7 @@ function PhaseChip({
 function Stat({
   big,
   label,
-  color = TEXT_INTERFACE,
+  color = '$color',
 }: {
   big: string;
   label: string;
@@ -381,7 +372,7 @@ function Stat({
         fontSize={11}
         letterSpacing={1.1}
         textTransform="uppercase"
-        color={TEXT_SECONDARY}
+        color="$textMuted"
       >
         {label}
       </Text>
@@ -399,9 +390,9 @@ function HeroRightPanel({ summary }: { summary: HomeLeagueSummary }) {
 
   const panel = (children: React.ReactNode) => (
     <YStack
-      backgroundColor={withAlpha(BG_DARK, 0.55)}
+      backgroundColor="$glassSurfaceLight"
       borderWidth={1}
-      borderColor={PANEL_BORDER}
+      borderColor="$surfacePanelBorder"
       borderRadius={16}
       padding={20}
       gap="$3"
@@ -423,7 +414,7 @@ function HeroRightPanel({ summary }: { summary: HomeLeagueSummary }) {
           Draft in Progress
         </Text>
         {summary.draftMode ? (
-          <Text fontFamily={BODY_FONT} fontSize={15} color={TEXT_SECONDARY}>
+          <Text fontFamily={BODY_FONT} fontSize={15} color="$textMuted">
             {summary.draftMode === 'snake' ? 'Snake draft' : summary.draftMode}
             {summary.selectionMethod === 'auto' ? ' · Auto-pick' : ''}
           </Text>
@@ -445,7 +436,7 @@ function HeroRightPanel({ summary }: { summary: HomeLeagueSummary }) {
             fontSize={13}
             letterSpacing={0.8}
             textTransform="uppercase"
-            color={TEXT_INTERFACE}
+            color="$color"
           >
             My Team
           </Text>
@@ -454,7 +445,7 @@ function HeroRightPanel({ summary }: { summary: HomeLeagueSummary }) {
             fontWeight="800"
             fontSize={isLeading ? 48 : 40}
             lineHeight={isLeading ? 48 : 40}
-            color={isLeading ? BRAND_GOLD_LIGHT : TEXT_INTERFACE}
+            color={isLeading ? BRAND_GOLD_LIGHT : '$color'}
             fontVariant={['tabular-nums']}
           >
             {userScore.toFixed(1)}
@@ -476,7 +467,7 @@ function HeroRightPanel({ summary }: { summary: HomeLeagueSummary }) {
             fontSize={13}
             letterSpacing={0.8}
             textTransform="uppercase"
-            color={TEXT_INTERFACE}
+            color="$color"
             numberOfLines={1}
           >
             {summary.opponentTeamName ?? 'Opponent'}
@@ -486,7 +477,7 @@ function HeroRightPanel({ summary }: { summary: HomeLeagueSummary }) {
             fontWeight="800"
             fontSize={!isLeading ? 48 : 40}
             lineHeight={!isLeading ? 48 : 40}
-            color={!isLeading ? BRAND_GOLD_LIGHT : TEXT_INTERFACE}
+            color={!isLeading ? BRAND_GOLD_LIGHT : '$color'}
             fontVariant={['tabular-nums']}
           >
             {oppScore.toFixed(1)}
@@ -541,7 +532,7 @@ function LeagueHeroCard({
       borderRadius={24}
       borderWidth={1}
       borderColor={withAlpha(BRAND_GOLD, 0.22)}
-      backgroundColor={SURFACE_DEEP}
+      backgroundColor="$surfaceCard"
       padding={32}
       gap="$5"
       $gtSm={{ flexDirection: 'row', alignItems: 'center' }}
@@ -560,12 +551,12 @@ function LeagueHeroCard({
           fontWeight="800"
           fontSize={36}
           lineHeight={38}
-          color={WHITE}
+          color="$color"
         >
           {summary.leagueName ?? 'League'}
         </Text>
         {eraDesc ? (
-          <Text fontFamily={BODY_FONT} fontSize={15} color={TEXT_SECONDARY}>
+          <Text fontFamily={BODY_FONT} fontSize={15} color="$textMuted">
             {eraDesc}
           </Text>
         ) : null}
@@ -578,7 +569,7 @@ function LeagueHeroCard({
               fontSize={12}
               letterSpacing={1.1}
               textTransform="uppercase"
-              color={TEXT_SECONDARY}
+              color="$textMuted"
             >
               Week {summary.currentWeekNumber}/{summary.totalMatchups}
             </Text>
@@ -590,7 +581,7 @@ function LeagueHeroCard({
               fontSize={12}
               letterSpacing={1.1}
               textTransform="uppercase"
-              color={TEXT_SECONDARY}
+              color="$textMuted"
             >
               {summary.teamCount} teams
             </Text>
@@ -637,7 +628,7 @@ function LeagueListRow({
 
   let scoreBig: string;
   let scoreLabel: string;
-  let scoreColor = TEXT_INTERFACE;
+  let scoreColor = '$color';
 
   if (isDraftLive) {
     scoreBig = 'Live';
@@ -674,19 +665,19 @@ function LeagueListRow({
       accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
       onPress={onPress}
       cursor="pointer"
-      backgroundColor={SURFACE_CARD}
+      backgroundColor="$surfaceCard"
       paddingVertical={18}
       paddingHorizontal={22}
       gap="$3"
       alignItems="center"
-      hoverStyle={{ backgroundColor: SURFACE_HOVER }}
+      hoverStyle={{ backgroundColor: '$color4' }}
     >
       <YStack flex={1} gap="$1" minWidth={0}>
         <Text
           fontFamily={DISPLAY_FONT}
           fontWeight="700"
           fontSize={18}
-          color={TEXT_INTERFACE}
+          color="$color"
           numberOfLines={1}
         >
           {summary.leagueName ?? 'League'}
@@ -695,7 +686,7 @@ function LeagueListRow({
           <Text
             fontFamily={BODY_FONT}
             fontSize={13}
-            color={TEXT_SECONDARY}
+            color="$textMuted"
             numberOfLines={1}
           >
             {subParts.join(' · ')}
@@ -712,12 +703,12 @@ function LeagueListRow({
             alignSelf="flex-start"
             marginTop="$1"
             borderWidth={1}
-            borderColor={BORDER_STRONG}
+            borderColor="$outlineStrong"
             borderRadius={9999}
             paddingVertical={8}
             paddingHorizontal={12}
             cursor="pointer"
-            hoverStyle={{ borderColor: BORDER_INTERACTIVE }}
+            hoverStyle={{ borderColor: '$borderColorFocus' }}
           >
             <Text
               fontFamily={DISPLAY_FONT}
@@ -725,7 +716,7 @@ function LeagueListRow({
               fontSize={11}
               letterSpacing={1.1}
               textTransform="uppercase"
-              color={TEXT_SECONDARY}
+              color="$textMuted"
             >
               Mock Draft
             </Text>
@@ -746,7 +737,7 @@ function LeagueListRow({
         <Text
           fontFamily={BODY_FONT}
           fontSize={12}
-          color={TEXT_SECONDARY}
+          color="$textMuted"
           numberOfLines={1}
         >
           {scoreLabel}
@@ -783,7 +774,7 @@ function SportCard({
       flex={1}
       backgroundColor={bg}
       borderWidth={1}
-      borderColor={withAlpha(WHITE, 0.08)}
+      borderColor="$glassBorder"
       borderRadius={20}
       padding={full ? 32 : 28}
       gap="$4"
@@ -794,9 +785,9 @@ function SportCard({
           width={full ? 72 : 64}
           height={full ? 72 : 64}
           borderRadius={12}
-          backgroundColor={withAlpha(BG_DARK, 0.55)}
+          backgroundColor="$glassSurfaceLight"
           borderWidth={1}
-          borderColor={PANEL_BORDER}
+          borderColor="$surfacePanelBorder"
           alignItems="center"
           justifyContent="center"
         >
@@ -844,14 +835,14 @@ function SportCard({
           fontFamily={DISPLAY_FONT}
           fontWeight="800"
           fontSize={full ? 32 : 26}
-          color={WHITE}
+          color="$color"
         >
           {sport.title}
         </Text>
         <Text
           fontFamily={BODY_FONT}
           fontSize={full ? 15 : 14}
-          color={TEXT_SECONDARY}
+          color="$textMuted"
         >
           {sport.description}
         </Text>
@@ -893,9 +884,9 @@ function StatsCta({
 }) {
   return (
     <XStack
-      backgroundColor={SURFACE_PANEL}
+      backgroundColor="$surfacePanel"
       borderWidth={1}
-      borderColor={PANEL_BORDER}
+      borderColor="$surfacePanelBorder"
       borderRadius={16}
       padding={24}
       gap="$4"
@@ -907,13 +898,13 @@ function StatsCta({
           fontFamily={DISPLAY_FONT}
           fontWeight="700"
           fontSize={18}
-          color={TEXT_INTERFACE}
+          color="$color"
         >
           {isNewUser
             ? 'Or just browse a century of data'
             : 'Explore player statistics'}
         </Text>
-        <Text fontFamily={BODY_FONT} fontSize={14} color={TEXT_SECONDARY}>
+        <Text fontFamily={BODY_FONT} fontSize={14} color="$textMuted">
           {isNewUser
             ? 'Not ready to commit to a league yet? Every box score since 1876 is here to read.'
             : 'Every recorded at-bat since 1876. Filter by era, team, or the night a record fell.'}
@@ -939,9 +930,9 @@ function MockDraftCta({
 }) {
   return (
     <XStack
-      backgroundColor={SURFACE_PANEL}
+      backgroundColor="$surfacePanel"
       borderWidth={1}
-      borderColor={PANEL_BORDER}
+      borderColor="$surfacePanelBorder"
       borderRadius={24}
       padding={28}
       gap="$4"
@@ -970,11 +961,11 @@ function MockDraftCta({
           fontFamily={DISPLAY_FONT}
           fontWeight="700"
           fontSize={18}
-          color={TEXT_INTERFACE}
+          color="$color"
         >
           See who falls to your pick.
         </Text>
-        <Text fontFamily={BODY_FONT} fontSize={14} color={TEXT_SECONDARY}>
+        <Text fontFamily={BODY_FONT} fontSize={14} color="$textMuted">
           {atCap
             ? "You've used your free mock drafts this week. Upgrade or check back next week."
             : 'Run a 12-team snake against bots in under ten minutes. Once you join a real league, mocks pull from that league’s exact era and ruleset.'}
@@ -1003,7 +994,7 @@ function GreetingHeader({
     <YStack
       paddingBottom={24}
       borderBottomWidth={1}
-      borderBottomColor={PANEL_BORDER}
+      borderBottomColor="$surfacePanelBorder"
       gap="$2"
     >
       <Text
@@ -1023,7 +1014,7 @@ function GreetingHeader({
         fontWeight="800"
         fontSize={44}
         lineHeight={46}
-        color={WHITE}
+        color="$color"
       >
         {userName}
       </H1>
@@ -1037,9 +1028,9 @@ function GreetingHeader({
 function OnThisDayPanel({ children }: { children: React.ReactNode }) {
   return (
     <YStack
-      backgroundColor={SURFACE_PANEL}
+      backgroundColor="$surfacePanel"
       borderWidth={1}
-      borderColor={PANEL_BORDER}
+      borderColor="$surfacePanelBorder"
       borderRadius={16}
       padding={22}
       gap="$3"
@@ -1092,12 +1083,12 @@ function PremiumEmptyStateCtas({
           fontFamily={DISPLAY_FONT}
           fontWeight="700"
           fontSize={15}
-          color={TEXT_INTERFACE}
+          color="$color"
         >
           Exclusive league types unlocked
         </Text>
       </XStack>
-      <Text fontFamily={BODY_FONT} fontSize={14} color={TEXT_SECONDARY}>
+      <Text fontFamily={BODY_FONT} fontSize={14} color="$textMuted">
         Your subscription unlocks salary cap enforcement and auction drafts —
         the most competitive formats in the archive.
       </Text>
@@ -1210,7 +1201,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
           gap="$4"
         >
           <Spinner size="large" color={BRAND_GOLD_LIGHT} />
-          <Text fontFamily={BODY_FONT} color={TEXT_SECONDARY}>
+          <Text fontFamily={BODY_FONT} color="$textMuted">
             Loading your dashboard…
           </Text>
         </YStack>
@@ -1232,7 +1223,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
           <GreetingHeader userName={userName} />
           <YStack
             testID="home-error"
-            backgroundColor={SURFACE_PANEL}
+            backgroundColor="$surfacePanel"
             borderWidth={1}
             borderColor={withAlpha(BRAND_SEAM_RED, 0.35)}
             borderRadius={20}
@@ -1244,11 +1235,11 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
               fontFamily={DISPLAY_FONT}
               fontWeight="800"
               fontSize={26}
-              color={TEXT_INTERFACE}
+              color="$color"
             >
               Unable to load your leagues
             </H2>
-            <Text fontFamily={BODY_FONT} fontSize={15} color={TEXT_SECONDARY}>
+            <Text fontFamily={BODY_FONT} fontSize={15} color="$textMuted">
               We couldn&apos;t reach the league server. Your standings and
               matchups are safe — this is a display issue only.
             </Text>
@@ -1300,7 +1291,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                 fontSize={14}
                 letterSpacing={1}
                 textTransform="uppercase"
-                color={TEXT_SECONDARY}
+                color="$textMuted"
                 fontVariant={['tabular-nums']}
               >
                 {derivedStats.leagueCount}{' '}
@@ -1313,7 +1304,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                   fontSize={14}
                   letterSpacing={1}
                   textTransform="uppercase"
-                  color={TEXT_SECONDARY}
+                  color="$textMuted"
                   fontVariant={['tabular-nums']}
                 >
                   · Overall {derivedStats.aggregateRecord}
@@ -1327,7 +1318,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                   fontSize={14}
                   letterSpacing={1}
                   textTransform="uppercase"
-                  color={TEXT_SECONDARY}
+                  color="$textMuted"
                   fontVariant={['tabular-nums']}
                 >
                   · {derivedStats.firstPlaceCount} first place
@@ -1354,11 +1345,11 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                 {secondaryLeagues.length > 0 ? (
                   <YStack
                     borderWidth={1}
-                    borderColor={PANEL_BORDER}
+                    borderColor="$surfacePanelBorder"
                     borderRadius={12}
                     overflow="hidden"
                     gap={1}
-                    backgroundColor={PANEL_BORDER}
+                    backgroundColor="$surfacePanelBorder"
                   >
                     {secondaryLeagues.map((s) => (
                       <LeagueListRow
@@ -1386,13 +1377,13 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                       onPress={onShowArchived}
                       alignSelf="flex-start"
                       borderWidth={1}
-                      borderColor={PANEL_BORDER}
+                      borderColor="$surfacePanelBorder"
                       borderStyle="dashed"
                       borderRadius={9999}
                       paddingVertical={10}
                       paddingHorizontal={16}
                       cursor="pointer"
-                      hoverStyle={{ borderColor: BORDER_STRONG }}
+                      hoverStyle={{ borderColor: '$outlineStrong' }}
                     >
                       <Text
                         fontFamily={DISPLAY_FONT}
@@ -1400,7 +1391,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                         fontSize={12}
                         letterSpacing={1.1}
                         textTransform="uppercase"
-                        color={TEXT_SECONDARY}
+                        color="$textMuted"
                       >
                         {archivedCount != null
                           ? `Show ${archivedCount} archived ${archivedCount === 1 ? 'league' : 'leagues'}`
@@ -1414,7 +1405,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                     <Text
                       fontFamily={BODY_FONT}
                       fontSize={13}
-                      color={TEXT_SECONDARY}
+                      color="$textMuted"
                     >
                       Loading archived leagues…
                     </Text>
@@ -1427,17 +1418,17 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                       fontSize={14}
                       letterSpacing={1.1}
                       textTransform="uppercase"
-                      color={TEXT_SECONDARY}
+                      color="$textMuted"
                     >
                       Archived
                     </Text>
                     <YStack
                       borderWidth={1}
-                      borderColor={PANEL_BORDER}
+                      borderColor="$surfacePanelBorder"
                       borderRadius={12}
                       overflow="hidden"
                       gap={1}
-                      backgroundColor={PANEL_BORDER}
+                      backgroundColor="$surfacePanelBorder"
                     >
                       {archivedLeagues.map((s) => (
                         <LeagueListRow
@@ -1498,7 +1489,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
         <YStack
           paddingBottom={32}
           borderBottomWidth={1}
-          borderBottomColor={PANEL_BORDER}
+          borderBottomColor="$surfacePanelBorder"
           gap="$4"
         >
           <Text
@@ -1517,7 +1508,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
             fontWeight="800"
             fontSize={48}
             lineHeight={48}
-            color={WHITE}
+            color="$color"
           >
             Start your dynasty.
           </H1>
@@ -1534,7 +1525,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
             fontFamily={BODY_FONT}
             fontSize={18}
             lineHeight={28}
-            color={TEXT_SECONDARY}
+            color="$textMuted"
           >
             Create a league in sixty seconds. Invite ten friends, pick an era,
             and compete on real archived statistics — from Deadball to today.
