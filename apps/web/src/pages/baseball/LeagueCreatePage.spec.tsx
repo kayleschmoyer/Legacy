@@ -150,11 +150,22 @@ jest.mock('@legacy-sports/shared-components', () => ({
   StatusBadge: ({ label }: { label: string }) => (
     <span data-testid="status-badge">{label}</span>
   ),
+  Skeleton: ({ width, height }: { width?: number; height?: number }) => (
+    <span
+      data-testid="skeleton-block"
+      data-width={width}
+      data-height={height}
+    />
+  ),
 }));
 
 let mockIsPremium = false;
+let mockIsPremiumLoading = false;
 jest.mock('../../hooks/useIsPremium', () => ({
-  useIsPremiumStatus: () => ({ isPremium: mockIsPremium, isLoading: false }),
+  useIsPremiumStatus: () => ({
+    isPremium: mockIsPremium,
+    isLoading: mockIsPremiumLoading,
+  }),
 }));
 
 jest.mock('../../utils/analytics', () => ({
@@ -326,6 +337,7 @@ describe('LeagueCreatePage — free league limit (LS-5012)', () => {
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
     mockIsPremium = false;
+    mockIsPremiumLoading = false;
   });
 
   it('does not show the limit banner when a free user has fewer than 3 leagues', () => {
@@ -426,6 +438,7 @@ describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
     mockIsPremium = false;
+    mockIsPremiumLoading = false;
   });
 
   it('pushes (not replaces) history when switching sport, so Back returns to the prior sport create page (LS-6110)', () => {
@@ -542,6 +555,7 @@ describe('LeagueCreatePage — selection reset notice (LS-4088)', () => {
     // Auction at all, so reaching the "reset from Auction" state requires a
     // premium viewer.
     mockIsPremium = true;
+    mockIsPremiumLoading = false;
   });
 
   it('shows the reset notice when switching from Auction to Automated draft', () => {
@@ -683,6 +697,7 @@ describe('LeagueCreatePage — Cancel discard confirmation (LS-6108)', () => {
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
     mockIsPremium = false;
+    mockIsPremiumLoading = false;
   });
 
   it('navigates immediately when Cancel is clicked with no unsaved changes', () => {
@@ -940,6 +955,7 @@ describe('LeagueCreatePage — unsaved-changes navigation guard (LS-6109)', () =
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
     mockIsPremium = false;
+    mockIsPremiumLoading = false;
   });
 
   function dispatchBeforeUnload() {
@@ -1657,6 +1673,7 @@ describe('LeagueCreatePage — Games Per Matchup typing bounds (LS-6101)', () =>
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
     mockIsPremium = false;
+    mockIsPremiumLoading = false;
   });
 
   it('clamps to the sport max while typing a value above the bound (baseball, max 162)', () => {
@@ -1749,6 +1766,7 @@ describe('LeagueCreatePage — Max Roster Size recommended marker (LS-6104)', ()
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
     mockIsPremium = false;
+    mockIsPremiumLoading = false;
   });
 
   // Scoped to the roster-size group's container, not `screen` — "16" is also
@@ -2315,5 +2333,53 @@ describe('LeagueCreatePage — ?name= sanitization (LS-6107 / CLB-051)', () => {
     renderPage('/baseball/league/create?name=My%20Great%20League');
     const input = screen.getByPlaceholderText('Enter your league name');
     expect(input.value).toBe('My Great League');
+  });
+});
+
+describe('LeagueCreatePage — premiumLoading cold-load era display (LS-6088)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+  });
+
+  it('shows the non-premium upsell banner once entitlements resolve as non-premium', () => {
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(screen.getByText('Historical eras are premium')).toBeInTheDocument();
+  });
+
+  it('does not show the upsell banner while premiumLoading is true, even though isPremium is still false', () => {
+    mockIsPremium = false;
+    mockIsPremiumLoading = true;
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(
+      screen.queryByText('Historical eras are premium'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders a loading skeleton for the era grid instead of locked tiles while premiumLoading is true', () => {
+    mockIsPremium = true;
+    mockIsPremiumLoading = true;
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(screen.getByTestId('era-entitlements-loading')).toBeInTheDocument();
+    expect(screen.getAllByTestId('skeleton-block').length).toBeGreaterThan(0);
+  });
+
+  it('renders the real era grid (no skeleton) once premiumLoading resolves', () => {
+    mockIsPremium = true;
+    mockIsPremiumLoading = false;
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(
+      screen.queryByTestId('era-entitlements-loading'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('skeleton-block')).not.toBeInTheDocument();
   });
 });

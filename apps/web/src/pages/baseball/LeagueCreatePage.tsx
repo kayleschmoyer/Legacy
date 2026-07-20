@@ -26,7 +26,11 @@ import {
   Lock,
 } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
-import { Dialog, StatusBadge } from '@legacy-sports/shared-components';
+import {
+  Dialog,
+  Skeleton,
+  StatusBadge,
+} from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { stripInvisibleAndControlChars } from '@legacy-sports/utils';
 import {
@@ -2593,8 +2597,10 @@ export function LeagueCreatePage(): React.JSX.Element {
                 open={openSections.has('era-history')}
                 onToggle={() => toggleSection('era-history')}
               >
-                {/* Premium upsell banner */}
-                {!isPremium && (
+                {/* Premium upsell banner — suppressed while entitlements are
+                    still loading so a premium user never sees a flash of the
+                    non-premium banner (LS-6088). */}
+                {!isPremium && !premiumLoading && (
                   <XStack
                     gap="$3"
                     alignItems="center"
@@ -2679,14 +2685,38 @@ export function LeagueCreatePage(): React.JSX.Element {
                   label="Historical Era Filter"
                   hint="Only players active during this window are draftable."
                 >
-                  <EraFilterGrid
-                    sport={formData.sport}
-                    value={formData.baseballEraFilter}
-                    onChange={(v) => handleInputChange('baseballEraFilter', v)}
-                    isPremium={!!isPremium && !premiumLoading}
-                    disabled={isFormDisabled}
-                    onUpgrade={openEraUpgradeModal}
-                  />
+                  {premiumLoading ? (
+                    <YStack
+                      gap="$2"
+                      data-testid="era-entitlements-loading"
+                      aria-label="Loading entitlements"
+                    >
+                      <Text fontFamily="$body" fontSize={12} color="$color11">
+                        Loading entitlements…
+                      </Text>
+                      <XStack flexWrap="wrap" gap="$2">
+                        {ERAS_BY_SPORT[formData.sport].map((era) => (
+                          <Skeleton
+                            key={era.id}
+                            width={96}
+                            height={76}
+                            radius={8}
+                          />
+                        ))}
+                      </XStack>
+                    </YStack>
+                  ) : (
+                    <EraFilterGrid
+                      sport={formData.sport}
+                      value={formData.baseballEraFilter}
+                      onChange={(v) =>
+                        handleInputChange('baseballEraFilter', v)
+                      }
+                      isPremium={!!isPremium}
+                      disabled={isFormDisabled}
+                      onUpgrade={openEraUpgradeModal}
+                    />
+                  )}
                 </FieldRow>
 
                 {/* Custom era year range */}
