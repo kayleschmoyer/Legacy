@@ -69,8 +69,6 @@ export function isPitcher(
 ): teamMember is AppTeamMemberFragment {
   if (teamMember === null) return false;
   const eligible = teamMember.player?.eligiblePositions ?? [];
-  // If no eligibility data, fall back to treating everyone as a pitcher
-  if (eligible.length === 0) return true;
   return eligible.some((pos) => PITCHING_POSITIONS.has(pos));
 }
 
