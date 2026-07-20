@@ -51,6 +51,11 @@ Preconditions that hold on every platform:
 
 Why the degraded path is background-only: the repo hook `.agents/hooks/enforce-background.mjs` exit-2 blocks foreground `make pc-<chunk>` (and foreground `pnpm exec nx affected|run-many`) because they exceed the Bash tool's ~120s inline timeout. `run_in_background: true` satisfies the hook and survives long chunks; completion arrives as a notification — do not poll output files while waiting. The companion hook `.claude/hooks/guard-make-pc.sh` warns (never blocks) on monolithic `make pc`.
 
+Two guardrails on the background wait (LS-8542, from the PR #6190 stall):
+
+- **Refresh the `<!-- continuation-plan -->` checkpoint before ending any turn that waits on a background chunk.** If the completion notification is missed or never processed, the session stalls permanently in draft; the `/sweep-prs` stalled-agent net ([sweep.md Step 2b](../pr-lifecycle/references/sweep.md)) is what recovers it, and it resumes from that checkpoint.
+- **This degraded path is cloud-only.** A _local_ session where `nx_run_pc_chunk`/`make_run` are missing has a **broken worktree** (usually a dead `node_modules` link — stdio MCP servers fail silently without `node_modules/.bin/tsx`), not a degraded environment. Repair it (`node scripts/modules-pool/link.mjs`, then restart the session) instead of adopting background-Bash validation — see [workflow-overview local nuances](../workflow-overview/SKILL.md#local-only-step-nuances).
+
 ## Spine step binding by platform
 
 | Spine step          | Copilot                                                                                                                | Connector CC web                                                                                                                  | Default CC web                                                                                                 |

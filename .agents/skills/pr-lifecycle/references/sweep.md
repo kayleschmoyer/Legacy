@@ -6,7 +6,7 @@ One-pass orchestration across all open PRs: scan, take API-only actions inline, 
 
 - **Chip** — an independent agent session spawned via `mcp__ccd_session__spawn_task`. Each chip runs in its own ephemeral worktree with no memory of this conversation, so every chip prompt must be self-contained. Chips are the only dispatch mechanism for per-PR code work — `Agent(...)` subagents are not (AGENTS.md Tool Usage tier rule).
 - **Orchestrator** — the session running this playbook. Permitted actions: scan, classify, label, comment, re-run CI, resolve meta threads, spawn chips, report. It does not `Read`/`Edit` PR files, run validation, read full CI logs, or push.
-- **Settled** — a PR requiring no further action this pass: clean, draft, owned by another agent (`agent-in-progress` label), dispatched to a chip, commanded (`@dependabot rebase` posted), or labeled `requires-human-review`.
+- **Settled** — a PR requiring no further action this pass: clean, a draft with no agent claim (human/WIP drafts), **freshly** agent-owned (`agent-in-progress` or `sweep-claimed` with recent activity — see the staleness rule in Step 1), dispatched to a chip, commanded (`@dependabot rebase` posted), or labeled `requires-human-review`. A **stale** agent claim is never settled — it marks a stalled agent session (Step 2b).
 
 **Environment routing**: this playbook requires chip dispatch and local git. Detect mode first: if `mcp__ccd_session__spawn_task` is absent (cloud/API-only session — no worktrees, no `twig`), run [sweep-cloud.md](sweep-cloud.md) instead. In a local session where `mcp__ccd_session__spawn_task` is unexpectedly unavailable, stop and inform the user — do not substitute `Agent()` dispatch.
 
@@ -32,17 +32,20 @@ github_ensure_sweep_labels()                      # ensures sweep-claimed / swee
 github_sweep_stale_claims(olderThanMinutes: 30)   # long queues only (>20 PRs): find claims left by crashed agents
 ```
 
-`github_sweep_stale_claims` returns `{ staleClaims: [{ number, title, claimedAt, minutesAgo }], ... }` using label-event timestamps. For each stale claim, remove the stale label so this pass can pick the PR up: `github_manage_labels(prs: [<PR#>], remove: ["sweep-claimed", "agent-in-progress"])`.
+`github_sweep_stale_claims` returns `{ staleClaims: [{ number, title, claimedAt, minutesAgo }], ... }` using label-event timestamps. For each stale claim, remove the stale label so this pass can pick the PR up: `github_manage_labels(prs: [<PR#>], remove: ["sweep-claimed", "agent-in-progress"])`. Note its blind spot: it scans **only** the `sweep-claimed` label — stalled author sessions carry `agent-in-progress` and are caught by Step 1's staleness rule + Step 2b instead, which run on **every** pass regardless of queue length.
 
 ## Step 1: Scan
 
 ```
-github_pr_dashboard(state: "open", limit: 100, excludeDrafts: true, format: "json")
+github_pr_dashboard(state: "open", limit: 100, excludeDrafts: false, format: "json")
 ```
 
-- Pass `excludeDrafts: true` explicitly on **every** dashboard call (drafts are owned by their creating agent; the response's top-level `draftsExcluded` count goes in the report). Pass `limit: 100` explicitly — the default is 30 and the hard cap is 100; if more than 100 PRs are open, cover the remainder with filtered slices (`label:` / `author:` params).
-- `format: "json"` returns the structured payload (`summary`, `prs[]` with `mergeable`, `hasConflictSignal`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`).
-- **Post-filter in-context**: the dashboard does **not** filter `agent-in-progress` or `sweep-claimed` server-side. Drop any PR whose `labels` include either — it is owned by another agent. Log the skipped count.
+- Pass `excludeDrafts: false` explicitly on **every** dashboard call — drafts must be in the scan for stalled-agent detection (Step 2b). Pass `limit: 100` explicitly — the default is 30 and the hard cap is 100; if more than 100 PRs are open, cover the remainder with filtered slices (`label:` / `author:` params).
+- `format: "json"` returns the structured payload (`summary`, `prs[]` with `mergeable`, `hasConflictSignal`, `ciStatus`, `reviewDecision`, `unresolvedThreads`, `labels[]`, `branch`, `isDraft`, `updatedAt`).
+- **Post-filter in-context with the staleness rule**: the dashboard does **not** filter `agent-in-progress` or `sweep-claimed` server-side. For each PR whose `labels` include either, compute minutes since `updatedAt`:
+  - **< 90 min** → freshly owned by another agent. Skip it and log the count. (A healthy author session bumps `updatedAt` continuously: checkpoint-comment refreshes after each validation chunk, pushes, label events.)
+  - **≥ 90 min** → **stalled agent session** — route to Step 2b. Do not skip it: the owning session is dead and nothing else will ever pick this PR up.
+- Drafts with **no** agent claim are human/WIP drafts: settled, count them for the report.
 - **Dashboard `ciStatus` can be stale** (checks latched on an old SHA). Before classifying a PR as CI-failing or clean, confirm job-level state with `github_pr_batch_status(numbers: [...])` — max 50 numbers per call, chunk larger lists.
 
 ## Step 2: API-fast triage (inline — no worktree)
@@ -56,6 +59,13 @@ For each PR, take whichever action applies:
 | Transient CI failure (single flaky/infra job, not a code defect)                   | `ci_rerun(runId: <id>, failedOnly: true)` — record the run ID as pending in the report; do not wait for it.                                                                                                                                                                                                                                                                                                                                        |
 | Meta-only unresolved threads (process comments, no code change requested)          | Fetch with `github_get_review_threads({ number: <PR#> })` (returns unresolved threads by default, each with a `PRRT_` node `id`), then resolve in one batch: `github_resolve_threads({ threadIds: [...], prNumber: <PR#> })`. Never resolve threads that request code changes — those go to a chip.                                                                                                                                                |
 | Bot-authored PR whose latest Copilot review is `COMMENTED` with 0 open threads     | Stale review state — Copilot does not re-review when threads are resolved externally. Re-request: `github_request_review(prs: [<PR#>])`.                                                                                                                                                                                                                                                                                                           |
+
+## Step 2b: Stalled-agent recovery (the draft-checkpoint consumer)
+
+For each PR the staleness rule flagged (agent claim + `updatedAt` ≥ 90 min ago):
+
+- **Draft** → dispatch a **resume-draft chip** (template in Step 4). This is the recovery consumer of the spine's [draft-PR-before-validation checkpoint](../../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions): the author session opened the draft, pushed, posted a `<!-- continuation-plan -->` comment, then died (most often mid-validation, waiting on a background-chunk notification that never got processed — the PR #6190 / LS-8542 incident). The checkpoint is worthless unless something resumes from it; this step is that something. Leave the existing `agent-in-progress` label in place — it is the resume chip's claim.
+- **Not draft** → the agent died after mark-ready. Release the stale claim (`github_manage_labels(prs: [<PR#>], remove: ["agent-in-progress", "sweep-claimed"])`) and let the PR flow into Steps 2–3 classification in this same pass like any other PR.
 
 ## Step 3: Classify actionable PRs
 
@@ -127,6 +137,26 @@ A task is complete when the fix is pushed (or a confirmed flake has been re-run)
 })
 ```
 
+### Resume-draft chip (stalled agent session — from Step 2b)
+
+The one chip type that targets a **draft**. Do not add `agent-in-progress` before dispatching — the stale label already on the PR is the claim the chip inherits.
+
+```
+mcp__ccd_session__spawn_task({
+  title: "Resume stalled draft PR #<num>",
+  tldr: "Draft PR #<num> was abandoned mid-validation by a stalled agent session; finish validation and drive it to Ready.",
+  prompt: `Draft PR #<num> on branch <branch> is a stalled agent draft: its author session died mid-validation (last PR activity <minutesAgo> min ago) and nothing else will pick it up. Resume it from its checkpoint — do not restart the work from zero and do not re-run steps the checkpoint marks done.
+
+1. Post a brief PR comment that you are resuming (github_comment_pr) — this refreshes the claim so concurrent sweeps skip the PR.
+2. Read the PR body and its most recent <!-- continuation-plan --> comment (github_list_pr_comments) to learn what is already done and what is left. If no checkpoint exists, assume everything after the first push is left: migrations, all seven pc-* chunks, self-review, mark ready.
+3. Enter a worktree for branch <branch> — fetch first; the branch exists on the remote; check it out, never rename it. Run node scripts/modules-pool/link.mjs before any pnpm/make command.
+4. Finish the remaining spine steps in order per .agents/skills/workflow-overview/references/ticket-to-merge-spine.md: migrations status+apply, the seven pc-* chunks in canonical order (fix failures at the root), self-review per .agents/skills/pr-lifecycle/references/common-review-patterns.md, then github_mark_pr_ready({ number: <num> }) and transition the ticket in the PR title to In Review.
+5. Refresh the <!-- continuation-plan --> comment after each chunk so a future stall is recoverable.
+
+A task is complete when the PR is Ready (isDraft: false, bot:ready-for-review applied) with validation green. Never end a turn with the PR still in draft — if genuinely blocked, explain the blocker in a PR comment and remove agent-in-progress (github_manage_labels(prs: [<num>], remove: ["agent-in-progress"])) so the next sweep can act.`
+})
+```
+
 Substitute concrete `<num>`, `<branch>`, and failing-check lists per PR. Keep titles under 60 chars.
 
 > **Chips are not event-bound.** A chip session starts on an auto-generated `claude/<worktree>` branch, so PR push notifications never route to it unless it checks out the PR head branch and calls `worktree_set` (binding is by PR head branch, cached at session start — see [drive.md Gotchas](drive.md#gotchas) and anthropics/claude-code#18690). This is why every template above ends with push → release claim → **stop**: a chip that ends its turn "waiting for the next review/CI event" waits forever, and the PR silently stalls. Re-invoking `/sweep-prs` (or `/loop 30m /sweep-prs`) is the re-scan mechanism, not chip-side waiting.
@@ -142,7 +172,8 @@ Substitute concrete `<num>`, `<branch>`, and failing-check lists per PR. Keep ti
 
 Print a summary listing:
 
-- Draft PRs skipped (`draftsExcluded`) and `agent-in-progress`/`sweep-claimed` PRs skipped
+- Human/WIP drafts skipped (no agent claim) and freshly agent-owned PRs skipped (claim + activity < 90 min)
+- Stalled agent sessions recovered: resume-draft chips dispatched (each with PR link + minutes stale) and stale non-draft claims released
 - Clean PRs where `bot:ready-for-review` was (re-)applied (Reviewer Bot will label `merge-when-ready` on APPROVED)
 - Dependabot PRs commented / routed to [sweep-dependabot](../../sweep-dependabot/SKILL.md)
 - CI re-runs triggered (run IDs, recorded as pending — not awaited)
@@ -181,6 +212,7 @@ When one MCP tool fails, do not assume the server is down:
 
 ## Provenance and maintenance
 
+- 2026-07-20 (LS-8542): added the staleness rule, Step 2b, and the resume-draft chip after the PR #6190 incident — a stalled author session left a draft with `agent-in-progress` that was invisible to every net (drafts excluded from the scan, agent-claimed PRs post-filtered out, `github_sweep_stale_claims` scans only `sweep-claimed`).
 - Rewritten 2026-07-02 from the Phase-1 skills audit (`scratch/skills-audit/synthesis.json`, inconsistency #14): consolidates and replaces `sweep-passes.md`, `pr-maintenance.md`, `pr-maintenance-workflow.md`, `sweep-prs.md`, `sweep-and-parallelization.md`, and `multi-agent-sweep-coordination.md`. Removed: mandated 60s CI polling loops (banned — event-driven), `Agent()` PR-work dispatch (chips only), the `Workflow`/`pipeline()` triage primitive (not in the harness), and citations of nonexistent tools (`github_list_review_threads`, `github_resolve_thread`, `github_pr_files`).
 - Verify tool names: `grep -rEho "'github_[a-z_]+'" tools/mcp/github-server/src/*.ts | sort -u` and `grep -rEho "'worktree_[a-z_]+'" tools/mcp/worktree-server/src/*.ts | sort -u`
 - Verify dashboard params/caps (limit max 100, default 30; `excludeDrafts` default true; no server-side `agent-in-progress` filter): `grep -n -A30 "'github_pr_dashboard'" tools/mcp/github-server/src/index.ts`
