@@ -2225,7 +2225,7 @@ export function MatchupRosterComparison({
                 backgroundColor="$gray3"
               >
                 <Text fontSize="$1" fontWeight="600" color="$textMuted">
-                  {team1Bench.length + team2Bench.length}
+                  {team1Bench.length} vs {team2Bench.length}
                 </Text>
               </XStack>
             </BenchToggle>
