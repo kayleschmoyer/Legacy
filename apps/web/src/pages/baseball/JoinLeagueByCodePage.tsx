@@ -267,7 +267,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 leagueInfo &&
                 (leagueInfo.isAlreadyMember ? (
                   <Text
-                    color="$blue10"
+                    color="$brandGoldLight"
                     fontSize="$2"
                     fontWeight="600"
                     data-testid="invite-validation-invalid"

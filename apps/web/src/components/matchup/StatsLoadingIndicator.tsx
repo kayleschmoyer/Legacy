@@ -32,9 +32,9 @@ export function StatsLoadingIndicator({
     switch (status) {
       case StatsLoadingStatus.Loading:
         return {
-          icon: <Spinner size="small" color="$blue10" />,
-          color: '$blue10',
-          bgColor: '$blue3',
+          icon: <Spinner size="small" color="$brandNavyLight" />,
+          color: '$brandNavyLight',
+          bgColor: '$surfaceInteractive',
           text: 'Loading game stats...',
           description: 'Fetching player game data from Baseball Reference',
         };

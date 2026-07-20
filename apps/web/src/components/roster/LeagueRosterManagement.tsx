@@ -810,7 +810,16 @@ export function LeagueRosterManagement({
                     <Button
                       size="$3"
                       variant="outlined"
-                      theme="blue"
+                      borderColor="$brandNavyLight"
+                      color="$brandNavyLight"
+                      hoverStyle={{
+                        borderColor: '$brandNavy',
+                        color: '$brandNavy',
+                      }}
+                      pressStyle={{
+                        borderColor: '$brandNavyDark',
+                        color: '$brandNavyDark',
+                      }}
                       onPress={() => setSelectedPlayer(null)}
                     >
                       Clear Selection

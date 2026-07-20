@@ -112,7 +112,7 @@ export function AvatarPicker({
                 style={{ cursor: 'pointer', position: 'relative' }}
                 borderRadius="$3"
                 borderWidth={2}
-                borderColor={isActive ? '$blue10' : 'transparent'}
+                borderColor={isActive ? '$brandNavyLight' : 'transparent'}
                 padding={2}
                 title={preset.label}
               >
@@ -162,7 +162,10 @@ export function AvatarPicker({
         </Button>
         <Button
           size="$3"
-          theme="blue"
+          backgroundColor="$brandNavyLight"
+          color="$textOnAccent"
+          hoverStyle={{ backgroundColor: '$brandNavy' }}
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
           onPress={handleSave}
           disabled={loading}
           icon={loading ? <Spinner size="small" /> : undefined}

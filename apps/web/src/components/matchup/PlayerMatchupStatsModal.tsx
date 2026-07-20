@@ -498,7 +498,7 @@ export function PlayerMatchupStatsModal({
                       <Text fontSize="$2" color="$gray11">
                         Total Score
                       </Text>
-                      <H3 color="$blue11">
+                      <H3 color="$brandGoldLight">
                         {scoreBreakdown.totalScore.toFixed(2)}
                       </H3>
                     </YStack>
@@ -513,7 +513,7 @@ export function PlayerMatchupStatsModal({
                 {/* Batting Stats */}
                 {scoreBreakdown.batting.length > 0 && (
                   <YStack gap="$2">
-                    <H4 paddingHorizontal="$3" color="$blue11">
+                    <H4 paddingHorizontal="$3" color="$brandGoldLight">
                       Batting
                     </H4>
                     <Card bordered>
@@ -560,7 +560,7 @@ export function PlayerMatchupStatsModal({
                 {/* Pitching Stats */}
                 {scoreBreakdown.pitching.length > 0 && (
                   <YStack gap="$2">
-                    <H4 paddingHorizontal="$3" color="$blue11">
+                    <H4 paddingHorizontal="$3" color="$brandGoldLight">
                       Pitching
                     </H4>
                     <Card bordered>
@@ -607,7 +607,7 @@ export function PlayerMatchupStatsModal({
                 {/* Fielding Stats */}
                 {scoreBreakdown.fielding.length > 0 && (
                   <YStack gap="$2">
-                    <H4 paddingHorizontal="$3" color="$blue11">
+                    <H4 paddingHorizontal="$3" color="$brandGoldLight">
                       Fielding
                     </H4>
                     <Card bordered>

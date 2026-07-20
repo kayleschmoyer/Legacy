@@ -619,7 +619,10 @@ export default function AdminUsersPage() {
                 Cancel
               </Button>
               <Button
-                theme="blue"
+                backgroundColor="$brandNavyLight"
+                color="$textOnAccent"
+                hoverStyle={{ backgroundColor: '$brandNavy' }}
+                pressStyle={{ backgroundColor: '$brandNavyDark' }}
                 onPress={() => {
                   void handleImpersonateConfirm();
                 }}
@@ -695,7 +698,21 @@ export default function AdminUsersPage() {
                       </Button>
                       {!isSelfRevoke && (
                         <Button
-                          theme={willRevoke ? 'red' : 'blue'}
+                          theme={willRevoke ? 'red' : undefined}
+                          backgroundColor={
+                            willRevoke ? undefined : '$brandNavyLight'
+                          }
+                          color={willRevoke ? undefined : '$textOnAccent'}
+                          hoverStyle={
+                            willRevoke
+                              ? undefined
+                              : { backgroundColor: '$brandNavy' }
+                          }
+                          pressStyle={
+                            willRevoke
+                              ? undefined
+                              : { backgroundColor: '$brandNavyDark' }
+                          }
                           onPress={() => {
                             const { userId, currentLevel } = pendingToggle;
                             setPendingToggle(null);

@@ -92,7 +92,7 @@ function SlotRow({
           width={28}
           height={28}
           borderRadius="$full"
-          backgroundColor={count > 0 ? '$blue9' : PANEL_BORDER}
+          backgroundColor={count > 0 ? '$brandNavyLight' : PANEL_BORDER}
           alignItems="center"
           justifyContent="center"
           cursor={count > 0 ? 'pointer' : 'default'}
@@ -115,7 +115,7 @@ function SlotRow({
           width={28}
           height={28}
           borderRadius="$full"
-          backgroundColor="$blue9"
+          backgroundColor="$brandNavyLight"
           alignItems="center"
           justifyContent="center"
           cursor="pointer"
@@ -169,10 +169,10 @@ export function StepRosterSettings({
 
       <YStack
         padding="$3"
-        backgroundColor="$blue2"
+        backgroundColor="$surfaceInteractive"
         borderRadius="$2"
         borderWidth={1}
-        borderColor="$blue6"
+        borderColor="$outlineSubtle"
       >
         <XStack gap="$4">
           <YStack alignItems="center">

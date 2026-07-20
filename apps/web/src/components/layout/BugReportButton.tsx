@@ -755,7 +755,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({
                   </Dialog.Close>
                   <Button
                     size="$3"
-                    backgroundColor="$blue9"
+                    backgroundColor="$brandNavyLight"
                     borderWidth={0}
                     borderRadius="$5"
                     disabled={isLoading || !description.trim()}

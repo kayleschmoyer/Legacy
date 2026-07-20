@@ -148,7 +148,7 @@ export function MatchupScoreboard({
 
   const getStatusBadgeColor = () => {
     if (status === MatchupStatus.InProgress) return '$green10';
-    if (status === MatchupStatus.Completed) return '$blue10';
+    if (status === MatchupStatus.Completed) return '$brandGoldLight';
     return '$gray10';
   };
 
@@ -204,10 +204,10 @@ export function MatchupScoreboard({
           alignItems="center"
           paddingVertical="$3"
           paddingHorizontal="$4"
-          backgroundColor={team1Leading ? '$blue3' : '$background'}
+          backgroundColor={team1Leading ? '$surfaceInteractive' : '$background'}
           borderRadius="$3"
           borderWidth={team1Leading ? 2 : 0}
-          borderColor={team1Leading ? '$blue8' : 'transparent'}
+          borderColor={team1Leading ? '$brandNavyLight' : 'transparent'}
           flexWrap="wrap"
           gap="$2"
         >
@@ -222,7 +222,7 @@ export function MatchupScoreboard({
           <H3
             fontSize="$9"
             fontWeight="900"
-            color={team1Leading ? '$blue11' : '$gray11'}
+            color={team1Leading ? '$brandGoldLight' : '$gray11'}
           >
             {team1Score?.toFixed(2) ?? '0.00'}
           </H3>
@@ -234,10 +234,10 @@ export function MatchupScoreboard({
           alignItems="center"
           paddingVertical="$3"
           paddingHorizontal="$4"
-          backgroundColor={team2Leading ? '$blue3' : '$background'}
+          backgroundColor={team2Leading ? '$surfaceInteractive' : '$background'}
           borderRadius="$3"
           borderWidth={team2Leading ? 2 : 0}
-          borderColor={team2Leading ? '$blue8' : 'transparent'}
+          borderColor={team2Leading ? '$brandNavyLight' : 'transparent'}
           flexWrap="wrap"
           gap="$2"
         >
@@ -252,7 +252,7 @@ export function MatchupScoreboard({
           <H3
             fontSize="$9"
             fontWeight="900"
-            color={team2Leading ? '$blue11' : '$gray11'}
+            color={team2Leading ? '$brandGoldLight' : '$gray11'}
           >
             {team2Score?.toFixed(2) ?? '0.00'}
           </H3>

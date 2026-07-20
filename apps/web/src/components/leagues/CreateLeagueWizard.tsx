@@ -296,11 +296,19 @@ export function CreateLeagueWizard() {
               height={isCurrent ? 28 : 22}
               borderRadius="$full"
               backgroundColor={
-                isDone ? BRAND_GOLD : isCurrent ? '$blue9' : SURFACE_CARD
+                isDone
+                  ? BRAND_GOLD
+                  : isCurrent
+                    ? '$brandNavyLight'
+                    : SURFACE_CARD
               }
               borderWidth={1}
               borderColor={
-                isDone ? BRAND_GOLD : isCurrent ? '$blue9' : PANEL_BORDER
+                isDone
+                  ? BRAND_GOLD
+                  : isCurrent
+                    ? '$brandNavyLight'
+                    : PANEL_BORDER
               }
               alignItems="center"
               justifyContent="center"
@@ -470,7 +478,7 @@ export function CreateLeagueWizard() {
               flex={1}
               padding="$3"
               borderRadius="$3"
-              backgroundColor="$blue9"
+              backgroundColor="$brandNavyLight"
               alignItems="center"
               justifyContent="center"
               cursor="pointer"

@@ -31,7 +31,7 @@ export function StandingsPage() {
         justifyContent="center"
         minHeight={400}
       >
-        <Spinner size="large" color="$blue10" />
+        <Spinner size="large" color="$brandNavyLight" />
         <Text marginTop="$2" color="$gray11">
           Loading standings...
         </Text>
@@ -54,7 +54,14 @@ export function StandingsPage() {
           {String(error.message)}
         </Text>
         {}
-        <Button marginTop="$4" theme="blue" onPress={() => refetch()}>
+        <Button
+          marginTop="$4"
+          backgroundColor="$brandNavyLight"
+          color="$textOnAccent"
+          hoverStyle={{ backgroundColor: '$brandNavy' }}
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
+          onPress={() => refetch()}
+        >
           Retry
         </Button>
       </YStack>
@@ -83,7 +90,10 @@ export function StandingsPage() {
             Refresh
           </Button>
           <Button
-            theme="blue"
+            backgroundColor="$brandNavyLight"
+            color="$textOnAccent"
+            hoverStyle={{ backgroundColor: '$brandNavy' }}
+            pressStyle={{ backgroundColor: '$brandNavyDark' }}
             onPress={() => navigate(`/baseball/league/${leagueId ?? ''}`)}
           >
             Back to League
@@ -100,7 +110,7 @@ export function StandingsPage() {
           <Separator />
           {bracketLoading ? (
             <XStack justifyContent="center" padding="$4">
-              <Spinner size="small" color="$blue10" />
+              <Spinner size="small" color="$brandNavyLight" />
             </XStack>
           ) : bracketData?.getPlayoffBracket ? (
             <PlayoffBracket bracket={bracketData.getPlayoffBracket} />

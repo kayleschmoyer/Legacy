@@ -313,7 +313,7 @@ function LeagueTradesView({
         <Text
           tag="button"
           onPress={onBack}
-          color="$blue10"
+          color="$brandGoldLight"
           fontSize="$4"
           pressStyle={{ opacity: 0.7 }}
           accessibilityRole="button"
@@ -327,8 +327,8 @@ function LeagueTradesView({
           }
         >
           <XStack alignItems="center" gap="$1">
-            <ChevronLeft size={16} color="$blue10" />
-            <Text color="$blue10" fontSize="$3">
+            <ChevronLeft size={16} color="$brandGoldLight" />
+            <Text color="$brandGoldLight" fontSize="$3">
               {leagueName}
             </Text>
           </XStack>
@@ -552,7 +552,7 @@ export function TradeCenterPage(): React.JSX.Element {
                 <Text
                   tag="button"
                   onPress={() => void refetch()}
-                  color="$blue10"
+                  color="$brandGoldLight"
                   fontSize="$3"
                   pressStyle={{ opacity: 0.7 }}
                   accessibilityRole="button"

@@ -36,7 +36,7 @@ const getPositionColors = (
   const pos = position.toUpperCase();
   if (pos === 'C') return { bg: '$amber3', text: '$amber11' };
   if (['1B', '2B', '3B', 'SS', 'IF'].includes(pos))
-    return { bg: '$blue3', text: '$blue11' };
+    return { bg: '$surfaceInteractive', text: '$brandGoldLight' };
   if (['LF', 'CF', 'RF', 'OF'].includes(pos))
     return { bg: '$green3', text: '$green11' };
   if (pos === 'SP') return { bg: '$amber6', text: '$amber12' };
@@ -231,7 +231,7 @@ function SkeletonLoading({
         <XStack
           padding="$2.5"
           paddingHorizontal="$4"
-          backgroundColor="$blue2"
+          backgroundColor="$surfaceInteractive"
           gap="$2"
           alignItems="center"
         >
@@ -239,12 +239,12 @@ function SkeletonLoading({
             width={4}
             height={16}
             borderRadius={2}
-            backgroundColor="$blue9"
+            backgroundColor="$brandNavyLight"
           />
           <Text
             fontSize="$3"
             fontWeight="700"
-            color="$blue11"
+            color="$brandGoldLight"
             letterSpacing={0.3}
           >
             STARTING LINEUP
@@ -299,7 +299,7 @@ function SkeletonLoading({
               <Text
                 fontSize="$1"
                 fontWeight="700"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
                 letterSpacing={0.5}
               >
@@ -313,7 +313,7 @@ function SkeletonLoading({
               <Text
                 fontSize="$1"
                 fontWeight="700"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
                 letterSpacing={0.5}
               >
@@ -469,7 +469,7 @@ function SkeletonLoading({
               <Text
                 fontSize="$1"
                 fontWeight="700"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
                 letterSpacing={0.5}
               >
@@ -483,7 +483,7 @@ function SkeletonLoading({
               <Text
                 fontSize="$1"
                 fontWeight="700"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
                 letterSpacing={0.5}
               >
@@ -1411,7 +1411,7 @@ export function MatchupRosterComparison({
                     color="$gray12"
                     cursor="pointer"
                     hoverStyle={{
-                      color: '$blue11',
+                      color: '$brandGoldLight',
                       textDecoration: 'underline',
                     }}
                     onPress={() => {
@@ -1448,7 +1448,7 @@ export function MatchupRosterComparison({
 
                           if (loadingCount > 0) {
                             return (
-                              <Text color="$blue10">
+                              <Text color="$brandGoldLight">
                                 {' '}
                                 • Loading stats ({loadingCount})
                               </Text>
@@ -1470,7 +1470,7 @@ export function MatchupRosterComparison({
                     )}
                   </Text>
                   {team1Stats && (
-                    <Text fontSize="$1" color="$blue10" marginTop="$1">
+                    <Text fontSize="$1" color="$brandGoldLight" marginTop="$1">
                       {team1Stats}
                     </Text>
                   )}
@@ -1612,7 +1612,7 @@ export function MatchupRosterComparison({
                     textAlign="right"
                     cursor="pointer"
                     hoverStyle={{
-                      color: '$blue11',
+                      color: '$brandGoldLight',
                       textDecoration: 'underline',
                     }}
                     onPress={() => {
@@ -1649,7 +1649,7 @@ export function MatchupRosterComparison({
 
                           if (loadingCount > 0) {
                             return (
-                              <Text color="$blue10">
+                              <Text color="$brandGoldLight">
                                 {' '}
                                 • Loading stats ({loadingCount})
                               </Text>
@@ -1673,7 +1673,7 @@ export function MatchupRosterComparison({
                   {team2Stats && (
                     <Text
                       fontSize="$1"
-                      color="$blue10"
+                      color="$brandGoldLight"
                       marginTop="$1"
                       textAlign="right"
                     >
@@ -1774,11 +1774,11 @@ export function MatchupRosterComparison({
       >
         {/* Starters Section Header */}
         <YStack
-          backgroundColor="$blue3"
+          backgroundColor="$surfaceInteractive"
           paddingVertical="$2"
           paddingHorizontal="$3"
         >
-          <H5 color="$blue11">Starting Lineup</H5>
+          <H5 color="$brandGoldLight">Starting Lineup</H5>
         </YStack>
 
         {/* Header Row for Starters */}
@@ -1787,9 +1787,9 @@ export function MatchupRosterComparison({
           paddingVertical="$2.5"
           paddingLeft="$3"
           paddingRight="$3"
-          backgroundColor="$blue2"
+          backgroundColor="$surfaceInteractive"
           borderBottomWidth={2}
-          borderBottomColor="$blue7"
+          borderBottomColor="$outlineStrong"
           justifyContent="space-between"
           alignItems="center"
         >
@@ -1799,7 +1799,7 @@ export function MatchupRosterComparison({
               <Text
                 fontSize="$2"
                 fontWeight="bold"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
               >
                 Pos
@@ -1809,7 +1809,7 @@ export function MatchupRosterComparison({
               <Text
                 fontSize="$2"
                 fontWeight="bold"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
               >
                 {team1Name}
@@ -1829,21 +1829,21 @@ export function MatchupRosterComparison({
               <Text
                 fontSize="$2"
                 fontWeight="bold"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
               >
                 Actual
               </Text>
             </YStack>
           </XStack>
-          <Separator vertical height="100%" borderColor="$blue6" />
+          <Separator vertical height="100%" borderColor="$outlineSubtle" />
           {/* Team 2 Side - 47% */}
           <XStack width="47%" alignItems="center" gap="$2">
             <YStack width={60} flexShrink={0} alignItems="center">
               <Text
                 fontSize="$2"
                 fontWeight="bold"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
               >
                 Actual
@@ -1863,7 +1863,7 @@ export function MatchupRosterComparison({
               <Text
                 fontSize="$2"
                 fontWeight="bold"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
               >
                 {team2Name}
@@ -1873,7 +1873,7 @@ export function MatchupRosterComparison({
               <Text
                 fontSize="$2"
                 fontWeight="bold"
-                color="$blue11"
+                color="$brandGoldLight"
                 textTransform="uppercase"
               >
                 Pos
@@ -1912,9 +1912,9 @@ export function MatchupRosterComparison({
           paddingVertical="$3"
           paddingLeft="$3"
           paddingRight="$3"
-          backgroundColor="$blue2"
+          backgroundColor="$surfaceInteractive"
           borderTopWidth={2}
-          borderTopColor="$blue8"
+          borderTopColor="$brandNavyLight"
           marginTop="$3"
           justifyContent="space-between"
           alignItems="center"
@@ -1922,7 +1922,7 @@ export function MatchupRosterComparison({
           {/* Team 1 Side - 47% */}
           <XStack width="47%" alignItems="center" gap="$2">
             <YStack flex={1} minWidth={0}>
-              <Text fontSize="$4" fontWeight="800" color="$blue11">
+              <Text fontSize="$4" fontWeight="800" color="$brandGoldLight">
                 Hitters Total
               </Text>
             </YStack>
@@ -1948,7 +1948,7 @@ export function MatchupRosterComparison({
           <Separator
             vertical
             height="100%"
-            borderColor="$blue8"
+            borderColor="$brandNavyLight"
             borderWidth={2}
           />
           {/* Team 2 Side - 47% */}
@@ -1972,7 +1972,7 @@ export function MatchupRosterComparison({
               </Text>
             </YStack>
             <YStack flex={1} alignItems="flex-end" minWidth={0}>
-              <Text fontSize="$4" fontWeight="800" color="$blue11">
+              <Text fontSize="$4" fontWeight="800" color="$brandGoldLight">
                 Hitters Total
               </Text>
             </YStack>
@@ -1992,11 +1992,11 @@ export function MatchupRosterComparison({
           marginBottom={0}
         >
           <YStack
-            backgroundColor="$blue3"
+            backgroundColor="$surfaceInteractive"
             paddingVertical="$2"
             paddingHorizontal="$3"
           >
-            <H5 color="$blue11">Pitchers</H5>
+            <H5 color="$brandGoldLight">Pitchers</H5>
           </YStack>
           <YStack>
             {Array.from({ length: maxPitcherRows }).map((_, index) =>
@@ -2015,9 +2015,9 @@ export function MatchupRosterComparison({
             paddingVertical="$3"
             paddingLeft="$3"
             paddingRight="$3"
-            backgroundColor="$blue2"
+            backgroundColor="$surfaceInteractive"
             borderTopWidth={2}
-            borderTopColor="$blue8"
+            borderTopColor="$brandNavyLight"
             marginTop="$3"
             justifyContent="space-between"
             alignItems="center"
@@ -2025,7 +2025,7 @@ export function MatchupRosterComparison({
             {/* Team 1 Side - 47% */}
             <XStack width="47%" alignItems="center" gap="$2">
               <YStack flex={1} minWidth={0}>
-                <Text fontSize="$4" fontWeight="800" color="$blue11">
+                <Text fontSize="$4" fontWeight="800" color="$brandGoldLight">
                   Pitchers Total
                 </Text>
               </YStack>
@@ -2051,7 +2051,7 @@ export function MatchupRosterComparison({
             <Separator
               vertical
               height="100%"
-              borderColor="$blue8"
+              borderColor="$brandNavyLight"
               borderWidth={2}
             />
             {/* Team 2 Side - 47% */}
@@ -2075,7 +2075,7 @@ export function MatchupRosterComparison({
                 </Text>
               </YStack>
               <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                <Text fontSize="$4" fontWeight="800" color="$blue11">
+                <Text fontSize="$4" fontWeight="800" color="$brandGoldLight">
                   Pitchers Total
                 </Text>
               </YStack>
@@ -2137,11 +2137,11 @@ export function MatchupRosterComparison({
                 <>
                   {/* Bullpen Section Header */}
                   <YStack
-                    backgroundColor="$blue3"
+                    backgroundColor="$surfaceInteractive"
                     paddingVertical="$2"
                     paddingHorizontal="$3"
                   >
-                    <H5 color="$blue11">Bullpen</H5>
+                    <H5 color="$brandGoldLight">Bullpen</H5>
                   </YStack>
 
                   {/* Header Row for Bullpen */}
@@ -2162,7 +2162,7 @@ export function MatchupRosterComparison({
                         <Text
                           fontSize="$2"
                           fontWeight="bold"
-                          color="$blue11"
+                          color="$brandGoldLight"
                           textTransform="uppercase"
                         >
                           {team1Name} Bullpen
@@ -2221,7 +2221,7 @@ export function MatchupRosterComparison({
                         <Text
                           fontSize="$2"
                           fontWeight="bold"
-                          color="$blue11"
+                          color="$brandGoldLight"
                           textTransform="uppercase"
                         >
                           {team2Name} Bullpen
@@ -2250,11 +2250,11 @@ export function MatchupRosterComparison({
                 <>
                   {/* Bench Section Header */}
                   <YStack
-                    backgroundColor="$blue3"
+                    backgroundColor="$surfaceInteractive"
                     paddingVertical="$2"
                     paddingHorizontal="$3"
                   >
-                    <H5 color="$blue11">Bench</H5>
+                    <H5 color="$brandGoldLight">Bench</H5>
                   </YStack>
 
                   {/* Header Row for Bench */}
@@ -2275,7 +2275,7 @@ export function MatchupRosterComparison({
                         <Text
                           fontSize="$2"
                           fontWeight="bold"
-                          color="$blue11"
+                          color="$brandGoldLight"
                           textTransform="uppercase"
                         >
                           {team1Name} Bench
@@ -2334,7 +2334,7 @@ export function MatchupRosterComparison({
                         <Text
                           fontSize="$2"
                           fontWeight="bold"
-                          color="$blue11"
+                          color="$brandGoldLight"
                           textTransform="uppercase"
                         >
                           {team2Name} Bench

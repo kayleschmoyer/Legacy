@@ -121,7 +121,7 @@ export function BannerPicker({
                 }}
                 borderRadius="$3"
                 borderWidth={2}
-                borderColor={isActive ? '$blue10' : '$gray5'}
+                borderColor={isActive ? '$brandNavyLight' : '$gray5'}
                 overflow="hidden"
                 title={preset.label}
               >
@@ -136,7 +136,7 @@ export function BannerPicker({
                   }}
                 />
                 <XStack
-                  backgroundColor={isActive ? '$blue3' : '$gray3'}
+                  backgroundColor={isActive ? '$surfaceInteractive' : '$gray3'}
                   paddingHorizontal="$2"
                   paddingVertical="$1"
                   justifyContent="center"
@@ -144,7 +144,7 @@ export function BannerPicker({
                   <Text
                     fontSize="$1"
                     fontWeight={isActive ? '700' : '400'}
-                    color={isActive ? '$blue11' : '$gray10'}
+                    color={isActive ? '$brandGoldLight' : '$gray10'}
                   >
                     {preset.label}
                   </Text>
@@ -188,7 +188,10 @@ export function BannerPicker({
         </Button>
         <Button
           size="$3"
-          theme="blue"
+          backgroundColor="$brandNavyLight"
+          color="$textOnAccent"
+          hoverStyle={{ backgroundColor: '$brandNavy' }}
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
           onPress={handleSave}
           disabled={loading}
           icon={loading ? <Spinner size="small" /> : undefined}

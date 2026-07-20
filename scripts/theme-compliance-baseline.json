@@ -2,8 +2,8 @@
   "apps/web": {
     "rawHex": 311,
     "rawRgba": 168,
-    "blueToken": 128,
-    "themeBlue": 7
+    "blueToken": 0,
+    "themeBlue": 0
   },
   "apps/app": {
     "rawHex": 88,

@@ -327,7 +327,7 @@ function ForceRosterMovesSection({
           onPress={() => requireStepUp(() => void handleForceAdd())}
           disabled={addLoading || !addTeamId || !addPlayerId}
           icon={addLoading ? <Spinner size="small" /> : <UserPlus size={14} />}
-          backgroundColor="$blue9"
+          backgroundColor="$brandNavyLight"
           color="white"
           alignSelf="flex-start"
         >
@@ -567,7 +567,7 @@ export function EditMatchupScoresSection({
             onPress={() => requireStepUp(() => void handleEdit())}
             disabled={loading || !matchupId || !team1Score || !team2Score}
             icon={loading ? <Spinner size="small" /> : <Check size={14} />}
-            backgroundColor="$blue9"
+            backgroundColor="$brandNavyLight"
             color="white"
             alignSelf="flex-start"
           >
@@ -713,7 +713,7 @@ export function SwapMatchupTeamsSection({
             onPress={() => requireStepUp(() => void handleSwap())}
             disabled={loading || !matchupId1 || !matchupId2}
             icon={loading ? <Spinner size="small" /> : <RefreshCw size={14} />}
-            backgroundColor="$blue9"
+            backgroundColor="$brandNavyLight"
             color="white"
             alignSelf="flex-start"
           >
@@ -1030,7 +1030,7 @@ function RecalculateScoresSection({
       borderColor="$surfacePanelBorder"
     >
       <SectionHeader
-        icon={<Calculator size={16} color="$blue10" />}
+        icon={<Calculator size={16} color="$brandGoldLight" />}
         title="Recalculate Matchup Scores"
         description="Retroactively recalculate all matchup scores using the league's current scoring settings. Useful after changing scoring multipliers."
       />
@@ -1223,7 +1223,7 @@ function AuditLogSection({ leagueId }: { leagueId: number }) {
                 <Text
                   fontSize="$2"
                   fontWeight="600"
-                  color="$blue10"
+                  color="$brandGoldLight"
                   minWidth={80}
                 >
                   {log.action != null
@@ -1280,14 +1280,14 @@ export function CommissionerToolsControl({
 
       <Card
         padding="$3"
-        backgroundColor="$blue2"
-        borderColor="$blue6"
+        backgroundColor="$surfaceInteractive"
+        borderColor="$outlineSubtle"
         borderWidth={1}
         borderRadius="$4"
       >
         <XStack alignItems="center" gap="$2">
           <AlertTriangle size={14} color="#60A5FA" />
-          <Text fontSize="$2" color="$blue11">
+          <Text fontSize="$2" color="$brandGoldLight">
             <Text fontWeight="700">Advanced Commissioner Tools</Text> — All
             actions are audit-logged and visible to other commissioners.
           </Text>

@@ -382,7 +382,10 @@ export function LeagueDuesControl({
           Reset
         </Button>
         <Button
-          theme="blue"
+          backgroundColor="$brandNavyLight"
+          color="$textOnAccent"
+          hoverStyle={{ backgroundColor: '$brandNavy' }}
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
           size="$3"
           onPress={() => void handleSave()}
           disabled={!hasChanges || saving || !!validationError}

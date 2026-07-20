@@ -1835,18 +1835,18 @@ export function MatchupRosterComparison({
         {/* Banner when server-side stats are still being processed */}
         {isStatsLoading(matchup.statsLoadingStatus) && (
           <XStack
-            backgroundColor="$blue2"
+            backgroundColor="$surfaceInteractive"
             padding="$3"
             borderBottomWidth={1}
-            borderBottomColor="$blue6"
+            borderBottomColor="$outlineSubtle"
             gap="$2"
             alignItems="flex-start"
           >
             <YStack gap="$1">
-              <Text fontSize="$2" color="$blue11" fontWeight="600">
+              <Text fontSize="$2" color="$brandGoldLight" fontWeight="600">
                 Stats are updating
               </Text>
-              <Text fontSize="$1" color="$blue10">
+              <Text fontSize="$1" color="$brandGoldLight">
                 Scores will refresh automatically as game stats finish loading.
               </Text>
             </YStack>
@@ -1924,10 +1924,14 @@ export function MatchupRosterComparison({
                     paddingHorizontal="$1.5"
                     paddingVertical="$0.5"
                     borderRadius="$10"
-                    backgroundColor="$blue3"
+                    backgroundColor="$surfaceInteractive"
                     alignSelf="flex-start"
                   >
-                    <Text fontSize="$1" fontWeight="700" color="$blue10">
+                    <Text
+                      fontSize="$1"
+                      fontWeight="700"
+                      color="$brandGoldLight"
+                    >
                       YOU
                     </Text>
                   </XStack>

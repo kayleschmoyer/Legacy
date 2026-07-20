@@ -42,6 +42,22 @@
       "rules": {
         "no-console": "off"
       }
+    },
+    {
+      "files": ["src/**/*.ts", "src/**/*.tsx"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "Literal[value=/^\\$blue([1-9]|1[0-2])$/]",
+            "message": "Raw Tamagui $blue* tokens render generic Tailwind blue and are banned. Use the brand token replacement table in .agents/skills/ui/references/brand-colors.md ($brandNavyLight, $brandGoldLight, …)."
+          },
+          {
+            "selector": "JSXAttribute[name.name='theme'] Literal[value='blue']",
+            "message": "theme=\"blue\" renders generic Tailwind blue and is banned. Use backgroundColor=\"$brandNavyLight\" + hoverStyle/pressStyle instead — see .agents/skills/ui/references/brand-colors.md."
+          }
+        ]
+      }
     }
   ]
 }

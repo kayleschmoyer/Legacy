@@ -53,9 +53,9 @@ const OptionButton = ({
     onPress={onPress}
     padding="$3"
     flex={1}
-    backgroundColor={selected ? '$blue9' : SURFACE_CARD}
+    backgroundColor={selected ? '$brandNavyLight' : SURFACE_CARD}
     borderWidth={1}
-    borderColor={selected ? '$blue9' : PANEL_BORDER}
+    borderColor={selected ? '$brandNavyLight' : PANEL_BORDER}
     borderRadius="$2"
     cursor="pointer"
     animation="quick"
@@ -130,10 +130,12 @@ export function StepLeagueSettings({
               width={48}
               height={40}
               backgroundColor={
-                settings.numTeams === n ? '$blue9' : SURFACE_CARD
+                settings.numTeams === n ? '$brandNavyLight' : SURFACE_CARD
               }
               borderWidth={1}
-              borderColor={settings.numTeams === n ? '$blue9' : PANEL_BORDER}
+              borderColor={
+                settings.numTeams === n ? '$brandNavyLight' : PANEL_BORDER
+              }
               borderRadius="$2"
               alignItems="center"
               justifyContent="center"
