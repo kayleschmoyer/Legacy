@@ -274,14 +274,14 @@ function LineupEditor(props: LineupEditorProps) {
 
       const getStatusColor = () => {
         if (actualValue === undefined) return '$gray10';
-        if (actualValue === projValue) return '$blue10';
+        if (actualValue === projValue) return '$brandGoldLight';
         if (actualValue > (projValue || 0)) return '$green10';
         return '$red10';
       };
 
       return (
         <Card
-          backgroundColor={isSelected ? '$blue3' : '$gray3'}
+          backgroundColor={isSelected ? '$surfaceInteractive' : '$gray3'}
           borderColor={isSelected ? '$yellow10' : '$gray6'}
           borderWidth={isSelected ? 2 : 1}
           padding="$3"

@@ -1166,7 +1166,9 @@ export function LeagueSettingsControl({
             Reset
           </Button>
           <Button
-            theme="blue"
+            backgroundColor="$brandNavyLight"
+            hoverStyle={{ backgroundColor: '$brandNavy' }}
+            pressStyle={{ backgroundColor: '$brandNavyDark' }}
             size="$3"
             onPress={() => void handleSave()}
             disabled={isLocked || !hasChanges || saving || !!validationError}

@@ -43,7 +43,7 @@ function NavigationDrawer({
       {/* Header */}
       <YStack
         padding="$4"
-        backgroundColor="$blue4"
+        backgroundColor="$accentMuted"
         borderBottomWidth={1}
         borderBottomColor="$gray5"
       >
@@ -82,23 +82,29 @@ function NavigationDrawer({
                 justifyContent="flex-start"
                 onPress={() => handleItemPress(item.route)}
                 backgroundColor={
-                  currentRoute === item.route ? '$blue3' : 'transparent'
+                  currentRoute === item.route
+                    ? '$surfaceInteractive'
+                    : 'transparent'
                 }
                 borderColor={
-                  currentRoute === item.route ? '$blue7' : 'transparent'
+                  currentRoute === item.route ? '$outlineStrong' : 'transparent'
                 }
                 margin="$1"
                 paddingHorizontal="$3"
               >
                 <XStack alignItems="center" space="$3">
                   {item.icon && (
-                    <Text fontSize="$5" color="$blue10">
+                    <Text fontSize="$5" color="$brandNavyLight">
                       {item.icon}
                     </Text>
                   )}
                   <Text
                     fontSize="$4"
-                    color={currentRoute === item.route ? '$blue11' : '$gray11'}
+                    color={
+                      currentRoute === item.route
+                        ? '$brandGoldLight'
+                        : '$gray11'
+                    }
                     fontWeight={currentRoute === item.route ? '600' : 'normal'}
                   >
                     {item.title}
@@ -160,7 +166,7 @@ function TabNavigation({
           key={item.route}
           flex={1}
           backgroundColor={
-            currentRoute === item.route ? '$blue4' : 'transparent'
+            currentRoute === item.route ? '$accentMuted' : 'transparent'
           }
           borderRadius={currentRoute === item.route ? '$2' : 0}
           marginHorizontal={currentRoute === item.route ? '$1' : 0}
@@ -180,7 +186,9 @@ function TabNavigation({
             )}
             <Text
               fontSize="$2"
-              color={currentRoute === item.route ? '$blue11' : '$gray10'}
+              color={
+                currentRoute === item.route ? '$brandGoldLight' : '$gray10'
+              }
               fontWeight={currentRoute === item.route ? '600' : '400'}
             >
               {item.title}
@@ -233,7 +241,7 @@ function BreadcrumbNavigation({
               onPress={() => item.route && onNavigate(item.route)}
               padding="$1"
               minHeight="auto"
-              color="$blue10"
+              color="$brandGoldLight"
               fontSize="$3"
             >
               {item.title}

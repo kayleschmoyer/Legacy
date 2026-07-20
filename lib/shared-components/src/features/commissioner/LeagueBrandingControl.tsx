@@ -279,7 +279,9 @@ export function LeagueBrandingControl({
               Reset
             </Button>
             <Button
-              theme="blue"
+              backgroundColor="$brandNavyLight"
+              hoverStyle={{ backgroundColor: '$brandNavy' }}
+              pressStyle={{ backgroundColor: '$brandNavyDark' }}
               size="$3"
               onPress={handleColorsSave}
               disabled={

@@ -188,7 +188,7 @@ export const ColumnCustomizer: React.FC<ColumnCustomizerProps> = ({
               {/* Visibility checkbox — native-friendly toggle button. */}
               <Button
                 size="$2"
-                backgroundColor={visible ? '$blue10' : '$gray4'}
+                backgroundColor={visible ? '$brandNavyLight' : '$gray4'}
                 onPress={() => toggleHidden(key)}
                 data-testid={`column-customizer-visible-${key}`}
                 aria-label={`${visible ? 'Hide' : 'Show'} ${key}`}

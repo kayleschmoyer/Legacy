@@ -98,9 +98,9 @@ function SlotRow({
     isLocked && assignedName
       ? '$amber2'
       : state === 'selected'
-        ? '$blue3'
+        ? '$surfaceInteractive'
         : state === 'eligible-swap'
-          ? '$blue2'
+          ? '$surfaceInteractive'
           : state === 'eligible-empty'
             ? '$green2'
             : undefined;
@@ -134,7 +134,7 @@ function SlotRow({
       paddingHorizontal="$3"
       borderRadius="$3"
       borderWidth={state === 'selected' ? 2 : 0}
-      borderColor={state === 'selected' ? '$blue8' : undefined}
+      borderColor={state === 'selected' ? '$brandNavyLight' : undefined}
       backgroundColor={disabled ? '$gray2' : background}
       alignItems="center"
       gap="$2"
@@ -227,8 +227,10 @@ function BenchRow({
       paddingHorizontal="$3"
       borderRadius="$3"
       borderWidth={selected ? 2 : 0}
-      borderColor={selected ? '$blue8' : undefined}
-      backgroundColor={isLocked ? '$amber2' : selected ? '$blue3' : undefined}
+      borderColor={selected ? '$brandNavyLight' : undefined}
+      backgroundColor={
+        isLocked ? '$amber2' : selected ? '$surfaceInteractive' : undefined
+      }
       alignItems="center"
       gap="$2"
       hoverStyle={effectiveReadOnly ? undefined : { backgroundColor: '$gray3' }}
@@ -457,7 +459,7 @@ export function RosterBoard<
         padding="$5"
         alignItems="center"
       >
-        <Spinner size="small" color="$blue8" />
+        <Spinner size="small" color="$brandNavyLight" />
         <Text marginTop="$2" color="$gray11" fontSize="$3">
           Loading roster…
         </Text>
@@ -527,17 +529,17 @@ export function RosterBoard<
           aria-live="polite"
           borderRadius="$4"
           borderWidth={1}
-          borderColor="$blue7"
-          backgroundColor="$blue2"
+          borderColor="$outlineStrong"
+          backgroundColor="$surfaceInteractive"
           padding="$3"
         >
           <XStack alignItems="center" gap="$2">
-            <Users size={18} color="var(--blue11)" />
+            <Users size={18} color="var(--brandGoldLight)" />
             <YStack flex={1} minWidth={0}>
-              <Text fontSize="$3" fontWeight="700" color="$blue12">
+              <Text fontSize="$3" fontWeight="700" color="$brandGold">
                 {selectedName} selected
               </Text>
-              <Text fontSize="$2" color="$blue11">
+              <Text fontSize="$2" color="$brandGoldLight">
                 {selected.positionId != null
                   ? 'Tap an eligible slot to swap, or tap the bench to send this player there.'
                   : 'Tap an eligible lineup slot to assign.'}
@@ -549,8 +551,8 @@ export function RosterBoard<
               tabIndex={0}
               fontSize="$2"
               fontWeight="600"
-              color="$blue11"
-              hoverStyle={{ color: '$blue12' }}
+              color="$brandGoldLight"
+              hoverStyle={{ color: '$brandGold' }}
               onPress={() => setSelected(null)}
             >
               Cancel
@@ -669,8 +671,8 @@ export function RosterBoard<
                 tabIndex={0}
                 fontSize="$2"
                 fontWeight="600"
-                color="$blue11"
-                hoverStyle={{ color: '$blue12' }}
+                color="$brandGoldLight"
+                hoverStyle={{ color: '$brandGold' }}
                 onPress={() => {
                   const pos = positions.find(
                     (p) => p.id === selected.positionId,

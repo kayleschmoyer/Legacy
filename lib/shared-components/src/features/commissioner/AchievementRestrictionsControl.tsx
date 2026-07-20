@@ -507,9 +507,10 @@ function AchievementRow({
               )}
               <Button
                 size="$3"
-                theme="blue"
                 backgroundColor={withAlpha('#2C4A7C', 0.35)}
                 borderColor="$brandNavyLight"
+                hoverStyle={{ backgroundColor: '$brandNavy' }}
+                pressStyle={{ backgroundColor: '$brandNavyDark' }}
                 icon={
                   isSaving ? (
                     <Spinner size="small" />

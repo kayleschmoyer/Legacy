@@ -1986,11 +1986,13 @@ export function TradingCenter({
                             }
                           }}
                           backgroundColor={
-                            isActive ? (badge?.bg ?? '$blue3') : '$surfacePanel'
+                            isActive
+                              ? (badge?.bg ?? '$surfaceInteractive')
+                              : '$surfacePanel'
                           }
                           borderColor={
                             isActive
-                              ? (badge?.border ?? '$blue7')
+                              ? (badge?.border ?? '$outlineStrong')
                               : '$outlineSubtle'
                           }
                           borderWidth={1}
@@ -2005,7 +2007,7 @@ export function TradingCenter({
                             fontWeight={isActive ? '700' : '500'}
                             color={
                               isActive
-                                ? (badge?.text ?? '$blue11')
+                                ? (badge?.text ?? '$brandGoldLight')
                                 : '$textMuted'
                             }
                           >
@@ -2058,9 +2060,11 @@ export function TradingCenter({
                             }
                           }}
                           backgroundColor={
-                            isActive ? '$blue3' : '$surfacePanel'
+                            isActive ? '$surfaceInteractive' : '$surfacePanel'
                           }
-                          borderColor={isActive ? '$blue7' : '$outlineSubtle'}
+                          borderColor={
+                            isActive ? '$outlineStrong' : '$outlineSubtle'
+                          }
                           borderWidth={1}
                           borderRadius="$10"
                           paddingHorizontal="$2.5"
@@ -2071,7 +2075,7 @@ export function TradingCenter({
                           <Text
                             fontSize="$1"
                             fontWeight={isActive ? '700' : '500'}
-                            color={isActive ? '$blue11' : '$textMuted'}
+                            color={isActive ? '$brandGoldLight' : '$textMuted'}
                           >
                             {label}
                           </Text>

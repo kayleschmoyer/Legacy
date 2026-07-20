@@ -185,7 +185,7 @@ function PlayersGrid({
         flex={1}
         style={{ justifyContent: 'center', alignItems: 'center', padding: 16 }}
       >
-        <Spinner size="large" color="$blue10" />
+        <Spinner size="large" color="$brandNavyLight" />
         <Text style={{ marginTop: 8 }}>Loading players...</Text>
       </YStack>
     );
@@ -390,7 +390,7 @@ function PlayersGrid({
               >
                 {loadingMore ? (
                   <XStack gap="$2" ai="center">
-                    <Spinner size="small" color="$blue10" />
+                    <Spinner size="small" color="$brandNavyLight" />
                     <Text>Loading...</Text>
                   </XStack>
                 ) : (

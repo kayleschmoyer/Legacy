@@ -60,7 +60,22 @@
         "import/order": "error",
         "react/jsx-no-useless-fragment": "error",
         "prefer-const": "error",
-        "no-inner-declarations": "error"
+        "no-inner-declarations": "error",
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "Literal[value=/^\\$blue([1-9]|1[0-2])$/]",
+            "message": "Raw Tamagui $blue* tokens are banned (LS-8523) — render generic Tailwind blue and violate the brand. Use $brandNavy*/$brandGold* tokens instead. See .agents/skills/ui/references/brand-colors.md."
+          },
+          {
+            "selector": "JSXAttribute[name.name='theme'] > Literal[value='blue']",
+            "message": "theme=\"blue\" is banned (LS-8523) — renders generic Tailwind blue. Use backgroundColor=\"$brandNavyLight\" with hoverStyle/pressStyle instead. See .agents/skills/ui/references/brand-colors.md."
+          },
+          {
+            "selector": "Property[key.name='theme'] > Literal[value='blue']",
+            "message": "theme: 'blue' is banned (LS-8523) — renders generic Tailwind blue. Use $brandNavy*/$brandGold* tokens instead. See .agents/skills/ui/references/brand-colors.md."
+          }
+        ]
       }
     },
     {

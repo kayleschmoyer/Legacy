@@ -65,9 +65,13 @@ export function CommissionerNoteControl({
   };
 
   return (
-    <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+    <Card
+      backgroundColor="$surfaceInteractive"
+      borderColor="$outlineSubtle"
+      padding="$4"
+    >
       <YStack space="$3">
-        <H4 color="$blue11">Commissioner Note</H4>
+        <H4 color="$brandGoldLight">Commissioner Note</H4>
         <Text color="$gray11" fontSize="$3">
           This note is visible to all league members on the league page.
         </Text>
@@ -80,7 +84,7 @@ export function CommissionerNoteControl({
         />
         <XStack justifyContent="flex-end">
           <Button
-            backgroundColor="$blue9"
+            backgroundColor="$brandNavyLight"
             color="white"
             onPress={() => void handleSave()}
             disabled={saving}

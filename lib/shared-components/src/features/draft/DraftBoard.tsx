@@ -76,15 +76,19 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
 }) => {
   return (
     <Card
-      backgroundColor={isSelected ? '$blue4' : isDrafted ? '$gray4' : '$gray2'}
-      borderColor={isSelected ? '$blue8' : isDrafted ? '$gray6' : '$gray6'}
+      backgroundColor={
+        isSelected ? '$accentMuted' : isDrafted ? '$gray4' : '$gray2'
+      }
+      borderColor={
+        isSelected ? '$brandNavyLight' : isDrafted ? '$gray6' : '$gray6'
+      }
       borderWidth={isSelected ? 2 : 1}
       borderRadius="$3"
       padding="$3"
       margin="$1"
       pressStyle={{
         scale: isDrafted ? 1 : 0.98,
-        borderColor: '$blue10',
+        borderColor: '$brandNavyDark',
       }}
       onPress={isDrafted ? undefined : onSelect}
       opacity={isDrafted ? 0.6 : 1}
@@ -246,11 +250,13 @@ const FilterControls: React.FC<FilterControlsProps> = ({
             key={position}
             size="$2"
             backgroundColor={
-              filters.position === position ? '$blue10' : '$gray4'
+              filters.position === position ? '$brandNavyLight' : '$gray4'
             }
-            borderColor={filters.position === position ? '$blue10' : '$gray6'}
+            borderColor={
+              filters.position === position ? '$brandNavyLight' : '$gray6'
+            }
             pressStyle={{
-              backgroundColor: '$blue8',
+              backgroundColor: '$brandNavyDark',
               scale: 0.98,
             }}
             onPress={() => onFiltersChange({ ...filters, position })}
@@ -403,7 +409,7 @@ function DraftBoard({
       <XStack gap="$2" justifyContent="center" padding="$3">
         <Button
           size="$3"
-          backgroundColor="$blue10"
+          backgroundColor="$brandNavyLight"
           onPress={() => handleTimerControl(isActive ? 'pause' : 'start')}
         >
           <Text color="white" fontWeight="600">
@@ -493,7 +499,10 @@ function DraftBoard({
                   Cancel
                 </Text>
               </Button>
-              <Button backgroundColor="$blue10" onPress={handleConfirmDraft}>
+              <Button
+                backgroundColor="$brandNavyLight"
+                onPress={handleConfirmDraft}
+              >
                 <Text color="white" fontWeight="600">
                   Draft Player
                 </Text>

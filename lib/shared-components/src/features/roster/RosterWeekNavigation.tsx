@@ -46,7 +46,12 @@ export function RosterWeekNavigation({
     ? { label: 'Current', bg: '$green3', border: '$green7', text: '$green11' }
     : isPast
       ? { label: 'Frozen', bg: '$gray4', border: '$gray7', text: '$gray11' }
-      : { label: 'Upcoming', bg: '$blue3', border: '$blue7', text: '$blue11' };
+      : {
+          label: 'Upcoming',
+          bg: '$surfaceInteractive',
+          border: '$outlineStrong',
+          text: '$brandGoldLight',
+        };
 
   return (
     <XStack
@@ -135,8 +140,8 @@ export function RosterWeekNavigation({
           tabIndex={0}
           fontSize="$2"
           fontWeight="600"
-          color="$blue11"
-          hoverStyle={{ color: '$blue12' }}
+          color="$brandGoldLight"
+          hoverStyle={{ color: '$brandGold' }}
           onPress={onResetToCurrent}
         >
           Reset to Current

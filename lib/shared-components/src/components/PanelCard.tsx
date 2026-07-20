@@ -30,7 +30,7 @@ export const PanelCard = tamaguiStyled(Card, {
         animation: 'quick',
         pressStyle: { scale: 0.98 },
         hoverStyle: {
-          borderColor: '$blue8',
+          borderColor: '$brandNavyLight',
           backgroundColor: '$backgroundHover',
         },
       },

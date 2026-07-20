@@ -242,7 +242,7 @@ function CareerStatsViewer({
       </YStack>
 
       <Button
-        backgroundColor={loading ? '$color6' : '$blue10'}
+        backgroundColor={loading ? '$color6' : '$brandNavyLight'}
         paddingVertical="$3"
         paddingHorizontal="$6"
         borderRadius="$3"

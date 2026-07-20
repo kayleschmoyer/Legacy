@@ -68,7 +68,7 @@ export function getPositionColors(position: string | null | undefined): {
   const pos = position.toUpperCase();
   if (pos === 'C') return { bg: '$amber3', text: '$amber11' };
   if (['1B', '2B', '3B', 'SS', 'IF'].includes(pos))
-    return { bg: '$blue3', text: '$blue11' };
+    return { bg: '$surfaceInteractive', text: '$brandGoldLight' };
   if (['LF', 'CF', 'RF', 'OF'].includes(pos))
     return { bg: '$green3', text: '$green11' };
   if (pos === 'SP') return { bg: '$amber6', text: '$amber12' };

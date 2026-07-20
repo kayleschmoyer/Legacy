@@ -1228,7 +1228,9 @@ function GameLogsTable({
             <Button
               key={v}
               data-testid={`venue-${v}`}
-              backgroundColor={filters.venue === v ? '$blue10' : '$gray4'}
+              backgroundColor={
+                filters.venue === v ? '$brandNavyLight' : '$gray4'
+              }
               onPress={() => dispatch({ type: 'setVenue', value: v })}
               disabled={loading}
               paddingHorizontal="$4"
@@ -1246,7 +1248,7 @@ function GameLogsTable({
       </YStack>
 
       <Button
-        backgroundColor={submitDisabled ? '$gray8' : '$blue10'}
+        backgroundColor={submitDisabled ? '$gray8' : '$brandNavyLight'}
         paddingVertical="$3"
         paddingHorizontal="$6"
         borderRadius="$3"

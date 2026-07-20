@@ -96,7 +96,7 @@ export const GameResult: React.FC<GameResultProps> = ({
 
       <Button
         size="$5"
-        theme="blue"
+        backgroundColor="$brandNavyLight"
         onPress={onPlayAgain}
         testID="play-again-button"
       >

@@ -56,7 +56,9 @@ export function AnalyticsScreen({ leagueId }: AnalyticsScreenProps) {
         </Text>
         <Button
           marginTop="$4"
-          theme="blue"
+          backgroundColor="$brandNavyLight"
+          hoverStyle={{ backgroundColor: '$brandNavy' }}
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
           onPress={() => {
             void refetch();
           }}
@@ -107,21 +109,30 @@ export function AnalyticsScreen({ leagueId }: AnalyticsScreenProps) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <XStack space="$2">
             <Button
-              theme={selectedTab === 'overview' ? 'blue' : 'alt2'}
+              theme={selectedTab === 'overview' ? undefined : 'alt2'}
+              backgroundColor={
+                selectedTab === 'overview' ? '$brandNavyLight' : undefined
+              }
               size="$3"
               onPress={() => setSelectedTab('overview')}
             >
               Overview
             </Button>
             <Button
-              theme={selectedTab === 'power' ? 'blue' : 'alt2'}
+              theme={selectedTab === 'power' ? undefined : 'alt2'}
+              backgroundColor={
+                selectedTab === 'power' ? '$brandNavyLight' : undefined
+              }
               size="$3"
               onPress={() => setSelectedTab('power')}
             >
               Power Rankings
             </Button>
             <Button
-              theme={selectedTab === 'playoff' ? 'blue' : 'alt2'}
+              theme={selectedTab === 'playoff' ? undefined : 'alt2'}
+              backgroundColor={
+                selectedTab === 'playoff' ? '$brandNavyLight' : undefined
+              }
               size="$3"
               onPress={() => setSelectedTab('playoff')}
             >

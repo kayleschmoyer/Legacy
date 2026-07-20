@@ -201,7 +201,7 @@ export function NotificationSettings({
         </YStack>
 
         {loading && (
-          <Text fontSize="$2" color="$blue10" textAlign="center">
+          <Text fontSize="$2" color="$brandGoldLight" textAlign="center">
             Saving preferences...
           </Text>
         )}

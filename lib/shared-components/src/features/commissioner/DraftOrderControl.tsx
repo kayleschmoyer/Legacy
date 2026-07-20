@@ -429,7 +429,9 @@ export function DraftOrderControl({
                   Reset
                 </Button>
                 <Button
-                  theme="blue"
+                  backgroundColor="$brandNavyLight"
+                  hoverStyle={{ backgroundColor: '$brandNavy' }}
+                  pressStyle={{ backgroundColor: '$brandNavyDark' }}
                   size="$3"
                   onPress={() => void handleSaveOrder()}
                   disabled={!hasCustomOrder || isBusy}

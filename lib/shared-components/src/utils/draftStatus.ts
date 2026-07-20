@@ -76,7 +76,11 @@ export function getDraftStatusColors(
     case 'queued':
       return { bg: '$amber3', border: '$amber7', text: '$amber11' };
     case 'in-progress':
-      return { bg: '$blue3', border: '$blue7', text: '$blue11' };
+      return {
+        bg: '$surfaceInteractive',
+        border: '$outlineStrong',
+        text: '$brandGoldLight',
+      };
     case 'completed':
       return { bg: '$green3', border: '$green7', text: '$green11' };
     default:

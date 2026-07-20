@@ -250,7 +250,7 @@ export function EnhancedAuthGuard({
           backgroundColor="$background"
           space="$3"
         >
-          <Spinner size="large" color="$blue10" />
+          <Spinner size="large" color="$brandNavyLight" />
           <Text color="$color11">Loading...</Text>
         </YStack>
       )

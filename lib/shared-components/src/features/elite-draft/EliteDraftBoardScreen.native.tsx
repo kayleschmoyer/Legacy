@@ -234,13 +234,13 @@ function NativePreDraftLobby({
         {!isOwner && (
           <Card
             padding="$3"
-            backgroundColor="$blue2"
-            borderColor="$blue6"
+            backgroundColor="$surfaceInteractive"
+            borderColor="$outlineSubtle"
             bordered
             width="100%"
             maxWidth={360}
           >
-            <Text color="$blue10" fontSize="$3">
+            <Text color="$brandGoldLight" fontSize="$3">
               You'll be notified when the commissioner starts the draft.
             </Text>
           </Card>
@@ -1048,7 +1048,7 @@ export function EliteDraftBoardScreen({
                 marginBottom="$1"
                 marginHorizontal="$3"
                 bordered
-                backgroundColor={isMine ? '$blue2' : undefined}
+                backgroundColor={isMine ? '$surfaceInteractive' : undefined}
               >
                 <XStack justifyContent="space-between" alignItems="center">
                   <XStack flex={1} alignItems="center" space="$2">

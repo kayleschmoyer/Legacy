@@ -412,20 +412,22 @@ export function MatchupRosterEditorView({
           paddingHorizontal="$3"
           backgroundColor={
             !locked && isSelected
-              ? '$blue3'
+              ? '$surfaceInteractive'
               : !locked && isSwapTarget && !isIneligibleSwapTarget
-                ? '$blue2'
+                ? '$surfaceInteractive'
                 : undefined
           }
           borderWidth={!locked && isSelected ? 2 : 0}
-          borderColor={!locked && isSelected ? '$blue8' : undefined}
+          borderColor={!locked && isSelected ? '$brandNavyLight' : undefined}
           borderRadius="$3"
           opacity={isIneligibleSwapTarget ? 0.45 : undefined}
           hoverStyle={
             locked || isIneligibleSwapTarget
               ? undefined
               : {
-                  backgroundColor: isSwapTarget ? '$blue2' : '$gray3',
+                  backgroundColor: isSwapTarget
+                    ? '$surfaceInteractive'
+                    : '$gray3',
                   cursor: 'pointer',
                 }
           }
@@ -498,15 +500,17 @@ export function MatchupRosterEditorView({
                     <Button
                       key={opt.id}
                       size="$2"
-                      backgroundColor={eligible ? '$blue8' : '$gray5'}
+                      backgroundColor={eligible ? '$brandNavyLight' : '$gray5'}
                       color="white"
                       data-testid={`roster-assign-${player.id}-${opt.id}`}
                       opacity={eligible ? 1 : 0.5}
                       pressStyle={
-                        eligible ? { backgroundColor: '$blue10' } : undefined
+                        eligible
+                          ? { backgroundColor: '$brandNavyDark' }
+                          : undefined
                       }
                       hoverStyle={
-                        eligible ? { backgroundColor: '$blue9' } : undefined
+                        eligible ? { backgroundColor: '$brandNavy' } : undefined
                       }
                       onPress={(e: { stopPropagation: () => void }) => {
                         e.stopPropagation();
@@ -543,7 +547,7 @@ export function MatchupRosterEditorView({
       overflow="hidden"
       borderRadius="$6"
       borderWidth={1}
-      borderColor="$blue8"
+      borderColor="$brandNavyLight"
       backgroundColor="$background"
     >
       {/* Header */}
@@ -553,7 +557,7 @@ export function MatchupRosterEditorView({
         alignItems="center"
         borderBottomWidth={1}
         borderBottomColor="$gray4"
-        backgroundColor="$blue2"
+        backgroundColor="$surfaceInteractive"
       >
         <XStack alignItems="center" gap="$2">
           <H4 color="$yellow10">{locked ? 'Current Lineup' : 'Edit Lineup'}</H4>
@@ -589,7 +593,7 @@ export function MatchupRosterEditorView({
       <YStack
         paddingHorizontal="$4"
         paddingVertical="$2"
-        backgroundColor="$blue2"
+        backgroundColor="$surfaceInteractive"
         borderBottomWidth={1}
         borderBottomColor="$gray4"
       >
@@ -635,8 +639,12 @@ export function MatchupRosterEditorView({
 
       {/* Mutation loading indicator */}
       {!locked && mutating && (
-        <XStack padding="$2" justifyContent="center" backgroundColor="$blue2">
-          <Spinner size="small" color="$blue8" />
+        <XStack
+          padding="$2"
+          justifyContent="center"
+          backgroundColor="$surfaceInteractive"
+        >
+          <Spinner size="small" color="$brandNavyLight" />
           <Text marginLeft="$2" fontSize="$2" color="$yellow10">
             Updating lineup...
           </Text>
@@ -648,7 +656,7 @@ export function MatchupRosterEditorView({
         <XStack
           padding="$2.5"
           paddingHorizontal="$4"
-          backgroundColor="$blue2"
+          backgroundColor="$surfaceInteractive"
           gap="$2"
           alignItems="center"
         >
@@ -656,7 +664,7 @@ export function MatchupRosterEditorView({
             width={4}
             height={16}
             borderRadius={2}
-            backgroundColor="$blue8"
+            backgroundColor="$brandNavyLight"
           />
           <Text
             fontSize="$2"

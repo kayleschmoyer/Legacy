@@ -329,7 +329,9 @@ export function PlayersTable({
                     r="$2"
                     borderWidth={selectedPlayer?.id === player.id ? 2 : 1}
                     borderColor={
-                      selectedPlayer?.id === player.id ? '$blue8' : 'gray'
+                      selectedPlayer?.id === player.id
+                        ? '$brandNavyLight'
+                        : 'gray'
                     }
                     pressStyle={{
                       bg: '$gray3',
@@ -358,10 +360,13 @@ export function PlayersTable({
                     </XStack>
                     {showProjections && projectedPoints && (
                       <XStack flex={1.2} ai="center" jc="center" gap="$1">
-                        <TrendingUp size={compact ? 10 : 12} color="$blue10" />
+                        <TrendingUp
+                          size={compact ? 10 : 12}
+                          color="$brandGoldLight"
+                        />
                         <Text
                           fontSize={compact ? 2 : 3}
-                          color="$blue11"
+                          color="$brandGoldLight"
                           fontWeight="600"
                         >
                           {formatProjection(projection)}

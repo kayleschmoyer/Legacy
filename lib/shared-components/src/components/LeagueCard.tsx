@@ -63,7 +63,7 @@ export function LeagueCard({
       value: league.currentWeekNumber
         ? `Week ${league.currentWeekNumber}`
         : 'Preseason Slate',
-      accentColor: '$blue11',
+      accentColor: '$brandGoldLight',
     },
     {
       label: 'Roster Limit',
@@ -205,7 +205,7 @@ export function LeagueCard({
               backgroundColor={withAlpha(BLUE_DEEP, 0.16)}
               borderColor={withAlpha(BLUE, 0.45)}
               borderWidth={1}
-              color="$blue11"
+              color="$brandGoldLight"
               hoverStyle={{
                 backgroundColor: withAlpha(BLUE_DEEP, 0.22),
                 borderColor: withAlpha(BLUE, 0.6),
@@ -217,7 +217,7 @@ export function LeagueCard({
               }}
               animation="quick"
             >
-              <Text fontWeight="700" color="$blue11">
+              <Text fontWeight="700" color="$brandGoldLight">
                 View League
               </Text>
             </Button>

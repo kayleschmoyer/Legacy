@@ -14,7 +14,7 @@
   "lib/shared-components": {
     "rawHex": 507,
     "rawRgba": 464,
-    "blueToken": 113,
-    "themeBlue": 12
+    "blueToken": 0,
+    "themeBlue": 0
   }
 }

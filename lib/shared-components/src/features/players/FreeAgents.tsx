@@ -126,7 +126,7 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
         shadowOpacity={0.25}
         shadowRadius={4}
         borderWidth={isSelected ? 2 : 1}
-        borderColor={isSelected ? '$blue8' : '$gray6'}
+        borderColor={isSelected ? '$brandNavyLight' : '$gray6'}
         padding="$3"
         pressStyle={{ scale: 0.98 }}
         onPress={onSelect}
@@ -203,7 +203,7 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
 
         {/* Stats Preview */}
         <XStack justifyContent="space-between" marginBottom="$3">
-          <Text fontSize="$2" color="$blue10" fontWeight="600">
+          <Text fontSize="$2" color="$brandGoldLight" fontWeight="600">
             Rank: #{player.rank}
           </Text>
           <Text fontSize="$2" color="$gray10">
@@ -216,7 +216,7 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
 
         {/* Action Button */}
         <Button
-          backgroundColor="$blue9"
+          backgroundColor="$brandNavyLight"
           color="white"
           fontWeight="600"
           onPress={onClaim}
@@ -280,10 +280,14 @@ const SortFilterControls: React.FC<SortFilterControlsProps> = ({
               size="$3"
               variant={filters.position === position ? 'outlined' : 'outlined'}
               backgroundColor={
-                filters.position === position ? '$blue3' : '$gray1'
+                filters.position === position ? '$surfaceInteractive' : '$gray1'
               }
-              borderColor={filters.position === position ? '$blue7' : '$gray6'}
-              color={filters.position === position ? '$blue11' : '$gray11'}
+              borderColor={
+                filters.position === position ? '$outlineStrong' : '$gray6'
+              }
+              color={
+                filters.position === position ? '$brandGoldLight' : '$gray11'
+              }
               onPress={() => onFiltersChange({ ...filters, position })}
               borderRadius="$6"
             >
@@ -344,9 +348,13 @@ const SortFilterControls: React.FC<SortFilterControlsProps> = ({
               <Button
                 key={option}
                 variant={sortBy === option ? 'outlined' : 'outlined'}
-                backgroundColor={sortBy === option ? '$blue3' : 'transparent'}
-                borderColor={sortBy === option ? '$blue7' : 'transparent'}
-                color={sortBy === option ? '$blue11' : '$gray11'}
+                backgroundColor={
+                  sortBy === option ? '$surfaceInteractive' : 'transparent'
+                }
+                borderColor={
+                  sortBy === option ? '$outlineStrong' : 'transparent'
+                }
+                color={sortBy === option ? '$brandGoldLight' : '$gray11'}
                 justifyContent="flex-start"
                 onPress={() => {
                   onSortChange(option);
@@ -423,11 +431,15 @@ const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
             Submit Waiver Claim
           </Text>
 
-          <Card backgroundColor="$blue2" padding="$3" borderRadius="$3">
-            <Text fontSize="$4" fontWeight="bold" color="$blue12">
+          <Card
+            backgroundColor="$surfaceInteractive"
+            padding="$3"
+            borderRadius="$3"
+          >
+            <Text fontSize="$4" fontWeight="bold" color="$brandGold">
               {`${player.firstName} ${player.lastName}`}
             </Text>
-            <Text fontSize="$3" color="$blue11">
+            <Text fontSize="$3" color="$brandGoldLight">
               {player.position} - {player.team}
             </Text>
           </Card>
@@ -515,7 +527,7 @@ const WaiverClaimModal: React.FC<WaiverClaimModalProps> = ({
             </Button>
             <Button
               flex={1}
-              backgroundColor="$blue9"
+              backgroundColor="$brandNavyLight"
               color="white"
               fontWeight="600"
               onPress={handleSubmit}

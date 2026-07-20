@@ -72,7 +72,7 @@ function NotificationCard({
       elevate
       size="$3"
       bordered
-      backgroundColor={item.read ? '$background' : '$blue2'}
+      backgroundColor={item.read ? '$background' : '$surfaceInteractive'}
       pressStyle={{ scale: 0.985 }}
       onPress={() => onNotificationPress?.(item)}
       animation="bouncy"
@@ -97,7 +97,7 @@ function NotificationCard({
           {!item.read && (
             <Circle
               size={10}
-              backgroundColor="$blue10"
+              backgroundColor="$brandNavyLight"
               marginTop="$2"
               marginLeft="$2"
             />

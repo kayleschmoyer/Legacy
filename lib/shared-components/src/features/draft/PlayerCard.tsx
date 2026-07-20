@@ -152,8 +152,8 @@ function PlayerCard({
         shadowOpacity={0.25}
         shadowRadius={4}
         borderWidth={isSelected ? 2 : 1}
-        borderColor={isSelected ? '$blue8' : '$gray6'}
-        backgroundColor={isSelected ? '$blue2' : '$gray3'}
+        borderColor={isSelected ? '$brandNavyLight' : '$gray6'}
+        backgroundColor={isSelected ? '$surfaceInteractive' : '$gray3'}
         minHeight={getMinHeight()}
         pressStyle={{
           scale: 0.98,
@@ -243,7 +243,7 @@ function PlayerCard({
         <XStack justifyContent="space-between" alignItems="center">
           <XStack alignItems="center" space="$2">
             {player.rank && (
-              <Text fontSize="$2" color="$blue10" fontWeight="600">
+              <Text fontSize="$2" color="$brandGoldLight" fontWeight="600">
                 #{player.rank}
               </Text>
             )}
@@ -295,7 +295,7 @@ function PlayerCard({
             {onAction && (
               <Button
                 size="$2"
-                backgroundColor="$blue9"
+                backgroundColor="$brandNavyLight"
                 color="white"
                 fontWeight="600"
                 onPress={onAction}

@@ -61,7 +61,9 @@ export const TwentyQuestionsEntry: React.FC<TwentyQuestionsEntryProps> = ({
                 <Button
                   key={s.value}
                   size="$3"
-                  theme={sport === s.value ? 'blue' : undefined}
+                  backgroundColor={
+                    sport === s.value ? '$brandNavyLight' : undefined
+                  }
                   variant={sport === s.value ? undefined : 'outlined'}
                   onPress={() => onSportChange(s.value)}
                   testID={`sport-${s.value}`}
@@ -82,7 +84,9 @@ export const TwentyQuestionsEntry: React.FC<TwentyQuestionsEntryProps> = ({
               <Button
                 key={d.value}
                 size="$3"
-                theme={difficulty === d.value ? 'blue' : undefined}
+                backgroundColor={
+                  difficulty === d.value ? '$brandNavyLight' : undefined
+                }
                 variant={difficulty === d.value ? undefined : 'outlined'}
                 onPress={() => onDifficultyChange(d.value)}
                 testID={`difficulty-${d.value}`}
@@ -97,7 +101,7 @@ export const TwentyQuestionsEntry: React.FC<TwentyQuestionsEntryProps> = ({
 
     <Button
       size="$5"
-      theme="blue"
+      backgroundColor="$brandNavyLight"
       onPress={onStart}
       disabled={starting}
       testID={hasActiveGame ? 'resume-game-button' : 'start-game-button'}

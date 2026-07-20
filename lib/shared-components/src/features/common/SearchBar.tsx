@@ -233,7 +233,11 @@ function SearchBar({
                   Cancel
                 </Text>
               </Button>
-              <Button flex={1} backgroundColor="$blue8" onPress={applyFilters}>
+              <Button
+                flex={1}
+                backgroundColor="$brandNavyLight"
+                onPress={applyFilters}
+              >
                 <Text color="$white" fontWeight="bold">
                   Apply
                 </Text>

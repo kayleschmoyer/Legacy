@@ -45,7 +45,7 @@ export function UnifiedLoadingPanel({
       minHeight={fullScreen ? '100vh' : undefined}
       backgroundColor={fullScreen ? '$background' : undefined}
     >
-      <Spinner size={size} color="$blue9" />
+      <Spinner size={size} color="$brandNavyLight" />
       {message ? (
         <Text fontSize="$3" color="$gray10">
           {message}

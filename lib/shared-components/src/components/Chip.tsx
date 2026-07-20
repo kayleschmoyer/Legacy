@@ -51,7 +51,11 @@ const TONE_STYLES: Record<
   seam: { bg: '$brandSeamRed', fg: '#FFFFFF', border: '$brandSeamRedLight' },
   success: { bg: '$successMuted', fg: '$green10', border: '$green7' },
   warning: { bg: '$warningMuted', fg: '$amber10', border: '$amber7' },
-  info: { bg: '$accentMuted', fg: '$blue10', border: '$blue8' },
+  info: {
+    bg: '$accentMuted',
+    fg: '$brandGoldLight',
+    border: '$brandNavyLight',
+  },
   // Status chips — league lifecycle states, always show border.
   // Backgrounds use rgba values (same pattern as position chips below) since
   // no dedicated alpha-tinted tokens exist in the current foundations slice.

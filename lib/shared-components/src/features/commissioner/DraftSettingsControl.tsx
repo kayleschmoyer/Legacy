@@ -837,7 +837,7 @@ export function DraftSettingsControl({
                   )}
                 </XStack>
                 {scheduledAt && (
-                  <Text fontSize="$2" color="$blue10">
+                  <Text fontSize="$2" color="$brandGoldLight">
                     Draft room opens at{' '}
                     {new Date(
                       new Date(scheduledAt).getTime() - 30 * 60 * 1000,
@@ -863,7 +863,9 @@ export function DraftSettingsControl({
                     Reset
                   </Button>
                   <Button
-                    theme="blue"
+                    backgroundColor="$brandNavyLight"
+                    hoverStyle={{ backgroundColor: '$brandNavy' }}
+                    pressStyle={{ backgroundColor: '$brandNavyDark' }}
                     size="$3"
                     onPress={() => void handleSave()}
                     disabled={!hasChanges || saving}

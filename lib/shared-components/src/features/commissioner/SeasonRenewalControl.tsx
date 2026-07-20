@@ -83,9 +83,13 @@ export function SeasonRenewalControl({
 
   return (
     <>
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+      <Card
+        backgroundColor="$surfaceInteractive"
+        borderColor="$outlineSubtle"
+        padding="$4"
+      >
         <YStack space="$3">
-          <H4 color="$blue11">Start New Season</H4>
+          <H4 color="$brandGoldLight">Start New Season</H4>
 
           <Text color="$gray11" fontSize="$3">
             Begin a new season for this league. A new league will be created
@@ -95,7 +99,9 @@ export function SeasonRenewalControl({
 
           <XStack justifyContent="flex-start" gap="$3">
             <Button
-              theme="blue"
+              backgroundColor="$brandNavyLight"
+              hoverStyle={{ backgroundColor: '$brandNavy' }}
+              pressStyle={{ backgroundColor: '$brandNavyDark' }}
               onPress={() => setShowConfirmDialog(true)}
               disabled={loading}
               icon={loading ? <Spinner /> : undefined}
@@ -138,7 +144,7 @@ export function SeasonRenewalControl({
             padding="$4"
             width={520}
           >
-            <Dialog.Title id="season-renewal-title" color="$blue11">
+            <Dialog.Title id="season-renewal-title" color="$brandGoldLight">
               Start New Season for "{leagueName}"?
             </Dialog.Title>
             <Dialog.Description id="season-renewal-description">
@@ -195,7 +201,9 @@ export function SeasonRenewalControl({
                 </Button>
               </Dialog.Close>
               <Button
-                theme="blue"
+                backgroundColor="$brandNavyLight"
+                hoverStyle={{ backgroundColor: '$brandNavy' }}
+                pressStyle={{ backgroundColor: '$brandNavyDark' }}
                 onPress={handleConfirm}
                 disabled={loading}
                 icon={loading ? <Spinner /> : undefined}

@@ -25,7 +25,12 @@ function Banner({ kind, icon, title, sub }: BannerProps): React.JSX.Element {
           title: '$orange11',
           sub: '$orange11',
         }
-      : { bg: '$blue2', border: '$blue7', title: '$blue12', sub: '$blue11' };
+      : {
+          bg: '$surfaceInteractive',
+          border: '$outlineSubtle',
+          title: '$brandGold',
+          sub: '$brandGoldLight',
+        };
   return (
     <XStack
       role="status"

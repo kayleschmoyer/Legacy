@@ -367,7 +367,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
 
       <Button
         size="$4"
-        theme="blue"
+        backgroundColor="$brandNavyLight"
         onPress={handleAsk}
         disabled={!canSubmit}
         testID="ask-question-button"
