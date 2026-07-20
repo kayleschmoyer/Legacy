@@ -45,6 +45,9 @@ const brandDark = {
   outlineStrong: '#2F3B53',
   textMuted: '#9CAAC5',
   textOnAccent: '#F8FAFC',
+  // Dark text for gold/amber-filled surfaces (buttons, chips) — gold is a
+  // mid-light hue in both themes, so this stays constant across themes.
+  textOnGold: '#1A1206',
 
   // Glass surface tokens — for glassmorphism overlays & cards
   glassSurface: 'rgba(10, 15, 26, 0.75)',
@@ -196,6 +199,7 @@ const brandLight = {
   outlineStrong: '#C3CDDA',
   textMuted: '#4A6080',
   textOnAccent: '#FFFFFF',
+  textOnGold: '#1A1206',
 
   // Glass surface tokens — for glassmorphism overlays & cards
   glassSurface: 'rgba(255, 255, 255, 0.75)',

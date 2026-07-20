@@ -64,74 +64,81 @@ const VARIANT_STYLES: Record<
     pulse?: boolean;
   }
 > = {
-  // Semantic variants — colours from colors_and_type.css design token foundations.
+  // Semantic variants — Tamagui theme tokens (lib/tamagui-config), resolved
+  // per active theme so both light and dark render correctly.
   info: {
-    bg: 'rgba(70,110,176,0.22)',
-    color: '#8FB4E8',
-    border: 'rgba(70,110,176,0.55)',
+    bg: '$accentMuted',
+    color: '$color12',
+    border: '$brandNavyLight',
   },
   success: {
-    bg: 'rgba(34,110,74,0.22)',
-    color: '#6FD39A',
-    border: 'rgba(34,110,74,0.55)',
+    bg: '$successMuted',
+    color: '$green10',
+    border: '$green7',
   },
   warning: {
-    bg: 'rgba(176,118,38,0.22)',
-    color: '#E3B870',
-    border: 'rgba(176,118,38,0.55)',
+    bg: '$warningMuted',
+    color: '$amber10',
+    border: '$amber7',
   },
   error: {
-    bg: 'rgba(176,46,68,0.22)',
-    color: '#E07A8C',
-    border: 'rgba(176,46,68,0.55)',
+    bg: '$red3',
+    color: '$red10',
+    border: '$red7',
   },
   neutral: {
-    bg: 'rgba(127,144,174,0.12)',
-    color: '#9CAAC5',
-    border: '#2F3B53',
+    bg: '$surfaceCard',
+    color: '$textMuted',
+    border: '$outlineStrong',
   },
   // Gold heritage accent — "Premium", featured, or championship moments.
   // Never use for action-required states (that's `error`/`draftLive`).
   accent: {
-    bg: 'rgba(197,165,90,0.12)',
-    color: '#D4BB78',
-    border: 'rgba(197,165,90,0.4)',
+    bg: '$amber3',
+    color: '$brandGoldLight',
+    border: '$brandGoldDark',
   },
-  // Heritage lifecycle states — tuned for the dark "night stadium" surface.
-  // draftLive: action-required (seam red) + pulsing live dot.
+  // Heritage lifecycle states.
+  // draftLive: action-required (seam red) + pulsing live dot. The pulse dot
+  // renders via a raw RN `Animated.View` style (PulseDot below), which
+  // bypasses Tamagui's own token resolution — `useTheme()` is unavailable in
+  // this repo's installed Tamagui version (its types don't resolve; nothing
+  // else in the codebase uses it). `brandSeamRedLight` is `#E63950` in both
+  // brandDark and brandLight (lib/tamagui-config), so a literal is
+  // theme-safe here — unlike the other variants, it can't regress a theme.
   draftLive: {
-    bg: 'rgba(176,46,68,0.22)',
-    color: '#E07A8C',
-    border: 'rgba(176,46,68,0.55)',
+    bg: '$red3',
+    color: '$red10',
+    border: '$red7',
     dotColor: '#E63950',
     pulse: true,
   },
   // preDraft: pre-season anticipation (heritage gold) + static dot.
   preDraft: {
-    bg: 'rgba(197,165,90,0.12)',
-    color: '#D4BB78',
-    border: 'rgba(197,165,90,0.4)',
-    dotColor: '#C5A55A',
+    bg: '$amber3',
+    color: '$brandGoldLight',
+    border: '$brandGoldDark',
+    dotColor: '$brandGold',
   },
   live: {
-    bg: 'rgba(176,46,68,0.22)',
-    color: '#E07A8C',
-    border: 'rgba(176,46,68,0.55)',
+    bg: '$red3',
+    color: '$red10',
+    border: '$red7',
   },
   final: {
-    bg: 'rgba(127,144,174,0.12)',
-    color: '#9CAAC5',
-    border: '#2F3B53',
+    bg: '$surfaceCard',
+    color: '$textMuted',
+    border: '$outlineStrong',
   },
   active: {
-    bg: 'rgba(34,110,74,0.22)',
-    color: '#6FD39A',
-    border: 'rgba(34,110,74,0.55)',
+    bg: '$successMuted',
+    color: '$green10',
+    border: '$green7',
   },
   comingSoon: {
-    bg: 'rgba(176,118,38,0.22)',
-    color: '#E3B870',
-    border: 'rgba(176,118,38,0.55)',
+    bg: '$warningMuted',
+    color: '$amber10',
+    border: '$amber7',
   },
 };
 

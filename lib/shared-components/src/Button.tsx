@@ -101,21 +101,21 @@ interface VariantStyle {
 const VARIANT_STYLES: Record<ButtonVariant, VariantStyle> = {
   primary: {
     bg: '$brandNavy',
-    fg: '#FFFFFF',
+    fg: '$textOnAccent',
     border: '$brandNavyLight',
     bgHover: '$brandNavyLight',
     bgPress: '$brandNavyDark',
   },
   gold: {
     bg: '$brandGold',
-    fg: '#111111',
+    fg: '$textOnGold',
     border: '$brandGoldDark',
     bgHover: '$brandGoldLight',
     bgPress: '$brandGoldDark',
   },
   danger: {
     bg: '$brandSeamRed',
-    fg: '#FFFFFF',
+    fg: '$textOnAccent',
     border: '$brandSeamRedLight',
     bgHover: '$brandSeamRedLight',
     bgPress: '$brandSeamRedDark',
@@ -145,7 +145,11 @@ function Button({
 
   const processChildren = (child: React.ReactNode): React.ReactNode => {
     if (typeof child === 'string') {
-      return <Text>{child}</Text>;
+      // A nested <Text> doesn't inherit TamaguiButton's `color` prop, so it
+      // falls back to the ambient theme's default text color — wrong for a
+      // filled navy/red button in light theme (dark-on-dark). Pass it
+      // explicitly.
+      return <Text color={styles.fg}>{child}</Text>;
     }
     return child;
   };

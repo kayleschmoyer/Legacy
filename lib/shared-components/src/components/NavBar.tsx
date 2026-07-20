@@ -2,7 +2,6 @@ import React from 'react';
 import { Text, XStack } from 'tamagui';
 import type { BrandIconName } from './icons/BrandIcon';
 import { BrandIcon } from './icons/BrandIcon';
-import { BRAND_NAVY, TEXT_HIGH_CONTRAST, TEXT_MUTED } from '../utils/colors';
 
 export type { BrandIconName };
 
@@ -86,11 +85,22 @@ export function NavBar({
 function NavPill({ link }: { link: NavLink }) {
   const [hovered, setHovered] = React.useState(false);
 
-  const textColor = link.active
-    ? '#ffffff'
+  // Text/background render through real Tamagui props below, so a `$token`
+  // string is all they need — Tamagui resolves it per-theme, cross-platform.
+  const textColorToken = link.active
+    ? '$textOnAccent'
     : hovered
-      ? TEXT_HIGH_CONTRAST
-      : TEXT_MUTED;
+      ? '$color12'
+      : '$textMuted';
+  // BrandIcon renders raw SVG (bypasses Tamagui's own token resolution), so
+  // it needs a literal color. CSS custom properties stay theme-aware on web;
+  // native resolution lands with the theme-aware color helper (LS-8525) — see
+  // .agents/skills/ui/SKILL.md § Raw-CSS Strings.
+  const iconColorVar = link.active
+    ? 'var(--textOnAccent)'
+    : hovered
+      ? 'var(--color12)'
+      : 'var(--textMuted)';
 
   return (
     <XStack
@@ -101,9 +111,9 @@ function NavPill({ link }: { link: NavLink }) {
       borderRadius={9999}
       cursor="pointer"
       onPress={link.onPress}
+      backgroundColor={link.active ? '$brandNavy' : 'transparent'}
       style={
         {
-          background: link.active ? BRAND_NAVY : 'transparent',
           transition: 'background 120ms ease-out',
           userSelect: 'none',
         } as never
@@ -115,8 +125,8 @@ function NavPill({ link }: { link: NavLink }) {
         <BrandIcon
           name={link.icon}
           size={16}
-          color={textColor}
-          accentColor={textColor}
+          color={iconColorVar}
+          accentColor={iconColorVar}
           style={{
             opacity: link.active ? 1 : 0.8,
             transition: 'color 120ms ease-out',
@@ -129,9 +139,8 @@ function NavPill({ link }: { link: NavLink }) {
         fontSize={13}
         letterSpacing={0.78}
         textTransform="uppercase"
-        style={
-          { color: textColor, transition: 'color 120ms ease-out' } as never
-        }
+        color={textColorToken}
+        style={{ transition: 'color 120ms ease-out' } as never}
       >
         {link.label}
       </Text>

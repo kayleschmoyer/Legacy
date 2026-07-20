@@ -68,7 +68,7 @@ export function PlayerCard({
       alignItems="center"
       justifyContent="space-between"
       width="100%"
-      shadowColor="rgba(8, 12, 20, 0.45)"
+      shadowColor="$shadowColor"
       shadowOffset={{ width: 0, height: 2 }}
       shadowRadius={10}
       onPress={onPress}
@@ -129,7 +129,7 @@ export function PlayerCard({
                 fontWeight="700"
                 fontSize={10}
                 letterSpacing={0.8}
-                color="#FFFFFF"
+                color="$textOnAccent"
               >
                 {position}
               </Text>

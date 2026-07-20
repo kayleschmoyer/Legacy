@@ -4446,6 +4446,8 @@ export type TradeOfferPlayer = {
   playerId?: Maybe<Scalars['Int']['output']>;
   playerName?: Maybe<Scalars['String']['output']>;
   playerPosition?: Maybe<Scalars['String']['output']>;
+  /** This player's salary (dollars) in a salary-cap league — the authoritative cap hit used when the trade is accepted. Null in leagues without a salary cap. */
+  salary?: Maybe<Scalars['Int']['output']>;
   tradeOfferId?: Maybe<Scalars['Int']['output']>;
 };
 

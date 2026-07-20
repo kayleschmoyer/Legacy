@@ -8,12 +8,15 @@ type CardVariants = {
   compact?: boolean;
 };
 
+// Web-only CSS strings — Tamagui emits every theme token as `var(--token)`,
+// so these stay theme-aware without embedding hex/rgba literals. Native
+// ignores the unknown `style` keys these values feed (see usage below).
 const GOLD_GRADIENT =
-  'linear-gradient(135deg, #0A0F1A 0%, rgba(27, 58, 92, 0.45) 100%)';
-const SHADOW_MD = '0 4px 14px rgba(8, 12, 20, 0.55)';
-const SHADOW_LG = '0 12px 32px rgba(8, 12, 20, 0.65)';
+  'linear-gradient(135deg, var(--background) 0%, var(--accentMuted) 100%)';
+const SHADOW_MD = '0 4px 14px var(--shadowColor)';
+const SHADOW_LG = '0 12px 32px var(--shadowColorHover)';
 const SHADOW_GOLD =
-  '0 0 0 1px rgba(197, 165, 90, 0.35), 0 6px 24px rgba(197, 165, 90, 0.25)';
+  '0 0 0 1px color-mix(in srgb, var(--brandGold) 35%, transparent), 0 6px 24px color-mix(in srgb, var(--brandGold) 25%, transparent)';
 
 export const Card = tamaguiStyled(TamaguiCard, {
   backgroundColor: '$surfaceCard',
@@ -51,7 +54,9 @@ export const Card = tamaguiStyled(TamaguiCard, {
     },
     premium: {
       true: {
-        borderColor: 'rgba(197, 165, 90, 0.25)',
+        // `borderColor` is a real Tamagui prop (applies on native too), so
+        // it needs an actual token — not a CSS var string.
+        borderColor: '$brandGold',
         style: { boxShadow: SHADOW_GOLD, backgroundImage: GOLD_GRADIENT },
       },
     },
