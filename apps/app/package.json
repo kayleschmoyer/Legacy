@@ -11,7 +11,7 @@
     "prebuild:android": "expo prebuild --clean --platform android --no-install"
   },
   "dependencies": {
-    "@expo/metro-config": "~56.0.16",
+    "@expo/metro-config": "~56.0.17",
     "@expo/dom-webview": "~56.0.5",
     "@legacy-sports/analytics": "workspace:*",
     "@legacy-sports/app-config": "workspace:*",
@@ -29,7 +29,7 @@
     "@react-native-firebase/app": "^23.8.8",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-native-picker/picker": "2.11.4",
-    "expo": "^56.0.15",
+    "expo": "^56.0.16",
     "expo-apple-authentication": "~56.0.4",
     "expo-crypto": "~56.0.0",
     "expo-device": "~56.0.4",
@@ -58,7 +58,7 @@
     "@babel/core": "*",
     "@babel/preset-env": "*",
     "@babel/runtime": "*",
-    "@expo/cli": "~56.1.19",
+    "@expo/cli": "~56.1.20",
     "@types/react": "~19.2.17"
   }
 }
