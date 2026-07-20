@@ -102,6 +102,10 @@ className = 'text-blue-500'; // Tailwind classes
 
 Also brand-banned regardless of mechanism: purple/violet/pink/neon accents, gradient text (`background-clip: text`), accent stripes wider than 1px (see `docs/design/brand.md`).
 
+## Plain-CSS pages (non-Tamagui)
+
+`league-detail-v2` (`apps/web/src/pages/baseball/league-detail-v2/styles.css`) is plain CSS, not Tamagui — it defines its own `--brand-*`/`--fg*`/`--surface-*`/`--outline-*` custom properties scoped to `.ls-root`, with light-theme overrides under `.t_light .ls-root` (`.t_light` is applied to `<html>` by `apps/web/src/context/ThemeContext.tsx`). The light values are sourced from `lib/design-tokens`' `lightSurface`/`lightText` and match the `league-detail-page` design-sync bundle's `.theme-light` override block (`docs/design/qDGBVlOyaV-306Id0kWq0Q/league-detail-page/project/ds/colors_and_type.css`) — do not hand-edit `docs/design/`, but keep this file's light block in sync if a future `/sync-designs` run changes those source values. Any future plain-CSS page following this pattern should scope its dark values to its root class and add a `.t_light <root-class> { ... }` override block the same way, rather than inventing a new theming mechanism.
+
 ## Semantic Rules
 
 - **Primary CTA buttons** → `$brandNavyLight` bg, `$textOnAccent` text
