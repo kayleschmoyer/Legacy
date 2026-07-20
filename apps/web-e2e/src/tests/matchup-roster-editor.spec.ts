@@ -331,6 +331,11 @@ test.describe('Matchup Detail – Roster Editor @regression', () => {
     page,
   }) => {
     let captured: Record<string, unknown> | null = null;
+    // beforeEach already registered a GraphQL route handler and navigated to
+    // MATCHUP_URL — unroute it before stacking a second handler so the two
+    // handlers' independent `players` closures can't race on the re-navigation
+    // below (LS-8517: stacked routes + re-goto caused intermittent timeouts).
+    await page.unroute(isGraphQLEndpoint);
     await mockRosterEditorGraphQL(page, {
       matchupStatus: 'scheduled',
       onUpdatePosition: (variables) => {
