@@ -209,7 +209,41 @@ if (!cmd) {
   process.exit(1);
 }
 
-const child = spawn(cmd, cmdArgs, { stdio: 'inherit' });
+// tsx resolves tsconfig.json from the CWD (repo root), whose tsconfig extends
+// expo/tsconfig.base with no "paths" mappings — so workspace imports like
+// @legacy-sports/mcp-format fail with ERR_MODULE_NOT_FOUND (LS-8514).  When
+// the caller has not set TSX_TSCONFIG_PATH explicitly (mcp.json env entries
+// win), default it to the server's own tsconfig.json — found by walking up
+// from the .ts entrypoint, stopping before the repo root — falling back to
+// tsconfig.base.json, which carries the workspace "paths" mappings.
+const env = { ...process.env };
+if (!env.TSX_TSCONFIG_PATH) {
+  const entrypoint = [...cmdArgs].reverse().find((a) => a.endsWith('.ts'));
+  if (entrypoint) {
+    const root = path.resolve(cwd);
+    let dir = path.resolve(cwd, path.dirname(entrypoint));
+    let tsconfig = null;
+    while (dir !== root && path.dirname(dir) !== dir) {
+      const candidate = path.join(dir, 'tsconfig.json');
+      if (fs.existsSync(candidate)) {
+        tsconfig = candidate;
+        break;
+      }
+      dir = path.dirname(dir);
+    }
+    if (
+      tsconfig === null &&
+      fs.existsSync(path.join(root, 'tsconfig.base.json'))
+    ) {
+      tsconfig = path.join(root, 'tsconfig.base.json');
+    }
+    if (tsconfig !== null) {
+      env.TSX_TSCONFIG_PATH = tsconfig;
+    }
+  }
+}
+
+const child = spawn(cmd, cmdArgs, { stdio: 'inherit', env });
 child.on('exit', (code, signal) => {
   // If killed by signal (code === null), exit non-zero to surface the failure
   if (code !== null) {
