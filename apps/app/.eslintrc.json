@@ -26,7 +26,26 @@
       },
       "rules": {
         "@typescript-eslint/no-redundant-type-constituents": "error",
-        "@typescript-eslint/no-unused-vars": "error"
+        "@typescript-eslint/no-unused-vars": "error",
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "Literal[value=/\\$blue(1[0-2]|[1-9])\\b/]",
+            "message": "$blue* Tamagui tokens are banned (generic Tailwind blue). Use a brand token from .agents/skills/ui/references/brand-colors.md instead."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/\\$blue(1[0-2]|[1-9])\\b/]",
+            "message": "$blue* Tamagui tokens are banned (generic Tailwind blue). Use a brand token from .agents/skills/ui/references/brand-colors.md instead."
+          },
+          {
+            "selector": "JSXAttribute[name.name='theme'] Literal[value='blue']",
+            "message": "theme=\"blue\" is banned (generic Tailwind blue). Use backgroundColor=\"$brandNavyLight\" with hoverStyle/pressStyle instead — see .agents/skills/ui/references/brand-colors.md."
+          },
+          {
+            "selector": "Property[key.name='theme'] Literal[value='blue']",
+            "message": "theme: \"blue\" is banned (generic Tailwind blue). Use a brand token from .agents/skills/ui/references/brand-colors.md instead."
+          }
+        ]
       }
     },
     {

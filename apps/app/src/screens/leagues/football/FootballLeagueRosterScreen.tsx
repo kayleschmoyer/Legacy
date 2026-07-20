@@ -164,7 +164,7 @@ export function FootballLeagueRosterScreen(
   if (loading) {
     return (
       <YStack alignItems="center" padding="$6" gap="$3">
-        <Spinner size="large" color="$blue9" />
+        <Spinner size="large" color="$brandNavyLight" />
         <Text fontSize="$3" color="$gray9">
           Loading roster…
         </Text>
@@ -229,11 +229,15 @@ export function FootballLeagueRosterScreen(
                         width={28}
                         height={28}
                         borderRadius="$2"
-                        backgroundColor="$blue3"
+                        backgroundColor="$surfaceInteractive"
                         alignItems="center"
                         justifyContent="center"
                       >
-                        <Text fontSize="$1" fontWeight="700" color="$blue10">
+                        <Text
+                          fontSize="$1"
+                          fontWeight="700"
+                          color="$brandGoldLight"
+                        >
                           {getPositionBadge(member)}
                         </Text>
                       </YStack>

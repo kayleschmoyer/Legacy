@@ -63,19 +63,33 @@ export function LeagueStandings({
         </Card>
 
         {/* Header Row */}
-        <Card backgroundColor="$blue2" borderColor="$blue6" borderWidth={1}>
+        <Card
+          backgroundColor="$surfaceSubtle"
+          borderColor="$outlineSubtle"
+          borderWidth={1}
+        >
           <XStack padding="$3" justifyContent="space-between">
-            <Text flex={0.5} fontSize="$3" fontWeight="600" color="$blue11">
+            <Text
+              flex={0.5}
+              fontSize="$3"
+              fontWeight="600"
+              color="$brandGoldLight"
+            >
               Rank
             </Text>
-            <Text flex={2} fontSize="$3" fontWeight="600" color="$blue11">
+            <Text
+              flex={2}
+              fontSize="$3"
+              fontWeight="600"
+              color="$brandGoldLight"
+            >
               Team Name
             </Text>
             <Text
               flex={1}
               fontSize="$3"
               fontWeight="600"
-              color="$blue11"
+              color="$brandGoldLight"
               textAlign="right"
             >
               Points
@@ -95,11 +109,15 @@ export function LeagueStandings({
               <Card
                 padding="$3"
                 borderWidth={1}
-                borderColor={isUserTeam ? '$blue8' : '$gray4'}
-                backgroundColor={isUserTeam ? '$blue2' : '$background'}
+                borderColor={isUserTeam ? '$brandNavyLight' : '$gray4'}
+                backgroundColor={
+                  isUserTeam ? '$surfaceInteractive' : '$background'
+                }
                 pressStyle={{
                   scale: 0.98,
-                  backgroundColor: isUserTeam ? '$blue3' : '$gray2',
+                  backgroundColor: isUserTeam
+                    ? '$surfaceInteractive'
+                    : '$gray2',
                 }}
                 cursor="pointer"
               >
@@ -108,7 +126,7 @@ export function LeagueStandings({
                     flex={0.5}
                     fontSize="$4"
                     fontWeight="600"
-                    color="$blue10"
+                    color="$brandGoldLight"
                   >
                     {index + 1}
                   </Text>
@@ -118,7 +136,11 @@ export function LeagueStandings({
                         {team.name}
                       </Text>
                       {isUserTeam && (
-                        <Text fontSize="$2" color="$blue10" fontWeight="600">
+                        <Text
+                          fontSize="$2"
+                          color="$brandGoldLight"
+                          fontWeight="600"
+                        >
                           (Your Team)
                         </Text>
                       )}

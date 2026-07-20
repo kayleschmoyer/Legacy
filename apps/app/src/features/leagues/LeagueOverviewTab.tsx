@@ -177,7 +177,7 @@ export function LeagueOverviewTab({
                 </Text>
               </YStack>
               <Button size="$2" chromeless onPress={onViewAllStandings}>
-                <Text fontSize="$2" color="$blue9">
+                <Text fontSize="$2" color="$brandGoldLight">
                   View All →
                 </Text>
               </Button>
@@ -191,7 +191,9 @@ export function LeagueOverviewTab({
                     paddingHorizontal="$2"
                     alignItems="center"
                     space="$2"
-                    backgroundColor={row.isMine ? '$blue2' : 'transparent'}
+                    backgroundColor={
+                      row.isMine ? '$surfaceInteractive' : 'transparent'
+                    }
                     borderRadius="$2"
                   >
                     <Text
@@ -275,7 +277,11 @@ export function LeagueOverviewTab({
 
         {/* Invite (commissioner only) */}
         {isCommissioner ? (
-          <Card backgroundColor="$blue2" borderColor="$blue6" padding="$3">
+          <Card
+            backgroundColor="$surfaceSubtle"
+            borderColor="$outlineSubtle"
+            padding="$3"
+          >
             <YStack space="$3">
               <XStack justifyContent="space-between" alignItems="center">
                 <YStack flex={1}>
@@ -288,7 +294,7 @@ export function LeagueOverviewTab({
                 </YStack>
                 <Button
                   size="$3"
-                  backgroundColor="$blue9"
+                  backgroundColor="$brandNavyLight"
                   color="white"
                   onPress={onInviteShare}
                 >

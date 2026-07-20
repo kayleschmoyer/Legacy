@@ -295,7 +295,9 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                     />
                     <Button
                       size="$2"
-                      theme="blue"
+                      backgroundColor="$brandNavyLight"
+                      hoverStyle={{ backgroundColor: '$brandNavy' }}
+                      pressStyle={{ backgroundColor: '$brandNavyDark' }}
                       onPress={() => void handleSaveUsername()}
                       disabled={updatingUsername}
                       icon={

@@ -111,8 +111,8 @@ export function AndroidSubscriptionScreen({
               <Card
                 key={product.productId}
                 borderWidth={2}
-                borderColor={isAnnual ? '$blue8' : '$color8'}
-                backgroundColor={isAnnual ? '$blue1' : '$background'}
+                borderColor={isAnnual ? '$brandNavyLight' : '$color8'}
+                backgroundColor={isAnnual ? '$surfaceSubtle' : '$background'}
                 padding="$4"
                 pressStyle={{ opacity: 0.8 }}
                 onPress={() => void handlePurchase(product.productId)}
@@ -124,7 +124,7 @@ export function AndroidSubscriptionScreen({
                     </Text>
                     {isAnnual ? (
                       <Card
-                        backgroundColor="$blue9"
+                        backgroundColor="$brandNavyLight"
                         paddingHorizontal="$2"
                         paddingVertical="$1"
                         borderRadius="$2"
@@ -135,7 +135,7 @@ export function AndroidSubscriptionScreen({
                       </Card>
                     ) : null}
                   </XStack>
-                  <Text fontSize="$6" fontWeight="bold" color="$blue10">
+                  <Text fontSize="$6" fontWeight="bold" color="$brandGoldLight">
                     {product.localizedPrice}
                     <Text fontSize="$3" fontWeight="normal" color="$color11">
                       {isAnnual ? '/year' : '/month'}

@@ -64,7 +64,7 @@ const computeScoreColor = (
   const projected = Number(projectedValue);
 
   if (Math.abs(actual - projected) < 0.005) {
-    return '$blue10';
+    return '$brandGoldLight';
   }
 
   return actual > projected ? '$green10' : '$red10';

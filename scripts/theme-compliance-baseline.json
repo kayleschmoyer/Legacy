@@ -6,14 +6,14 @@
     "themeBlue": 7
   },
   "apps/app": {
-    "rawHex": 121,
+    "rawHex": 111,
     "rawRgba": 13,
-    "blueToken": 117,
-    "themeBlue": 2
+    "blueToken": 0,
+    "themeBlue": 0
   },
   "lib/shared-components": {
-    "rawHex": 542,
-    "rawRgba": 497,
+    "rawHex": 528,
+    "rawRgba": 492,
     "blueToken": 113,
     "themeBlue": 12
   }

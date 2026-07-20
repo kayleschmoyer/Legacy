@@ -321,7 +321,7 @@ export function FootballMatchupScreen(
   if (matchupLoading) {
     return (
       <YStack alignItems="center" padding="$6" gap="$3">
-        <Spinner size="large" color="$blue9" />
+        <Spinner size="large" color="$brandNavyLight" />
         <Text fontSize="$3" color="$gray9">
           Loading matchup…
         </Text>
@@ -352,7 +352,7 @@ export function FootballMatchupScreen(
 
         {playersLoading ? (
           <YStack alignItems="center" padding="$4">
-            <Spinner size="small" color="$blue9" />
+            <Spinner size="small" color="$brandNavyLight" />
           </YStack>
         ) : (
           <>

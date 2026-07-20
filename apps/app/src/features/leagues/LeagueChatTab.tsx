@@ -136,7 +136,7 @@ export function LeagueChatTab({
                   ) : (
                     /* Text bubble */
                     <YStack
-                      backgroundColor={isMe ? '$blue9' : '$gray3'}
+                      backgroundColor={isMe ? '$brandNavyLight' : '$gray3'}
                       borderRadius="$4"
                       paddingHorizontal="$3"
                       paddingVertical="$2"
@@ -206,7 +206,7 @@ export function LeagueChatTab({
           />
           <Button
             size="$3"
-            backgroundColor="$blue9"
+            backgroundColor="$brandNavyLight"
             color="white"
             onPress={() => void handleSend()}
             disabled={!inputText.trim() || sending}

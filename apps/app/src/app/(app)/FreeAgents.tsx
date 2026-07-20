@@ -190,8 +190,8 @@ export function LeagueFreeAgents({
       return (
         <Button
           size="$2"
-          backgroundColor="$blue3"
-          borderColor="$blue7"
+          backgroundColor="$surfaceInteractive"
+          borderColor="$outlineStrong"
           borderWidth={1}
           borderRadius="$2"
           onPress={() => {
@@ -203,9 +203,9 @@ export function LeagueFreeAgents({
             if (player.id !== claimingPlayerId) setFaabBid('');
             setClaimingPlayerId(player.id);
           }}
-          icon={<UserPlus size={12} color="$blue10" />}
+          icon={<UserPlus size={12} color="$brandGoldLight" />}
         >
-          <Text fontSize="$1" color="$blue10" fontWeight="600">
+          <Text fontSize="$1" color="$brandGoldLight" fontWeight="600">
             {waiverEnabled ? 'Claim' : 'Add'}
           </Text>
         </Button>
@@ -232,13 +232,13 @@ export function LeagueFreeAgents({
             onKeyDown={(e: React.KeyboardEvent) => {
               if (e.key === 'Enter' || e.key === ' ') onBack?.();
             }}
-            color="$blue10"
+            color="$brandGoldLight"
             fontSize="$4"
             pressStyle={{ opacity: 0.7 }}
             accessibilityRole="button"
             accessibilityLabel={`Back to ${leagueName}`}
           >
-            <ChevronLeft size={16} color="$blue10" /> {leagueName}
+            <ChevronLeft size={16} color="$brandGoldLight" /> {leagueName}
           </Text>
         </XStack>
       )}

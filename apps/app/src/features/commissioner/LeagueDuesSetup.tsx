@@ -140,7 +140,11 @@ export function LeagueDuesSetup({
 
   if (queryLoading && !initialized) {
     return (
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+      <Card
+        backgroundColor="$surfaceSubtle"
+        borderColor="$outlineSubtle"
+        padding="$4"
+      >
         <YStack space="$3" alignItems="center">
           <Spinner size="large" />
           <Text color="$gray10">Loading dues settings...</Text>
@@ -150,11 +154,15 @@ export function LeagueDuesSetup({
   }
 
   return (
-    <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+    <Card
+      backgroundColor="$surfaceSubtle"
+      borderColor="$outlineSubtle"
+      padding="$4"
+    >
       <YStack space="$4">
         {/* Header */}
         <YStack>
-          <Text fontSize="$5" fontWeight="600" color="$blue11">
+          <Text fontSize="$5" fontWeight="600" color="$brandGoldLight">
             League Dues
           </Text>
           <Text color="$gray11" fontSize="$3">
@@ -168,7 +176,7 @@ export function LeagueDuesSetup({
           alignItems="center"
           padding="$3"
           borderRadius="$4"
-          backgroundColor={enabled ? '$blue3' : '$gray3'}
+          backgroundColor={enabled ? '$surfaceInteractive' : '$gray3'}
         >
           <YStack flex={1}>
             <Text fontWeight="600">Enable League Dues</Text>
@@ -224,7 +232,9 @@ export function LeagueDuesSetup({
                 alignItems="center"
                 padding="$3"
                 borderRadius="$4"
-                backgroundColor={reminderEnabled ? '$blue3' : '$gray3'}
+                backgroundColor={
+                  reminderEnabled ? '$surfaceInteractive' : '$gray3'
+                }
               >
                 <YStack flex={1}>
                   <Text fontWeight="600">Auto-Reminders</Text>
@@ -259,8 +269,12 @@ export function LeagueDuesSetup({
                         <Button
                           key={option.value}
                           size="$3"
-                          backgroundColor={isSelected ? '$blue9' : '$gray4'}
-                          borderColor={isSelected ? '$blue10' : '$gray6'}
+                          backgroundColor={
+                            isSelected ? '$brandNavyLight' : '$gray4'
+                          }
+                          borderColor={
+                            isSelected ? '$brandNavyLight' : '$gray6'
+                          }
                           borderWidth={1}
                           borderRadius="$3"
                           onPress={() => {
@@ -309,7 +323,7 @@ export function LeagueDuesSetup({
             Reset
           </Button>
           <Button
-            backgroundColor="$blue9"
+            backgroundColor="$brandNavyLight"
             color="white"
             size="$3"
             onPress={() => void handleSave()}

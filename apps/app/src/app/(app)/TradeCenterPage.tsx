@@ -119,13 +119,13 @@ function LeagueTrades({
         <XStack alignItems="center" gap="$2" padding="$4" paddingBottom="$2">
           <Text
             onPress={onBack}
-            color="$blue10"
+            color="$brandGoldLight"
             fontSize="$4"
             pressStyle={{ opacity: 0.7 }}
             accessibilityRole="button"
             accessibilityLabel={`Back to league list`}
           >
-            <ChevronLeft size={16} color="$blue10" /> Back
+            <ChevronLeft size={16} color="$brandGoldLight" /> Back
           </Text>
         </XStack>
         <YStack
@@ -152,13 +152,13 @@ function LeagueTrades({
       <XStack alignItems="center" gap="$2" padding="$4" paddingBottom="$2">
         <Text
           onPress={onBack}
-          color="$blue10"
+          color="$brandGoldLight"
           fontSize="$4"
           pressStyle={{ opacity: 0.7 }}
           accessibilityRole="button"
           accessibilityLabel={`Back to league list`}
         >
-          <ChevronLeft size={16} color="$blue10" /> {leagueName}
+          <ChevronLeft size={16} color="$brandGoldLight" /> {leagueName}
         </Text>
       </XStack>
 
@@ -272,7 +272,7 @@ export default function TradeCenterPage() {
             </Text>
             <Text
               onPress={() => void refetch()}
-              color="$blue10"
+              color="$brandGoldLight"
               fontSize="$3"
               pressStyle={{ opacity: 0.7 }}
               accessibilityRole="button"

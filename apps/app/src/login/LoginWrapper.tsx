@@ -104,14 +104,14 @@ const Login: React.FC = () => {
 
         {isLoading && (
           <YStack alignItems="center" marginTop="$5">
-            <Spinner size="large" color="$blue10" />
+            <Spinner size="large" color="$brandNavyLight" />
           </YStack>
         )}
 
         <Button backgroundColor="transparent" marginTop="$4">
           <Text fontSize="$4" textAlign="center">
             Don't have an account?{' '}
-            <Text color="$blue10" textDecorationLine="underline">
+            <Text color="$brandGoldLight" textDecorationLine="underline">
               Register here
             </Text>
           </Text>

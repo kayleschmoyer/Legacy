@@ -190,7 +190,7 @@ export default function AnalyticsScreen() {
   if (loading && !data) {
     return (
       <YStack flex={1} padding="$4" alignItems="center" justifyContent="center">
-        <Spinner size="large" color="$blue10" />
+        <Spinner size="large" color="$brandNavyLight" />
         <Text marginTop="$2" color="$gray11">
           Loading analytics...
         </Text>
@@ -207,7 +207,13 @@ export default function AnalyticsScreen() {
         <Text marginTop="$2" color="$gray11" textAlign="center">
           {error?.message || 'Unable to load league analytics'}
         </Text>
-        <Button marginTop="$4" theme="blue" onPress={() => refetch()}>
+        <Button
+          marginTop="$4"
+          backgroundColor="$brandNavyLight"
+          hoverStyle={{ backgroundColor: '$brandNavy' }}
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
+          onPress={() => refetch()}
+        >
           Retry
         </Button>
       </YStack>
@@ -233,28 +239,44 @@ export default function AnalyticsScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <XStack space="$2">
             <Button
-              theme={selectedTab === 'overview' ? 'blue' : 'alt2'}
+              theme={selectedTab === 'overview' ? undefined : 'alt2'}
+              backgroundColor={
+                selectedTab === 'overview' ? '$brandNavyLight' : undefined
+              }
+              color={selectedTab === 'overview' ? '$textOnAccent' : undefined}
               size="$3"
               onPress={() => setSelectedTab('overview')}
             >
               Overview
             </Button>
             <Button
-              theme={selectedTab === 'power' ? 'blue' : 'alt2'}
+              theme={selectedTab === 'power' ? undefined : 'alt2'}
+              backgroundColor={
+                selectedTab === 'power' ? '$brandNavyLight' : undefined
+              }
+              color={selectedTab === 'power' ? '$textOnAccent' : undefined}
               size="$3"
               onPress={() => setSelectedTab('power')}
             >
               Power Rankings
             </Button>
             <Button
-              theme={selectedTab === 'playoff' ? 'blue' : 'alt2'}
+              theme={selectedTab === 'playoff' ? undefined : 'alt2'}
+              backgroundColor={
+                selectedTab === 'playoff' ? '$brandNavyLight' : undefined
+              }
+              color={selectedTab === 'playoff' ? '$textOnAccent' : undefined}
               size="$3"
               onPress={() => setSelectedTab('playoff')}
             >
               Playoff Projections
             </Button>
             <Button
-              theme={selectedTab === 'h2h' ? 'blue' : 'alt2'}
+              theme={selectedTab === 'h2h' ? undefined : 'alt2'}
+              backgroundColor={
+                selectedTab === 'h2h' ? '$brandNavyLight' : undefined
+              }
+              color={selectedTab === 'h2h' ? '$textOnAccent' : undefined}
               size="$3"
               onPress={() => setSelectedTab('h2h')}
             >
@@ -274,7 +296,7 @@ export default function AnalyticsScreen() {
                   <Text color="$gray11" fontSize="$2">
                     Average Points/Matchup
                   </Text>
-                  <Text fontSize="$7" fontWeight="bold" color="$blue10">
+                  <Text fontSize="$7" fontWeight="bold" color="$brandGoldLight">
                     {analytics.averagePointsPerMatchup.toFixed(2)}
                   </Text>
                 </YStack>
@@ -283,7 +305,11 @@ export default function AnalyticsScreen() {
                     <Text color="$gray11" fontSize="$2">
                       Current Week
                     </Text>
-                    <Text fontSize="$6" fontWeight="bold" color="$blue10">
+                    <Text
+                      fontSize="$6"
+                      fontWeight="bold"
+                      color="$brandGoldLight"
+                    >
                       {analytics.currentWeek}
                     </Text>
                   </YStack>
@@ -291,7 +317,11 @@ export default function AnalyticsScreen() {
                     <Text color="$gray11" fontSize="$2">
                       Total Teams
                     </Text>
-                    <Text fontSize="$6" fontWeight="bold" color="$blue10">
+                    <Text
+                      fontSize="$6"
+                      fontWeight="bold"
+                      color="$brandGoldLight"
+                    >
                       {analytics.totalTeams}
                     </Text>
                   </YStack>
@@ -391,7 +421,7 @@ export default function AnalyticsScreen() {
                           fontSize="$6"
                           fontWeight="bold"
                           minWidth={40}
-                          color="$blue10"
+                          color="$brandGoldLight"
                         >
                           #{team.rank}
                         </Text>
@@ -547,7 +577,7 @@ export default function AnalyticsScreen() {
                         flex={1}
                         minWidth={100}
                         padding="$3"
-                        backgroundColor="$blue2"
+                        backgroundColor="$surfaceSubtle"
                       >
                         <Text fontSize="$1" color="$gray11">
                           Matchups

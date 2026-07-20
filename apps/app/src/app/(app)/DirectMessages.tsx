@@ -94,7 +94,7 @@ function ConversationThread({
       >
         <YStack
           maxWidth="75%"
-          backgroundColor={isMe ? '$blue10' : '$gray4'}
+          backgroundColor={isMe ? '$brandNavyLight' : '$gray4'}
           borderRadius="$4"
           padding="$3"
           gap="$1"
@@ -104,7 +104,7 @@ function ConversationThread({
           </Text>
           <Text
             fontSize="$1"
-            color={isMe ? '$blue4' : '$textMuted'}
+            color={isMe ? '$textOnAccent' : '$textMuted'}
             textAlign={isMe ? 'right' : 'left'}
           >
             {time}
@@ -132,11 +132,12 @@ function ConversationThread({
         >
           <Text
             onPress={onBack}
-            color="$blue10"
+            color="$brandGoldLight"
             fontSize="$4"
             pressStyle={{ opacity: 0.7 }}
           >
-            <ChevronLeft size={16} color="$blue10" /> {otherRecipientName}
+            <ChevronLeft size={16} color="$brandGoldLight" />{' '}
+            {otherRecipientName}
           </Text>
         </XStack>
 
@@ -205,7 +206,7 @@ function ConversationThread({
             />
             <Button
               size="$3"
-              backgroundColor="$blue10"
+              backgroundColor="$brandNavyLight"
               borderRadius="$10"
               disabled={sending || !messageText.trim()}
               onPress={handleSend}
@@ -251,11 +252,11 @@ function LeagueMemberList({
         <XStack alignItems="center" gap="$2">
           <Text
             onPress={onBack}
-            color="$blue10"
+            color="$brandGoldLight"
             fontSize="$4"
             pressStyle={{ opacity: 0.7 }}
           >
-            <ChevronLeft size={16} color="$blue10" /> {leagueName}
+            <ChevronLeft size={16} color="$brandGoldLight" /> {leagueName}
           </Text>
         </XStack>
 

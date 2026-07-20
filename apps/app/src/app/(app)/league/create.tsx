@@ -209,8 +209,8 @@ function SportSelector({
               size="$4"
               onPress={() => onChange(sport)}
               disabled={disabled}
-              backgroundColor={selected ? '$blue8' : '$color2'}
-              borderColor={selected ? '$blue8' : '$borderColor'}
+              backgroundColor={selected ? '$brandNavyLight' : '$color2'}
+              borderColor={selected ? '$brandNavyLight' : '$borderColor'}
               borderWidth={selected ? 2 : 1}
               elevation={selected ? 3 : 1}
               pressStyle={{ scale: 0.95 }}
@@ -219,7 +219,7 @@ function SportSelector({
               accessibilityLabel={`Select ${label}`}
             >
               <Text
-                color={selected ? '$blue12' : '$color'}
+                color={selected ? '$brandGold' : '$color'}
                 fontWeight={selected ? '700' : '500'}
                 fontSize="$4"
               >
@@ -535,14 +535,18 @@ export default function CreateLeagueScreen(): React.JSX.Element {
                           }
                           disabled={loading}
                           minWidth="$5"
-                          backgroundColor={selected ? '$blue8' : '$color2'}
-                          borderColor={selected ? '$blue8' : '$borderColor'}
+                          backgroundColor={
+                            selected ? '$brandNavyLight' : '$color2'
+                          }
+                          borderColor={
+                            selected ? '$brandNavyLight' : '$borderColor'
+                          }
                           borderWidth={selected ? 2 : 1}
                           elevation={selected ? 3 : 1}
                           pressStyle={{ scale: 0.95 }}
                         >
                           <Text
-                            color={selected ? '$blue12' : '$color'}
+                            color={selected ? '$brandGold' : '$color'}
                             fontWeight={selected ? '700' : '500'}
                           >
                             {count}
@@ -573,14 +577,18 @@ export default function CreateLeagueScreen(): React.JSX.Element {
                           }
                           disabled={loading}
                           minWidth="$5"
-                          backgroundColor={selected ? '$blue8' : '$color2'}
-                          borderColor={selected ? '$blue8' : '$borderColor'}
+                          backgroundColor={
+                            selected ? '$brandNavyLight' : '$color2'
+                          }
+                          borderColor={
+                            selected ? '$brandNavyLight' : '$borderColor'
+                          }
                           borderWidth={selected ? 2 : 1}
                           elevation={selected ? 3 : 1}
                           pressStyle={{ scale: 0.95 }}
                         >
                           <Text
-                            color={selected ? '$blue12' : '$color'}
+                            color={selected ? '$brandGold' : '$color'}
                             fontWeight={selected ? '700' : '500'}
                           >
                             {size}
@@ -992,26 +1000,28 @@ export default function CreateLeagueScreen(): React.JSX.Element {
         <Card
           size="$4"
           bordered
-          backgroundColor={sport === 'football' ? '$orange2' : '$blue2'}
-          borderColor={sport === 'football' ? '$orange6' : '$blue6'}
+          backgroundColor={
+            sport === 'football' ? '$orange2' : '$surfaceInteractive'
+          }
+          borderColor={sport === 'football' ? '$orange6' : '$outlineSubtle'}
           padding="$4"
         >
           <YStack space="$3">
             <H2
               size="$5"
-              color={sport === 'football' ? '$orange11' : '$blue11'}
+              color={sport === 'football' ? '$orange11' : '$brandGoldLight'}
             >
               What happens next?
             </H2>
             <Text
               size="$3"
-              color={sport === 'football' ? '$orange11' : '$blue11'}
+              color={sport === 'football' ? '$orange11' : '$brandGoldLight'}
             >
               • Your league will be created with the specified number of teams
             </Text>
             <Text
               size="$3"
-              color={sport === 'football' ? '$orange11' : '$blue11'}
+              color={sport === 'football' ? '$orange11' : '$brandGoldLight'}
             >
               • You'll be set as the league commissioner
             </Text>
@@ -1024,7 +1034,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
             )}
             <Text
               size="$3"
-              color={sport === 'football' ? '$orange11' : '$blue11'}
+              color={sport === 'football' ? '$orange11' : '$brandGoldLight'}
             >
               • You can invite friends to join your league after creation
             </Text>

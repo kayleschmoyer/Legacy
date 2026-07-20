@@ -111,7 +111,11 @@ export function LeagueDuesPaymentStatus({
 
   if (loading && !data) {
     return (
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+      <Card
+        backgroundColor="$surfaceSubtle"
+        borderColor="$outlineSubtle"
+        padding="$4"
+      >
         <YStack space="$3" alignItems="center">
           <Spinner size="large" />
           <Text color="$gray10">Loading payment status...</Text>
@@ -121,11 +125,15 @@ export function LeagueDuesPaymentStatus({
   }
 
   return (
-    <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+    <Card
+      backgroundColor="$surfaceSubtle"
+      borderColor="$outlineSubtle"
+      padding="$4"
+    >
       <YStack space="$4">
         {/* Header */}
         <YStack>
-          <Text fontSize="$5" fontWeight="600" color="$blue11">
+          <Text fontSize="$5" fontWeight="600" color="$brandGoldLight">
             Payment Status
           </Text>
           <Text color="$gray11" fontSize="$3">
@@ -168,9 +176,9 @@ export function LeagueDuesPaymentStatus({
             alignItems="center"
             padding="$2"
             borderRadius="$3"
-            backgroundColor="$blue3"
+            backgroundColor="$surfaceInteractive"
           >
-            <Text fontSize="$6" fontWeight="800" color="$blue11">
+            <Text fontSize="$6" fontWeight="800" color="$brandGoldLight">
               {`$${collectedDollars}`}
             </Text>
             <Text fontSize="$1" color="$gray10">
@@ -196,8 +204,8 @@ export function LeagueDuesPaymentStatus({
                 key={mode}
                 size="$2"
                 flex={1}
-                backgroundColor={isActive ? '$blue9' : '$gray4'}
-                borderColor={isActive ? '$blue10' : '$gray6'}
+                backgroundColor={isActive ? '$brandNavyLight' : '$gray4'}
+                borderColor={isActive ? '$brandNavyLight' : '$gray6'}
                 borderWidth={1}
                 borderRadius="$3"
                 onPress={() => setFilter(mode)}

@@ -50,8 +50,8 @@ function SportSelector({
               size="$4"
               onPress={() => onChange(sport)}
               disabled={disabled}
-              backgroundColor={selected ? '$blue8' : '$color2'}
-              borderColor={selected ? '$blue8' : '$borderColor'}
+              backgroundColor={selected ? '$brandNavyLight' : '$color2'}
+              borderColor={selected ? '$brandNavyLight' : '$borderColor'}
               borderWidth={selected ? 2 : 1}
               elevation={selected ? 3 : 1}
               pressStyle={{ scale: 0.95 }}
@@ -60,7 +60,7 @@ function SportSelector({
               accessibilityLabel={`Select ${label}`}
             >
               <Text
-                color={selected ? '$blue12' : '$color'}
+                color={selected ? '$brandGold' : '$color'}
                 fontWeight={selected ? '700' : '500'}
                 fontSize="$4"
               >

@@ -202,7 +202,7 @@ export function LeagueScoringEditor(
   if (loading) {
     return (
       <YStack alignItems="center" padding="$6" gap="$3">
-        <Spinner size="large" color="$blue9" />
+        <Spinner size="large" color="$brandNavyLight" />
         <Text fontSize="$3" color="$gray9">
           Loading scoring profile…
         </Text>
@@ -242,7 +242,7 @@ export function LeagueScoringEditor(
               width={32}
               height={32}
               borderRadius={10}
-              backgroundColor="$blue3"
+              backgroundColor="$surfaceInteractive"
               alignItems="center"
               justifyContent="center"
             >
@@ -264,7 +264,7 @@ export function LeagueScoringEditor(
             paddingHorizontal="$2.5"
             paddingVertical="$1"
             borderRadius="$10"
-            backgroundColor="$blue9"
+            backgroundColor="$brandNavyLight"
             animation="quick"
             enterStyle={{ opacity: 0, scale: 0.8 }}
             elevation={4}
@@ -327,12 +327,16 @@ export function LeagueScoringEditor(
                       </Text>
                       {overrideCount > 0 && (
                         <XStack
-                          backgroundColor="$blue3"
+                          backgroundColor="$surfaceInteractive"
                           paddingHorizontal="$1.5"
                           paddingVertical={1}
                           borderRadius="$10"
                         >
-                          <Text fontSize={10} fontWeight="700" color="$blue10">
+                          <Text
+                            fontSize={10}
+                            fontWeight="700"
+                            color="$brandGoldLight"
+                          >
                             {overrideCount} custom
                           </Text>
                         </XStack>
@@ -365,7 +369,9 @@ export function LeagueScoringEditor(
                           paddingVertical="$2.5"
                           alignItems="center"
                           gap="$2"
-                          backgroundColor={isDirty ? '$blue2' : 'transparent'}
+                          backgroundColor={
+                            isDirty ? '$surfaceInteractive' : 'transparent'
+                          }
                           animation="quick"
                         >
                           {/* Stat info */}
@@ -380,7 +386,7 @@ export function LeagueScoringEditor(
                               </Text>
                               {isOverride && (
                                 <XStack
-                                  backgroundColor="$blue3"
+                                  backgroundColor="$surfaceInteractive"
                                   paddingHorizontal={6}
                                   paddingVertical={1}
                                   borderRadius={20}
@@ -388,7 +394,7 @@ export function LeagueScoringEditor(
                                   <Text
                                     fontSize={9}
                                     fontWeight="700"
-                                    color="$blue10"
+                                    color="$brandGoldLight"
                                   >
                                     CUSTOM
                                   </Text>
@@ -418,7 +424,7 @@ export function LeagueScoringEditor(
                                   errorMessage
                                     ? '$red8'
                                     : isDirty
-                                      ? '$blue7'
+                                      ? '$outlineStrong'
                                       : '$gray5'
                                 }
                                 borderWidth={1.5}
@@ -525,7 +531,7 @@ export function LeagueScoringEditor(
           <Button
             flex={1}
             size="$4"
-            backgroundColor={canSave ? '$blue9' : '$gray5'}
+            backgroundColor={canSave ? '$brandNavyLight' : '$gray5'}
             borderRadius="$4"
             onPress={() => {
               void handleSave();
@@ -533,7 +539,7 @@ export function LeagueScoringEditor(
             disabled={!canSave}
             opacity={canSave ? 1 : 0.5}
             pressStyle={
-              canSave ? { scale: 0.97, backgroundColor: '$blue10' } : {}
+              canSave ? { scale: 0.97, backgroundColor: '$brandNavyDark' } : {}
             }
             animation="quick"
             elevation={canSave ? 4 : 0}

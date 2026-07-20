@@ -182,7 +182,9 @@ export function LeagueHistoryTab({
                         borderRadius="$4"
                         fontSize="$2"
                         fontWeight={isActive ? '700' : '400'}
-                        backgroundColor={isActive ? '$blue9' : '$gray4'}
+                        backgroundColor={
+                          isActive ? '$brandNavyLight' : '$gray4'
+                        }
                         color={isActive ? 'white' : '$gray11'}
                       >
                         Season {s.seasonNumber ?? '—'}
@@ -337,7 +339,11 @@ export function LeagueHistoryTab({
                           </Text>
                         )}
                       </YStack>
-                      <Text fontSize="$5" fontWeight="800" color="$blue10">
+                      <Text
+                        fontSize="$5"
+                        fontWeight="800"
+                        color="$brandGoldLight"
+                      >
                         {formatRecordValue(type, r.value ?? 0)}
                       </Text>
                     </XStack>

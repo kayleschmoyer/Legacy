@@ -79,7 +79,7 @@ function LeagueCommissionerTools({
         </Text>
         <Text
           onPress={onBack}
-          color="$blue10"
+          color="$brandGoldLight"
           fontSize="$4"
           pressStyle={{ opacity: 0.7 }}
         >
@@ -104,11 +104,11 @@ function LeagueCommissionerTools({
         <XStack alignItems="center" gap="$2">
           <Text
             onPress={onBack}
-            color="$blue10"
+            color="$brandGoldLight"
             fontSize="$4"
             pressStyle={{ opacity: 0.7 }}
           >
-            <ChevronLeft size={16} color="$blue10" /> {leagueName}
+            <ChevronLeft size={16} color="$brandGoldLight" /> {leagueName}
           </Text>
         </XStack>
 
@@ -291,13 +291,13 @@ export const LeagueManagement: React.FC = () => {
                     height={40}
                     borderRadius={20}
                     backgroundColor={
-                      isCommissioner ? '$blue3' : '$surfaceSubtle'
+                      isCommissioner ? '$surfaceInteractive' : '$surfaceSubtle'
                     }
                     alignItems="center"
                     justifyContent="center"
                   >
                     {isCommissioner ? (
-                      <Shield size={18} color="$blue10" />
+                      <Shield size={18} color="$brandGoldLight" />
                     ) : (
                       <Settings size={18} color="$color" />
                     )}

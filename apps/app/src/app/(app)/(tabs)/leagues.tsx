@@ -77,7 +77,7 @@ export default function LeaguesTab() {
           onKeyDown={(e: React.KeyboardEvent) => {
             if (e.key === 'Enter' || e.key === ' ') showAddActions();
           }}
-          backgroundColor="$blue10"
+          backgroundColor="$brandNavyLight"
           borderRadius="$10"
           width={36}
           height={36}
@@ -105,7 +105,7 @@ export default function LeaguesTab() {
           </Text>
           <Button
             testID="leagues-browse-cta"
-            backgroundColor="$blue10"
+            backgroundColor="$brandNavyLight"
             borderRadius="$4"
             onPress={() => router.navigate('/league-discovery')}
             accessibilityRole="button"

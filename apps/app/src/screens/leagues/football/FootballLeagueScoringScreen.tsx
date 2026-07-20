@@ -247,7 +247,7 @@ export function FootballLeagueScoringScreen(
   if (loading) {
     return (
       <YStack alignItems="center" padding="$6" gap="$3">
-        <Spinner size="large" color="$blue9" />
+        <Spinner size="large" color="$brandNavyLight" />
         <Text fontSize="$3" color="$gray9">
           Loading scoring profile…
         </Text>
@@ -388,7 +388,7 @@ export function FootballLeagueScoringScreen(
         <Button
           onPress={() => void handleSave()}
           disabled={!canSave}
-          backgroundColor={canSave ? '$blue9' : '$gray5'}
+          backgroundColor={canSave ? '$brandNavyLight' : '$gray5'}
           color="white"
           borderRadius="$4"
           size="$4"

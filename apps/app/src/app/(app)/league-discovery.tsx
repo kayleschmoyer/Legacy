@@ -110,7 +110,9 @@ export default function LeagueDiscoveryScreen() {
                 paddingHorizontal="$2"
                 paddingVertical="$1"
                 borderRadius="$3"
-                backgroundColor={statusFilter === status ? '$blue9' : '$gray3'}
+                backgroundColor={
+                  statusFilter === status ? '$brandNavyLight' : '$gray3'
+                }
               >
                 <Text
                   fontSize="$2"
@@ -175,8 +177,8 @@ export default function LeagueDiscoveryScreen() {
                 <XStack space="$2" flexWrap="wrap">
                   <Text
                     fontSize="$1"
-                    color="$blue9"
-                    backgroundColor="$blue2"
+                    color="$brandGoldLight"
+                    backgroundColor="$surfaceSubtle"
                     paddingHorizontal="$1.5"
                     paddingVertical={2}
                     borderRadius="$2"
@@ -263,7 +265,7 @@ export default function LeagueDiscoveryScreen() {
                 ) : (
                   <Button
                     size="$3"
-                    backgroundColor="$blue9"
+                    backgroundColor="$brandNavyLight"
                     color="white"
                     disabled={league.id == null}
                     onPress={() => setJoinTargetId(league.id ?? null)}

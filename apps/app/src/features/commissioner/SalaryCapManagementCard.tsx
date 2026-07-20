@@ -63,9 +63,13 @@ export function SalaryCapManagementCard({
       featureName="Salary Cap"
       featureDescription="Manage team salaries and enforce roster spending caps from the full web experience."
     >
-      <Card backgroundColor="$blue2" borderColor="$blue6" padding="$4">
+      <Card
+        backgroundColor="$surfaceSubtle"
+        borderColor="$outlineSubtle"
+        padding="$4"
+      >
         <YStack space="$3">
-          <Text fontSize="$5" fontWeight="600" color="$blue11">
+          <Text fontSize="$5" fontWeight="600" color="$brandGoldLight">
             Salary Cap Management
           </Text>
           <Text color="$gray11" fontSize="$3">
@@ -88,7 +92,7 @@ export function SalaryCapManagementCard({
               </Text>
             </YStack>
             <Button
-              backgroundColor="$blue9"
+              backgroundColor="$brandNavyLight"
               color="white"
               onPress={handleOpenWeb}
               minWidth={120}
