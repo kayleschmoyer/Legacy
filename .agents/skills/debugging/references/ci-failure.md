@@ -524,6 +524,7 @@ Some CI failures are not caused by your code:
 
 - **GitHub Actions infrastructure** — runner timeouts, service outages
 - **Network issues** — npm registry failures, GitHub API rate limits
+- **E2E failures pre-existing on `main`** — a regression that already merged breaks the same specs on every PR. Do **not** rerun-and-hope and do not debug them as your own: run the attribution gate and, if confirmed pre-existing, enter the hold protocol in [pr-lifecycle e2e-hold.md](../../pr-lifecycle/references/e2e-hold.md) (blocker ticket → hold marker → monitor → rebase on fix).
 
 In these cases, rerun the failed jobs:
 

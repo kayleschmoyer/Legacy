@@ -109,16 +109,17 @@ Orchestrate maintenance across all open PRs: one-pass triage that handles API-on
 
 This skill consolidates the full PR-lifecycle cluster. Load the matching reference for your specific trigger:
 
-| Reference                                                          | Trigger                                                                                 |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| [references/drive.md](references/drive.md)                         | Drive/land/ship a specific PR to merge (single PR, by number/URL)                       |
-| [references/fix.md](references/fix.md)                             | Fix all outstanding issues on one PR (conflicts + reviews + CI)                         |
-| [references/unblock.md](references/unblock.md)                     | Investigate and unblock stuck PRs; detect Expected CI / false positives                 |
-| [references/sweep.md](references/sweep.md)                         | Local chip-dispatch sweep across all open PRs (`/sweep-prs`)                            |
-| [references/sweep-cloud.md](references/sweep-cloud.md)             | Cloud-mode sweep algorithm (API-only actions + report)                                  |
-| [references/respond-to-review.md](references/respond-to-review.md) | Scaffold FIX/JUSTIFY/CANNOT-COMPLY replies to bot review threads (`/respond-to-review`) |
-| [references/fix-reviews.md](references/fix-reviews.md)             | Fix Copilot review comments on a PR (single-PR review workflow)                         |
-| [references/ci-event-response.md](references/ci-event-response.md) | Triage and respond to CI/GitHub events on a watched PR (event-driven cloud agent)       |
+| Reference                                                          | Trigger                                                                                     |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| [references/drive.md](references/drive.md)                         | Drive/land/ship a specific PR to merge (single PR, by number/URL)                           |
+| [references/fix.md](references/fix.md)                             | Fix all outstanding issues on one PR (conflicts + reviews + CI)                             |
+| [references/unblock.md](references/unblock.md)                     | Investigate and unblock stuck PRs; detect Expected CI / false positives                     |
+| [references/sweep.md](references/sweep.md)                         | Local chip-dispatch sweep across all open PRs (`/sweep-prs`)                                |
+| [references/sweep-cloud.md](references/sweep-cloud.md)             | Cloud-mode sweep algorithm (API-only actions + report)                                      |
+| [references/respond-to-review.md](references/respond-to-review.md) | Scaffold FIX/JUSTIFY/CANNOT-COMPLY replies to bot review threads (`/respond-to-review`)     |
+| [references/fix-reviews.md](references/fix-reviews.md)             | Fix Copilot review comments on a PR (single-PR review workflow)                             |
+| [references/ci-event-response.md](references/ci-event-response.md) | Triage and respond to CI/GitHub events on a watched PR (event-driven cloud agent)           |
+| [references/e2e-hold.md](references/e2e-hold.md)                   | E2E failures not caused by this PR: attribution gate, blocker ticket, hold, monitor, resume |
 
 ## Who's Who in the PR Flow
 
@@ -439,6 +440,7 @@ gh pr ready <PR#>
 | [references/agent-screenshots.md](references/agent-screenshots.md)                                                        | Capture before/after screenshots for UI PRs using browser MCP               |
 | [references/bug-verification-templates.md](references/bug-verification-templates.md)                                      | PR body templates for proving bug fixes (screenshots, tests, queries, logs) |
 | [references/ci-checks-reference.md](references/ci-checks-reference.md)                                                    | Every PR check: what it validates, why it fails, and how to fix it locally  |
+| [references/e2e-hold.md](references/e2e-hold.md)                                                                          | External E2E blocker protocol: attribute, ticket, hold, monitor, resume     |
 | [workflow-overview (PR Preview section)](../workflow-overview/references/post-merge-and-deploy.md#pr-preview-deployments) | PR preview URL pattern and how to verify deployment (do not list branches)  |
 
 ## Parent-Agent PR Recovery

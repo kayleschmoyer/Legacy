@@ -203,6 +203,14 @@
   color: "d93f0b"
   description: "sweep-claimed was not cleaned up — claiming agent may have crashed"
 
+# Applied by an author agent when its PR's E2E failures are proven pre-existing
+# on main (attribution gate in pr-lifecycle/references/e2e-hold.md). Exempts
+# the PR from the sweep staleness rule; pairs with an <!-- e2e-hold --> marker
+# comment naming the blocker ticket. Removed by the resume step after rebase.
+- name: "blocked:e2e-on-main"
+  color: "d4c5f9"
+  description: "Held: E2E broken on main, not by this PR — see e2e-hold marker comment for blocker ticket"
+
 # ---------------------------------------------------------------------------
 # Review State Labels
 # ---------------------------------------------------------------------------
