@@ -1,5 +1,9 @@
 import { inflateRawSync } from 'node:zlib';
-import { buildHeaders, getDeploysToken } from './github-api.js';
+import {
+  buildHeaders,
+  deploysTokenWasFallback,
+  getDeploysToken,
+} from './github-api.js';
 
 export const DEPLOYS_REPO = 'bkrupa/legacy-sports-deploys';
 export const DEPLOYS_BRANCH = 'gh-pages';
@@ -27,8 +31,15 @@ export async function fetchFileContent(
   });
   if (!res.ok) {
     const body = await res.text();
+    const fallbackHint =
+      res.status === 404 && repo === DEPLOYS_REPO && deploysTokenWasFallback()
+        ? ' (PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID are not configured in this ' +
+          'session, so the request used the broad fallback token, which typically ' +
+          `lacks read access to the private ${DEPLOYS_REPO} repo — this 404 is a ` +
+          'credentials gap, not necessarily a missing/undeployed report.)'
+        : '';
     throw new Error(
-      `GitHub API ${res.status} fetching ${path}: ${body.slice(0, 300)}`,
+      `GitHub API ${res.status} fetching ${path}: ${body.slice(0, 300)}${fallbackHint}`,
     );
   }
   const json = (await res.json()) as {

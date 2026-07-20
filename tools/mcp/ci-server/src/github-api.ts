@@ -194,6 +194,18 @@ export async function getToken(): Promise<string> {
 // Cache for the deploys-repo token (generated via PREVIEW_APP credentials)
 let cachedDeploysToken: string | undefined;
 let cachedDeploysTokenExpiry: Date | undefined;
+let lastDeploysTokenWasFallback = false;
+
+/**
+ * Whether the most recent `getDeploysToken()` call returned the broad
+ * fallback token instead of a PREVIEW_APP-scoped one (LS-8540). The fallback
+ * token frequently lacks read access to the private `legacy-sports-deploys`
+ * repo, so a 404 immediately after a fallback is a credentials gap, not a
+ * missing/undeployed report.
+ */
+export function deploysTokenWasFallback(): boolean {
+  return lastDeploysTokenWasFallback;
+}
 
 /**
  * Generate or return a cached installation token for `bkrupa/legacy-sports-deploys`.
@@ -273,6 +285,7 @@ export async function getDeploysToken(): Promise<string> {
               new Date(data.expires_at).getTime() - 5 * 60 * 1000,
             );
           }
+          lastDeploysTokenWasFallback = false;
           return cachedDeploysToken;
         }
       }
@@ -280,6 +293,7 @@ export async function getDeploysToken(): Promise<string> {
   }
 
   // Fall back to the main token (works when GH_TOKEN is a PAT with access to both repos)
+  lastDeploysTokenWasFallback = true;
   return getToken();
 }
 
