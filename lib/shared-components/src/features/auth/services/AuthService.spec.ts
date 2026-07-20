@@ -17,6 +17,17 @@ const testConfig = {
   oauthProxyUrl: 'http://localhost:5001',
 };
 
+/** Build a (signature-less) JWT whose payload base64url-decodes to `payload`. */
+function makeJwt(payload: Record<string, unknown>): string {
+  const encode = (obj: unknown) =>
+    Buffer.from(JSON.stringify(obj))
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.sig`;
+}
+
 describe('AuthService.refreshJwt', () => {
   let service: AuthService;
 
@@ -309,17 +320,6 @@ describe('AuthService.unlinkProvider', () => {
 describe('AuthService.persistSession', () => {
   let service: AuthService;
 
-  /** Build a (signature-less) JWT whose payload base64url-decodes to `payload`. */
-  function makeJwt(payload: Record<string, unknown>): string {
-    const encode = (obj: unknown) =>
-      Buffer.from(JSON.stringify(obj))
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-    return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.sig`;
-  }
-
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
@@ -344,5 +344,60 @@ describe('AuthService.persistSession', () => {
     expect(service.getStoredTokenExpiry()).toBe(exp);
     // Profile is cached so the session restores instantly on reload.
     expect(service.getStoredUserProfile()).toEqual(user);
+  });
+});
+
+describe('AuthService token storage hardening (LS-2641)', () => {
+  let service: AuthService;
+
+  const testUser = {
+    id: 7,
+    email: 'user@test.com',
+    username: 'TestUser',
+    accessLevel: 'none' as const,
+  };
+
+  /** Mock a successful oauth-proxy /google exchange response body. */
+  function mockOAuthExchange(body: Record<string, unknown>): void {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest.fn().mockResolvedValue(JSON.stringify(body)),
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    service = new AuthService(testConfig);
+  });
+
+  it('never persists the OAuth refresh token to localStorage', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const jwt = makeJwt({ id: 7, email: 'user@test.com', exp });
+    mockOAuthExchange({
+      jwt,
+      refreshToken: 'refresh-token-secret',
+      user: testUser,
+    });
+
+    await service.authenticateWithOAuth({ code: 'auth-code' });
+
+    // localStorage is readable by any JS on the origin — a refresh token
+    // stored there turns any XSS into full account takeover (LS-2641).
+    expect(localStorage.getItem('auth_refresh_token')).toBeNull();
+    // The JWT stays in memory only; the session cookie is HttpOnly.
+    expect(service.getCurrentToken()).toBe(jwt);
+  });
+
+  it('scrubs a refresh token persisted by older builds on login', async () => {
+    localStorage.setItem('auth_refresh_token', 'stale-refresh-token');
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const jwt = makeJwt({ id: 7, email: 'user@test.com', exp });
+    mockOAuthExchange({ jwt, user: testUser });
+
+    await service.authenticateWithOAuth({ code: 'auth-code' });
+
+    expect(localStorage.getItem('auth_refresh_token')).toBeNull();
   });
 });

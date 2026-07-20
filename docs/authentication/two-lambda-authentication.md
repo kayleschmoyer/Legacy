@@ -290,7 +290,7 @@ VITE_OAUTH_PROXY_URL=http://localhost:5001/oauth
 2. **User pre-authorization** checks user exists in database before OAuth validation
 3. **JWT tokens** are signed with secrets stored in AWS Secrets Manager
 4. **Cross-origin requests** are handled with proper CORS configuration
-5. **Token storage** uses platform-specific secure storage (web: localStorage, mobile: Keychain)
+5. **Token storage** uses platform-specific secure storage (web: HttpOnly cookie + in-memory JWT, never localStorage — LS-2641; mobile: Keychain/SecureStore)
 
 ## Troubleshooting
 

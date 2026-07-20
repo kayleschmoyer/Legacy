@@ -25,7 +25,6 @@ interface User {
 
 interface AuthTokens {
   jwt: string;
-  refreshToken?: string;
 }
 
 /** localStorage key for cached user profile (non-sensitive, used for fast reload). */
@@ -96,11 +95,10 @@ export class AuthService {
       // Single call to secure OAuth lambda (checks user exists + validates OAuth)
       const authResult = await this.callSecureOAuth(oauthResponse);
 
-      // Store authentication tokens securely
-      this.storeTokens({
-        jwt: authResult.jwt,
-        refreshToken: authResult.refreshToken,
-      });
+      // Store the JWT in memory only. Any refreshToken in the exchange
+      // result is deliberately NOT persisted on web (LS-2641) — refresh
+      // re-uses the HttpOnly session cookie instead.
+      this.storeTokens({ jwt: authResult.jwt });
 
       // Persist CSRF token from response body (cross-origin safe)
       if (authResult.csrfToken) {
@@ -474,9 +472,11 @@ export class AuthService {
   /**
    * Store authentication tokens securely (platform-specific).
    *
-   * On web, the JWT is now stored in an HttpOnly cookie set by the server.
-   * We no longer persist it in localStorage to prevent XSS token theft.
-   * Only the refresh token (if present) is kept in localStorage for mobile.
+   * On web, the JWT is stored in an HttpOnly cookie set by the server and no
+   * token is ever persisted to localStorage — localStorage is readable by any
+   * JS on the origin, so a persisted token turns any XSS into account
+   * takeover (LS-2641). Refresh on web re-uses the HttpOnly cookie; mobile
+   * keeps its tokens in Expo SecureStore via SecureStorageProvider, not here.
    */
   private storeTokens(tokens: AuthTokens): void {
     // Track the JWT in memory so consumers that need the raw token (e.g.
@@ -485,11 +485,9 @@ export class AuthService {
     this.currentJwt = tokens.jwt;
     try {
       if (typeof localStorage !== 'undefined') {
-        // Do NOT store JWT in localStorage — it's now in an HttpOnly cookie.
-        // Only store refresh token for mobile flows that need it.
-        if (tokens.refreshToken) {
-          localStorage.setItem('auth_refresh_token', tokens.refreshToken);
-        }
+        // Do NOT store tokens in localStorage (LS-2641). Scrub the refresh
+        // token that older builds persisted so returning users are cleaned up.
+        localStorage.removeItem('auth_refresh_token');
         // Store the token expiry so the frontend can schedule proactive refresh.
         try {
           const parts = tokens.jwt.split('.');
