@@ -1,27 +1,30 @@
-/* Login page styles (LS-3691) — always dark, standalone from Tamagui theme */
+/* Login page styles (LS-3691). Local custom properties below resolve to the
+   Tamagui-emitted theme vars (LS-8530) — both light and dark render correctly;
+   the literal fallback after each `var()` only covers the (practically never
+   hit) case where this CSS loads outside the TamaguiProvider tree. */
 * {
   box-sizing: border-box;
 }
 
 /* ── Design tokens scoped to the login root ── */
 .ll-root {
-  --bg: #0a0f1a;
-  --surface-panel: #111b2f;
-  --surface-card: #16223a;
-  --panel-border: #1f2d48;
-  --outline-subtle: #1c2740;
-  --outline-default: #2f3b53;
-  --outline-strong: #4d5d80;
-  --fg1: #f8fafc;
-  --fg1-strong: #ffffff;
-  --fg2: #dee6ff;
-  --fg3: #9caac5;
-  --fg4: #6c80ba;
-  --brand-gold: #c5a55a;
-  --brand-gold-light: #d4bb78;
-  --brand-navy: #1b3a5c;
-  --brand-navy-light: #2c4a7c;
-  --focus-ring: #4e8ed6;
+  --bg: var(--background, #0a0f1a);
+  --surface-panel: var(--surfacePanel, #111b2f);
+  --surface-card: var(--surfaceCard, #16223a);
+  --panel-border: var(--surfacePanelBorder, #1f2d48);
+  --outline-subtle: var(--outlineSubtle, #1c2740);
+  --outline-default: var(--borderColor, #2f3b53);
+  --outline-strong: var(--borderColorFocus, #4d5d80);
+  --fg1: var(--color, #f8fafc);
+  --fg1-strong: var(--color12, #ffffff);
+  --fg2: var(--color11, #dee6ff);
+  --fg3: var(--textMuted, #9caac5);
+  --fg4: var(--color10, #6c80ba);
+  --brand-gold: var(--brandGold, #c5a55a);
+  --brand-gold-light: var(--brandGoldLight, #d4bb78);
+  --brand-navy: var(--brandNavy, #1b3a5c);
+  --brand-navy-light: var(--brandNavyLight, #2c4a7c);
+  --focus-ring: var(--focusRing, #4e8ed6);
   --font-display: 'Big Shoulders Display', 'Oswald', system-ui, sans-serif;
   --font-body: 'Literata', Georgia, 'Times New Roman', serif;
   --radius-2: 6px;
@@ -343,7 +346,11 @@
 }
 
 .ll-card {
-  background: linear-gradient(180deg, #16223a 0%, #111b2f 100%);
+  background: linear-gradient(
+    180deg,
+    var(--surface-card) 0%,
+    var(--surface-panel) 100%
+  );
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-7);
   padding: 36px 32px 28px;
@@ -442,6 +449,9 @@
   text-align: left;
 }
 
+/* Google/Discord button colors are third-party brand marks (Google's white
+   sign-in button, Discord's blurple) — fixed by the provider's own brand
+   guidelines, not by our theme, so they stay constant across light/dark. */
 .ll-oauth-google {
   background: #ffffff;
   color: #1f1f1f;
@@ -620,7 +630,7 @@
   border: 1px solid rgba(196, 30, 58, 0.35);
   font-family: var(--font-body);
   font-size: 14px;
-  color: #e63950;
+  color: var(--brandSeamRedLight, #e63950);
   line-height: 1.5;
   margin-top: 10px;
 }

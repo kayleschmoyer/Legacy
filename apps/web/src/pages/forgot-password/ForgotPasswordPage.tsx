@@ -53,7 +53,7 @@ export function ForgotPasswordPage(): React.JSX.Element {
       <div
         style={{
           minHeight: '100vh',
-          background: '#0A0F1A',
+          background: 'var(--background)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -64,8 +64,8 @@ export function ForgotPasswordPage(): React.JSX.Element {
           style={{
             width: '100%',
             maxWidth: '400px',
-            background: '#0D1526',
-            border: '1px solid #1B3A5C',
+            background: 'var(--surfaceSubtle)',
+            border: '1px solid var(--brandNavy)',
             borderRadius: '12px',
             padding: '40px 32px',
           }}
@@ -88,7 +88,7 @@ export function ForgotPasswordPage(): React.JSX.Element {
           <h1
             style={{
               fontFamily: "'Big Shoulders Display', Impact, sans-serif",
-              color: '#E8DCC8',
+              color: 'var(--color12)',
               fontSize: '24px',
               margin: '0 0 8px',
             }}
@@ -100,18 +100,18 @@ export function ForgotPasswordPage(): React.JSX.Element {
             <div>
               <p
                 style={{
-                  color: '#B0B8C8',
+                  color: 'var(--textMuted)',
                   lineHeight: 1.6,
                   marginBottom: '24px',
                 }}
               >
                 If an account exists for{' '}
-                <strong style={{ color: '#E8DCC8' }}>{email}</strong>, you'll
-                receive a password reset link shortly. Check your inbox.
+                <strong style={{ color: 'var(--color12)' }}>{email}</strong>,
+                you'll receive a password reset link shortly. Check your inbox.
               </p>
-              <p style={{ color: '#6B7280', fontSize: '14px' }}>
+              <p style={{ color: 'var(--textMuted)', fontSize: '14px' }}>
                 Already have a link?{' '}
-                <Link to="/login" style={{ color: '#C5A55A' }}>
+                <Link to="/login" style={{ color: 'var(--brandGold)' }}>
                   Sign in
                 </Link>
               </p>
@@ -124,7 +124,7 @@ export function ForgotPasswordPage(): React.JSX.Element {
             >
               <p
                 style={{
-                  color: '#B0B8C8',
+                  color: 'var(--textMuted)',
                   lineHeight: 1.6,
                   marginBottom: '24px',
                   marginTop: 0,
@@ -137,7 +137,7 @@ export function ForgotPasswordPage(): React.JSX.Element {
                 htmlFor="email"
                 style={{
                   display: 'block',
-                  color: '#9CA3AF',
+                  color: 'var(--textMuted)',
                   fontSize: '13px',
                   marginBottom: '6px',
                 }}
@@ -155,10 +155,10 @@ export function ForgotPasswordPage(): React.JSX.Element {
                 style={{
                   width: '100%',
                   padding: '10px 14px',
-                  background: '#111B2F',
-                  border: '1px solid #1B3A5C',
+                  background: 'var(--surfacePanel)',
+                  border: '1px solid var(--brandNavy)',
                   borderRadius: '6px',
-                  color: '#E8DCC8',
+                  color: 'var(--color12)',
                   fontSize: '15px',
                   marginBottom: error ? '8px' : '20px',
                   boxSizing: 'border-box',
@@ -169,7 +169,7 @@ export function ForgotPasswordPage(): React.JSX.Element {
               {error && (
                 <p
                   style={{
-                    color: '#C41E3A',
+                    color: 'var(--brandSeamRed)',
                     fontSize: '13px',
                     marginBottom: '16px',
                     marginTop: 0,
@@ -185,8 +185,10 @@ export function ForgotPasswordPage(): React.JSX.Element {
                 style={{
                   width: '100%',
                   padding: '12px',
-                  background: isSubmitting ? '#0F2440' : '#1B3A5C',
-                  color: '#E8DCC8',
+                  background: isSubmitting
+                    ? 'var(--brandNavyDark)'
+                    : 'var(--brandNavy)',
+                  color: 'var(--color12)',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '15px',
@@ -200,13 +202,13 @@ export function ForgotPasswordPage(): React.JSX.Element {
 
               <p
                 style={{
-                  color: '#6B7280',
+                  color: 'var(--textMuted)',
                   fontSize: '13px',
                   textAlign: 'center',
                   margin: 0,
                 }}
               >
-                <Link to="/login" style={{ color: '#C5A55A' }}>
+                <Link to="/login" style={{ color: 'var(--brandGold)' }}>
                   Back to sign in
                 </Link>
               </p>

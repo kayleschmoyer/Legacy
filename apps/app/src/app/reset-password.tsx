@@ -6,7 +6,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Button, Input, Label, Paragraph, Text, Theme, YStack } from 'tamagui';
+import { Button, Input, Label, Paragraph, Text, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 
@@ -91,106 +91,104 @@ const ResetPasswordScreen: React.FC = () => {
   };
 
   return (
-    <Theme name="legacy_dark">
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
+        <YStack
+          flex={1}
+          justifyContent="center"
+          padding="$5"
+          backgroundColor="$background"
+          gap="$4"
         >
-          <YStack
-            flex={1}
-            justifyContent="center"
-            padding="$5"
-            backgroundColor="#0A0F1A"
-            gap="$4"
-          >
-            <YStack gap="$2">
-              <Text
-                fontFamily="$heading"
-                fontSize={28}
-                color="#E8DCC8"
-                fontWeight="700"
-              >
-                Reset password
-              </Text>
-              {done ? (
-                <Paragraph color="#B0B8C8" lineHeight={24}>
-                  Your password has been updated. You can now sign in with your
-                  new password.
-                </Paragraph>
-              ) : (
-                <Paragraph color="#B0B8C8" lineHeight={24}>
-                  Choose a new password — must be at least 12 characters.
-                </Paragraph>
-              )}
-            </YStack>
-
+          <YStack gap="$2">
+            <Text
+              fontFamily="$heading"
+              fontSize={28}
+              color="$color12"
+              fontWeight="700"
+            >
+              Reset password
+            </Text>
             {done ? (
-              <Button
-                backgroundColor="#1B3A5C"
-                color="#E8DCC8"
-                onPress={() => router.replace('/login')}
-              >
-                Sign in
-              </Button>
+              <Paragraph color="$textMuted" lineHeight={24}>
+                Your password has been updated. You can now sign in with your
+                new password.
+              </Paragraph>
             ) : (
-              <YStack gap="$3">
-                <YStack gap="$1">
-                  <Label color="#9CA3AF" htmlFor="password">
-                    New password
-                  </Label>
-                  <Input
-                    id="password"
-                    secureTextEntry
-                    placeholder="At least 12 characters"
-                    value={password}
-                    onChangeText={setPassword}
-                    backgroundColor="#111B2F"
-                    color="#E8DCC8"
-                    borderColor="#1B3A5C"
-                    placeholderTextColor="#4B5563"
-                    editable={!isSubmitting}
-                  />
-                </YStack>
-
-                <YStack gap="$1">
-                  <Label color="#9CA3AF" htmlFor="confirm">
-                    Confirm new password
-                  </Label>
-                  <Input
-                    id="confirm"
-                    secureTextEntry
-                    placeholder="Repeat password"
-                    value={confirm}
-                    onChangeText={setConfirm}
-                    backgroundColor="#111B2F"
-                    color="#E8DCC8"
-                    borderColor="#1B3A5C"
-                    placeholderTextColor="#4B5563"
-                    editable={!isSubmitting}
-                  />
-                </YStack>
-
-                <Button
-                  backgroundColor="#1B3A5C"
-                  color="#E8DCC8"
-                  onPress={() => {
-                    void handleSubmit();
-                  }}
-                  disabled={isSubmitting}
-                  opacity={isSubmitting ? 0.6 : 1}
-                >
-                  {isSubmitting ? 'Updating…' : 'Update password'}
-                </Button>
-              </YStack>
+              <Paragraph color="$textMuted" lineHeight={24}>
+                Choose a new password — must be at least 12 characters.
+              </Paragraph>
             )}
           </YStack>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Theme>
+
+          {done ? (
+            <Button
+              backgroundColor="$brandNavy"
+              color="$color12"
+              onPress={() => router.replace('/login')}
+            >
+              Sign in
+            </Button>
+          ) : (
+            <YStack gap="$3">
+              <YStack gap="$1">
+                <Label color="$textMuted" htmlFor="password">
+                  New password
+                </Label>
+                <Input
+                  id="password"
+                  secureTextEntry
+                  placeholder="At least 12 characters"
+                  value={password}
+                  onChangeText={setPassword}
+                  backgroundColor="$surfacePanel"
+                  color="$color12"
+                  borderColor="$brandNavy"
+                  placeholderTextColor="$textMuted"
+                  editable={!isSubmitting}
+                />
+              </YStack>
+
+              <YStack gap="$1">
+                <Label color="$textMuted" htmlFor="confirm">
+                  Confirm new password
+                </Label>
+                <Input
+                  id="confirm"
+                  secureTextEntry
+                  placeholder="Repeat password"
+                  value={confirm}
+                  onChangeText={setConfirm}
+                  backgroundColor="$surfacePanel"
+                  color="$color12"
+                  borderColor="$brandNavy"
+                  placeholderTextColor="$textMuted"
+                  editable={!isSubmitting}
+                />
+              </YStack>
+
+              <Button
+                backgroundColor="$brandNavy"
+                color="$color12"
+                onPress={() => {
+                  void handleSubmit();
+                }}
+                disabled={isSubmitting}
+                opacity={isSubmitting ? 0.6 : 1}
+              >
+                {isSubmitting ? 'Updating…' : 'Update password'}
+              </Button>
+            </YStack>
+          )}
+        </YStack>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

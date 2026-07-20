@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
-import { Button, Spinner, Text, Theme, YStack } from 'tamagui';
+import { Button, Spinner, Text, YStack } from 'tamagui';
 import { LoginPage, useAuth } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { useAuthHandlers } from '../common/auth/AuthHooks';
@@ -16,8 +16,6 @@ import {
   promptBiometric,
   storeJwtForBiometric,
 } from '../common/auth/BiometricAuth';
-
-const BG_DEEP_NAVY = '#0A0F1A';
 
 const Login: React.FC = () => {
   const router = useRouter();
@@ -188,56 +186,54 @@ const Login: React.FC = () => {
     isGoogleLoading || isAppleLoading || isDiscordLoading || isBiometricLoading;
 
   return (
-    <Theme name="legacy_dark">
-      {/* This OAuth-only screen has no text inputs, so it never raises a soft
-          keyboard — a KeyboardAvoidingView wrapper would be dead code. Per
-          LS-6656 the app is OAuth-only (no email/password parity to autofill),
-          so a plain layout container is used here. */}
-      <YStack
-        testID="login-screen"
-        flex={1}
-        justifyContent="center"
-        padding="$5"
-        backgroundColor={BG_DEEP_NAVY}
-        gap="$4"
-      >
-        <LoginPage
-          onGoogleSignIn={handleGoogleSignIn}
-          onAppleSignIn={appleAvailable ? handleAppleSignIn : undefined}
-          onDiscordSignIn={discordAvailable ? handleDiscordSignIn : undefined}
-          isGoogleLoading={isGoogleLoading}
-          isAppleLoading={isAppleLoading}
-          isDiscordLoading={isDiscordLoading}
-          errorMessage={errorMessage}
-        />
+    // This OAuth-only screen has no text inputs, so it never raises a soft
+    // keyboard — a KeyboardAvoidingView wrapper would be dead code. Per
+    // LS-6656 the app is OAuth-only (no email/password parity to autofill),
+    // so a plain layout container is used here.
+    <YStack
+      testID="login-screen"
+      flex={1}
+      justifyContent="center"
+      padding="$5"
+      backgroundColor="$background"
+      gap="$4"
+    >
+      <LoginPage
+        onGoogleSignIn={handleGoogleSignIn}
+        onAppleSignIn={appleAvailable ? handleAppleSignIn : undefined}
+        onDiscordSignIn={discordAvailable ? handleDiscordSignIn : undefined}
+        isGoogleLoading={isGoogleLoading}
+        isAppleLoading={isAppleLoading}
+        isDiscordLoading={isDiscordLoading}
+        errorMessage={errorMessage}
+      />
 
-        {canUseBiometric ? (
-          <Button
-            testID="biometric-login-button"
-            height={52}
-            backgroundColor="#1B3A5C"
-            borderColor="rgba(197,165,90,0.4)"
-            borderWidth={1}
-            borderRadius={12}
-            disabled={isAnyLoading}
-            opacity={isAnyLoading ? 0.7 : 1}
-            onPress={() => {
-              void handleBiometricSignIn();
-            }}
-            aria-label="Sign in with biometrics"
-            pressStyle={{ backgroundColor: '#163249' }}
-          >
-            {isBiometricLoading ? (
-              <Spinner size="small" color="#C5A55A" />
-            ) : (
-              <Text color="#C5A55A" fontWeight="700" fontSize={14}>
-                Sign in with Face ID / Fingerprint
-              </Text>
-            )}
-          </Button>
-        ) : null}
-      </YStack>
-    </Theme>
+      {canUseBiometric ? (
+        <Button
+          testID="biometric-login-button"
+          height={52}
+          backgroundColor="$brandNavy"
+          borderColor="$accentMuted"
+          borderWidth={1}
+          borderRadius={12}
+          disabled={isAnyLoading}
+          opacity={isAnyLoading ? 0.7 : 1}
+          onPress={() => {
+            void handleBiometricSignIn();
+          }}
+          aria-label="Sign in with biometrics"
+          pressStyle={{ backgroundColor: '$brandNavyDark' }}
+        >
+          {isBiometricLoading ? (
+            <Spinner size="small" color="$brandGold" />
+          ) : (
+            <Text color="$brandGold" fontWeight="700" fontSize={14}>
+              Sign in with Face ID / Fingerprint
+            </Text>
+          )}
+        </Button>
+      ) : null}
+    </YStack>
   );
 };
 

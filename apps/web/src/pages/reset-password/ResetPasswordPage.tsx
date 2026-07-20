@@ -65,7 +65,7 @@ export function ResetPasswordPage(): React.JSX.Element {
 
   const containerStyle: React.CSSProperties = {
     minHeight: '100vh',
-    background: '#0A0F1A',
+    background: 'var(--background)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -75,15 +75,15 @@ export function ResetPasswordPage(): React.JSX.Element {
   const cardStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: '400px',
-    background: '#0D1526',
-    border: '1px solid #1B3A5C',
+    background: 'var(--surfaceSubtle)',
+    border: '1px solid var(--brandNavy)',
     borderRadius: '12px',
     padding: '40px 32px',
   };
 
   const headingStyle: React.CSSProperties = {
     fontFamily: "'Big Shoulders Display', Impact, sans-serif",
-    color: '#E8DCC8',
+    color: 'var(--color12)',
     fontSize: '24px',
     margin: '0 0 8px',
   };
@@ -91,10 +91,10 @@ export function ResetPasswordPage(): React.JSX.Element {
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '10px 14px',
-    background: '#111B2F',
-    border: '1px solid #1B3A5C',
+    background: 'var(--surfacePanel)',
+    border: '1px solid var(--brandNavy)',
     borderRadius: '6px',
-    color: '#E8DCC8',
+    color: 'var(--color12)',
     fontSize: '15px',
     marginBottom: '16px',
     boxSizing: 'border-box',
@@ -106,10 +106,10 @@ export function ResetPasswordPage(): React.JSX.Element {
       <div style={containerStyle}>
         <div style={cardStyle}>
           <h1 style={headingStyle}>Invalid link</h1>
-          <p style={{ color: '#B0B8C8', lineHeight: 1.6 }}>
+          <p style={{ color: 'var(--textMuted)', lineHeight: 1.6 }}>
             This reset link is missing a token. Please use the link from your
             email, or{' '}
-            <Link to="/forgot-password" style={{ color: '#C5A55A' }}>
+            <Link to="/forgot-password" style={{ color: 'var(--brandGold)' }}>
               request a new one
             </Link>
             .
@@ -149,7 +149,7 @@ export function ResetPasswordPage(): React.JSX.Element {
             <div>
               <p
                 style={{
-                  color: '#B0B8C8',
+                  color: 'var(--textMuted)',
                   lineHeight: 1.6,
                   marginBottom: '24px',
                 }}
@@ -163,8 +163,8 @@ export function ResetPasswordPage(): React.JSX.Element {
                   display: 'block',
                   textAlign: 'center',
                   padding: '12px',
-                  background: '#1B3A5C',
-                  color: '#E8DCC8',
+                  background: 'var(--brandNavy)',
+                  color: 'var(--color12)',
                   borderRadius: '6px',
                   textDecoration: 'none',
                   fontWeight: 600,
@@ -181,7 +181,7 @@ export function ResetPasswordPage(): React.JSX.Element {
             >
               <p
                 style={{
-                  color: '#B0B8C8',
+                  color: 'var(--textMuted)',
                   lineHeight: 1.6,
                   marginBottom: '24px',
                   marginTop: 0,
@@ -194,7 +194,7 @@ export function ResetPasswordPage(): React.JSX.Element {
                 htmlFor="password"
                 style={{
                   display: 'block',
-                  color: '#9CA3AF',
+                  color: 'var(--textMuted)',
                   fontSize: '13px',
                   marginBottom: '6px',
                 }}
@@ -216,7 +216,7 @@ export function ResetPasswordPage(): React.JSX.Element {
                 htmlFor="confirm"
                 style={{
                   display: 'block',
-                  color: '#9CA3AF',
+                  color: 'var(--textMuted)',
                   fontSize: '13px',
                   marginBottom: '6px',
                 }}
@@ -237,7 +237,7 @@ export function ResetPasswordPage(): React.JSX.Element {
               {error && (
                 <p
                   style={{
-                    color: '#C41E3A',
+                    color: 'var(--brandSeamRed)',
                     fontSize: '13px',
                     marginBottom: '16px',
                     marginTop: 0,
@@ -253,8 +253,10 @@ export function ResetPasswordPage(): React.JSX.Element {
                 style={{
                   width: '100%',
                   padding: '12px',
-                  background: isSubmitting ? '#0F2440' : '#1B3A5C',
-                  color: '#E8DCC8',
+                  background: isSubmitting
+                    ? 'var(--brandNavyDark)'
+                    : 'var(--brandNavy)',
+                  color: 'var(--color12)',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '15px',
