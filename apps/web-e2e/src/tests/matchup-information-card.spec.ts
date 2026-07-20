@@ -11,12 +11,16 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { test } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8451 / ADR-0016): matchup assertions speak
+// `matchupPage` driver verbs so the spec is selector-free and native-ready.
+// `page` is retained only for GraphQL route mocking (a web-only capability).
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -153,28 +157,27 @@ async function mockMatchupGraphQL(
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Information card – timestamps @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await mockMatchupGraphQL(page);
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
   });
 
-  test('shows the Matchup Information heading', async ({ page }) => {
-    await expect(page.getByText('Matchup Information')).toBeVisible();
+  test('shows the Matchup Information heading', async ({ matchupPage }) => {
+    await matchupPage.text('Matchup Information').expectVisible();
   });
 
-  test('shows the matchup start timestamp', async ({ page }) => {
-    const startLine = page.getByText(/^Start:/);
-    await expect(startLine).toBeVisible();
+  test('shows the matchup start timestamp', async ({ matchupPage }) => {
+    const startLine = matchupPage.text(/^Start:/);
+    await startLine.expectVisible();
     // The component formats via Date#toLocaleString(); assert the fixture year
     // is present rather than an exact locale/timezone-dependent string.
-    await expect(startLine).toContainText('2025');
+    await startLine.expectContainsText('2025');
   });
 
-  test('shows the matchup end timestamp', async ({ page }) => {
-    const endLine = page.getByText(/^End:/);
-    await expect(endLine).toBeVisible();
-    await expect(endLine).toContainText('2025');
+  test('shows the matchup end timestamp', async ({ matchupPage }) => {
+    const endLine = matchupPage.text(/^End:/);
+    await endLine.expectVisible();
+    await endLine.expectContainsText('2025');
   });
 });
 
@@ -185,17 +188,17 @@ test.describe('Matchup Information card – timestamps @regression', () => {
 test.describe('Matchup Information card – invalid timestamps @regression', () => {
   test('shows a fallback instead of "Invalid Date" for a malformed start/end time', async ({
     page,
+    matchupPage,
   }) => {
     await mockMatchupGraphQL(page, {
       startTime: 'not-a-real-timestamp',
       endTime: 'also-not-a-real-timestamp',
     });
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
 
-    await expect(page.getByText('Start: —')).toBeVisible();
-    await expect(page.getByText('End: —')).toBeVisible();
-    await expect(page.getByText('Invalid Date')).toHaveCount(0);
+    await matchupPage.text('Start: —').expectVisible();
+    await matchupPage.text('End: —').expectVisible();
+    await matchupPage.text('Invalid Date').expectCount(0);
   });
 });
 
@@ -206,16 +209,14 @@ test.describe('Matchup Information card – invalid timestamps @regression', () 
 test.describe('Matchup Information card – hidden without timestamps @regression', () => {
   test('does not render the card when start and end times are null', async ({
     page,
+    matchupPage,
   }) => {
     await mockMatchupGraphQL(page, { startTime: null, endTime: null });
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
 
     // The rest of the page still renders (main region present) but the
     // Matchup Information section is omitted.
-    await expect(
-      page.locator('[role="main"][aria-label="Matchup details"]'),
-    ).toBeVisible();
-    await expect(page.getByText('Matchup Information')).toHaveCount(0);
+    await matchupPage.mainRegion.expectVisible();
+    await matchupPage.text('Matchup Information').expectCount(0);
   });
 });

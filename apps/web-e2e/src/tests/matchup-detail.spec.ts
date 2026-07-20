@@ -9,12 +9,18 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8451 / ADR-0016): matchup detail assertions speak
+// `matchupPage` driver verbs so the spec is selector-free and native-ready.
+// `page` is retained only for GraphQL route mocking (a web-only capability),
+// URL assertions, and the web-only page-meta (<title>/<head>) and loading-nav
+// surfaces documented inline below.
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -135,34 +141,32 @@ async function mockMatchupGraphQL(page: import('@playwright/test').Page) {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – page structure @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await mockMatchupGraphQL(page);
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
   });
 
-  test('loads the matchup detail page without errors', async ({ page }) => {
+  test('loads the matchup detail page without errors', async ({
+    page,
+    matchupPage,
+  }) => {
     await expect(page).toHaveURL(MATCHUP_URL);
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await matchupPage.expectNoAppError();
   });
 
-  test('shows Matchup Details heading', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /matchup details/i }),
-    ).toBeVisible();
+  test('shows Matchup Details heading', async ({ matchupPage }) => {
+    await matchupPage.heading(/matchup details/i).expectVisible();
   });
 
-  test('shows Back to League button', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: /back to league/i }),
-    ).toBeVisible();
+  test('shows Back to League button', async ({ matchupPage }) => {
+    await matchupPage.button(/back to league/i).expectVisible();
   });
 
-  test('clicking Back to League navigates back', async ({ page }) => {
-    await page.getByRole('button', { name: /back to league/i }).click();
-    await page.waitForLoadState('load');
+  test('clicking Back to League navigates back', async ({
+    page,
+    matchupPage,
+  }) => {
+    await matchupPage.goBackToLeague();
     await expect(page).toHaveURL(`/baseball/league/${LEAGUE_ID}`);
   });
 });
@@ -172,10 +176,9 @@ test.describe('Matchup Detail – page structure @smoke', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – page meta @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await mockMatchupGraphQL(page);
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
   });
 
   test('sets a dynamic document title reflecting the matchup week', async ({
@@ -183,6 +186,7 @@ test.describe('Matchup Detail – page meta @regression', () => {
   }) => {
     // MOCK_MATCHUP.weekNumber === 3, so PageMeta renders
     // "Week 3 Matchup | Legacy Sports".
+    // web-only (ADR-0016 §4): no portable expression
     await expect(page).toHaveTitle(/Week 3 Matchup \| Legacy Sports/);
   });
 
@@ -193,6 +197,7 @@ test.describe('Matchup Detail – page meta @regression', () => {
     // a second, matchup-specific one. Scope to the dynamic tag by its content
     // ("matchup" appears only in PageMeta's description) so the strict-mode
     // locator resolves to exactly one element.
+    // web-only (ADR-0016 §4): no portable expression
     await expect(
       page.locator('head > meta[name="description"][content*="matchup"]'),
     ).toHaveAttribute('content', /Week 3 .*matchup/i);
@@ -204,27 +209,24 @@ test.describe('Matchup Detail – page meta @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – scoreboard @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await mockMatchupGraphQL(page);
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
   });
 
-  test('does not show loading spinner after data loads', async ({ page }) => {
-    await expect(
-      page.getByText('Loading matchup details...'),
-    ).not.toBeVisible();
+  test('does not show loading spinner after data loads', async ({
+    matchupPage,
+  }) => {
+    await matchupPage.text('Loading matchup details...').expectHidden();
   });
 
-  test('does not show not-found state', async ({ page }) => {
-    await expect(page.getByText('Matchup not found')).not.toBeVisible();
+  test('does not show not-found state', async ({ matchupPage }) => {
+    await matchupPage.text('Matchup not found').expectHidden();
   });
 
-  test('renders main matchup content area', async ({ page }) => {
+  test('renders main matchup content area', async ({ matchupPage }) => {
     // The main content area has role="main" aria-label="Matchup details"
-    await expect(
-      page.locator('[role="main"][aria-label="Matchup details"]'),
-    ).toBeVisible();
+    await matchupPage.mainRegion.expectVisible();
   });
 });
 
@@ -233,7 +235,10 @@ test.describe('Matchup Detail – scoreboard @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – loading state @regression', () => {
-  test('shows loading spinner while data is pending', async ({ page }) => {
+  test('shows loading spinner while data is pending', async ({
+    page,
+    matchupPage,
+  }) => {
     // Intercept the matchup query with a long delay so the loading state
     // is reliably visible. Register the catch-all first, then the delay
     // route — Playwright evaluates routes in LIFO order (last registered
@@ -268,13 +273,14 @@ test.describe('Matchup Detail – loading state @regression', () => {
       },
     );
 
+    // web-only timing: gate the spinner before the mocked query resolves
     await page.goto(MATCHUP_URL, { waitUntil: 'commit' });
 
     // The loading branch renders both a Tamagui Spinner and the text.  Match
     // by text but allow more time — V2 main bundle hydration plus the Apollo
     // query setup can take several seconds before the loading branch paints
     // when the network request is gated.
-    await expect(page.getByText('Loading matchup details...')).toBeVisible({
+    await matchupPage.text('Loading matchup details...').expectVisible({
       timeout: 15_000,
     });
 
@@ -288,7 +294,7 @@ test.describe('Matchup Detail – loading state @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – error state @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
       if (
@@ -312,21 +318,21 @@ test.describe('Matchup Detail – error state @regression', () => {
       }
     });
 
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
   });
 
   test('shows error message when GraphQL returns an error', async ({
-    page,
+    matchupPage,
   }) => {
-    await expect(page.getByText(/error loading matchup/i)).toBeVisible();
+    await matchupPage.text(/error loading matchup/i).expectVisible();
   });
 
-  test('shows Back to League button and navigates back', async ({ page }) => {
-    const backButton = page.getByRole('button', { name: /back to league/i });
-    await expect(backButton).toBeVisible();
-    await backButton.click();
-    await page.waitForLoadState('load');
+  test('shows Back to League button and navigates back', async ({
+    page,
+    matchupPage,
+  }) => {
+    await matchupPage.button(/back to league/i).expectVisible();
+    await matchupPage.goBackToLeague();
     await expect(page).toHaveURL(`/baseball/league/${LEAGUE_ID}`);
   });
 });
@@ -336,7 +342,7 @@ test.describe('Matchup Detail – error state @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – not-found state @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
       if (
@@ -356,19 +362,19 @@ test.describe('Matchup Detail – not-found state @regression', () => {
       }
     });
 
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
   });
 
-  test('shows Matchup not found message', async ({ page }) => {
-    await expect(page.getByText('Matchup not found')).toBeVisible();
+  test('shows Matchup not found message', async ({ matchupPage }) => {
+    await matchupPage.text('Matchup not found').expectVisible();
   });
 
-  test('shows Back to League button and navigates back', async ({ page }) => {
-    const backButton = page.getByRole('button', { name: /back to league/i });
-    await expect(backButton).toBeVisible();
-    await backButton.click();
-    await page.waitForLoadState('load');
+  test('shows Back to League button and navigates back', async ({
+    page,
+    matchupPage,
+  }) => {
+    await matchupPage.button(/back to league/i).expectVisible();
+    await matchupPage.goBackToLeague();
     await expect(page).toHaveURL(`/baseball/league/${LEAGUE_ID}`);
   });
 });
@@ -380,6 +386,7 @@ test.describe('Matchup Detail – not-found state @regression', () => {
 test.describe('Matchup Detail – stale-scores warning @regression', () => {
   test('shows warning banner when getMatchupPlayers query errors', async ({
     page,
+    matchupPage,
   }) => {
     // Mock everything normally except getMatchupPlayers, which returns an
     // error so MatchupScoreboard falls back to the matchup's stored scores
@@ -433,11 +440,10 @@ test.describe('Matchup Detail – stale-scores warning @regression', () => {
       }
     });
 
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
 
-    await expect(
-      page.getByText(/live stats unavailable.*last saved scores/i),
-    ).toBeVisible();
+    await matchupPage
+      .text(/live stats unavailable.*last saved scores/i)
+      .expectVisible();
   });
 });

@@ -9,7 +9,11 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
+// Page-object migration (LS-8451 / ADR-0016): matchup interactions and
+// assertions speak `matchupPage` driver verbs so the spec is selector-free and
+// native-ready. `page` is retained only for GraphQL route mocking / useTier
+// (web-only capabilities) and URL assertions.
+import { customAuthTest, expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback, useTier } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -359,46 +363,46 @@ async function mockMatchupGraphQL(
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Week Navigation – current week display @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await mockMatchupGraphQL(page);
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID_WEEK3);
   });
 
   test('loads the matchup detail page showing current week', async ({
     page,
+    matchupPage,
   }) => {
     await expect(page).toHaveURL(MATCHUP_URL);
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await matchupPage.expectNoAppError();
   });
 
-  test('displays the current week number with scores', async ({ page }) => {
+  test('displays the current week number with scores', async ({
+    matchupPage,
+  }) => {
     // The MatchupNavigationControls stepper shows "Week 3"
-    await expect(page.getByText('Week 3').first()).toBeVisible();
+    await matchupPage.weekLabel(3).expectVisible();
 
     // Wait for the matchup cards to load (they depend on GetMatchupsByWeek)
-    const userMatchupCard = page.getByLabel('Alpha Squad vs Beta Force', {
-      exact: true,
-    });
-    await expect(userMatchupCard).toBeVisible();
+    const userMatchupCard = matchupPage.matchupCard(
+      'Alpha Squad vs Beta Force',
+    );
+    await userMatchupCard.expectVisible();
 
     // Team scores should be visible inside the navigation matchup cards
-    await expect(userMatchupCard.getByText('42.5')).toBeVisible();
-    await expect(userMatchupCard.getByText('38.1')).toBeVisible();
+    await userMatchupCard.byText('42.5').expectVisible();
+    await userMatchupCard.byText('38.1').expectVisible();
   });
 
-  test('shows team names for the current matchup', async ({ page }) => {
+  test('shows team names for the current matchup', async ({ matchupPage }) => {
     // Team names appear in the scoreboard region which has an aria-label
     // containing both team names. Use the region role to scope precisely.
-    const scoreboard = page.getByRole('region', {
-      name: /Alpha Squad vs Beta Force/,
-    });
-    await expect(scoreboard).toBeVisible();
+    const scoreboard = matchupPage.scoreboardRegion(
+      /Alpha Squad vs Beta Force/,
+    );
+    await scoreboard.expectVisible();
 
-    await expect(scoreboard.getByText('Alpha Squad').first()).toBeVisible();
-    await expect(scoreboard.getByText('Beta Force').first()).toBeVisible();
+    await scoreboard.byText('Alpha Squad').first().expectVisible();
+    await scoreboard.byText('Beta Force').first().expectVisible();
   });
 });
 
@@ -407,61 +411,58 @@ test.describe('Matchup Week Navigation – current week display @smoke', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Week Navigation – stepper controls @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await mockMatchupGraphQL(page);
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID_WEEK3);
   });
 
-  test('previous and next week buttons are visible', async ({ page }) => {
-    const prevButton = page.getByLabel('Previous week');
-    const nextButton = page.getByLabel('Next week');
-
-    await expect(prevButton).toBeVisible();
-    await expect(nextButton).toBeVisible();
+  test('previous and next week buttons are visible', async ({
+    matchupPage,
+  }) => {
+    await matchupPage.prevWeekButton.expectVisible();
+    await matchupPage.nextWeekButton.expectVisible();
   });
 
   test('previous week button is disabled on the first available week', async ({
-    page,
+    matchupPage,
   }) => {
     // Week 3 is the first available week (weeks 3 and 4 exist).
     // The StepperButton uses an `disabled` variant that sets opacity to 0.3.
-    const prevButton = page.getByLabel('Previous week');
-    await expect(prevButton).toBeVisible();
+    await matchupPage.prevWeekButton.expectVisible();
 
     // Check that the button has the disabled attribute (Tamagui renders aria-disabled)
-    await expect(prevButton).toHaveAttribute('aria-disabled', 'true');
+    await matchupPage.prevWeekButton.expectAttribute('aria-disabled', 'true');
   });
 
   test('previous week button is removed from tab order when disabled (LS-5891)', async ({
-    page,
+    matchupPage,
   }) => {
     // Week 3 is the first available week, so the prev button is disabled.
     // A disabled stepper button must not be keyboard-focusable — tabIndex=-1
     // keeps it out of the tab order instead of a silent dead stop.
-    const prevButton = page.getByLabel('Previous week');
-    await expect(prevButton).toBeVisible();
-    await expect(prevButton).toHaveAttribute('tabindex', '-1');
+    await matchupPage.prevWeekButton.expectVisible();
+    await matchupPage.prevWeekButton.expectAttribute('tabindex', '-1');
   });
 
-  test('clicking next week loads week 4 matchup data', async ({ page }) => {
-    const nextButton = page.getByLabel('Next week');
-    await expect(nextButton).toBeVisible();
+  test('clicking next week loads week 4 matchup data', async ({
+    matchupPage,
+  }) => {
+    await matchupPage.nextWeekButton.expectVisible();
 
-    await nextButton.click();
+    await matchupPage.goNextWeek();
 
     // After clicking next, the stepper should now show "Week 4"
-    await expect(page.getByText('Week 4').first()).toBeVisible();
+    await matchupPage.weekLabel(4).expectVisible();
 
     // The navigation auto-selects the user's matchup in the new week.
     // Week 4 matchup has team1Id=1 (user's team) vs team3Id=3 (Gamma Rays),
     // so the page navigates to the week 4 matchup. Wait for the scoreboard
     // region to update to show the new matchup.
-    const week4Scoreboard = page.getByRole('region', {
-      name: /Alpha Squad vs Gamma Rays/,
-    });
-    await expect(week4Scoreboard).toBeVisible();
-    await expect(week4Scoreboard.getByText('Gamma Rays').first()).toBeVisible();
+    const week4Scoreboard = matchupPage.scoreboardRegion(
+      /Alpha Squad vs Gamma Rays/,
+    );
+    await week4Scoreboard.expectVisible();
+    await week4Scoreboard.byText('Gamma Rays').first().expectVisible();
   });
 });
 
@@ -473,25 +474,24 @@ test.describe('Matchup Week Navigation – stepper controls @regression', () => 
 // accessLevel === 'admin'.
 // ---------------------------------------------------------------------------
 
-const premiumTest = createCustomAuthTest('premium@test.com');
+const premiumTest = customAuthTest('premium@test.com');
 
 premiumTest.describe(
   'Matchup Week Navigation – win probability (premium) @regression',
   () => {
-    premiumTest.beforeEach(async ({ page }) => {
+    premiumTest.beforeEach(async ({ page, matchupPage }) => {
       await mockMatchupGraphQL(page, { isPremium: true });
-      await page.goto(MATCHUP_URL);
-      await page.waitForLoadState('load');
+      await matchupPage.goto(LEAGUE_ID, MATCHUP_ID_WEEK3);
     });
 
     premiumTest(
       'win probability panel is visible for premium users',
-      async ({ page }) => {
+      async ({ matchupPage }) => {
         // The MatchupWinProbabilityPanel header contains "Win Probability".
         // Use first() because the label appears in both the header and the
         // ProbabilityBar ("WIN PROBABILITY"). The panel renders asynchronously
         // after the matchup data loads, so allow extra time.
-        await expect(page.getByText('Win Probability').first()).toBeVisible({
+        await matchupPage.text('Win Probability').first().expectVisible({
           timeout: 10000,
         });
       },
@@ -499,13 +499,11 @@ premiumTest.describe(
 
     premiumTest(
       'premium user does not see the upgrade prompt overlay',
-      async ({ page }) => {
+      async ({ matchupPage }) => {
         // PremiumGate shows "Premium Feature" text and "Upgrade to Premium" button
         // for free users. Premium users should NOT see these.
-        await expect(page.getByText('Premium Feature')).not.toBeVisible();
-        await expect(
-          page.getByRole('button', { name: /upgrade to premium/i }),
-        ).not.toBeVisible();
+        await matchupPage.text('Premium Feature').expectHidden();
+        await matchupPage.upgradeButton.expectHidden();
       },
     );
 
@@ -517,35 +515,34 @@ premiumTest.describe(
     // never exact win-probability percentages.
     premiumTest(
       'shows projected final scores for both teams',
-      async ({ page }) => {
-        const panel = page.getByTestId('win-probability-panel');
-        await expect(panel).toBeVisible({ timeout: 10000 });
-        await expect(panel.getByText('PROJECTED FINAL SCORES')).toBeVisible();
-        await expect(panel.getByText('vs')).toBeVisible();
+      async ({ matchupPage }) => {
+        const panel = matchupPage.winProbabilityPanel;
+        await panel.expectVisible({ timeout: 10000 });
+        await panel.byText('PROJECTED FINAL SCORES').expectVisible();
+        await panel.byText('vs').expectVisible();
       },
     );
 
     premiumTest(
       'shows the batting/pitching/fielding category breakdown',
-      async ({ page }) => {
-        const panel = page.getByTestId('win-probability-panel');
-        await expect(panel).toBeVisible({ timeout: 10000 });
-        await expect(
-          panel.getByText('CATEGORY BREAKDOWN (PROJECTED)'),
-        ).toBeVisible();
-        await expect(panel.getByText('BATTING')).toBeVisible();
-        await expect(panel.getByText('PITCHING')).toBeVisible();
-        await expect(panel.getByText('FIELDING')).toBeVisible();
+      async ({ matchupPage }) => {
+        const panel = matchupPage.winProbabilityPanel;
+        await panel.expectVisible({ timeout: 10000 });
+        await panel.byText('CATEGORY BREAKDOWN (PROJECTED)').expectVisible();
+        await panel.byText('BATTING').expectVisible();
+        await panel.byText('PITCHING').expectVisible();
+        await panel.byText('FIELDING').expectVisible();
       },
     );
 
-    premiumTest('shows the simulation-count footnote', async ({ page }) => {
-      const panel = page.getByTestId('win-probability-panel');
-      await expect(panel).toBeVisible({ timeout: 10000 });
-      await expect(
-        panel.getByText(/based on [\d,]+ simulations/i),
-      ).toBeVisible();
-    });
+    premiumTest(
+      'shows the simulation-count footnote',
+      async ({ matchupPage }) => {
+        const panel = matchupPage.winProbabilityPanel;
+        await panel.expectVisible({ timeout: 10000 });
+        await panel.byText(/based on [\d,]+ simulations/i).expectVisible();
+      },
+    );
   },
 );
 
@@ -558,7 +555,7 @@ premiumTest.describe(
   () => {
     premiumTest(
       'does not render the win probability panel for a completed matchup',
-      async ({ page }) => {
+      async ({ page, matchupPage }) => {
         await mockMatchupGraphQL(page, {
           isPremium: true,
           // Real MatchupStatus enum value (lib/graphql) is lowercase
@@ -566,12 +563,9 @@ premiumTest.describe(
           // against that exact string.
           currentMatchup: makeMatchup({ status: 'completed' }),
         });
-        await page.goto(MATCHUP_URL);
-        await page.waitForLoadState('load');
+        await matchupPage.goto(LEAGUE_ID, MATCHUP_ID_WEEK3);
 
-        await expect(
-          page.getByTestId('win-probability-panel'),
-        ).not.toBeVisible();
+        await matchupPage.winProbabilityPanel.expectHidden();
       },
     );
   },
@@ -584,36 +578,33 @@ premiumTest.describe(
 // so useIsPremium resolves to false, exercising the PremiumGate overlay path.
 // ---------------------------------------------------------------------------
 
-const freeTest = createCustomAuthTest('free@test.com');
+const freeTest = customAuthTest('free@test.com');
 
 freeTest.describe(
   'Matchup Week Navigation – win probability (free user) @regression',
   () => {
-    freeTest.beforeEach(async ({ page }) => {
+    freeTest.beforeEach(async ({ page, matchupPage }) => {
       await mockMatchupGraphQL(page, { isPremium: false });
-      await page.goto(MATCHUP_URL);
-      await page.waitForLoadState('load');
+      await matchupPage.goto(LEAGUE_ID, MATCHUP_ID_WEEK3);
     });
 
     freeTest(
       'free user sees the premium gate overlay instead of win probability',
-      async ({ page }) => {
+      async ({ matchupPage }) => {
         // The PremiumGate shows the "Premium Feature" text and upgrade CTA
-        await expect(page.getByText('Premium Feature')).toBeVisible();
-        await expect(
-          page.getByRole('button', { name: /upgrade to premium/i }),
-        ).toBeVisible();
+        await matchupPage.text('Premium Feature').expectVisible();
+        await matchupPage.upgradeButton.expectVisible();
       },
     );
 
     freeTest(
       'free user sees the feature description in the gate overlay',
-      async ({ page }) => {
+      async ({ matchupPage }) => {
         // The PremiumGate renders the featureDescription from MatchupDetailPage:
         // "See win probability and projected scores for every matchup based on remaining games."
-        await expect(
-          page.getByText(/win probability and projected scores/i),
-        ).toBeVisible();
+        await matchupPage
+          .text(/win probability and projected scores/i)
+          .expectVisible();
       },
     );
   },

@@ -7,9 +7,14 @@
  * All GraphQL queries are mocked so these tests run without a live backend.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8451 / ADR-0016): standings assertions speak
+// `standingsPage` driver verbs so the spec is selector-free and native-ready.
+// `page` is retained only for GraphQL route mocking (a web-only capability) and
+// URL assertions — mirroring the migrated league-detail-tabs spec.
 
 /** URL predicate for the GraphQL API endpoint */
 
@@ -203,47 +208,47 @@ async function mockLeagueDetailGraphQL(page: import('@playwright/test').Page) {
 test.describe('Standings Tab — navigation @smoke', () => {
   test('navigates to the standings tab on the league detail page', async ({
     page,
+    standingsPage,
   }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/standings');
-    await page.waitForLoadState('load');
+    await standingsPage.goto(1);
 
     await expect(page).toHaveURL('/baseball/league/1/standings');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await standingsPage.expectNoAppError();
   });
 });
 
 test.describe('Standings Tab – data rendering @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, standingsPage }) => {
     await mockLeagueDetailGraphQL(page);
-    await page.goto('/baseball/league/1/standings');
-    await page.waitForLoadState('load');
+    await standingsPage.goto(1);
   });
 
-  test('shows team names from mocked standings data', async ({ page }) => {
-    await expect(page.getByText('Alpha Squad')).toBeVisible();
-    await expect(page.getByText('Beta Force')).toBeVisible();
-    await expect(page.getByText('Gamma Stars')).toBeVisible();
-    await expect(page.getByText('Delta Kings')).toBeVisible();
+  test('shows team names from mocked standings data', async ({
+    standingsPage,
+  }) => {
+    await standingsPage.team('Alpha Squad').expectVisible();
+    await standingsPage.team('Beta Force').expectVisible();
+    await standingsPage.team('Gamma Stars').expectVisible();
+    await standingsPage.team('Delta Kings').expectVisible();
   });
 
-  test('shows win totals from standings data', async ({ page }) => {
+  test('shows win totals from standings data', async ({ standingsPage }) => {
     // Alpha Squad has 8 wins — verify a win count is visible
-    const cells = page.getByText('8');
-    await expect(cells.first()).toBeVisible();
+    await standingsPage.statCell('8').first().expectVisible();
   });
 
-  test('shows loss totals from standings data', async ({ page }) => {
+  test('shows loss totals from standings data', async ({ standingsPage }) => {
     // Alpha Squad (8W-2L): loss count 2 should be visible
-    const cells = page.getByText('2');
-    await expect(cells.first()).toBeVisible();
+    await standingsPage.statCell('2').first().expectVisible();
   });
 });
 
 test.describe('Standings Tab — error state @regression', () => {
-  test('shows an error state when standings query fails', async ({ page }) => {
+  test('shows an error state when standings query fails', async ({
+    page,
+    standingsPage,
+  }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
 
@@ -288,18 +293,18 @@ test.describe('Standings Tab — error state @regression', () => {
       }
     });
 
-    await page.goto('/baseball/league/1/standings');
-    await page.waitForLoadState('load');
+    await standingsPage.goto(1);
 
     // The page should not crash even when standings fail
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await standingsPage.expectNoAppError();
   });
 });
 
 test.describe('Standings Tab — empty state @regression', () => {
-  test('handles empty standings gracefully', async ({ page }) => {
+  test('handles empty standings gracefully', async ({
+    page,
+    standingsPage,
+  }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
       const postData = route.request().postData()?.toLowerCase() ?? '';
 
@@ -341,14 +346,11 @@ test.describe('Standings Tab — empty state @regression', () => {
       }
     });
 
-    await page.goto('/baseball/league/1/standings');
-    await page.waitForLoadState('load');
+    await standingsPage.goto(1);
 
     // App should still load without crashing
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await standingsPage.expectNoAppError();
     // Teams should show (without standings data, they appear in default order)
-    await expect(page.getByText('Alpha Squad')).toBeVisible();
+    await standingsPage.team('Alpha Squad').expectVisible();
   });
 });

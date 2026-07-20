@@ -14,12 +14,17 @@
  * All GraphQL responses are mocked so no live backend is required.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8451 / ADR-0016): roster-editor interactions and
+// assertions speak `matchupPage` driver verbs so the spec is selector-free and
+// native-ready. `page` is retained only for GraphQL route mocking (a web-only
+// capability) and the plain-value assertions on captured mock variables.
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -283,52 +288,47 @@ async function mockRosterEditorGraphQL(
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – Roster Editor @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, matchupPage }) => {
     await mockRosterEditorGraphQL(page, { matchupStatus: 'scheduled' });
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
   });
 
   test("renders the Edit Lineup roster editor for the user's own team on a scheduled matchup", async ({
-    page,
+    matchupPage,
   }) => {
-    await expect(
-      page.getByRole('heading', { name: 'Edit Lineup' }),
-    ).toBeVisible();
-    await expect(page.getByText('Unlocked', { exact: true })).toBeVisible();
+    await matchupPage.heading('Edit Lineup').expectVisible();
+    await matchupPage.text('Unlocked', { exact: true }).expectVisible();
     // Two of three slots (C, 1B) are filled; CF is empty.
-    await expect(page.getByText('STARTERS (2/3)')).toBeVisible();
-    await expect(page.getByText('BENCH (1)')).toBeVisible();
-    await expect(page.getByTestId('matchup-player-row-203')).toBeVisible();
+    await matchupPage.text('STARTERS (2/3)').expectVisible();
+    await matchupPage.text('BENCH (1)').expectVisible();
+    await matchupPage.playerRow(203).expectVisible();
   });
 
   test('assigns a bench player to an eligible empty slot and invokes the update mutation with the expected payload', async ({
-    page,
+    matchupPage,
   }) => {
     // Select the bench player (Sam Okafor, eligible for CF only).
-    const benchRow = page.getByTestId('matchup-player-row-203');
-    await benchRow.click();
+    await matchupPage.selectPlayerRow(203);
 
     // Selecting the bench player reveals one assign button per league
     // position slot; only the CF button is eligible for this player.
-    const assignToCf = page.getByTestId('roster-assign-203-12');
-    await expect(assignToCf).toBeVisible();
-    await expect(assignToCf).toBeEnabled();
+    const assignToCf = matchupPage.assignButton(203, 12);
+    await assignToCf.expectVisible();
+    await assignToCf.expectEnabled();
 
-    await assignToCf.click();
+    await matchupPage.assignPlayerToPosition(203, 12);
 
     // UI reflects the new assignment once the mutation resolves and the
     // roster is refetched: all three slots are now filled and the bench
     // is empty.
-    await expect(page.getByText('STARTERS (3/3)')).toBeVisible();
-    await expect(page.getByText('No bench players')).toBeVisible();
-    await expect(page.getByTestId('matchup-player-row-203')).toContainText(
-      'Sam Okafor',
-    );
+    await matchupPage.text('STARTERS (3/3)').expectVisible();
+    await matchupPage.text('No bench players').expectVisible();
+    await matchupPage.playerRow(203).expectContainsText('Sam Okafor');
   });
 
   test('save mutation is invoked with the expected matchupPlayerId and positionId', async ({
     page,
+    matchupPage,
   }) => {
     let captured: Record<string, unknown> | null = null;
     // beforeEach already registered a GraphQL route handler and navigated to
@@ -342,13 +342,12 @@ test.describe('Matchup Detail – Roster Editor @regression', () => {
         captured = variables;
       },
     });
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
 
-    await page.getByTestId('matchup-player-row-203').click();
-    await page.getByTestId('roster-assign-203-12').click();
+    await matchupPage.selectPlayerRow(203);
+    await matchupPage.assignPlayerToPosition(203, 12);
 
-    await expect(page.getByText('STARTERS (3/3)')).toBeVisible();
+    await matchupPage.text('STARTERS (3/3)').expectVisible();
     expect(captured).toEqual({ matchupPlayerId: 203, positionId: 12 });
   });
 });
@@ -360,6 +359,7 @@ test.describe('Matchup Detail – Roster Editor @regression', () => {
 test.describe('Matchup Detail – Roster Editor lock discovery @regression', () => {
   test('discovers the matchup is locked on the first edit attempt and blocks the write', async ({
     page,
+    matchupPage,
   }) => {
     let mutationCalled = false;
     await mockRosterEditorGraphQL(page, {
@@ -368,25 +368,20 @@ test.describe('Matchup Detail – Roster Editor lock discovery @regression', () 
         mutationCalled = true;
       },
     });
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
 
     // Initial render is optimistic — the editor shows Unlocked until an edit
     // is attempted and the server-side pre-flight check reveals the lock.
-    await expect(
-      page.getByRole('heading', { name: 'Edit Lineup' }),
-    ).toBeVisible();
-    await expect(page.getByText('Unlocked', { exact: true })).toBeVisible();
+    await matchupPage.heading('Edit Lineup').expectVisible();
+    await matchupPage.text('Unlocked', { exact: true }).expectVisible();
 
-    await page.getByTestId('matchup-player-row-203').click();
-    await page.getByTestId('roster-assign-203-12').click();
+    await matchupPage.selectPlayerRow(203);
+    await matchupPage.assignPlayerToPosition(203, 12);
 
     // The pre-flight GetMatchupById check reports `in_progress`, so the
     // editor flips to its locked, read-only state instead of writing.
-    await expect(
-      page.getByRole('heading', { name: 'Current Lineup' }),
-    ).toBeVisible();
-    await expect(page.getByText('Locked', { exact: true })).toBeVisible();
+    await matchupPage.heading('Current Lineup').expectVisible();
+    await matchupPage.text('Locked', { exact: true }).expectVisible();
     expect(mutationCalled).toBe(false);
   });
 });

@@ -13,9 +13,12 @@ import {
   DraftPage,
   ForgotPasswordPage,
   LeaguePage,
+  MatchupPage,
   PlayersPage,
   ProfileSettingsScreen,
   ResetPasswordPage,
+  RosterPage,
+  StandingsPage,
 } from '../pages';
 import { NavHeader } from '../components';
 import { PlaywrightWebDriver } from '../driver';
@@ -43,6 +46,12 @@ export interface PageObjectFixtures {
   resetPasswordPage: ResetPasswordPage;
   leaguePage: LeaguePage;
   playersPage: PlayersPage;
+  /** The league Standings tab surface (`/…/league/:id/standings`). */
+  standingsPage: StandingsPage;
+  /** The league Roster tab surface (`/…/league/:id/roster`). */
+  rosterPage: RosterPage;
+  /** The matchup detail page (`/…/league/:id/matchups/:matchupId`). */
+  matchupPage: MatchupPage;
   /** The Discord OAuth callback screen (/auth/discord/callback). */
   discordCallbackScreen: DiscordCallbackScreen;
   /** The Profile Settings screen (/profile/settings) — the callback redirect target. */
@@ -93,6 +102,24 @@ const pageObjects = {
     use: (pageObject: PlayersPage) => Promise<void>,
   ) => {
     await use(new PlayersPage(new PlaywrightWebDriver(page)));
+  },
+  standingsPage: async (
+    { page }: { page: Page },
+    use: (pageObject: StandingsPage) => Promise<void>,
+  ) => {
+    await use(new StandingsPage(new PlaywrightWebDriver(page)));
+  },
+  rosterPage: async (
+    { page }: { page: Page },
+    use: (pageObject: RosterPage) => Promise<void>,
+  ) => {
+    await use(new RosterPage(new PlaywrightWebDriver(page)));
+  },
+  matchupPage: async (
+    { page }: { page: Page },
+    use: (pageObject: MatchupPage) => Promise<void>,
+  ) => {
+    await use(new MatchupPage(new PlaywrightWebDriver(page)));
   },
   discordCallbackScreen: async (
     { page }: { page: Page },
