@@ -11,7 +11,7 @@ Use this guide when creating or updating UI components in the web and mobile app
 
 - **Framework**: Tamagui (Universal React styling)
 - **Icons**: `@tamagui/lucide-icons`
-- **Theme**: Custom theme with variables like `$background`, `$blue10`, `$surfaceCard`.
+- **Theme**: Custom light + dark themes with tokens like `$background`, `$brandNavyLight`, `$surfaceCard`. Both themes are supported on every page — use tokens only (see [brand-colors.md](brand-colors.md)); never `$blue*` or raw hex.
 
 ## Core Stylistic Patterns
 
@@ -69,7 +69,7 @@ const InteractiveCard = styled(Card, {
   animation: 'quick',
   pressStyle: { scale: 0.98 },
   hoverStyle: {
-    borderColor: '$blue8',
+    borderColor: '$brandNavyLight',
     backgroundColor: '$backgroundHover',
   },
 });
@@ -79,8 +79,9 @@ const InteractiveCard = styled(Card, {
 
 Use theme tokens to create "glowing" or "active" effects without hardcoding hex values.
 
-- **Active Buttons**: `theme="active"`, `backgroundColor="$blue9"`
-- **Tags/Badges**: `backgroundColor="$blue3"`, `color="$blue10"`
+- **Active Buttons**: `backgroundColor="$brandNavyLight"` with `hoverStyle`/`pressStyle` (never `theme="blue"`)
+- **Tags/Badges**: `backgroundColor="$surfaceInteractive"`, `color="$brandGoldLight"`
+- **Gradients (web)**: build from CSS vars so they stay theme-aware — `linear-gradient(135deg, var(--surfacePanel), var(--brandNavy))`
 
 ## Layout Best Practices
 

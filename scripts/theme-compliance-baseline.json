@@ -1,0 +1,20 @@
+{
+  "apps/web": {
+    "rawHex": 349,
+    "rawRgba": 168,
+    "blueToken": 128,
+    "themeBlue": 7
+  },
+  "apps/app": {
+    "rawHex": 121,
+    "rawRgba": 13,
+    "blueToken": 117,
+    "themeBlue": 2
+  },
+  "lib/shared-components": {
+    "rawHex": 542,
+    "rawRgba": 497,
+    "blueToken": 113,
+    "themeBlue": 12
+  }
+}

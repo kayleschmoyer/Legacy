@@ -30,7 +30,7 @@ These issues appear repeatedly in reviewer bot CHANGES_REQUESTED cycles. Knowing
 | 22  | `role="button"` without `tabIndex={0}`                           | Add `tabIndex={0}` and `onKeyDown`; prefer native `<button>`                                                                                                                                                      | `lint-review-patterns` |
 | 23  | Collapsed content stays in accessibility tree                    | Add `aria-hidden`, `visibility: hidden`, `pointerEvents: none` when hidden                                                                                                                                        | Manual                 |
 | 24  | `transition: 'all'` instead of specific properties               | Enumerate only the properties being transitioned                                                                                                                                                                  | `lint-review-patterns` |
-| 25  | Inline hex literal instead of `colors.ts` constant               | Import and use named constant from `apps/web/src/constants/colors.ts`                                                                                                                                             | `lint-review-patterns` |
+| 25  | Hardcoded color (hex/rgba, `$blue*`, dark-only constant)         | Use Tamagui theme tokens (`$brandNavy`, `$surfaceCard`, …) so both themes render — see `.agents/skills/ui/references/brand-colors.md`                                                                             | `lint-review-patterns` |
 | 26  | `throw new Error()` in GraphQL resolver for input validation     | Use `UserInputError` from `lambdas/db/src/schema/graphql-errors.ts`                                                                                                                                               | `lint-review-patterns` |
 | 27  | `localStorage`/`sessionStorage` write without try/catch          | Wrap in try/catch — storage throws in private mode and on quota exceeded                                                                                                                                          | `lint-review-patterns` |
 | 28  | Unsafe `as 'literal-union'` cast on unvalidated external data    | Use type guard with allowed-values array instead of bare `as` assertion                                                                                                                                           | Manual                 |
@@ -278,22 +278,25 @@ style={{ transition: 'all 0.15s ease' }}
 style={{ transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease' }}
 ```
 
-### #25 — Inline hex literals instead of `colors.ts` constants
+### #25 — Hardcoded colors instead of Tamagui theme tokens
 
-This codebase centralizes all hex values in `apps/web/src/constants/colors.ts`. Using raw hex in component files creates drift. Caught by `lint-review-patterns` for `.tsx` files.
+Both light and dark themes are supported on every page (epic LS-8518). Raw hex/rgba literals — and imports of the dark-only constants files (`apps/web/src/constants/colors.ts`, `lib/shared-components/src/utils/colors.ts`, being retired under LS-8526) — render identically in both themes and break one of them. So do the banned `$blue1`–`$blue12` tokens and `theme="blue"` (generic Tailwind blue). The theme-compliance ratchet (`make lint-theme-compliance`, LS-8519) fails `custom-checks` on any count increase.
 
 ```tsx
 // Bad
 backgroundColor: '#ffffff';
 color: '#1B3A5C';
+import { BRAND_NAVY } from '../../constants/colors'; // dark-only constant
+backgroundColor: '$blue9'; // banned generic blue
 
-// Good
-import { BRAND_NAVY, BACKGROUND_PRIMARY } from '../../constants/colors';
-backgroundColor: BACKGROUND_PRIMARY;
-color: BRAND_NAVY;
+// Good — theme tokens resolve per active theme
+backgroundColor: '$background';
+color: '$brandNavy';
+// Raw-CSS strings (web): use theme-aware CSS vars
+background: 'linear-gradient(135deg, var(--surfacePanel), var(--brandNavy))';
 ```
 
-**When to check**: any inline color value in `apps/web/**/*.tsx` or `lib/shared-components/**/*.tsx`.
+**When to check**: any color value in `apps/web/**`, `apps/app/**`, or `lib/shared-components/**`. Full token table and `$blue*` replacement map: `.agents/skills/ui/references/brand-colors.md`.
 
 ### #26 — `throw new Error()` in GraphQL resolvers for input validation
 

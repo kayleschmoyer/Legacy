@@ -208,7 +208,7 @@ const PATTERNS = [
   },
   {
     id: 'inline-hex-color',
-    name: '#25 — Inline hex color literal (use colors.ts constant)',
+    name: '#25 — Inline hex color literal (use Tamagui theme tokens)',
     regex: /['"]#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b['"]/,
     fileFilter: (f) =>
       /\.(tsx|jsx)$/.test(f) &&
@@ -218,7 +218,7 @@ const PATTERNS = [
       !f.endsWith('.config.js'),
     severity: 'warning',
     description:
-      'Import named constants from apps/web/src/constants/colors.ts instead of inline hex values.',
+      'Use Tamagui theme tokens ($brandNavy, $surfaceCard, ...) so both light and dark themes render; see .agents/skills/ui/references/brand-colors.md (LS-8518).',
   },
   {
     id: 'graphql-resolver-plain-error',
