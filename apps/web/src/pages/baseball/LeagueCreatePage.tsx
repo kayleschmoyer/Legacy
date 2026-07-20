@@ -1006,6 +1006,8 @@ interface FieldRowProps {
   labelId?: string;
   hint?: string;
   required?: boolean;
+  /** Stable test id for scoping E2E locators to this field's controls. */
+  testId?: string;
   children: React.ReactNode;
 }
 
@@ -1014,10 +1016,11 @@ function FieldRow({
   labelId,
   hint,
   required,
+  testId,
   children,
 }: FieldRowProps): React.JSX.Element {
   return (
-    <YStack gap="$2">
+    <YStack gap="$2" data-testid={testId}>
       <XStack gap="$2" alignItems="center">
         <Text
           id={labelId}
@@ -2308,6 +2311,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   {/* Number of Teams */}
                   <FieldRow
                     label="Number of Teams"
+                    testId="numberOfTeams-field"
                     required
                     hint={
                       formData.numberOfTeams % 2 === 1
@@ -2326,6 +2330,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   {/* Divisions */}
                   <FieldRow
                     label="Number of Divisions"
+                    testId="numberOfDivisions-field"
                     hint={
                       formData.numberOfTeams % 2 === 1
                         ? `With ${formData.numberOfTeams} teams, only odd division counts (${ALL_DIVISION_COUNT_OPTIONS.filter((d) => d <= formData.numberOfTeams && d % 2 === 1).join(', ')}) are allowed for equal team distribution.`

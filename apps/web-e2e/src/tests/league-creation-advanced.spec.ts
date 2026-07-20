@@ -13,11 +13,23 @@
  */
 
 import { adminTest, customAuthTest, expect, test } from '../fixtures/pages';
-import { unmockedGraphQLFallback, useTier } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+  useTier,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** Free-tier identity, with page objects injected. */
 const freeUserTest = customAuthTest('freeuser@test.com', 'none');
+
+/** Extract `variables.input.numberOfDivisions` from a captured mutation request body. */
+function readSubmittedDivisions(postData: string): number | undefined {
+  const parsed = JSON.parse(postData) as {
+    variables?: { input?: { numberOfDivisions?: number } };
+  };
+  return parsed.variables?.input?.numberOfDivisions;
+}
 
 /** Mock a successful createLeagueAndTeams response */
 async function mockCreateLeagueSuccess(page: import('@playwright/test').Page) {
@@ -189,6 +201,109 @@ test.describe('League Creation — Advanced Settings @regression', () => {
 
     await leaguePage.text('Number of Divisions').expectVisible();
     await leaguePage.text('How many divisions to split').expectVisible();
+  });
+
+  test('should select a division count and submit it as numberOfDivisions (LS-5365)', async ({
+    page,
+    leaguePage,
+  }) => {
+    let submittedDivisions: number | undefined;
+    await page.route(isGraphQLEndpoint, async (route) => {
+      if (
+        extractOperationName(route).toLowerCase() === 'createleagueandteams'
+      ) {
+        submittedDivisions = readSubmittedDivisions(
+          route.request().postData() ?? '',
+        );
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              createLeagueAndTeams: {
+                __typename: 'CreateLeagueAndTeamsPayload',
+                league: { __typename: 'League', id: 77 },
+              },
+            },
+          }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+
+    // Default team count (12) allows division options 2 and 4 — select 4.
+    await leaguePage.selectDivisionCount(4);
+    await leaguePage.fillLeagueName('Division Pick League');
+    await leaguePage.submitCreate();
+    await leaguePage.continueToLeague();
+
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+    expect(submittedDivisions).toBe(4);
+  });
+
+  test('should filter division options to team-count parity and reset an invalid selection (LS-5365)', async ({
+    page,
+    leaguePage,
+  }) => {
+    let submittedDivisions: number | undefined;
+    await page.route(isGraphQLEndpoint, async (route) => {
+      if (
+        extractOperationName(route).toLowerCase() === 'createleagueandteams'
+      ) {
+        submittedDivisions = readSubmittedDivisions(
+          route.request().postData() ?? '',
+        );
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              createLeagueAndTeams: {
+                __typename: 'CreateLeagueAndTeamsPayload',
+                league: { __typename: 'League', id: 78 },
+              },
+            },
+          }),
+        });
+      } else {
+        await unmockedGraphQLFallback(route);
+      }
+    });
+
+    await leaguePage.gotoCreate();
+    await leaguePage.leagueNameInput.expectVisible();
+
+    // Default is 12 teams / 2 divisions. Pick the even division option (4)
+    // first, then flip team count to an odd value (7) — the even divisions
+    // selection is no longer valid, so it snaps to the nearest same-parity
+    // option (3, the closer of the two odd choices [1, 3] to the stale value
+    // of 4 — LeagueCreatePage handleInputChange, LS-6060), and only odd
+    // division options remain selectable.
+    await leaguePage.selectDivisionCount(4);
+    await leaguePage.selectTeamCount(7);
+
+    await leaguePage
+      .text(
+        'With 7 teams, only odd division counts (1, 3) are allowed for equal team distribution.',
+      )
+      .expectVisible();
+    await leaguePage.numberOfDivisionsField
+      .byRole('button', { name: '2', exact: true })
+      .expectHidden();
+    await leaguePage.numberOfDivisionsField
+      .byRole('button', { name: '4', exact: true })
+      .expectHidden();
+
+    await leaguePage.fillLeagueName('Parity Reset League');
+    await leaguePage.submitCreate();
+    await leaguePage.continueToLeague();
+
+    await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
+    expect(submittedDivisions).toBe(3);
   });
 
   // ─── Draft Mode ───────────────────────────────────────────────────────────

@@ -148,6 +148,23 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('create-league-faab-budget-custom-input');
   }
 
+  /**
+   * The "Number of Teams" field (Basic Settings). Scopes team-count option
+   * buttons so their labels don't collide with the Number of Divisions
+   * button group, which can render an identical numeral (LS-5365).
+   */
+  get numberOfTeamsField(): UIElement {
+    return this.driver.byTestId('numberOfTeams-field');
+  }
+
+  /**
+   * The "Number of Divisions" field (Basic Settings). Scopes division-count
+   * option buttons — see {@link numberOfTeamsField} (LS-5365).
+   */
+  get numberOfDivisionsField(): UIElement {
+    return this.driver.byTestId('numberOfDivisions-field');
+  }
+
   // ── Reads: named detail getters ──────────────────────────────────
 
   /** The league name rendered as the detail page `<h1>`. */
@@ -424,6 +441,27 @@ export class LeaguePage extends BaseScreen {
     opts?: { exact?: boolean },
   ): Promise<void> {
     await this.button(name, opts).tap();
+  }
+
+  /**
+   * Select a team-count option, scoped to the Number of Teams field so the
+   * numeral can't match an identically-labelled Number of Divisions button
+   * (LS-5365).
+   */
+  async selectTeamCount(count: number): Promise<void> {
+    await this.numberOfTeamsField
+      .byRole('button', { name: String(count), exact: true })
+      .tap();
+  }
+
+  /**
+   * Select a division-count option, scoped to the Number of Divisions field
+   * — see {@link selectTeamCount} (LS-5365).
+   */
+  async selectDivisionCount(count: number): Promise<void> {
+    await this.numberOfDivisionsField
+      .byRole('button', { name: String(count), exact: true })
+      .tap();
   }
 
   /** Click a text affordance (toggle, era card, visibility pill, …). */
