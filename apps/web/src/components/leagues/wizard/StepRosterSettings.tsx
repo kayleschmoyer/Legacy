@@ -2,13 +2,6 @@ import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
 import { Minus, Plus } from '@tamagui/lucide-icons';
 import type { DefensiveFormat } from './StepDefensiveFormat';
-import {
-  BRAND_GOLD,
-  PANEL_BORDER,
-  SURFACE_CARD,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
-} from '../../../constants/colors';
 
 export const DST_ROSTER_DEFAULTS: Record<string, number> = {
   QB: 1,
@@ -72,16 +65,16 @@ function SlotRow({
       alignItems="center"
       justifyContent="space-between"
       padding="$3"
-      backgroundColor={SURFACE_CARD}
+      backgroundColor="$surfaceCard"
       borderRadius="$2"
       borderWidth={1}
-      borderColor={PANEL_BORDER}
+      borderColor="$surfacePanelBorder"
     >
       <YStack flex={1}>
-        <Text fontSize={13} fontWeight="600" color={TEXT_PRIMARY}>
+        <Text fontSize={13} fontWeight="600" color="$color">
           {slot}
         </Text>
-        <Text fontSize={11} color={TEXT_MUTED}>
+        <Text fontSize={11} color="$textMuted">
           {SLOT_LABELS[slot] ?? slot}
         </Text>
       </YStack>
@@ -92,18 +85,20 @@ function SlotRow({
           width={28}
           height={28}
           borderRadius="$full"
-          backgroundColor={count > 0 ? '$brandNavyLight' : PANEL_BORDER}
+          backgroundColor={
+            count > 0 ? '$brandNavyLight' : '$surfacePanelBorder'
+          }
           alignItems="center"
           justifyContent="center"
           cursor={count > 0 ? 'pointer' : 'default'}
           animation="quick"
         >
-          <Minus size={12} color={count > 0 ? 'white' : TEXT_MUTED} />
+          <Minus size={12} color={count > 0 ? '$textOnAccent' : '$textMuted'} />
         </XStack>
         <Text
           fontSize={16}
           fontWeight="700"
-          color={BRAND_GOLD}
+          color="$brandGold"
           minWidth={20}
           textAlign="center"
         >
@@ -121,7 +116,7 @@ function SlotRow({
           cursor="pointer"
           animation="quick"
         >
-          <Plus size={12} color="white" />
+          <Plus size={12} color="$textOnAccent" />
         </XStack>
       </XStack>
     </XStack>
@@ -157,11 +152,11 @@ export function StepRosterSettings({
           fontSize={22}
           fontWeight="700"
           fontFamily="$heading"
-          color={TEXT_PRIMARY}
+          color="$color"
         >
           Roster Settings
         </Text>
-        <Text fontSize={14} color={TEXT_MUTED}>
+        <Text fontSize={14} color="$textMuted">
           Configure starting lineup slots and bench size. Defaults reflect a{' '}
           {defensiveFormat === 'idp' ? 'IDP' : 'D/ST'} format.
         </Text>
@@ -176,26 +171,26 @@ export function StepRosterSettings({
       >
         <XStack gap="$4">
           <YStack alignItems="center">
-            <Text fontSize={20} fontWeight="700" color={BRAND_GOLD}>
+            <Text fontSize={20} fontWeight="700" color="$brandGold">
               {totalStarters}
             </Text>
-            <Text fontSize={11} color={TEXT_MUTED}>
+            <Text fontSize={11} color="$textMuted">
               Starters
             </Text>
           </YStack>
           <YStack alignItems="center">
-            <Text fontSize={20} fontWeight="700" color={TEXT_PRIMARY}>
+            <Text fontSize={20} fontWeight="700" color="$color">
               {bench}
             </Text>
-            <Text fontSize={11} color={TEXT_MUTED}>
+            <Text fontSize={11} color="$textMuted">
               Bench
             </Text>
           </YStack>
           <YStack alignItems="center">
-            <Text fontSize={20} fontWeight="700" color={TEXT_PRIMARY}>
+            <Text fontSize={20} fontWeight="700" color="$color">
               {totalRoster}
             </Text>
-            <Text fontSize={11} color={TEXT_MUTED}>
+            <Text fontSize={11} color="$textMuted">
               Total
             </Text>
           </YStack>

@@ -26,15 +26,6 @@ import {
 } from './wizard/StepRosterSettings';
 import { type SportChoice, StepSportSelect } from './wizard/StepSportSelect';
 import { PageMeta } from '../PageMeta';
-import {
-  BG_DARK,
-  BRAND_GOLD,
-  BRAND_SEAM_RED,
-  PANEL_BORDER,
-  SURFACE_CARD,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
-} from '../../constants/colors';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -297,18 +288,18 @@ export function CreateLeagueWizard() {
               borderRadius="$full"
               backgroundColor={
                 isDone
-                  ? BRAND_GOLD
+                  ? '$brandGold'
                   : isCurrent
                     ? '$brandNavyLight'
-                    : SURFACE_CARD
+                    : '$surfaceCard'
               }
               borderWidth={1}
               borderColor={
                 isDone
-                  ? BRAND_GOLD
+                  ? '$brandGold'
                   : isCurrent
                     ? '$brandNavyLight'
-                    : PANEL_BORDER
+                    : '$surfacePanelBorder'
               }
               alignItems="center"
               justifyContent="center"
@@ -317,7 +308,15 @@ export function CreateLeagueWizard() {
               <Text
                 fontSize={isCurrent ? 12 : 10}
                 fontWeight="700"
-                color={isDone ? '#1B1208' : isCurrent ? '$color1' : TEXT_MUTED}
+                // $brandGold is a similarly mid-tone warm gold in both themes, so a fixed
+                // dark ink (no theme token needed) keeps the checkmark readable in both.
+                color={
+                  isDone
+                    ? '#1B1208'
+                    : isCurrent
+                      ? '$textOnAccent'
+                      : '$textMuted'
+                }
               >
                 {isDone ? '✓' : String(i + 1)}
               </Text>
@@ -326,7 +325,7 @@ export function CreateLeagueWizard() {
               <XStack
                 width={20}
                 height={2}
-                backgroundColor={isDone ? BRAND_GOLD : PANEL_BORDER}
+                backgroundColor={isDone ? '$brandGold' : '$surfacePanelBorder'}
                 borderRadius="$full"
                 animation="quick"
               />
@@ -342,7 +341,7 @@ export function CreateLeagueWizard() {
   const isLastStep = stepIndex === steps.length - 1;
 
   return (
-    <ScrollView backgroundColor={BG_DARK} minHeight="100vh">
+    <ScrollView backgroundColor="$background" minHeight="100vh">
       <PageMeta
         title="Create League"
         description="Create a new fantasy sports league"
@@ -361,23 +360,23 @@ export function CreateLeagueWizard() {
             fontSize={28}
             fontWeight="800"
             fontFamily="$heading"
-            color={TEXT_PRIMARY}
+            color="$color"
           >
             Create a New League
           </Text>
           <StepIndicator />
-          <Text fontSize={12} color={TEXT_MUTED}>
+          <Text fontSize={12} color="$textMuted">
             Step {stepIndex + 1} of {steps.length} — {STEP_LABELS[currentStep]}
           </Text>
         </YStack>
 
         {/* Step content */}
         <YStack
-          backgroundColor={SURFACE_CARD}
+          backgroundColor="$surfaceCard"
           borderRadius="$4"
           padding="$5"
           borderWidth={1}
-          borderColor={PANEL_BORDER}
+          borderColor="$surfacePanelBorder"
         >
           {currentStep === 'sport' && (
             <StepSportSelect
@@ -441,7 +440,7 @@ export function CreateLeagueWizard() {
               gap="$2"
               alignItems="center"
             >
-              <Text fontSize={13} color={BRAND_SEAM_RED}>
+              <Text fontSize={13} color="$brandSeamRed">
                 {stepError}
               </Text>
             </XStack>
@@ -459,15 +458,15 @@ export function CreateLeagueWizard() {
               paddingHorizontal="$4"
               borderRadius="$3"
               borderWidth={1}
-              borderColor={PANEL_BORDER}
-              backgroundColor={SURFACE_CARD}
+              borderColor="$surfacePanelBorder"
+              backgroundColor="$surfaceCard"
               alignItems="center"
               gap="$1"
               cursor={stepIndex > 0 ? 'pointer' : 'default'}
               animation="quick"
             >
-              <ChevronLeft size={16} color={TEXT_PRIMARY} />
-              <Text fontSize={14} fontWeight="600" color={TEXT_PRIMARY}>
+              <ChevronLeft size={16} color="$color" />
+              <Text fontSize={14} fontWeight="600" color="$color">
                 Back
               </Text>
             </XStack>
@@ -484,7 +483,7 @@ export function CreateLeagueWizard() {
               cursor="pointer"
               animation="quick"
             >
-              <Text fontSize={14} fontWeight="700" color="$color1">
+              <Text fontSize={14} fontWeight="700" color="$textOnAccent">
                 Continue
               </Text>
             </XStack>
@@ -500,15 +499,15 @@ export function CreateLeagueWizard() {
             paddingHorizontal="$3"
             borderRadius="$2"
             borderWidth={1}
-            borderColor={PANEL_BORDER}
-            backgroundColor={SURFACE_CARD}
+            borderColor="$surfacePanelBorder"
+            backgroundColor="$surfaceCard"
             alignItems="center"
             gap="$1"
             cursor="pointer"
             animation="quick"
           >
-            <ChevronLeft size={14} color={TEXT_MUTED} />
-            <Text fontSize={13} color={TEXT_MUTED}>
+            <ChevronLeft size={14} color="$textMuted" />
+            <Text fontSize={13} color="$textMuted">
               Back
             </Text>
           </XStack>

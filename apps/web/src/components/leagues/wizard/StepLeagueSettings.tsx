@@ -1,12 +1,6 @@
 import React from 'react';
 import { Input, Label, Text, XStack, YStack } from 'tamagui';
 import type { SportChoice } from './StepSportSelect';
-import {
-  PANEL_BORDER,
-  SURFACE_CARD,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
-} from '../../../constants/colors';
 
 export interface LeagueSettings {
   name: string;
@@ -53,9 +47,9 @@ const OptionButton = ({
     onPress={onPress}
     padding="$3"
     flex={1}
-    backgroundColor={selected ? '$brandNavyLight' : SURFACE_CARD}
+    backgroundColor={selected ? '$brandNavyLight' : '$surfaceCard'}
     borderWidth={1}
-    borderColor={selected ? '$brandNavyLight' : PANEL_BORDER}
+    borderColor={selected ? '$brandNavyLight' : '$surfacePanelBorder'}
     borderRadius="$2"
     cursor="pointer"
     animation="quick"
@@ -87,18 +81,18 @@ export function StepLeagueSettings({
           fontSize={22}
           fontWeight="700"
           fontFamily="$heading"
-          color={TEXT_PRIMARY}
+          color="$color"
         >
           League Settings
         </Text>
-        <Text fontSize={14} color={TEXT_MUTED}>
+        <Text fontSize={14} color="$textMuted">
           Configure the basics of your{' '}
           {sport === 'FOOTBALL' ? 'football' : 'baseball'} league.
         </Text>
       </YStack>
 
       <YStack gap="$2">
-        <Label htmlFor="league-name" color={TEXT_PRIMARY} fontWeight="600">
+        <Label htmlFor="league-name" color="$color" fontWeight="600">
           League Name
         </Label>
         <Input
@@ -107,18 +101,18 @@ export function StepLeagueSettings({
           onChangeText={(v: string) => set('name', v)}
           placeholder="Enter league name"
           maxLength={50}
-          backgroundColor={SURFACE_CARD}
-          borderColor={PANEL_BORDER}
-          color={TEXT_PRIMARY}
-          placeholderTextColor={TEXT_MUTED}
+          backgroundColor="$surfaceCard"
+          borderColor="$surfacePanelBorder"
+          color="$color"
+          placeholderTextColor="$textMuted"
         />
       </YStack>
 
       <YStack gap="$2">
-        <Text color={TEXT_PRIMARY} fontWeight="600" fontSize={14}>
+        <Text color="$color" fontWeight="600" fontSize={14}>
           Number of Teams
         </Text>
-        <Text fontSize={12} color={TEXT_MUTED}>
+        <Text fontSize={12} color="$textMuted">
           Default: {defaultTeams} teams
         </Text>
         <XStack flexWrap="wrap" gap="$2">
@@ -130,11 +124,13 @@ export function StepLeagueSettings({
               width={48}
               height={40}
               backgroundColor={
-                settings.numTeams === n ? '$brandNavyLight' : SURFACE_CARD
+                settings.numTeams === n ? '$brandNavyLight' : '$surfaceCard'
               }
               borderWidth={1}
               borderColor={
-                settings.numTeams === n ? '$brandNavyLight' : PANEL_BORDER
+                settings.numTeams === n
+                  ? '$brandNavyLight'
+                  : '$surfacePanelBorder'
               }
               borderRadius="$2"
               alignItems="center"
@@ -143,7 +139,7 @@ export function StepLeagueSettings({
               animation="quick"
             >
               <Text
-                color={settings.numTeams === n ? '$color1' : TEXT_PRIMARY}
+                color={settings.numTeams === n ? '$textOnAccent' : '$color'}
                 fontWeight="600"
                 fontSize={13}
               >
@@ -155,7 +151,7 @@ export function StepLeagueSettings({
       </YStack>
 
       <YStack gap="$2">
-        <Text color={TEXT_PRIMARY} fontWeight="600" fontSize={14}>
+        <Text color="$color" fontWeight="600" fontSize={14}>
           Draft Type
         </Text>
         <XStack gap="$2">
@@ -170,7 +166,9 @@ export function StepLeagueSettings({
                   fontSize={13}
                   fontWeight="700"
                   color={
-                    settings.draftType === opt.value ? '$color1' : TEXT_PRIMARY
+                    settings.draftType === opt.value
+                      ? '$textOnAccent'
+                      : '$color'
                   }
                 >
                   {opt.label}
@@ -178,8 +176,11 @@ export function StepLeagueSettings({
                 <Text
                   fontSize={11}
                   color={
-                    settings.draftType === opt.value ? '$color2' : TEXT_MUTED
+                    settings.draftType === opt.value
+                      ? '$textOnAccent'
+                      : '$textMuted'
                   }
+                  opacity={settings.draftType === opt.value ? 0.85 : 1}
                   textAlign="center"
                 >
                   {opt.description}
