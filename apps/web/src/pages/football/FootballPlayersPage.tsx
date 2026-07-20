@@ -33,23 +33,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useHasEntitlement, useIsPremium } from '../../hooks/useIsPremium';
-import {
-  BG_DARK,
-  BRAND_GOLD,
-  BRAND_NAVY,
-  BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
-  BRAND_SEAM_RED_LIGHT,
-  getFootballPositionColor,
-  GREEN,
-  OUTLINE_SUBTLE,
-  SURFACE_CARD,
-  SURFACE_HOVER,
-  SURFACE_PANEL,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
-  withAlpha,
-} from '../../constants/colors';
+import { getFootballPositionColor, withAlpha } from '../../constants/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
 type PlayerListItem = NonNullable<
@@ -173,11 +157,11 @@ function LeagueAvailabilityBadge({
 }: {
   league: LeagueAvailabilityEntry;
 }) {
-  const bg = league.isAvailable
-    ? withAlpha(GREEN, 0.15)
-    : withAlpha(TEXT_MUTED, 0.1);
-  const border = league.isAvailable ? withAlpha(GREEN, 0.45) : OUTLINE_SUBTLE;
-  const color = league.isAvailable ? GREEN : TEXT_MUTED;
+  const bg = league.isAvailable ? '$successMuted' : '$surfaceSubtle';
+  const border = league.isAvailable
+    ? 'color-mix(in srgb, var(--green7) 45%, transparent)'
+    : '$outlineSubtle';
+  const color = league.isAvailable ? '$green8' : '$textMuted';
   return (
     <YStack
       key={league.leagueId}
@@ -204,7 +188,7 @@ function LeagueAvailabilityCell({
   const total = entries.length;
   if (total === 0) return null;
 
-  const summaryColor = availableCount > 0 ? GREEN : TEXT_MUTED;
+  const summaryColor = availableCount > 0 ? '$green8' : '$textMuted';
 
   return (
     <YStack gap={4} alignItems="flex-end">
@@ -235,15 +219,15 @@ function TableHeader({ showAvailability }: { showAvailability: boolean }) {
 
   return (
     <XStack
-      backgroundColor={SURFACE_PANEL}
+      backgroundColor="$surfacePanel"
       borderBottomWidth={1}
-      borderColor={OUTLINE_SUBTLE}
+      borderColor="$outlineSubtle"
     >
       <XStack flex={1} minWidth={160} {...colStyles}>
         <Text
           fontSize={11}
           fontWeight="700"
-          color={TEXT_MUTED}
+          color="$textMuted"
           fontFamily={FONT_BODY}
           letterSpacing={0.8}
         >
@@ -254,7 +238,7 @@ function TableHeader({ showAvailability }: { showAvailability: boolean }) {
         <Text
           fontSize={11}
           fontWeight="700"
-          color={TEXT_MUTED}
+          color="$textMuted"
           fontFamily={FONT_BODY}
           letterSpacing={0.8}
         >
@@ -265,7 +249,7 @@ function TableHeader({ showAvailability }: { showAvailability: boolean }) {
         <Text
           fontSize={11}
           fontWeight="700"
-          color={TEXT_MUTED}
+          color="$textMuted"
           fontFamily={FONT_BODY}
           letterSpacing={0.8}
         >
@@ -276,7 +260,7 @@ function TableHeader({ showAvailability }: { showAvailability: boolean }) {
         <Text
           fontSize={11}
           fontWeight="700"
-          color={TEXT_MUTED}
+          color="$textMuted"
           fontFamily={FONT_BODY}
           letterSpacing={0.8}
           textAlign="right"
@@ -290,7 +274,7 @@ function TableHeader({ showAvailability }: { showAvailability: boolean }) {
             <Text
               fontSize={11}
               fontWeight="700"
-              color={BRAND_GOLD}
+              color="$brandGold"
               fontFamily={FONT_BODY}
               letterSpacing={0.8}
               textAlign="right"
@@ -301,12 +285,12 @@ function TableHeader({ showAvailability }: { showAvailability: boolean }) {
               paddingHorizontal={5}
               paddingVertical={1}
               borderRadius={3}
-              backgroundColor={withAlpha(BRAND_GOLD, 0.18)}
+              backgroundColor="$warningMuted"
             >
               <Text
                 fontSize={9}
                 fontWeight="700"
-                color={BRAND_GOLD}
+                color="$brandGold"
                 fontFamily={FONT_BODY}
                 letterSpacing={0.5}
               >
@@ -349,8 +333,8 @@ function TableRow({
     <XStack
       cursor="pointer"
       borderBottomWidth={1}
-      borderColor={OUTLINE_SUBTLE}
-      hoverStyle={{ backgroundColor: SURFACE_HOVER }}
+      borderColor="$outlineSubtle"
+      hoverStyle={{ backgroundColor: '$surfaceInteractive' }}
       pressStyle={{ opacity: 0.85 }}
       animation="quick"
       onPress={() => player?.id != null && onNavigate(String(player.id))}
@@ -359,7 +343,7 @@ function TableRow({
         <Text
           fontSize={14}
           fontWeight="600"
-          color={TEXT_PRIMARY}
+          color="$color"
           fontFamily={FONT_DISPLAY}
           numberOfLines={1}
         >
@@ -387,7 +371,7 @@ function TableRow({
         </YStack>
       </XStack>
       <XStack width={80} {...colStyles}>
-        <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+        <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
           {player?.nflTeam ?? '—'}
         </Text>
       </XStack>
@@ -397,17 +381,17 @@ function TableRow({
             <Text
               fontSize={13}
               fontWeight="700"
-              color={TEXT_PRIMARY}
+              color="$color"
               fontVariant={['tabular-nums']}
             >
               {keyStat.value}
             </Text>
-            <Text fontSize={11} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+            <Text fontSize={11} color="$textMuted" fontFamily={FONT_BODY}>
               {keyStat.label}
             </Text>
           </XStack>
         ) : (
-          <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+          <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
             —
           </Text>
         )}
@@ -447,12 +431,12 @@ function ViewToggleButton({
       borderRadius={6}
       alignItems="center"
       justifyContent="center"
-      backgroundColor={active ? withAlpha(BRAND_NAVY, 0.5) : 'transparent'}
+      backgroundColor={active ? '$surfaceInteractive' : 'transparent'}
       borderWidth={1}
-      borderColor={active ? BRAND_NAVY : OUTLINE_SUBTLE}
+      borderColor={active ? '$brandNavy' : '$outlineSubtle'}
       cursor="pointer"
       onPress={onPress}
-      hoverStyle={{ borderColor: BRAND_NAVY }}
+      hoverStyle={{ borderColor: '$brandNavy' }}
       pressStyle={{ opacity: 0.8 }}
       animation="quick"
       accessibilityRole="button"
@@ -475,13 +459,13 @@ interface AdvancedFiltersPanelProps {
 }
 
 const numericInputStyles = {
-  backgroundColor: SURFACE_CARD,
+  backgroundColor: '$surfaceCard',
   borderWidth: 1,
-  borderColor: OUTLINE_SUBTLE,
+  borderColor: '$outlineSubtle',
   borderRadius: 8,
   paddingHorizontal: 12,
   height: 36,
-  color: TEXT_PRIMARY,
+  color: '$color',
   fontSize: 13,
   fontFamily: FONT_BODY,
   width: 120,
@@ -499,9 +483,9 @@ function AdvancedFiltersPanel({
     <YStack
       gap={12}
       padding={12}
-      backgroundColor={SURFACE_PANEL}
+      backgroundColor="$surfacePanel"
       borderWidth={1}
-      borderColor={OUTLINE_SUBTLE}
+      borderColor="$outlineSubtle"
       borderRadius={10}
     >
       {/* Injury status */}
@@ -509,7 +493,7 @@ function AdvancedFiltersPanel({
         <Text
           fontSize={11}
           fontWeight="700"
-          color={TEXT_MUTED}
+          color="$textMuted"
           fontFamily={FONT_BODY}
           letterSpacing={0.8}
         >
@@ -524,21 +508,19 @@ function AdvancedFiltersPanel({
                 paddingHorizontal={12}
                 paddingVertical={6}
                 borderRadius={6}
-                backgroundColor={
-                  active ? withAlpha(BRAND_GOLD, 0.18) : 'transparent'
-                }
+                backgroundColor={active ? '$warningMuted' : 'transparent'}
                 borderWidth={1}
-                borderColor={active ? BRAND_GOLD : OUTLINE_SUBTLE}
+                borderColor={active ? '$brandGold' : '$outlineSubtle'}
                 cursor="pointer"
                 onPress={() => onInjuryStatusChange(opt.value)}
-                hoverStyle={{ borderColor: BRAND_GOLD }}
+                hoverStyle={{ borderColor: '$brandGold' }}
                 pressStyle={{ opacity: 0.8 }}
                 animation="quick"
               >
                 <Text
                   fontSize={12}
                   fontWeight="600"
-                  color={active ? BRAND_GOLD : TEXT_MUTED}
+                  color={active ? '$brandGold' : '$textMuted'}
                   fontFamily={FONT_BODY}
                 >
                   {opt.label}
@@ -555,7 +537,7 @@ function AdvancedFiltersPanel({
           <Text
             fontSize={11}
             fontWeight="700"
-            color={TEXT_MUTED}
+            color="$textMuted"
             fontFamily={FONT_BODY}
             letterSpacing={0.8}
           >
@@ -566,17 +548,17 @@ function AdvancedFiltersPanel({
             keyboardType="numeric"
             inputMode="decimal"
             placeholder="e.g. 150"
-            placeholderTextColor={TEXT_MUTED}
+            placeholderTextColor="$textMuted"
             value={minProjected}
             onChangeText={onMinProjectedChange}
-            focusStyle={{ borderColor: BRAND_GOLD, outlineWidth: 0 }}
+            focusStyle={{ borderColor: '$brandGold', outlineWidth: 0 }}
           />
         </YStack>
         <YStack gap={6}>
           <Text
             fontSize={11}
             fontWeight="700"
-            color={TEXT_MUTED}
+            color="$textMuted"
             fontFamily={FONT_BODY}
             letterSpacing={0.8}
           >
@@ -587,10 +569,10 @@ function AdvancedFiltersPanel({
             keyboardType="numeric"
             inputMode="numeric"
             placeholder="e.g. 50"
-            placeholderTextColor={TEXT_MUTED}
+            placeholderTextColor="$textMuted"
             value={maxAdp}
             onChangeText={onMaxAdpChange}
-            focusStyle={{ borderColor: BRAND_GOLD, outlineWidth: 0 }}
+            focusStyle={{ borderColor: '$brandGold', outlineWidth: 0 }}
           />
         </YStack>
       </XStack>
@@ -617,25 +599,25 @@ const ADVANCED_FILTERS_FEATURE_DESCRIPTION =
 function ProjectionsUpsellBanner({ onUpgrade }: { onUpgrade: () => void }) {
   return (
     <XStack
-      backgroundColor={withAlpha(BRAND_GOLD, 0.08)}
+      backgroundColor="$warningMuted"
       borderWidth={1}
-      borderColor={withAlpha(BRAND_GOLD, 0.35)}
+      borderColor="color-mix(in srgb, var(--brandGold) 35%, transparent)"
       borderRadius={10}
       padding={14}
       gap={12}
       alignItems="center"
     >
-      <Star size={20} color={BRAND_GOLD} />
+      <Star size={20} color="$brandGold" />
       <YStack flex={1} gap={2}>
         <Text
           fontSize={14}
           fontWeight="700"
-          color={BRAND_GOLD}
+          color="$brandGold"
           fontFamily={FONT_DISPLAY}
         >
           Unlock Projected Fantasy Points
         </Text>
-        <Text fontSize={12} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+        <Text fontSize={12} color="$textMuted" fontFamily={FONT_BODY}>
           Upgrade to Premium to see weekly projected points for every player.
         </Text>
       </YStack>
@@ -643,7 +625,7 @@ function ProjectionsUpsellBanner({ onUpgrade }: { onUpgrade: () => void }) {
         paddingHorizontal={12}
         paddingVertical={6}
         borderRadius={6}
-        backgroundColor={BRAND_GOLD}
+        backgroundColor="$brandGold"
         cursor="pointer"
         onPress={onUpgrade}
         role="button"
@@ -662,7 +644,7 @@ function ProjectionsUpsellBanner({ onUpgrade }: { onUpgrade: () => void }) {
         <Text
           fontSize={12}
           fontWeight="700"
-          color={BRAND_NAVY}
+          color="$brandNavy"
           fontFamily={FONT_BODY}
         >
           Upgrade
@@ -1052,7 +1034,7 @@ export function FootballPlayersPage({
   }
 
   return (
-    <YStack flex={1} backgroundColor={BG_DARK} minHeight="100vh">
+    <YStack flex={1} backgroundColor="$background" minHeight="100vh">
       <PageMeta
         title="Football Players"
         description="Browse NFL football players"
@@ -1066,19 +1048,20 @@ export function FootballPlayersPage({
           paddingBottom={20}
           gap={4}
           style={{
-            background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.25)} 0%, transparent 100%)`,
+            background:
+              'linear-gradient(180deg, var(--accentMuted) 0%, transparent 100%)',
           }}
         >
           <Text
             fontSize={28}
             fontWeight="800"
-            color={TEXT_PRIMARY}
+            color="$color"
             fontFamily={FONT_DISPLAY}
             letterSpacing={-0.5}
           >
             Football Players
           </Text>
-          <Text fontSize={14} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+          <Text fontSize={14} color="$textMuted" fontFamily={FONT_BODY}>
             Browse, search, and filter NFL players
           </Text>
         </YStack>
@@ -1089,12 +1072,12 @@ export function FootballPlayersPage({
         paddingHorizontal={16}
         paddingBottom={16}
         gap={12}
-        backgroundColor={BG_DARK}
+        backgroundColor="$background"
         style={{
           position: 'sticky',
           top: 0,
           zIndex: 10,
-          borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+          borderBottom: '1px solid var(--outlineSubtle)',
         }}
       >
         {/* Search + view toggle */}
@@ -1103,23 +1086,23 @@ export function FootballPlayersPage({
             flex={1}
             alignItems="center"
             gap={8}
-            backgroundColor={SURFACE_CARD}
+            backgroundColor="$surfaceCard"
             borderWidth={1}
-            borderColor={OUTLINE_SUBTLE}
+            borderColor="$outlineSubtle"
             borderRadius={8}
             paddingHorizontal={12}
             height={44}
           >
-            <Search size={16} color={TEXT_MUTED} />
+            <Search size={16} color="$textMuted" />
             <Input
               flex={1}
               placeholder="Search players..."
-              placeholderTextColor={TEXT_MUTED}
+              placeholderTextColor="$textMuted"
               value={searchInput}
               onChangeText={setSearchInput}
               backgroundColor="transparent"
               borderWidth={0}
-              color={TEXT_PRIMARY}
+              color="$color"
               fontSize={14}
               fontFamily={FONT_BODY}
               height={44}
@@ -1142,12 +1125,12 @@ export function FootballPlayersPage({
                 cursor="pointer"
                 padding={4}
                 borderRadius={4}
-                hoverStyle={{ backgroundColor: OUTLINE_SUBTLE }}
+                hoverStyle={{ backgroundColor: '$outlineSubtle' }}
                 focusStyle={{ outlineWidth: 0 }}
                 aria-label="Clear search"
                 accessibilityLabel="Clear search"
               >
-                <X size={16} color={TEXT_MUTED} />
+                <X size={16} color="$textMuted" />
               </XStack>
             )}
           </XStack>
@@ -1161,7 +1144,7 @@ export function FootballPlayersPage({
             >
               <LayoutGrid
                 size={16}
-                color={viewMode === 'cards' ? TEXT_PRIMARY : TEXT_MUTED}
+                color={viewMode === 'cards' ? '$color' : '$textMuted'}
               />
             </ViewToggleButton>
             <ViewToggleButton
@@ -1171,7 +1154,7 @@ export function FootballPlayersPage({
             >
               <LayoutList
                 size={16}
-                color={viewMode === 'table' ? TEXT_PRIMARY : TEXT_MUTED}
+                color={viewMode === 'table' ? '$color' : '$textMuted'}
               />
             </ViewToggleButton>
           </XStack>
@@ -1186,7 +1169,7 @@ export function FootballPlayersPage({
 
         {/* Team filter */}
         <XStack alignItems="center" gap={8}>
-          <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+          <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
             Team:
           </Text>
           <FootballTeamFilter
@@ -1203,7 +1186,7 @@ export function FootballPlayersPage({
         {/* Availability filter — visible when user is in at least one football league (LS-7042) */}
         {hasFootballLeagues && (
           <XStack alignItems="center" gap={8} flexWrap="wrap">
-            <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+            <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
               Availability:
             </Text>
             {(
@@ -1221,9 +1204,9 @@ export function FootballPlayersPage({
                   paddingVertical={6}
                   borderRadius={8}
                   borderWidth={1}
-                  borderColor={active ? BRAND_NAVY_LIGHT : OUTLINE_SUBTLE}
+                  borderColor={active ? '$brandNavyLight' : '$outlineSubtle'}
                   backgroundColor={
-                    active ? withAlpha(BRAND_NAVY_LIGHT, 0.25) : 'transparent'
+                    active ? '$surfaceInteractive' : 'transparent'
                   }
                   cursor="pointer"
                   onPress={() => setAvailabilityFilter(value)}
@@ -1239,14 +1222,14 @@ export function FootballPlayersPage({
                       setAvailabilityFilter(value);
                     }
                   }}
-                  hoverStyle={{ borderColor: BRAND_NAVY_LIGHT }}
+                  hoverStyle={{ borderColor: '$brandNavyLight' }}
                   pressStyle={{ opacity: 0.8 }}
                   animation="quick"
                 >
                   <Text
                     fontSize={13}
                     fontWeight={active ? '700' : '500'}
-                    color={active ? TEXT_PRIMARY : TEXT_MUTED}
+                    color={active ? '$color' : '$textMuted'}
                     fontFamily={FONT_BODY}
                   >
                     {label}
@@ -1266,10 +1249,8 @@ export function FootballPlayersPage({
           paddingVertical={6}
           borderRadius={8}
           borderWidth={1}
-          borderColor={showAdvanced ? BRAND_GOLD : OUTLINE_SUBTLE}
-          backgroundColor={
-            showAdvanced ? withAlpha(BRAND_GOLD, 0.12) : 'transparent'
-          }
+          borderColor={showAdvanced ? '$brandGold' : '$outlineSubtle'}
+          backgroundColor={showAdvanced ? '$warningMuted' : 'transparent'}
           cursor="pointer"
           onPress={() => setShowAdvanced((v) => !v)}
           role="button"
@@ -1281,18 +1262,18 @@ export function FootballPlayersPage({
               setShowAdvanced((v) => !v);
             }
           }}
-          hoverStyle={{ borderColor: BRAND_GOLD }}
+          hoverStyle={{ borderColor: '$brandGold' }}
           pressStyle={{ opacity: 0.85 }}
           animation="quick"
         >
           <SlidersHorizontal
             size={15}
-            color={showAdvanced ? BRAND_GOLD : TEXT_MUTED}
+            color={showAdvanced ? '$brandGold' : '$textMuted'}
           />
           <Text
             fontSize={13}
             fontWeight="600"
-            color={showAdvanced ? BRAND_GOLD : TEXT_MUTED}
+            color={showAdvanced ? '$brandGold' : '$textMuted'}
             fontFamily={FONT_BODY}
           >
             Advanced filters
@@ -1301,12 +1282,12 @@ export function FootballPlayersPage({
             paddingHorizontal={6}
             paddingVertical={1}
             borderRadius={4}
-            backgroundColor={withAlpha(BRAND_GOLD, 0.18)}
+            backgroundColor="$warningMuted"
           >
             <Text
               fontSize={10}
               fontWeight="700"
-              color={BRAND_GOLD}
+              color="$brandGold"
               fontFamily={FONT_BODY}
               letterSpacing={0.5}
             >
@@ -1340,13 +1321,13 @@ export function FootballPlayersPage({
       <YStack flex={1} padding={16} gap={16}>
         {error && (
           <YStack
-            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.1)}
+            backgroundColor="$red2"
             borderWidth={1}
-            borderColor={withAlpha(BRAND_SEAM_RED, 0.3)}
+            borderColor="$red6"
             borderRadius={8}
             padding={16}
           >
-            <Text color={BRAND_SEAM_RED_LIGHT} fontSize={14}>
+            <Text color="$red11" fontSize={14}>
               Failed to load players. Please try again.
             </Text>
           </YStack>
@@ -1359,7 +1340,7 @@ export function FootballPlayersPage({
             justifyContent="center"
             padding={40}
           >
-            <Spinner size="large" color={BRAND_GOLD} />
+            <Spinner size="large" color="$brandGold" />
           </YStack>
         )}
 
@@ -1371,10 +1352,10 @@ export function FootballPlayersPage({
             padding={40}
             gap={8}
           >
-            <Text fontSize={16} color={TEXT_MUTED} fontFamily={FONT_DISPLAY}>
+            <Text fontSize={16} color="$textMuted" fontFamily={FONT_DISPLAY}>
               No players found
             </Text>
-            <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+            <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
               Try adjusting your filters or search term.
             </Text>
           </YStack>
@@ -1409,9 +1390,9 @@ export function FootballPlayersPage({
         {players.length > 0 && viewMode === 'table' && (
           <YStack
             testID="player-list-table"
-            backgroundColor={SURFACE_CARD}
+            backgroundColor="$surfaceCard"
             borderWidth={1}
-            borderColor={OUTLINE_SUBTLE}
+            borderColor="$outlineSubtle"
             borderRadius={10}
             overflow="hidden"
           >
@@ -1443,24 +1424,24 @@ export function FootballPlayersPage({
         {hasMore && (
           <XStack justifyContent="center" paddingVertical={16}>
             {isLoadingMore ? (
-              <Spinner size="small" color={BRAND_GOLD} />
+              <Spinner size="small" color="$brandGold" />
             ) : (
               <YStack
                 paddingHorizontal={24}
                 paddingVertical={10}
                 borderRadius={8}
-                backgroundColor={SURFACE_PANEL}
+                backgroundColor="$surfacePanel"
                 borderWidth={1}
-                borderColor={OUTLINE_SUBTLE}
+                borderColor="$outlineSubtle"
                 onPress={loadMore}
                 cursor="pointer"
-                hoverStyle={{ borderColor: BRAND_NAVY }}
+                hoverStyle={{ borderColor: '$brandNavy' }}
                 pressStyle={{ opacity: 0.8 }}
                 animation="quick"
               >
                 <Text
                   fontSize={14}
-                  color={TEXT_PRIMARY}
+                  color="$color"
                   fontWeight="600"
                   fontFamily={FONT_BODY}
                 >
@@ -1482,15 +1463,16 @@ export function FootballPlayersPage({
             right: 0,
             zIndex: 20,
             padding: '12px 16px',
-            background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BG_DARK} 100%)`,
-            borderTop: `1px solid ${OUTLINE_SUBTLE}`,
+            background:
+              'linear-gradient(135deg, var(--brandNavy) 0%, var(--background) 100%)',
+            borderTop: '1px solid var(--outlineSubtle)',
             alignItems: 'center',
             gap: 12,
           }}
         >
           <Text
             fontSize={14}
-            color={TEXT_MUTED}
+            color="$textMuted"
             fontFamily={FONT_BODY}
             flex={1}
           >
@@ -1503,9 +1485,9 @@ export function FootballPlayersPage({
               paddingHorizontal={12}
               paddingVertical={6}
               borderRadius={6}
-              backgroundColor={SURFACE_PANEL}
+              backgroundColor="$surfacePanel"
               borderWidth={1}
-              borderColor={OUTLINE_SUBTLE}
+              borderColor="$outlineSubtle"
               onPress={() => setSelectedIds(new Set())}
               role="button"
               tabIndex={0}
@@ -1518,7 +1500,7 @@ export function FootballPlayersPage({
               cursor="pointer"
               pressStyle={{ opacity: 0.8 }}
             >
-              <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+              <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
                 Clear
               </Text>
             </YStack>
@@ -1528,9 +1510,9 @@ export function FootballPlayersPage({
               paddingHorizontal={20}
               paddingVertical={8}
               borderRadius={8}
-              backgroundColor={BRAND_NAVY}
+              backgroundColor="$brandNavy"
               borderWidth={1}
-              borderColor={BRAND_GOLD}
+              borderColor="$brandGold"
               onPress={goToCompare}
               role="button"
               tabIndex={0}
@@ -1541,13 +1523,13 @@ export function FootballPlayersPage({
                 }
               }}
               cursor="pointer"
-              hoverStyle={{ backgroundColor: BRAND_NAVY_LIGHT }}
+              hoverStyle={{ backgroundColor: '$brandNavyLight' }}
               pressStyle={{ opacity: 0.85 }}
               animation="quick"
             >
               <Text
                 fontSize={14}
-                color={BRAND_GOLD}
+                color="$brandGold"
                 fontWeight="700"
                 fontFamily={FONT_BODY}
               >

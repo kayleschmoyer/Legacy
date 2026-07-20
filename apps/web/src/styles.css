@@ -204,21 +204,9 @@ body {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(
-      ellipse at 20% 0%,
-      rgba(27, 58, 92, 0.22) 0%,
-      transparent 55%
-    ),
-    radial-gradient(
-      ellipse at 80% 10%,
-      rgba(196, 30, 58, 0.1) 0%,
-      transparent 45%
-    ),
-    radial-gradient(
-      ellipse at 50% 90%,
-      rgba(197, 165, 90, 0.08) 0%,
-      transparent 50%
-    );
+    radial-gradient(ellipse at 20% 0%, var(--accentMuted) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 10%, var(--red2) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 90%, var(--warningMuted) 0%, transparent 50%);
 }
 
 .ls-discovery-card {

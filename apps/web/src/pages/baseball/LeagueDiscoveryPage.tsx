@@ -16,29 +16,7 @@ import {
   useJoinPublicLeagueMutation,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
-import {
-  AMBER_DARK,
-  BG_DARK,
-  BLACK,
-  BLUE_LIGHT,
-  BRAND_GOLD,
-  BRAND_GOLD_DARK,
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY,
-  BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
-  BRAND_SEAM_RED_LIGHT,
-  EMERALD,
-  GREEN_LIGHT,
-  OUTLINE_SUBTLE,
-  SLATE_400,
-  SURFACE_CARD,
-  SURFACE_PANEL,
-  TEXT_HIGH_CONTRAST,
-  TEXT_MUTED,
-  WHITE,
-  withAlpha,
-} from '../../constants/colors';
+import { TEXT_ON_GOLD } from '../../constants/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -59,45 +37,45 @@ const DRAFT_STATUS_META: Record<string, DraftStatusMeta> = {
   'in-progress': {
     short: 'Draft Live',
     full: 'Draft in Progress',
-    bg: withAlpha(BRAND_SEAM_RED, 0.14),
-    color: BRAND_SEAM_RED_LIGHT,
-    border: withAlpha(BRAND_SEAM_RED, 0.4),
+    bg: 'var(--red2)',
+    color: 'var(--brandSeamRedLight)',
+    border: 'var(--red6)',
     pulse: true,
   },
   queued: {
     short: 'Queued',
     full: 'Draft Queued',
-    bg: withAlpha(BLUE_LIGHT, 0.14),
-    color: BLUE_LIGHT,
-    border: withAlpha(BLUE_LIGHT, 0.4),
+    bg: 'var(--accentMuted)',
+    color: 'var(--brandNavyLight)',
+    border: 'color-mix(in srgb, var(--brandNavyLight) 40%, transparent)',
   },
   'not-started': {
     short: 'Open',
     full: 'Open · Pre-Draft',
-    bg: withAlpha(BRAND_GOLD, 0.12),
-    color: BRAND_GOLD_LIGHT,
-    border: withAlpha(BRAND_GOLD, 0.4),
+    bg: 'var(--warningMuted)',
+    color: 'var(--brandGoldLight)',
+    border: 'color-mix(in srgb, var(--brandGold) 40%, transparent)',
   },
   paused: {
     short: 'Paused',
     full: 'Draft Paused',
-    bg: withAlpha(AMBER_DARK, 0.14),
-    color: AMBER_DARK,
-    border: withAlpha(AMBER_DARK, 0.4),
+    bg: 'var(--warningMuted)',
+    color: 'var(--amber8)',
+    border: 'color-mix(in srgb, var(--amber8) 40%, transparent)',
   },
   completed: {
     short: 'Closed',
     full: 'Draft Complete',
-    bg: withAlpha(SLATE_400, 0.12),
-    color: SLATE_400,
-    border: withAlpha(SLATE_400, 0.3),
+    bg: 'var(--surfaceSubtle)',
+    color: 'var(--textMuted)',
+    border: 'var(--outlineStrong)',
   },
 };
 
 const POOL_META: Record<string, { name: string; color: string }> = {
-  all: { name: 'Universal Pool', color: TEXT_HIGH_CONTRAST },
-  nl: { name: 'NL Only', color: BLUE_LIGHT },
-  al: { name: 'AL Only', color: AMBER_DARK },
+  all: { name: 'Universal Pool', color: 'var(--color12)' },
+  nl: { name: 'NL Only', color: 'var(--brandNavyLight)' },
+  al: { name: 'AL Only', color: 'var(--amber8)' },
 };
 
 const DRAFT_STATUS_FILTERS: { label: string; value: DraftStatusFilter }[] = [
@@ -138,9 +116,9 @@ function FilterPill({
         textTransform: 'uppercase',
         padding: '8px 14px',
         borderRadius: 9999,
-        border: `1px solid ${active ? withAlpha(BRAND_NAVY_LIGHT, 0.8) : OUTLINE_SUBTLE}`,
-        background: active ? withAlpha(BRAND_NAVY, 0.5) : 'transparent',
-        color: active ? WHITE : TEXT_MUTED,
+        border: `1px solid ${active ? 'color-mix(in srgb, var(--brandNavyLight) 80%, transparent)' : 'var(--outlineSubtle)'}`,
+        background: active ? 'var(--accentMuted)' : 'transparent',
+        color: active ? 'var(--textOnAccent)' : 'var(--textMuted)',
         cursor: 'pointer',
         display: 'inline-flex',
         alignItems: 'center',
@@ -199,8 +177,8 @@ function SkeletonCard() {
   return (
     <div
       style={{
-        background: SURFACE_CARD,
-        border: `1px solid ${withAlpha(WHITE, 0.06)}`,
+        background: 'var(--surfaceCard)',
+        border: `1px solid ${'var(--glassBorder)'}`,
         borderRadius: 16,
         padding: '20px 22px',
         display: 'flex',
@@ -234,8 +212,8 @@ function SkeletonCard() {
           gridTemplateColumns: '1fr 1fr auto',
           gap: 16,
           padding: '14px 0',
-          borderTop: `1px solid ${OUTLINE_SUBTLE}`,
-          borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+          borderTop: `1px solid ${'var(--outlineSubtle)'}`,
+          borderBottom: `1px solid ${'var(--outlineSubtle)'}`,
         }}
       >
         <div>
@@ -306,7 +284,7 @@ function SpotsMeter({
             fontSize: 10,
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
-            color: TEXT_MUTED,
+            color: 'var(--textMuted)',
           }}
         >
           Spots Open
@@ -318,7 +296,7 @@ function SpotsMeter({
             fontFamily: FONT_DISPLAY,
             fontWeight: 800,
             fontSize: 22,
-            color: isFull ? TEXT_MUTED : BRAND_GOLD_LIGHT,
+            color: isFull ? 'var(--textMuted)' : 'var(--brandGoldLight)',
             letterSpacing: '0.02em',
             lineHeight: 1,
             fontVariantNumeric: 'tabular-nums',
@@ -328,7 +306,7 @@ function SpotsMeter({
         </span>
         <span
           style={{
-            color: TEXT_MUTED,
+            color: 'var(--textMuted)',
             fontSize: 15,
             fontWeight: 600,
             marginLeft: 2,
@@ -341,7 +319,7 @@ function SpotsMeter({
       <div
         style={{
           height: 4,
-          background: withAlpha(WHITE, 0.05),
+          background: 'var(--glassBorder)',
           borderRadius: 2,
           overflow: 'hidden',
         }}
@@ -351,8 +329,8 @@ function SpotsMeter({
             height: '100%',
             width: '100%',
             background: isFull
-              ? OUTLINE_SUBTLE
-              : `linear-gradient(90deg, ${BRAND_GOLD_DARK}, ${BRAND_GOLD})`,
+              ? 'var(--outlineSubtle)'
+              : `linear-gradient(90deg, ${'var(--brandGoldDark)'}, ${'var(--brandGold)'})`,
             borderRadius: 2,
             transform: `scaleX(${fillPct / 100})`,
             transformOrigin: 'left',
@@ -412,16 +390,16 @@ function LeagueCard({
 
   const cardStyle: React.CSSProperties = {
     background: isMember
-      ? `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.35)} 0%, ${withAlpha(BRAND_GOLD, 0.08)} 100%), ${SURFACE_CARD}`
-      : SURFACE_CARD,
-    border: `1px solid ${isMember ? withAlpha(BRAND_GOLD, 0.45) : withAlpha(WHITE, 0.08)}`,
+      ? `linear-gradient(135deg, ${'var(--accentMuted)'} 0%, ${'var(--warningMuted)'} 100%), ${'var(--surfaceCard)'}`
+      : 'var(--surfaceCard)',
+    border: `1px solid ${isMember ? 'color-mix(in srgb, var(--brandGold) 45%, transparent)' : 'var(--glassBorder)'}`,
     borderRadius: 16,
     overflow: 'hidden',
     transition: 'all 220ms ease',
     opacity: isFull && !isMember ? 0.78 : 1,
     boxShadow: isMember
-      ? `0 4px 24px ${withAlpha(BLACK, 0.35)}, 0 0 0 1px ${withAlpha(BRAND_GOLD, 0.15)}`
-      : `0 2px 12px ${withAlpha(BLACK, 0.25)}`,
+      ? `0 4px 24px ${'var(--shadowColor)'}, 0 0 0 1px ${'var(--warningMuted)'}`
+      : `0 2px 12px ${'var(--shadowColor)'}`,
   };
 
   return (
@@ -435,17 +413,17 @@ function LeagueCard({
             alignItems: 'center',
             gap: 10,
             padding: '10px 22px',
-            background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${withAlpha(BRAND_NAVY, 0.4)} 100%)`,
-            borderBottom: `1px solid ${withAlpha(BRAND_GOLD, 0.3)}`,
+            background: `linear-gradient(90deg, ${'var(--brandNavy)'} 0%, ${'var(--accentMuted)'} 100%)`,
+            borderBottom: `1px solid ${'color-mix(in srgb, var(--brandGold) 30%, transparent)'}`,
             fontFamily: FONT_DISPLAY,
             fontWeight: 700,
             fontSize: 11,
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
-            color: BRAND_GOLD_LIGHT,
+            color: 'var(--brandGoldLight)',
           }}
         >
-          <Trophy size={14} color={BRAND_GOLD_LIGHT} />
+          <Trophy size={14} color="var(--brandGoldLight)" />
           You&rsquo;re already in this league
         </div>
       )}
@@ -467,7 +445,7 @@ function LeagueCard({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 800,
                   fontSize: 24,
-                  color: TEXT_HIGH_CONTRAST,
+                  color: 'var(--color12)',
                   margin: 0,
                   letterSpacing: '-0.01em',
                 }}
@@ -483,8 +461,8 @@ function LeagueCard({
               display: 'flex',
               alignItems: 'center',
               gap: 14,
-              background: `linear-gradient(135deg, ${withAlpha(EMERALD, 0.15)} 0%, ${withAlpha(EMERALD, 0.08)} 100%)`,
-              borderTop: `1px solid ${withAlpha(EMERALD, 0.35)}`,
+              background: `linear-gradient(135deg, ${'var(--successMuted)'} 0%, ${'var(--successMuted)'} 100%)`,
+              borderTop: `1px solid ${'var(--green7)'}`,
               marginTop: 14,
             }}
           >
@@ -493,15 +471,15 @@ function LeagueCard({
                 width: 36,
                 height: 36,
                 borderRadius: '50%',
-                background: withAlpha(EMERALD, 0.22),
-                color: GREEN_LIGHT,
+                background: 'var(--successMuted)',
+                color: 'var(--green9)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
-              <Check size={18} color={GREEN_LIGHT} />
+              <Check size={18} color="var(--green9)" />
             </div>
             <div>
               <div
@@ -509,7 +487,7 @@ function LeagueCard({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 700,
                   fontSize: 16,
-                  color: TEXT_HIGH_CONTRAST,
+                  color: 'var(--color12)',
                   letterSpacing: '0.02em',
                 }}
               >
@@ -519,7 +497,7 @@ function LeagueCard({
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 13,
-                  color: TEXT_MUTED,
+                  color: 'var(--textMuted)',
                   marginTop: 2,
                   fontStyle: 'italic',
                 }}
@@ -547,7 +525,7 @@ function LeagueCard({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 800,
                   fontSize: 24,
-                  color: TEXT_HIGH_CONTRAST,
+                  color: 'var(--color12)',
                   margin: 0,
                   letterSpacing: '-0.01em',
                   lineHeight: 1.1,
@@ -559,7 +537,7 @@ function LeagueCard({
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 13,
-                  color: TEXT_MUTED,
+                  color: 'var(--textMuted)',
                   marginTop: 6,
                 }}
               >
@@ -577,8 +555,8 @@ function LeagueCard({
               gap: 16,
               alignItems: 'end',
               padding: '14px 0',
-              borderTop: `1px solid ${OUTLINE_SUBTLE}`,
-              borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+              borderTop: `1px solid ${'var(--outlineSubtle)'}`,
+              borderBottom: `1px solid ${'var(--outlineSubtle)'}`,
               marginBottom: 14,
             }}
           >
@@ -590,7 +568,7 @@ function LeagueCard({
                   fontSize: 10,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: TEXT_MUTED,
+                  color: 'var(--textMuted)',
                   marginBottom: 4,
                 }}
               >
@@ -615,7 +593,7 @@ function LeagueCard({
                   fontSize: 10,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: TEXT_MUTED,
+                  color: 'var(--textMuted)',
                   marginBottom: 4,
                 }}
               >
@@ -625,7 +603,7 @@ function LeagueCard({
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 14,
-                  color: TEXT_HIGH_CONTRAST,
+                  color: 'var(--color12)',
                   fontWeight: 500,
                 }}
               >
@@ -639,7 +617,9 @@ function LeagueCard({
                 >
                   {lg.maxRosterSize}
                 </span>{' '}
-                <span style={{ color: TEXT_MUTED }}>players / team</span>
+                <span style={{ color: 'var(--textMuted)' }}>
+                  players / team
+                </span>
               </div>
             </div>
             <SpotsMeter available={available} total={total} isFull={isFull} />
@@ -651,8 +631,8 @@ function LeagueCard({
               style={{
                 marginTop: 4,
                 padding: 16,
-                background: withAlpha(BG_DARK, 0.5),
-                border: `1px solid ${OUTLINE_SUBTLE}`,
+                background: 'var(--background075)',
+                border: `1px solid ${'var(--outlineSubtle)'}`,
                 borderRadius: 12,
               }}
             >
@@ -663,7 +643,7 @@ function LeagueCard({
                   fontSize: 10,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: BRAND_GOLD_LIGHT,
+                  color: 'var(--brandGoldLight)',
                   marginBottom: 8,
                 }}
               >
@@ -695,9 +675,9 @@ function LeagueCard({
                     padding: '11px 14px',
                     fontFamily: FONT_BODY,
                     fontSize: 15,
-                    color: TEXT_HIGH_CONTRAST,
-                    background: withAlpha(BG_DARK, 0.7),
-                    border: `1px solid ${withAlpha(WHITE, 0.18)}`,
+                    color: 'var(--color12)',
+                    background: 'var(--background075)',
+                    border: `1px solid ${'var(--glassBorderHover)'}`,
                     borderRadius: 8,
                   }}
                   onKeyDown={(e) => {
@@ -718,9 +698,9 @@ function LeagueCard({
                     textTransform: 'uppercase',
                     padding: '11px 18px',
                     borderRadius: 12,
-                    border: `1px solid ${withAlpha(WHITE, 0.18)}`,
+                    border: `1px solid ${'var(--glassBorderHover)'}`,
                     background: 'transparent',
-                    color: TEXT_HIGH_CONTRAST,
+                    color: 'var(--color12)',
                     cursor: 'pointer',
                   }}
                 >
@@ -738,9 +718,9 @@ function LeagueCard({
                     textTransform: 'uppercase',
                     padding: '11px 18px',
                     borderRadius: 12,
-                    border: `1px solid ${BRAND_GOLD_DARK}`,
-                    background: BRAND_GOLD,
-                    color: BG_DARK,
+                    border: `1px solid ${'var(--brandGoldDark)'}`,
+                    background: 'var(--brandGold)',
+                    color: TEXT_ON_GOLD,
                     cursor: submitting ? 'not-allowed' : 'pointer',
                     opacity: submitting ? 0.7 : 1,
                     display: 'inline-flex',
@@ -756,7 +736,7 @@ function LeagueCard({
                   marginTop: 8,
                   fontFamily: FONT_BODY,
                   fontSize: 12,
-                  color: TEXT_MUTED,
+                  color: 'var(--textMuted)',
                   display: 'flex',
                   justifyContent: 'space-between',
                 }}
@@ -771,18 +751,18 @@ function LeagueCard({
                   style={{
                     marginTop: 10,
                     padding: '10px 14px',
-                    background: withAlpha(BRAND_SEAM_RED, 0.1),
-                    border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.4)}`,
+                    background: 'var(--red2)',
+                    border: `1px solid ${'var(--red6)'}`,
                     borderRadius: 8,
                     fontFamily: FONT_BODY,
                     fontSize: 13,
-                    color: BRAND_SEAM_RED_LIGHT,
+                    color: 'var(--brandSeamRedLight)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
                   }}
                 >
-                  <AlertCircle size={16} color={BRAND_SEAM_RED_LIGHT} />
+                  <AlertCircle size={16} color="var(--brandSeamRedLight)" />
                   {joinError}
                 </div>
               )}
@@ -809,8 +789,8 @@ function LeagueCard({
                     padding: '11px 18px',
                     borderRadius: 12,
                     border: 'none',
-                    background: BRAND_GOLD,
-                    color: BG_DARK,
+                    background: 'var(--brandGold)',
+                    color: TEXT_ON_GOLD,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -824,7 +804,7 @@ function LeagueCard({
                   style={{
                     fontFamily: FONT_BODY,
                     fontSize: 14,
-                    color: TEXT_MUTED,
+                    color: 'var(--textMuted)',
                     fontStyle: 'italic',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -836,7 +816,7 @@ function LeagueCard({
                       width: 6,
                       height: 6,
                       borderRadius: '50%',
-                      background: TEXT_MUTED,
+                      background: 'var(--textMuted)',
                       display: 'inline-block',
                     }}
                   />
@@ -859,9 +839,9 @@ function LeagueCard({
                     textTransform: 'uppercase',
                     padding: '11px 18px',
                     borderRadius: 12,
-                    border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.8)}`,
-                    background: BRAND_NAVY,
-                    color: WHITE,
+                    border: `1px solid ${'var(--brandNavyLight)'}`,
+                    background: 'var(--brandNavy)',
+                    color: 'var(--textOnAccent)',
                     cursor: 'pointer',
                     transition: 'all 150ms ease',
                   }}
@@ -983,8 +963,8 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
   // ── Styles ──────────────────────────────────────────────────────────────────
 
   const controlsPanelStyle: React.CSSProperties = {
-    background: SURFACE_PANEL,
-    border: `1px solid ${OUTLINE_SUBTLE}`,
+    background: 'var(--surfacePanel)',
+    border: `1px solid ${'var(--outlineSubtle)'}`,
     borderRadius: 16,
     padding: 16,
     display: 'flex',
@@ -998,9 +978,9 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
     padding: '13px 14px 13px 44px',
     fontFamily: FONT_BODY,
     fontSize: 15,
-    color: TEXT_HIGH_CONTRAST,
-    background: withAlpha(BG_DARK, 0.55),
-    border: `1px solid ${OUTLINE_SUBTLE}`,
+    color: 'var(--color12)',
+    background: 'var(--background075)',
+    border: `1px solid ${'var(--outlineSubtle)'}`,
     borderRadius: 10,
     transition: 'all 150ms ease',
   };
@@ -1043,7 +1023,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               style={{
                 width: 18,
                 height: 1,
-                background: BRAND_GOLD,
+                background: 'var(--brandGold)',
                 opacity: 0.6,
                 display: 'inline-block',
               }}
@@ -1055,7 +1035,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 fontSize: 11,
                 letterSpacing: '0.16em',
                 textTransform: 'uppercase',
-                color: BRAND_GOLD_LIGHT,
+                color: 'var(--brandGoldLight)',
               }}
             >
               Baseball · Public Leagues
@@ -1068,7 +1048,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               fontSize: 'clamp(32px, 4vw, 48px)',
               lineHeight: 1,
               letterSpacing: '-0.02em',
-              color: TEXT_HIGH_CONTRAST,
+              color: 'var(--color12)',
               margin: '0 0 10px',
             }}
           >
@@ -1077,7 +1057,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
           <p
             style={{
               fontFamily: FONT_BODY,
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
               fontSize: 16,
               lineHeight: 1.55,
               maxWidth: '58ch',
@@ -1100,8 +1080,8 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             padding: '11px 16px',
             borderRadius: 12,
             background: 'transparent',
-            color: TEXT_HIGH_CONTRAST,
-            border: `1px solid ${withAlpha(WHITE, 0.2)}`,
+            color: 'var(--color12)',
+            border: `1px solid ${'var(--glassBorderHover)'}`,
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
@@ -1125,12 +1105,12 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               left: 14,
               top: '50%',
               transform: 'translateY(-50%)',
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
               pointerEvents: 'none',
               display: 'flex',
             }}
           >
-            <Search size={18} color={TEXT_MUTED} />
+            <Search size={18} color="var(--textMuted)" />
           </span>
           <input
             aria-label="Search leagues"
@@ -1160,7 +1140,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 fontSize: 10,
                 letterSpacing: '0.16em',
                 textTransform: 'uppercase',
-                color: TEXT_MUTED,
+                color: 'var(--textMuted)',
               }}
             >
               Draft Status
@@ -1180,7 +1160,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                         width: 7,
                         height: 7,
                         borderRadius: '50%',
-                        background: BRAND_SEAM_RED_LIGHT,
+                        background: 'var(--brandSeamRedLight)',
                         display: 'inline-block',
                       }}
                     />
@@ -1199,7 +1179,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 fontSize: 10,
                 letterSpacing: '0.16em',
                 textTransform: 'uppercase',
-                color: TEXT_MUTED,
+                color: 'var(--textMuted)',
               }}
             >
               Player Pool
@@ -1230,7 +1210,11 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
       >
         <div
           data-testid="discovery-results-count"
-          style={{ fontFamily: FONT_BODY, color: TEXT_MUTED, fontSize: 14 }}
+          style={{
+            fontFamily: FONT_BODY,
+            color: 'var(--textMuted)',
+            fontSize: 14,
+          }}
         >
           {showLoading && (
             <span style={{ fontStyle: 'italic' }}>Scanning the clubhouse…</span>
@@ -1245,7 +1229,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 800,
                   fontSize: 22,
-                  color: TEXT_HIGH_CONTRAST,
+                  color: 'var(--color12)',
                   letterSpacing: '0.02em',
                   fontVariantNumeric: 'tabular-nums',
                   marginRight: 6,
@@ -1255,8 +1239,10 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 0
               </b>
               leagues
-              <span style={{ color: TEXT_MUTED, margin: '0 6px' }}>·</span>
-              <span style={{ color: TEXT_MUTED }}>
+              <span style={{ color: 'var(--textMuted)', margin: '0 6px' }}>
+                ·
+              </span>
+              <span style={{ color: 'var(--textMuted)' }}>
                 {showEmptyFiltered
                   ? 'none match your filters'
                   : 'none available right now'}
@@ -1270,7 +1256,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 800,
                   fontSize: 22,
-                  color: TEXT_HIGH_CONTRAST,
+                  color: 'var(--color12)',
                   letterSpacing: '0.02em',
                   fontVariantNumeric: 'tabular-nums',
                   marginRight: 6,
@@ -1280,8 +1266,12 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 {leagues.length}
               </b>
               {leagues.length === 1 ? 'league' : 'leagues'}
-              <span style={{ color: TEXT_MUTED, margin: '0 6px' }}>·</span>
-              <span style={{ color: TEXT_MUTED }}>available to join</span>
+              <span style={{ color: 'var(--textMuted)', margin: '0 6px' }}>
+                ·
+              </span>
+              <span style={{ color: 'var(--textMuted)' }}>
+                available to join
+              </span>
             </span>
           )}
         </div>
@@ -1292,7 +1282,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
           style={{
             background: 'transparent',
             border: 0,
-            color: TEXT_MUTED,
+            color: 'var(--textMuted)',
             cursor: refreshing || loading ? 'not-allowed' : 'pointer',
             opacity: refreshing || loading ? 0.6 : 1,
             fontFamily: FONT_DISPLAY,
@@ -1327,10 +1317,10 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               alignItems: 'center',
               gap: 12,
               padding: 32,
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
             }}
           >
-            <Spinner size="large" color={BRAND_GOLD} />
+            <Spinner size="large" color="var(--brandGold)" />
             <span
               style={{
                 fontFamily: FONT_DISPLAY,
@@ -1338,7 +1328,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 fontSize: 12,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: TEXT_MUTED,
+                color: 'var(--textMuted)',
               }}
             >
               Searching for Public Leagues…
@@ -1364,14 +1354,14 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
         <div
           role="alert"
           style={{
-            background: `linear-gradient(135deg, ${withAlpha(BRAND_SEAM_RED, 0.08)} 0%, ${withAlpha(BG_DARK, 0.4)} 100%), ${SURFACE_CARD}`,
-            border: `1px solid ${withAlpha(BRAND_SEAM_RED, 0.35)}`,
+            background: `linear-gradient(135deg, ${'var(--red2)'} 0%, ${'var(--background075)'} 100%), ${'var(--surfaceCard)'}`,
+            border: `1px solid ${'var(--red6)'}`,
             borderRadius: 16,
             padding: 28,
             display: 'flex',
             gap: 18,
             alignItems: 'flex-start',
-            boxShadow: `0 2px 12px ${withAlpha(BLACK, 0.25)}`,
+            boxShadow: `0 2px 12px ${'var(--shadowColor)'}`,
           }}
         >
           <div
@@ -1379,15 +1369,15 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               width: 44,
               height: 44,
               borderRadius: '50%',
-              background: withAlpha(BRAND_SEAM_RED, 0.18),
-              color: BRAND_SEAM_RED_LIGHT,
+              background: 'var(--red2)',
+              color: 'var(--brandSeamRedLight)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
             }}
           >
-            <AlertTriangle size={24} color={BRAND_SEAM_RED_LIGHT} />
+            <AlertTriangle size={24} color="var(--brandSeamRedLight)" />
           </div>
           <div style={{ flex: 1 }}>
             <h3
@@ -1395,7 +1385,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 fontFamily: FONT_DISPLAY,
                 fontWeight: 800,
                 fontSize: 22,
-                color: TEXT_HIGH_CONTRAST,
+                color: 'var(--color12)',
                 margin: '0 0 6px',
                 letterSpacing: '-0.005em',
               }}
@@ -1405,7 +1395,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             <p
               style={{
                 fontFamily: FONT_BODY,
-                color: TEXT_MUTED,
+                color: 'var(--textMuted)',
                 lineHeight: 1.55,
                 margin: '0 0 14px',
                 maxWidth: '60ch',
@@ -1419,9 +1409,9 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 style={{
                   fontFamily: "'Fira Code', 'Courier New', monospace",
                   fontSize: 12,
-                  color: TEXT_MUTED,
+                  color: 'var(--textMuted)',
                   padding: '8px 10px',
-                  background: withAlpha(BLACK, 0.3),
+                  background: 'var(--shadowColor)',
                   borderRadius: 6,
                   marginBottom: 14,
                   display: 'inline-block',
@@ -1442,9 +1432,9 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                   textTransform: 'uppercase',
                   padding: '11px 18px',
                   borderRadius: 12,
-                  border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.8)}`,
-                  background: BRAND_NAVY,
-                  color: WHITE,
+                  border: `1px solid ${'var(--brandNavyLight)'}`,
+                  background: 'var(--brandNavy)',
+                  color: 'var(--textOnAccent)',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1462,8 +1452,8 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
       {showEmpty && (
         <div
           style={{
-            background: SURFACE_CARD,
-            border: `1px solid ${withAlpha(WHITE, 0.08)}`,
+            background: 'var(--surfaceCard)',
+            border: `1px solid ${'var(--glassBorder)'}`,
             borderRadius: 20,
             padding: '48px 32px',
             textAlign: 'center',
@@ -1471,7 +1461,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             flexDirection: 'column',
             alignItems: 'center',
             gap: 14,
-            boxShadow: `0 2px 12px ${withAlpha(BLACK, 0.25)}`,
+            boxShadow: `0 2px 12px ${'var(--shadowColor)'}`,
           }}
         >
           <div
@@ -1479,22 +1469,22 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               width: 72,
               height: 72,
               borderRadius: '50%',
-              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.35)}, ${withAlpha(BRAND_GOLD, 0.08)})`,
-              border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
+              background: `linear-gradient(135deg, ${'var(--accentMuted)'}, ${'var(--warningMuted)'})`,
+              border: `1px solid ${'color-mix(in srgb, var(--brandGold) 25%, transparent)'}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 4,
             }}
           >
-            <Trophy size={32} color={BRAND_GOLD_LIGHT} />
+            <Trophy size={32} color="var(--brandGoldLight)" />
           </div>
           <h3
             style={{
               fontFamily: FONT_DISPLAY,
               fontWeight: 800,
               fontSize: 26,
-              color: TEXT_HIGH_CONTRAST,
+              color: 'var(--color12)',
               margin: 0,
               letterSpacing: '-0.01em',
             }}
@@ -1504,7 +1494,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
           <p
             style={{
               fontFamily: FONT_BODY,
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
               maxWidth: '48ch',
               lineHeight: 1.55,
               margin: 0,
@@ -1527,8 +1517,8 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               padding: '11px 18px',
               borderRadius: 12,
               border: 'none',
-              background: BRAND_GOLD,
-              color: BG_DARK,
+              background: 'var(--brandGold)',
+              color: TEXT_ON_GOLD,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
@@ -1544,7 +1534,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               fontSize: 10,
               letterSpacing: '0.16em',
               textTransform: 'uppercase',
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
               marginTop: 8,
             }}
           >
@@ -1557,8 +1547,8 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
       {showEmptyFiltered && (
         <div
           style={{
-            background: SURFACE_CARD,
-            border: `1px solid ${withAlpha(WHITE, 0.08)}`,
+            background: 'var(--surfaceCard)',
+            border: `1px solid ${'var(--glassBorder)'}`,
             borderRadius: 20,
             padding: '48px 32px',
             textAlign: 'center',
@@ -1566,7 +1556,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             flexDirection: 'column',
             alignItems: 'center',
             gap: 14,
-            boxShadow: `0 2px 12px ${withAlpha(BLACK, 0.25)}`,
+            boxShadow: `0 2px 12px ${'var(--shadowColor)'}`,
           }}
         >
           <div
@@ -1574,22 +1564,22 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               width: 72,
               height: 72,
               borderRadius: '50%',
-              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.35)}, ${withAlpha(BRAND_GOLD, 0.08)})`,
-              border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
+              background: `linear-gradient(135deg, ${'var(--accentMuted)'}, ${'var(--warningMuted)'})`,
+              border: `1px solid ${'color-mix(in srgb, var(--brandGold) 25%, transparent)'}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 4,
             }}
           >
-            <Search size={28} color={BRAND_GOLD_LIGHT} />
+            <Search size={28} color="var(--brandGoldLight)" />
           </div>
           <h3
             style={{
               fontFamily: FONT_DISPLAY,
               fontWeight: 800,
               fontSize: 26,
-              color: TEXT_HIGH_CONTRAST,
+              color: 'var(--color12)',
               margin: 0,
               letterSpacing: '-0.01em',
             }}
@@ -1599,7 +1589,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
           <p
             style={{
               fontFamily: FONT_BODY,
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
               maxWidth: '48ch',
               lineHeight: 1.55,
               margin: 0,
@@ -1611,7 +1601,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 <span
                   style={{
                     fontStyle: 'italic',
-                    color: BRAND_GOLD_LIGHT,
+                    color: 'var(--brandGoldLight)',
                     fontWeight: 500,
                   }}
                 >
@@ -1651,9 +1641,9 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 textTransform: 'uppercase',
                 padding: '11px 18px',
                 borderRadius: 12,
-                border: `1px solid ${withAlpha(WHITE, 0.2)}`,
+                border: `1px solid ${'var(--glassBorderHover)'}`,
                 background: 'transparent',
-                color: TEXT_HIGH_CONTRAST,
+                color: 'var(--color12)',
                 cursor: 'pointer',
               }}
             >
@@ -1671,8 +1661,8 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 padding: '11px 18px',
                 borderRadius: 12,
                 border: 'none',
-                background: BRAND_GOLD,
-                color: BG_DARK,
+                background: 'var(--brandGold)',
+                color: TEXT_ON_GOLD,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1740,8 +1730,8 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             style={{
               marginTop: 32,
               padding: '32px 28px',
-              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.35)} 0%, ${withAlpha(BG_DARK, 0.2)} 100%), ${SURFACE_CARD}`,
-              border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
+              background: `linear-gradient(135deg, ${'var(--accentMuted)'} 0%, ${'var(--background075)'} 100%), ${'var(--surfaceCard)'}`,
+              border: `1px solid ${'color-mix(in srgb, var(--brandGold) 25%, transparent)'}`,
               borderRadius: 20,
               display: 'flex',
               justifyContent: 'space-between',
@@ -1756,7 +1746,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 800,
                   fontSize: 26,
-                  color: TEXT_HIGH_CONTRAST,
+                  color: 'var(--color12)',
                   margin: 0,
                   letterSpacing: '-0.01em',
                 }}
@@ -1766,7 +1756,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               <p
                 style={{
                   fontFamily: FONT_BODY,
-                  color: TEXT_MUTED,
+                  color: 'var(--textMuted)',
                   margin: '6px 0 0',
                   maxWidth: '48ch',
                   lineHeight: 1.5,
@@ -1788,8 +1778,8 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 padding: '11px 18px',
                 borderRadius: 12,
                 border: 'none',
-                background: BRAND_GOLD,
-                color: BG_DARK,
+                background: 'var(--brandGold)',
+                color: TEXT_ON_GOLD,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',

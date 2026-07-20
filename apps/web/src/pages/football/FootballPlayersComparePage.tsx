@@ -10,19 +10,6 @@ import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
-import {
-  BG_DARK,
-  BRAND_GOLD,
-  BRAND_NAVY,
-  BRAND_SEAM_RED,
-  BRAND_SEAM_RED_LIGHT,
-  OUTLINE_SUBTLE,
-  SURFACE_CARD,
-  SURFACE_PANEL,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
-  withAlpha,
-} from '../../constants/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
 type ComparePlayer = NonNullable<FootballPlayerQuery['footballPlayer']>;
@@ -98,14 +85,14 @@ function PlayerColumnHeader({ player }: { player: ComparePlayer }) {
       <Text
         fontSize={16}
         fontWeight="800"
-        color={TEXT_PRIMARY}
+        color="$color"
         fontFamily={FONT_DISPLAY}
         textAlign="center"
         numberOfLines={2}
       >
         {playerName(player)}
       </Text>
-      <Text fontSize={12} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+      <Text fontSize={12} color="$textMuted" fontFamily={FONT_BODY}>
         {[player.isDst ? 'DST' : player.position, player.nflTeam]
           .filter(Boolean)
           .join(' · ')}
@@ -148,7 +135,7 @@ export function FootballPlayersComparePage() {
       : [];
 
   return (
-    <YStack flex={1} backgroundColor={BG_DARK} minHeight="100vh">
+    <YStack flex={1} backgroundColor="$background" minHeight="100vh">
       <PageMeta
         title="Compare Players"
         description="Side-by-side football player comparison"
@@ -161,7 +148,8 @@ export function FootballPlayersComparePage() {
         paddingBottom={16}
         gap={8}
         style={{
-          background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.25)} 0%, transparent 100%)`,
+          background:
+            'linear-gradient(180deg, var(--accentMuted) 0%, transparent 100%)',
         }}
       >
         <XStack
@@ -183,15 +171,15 @@ export function FootballPlayersComparePage() {
           }}
           hoverStyle={{ opacity: 0.8 }}
         >
-          <ArrowLeft size={16} color={TEXT_MUTED} />
-          <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+          <ArrowLeft size={16} color="$textMuted" />
+          <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
             Back to players
           </Text>
         </XStack>
         <Text
           fontSize={26}
           fontWeight="800"
-          color={TEXT_PRIMARY}
+          color="$color"
           fontFamily={FONT_DISPLAY}
           letterSpacing={-0.5}
         >
@@ -208,10 +196,10 @@ export function FootballPlayersComparePage() {
             padding={40}
             gap={8}
           >
-            <Text fontSize={16} color={TEXT_MUTED} fontFamily={FONT_DISPLAY}>
+            <Text fontSize={16} color="$textMuted" fontFamily={FONT_DISPLAY}>
               Select two players to compare
             </Text>
-            <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+            <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
               Go back to the players list and pick two.
             </Text>
           </YStack>
@@ -219,13 +207,13 @@ export function FootballPlayersComparePage() {
 
         {idsValid && error && (
           <YStack
-            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.1)}
+            backgroundColor="$red2"
             borderWidth={1}
-            borderColor={withAlpha(BRAND_SEAM_RED, 0.3)}
+            borderColor="$red6"
             borderRadius={8}
             padding={16}
           >
-            <Text color={BRAND_SEAM_RED_LIGHT} fontSize={14}>
+            <Text color="$red11" fontSize={14}>
               Failed to load players. Please try again.
             </Text>
           </YStack>
@@ -238,7 +226,7 @@ export function FootballPlayersComparePage() {
             justifyContent="center"
             padding={40}
           >
-            <Spinner size="large" color={BRAND_GOLD} />
+            <Spinner size="large" color="$brandGold" />
           </YStack>
         )}
 
@@ -250,10 +238,10 @@ export function FootballPlayersComparePage() {
             padding={40}
             gap={8}
           >
-            <Text fontSize={16} color={TEXT_MUTED} fontFamily={FONT_DISPLAY}>
+            <Text fontSize={16} color="$textMuted" fontFamily={FONT_DISPLAY}>
               Player not found
             </Text>
-            <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+            <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
               One or both players could not be loaded.
             </Text>
           </YStack>
@@ -266,9 +254,9 @@ export function FootballPlayersComparePage() {
             featureDescription="Compare players side-by-side with a Premium subscription."
           >
             <YStack
-              backgroundColor={SURFACE_CARD}
+              backgroundColor="$surfaceCard"
               borderWidth={1}
-              borderColor={OUTLINE_SUBTLE}
+              borderColor="$outlineSubtle"
               borderRadius={10}
               overflow="hidden"
             >
@@ -276,16 +264,16 @@ export function FootballPlayersComparePage() {
               <XStack
                 paddingVertical={16}
                 paddingHorizontal={12}
-                backgroundColor={SURFACE_PANEL}
+                backgroundColor="$surfacePanel"
                 borderBottomWidth={1}
-                borderBottomColor={OUTLINE_SUBTLE}
+                borderBottomColor="$outlineSubtle"
                 alignItems="center"
               >
                 <PlayerColumnHeader player={playerA} />
                 <YStack width={80} alignItems="center">
                   <Text
                     fontSize={12}
-                    color={BRAND_GOLD}
+                    color="$brandGold"
                     fontWeight="700"
                     fontFamily={FONT_BODY}
                   >
@@ -298,7 +286,7 @@ export function FootballPlayersComparePage() {
               {/* Stat rows */}
               {visibleRows.length === 0 ? (
                 <YStack padding={24} alignItems="center">
-                  <Text fontSize={13} color={TEXT_MUTED} fontFamily={FONT_BODY}>
+                  <Text fontSize={13} color="$textMuted" fontFamily={FONT_BODY}>
                     No comparable stats available for these players.
                   </Text>
                 </YStack>
@@ -310,15 +298,13 @@ export function FootballPlayersComparePage() {
                     paddingHorizontal={12}
                     alignItems="center"
                     backgroundColor={
-                      idx % 2 === 0
-                        ? 'transparent'
-                        : withAlpha(BRAND_NAVY, 0.08)
+                      idx % 2 === 0 ? 'transparent' : '$accentMuted'
                     }
                   >
                     <Text
                       flex={1}
                       fontSize={14}
-                      color={TEXT_PRIMARY}
+                      color="$color"
                       fontWeight="700"
                       fontVariant={['tabular-nums']}
                       textAlign="center"
@@ -328,7 +314,7 @@ export function FootballPlayersComparePage() {
                     <Text
                       width={80}
                       fontSize={12}
-                      color={TEXT_MUTED}
+                      color="$textMuted"
                       fontFamily={FONT_BODY}
                       textAlign="center"
                     >
@@ -337,7 +323,7 @@ export function FootballPlayersComparePage() {
                     <Text
                       flex={1}
                       fontSize={14}
-                      color={TEXT_PRIMARY}
+                      color="$color"
                       fontWeight="700"
                       fontVariant={['tabular-nums']}
                       textAlign="center"
