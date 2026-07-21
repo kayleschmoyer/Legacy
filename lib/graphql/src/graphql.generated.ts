@@ -5230,6 +5230,7 @@ export type FootballPlayersQueryVariables = Exact<{
   freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
   injuryStatus?: InputMaybe<Scalars['String']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
@@ -15844,6 +15845,7 @@ export const FootballPlayers = gql`
     $freeAgent: Boolean
     $search: String
     $after: String
+    $first: Int
     $injuryStatus: String
     $minProjectedPoints: Float
     $maxAdpRank: Int
@@ -15857,6 +15859,7 @@ export const FootballPlayers = gql`
       freeAgent: $freeAgent
       search: $search
       after: $after
+      first: $first
       injuryStatus: $injuryStatus
       minProjectedPoints: $minProjectedPoints
       maxAdpRank: $maxAdpRank
@@ -15893,6 +15896,7 @@ export const FootballPlayers = gql`
  *      freeAgent: // value for 'freeAgent'
  *      search: // value for 'search'
  *      after: // value for 'after'
+ *      first: // value for 'first'
  *      injuryStatus: // value for 'injuryStatus'
  *      minProjectedPoints: // value for 'minProjectedPoints'
  *      maxAdpRank: // value for 'maxAdpRank'

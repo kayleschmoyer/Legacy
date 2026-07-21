@@ -39,6 +39,7 @@ jest.mock('../../context/GrowthBookProvider', () => ({
 // drive callbacks (e.g. onExport) directly. Prefixed with `mock` so the hoisted
 // jest.mock factory is allowed to reference it.
 let mockStatsPageProps: Record<string, unknown> = {};
+let mockFootballStatsPageProps: Record<string, unknown> = {};
 jest.mock('@legacy-sports/shared-components/players', () => ({
   // Capture the props the host passes (so onExport can be driven directly) and
   // expose a Share affordance so the host's onShare handler (and its
@@ -124,13 +125,58 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
     raw == null || raw === '' ? null : raw === 'none' ? [] : raw.split(','),
   serializeVisibleColumns: (cols: readonly string[] | null) =>
     cols === null ? null : cols.length === 0 ? 'none' : cols.join(','),
+  // The NFL view renders inline through the shared FootballStatsPage shell
+  // binding (LS-8442). A lightweight marker stands in for the graphql/Tamagui
+  // -heavy real component; capture props so the host wiring can be asserted and
+  // a player click can be simulated.
+  FootballStatsPage: (props: {
+    title?: string;
+    isPremium?: boolean;
+    onPlayerDetails?: (playerId: number) => void;
+    [key: string]: unknown;
+  }) => {
+    mockFootballStatsPageProps = props;
+    return (
+      <div
+        data-testid="football-stats-page"
+        data-title={String(props.title)}
+        data-premium={String(props.isPremium)}
+      />
+    );
+  },
 }));
 
-// The football stats browser is rendered inline for the NFL view (LS-8104) and
-// lazy-loaded; mock it with a lightweight marker so the route can be asserted
-// without pulling the real (graphql/Tamagui-heavy) page into the unit test.
-jest.mock('../football/FootballPlayersPage', () => ({
-  FootballPlayersPage: () => <div data-testid="football-players-page" />,
+// The football detail modal (LS-8442) is graphql/Tamagui-heavy; mock it with a
+// lightweight marker so the NFL deep-link path can be asserted without pulling
+// the real component into the unit test.
+jest.mock('../../components/FootballPlayerDetailModal', () => ({
+  FootballPlayerDetailModal: ({
+    playerId,
+    onOpenChange,
+    onViewFullPage,
+  }: {
+    playerId: number | null;
+    onOpenChange: (open: boolean) => void;
+    onViewFullPage?: () => void;
+  }) => (
+    <div
+      data-testid="football-player-detail-modal"
+      data-player-id={String(playerId)}
+    >
+      <button
+        data-testid="close-football-modal"
+        onClick={() => onOpenChange(false)}
+      >
+        close
+      </button>
+      <button
+        data-testid="football-view-full-page"
+        onClick={() => onViewFullPage?.()}
+      >
+        full page
+      </button>
+    </div>
+  ),
 }));
 
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
@@ -217,35 +263,28 @@ describe('PlayerStatsRoute inline NFL view', () => {
     mockSearchParams = new URLSearchParams('sport=nfl');
     render(<PlayerStatsRoute />);
     expect(
-      await screen.findByTestId('football-players-page'),
+      await screen.findByTestId('football-stats-page'),
     ).toBeInTheDocument();
     // Inline render replaces the old redirect to /football/players.
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  // LS-8132: the inline NFL view wraps the football browser in the same
-  // editorial hero pattern used by the MLB stats page so the two sports share
-  // UI conventions instead of diverging.
-  it('renders an editorial "NFL Player Statistics" header for the inline NFL view', async () => {
+  // LS-8442: the inline NFL view now renders through the shared PlayerStatsShell
+  // (via FootballStatsPage), which owns the branded "NFL Player Statistics"
+  // header + share action internally. The route passes the title and premium
+  // wiring down; the header is no longer rendered by the route itself.
+  it('renders the NFL stats page through the shared shell with the NFL title', async () => {
     mockSearchParams = new URLSearchParams('sport=nfl');
     render(<PlayerStatsRoute />);
-    await screen.findByTestId('football-players-page');
-    expect(
-      screen.getByRole('heading', { name: /nfl player statistics/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', {
-        name: /share nfl player statistics link/i,
-      }),
-    ).toBeInTheDocument();
+    const page = await screen.findByTestId('football-stats-page');
+    expect(page).toHaveAttribute('data-title', 'NFL Player Statistics');
+    expect(mockFootballStatsPageProps.title).toBe('NFL Player Statistics');
   });
 
   it('renders the baseball stats page (not football) when sport=mlb', () => {
     mockSearchParams = new URLSearchParams('sport=mlb');
     render(<PlayerStatsRoute />);
-    expect(
-      screen.queryByTestId('football-players-page'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('football-stats-page')).not.toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -253,9 +292,7 @@ describe('PlayerStatsRoute inline NFL view', () => {
     mockSearchParams = new URLSearchParams('sport=nfl');
     mockFootballEnabled = false;
     render(<PlayerStatsRoute />);
-    expect(
-      screen.queryByTestId('football-players-page'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('football-stats-page')).not.toBeInTheDocument();
   });
 });
 
@@ -291,7 +328,7 @@ describe('PlayerStatsRoute sport switcher', () => {
     render(<PlayerStatsRoute />);
     // NFL view renders the (lazy) football browser; wait for it before asserting
     // the switcher, which is rendered alongside it.
-    await screen.findByTestId('football-players-page');
+    await screen.findByTestId('football-stats-page');
     fireEvent.click(
       screen.getByRole('button', { name: /view mlb statistics/i }),
     );

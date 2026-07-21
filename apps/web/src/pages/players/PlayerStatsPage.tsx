@@ -1,10 +1,4 @@
-import React, {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useLocation,
   useNavigate,
@@ -12,8 +6,10 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import {
+  FootballStatsPage,
   isValidBattingSortField,
   normalizeViewMode,
+  parseFootballPositions,
   parseVisibleColumns,
   PlayerStatsPage,
   type PlayerStatsViewMode,
@@ -22,6 +18,7 @@ import {
 } from '@legacy-sports/shared-components/players';
 import type {
   ExportFormat,
+  FootballStatsFilters,
   PlayerStatsExportData,
   PlayerStatsFilters,
   PlayerWithStats,
@@ -50,17 +47,14 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { PlayerDetailModal } from '../../components/PlayerDetailModal';
+import { FootballPlayerDetailModal } from '../../components/FootballPlayerDetailModal';
 import { useLeagueRosteredPlayerIds } from '../../hooks/useLeagueRosteredPlayerIds';
 import { useFeatureValue } from '../../context/GrowthBookProvider';
 
-// Football statistics are served by the dedicated football players browser,
-// rendered inline when the sport switcher selects NFL (LS-8104). Lazy-loaded so
-// the default MLB stats route doesn't pull the football bundle for every user.
-const FootballPlayersPageLazy = React.lazy(() =>
-  import('../football/FootballPlayersPage').then((m) => ({
-    default: m.FootballPlayersPage,
-  })),
-);
+// NFL statistics render inline through the sport-agnostic PlayerStatsShell via
+// the shared FootballStatsPage binding when the sport switcher selects NFL
+// (LS-8442), replacing the former embedded FootballPlayersPage. The standalone
+// /football/players route still renders the bespoke FootballPlayersPage.
 
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
@@ -1031,174 +1025,6 @@ const sportSwitchButtonStyle = (active: boolean): React.CSSProperties => ({
   cursor: active ? 'default' : 'pointer',
 });
 
-const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
-const FONT_BODY = "'Literata', serif";
-const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
-
-const NFL_HEADER_FG_MUTED = '#9CAAC5';
-const NFL_HEADER_FG_DIM = '#6C80BA';
-const NFL_HEADER_OUTLINE = '#1C2740';
-
-const nflGoldButtonStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '10px 16px',
-  minHeight: 40,
-  borderRadius: 12,
-  border: `1px solid ${withAlpha(BRAND_GOLD, 0.4)}`,
-  background: withAlpha(BRAND_GOLD, 0.08),
-  color: BRAND_GOLD_LIGHT,
-  fontFamily: FONT_DISPLAY,
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  cursor: 'pointer',
-};
-
-/**
- * Editorial hero rendered above the inline NFL stats view (LS-8132) so the
- * football route matches the MLB stats page's branded header pattern instead
- * of dropping straight into the football browser's bare title row.
- */
-function NflStatsHeader({
-  urlPreview,
-  onShare,
-}: {
-  urlPreview: string;
-  onShare: () => void;
-}) {
-  return (
-    <div
-      style={{
-        maxWidth: 1280,
-        width: '100%',
-        margin: '0 auto',
-        padding: '32px 24px 0',
-        display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: 24,
-      }}
-    >
-      <div
-        style={{
-          flex: 1,
-          minWidth: 240,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: FONT_DISPLAY,
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            color: BRAND_GOLD_LIGHT,
-          }}
-        >
-          Players · League Archive
-        </span>
-        <h1
-          style={{
-            fontFamily: FONT_DISPLAY,
-            fontWeight: 800,
-            fontSize: 'clamp(40px, 4.4vw, 60px)',
-            lineHeight: 1,
-            letterSpacing: '-0.02em',
-            color: WHITE,
-            margin: 0,
-          }}
-        >
-          NFL Player Statistics
-        </h1>
-        <p
-          style={{
-            fontFamily: FONT_BODY,
-            fontSize: 17,
-            lineHeight: 1.55,
-            color: NFL_HEADER_FG_MUTED,
-            maxWidth: '64ch',
-            margin: 0,
-          }}
-        >
-          Every active and recent NFL player. Filter by position, compare
-          seasons, and find the next addition to your dynasty roster.
-        </p>
-        <div
-          style={{
-            marginTop: 14,
-            padding: '8px 14px',
-            background: 'rgba(13,21,38,0.6)',
-            border: `1px solid ${NFL_HEADER_OUTLINE}`,
-            borderRadius: 8,
-            maxWidth: '100%',
-            overflow: 'hidden',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: 700,
-              fontSize: 10,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: NFL_HEADER_FG_DIM,
-              flexShrink: 0,
-            }}
-          >
-            URL
-          </span>
-          <span
-            style={{
-              fontFamily: FONT_MONO,
-              fontSize: 12,
-              color: NFL_HEADER_FG_MUTED,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              minWidth: 0,
-            }}
-          >
-            {urlPreview}
-          </span>
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onShare}
-        aria-label="Share NFL player statistics link"
-        style={nflGoldButtonStyle}
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={BRAND_GOLD_LIGHT}
-          strokeWidth="2"
-          aria-hidden="true"
-        >
-          <circle cx="18" cy="5" r="3" />
-          <circle cx="6" cy="12" r="3" />
-          <circle cx="18" cy="19" r="3" />
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-        </svg>
-        Share
-      </button>
-    </div>
-  );
-}
-
 /**
  * Sport switcher rendered above the stats page. Toggling between MLB and NFL
  * updates the `sport` URL param in place (LS-8104) so the page renders the
@@ -1299,6 +1125,17 @@ export function PlayerStatsRoute() {
   const { playerIds: baseballRosteredIds } = useLeagueRosteredPlayerIds(
     Sport.Baseball,
     !hasBaseballLeagues,
+  );
+
+  // Football availability filter (LS-8442): surfaced only when the viewer is in
+  // at least one football league, mirroring the baseball wiring above. Both
+  // queries are already auth-skipped via the shared `userLeagues` gate.
+  const hasFootballLeagues = (leaguesData?.userLeagues ?? []).some(
+    (l) => l.sport === Sport.Football,
+  );
+  const { playerIds: footballRosteredIds } = useLeagueRosteredPlayerIds(
+    Sport.Football,
+    !hasFootballLeagues,
   );
 
   // Derive the active sport from the URL param, falling back to the user's
@@ -1691,37 +1528,102 @@ export function PlayerStatsRoute() {
     [sport],
   );
 
-  // NFL view — render the football statistics browser inline (LS-8104) instead
-  // of redirecting away, so football gets the same on-page stats experience as
-  // baseball. Wraps the football browser in the same editorial header pattern
-  // used by the MLB stats page (LS-8132) so the two sports share UI patterns.
-  // Placed after all hooks to satisfy Rules of Hooks.
+  // NFL view — render the football statistics browser inline through the shared
+  // PlayerStatsShell (LS-8442), the same shell the MLB browser renders through,
+  // instead of redirecting away or embedding the bespoke football page. Placed
+  // after all hooks to satisfy Rules of Hooks; the standalone /football/players
+  // route still renders the bespoke FootballPlayersPage.
   if (showFootball) {
-    const nflUrlPreview = `/players/stats?${searchParams.toString()}`;
-    const handleNflShare = () => {
-      const url = `${window.location.origin}/players/stats?${searchParams.toString()}`;
-      void (async () => {
-        try {
-          if (navigator.share) {
-            await navigator.share({
-              title: 'NFL Player Statistics - Legacy Sports',
-              text: 'Check out these NFL player statistics from Legacy Sports',
-              url,
-            });
-          } else if (navigator.clipboard) {
-            await navigator.clipboard.writeText(url);
-            setLiveMsg('Link copied to clipboard.');
-          } else {
-            setLiveMsg('Could not share link. Please copy the URL manually.');
-          }
-        } catch (error) {
-          if (error instanceof Error && error.name === 'AbortError') return;
-          LOGGER.error(
-            'Error sharing NFL stats:',
-            error instanceof Error ? error : String(error),
-          );
-        }
-      })();
+    // Seed the football controller from the URL params the route persists.
+    const nflInitialFilters: Partial<FootballStatsFilters> = {};
+    // Validate each position against the known FootballPosition literals —
+    // a hand-crafted URL must never inject arbitrary strings (LS-8442 review).
+    const posRaw = searchParams.get('position');
+    if (posRaw) {
+      const positions = parseFootballPositions(posRaw);
+      if (positions.length > 0) {
+        nflInitialFilters.positions = positions;
+      }
+    }
+    const teamParam = sanitizeSearchParam(searchParams.get('team'));
+    if (teamParam) nflInitialFilters.team = teamParam;
+    const searchParam = sanitizeSearchParam(searchParams.get('search'));
+    if (searchParam) nflInitialFilters.searchTerm = searchParam;
+    const sortByParam = searchParams.get('sortBy');
+    if (
+      sortByParam === 'name' ||
+      sortByParam === 'position' ||
+      sortByParam === 'team'
+    ) {
+      nflInitialFilters.sortField = sortByParam;
+      nflInitialFilters.sortDir =
+        searchParams.get('sortDir') === 'desc' ? 'desc' : 'asc';
+    }
+    const injuryParam = sanitizeSearchParam(searchParams.get('injuryStatus'));
+    if (injuryParam) nflInitialFilters.injuryStatus = injuryParam;
+    const minProjParam = searchParams.get('minProjectedPoints');
+    if (minProjParam && Number.isFinite(Number(minProjParam))) {
+      nflInitialFilters.minProjectedPoints = Number(minProjParam);
+    }
+    const maxAdpParam = searchParams.get('maxAdpRank');
+    if (maxAdpParam && Number.isFinite(Number.parseInt(maxAdpParam, 10))) {
+      nflInitialFilters.maxAdpRank = Number.parseInt(maxAdpParam, 10);
+    }
+    const rawNflPageSize = Number.parseInt(
+      searchParams.get('pageSize') ?? '',
+      10,
+    );
+    const nflInitialPageSize = [25, 50, 100].includes(rawNflPageSize)
+      ? rawNflPageSize
+      : 25;
+
+    // Mirror committed football filters to the URL (sport=nfl preserved so a
+    // shared link restores the football view). Any open detail modal's
+    // ?playerId is carried through from the live URL so a filter commit doesn't
+    // close it (mirrors the MLB handleFiltersChange rationale, LS-8260).
+    const handleNflFiltersChange = (state: {
+      pageSize: number;
+      filters: FootballStatsFilters;
+    }) => {
+      const params = new URLSearchParams();
+      params.set('sport', 'nfl');
+      params.set('pageSize', String(state.pageSize));
+      const f = state.filters;
+      if (f.positions && f.positions.length > 0) {
+        params.set('position', f.positions.join(','));
+      }
+      if (f.team) params.set('team', f.team);
+      if (f.searchTerm) params.set('search', f.searchTerm);
+      if (f.sortField) {
+        params.set('sortBy', f.sortField);
+        params.set('sortDir', f.sortDir ?? 'asc');
+      }
+      if (f.injuryStatus) params.set('injuryStatus', f.injuryStatus);
+      if (f.minProjectedPoints != null) {
+        params.set('minProjectedPoints', String(f.minProjectedPoints));
+      }
+      if (f.maxAdpRank != null) {
+        params.set('maxAdpRank', String(f.maxAdpRank));
+      }
+      const openPlayerId = new URLSearchParams(window.location.search).get(
+        'playerId',
+      );
+      if (openPlayerId) params.set('playerId', openPlayerId);
+      setSearchParams(params, { replace: true });
+    };
+
+    // A row click writes ?playerId, opening the detail modal in place (pushes
+    // history so Back closes it), matching the MLB deep-link behaviour.
+    const handleNflPlayerDetails = (playerId: number) => {
+      const params = new URLSearchParams(window.location.search);
+      params.set('playerId', String(playerId));
+      setSearchParams(params);
+    };
+
+    const handleNflViewFullPage = () => {
+      if (selectedPlayerId !== null && Number.isFinite(selectedPlayerId)) {
+        navigate(`/football/players/${selectedPlayerId}`);
+      }
     };
 
     return (
@@ -1737,25 +1639,37 @@ export function PlayerStatsRoute() {
           title="NFL Player Statistics"
           description="Browse career and season statistics for every NFL player available in your Legacy Sports fantasy league."
         />
+        <div className="sr-only" aria-live="polite">
+          {liveMsg}
+        </div>
         <StatsSportSwitcher
           active="nfl"
           onSelectMlb={() => handleSelectSport('mlb')}
           onSelectNfl={() => handleSelectSport('nfl')}
         />
-        <NflStatsHeader urlPreview={nflUrlPreview} onShare={handleNflShare} />
-        <Suspense
-          fallback={
-            <div
-              role="status"
-              aria-live="polite"
-              style={{ padding: '2rem', textAlign: 'center' }}
-            >
-              Loading NFL statistics…
-            </div>
-          }
-        >
-          <FootballPlayersPageLazy showHeader={false} />
-        </Suspense>
+        <FootballStatsPage
+          title="NFL Player Statistics"
+          isPremium={isPremium}
+          initialFilters={nflInitialFilters}
+          initialPageSize={nflInitialPageSize}
+          showHeader={true}
+          showActions={true}
+          onShare={handleShare}
+          onFiltersChange={handleNflFiltersChange}
+          onPlayerDetails={handleNflPlayerDetails}
+          showAvailabilityFilter={hasFootballLeagues}
+          rosteredPlayerIds={footballRosteredIds}
+        />
+        {selectedPlayerId !== null && (
+          <FootballPlayerDetailModal
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) handleClosePlayerDetails();
+            }}
+            playerId={selectedPlayerId}
+            onViewFullPage={handleNflViewFullPage}
+          />
+        )}
       </div>
     );
   }
