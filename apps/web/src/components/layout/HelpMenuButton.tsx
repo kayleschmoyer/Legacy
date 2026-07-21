@@ -3,9 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { Bug, HelpCircle, MessageSquare } from '@tamagui/lucide-icons';
 import { FONT_DISPLAY, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
 import {
+  BORDER_INTERACTIVE,
+  BRAND_GOLD,
   BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
   OUTLINE_SUBTLE,
+  SHADOW_DARK,
   SURFACE_PANEL,
+  TEXT_FG2,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
+  TEXT_TERTIARY,
+  WHITE,
+  withAlpha,
 } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 
@@ -16,7 +26,7 @@ interface Props {
 const ICON_BTN_STYLE: React.CSSProperties = {
   background: 'transparent',
   border: `1px solid ${OUTLINE_SUBTLE}`,
-  color: '#DEE6FF',
+  color: TEXT_FG2,
   width: 38,
   height: 38,
   borderRadius: 9999,
@@ -38,7 +48,7 @@ const MENU_ITEM_STYLE: React.CSSProperties = {
   cursor: 'pointer',
   fontFamily: "'Literata', serif",
   fontSize: 14,
-  color: '#F8FAFC',
+  color: TEXT_PRIMARY,
   background: 'transparent',
   border: 0,
   width: '100%',
@@ -76,8 +86,8 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
     ...ICON_BTN_STYLE,
     ...(isOpen
       ? {
-          borderColor: 'rgba(197,165,90,0.5)',
-          background: 'rgba(197,165,90,0.1)',
+          borderColor: withAlpha(BRAND_GOLD, 0.5),
+          background: withAlpha(BRAND_GOLD, 0.1),
           color: BRAND_GOLD_LIGHT,
         }
       : {}),
@@ -94,9 +104,9 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
         onMouseEnter={(e) => {
           if (!isOpen) {
             const el = e.currentTarget as HTMLElement;
-            el.style.borderColor = '#4D5D80';
-            el.style.background = 'rgba(255,255,255,0.04)';
-            el.style.color = '#F8FAFC';
+            el.style.borderColor = BORDER_INTERACTIVE;
+            el.style.background = withAlpha(WHITE, 0.04);
+            el.style.color = TEXT_PRIMARY;
           }
         }}
         onMouseLeave={(e) => {
@@ -104,7 +114,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
             const el = e.currentTarget as HTMLElement;
             el.style.borderColor = OUTLINE_SUBTLE;
             el.style.background = 'transparent';
-            el.style.color = '#DEE6FF';
+            el.style.color = TEXT_FG2;
           }
         }}
       >
@@ -121,9 +131,9 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
             top: 'calc(100% + 8px)',
             width: 280,
             background: SURFACE_PANEL,
-            border: `1px solid rgba(197,165,90,0.2)`,
+            border: `1px solid ${withAlpha(BRAND_GOLD, 0.2)}`,
             borderRadius: 16,
-            boxShadow: '0 12px 32px rgba(8,12,20,0.65)',
+            boxShadow: `0 12px 32px ${withAlpha(SHADOW_DARK, 0.65)}`,
             padding: 6,
             zIndex: NAV_DROPDOWN_Z_INDEX,
             animation: NAV_DROPDOWN_ANIMATION,
@@ -139,7 +149,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
               fontSize: 10,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#6C80BA',
+              color: TEXT_TERTIARY,
             }}
           >
             Help &amp; Support
@@ -147,7 +157,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
 
           {[
             {
-              icon: <HelpCircle size={16} color="#9CAAC5" />,
+              icon: <HelpCircle size={16} color={TEXT_MUTED} />,
               label: 'League Rules & FAQ',
               action: () => {
                 navigate('/help');
@@ -155,7 +165,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
               },
             },
             {
-              icon: <Bug size={16} color="#9CAAC5" />,
+              icon: <Bug size={16} color={TEXT_MUTED} />,
               label: 'Report a bug',
               action: () => {
                 onBugReport?.();
@@ -163,7 +173,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
               },
             },
             {
-              icon: <MessageSquare size={16} color="#9CAAC5" />,
+              icon: <MessageSquare size={16} color={TEXT_MUTED} />,
               label: 'Contact support',
               action: () => {
                 navigate('/help');
@@ -177,8 +187,10 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
               onClick={item.action}
               style={MENU_ITEM_STYLE}
               onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLElement).style.background =
-                  'rgba(27,58,92,0.3)')
+                ((e.currentTarget as HTMLElement).style.background = withAlpha(
+                  BRAND_NAVY,
+                  0.3,
+                ))
               }
               onMouseLeave={(e) =>
                 ((e.currentTarget as HTMLElement).style.background =
@@ -195,7 +207,7 @@ export const HelpMenuButton: React.FC<Props> = ({ onBugReport }) => {
             style={{
               padding: '10px 12px',
               fontSize: 11,
-              color: '#6C80BA',
+              color: TEXT_TERTIARY,
               borderTop: `1px solid ${OUTLINE_SUBTLE}`,
               marginTop: 4,
               display: 'flex',

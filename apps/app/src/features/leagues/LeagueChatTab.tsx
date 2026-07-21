@@ -9,8 +9,10 @@ import {
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { GifPicker } from '@legacy-sports/shared-components';
 import { config } from '@legacy-sports/app-config/native';
+import { colors } from '@legacy-sports/design-tokens';
 import { useLeagueChat } from './hooks/useLeagueChat';
 import { formatTime } from './formatTime';
+import { useThemeContext } from '../../context/ThemeContext';
 import type { LegacySportsJwt } from '../../common/auth/AuthHooks';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +33,11 @@ export function LeagueChatTab({
 }: LeagueChatTabProps): React.JSX.Element {
   const { messages, loading, sending, wsError, sendMessage } =
     useLeagueChat(leagueId);
+  // Raw RN <TextInput> styling can't consume Tamagui `$token` props, so pull
+  // resolved values from the design-token package — the same source of
+  // truth the Tamagui themes mirror — keyed by the active light/dark theme.
+  const { resolvedTheme } = useThemeContext();
+  const palette = colors[resolvedTheme];
   const [inputText, setInputText] = useState('');
   const [showGifPicker, setShowGifPicker] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -193,11 +200,18 @@ export function LeagueChatTab({
             </Button>
           ) : null}
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                borderColor: palette.surface.outlineDefault,
+                backgroundColor: palette.surface.surfacePanel,
+                color: palette.text.fg1,
+              },
+            ]}
             value={inputText}
             onChangeText={setInputText}
             placeholder="Message the league…"
-            placeholderTextColor="#9CAAC5"
+            placeholderTextColor={palette.text.fg3}
             multiline
             maxLength={2000}
             returnKeyType="send"
@@ -242,12 +256,9 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2F3B53',
-    backgroundColor: '#111B2F',
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#F8FAFC',
   },
   gifImage: {
     width: 200,

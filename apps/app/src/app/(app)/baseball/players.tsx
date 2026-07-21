@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, TextInput } from 'react-native';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
+import { baseballPositionBadges, colors } from '@legacy-sports/design-tokens';
 import type { BaseballPlayersQuery } from '@legacy-sports/graphql';
 import {
   Sport,
@@ -9,6 +10,7 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useBaseballRosteredPlayerIds } from './hooks/useBaseballRosteredPlayerIds';
+import { useThemeContext } from '../../../context/ThemeContext';
 import { SafeScreen } from '../../../components/SafeScreen';
 
 type BaseballPlayerNode = NonNullable<
@@ -38,18 +40,14 @@ const POSITIONS: BaseballPosition[] = [
   'DH',
 ];
 
-const POSITION_COLORS: Record<string, string> = {
-  P: '#C41E3A',
-  C: '#E67E22',
-  '1B': '#27AE60',
-  '2B': '#27AE60',
-  '3B': '#27AE60',
-  SS: '#27AE60',
-  OF: '#4A90D9',
-  DH: '#9B59B6',
-  RP: '#C41E3A',
-  SP: '#C41E3A',
-};
+// Position accent colors: same value in both themes (see baseballPositionBadges
+// in @legacy-sports/design-tokens — the sanctioned, ratchet-exempt palette home).
+function getPositionColor(pos: string): string {
+  return (
+    baseballPositionBadges[pos as keyof typeof baseballPositionBadges] ??
+    colors.brand.navy
+  );
+}
 
 const PITCHER_POSITIONS = new Set(['SP', 'RP', 'P']);
 
@@ -136,8 +134,6 @@ function PlayerRow({
   onPress: () => void;
 }) {
   const positions = player.eligiblePositions ?? [];
-  const primaryPos = positions[0] ?? '?';
-  const accentColor = POSITION_COLORS[primaryPos] ?? '#1B3A5C';
 
   return (
     <YStack
@@ -161,25 +157,24 @@ function PlayerRow({
               'Unknown Player'}
           </Text>
           <XStack gap="$2" alignItems="center">
-            {positions.slice(0, 3).map((pos) => (
-              <YStack
-                key={pos}
-                paddingHorizontal={7}
-                paddingVertical={2}
-                borderRadius="$1"
-                backgroundColor={`${POSITION_COLORS[pos] ?? '#1B3A5C'}26`}
-                borderWidth={1}
-                borderColor={`${POSITION_COLORS[pos] ?? '#1B3A5C'}80`}
-              >
-                <Text
-                  fontSize={11}
-                  fontWeight="700"
-                  color={POSITION_COLORS[pos] ?? accentColor}
+            {positions.slice(0, 3).map((pos) => {
+              const posColor = getPositionColor(pos);
+              return (
+                <YStack
+                  key={pos}
+                  paddingHorizontal={7}
+                  paddingVertical={2}
+                  borderRadius="$1"
+                  backgroundColor={`${posColor}26`}
+                  borderWidth={1}
+                  borderColor={`${posColor}80`}
                 >
-                  {pos}
-                </Text>
-              </YStack>
-            ))}
+                  <Text fontSize={11} fontWeight="700" color={posColor}>
+                    {pos}
+                  </Text>
+                </YStack>
+              );
+            })}
           </XStack>
         </YStack>
       </XStack>
@@ -198,8 +193,7 @@ function PositionPill({
   selected: boolean;
   onPress: () => void;
 }) {
-  const accentColor =
-    pos === 'All' ? '#1B3A5C' : (POSITION_COLORS[pos] ?? '#1B3A5C');
+  const accentColor = pos === 'All' ? colors.brand.navy : getPositionColor(pos);
   return (
     <YStack
       paddingHorizontal={14}
@@ -246,6 +240,8 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function BaseballPlayers(): React.JSX.Element {
   const router = useRouter();
+  const { resolvedTheme } = useThemeContext();
+  const palette = colors[resolvedTheme];
   const [position, setPosition] = useState<BaseballPosition>('All');
   const [searchInput, setSearchInput] = useState('');
   const [offset, setOffset] = useState(0);
@@ -385,8 +381,10 @@ export default function BaseballPlayers(): React.JSX.Element {
                   borderWidth={1}
                   onPress={() => setAvailabilityFilter(value)}
                   pressStyle={{ opacity: 0.7 }}
-                  backgroundColor={active ? '#1B3A5C4D' : '$glassSurface'}
-                  borderColor={active ? '#1B3A5C' : '$glassBorder'}
+                  backgroundColor={
+                    active ? `${colors.brand.navy}4D` : '$glassSurface'
+                  }
+                  borderColor={active ? colors.brand.navy : '$glassBorder'}
                   justifyContent="center"
                   alignItems="center"
                   testID={`availability-pill-${value}`}
@@ -397,7 +395,7 @@ export default function BaseballPlayers(): React.JSX.Element {
                   <Text
                     fontSize={13}
                     fontWeight="600"
-                    color={active ? '#4A90D9' : '$gray10'}
+                    color={active ? baseballPositionBadges.OF : '$gray10'}
                   >
                     {label}
                   </Text>
@@ -424,11 +422,16 @@ export default function BaseballPlayers(): React.JSX.Element {
           >
             <TextInput
               placeholder="Search players..."
-              placeholderTextColor="#666"
+              placeholderTextColor={palette.text.fg3}
               value={searchInput}
               onChangeText={setSearchInput}
               accessibilityLabel="Search players"
-              style={{ flex: 1, color: '#fff', fontSize: 14, height: 44 }}
+              style={{
+                flex: 1,
+                color: palette.text.fg1,
+                fontSize: 14,
+                height: 44,
+              }}
             />
           </XStack>
         </XStack>

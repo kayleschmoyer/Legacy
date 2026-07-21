@@ -27,6 +27,25 @@ import { env } from '../../config/environment';
 import { OnboardingTutorial } from '../../components/onboarding';
 import { PageMeta } from '../../components/PageMeta';
 import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
+import {
+  BG_DARK,
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_SEAM_RED,
+  BRAND_SEAM_RED_LIGHT,
+  STATS_BORDER,
+  SURFACE_CARD,
+  SURFACE_DEEP,
+  SURFACE_PANEL,
+  TEXT_FG2,
+  TEXT_INTERFACE,
+  TEXT_ON_GOLD,
+  TEXT_SECONDARY,
+  TEXT_TERTIARY,
+  WHITE,
+  withAlpha,
+} from '../../constants/colors';
 
 /* ─── Contact icon lookup ───
  * Keyed by HELP_CONTACT_ITEMS.title (stable semantic identifier) rather than
@@ -161,7 +180,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
     <YStack
       data-testid={`faq-item-${slug}`}
       borderBottomWidth={1}
-      borderBottomColor="rgba(30, 45, 69, 1)"
+      borderBottomColor={withAlpha(STATS_BORDER, 1)}
     >
       <button
         type="button"
@@ -177,7 +196,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
           gridTemplateColumns: 'auto 1fr auto',
           gap: 18,
           textAlign: 'left',
-          color: '#E8EDF5',
+          color: TEXT_INTERFACE,
           minHeight: 44,
           alignItems: 'center',
           width: '100%',
@@ -187,7 +206,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
           paddingBottom: 22,
           border: 'none',
           backgroundColor:
-            hovering || focused ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
+            hovering || focused ? withAlpha(WHITE, 0.02) : 'transparent',
           cursor: 'pointer',
         }}
       >
@@ -196,7 +215,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
             fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace",
             fontWeight: 500,
             fontSize: 12,
-            color: '#6C80BA',
+            color: TEXT_TERTIARY,
             letterSpacing: '0.06em',
             fontVariantNumeric: 'tabular-nums',
             width: 32,
@@ -210,7 +229,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
             fontWeight: 700,
             fontSize: 18,
             letterSpacing: '0.01em',
-            color: open ? '#D4BB78' : '#E8EDF5',
+            color: open ? BRAND_GOLD_LIGHT : TEXT_INTERFACE,
             transition: 'color 150ms ease',
           }}
         >
@@ -218,7 +237,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
         </span>
         <ChevronDown
           size={16}
-          color={open ? '#D4BB78' : '#8A9BB5'}
+          color={open ? BRAND_GOLD_LIGHT : TEXT_SECONDARY}
           style={{
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 150ms ease',
@@ -240,7 +259,7 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
               fontFamily: FONT_BODY,
               fontSize: 15,
               lineHeight: 1.65,
-              color: '#C9D2E2',
+              color: TEXT_FG2,
               margin: 0,
               maxWidth: '65ch',
             }}
@@ -258,14 +277,14 @@ function NumberedFaqItem({ index, question, answer }: NumberedFaqItemProps) {
 const ContactCardBase = styled(YStack, {
   borderRadius: 16,
   borderWidth: 1,
-  borderColor: '#1E2D45',
-  backgroundColor: '#111B2F',
+  borderColor: STATS_BORDER,
+  backgroundColor: SURFACE_PANEL,
   padding: 22,
   cursor: 'pointer' as never,
   animation: 'quick',
   hoverStyle: {
-    borderColor: 'rgba(197, 165, 90, 0.35)',
-    backgroundColor: '#16223A',
+    borderColor: withAlpha(BRAND_GOLD, 0.35),
+    backgroundColor: SURFACE_CARD,
   },
 });
 
@@ -319,11 +338,11 @@ function ContactOption({
           alignItems="center"
           justifyContent="center"
           borderWidth={1}
-          borderColor="#1E2D45"
-          style={{ background: 'rgba(27, 58, 92, 0.4)' }}
+          borderColor={STATS_BORDER}
+          style={{ background: withAlpha(BRAND_NAVY, 0.4) }}
         >
           {IconComponent ? (
-            <IconComponent size={24} color="#D4BB78" />
+            <IconComponent size={24} color={BRAND_GOLD_LIGHT} />
           ) : (
             <span role="img" aria-label={iconLabel} style={{ fontSize: 22 }}>
               {icon}
@@ -337,7 +356,7 @@ function ContactOption({
               fontWeight: 700,
               fontSize: 16,
               letterSpacing: '0.04em',
-              color: '#E8EDF5',
+              color: TEXT_INTERFACE,
             }}
           >
             {title}
@@ -347,7 +366,7 @@ function ContactOption({
               fontFamily: FONT_BODY,
               fontSize: 13,
               lineHeight: 1.45,
-              color: '#8A9BB5',
+              color: TEXT_SECONDARY,
             }}
           >
             {description}
@@ -358,7 +377,7 @@ function ContactOption({
           style={{
             fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace",
             fontSize: 12,
-            color: '#6C80BA',
+            color: TEXT_TERTIARY,
           }}
         >
           ↗
@@ -387,7 +406,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
             fontSize: 12,
             letterSpacing: '0.18em',
             textTransform: 'uppercase',
-            color: '#D4BB78',
+            color: BRAND_GOLD_LIGHT,
           }}
         >
           {eyebrow}
@@ -400,7 +419,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
           fontSize: 30,
           lineHeight: 1.1,
           letterSpacing: '-0.01em',
-          color: '#E8EDF5',
+          color: TEXT_INTERFACE,
           margin: 0,
         }}
       >
@@ -411,7 +430,7 @@ function SectionHead({ eyebrow, title, sub }: SectionHeadProps) {
           style={{
             fontFamily: FONT_BODY,
             fontSize: 15,
-            color: '#8A9BB5',
+            color: TEXT_SECONDARY,
             margin: 0,
           }}
         >
@@ -462,7 +481,7 @@ export default function HelpPage() {
                   fontSize: 12,
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
-                  color: '#D4BB78',
+                  color: BRAND_GOLD_LIGHT,
                 }}
               >
                 The Clubhouse
@@ -474,7 +493,7 @@ export default function HelpPage() {
                   fontSize: 'clamp(40px, 5vw, 56px)',
                   lineHeight: 1,
                   letterSpacing: '-0.02em',
-                  color: '#FFFFFF',
+                  color: WHITE,
                   margin: 0,
                 }}
               >
@@ -485,7 +504,7 @@ export default function HelpPage() {
                   fontFamily: FONT_BODY,
                   fontSize: 18,
                   lineHeight: 1.6,
-                  color: '#C9D2E2',
+                  color: TEXT_FG2,
                   margin: '8px 0 0',
                   maxWidth: '62ch',
                 }}
@@ -506,14 +525,12 @@ export default function HelpPage() {
             >
               <YStack
                 borderWidth={1}
-                borderColor="rgba(197, 165, 90, 0.45)"
+                borderColor={withAlpha(BRAND_GOLD, 0.45)}
                 borderRadius={24}
                 overflow="hidden"
                 style={{
-                  background:
-                    'linear-gradient(135deg, #0F1A30 0%, #16223A 60%, #1B3A5C 100%)',
-                  boxShadow:
-                    '0 0 0 1px rgba(197, 165, 90, 0.35), 0 6px 24px rgba(197, 165, 90, 0.25)',
+                  background: `linear-gradient(135deg, ${SURFACE_DEEP} 0%, ${SURFACE_CARD} 60%, ${BRAND_NAVY} 100%)`,
+                  boxShadow: `0 0 0 1px ${withAlpha(BRAND_GOLD, 0.35)}, 0 6px 24px ${withAlpha(BRAND_GOLD, 0.25)}`,
                 }}
               >
                 <XStack $sm={{ flexDirection: 'column' }} alignItems="stretch">
@@ -531,7 +548,7 @@ export default function HelpPage() {
                         fontSize: 12,
                         letterSpacing: '0.18em',
                         textTransform: 'uppercase',
-                        color: '#D4BB78',
+                        color: BRAND_GOLD_LIGHT,
                       }}
                     >
                       New to Legacy Sports?
@@ -543,7 +560,7 @@ export default function HelpPage() {
                         fontSize: 36,
                         lineHeight: 1,
                         letterSpacing: '-0.01em',
-                        color: '#FFFFFF',
+                        color: WHITE,
                         margin: 0,
                       }}
                     >
@@ -554,7 +571,7 @@ export default function HelpPage() {
                         fontFamily: FONT_BODY,
                         fontSize: 16,
                         lineHeight: 1.6,
-                        color: '#C9D2E2',
+                        color: TEXT_FG2,
                         margin: 0,
                         maxWidth: '50ch',
                       }}
@@ -570,11 +587,11 @@ export default function HelpPage() {
                       style={{
                         fontFamily: FONT_BODY,
                         fontSize: 13,
-                        color: '#8A9BB5',
+                        color: TEXT_SECONDARY,
                       }}
                     >
                       <span>Runs in under 2 minutes</span>
-                      <span style={{ color: '#6C80BA' }}>·</span>
+                      <span style={{ color: TEXT_TERTIARY }}>·</span>
                       <span>Skip or resume any time</span>
                     </XStack>
                     <XStack gap={10} flexWrap="wrap" marginTop={6}>
@@ -583,9 +600,9 @@ export default function HelpPage() {
                         borderRadius={12}
                         onPress={() => setTutorialOpen(true)}
                         style={{
-                          background: '#C5A55A',
-                          color: '#111',
-                          border: '1px solid #D4BB78',
+                          background: BRAND_GOLD,
+                          color: TEXT_ON_GOLD,
+                          border: `1px solid ${BRAND_GOLD_LIGHT}`,
                           fontFamily: FONT_DISPLAY,
                           fontWeight: 700,
                           fontSize: 13,
@@ -607,8 +624,8 @@ export default function HelpPage() {
                     padding={32}
                     gap={10}
                     borderLeftWidth={1}
-                    borderLeftColor="rgba(255, 255, 255, 0.06)"
-                    style={{ background: 'rgba(10, 15, 26, 0.45)' }}
+                    borderLeftColor={withAlpha(WHITE, 0.06)}
+                    style={{ background: withAlpha(BG_DARK, 0.45) }}
                     $sm={{
                       display: 'none' as never,
                     }}
@@ -623,8 +640,8 @@ export default function HelpPage() {
                         paddingVertical={10}
                         borderRadius={10}
                         borderWidth={1}
-                        borderColor="rgba(255, 255, 255, 0.04)"
-                        style={{ background: 'rgba(255, 255, 255, 0.02)' }}
+                        borderColor={withAlpha(WHITE, 0.04)}
+                        style={{ background: withAlpha(WHITE, 0.02) }}
                       >
                         <YStack
                           width={30}
@@ -633,9 +650,9 @@ export default function HelpPage() {
                           alignItems="center"
                           justifyContent="center"
                           borderWidth={1}
-                          borderColor="rgba(197, 165, 90, 0.35)"
+                          borderColor={withAlpha(BRAND_GOLD, 0.35)}
                           style={{
-                            background: 'rgba(197, 165, 90, 0.12)',
+                            background: withAlpha(BRAND_GOLD, 0.12),
                           }}
                         >
                           <span
@@ -643,7 +660,7 @@ export default function HelpPage() {
                               fontFamily: FONT_DISPLAY,
                               fontWeight: 800,
                               fontSize: 13,
-                              color: '#D4BB78',
+                              color: BRAND_GOLD_LIGHT,
                               fontVariantNumeric: 'tabular-nums',
                             }}
                           >
@@ -656,7 +673,7 @@ export default function HelpPage() {
                               fontFamily: FONT_BODY,
                               fontWeight: 600,
                               fontSize: 14,
-                              color: '#E8EDF5',
+                              color: TEXT_INTERFACE,
                             }}
                           >
                             {step.title}
@@ -665,7 +682,7 @@ export default function HelpPage() {
                             style={{
                               fontFamily: FONT_BODY,
                               fontSize: 12,
-                              color: '#8A9BB5',
+                              color: TEXT_SECONDARY,
                             }}
                           >
                             {step.desc}
@@ -676,7 +693,7 @@ export default function HelpPage() {
                             fontFamily:
                               "'JetBrains Mono', ui-monospace, Menlo, monospace",
                             fontSize: 10,
-                            color: '#6C80BA',
+                            color: TEXT_TERTIARY,
                             letterSpacing: '0.04em',
                           }}
                         >
@@ -692,7 +709,7 @@ export default function HelpPage() {
             {/* ── Quick Links ── */}
             <YStack
               borderTopWidth={1}
-              borderTopColor="#1E2D45"
+              borderTopColor={STATS_BORDER}
               paddingTop={40}
               marginBottom={40}
               $sm={{ paddingTop: 28, marginBottom: 28 }}
@@ -716,17 +733,17 @@ export default function HelpPage() {
                       paddingVertical={12}
                       borderRadius={9999}
                       borderWidth={1}
-                      borderColor="#1E2D45"
-                      backgroundColor="#111B2F"
+                      borderColor={STATS_BORDER}
+                      backgroundColor={SURFACE_PANEL}
                       cursor="pointer"
                       animation="quick"
                       hoverStyle={{
-                        borderColor: 'rgba(197, 165, 90, 0.45)',
-                        backgroundColor: '#16223A',
+                        borderColor: withAlpha(BRAND_GOLD, 0.45),
+                        backgroundColor: SURFACE_CARD,
                       }}
                       style={{ minHeight: 44 }}
                     >
-                      <Icon size={16} color="#D4BB78" />
+                      <Icon size={16} color={BRAND_GOLD_LIGHT} />
                       <span
                         style={{
                           fontFamily: FONT_DISPLAY,
@@ -734,7 +751,7 @@ export default function HelpPage() {
                           fontSize: 13,
                           letterSpacing: '0.06em',
                           textTransform: 'uppercase',
-                          color: '#E8EDF5',
+                          color: TEXT_INTERFACE,
                         }}
                       >
                         {label}
@@ -745,7 +762,7 @@ export default function HelpPage() {
                           fontFamily:
                             "'JetBrains Mono', ui-monospace, Menlo, monospace",
                           fontSize: 14,
-                          color: '#8A9BB5',
+                          color: TEXT_SECONDARY,
                         }}
                       >
                         →
@@ -759,7 +776,7 @@ export default function HelpPage() {
             {/* ── FAQ ── */}
             <YStack
               borderTopWidth={1}
-              borderTopColor="#1E2D45"
+              borderTopColor={STATS_BORDER}
               paddingTop={40}
               marginBottom={40}
               $sm={{ paddingTop: 28, marginBottom: 28 }}
@@ -772,8 +789,8 @@ export default function HelpPage() {
               <YStack
                 borderRadius={16}
                 borderWidth={1}
-                borderColor="#1E2D45"
-                backgroundColor="#111B2F"
+                borderColor={STATS_BORDER}
+                backgroundColor={SURFACE_PANEL}
                 overflow="hidden"
               >
                 {HELP_FAQ_ITEMS.map((item, i) => (
@@ -790,7 +807,7 @@ export default function HelpPage() {
             {/* ── Historical Stats FAQ ── */}
             <YStack
               borderTopWidth={1}
-              borderTopColor="#1E2D45"
+              borderTopColor={STATS_BORDER}
               paddingTop={40}
               marginBottom={40}
               $sm={{ paddingTop: 28, marginBottom: 28 }}
@@ -803,8 +820,8 @@ export default function HelpPage() {
               <YStack
                 borderRadius={16}
                 borderWidth={1}
-                borderColor="#1E2D45"
-                backgroundColor="#111B2F"
+                borderColor={STATS_BORDER}
+                backgroundColor={SURFACE_PANEL}
                 overflow="hidden"
               >
                 {HELP_HISTORICAL_FAQ_ITEMS.map((item, i) => (
@@ -821,7 +838,7 @@ export default function HelpPage() {
             {/* ── Contact & Support ── */}
             <YStack
               borderTopWidth={1}
-              borderTopColor="#1E2D45"
+              borderTopColor={STATS_BORDER}
               paddingTop={40}
               $sm={{ paddingTop: 28 }}
             >
@@ -868,10 +885,9 @@ export default function HelpPage() {
                 padding={22}
                 borderRadius={16}
                 borderWidth={1}
-                borderColor="rgba(196, 30, 58, 0.4)"
+                borderColor={withAlpha(BRAND_SEAM_RED, 0.4)}
                 style={{
-                  background:
-                    'linear-gradient(135deg, rgba(196, 30, 58, 0.08), rgba(196, 30, 58, 0.02)), #111B2F',
+                  background: `linear-gradient(135deg, ${withAlpha(BRAND_SEAM_RED, 0.08)}, ${withAlpha(BRAND_SEAM_RED, 0.02)}), ${SURFACE_PANEL}`,
                 }}
                 gap={12}
               >
@@ -883,8 +899,8 @@ export default function HelpPage() {
                     paddingVertical={6}
                     borderRadius={9999}
                     borderWidth={1}
-                    borderColor="rgba(196, 30, 58, 0.5)"
-                    style={{ background: 'rgba(196, 30, 58, 0.15)' }}
+                    borderColor={withAlpha(BRAND_SEAM_RED, 0.5)}
+                    style={{ background: withAlpha(BRAND_SEAM_RED, 0.15) }}
                   >
                     <span
                       className="help-pulse-dot"
@@ -893,7 +909,7 @@ export default function HelpPage() {
                         width: 7,
                         height: 7,
                         borderRadius: 9999,
-                        background: '#E63950',
+                        background: BRAND_SEAM_RED_LIGHT,
                         display: 'inline-block',
                         animation:
                           'helpUrgentPulse 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite',
@@ -906,20 +922,20 @@ export default function HelpPage() {
                         fontSize: 11,
                         letterSpacing: '0.14em',
                         textTransform: 'uppercase',
-                        color: '#E63950',
+                        color: BRAND_SEAM_RED_LIGHT,
                       }}
                     >
                       Urgent account issues
                     </span>
                   </XStack>
-                  <AlertTriangle size={16} color="#C41E3A" />
+                  <AlertTriangle size={16} color={BRAND_SEAM_RED} />
                 </XStack>
                 <p
                   style={{
                     fontFamily: FONT_BODY,
                     fontSize: 15,
                     lineHeight: 1.55,
-                    color: '#C9D2E2',
+                    color: TEXT_FG2,
                     margin: 0,
                     maxWidth: '62ch',
                   }}
@@ -930,7 +946,7 @@ export default function HelpPage() {
                     href={DISCORD_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: '#D4BB78', fontWeight: 600 }}
+                    style={{ color: BRAND_GOLD_LIGHT, fontWeight: 600 }}
                   >
                     Discord server
                   </a>{' '}
@@ -940,10 +956,10 @@ export default function HelpPage() {
                       fontFamily:
                         "'JetBrains Mono', ui-monospace, Menlo, monospace",
                       fontSize: 13,
-                      background: 'rgba(255, 255, 255, 0.05)',
+                      background: withAlpha(WHITE, 0.05),
                       padding: '1px 6px',
                       borderRadius: 4,
-                      color: '#E8EDF5',
+                      color: TEXT_INTERFACE,
                     }}
                   >
                     #urgent-support
@@ -958,7 +974,7 @@ export default function HelpPage() {
               marginTop={64}
               paddingTop={32}
               borderTopWidth={1}
-              borderTopColor="#1E2D45"
+              borderTopColor={STATS_BORDER}
               gap={6}
               $sm={{ marginTop: 48, paddingTop: 20 }}
             >
@@ -966,7 +982,7 @@ export default function HelpPage() {
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 13,
-                  color: '#C9D2E2',
+                  color: TEXT_FG2,
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
@@ -977,7 +993,7 @@ export default function HelpPage() {
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 12,
-                  color: '#6C80BA',
+                  color: TEXT_TERTIARY,
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >

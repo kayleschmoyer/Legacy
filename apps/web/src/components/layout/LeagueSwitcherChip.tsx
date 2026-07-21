@@ -14,9 +14,16 @@ import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
+  BRAND_NAVY_DARK,
   BRAND_SEAM_RED,
   OUTLINE_SUBTLE,
+  SHADOW_DARK,
   SURFACE_PANEL,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
+  TEXT_TERTIARY,
+  WHITE,
+  withAlpha,
 } from '../../constants/colors';
 import { NAV_DROPDOWN_Z_INDEX } from '../../constants/dimensions';
 import { BaseballIcon, FootballIcon } from '../icons/SportIcons';
@@ -28,10 +35,10 @@ const CHIP_STYLES: React.CSSProperties = {
   padding: '7px 10px 7px 8px',
   border: `1px solid ${OUTLINE_SUBTLE}`,
   borderRadius: 12,
-  background: 'rgba(255,255,255,0.02)',
+  background: withAlpha(WHITE, 0.02),
   cursor: 'pointer',
   transition: 'all 150ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-  color: '#F8FAFC',
+  color: TEXT_PRIMARY,
   textAlign: 'left' as const,
   maxWidth: 240,
   flexShrink: 0,
@@ -132,15 +139,14 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
     ...CHIP_STYLES,
     ...(isOpen
       ? {
-          borderColor: `rgba(197,165,90,0.4)`,
-          background: 'rgba(197,165,90,0.08)',
+          borderColor: withAlpha(BRAND_GOLD, 0.4),
+          background: withAlpha(BRAND_GOLD, 0.08),
         }
       : {}),
     ...(draftLive
       ? {
-          borderColor: 'rgba(196,30,58,0.6)',
-          boxShadow:
-            '0 0 0 2px rgba(196,30,58,0.15), 0 0 14px rgba(196,30,58,0.2)',
+          borderColor: withAlpha(BRAND_SEAM_RED, 0.6),
+          boxShadow: `0 0 0 2px ${withAlpha(BRAND_SEAM_RED, 0.15)}, 0 0 14px ${withAlpha(BRAND_SEAM_RED, 0.2)}`,
           animation: 'switcherDraftGlow 2.4s ease-in-out infinite',
         }
       : {}),
@@ -151,8 +157,8 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
       {/* Inject glow keyframes once */}
       <style>{`
         @keyframes switcherDraftGlow {
-          0%,100% { box-shadow: 0 0 0 2px rgba(196,30,58,0.15), 0 0 14px rgba(196,30,58,0.2); }
-          50%      { box-shadow: 0 0 0 2px rgba(196,30,58,0.35), 0 0 22px rgba(196,30,58,0.4); }
+          0%,100% { box-shadow: 0 0 0 2px ${withAlpha(BRAND_SEAM_RED, 0.15)}, 0 0 14px ${withAlpha(BRAND_SEAM_RED, 0.2)}; }
+          50%      { box-shadow: 0 0 0 2px ${withAlpha(BRAND_SEAM_RED, 0.35)}, 0 0 22px ${withAlpha(BRAND_SEAM_RED, 0.4)}; }
         }
       `}</style>
 
@@ -170,8 +176,8 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
             width: 28,
             height: 28,
             borderRadius: 8,
-            background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, #143050 100%)`,
-            border: `1px solid rgba(197,165,90,0.4)`,
+            background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`,
+            border: `1px solid ${withAlpha(BRAND_GOLD, 0.4)}`,
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -181,7 +187,9 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
             color: BRAND_GOLD_LIGHT,
             letterSpacing: '0.04em',
             flexShrink: 0,
-            boxShadow: draftLive ? `0 0 0 2px rgba(196,30,58,0.5)` : undefined,
+            boxShadow: draftLive
+              ? `0 0 0 2px ${withAlpha(BRAND_SEAM_RED, 0.5)}`
+              : undefined,
           }}
         >
           {initials}
@@ -203,7 +211,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               fontSize: 9,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: draftLive ? BRAND_SEAM_RED : '#9CAAC5',
+              color: draftLive ? BRAND_SEAM_RED : TEXT_MUTED,
               lineHeight: 1,
               display: 'flex',
               alignItems: 'center',
@@ -233,7 +241,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               fontFamily: FONT_DISPLAY,
               fontWeight: 700,
               fontSize: 13,
-              color: '#F8FAFC',
+              color: TEXT_PRIMARY,
               letterSpacing: '0.02em',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
@@ -245,7 +253,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
           </span>
         </span>
 
-        <ChevronDown size={11} color="#9CAAC5" />
+        <ChevronDown size={11} color={TEXT_MUTED} />
       </button>
 
       {/* Dropdown */}
@@ -259,9 +267,9 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
             top: 'calc(100% + 8px)',
             width: 340,
             background: SURFACE_PANEL,
-            border: `1px solid rgba(197,165,90,0.2)`,
+            border: `1px solid ${withAlpha(BRAND_GOLD, 0.2)}`,
             borderRadius: 16,
-            boxShadow: '0 12px 32px rgba(8,12,20,0.65)',
+            boxShadow: `0 12px 32px ${withAlpha(SHADOW_DARK, 0.65)}`,
             padding: 6,
             zIndex: NAV_DROPDOWN_Z_INDEX,
             animation: NAV_DROPDOWN_ANIMATION,
@@ -305,9 +313,11 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                   padding: '7px 10px',
                   borderRadius: 9999,
                   background:
-                    sport === s.id ? 'rgba(197,165,90,0.12)' : 'transparent',
-                  border: `1px solid ${sport === s.id ? 'rgba(197,165,90,0.45)' : OUTLINE_SUBTLE}`,
-                  color: sport === s.id ? BRAND_GOLD_LIGHT : '#9CAAC5',
+                    sport === s.id
+                      ? withAlpha(BRAND_GOLD, 0.12)
+                      : 'transparent',
+                  border: `1px solid ${sport === s.id ? withAlpha(BRAND_GOLD, 0.45) : OUTLINE_SUBTLE}`,
+                  color: sport === s.id ? BRAND_GOLD_LIGHT : TEXT_MUTED,
                   fontFamily: FONT_DISPLAY,
                   fontSize: 11,
                   fontWeight: 700,
@@ -320,12 +330,12 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                 {s.id === 'baseball' ? (
                   <BaseballIcon
                     size={14}
-                    color={sport === s.id ? BRAND_GOLD_LIGHT : '#9CAAC5'}
+                    color={sport === s.id ? BRAND_GOLD_LIGHT : TEXT_MUTED}
                   />
                 ) : (
                   <FootballIcon
                     size={14}
-                    color={sport === s.id ? BRAND_GOLD_LIGHT : '#9CAAC5'}
+                    color={sport === s.id ? BRAND_GOLD_LIGHT : TEXT_MUTED}
                   />
                 )}
                 <span>{s.label}</span>
@@ -340,9 +350,9 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                     borderRadius: 9999,
                     background:
                       sport === s.id
-                        ? 'rgba(197,165,90,0.25)'
-                        : 'rgba(255,255,255,0.06)',
-                    color: sport === s.id ? BRAND_GOLD_LIGHT : '#6C80BA',
+                        ? withAlpha(BRAND_GOLD, 0.25)
+                        : withAlpha(WHITE, 0.06),
+                    color: sport === s.id ? BRAND_GOLD_LIGHT : TEXT_TERTIARY,
                     fontSize: 9,
                     fontWeight: 800,
                     letterSpacing: 0,
@@ -363,7 +373,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               fontSize: 10,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#6C80BA',
+              color: TEXT_TERTIARY,
             }}
           >
             Your leagues · {filteredLeagues.length}
@@ -391,17 +401,17 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                   borderRadius: 12,
                   cursor: 'pointer',
                   background: isCurrent
-                    ? 'rgba(197,165,90,0.08)'
+                    ? withAlpha(BRAND_GOLD, 0.08)
                     : 'transparent',
                   border: 0,
                   width: '100%',
                   transition: 'background 120ms',
-                  color: '#F8FAFC',
+                  color: TEXT_PRIMARY,
                 }}
                 onMouseEnter={(e) => {
                   if (!isCurrent)
                     (e.currentTarget as HTMLElement).style.background =
-                      'rgba(27,58,92,0.3)';
+                      withAlpha(BRAND_NAVY, 0.3);
                 }}
                 onMouseLeave={(e) => {
                   if (!isCurrent)
@@ -414,8 +424,8 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                     width: 36,
                     height: 36,
                     borderRadius: 10,
-                    background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, #143050 100%)`,
-                    border: `1px solid rgba(197,165,90,0.35)`,
+                    background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`,
+                    border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -434,7 +444,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                       fontFamily: FONT_DISPLAY,
                       fontWeight: 700,
                       fontSize: 14,
-                      color: '#F8FAFC',
+                      color: TEXT_PRIMARY,
                       letterSpacing: '0.02em',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -447,7 +457,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                     style={{
                       fontFamily: "'Literata', serif",
                       fontSize: 12,
-                      color: '#9CAAC5',
+                      color: TEXT_MUTED,
                       marginTop: 2,
                       display: 'flex',
                       alignItems: 'center',
@@ -478,7 +488,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                 padding: '12px',
                 fontFamily: "'Literata', serif",
                 fontSize: 13,
-                color: '#6C80BA',
+                color: TEXT_TERTIARY,
                 textAlign: 'center',
               }}
             >
@@ -504,7 +514,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               fontSize: 10,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#6C80BA',
+              color: TEXT_TERTIARY,
             }}
           >
             Find a league
@@ -539,7 +549,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                 cursor: 'pointer',
                 fontFamily: "'Literata', serif",
                 fontSize: 14,
-                color: '#F8FAFC',
+                color: TEXT_PRIMARY,
                 background: 'transparent',
                 border: 0,
                 width: '100%',
@@ -547,15 +557,17 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                 transition: 'background 120ms',
               }}
               onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLElement).style.background =
-                  'rgba(27,58,92,0.3)')
+                ((e.currentTarget as HTMLElement).style.background = withAlpha(
+                  BRAND_NAVY,
+                  0.3,
+                ))
               }
               onMouseLeave={(e) =>
                 ((e.currentTarget as HTMLElement).style.background =
                   'transparent')
               }
             >
-              <span style={{ color: '#6C80BA' }}>{item.icon}</span>
+              <span style={{ color: TEXT_TERTIARY }}>{item.icon}</span>
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.hint && (
                 <span
@@ -565,10 +577,10 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                     fontSize: 9,
                     letterSpacing: '0.14em',
                     textTransform: 'uppercase',
-                    color: '#6C80BA',
+                    color: TEXT_TERTIARY,
                     padding: '3px 7px',
                     borderRadius: 6,
-                    background: 'rgba(27,58,92,0.4)',
+                    background: withAlpha(BRAND_NAVY, 0.4),
                     border: `1px solid ${OUTLINE_SUBTLE}`,
                     flexShrink: 0,
                   }}
@@ -601,8 +613,10 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               transition: 'background 120ms',
             }}
             onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                'rgba(27,58,92,0.3)')
+              ((e.currentTarget as HTMLElement).style.background = withAlpha(
+                BRAND_NAVY,
+                0.3,
+              ))
             }
             onMouseLeave={(e) =>
               ((e.currentTarget as HTMLElement).style.background =

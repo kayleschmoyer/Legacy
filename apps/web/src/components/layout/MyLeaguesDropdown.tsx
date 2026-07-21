@@ -296,7 +296,7 @@ export const MyLeaguesDropdown: React.FC = () => {
                             marginBottom={0}
                             numberOfLines={1}
                             ellipsizeMode="tail"
-                            color={isLeagueActive ? '#C5A55A' : '$color'}
+                            color={isLeagueActive ? '$brandGold' : '$color'}
                             style={{
                               fontFamily: FONT_DISPLAY,
                               fontWeight: '600',
@@ -323,7 +323,7 @@ export const MyLeaguesDropdown: React.FC = () => {
                                   fontFamily: FONT_DISPLAY,
                                   fontWeight: '700',
                                   fontSize: 9,
-                                  color: '#FFFFFF',
+                                  color: 'white',
                                   letterSpacing: '0.08em',
                                 }}
                               >

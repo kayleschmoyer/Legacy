@@ -25,6 +25,7 @@ import {
 } from '@legacy-sports/shared-components';
 import { StatCategory } from '@legacy-sports/shared-components/football';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { colors, footballPositionBadges } from '@legacy-sports/design-tokens';
 import type { FootballPlayersQuery } from '@legacy-sports/graphql';
 import {
   Sport,
@@ -32,6 +33,7 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
+import { useThemeContext } from '../../../context/ThemeContext';
 import { SafeScreen } from '../../../components/SafeScreen';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 import PlayerStatsScreen from '../PlayerStats';
@@ -71,20 +73,14 @@ const BASE_POSITIONS: FootballPosition[] = [
 
 const PREMIUM_POSITIONS: FootballPosition[] = ['SUPERFLEX', 'IDP'];
 
-const POSITION_COLORS: Record<string, string> = {
-  QB: '#4A90D9',
-  RB: '#27AE60',
-  WR: '#9B59B6',
-  TE: '#E67E22',
-  FLEX: '#C49A6C',
-  K: '#95A5A6',
-  DST: '#C41E3A', // seam red (team defense unit)
-  DL: '#C25A2A', // burnt orange-red (defensive line)
-  LB: '#9B7A3D', // amber-brown (linebackers)
-  DB: '#6B3FA0', // deep purple (defensive backs)
-  SUPERFLEX: '#D4AF37', // gold — premium composite (QB+Flex)
-  IDP: '#5B7FA6', // steel blue — premium composite (DL+LB+DB)
-};
+// Position accent colors: same value in both themes (see footballPositionBadges
+// in @legacy-sports/design-tokens — the sanctioned, ratchet-exempt palette home).
+function getPositionColor(pos: string): string {
+  return (
+    footballPositionBadges[pos as keyof typeof footballPositionBadges] ??
+    colors.brand.navy
+  );
+}
 
 const CONFERENCE_ORDER: Record<string, number> = { AFC: 0, NFC: 1 };
 const DIVISION_ORDER: Record<string, number> = {
@@ -353,10 +349,10 @@ function PlayerRow({
   const pos = player.position;
   const isDst = player.isDst;
   const displayPos = isDst ? 'DST' : (pos ?? '?');
-  const accentColor = POSITION_COLORS[displayPos] ?? '#1B3A5C';
+  const accentColor = getPositionColor(displayPos);
   const teamData = player.nflTeam ? NFL_TEAMS[player.nflTeam] : null;
-  const teamBg = teamData?.primaryColor ?? '#1B3A5C';
-  const teamFg = teamData?.secondaryColor ?? '#C5A55A';
+  const teamBg = teamData?.primaryColor ?? colors.brand.navy;
+  const teamFg = teamData?.secondaryColor ?? BRAND_GOLD;
 
   const playerName =
     [player.firstName, player.lastName].filter(Boolean).join(' ') ||
@@ -449,8 +445,7 @@ function PositionPill({
   selected: boolean;
   onPress: () => void;
 }) {
-  const accentColor =
-    pos === 'All' ? '#1B3A5C' : (POSITION_COLORS[pos] ?? '#1B3A5C');
+  const accentColor = pos === 'All' ? colors.brand.navy : getPositionColor(pos);
   return (
     <YStack
       paddingHorizontal={14}
@@ -479,8 +474,6 @@ function PositionPill({
     </YStack>
   );
 }
-
-const PREMIUM_GOLD = '#C5A55A';
 
 const PLAYERS_FILTER_KEY = '@football_players_filter';
 
@@ -534,8 +527,8 @@ function MyRosteredPill({
       borderWidth={1}
       onPress={onPress}
       pressStyle={{ opacity: 0.7 }}
-      backgroundColor={selected ? `${PREMIUM_GOLD}33` : '$glassSurface'}
-      borderColor={selected ? PREMIUM_GOLD : '$glassBorder'}
+      backgroundColor={selected ? `${BRAND_GOLD}33` : '$glassSurface'}
+      borderColor={selected ? BRAND_GOLD : '$glassBorder'}
       justifyContent="center"
       alignItems="center"
       testID="my-rostered-pill"
@@ -546,13 +539,13 @@ function MyRosteredPill({
       <XStack gap={5} alignItems="center">
         <Star
           size={13}
-          color={selected ? PREMIUM_GOLD : '$gray10'}
-          fill={selected ? PREMIUM_GOLD : 'transparent'}
+          color={selected ? BRAND_GOLD : '$gray10'}
+          fill={selected ? BRAND_GOLD : 'transparent'}
         />
         <Text
           fontSize={13}
           fontWeight="600"
-          color={selected ? PREMIUM_GOLD : '$gray10'}
+          color={selected ? BRAND_GOLD : '$gray10'}
         >
           My Rostered
         </Text>
@@ -651,15 +644,15 @@ function SportSwitcherPill({
       borderWidth={1}
       onPress={onPress}
       pressStyle={{ opacity: 0.7 }}
-      backgroundColor={active ? '#1B3A5C33' : '$glassSurface'}
-      borderColor={active ? '#1B3A5C' : '$glassBorder'}
+      backgroundColor={active ? `${colors.brand.navy}33` : '$glassSurface'}
+      borderColor={active ? colors.brand.navy : '$glassBorder'}
       justifyContent="center"
       alignItems="center"
     >
       <Text
         fontSize={14}
         fontWeight="600"
-        color={active ? '#1B3A5C' : '$gray10'}
+        color={active ? colors.brand.navy : '$gray10'}
       >
         {label}
       </Text>
@@ -669,6 +662,8 @@ function SportSwitcherPill({
 
 export function FootballPlayers(): React.JSX.Element {
   const router = useRouter();
+  const { resolvedTheme } = useThemeContext();
+  const palette = colors[resolvedTheme];
   const isPremium = useHasEntitlement(ENTITLEMENTS.football_projections);
   const hasAdvancedFilters = useHasEntitlement(
     ENTITLEMENTS.advanced_search_filters,
@@ -953,8 +948,10 @@ export function FootballPlayers(): React.JSX.Element {
                   borderWidth={1}
                   onPress={() => setAvailabilityFilter(value)}
                   pressStyle={{ opacity: 0.7 }}
-                  backgroundColor={active ? '#1B3A5C4D' : '$glassSurface'}
-                  borderColor={active ? '#1B3A5C' : '$glassBorder'}
+                  backgroundColor={
+                    active ? `${colors.brand.navy}4D` : '$glassSurface'
+                  }
+                  borderColor={active ? colors.brand.navy : '$glassBorder'}
                   justifyContent="center"
                   alignItems="center"
                   testID={`availability-pill-${value}`}
@@ -965,7 +962,7 @@ export function FootballPlayers(): React.JSX.Element {
                   <Text
                     fontSize={13}
                     fontWeight="600"
-                    color={active ? '#4A90D9' : '$gray10'}
+                    color={active ? footballPositionBadges.QB : '$gray10'}
                   >
                     {label}
                   </Text>
@@ -991,7 +988,7 @@ export function FootballPlayers(): React.JSX.Element {
               onPress={() => setShowMyRostered((v) => !v)}
             />
             {rosterLoading && showMyRostered && (
-              <Spinner size="small" color={PREMIUM_GOLD} />
+              <Spinner size="small" color={BRAND_GOLD} />
             )}
           </XStack>
         )}
@@ -1019,11 +1016,16 @@ export function FootballPlayers(): React.JSX.Element {
                   ? 'Search or pos:WR team:KC...'
                   : 'Search players...'
               }
-              placeholderTextColor="#666"
+              placeholderTextColor={palette.text.fg3}
               value={searchInput}
               onChangeText={setSearchInput}
               accessibilityLabel="Search players"
-              style={{ flex: 1, color: '#fff', fontSize: 14, height: 44 }}
+              style={{
+                flex: 1,
+                color: palette.text.fg1,
+                fontSize: 14,
+                height: 44,
+              }}
             />
           </XStack>
 
@@ -1161,11 +1163,16 @@ export function FootballPlayers(): React.JSX.Element {
                 <TextInput
                   autoFocus
                   placeholder="Search teams..."
-                  placeholderTextColor="#666"
+                  placeholderTextColor={palette.text.fg3}
                   value={teamSearch}
                   onChangeText={setTeamSearch}
                   accessibilityLabel="Search teams"
-                  style={{ flex: 1, color: '#fff', fontSize: 14, height: 44 }}
+                  style={{
+                    flex: 1,
+                    color: palette.text.fg1,
+                    fontSize: 14,
+                    height: 44,
+                  }}
                 />
               </XStack>
               <Pressable
@@ -1177,7 +1184,11 @@ export function FootballPlayers(): React.JSX.Element {
                 accessibilityLabel="Cancel"
                 accessibilityRole="button"
               >
-                <Text color="#4A90D9" fontSize={15} fontWeight="600">
+                <Text
+                  color={footballPositionBadges.QB}
+                  fontSize={15}
+                  fontWeight="600"
+                >
                   Cancel
                 </Text>
               </Pressable>
@@ -1200,9 +1211,11 @@ export function FootballPlayers(): React.JSX.Element {
                   style={{
                     padding: 16,
                     borderBottomWidth: 1,
-                    borderBottomColor: '#1A2A3A',
+                    borderBottomColor: palette.surface.outlineSubtle,
                     backgroundColor:
-                      teamFilter === item.value ? '#1B3A5C33' : 'transparent',
+                      teamFilter === item.value
+                        ? `${colors.brand.navy}33`
+                        : 'transparent',
                   }}
                 >
                   <Text color="$color" fontSize={15}>

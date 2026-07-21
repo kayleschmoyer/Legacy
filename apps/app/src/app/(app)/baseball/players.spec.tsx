@@ -9,6 +9,13 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
+// Avoids pulling in the real ThemeContext (which imports secureStorage from
+// the @legacy-sports/shared-components barrel — untransformed native deps in
+// that barrel, e.g. Google Sign-In, break Jest's module parser).
+jest.mock('../../../context/ThemeContext', () => ({
+  useThemeContext: () => ({ resolvedTheme: 'dark' }),
+}));
+
 jest.mock('tamagui', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createElement } = require('react') as typeof import('react');

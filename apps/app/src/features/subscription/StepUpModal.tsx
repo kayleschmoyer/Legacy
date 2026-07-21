@@ -13,10 +13,6 @@ import { captureError } from '@legacy-sports/rollbar/native';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 import { getMobileOAuthConfig } from '../../common/auth/mobileOAuthConfig';
 
-const BRAND_GOLD = '#B8962E';
-const BRAND_NAVY = '#1B3A5C';
-const BRAND_SEAM_RED = '#C41E3A';
-
 export interface StepUpModalProps {
   /** Called with the validUntil Unix timestamp (s) on successful verification. */
   onSuccess: (validUntil: number) => void;
@@ -136,7 +132,7 @@ export function StepUpModal({
           borderRadius="$5"
           overflow="hidden"
           borderWidth={1}
-          borderColor={`${BRAND_NAVY}66`}
+          borderColor="$accentMuted"
           backgroundColor="$background"
         >
           {/* Header */}
@@ -145,14 +141,14 @@ export function StepUpModal({
             paddingVertical="$4"
             gap="$3"
             alignItems="center"
-            backgroundColor={BRAND_NAVY}
+            backgroundColor="$brandNavy"
           >
             <Text fontSize={20}>🔒</Text>
             <YStack flex={1} gap="$0.5">
               <Paragraph size="$5" fontWeight="700" color="white">
                 Confirm your identity
               </Paragraph>
-              <Paragraph size="$2" color="rgba(255,255,255,0.7)">
+              <Paragraph size="$2" color="white" opacity={0.7}>
                 Re-authentication required for this action
               </Paragraph>
             </YStack>
@@ -187,12 +183,12 @@ export function StepUpModal({
                 padding="$3"
                 borderRadius="$3"
                 alignItems="flex-start"
-                backgroundColor={`${BRAND_SEAM_RED}14`}
+                backgroundColor="$errorMuted"
                 borderWidth={1}
-                borderColor={`${BRAND_SEAM_RED}4D`}
+                borderColor="$brandSeamRed"
               >
                 <Text fontSize={14}>⚠️</Text>
-                <Paragraph size="$2" color={BRAND_SEAM_RED} flex={1}>
+                <Paragraph size="$2" color="$brandSeamRed" flex={1}>
                   {error}
                 </Paragraph>
               </XStack>
@@ -203,7 +199,7 @@ export function StepUpModal({
                 size="$2"
                 chromeless
                 onPress={toggleMode}
-                color={BRAND_GOLD}
+                color="$brandGold"
                 testID="step-up-toggle-mode"
               >
                 {mode === 'totp' ? 'Use password instead' : 'Use authenticator'}
@@ -224,8 +220,8 @@ export function StepUpModal({
                   size="$3"
                   onPress={() => void handleVerify()}
                   disabled={loading || !value.trim()}
-                  backgroundColor={BRAND_GOLD}
-                  color={BRAND_NAVY}
+                  backgroundColor="$brandGold"
+                  color="$brandNavy"
                   fontWeight="700"
                   testID="step-up-verify"
                 >
@@ -249,7 +245,8 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'black',
+    opacity: 0.65,
   },
   card: {
     width: '100%',

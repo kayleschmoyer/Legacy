@@ -1,13 +1,13 @@
 {
   "apps/web": {
-    "rawHex": 308,
-    "rawRgba": 167,
+    "rawHex": 211,
+    "rawRgba": 107,
     "blueToken": 0,
     "themeBlue": 0
   },
   "apps/app": {
-    "rawHex": 88,
-    "rawRgba": 12,
+    "rawHex": 32,
+    "rawRgba": 10,
     "blueToken": 0,
     "themeBlue": 0
   },

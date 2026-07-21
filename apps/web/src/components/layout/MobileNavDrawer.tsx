@@ -24,10 +24,19 @@ import { LOGGER } from '@legacy-sports/logging';
 import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { FONT_DISPLAY } from './NavDropdownShared';
 import {
+  BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
   OUTLINE_SUBTLE,
   PANEL_BORDER,
+  SHADOW_DARK,
+  TEXT_FG2,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
+  TEXT_TERTIARY,
+  withAlpha,
 } from '../../constants/colors';
 
 interface Props {
@@ -46,7 +55,7 @@ const DRAWER_ITEM: React.CSSProperties = {
   fontWeight: 700,
   fontSize: 13,
   letterSpacing: '0.04em',
-  color: '#DEE6FF',
+  color: TEXT_FG2,
   background: 'transparent',
   border: 0,
   width: '100%',
@@ -133,7 +142,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(10,15,26,0.6)',
+        background: withAlpha(BG_DARK, 0.6),
         backdropFilter: 'blur(4px)',
         zIndex: 300,
         display: 'flex',
@@ -147,16 +156,16 @@ export const MobileNavDrawer: React.FC<Props> = ({
           width: '78%',
           maxWidth: 320,
           background: `
-            radial-gradient(ellipse at 0% 0%, rgba(27,58,92,0.35) 0%, transparent 50%),
-            radial-gradient(ellipse at 100% 100%, rgba(197,165,90,0.10) 0%, transparent 50%),
-            #0A0F1A
+            radial-gradient(ellipse at 0% 0%, ${withAlpha(BRAND_NAVY, 0.35)} 0%, transparent 50%),
+            radial-gradient(ellipse at 100% 100%, ${withAlpha(BRAND_GOLD, 0.1)} 0%, transparent 50%),
+            ${BG_DARK}
           `,
           borderRight: `1px solid ${PANEL_BORDER}`,
           height: '100%',
           overflowY: 'auto' as const,
           display: 'flex',
           flexDirection: 'column' as const,
-          boxShadow: '0 20px 48px rgba(8,12,20,0.75)',
+          boxShadow: `0 20px 48px ${withAlpha(SHADOW_DARK, 0.75)}`,
         }}
       >
         {/* Header */}
@@ -191,7 +200,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: 700,
                 fontSize: 10,
-                color: '#9CAAC5',
+                color: TEXT_MUTED,
                 letterSpacing: '0.2em',
                 textTransform: 'uppercase',
                 marginTop: 2,
@@ -208,7 +217,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
               marginLeft: 'auto',
               background: 'transparent',
               border: 0,
-              color: '#9CAAC5',
+              color: TEXT_MUTED,
               width: 32,
               height: 32,
               display: 'flex',
@@ -234,9 +243,8 @@ export const MobileNavDrawer: React.FC<Props> = ({
               margin: '12px 16px 0',
               padding: 14,
               borderRadius: 14,
-              background:
-                'linear-gradient(135deg, rgba(27,58,92,0.6), rgba(20,48,80,0.3))',
-              border: `1px solid rgba(197,165,90,0.35)`,
+              background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.6)}, ${withAlpha(BRAND_NAVY_DARK, 0.3)})`,
+              border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
               display: 'flex',
               gap: 12,
               alignItems: 'center',
@@ -248,8 +256,8 @@ export const MobileNavDrawer: React.FC<Props> = ({
                 width: 36,
                 height: 36,
                 borderRadius: 10,
-                background: 'rgba(10,15,26,0.7)',
-                border: `1px solid rgba(197,165,90,0.4)`,
+                background: withAlpha(BG_DARK, 0.7),
+                border: `1px solid ${withAlpha(BRAND_GOLD, 0.4)}`,
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -268,7 +276,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 700,
                   fontSize: 13,
-                  color: '#F8FAFC',
+                  color: TEXT_PRIMARY,
                   letterSpacing: '0.04em',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -282,7 +290,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
                   style={{
                     fontFamily: "'Literata', serif",
                     fontSize: 11,
-                    color: '#9CAAC5',
+                    color: TEXT_MUTED,
                     marginTop: 2,
                   }}
                 >
@@ -293,7 +301,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
                 </div>
               )}
             </div>
-            <ChevronRight size={14} color="#6C80BA" />
+            <ChevronRight size={14} color={TEXT_TERTIARY} />
           </div>
         )}
 
@@ -306,7 +314,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
             fontSize: 10,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
-            color: '#6C80BA',
+            color: TEXT_TERTIARY,
           }}
         >
           Leagues
@@ -329,8 +337,10 @@ export const MobileNavDrawer: React.FC<Props> = ({
             onClick={() => handleNav(item.to)}
             style={DRAWER_ITEM}
             onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                'rgba(27,58,92,0.35)')
+              ((e.currentTarget as HTMLElement).style.background = withAlpha(
+                BRAND_NAVY,
+                0.35,
+              ))
             }
             onMouseLeave={(e) =>
               ((e.currentTarget as HTMLElement).style.background =
@@ -346,8 +356,10 @@ export const MobileNavDrawer: React.FC<Props> = ({
           onClick={() => handleNav('/baseball/league/create')}
           style={{ ...DRAWER_ITEM, color: BRAND_GOLD_LIGHT }}
           onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLElement).style.background =
-              'rgba(27,58,92,0.35)')
+            ((e.currentTarget as HTMLElement).style.background = withAlpha(
+              BRAND_NAVY,
+              0.35,
+            ))
           }
           onMouseLeave={(e) =>
             ((e.currentTarget as HTMLElement).style.background = 'transparent')
@@ -366,7 +378,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
             fontSize: 10,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
-            color: '#6C80BA',
+            color: TEXT_TERTIARY,
           }}
         >
           Play
@@ -416,14 +428,16 @@ export const MobileNavDrawer: React.FC<Props> = ({
             style={{
               ...DRAWER_ITEM,
               background: item.active
-                ? 'linear-gradient(90deg, rgba(197,165,90,0.12), transparent)'
+                ? `linear-gradient(90deg, ${withAlpha(BRAND_GOLD, 0.12)}, transparent)`
                 : 'transparent',
-              color: item.active ? '#F8FAFC' : '#DEE6FF',
+              color: item.active ? TEXT_PRIMARY : TEXT_FG2,
             }}
             onMouseEnter={(e) => {
               if (!item.active)
-                (e.currentTarget as HTMLElement).style.background =
-                  'rgba(27,58,92,0.35)';
+                (e.currentTarget as HTMLElement).style.background = withAlpha(
+                  BRAND_NAVY,
+                  0.35,
+                );
             }}
             onMouseLeave={(e) => {
               if (!item.active)
@@ -458,7 +472,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
             fontSize: 10,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
-            color: '#6C80BA',
+            color: TEXT_TERTIARY,
           }}
         >
           You
@@ -486,8 +500,10 @@ export const MobileNavDrawer: React.FC<Props> = ({
             onClick={() => handleNav(item.to)}
             style={DRAWER_ITEM}
             onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                'rgba(27,58,92,0.35)')
+              ((e.currentTarget as HTMLElement).style.background = withAlpha(
+                BRAND_NAVY,
+                0.35,
+              ))
             }
             onMouseLeave={(e) =>
               ((e.currentTarget as HTMLElement).style.background =
@@ -506,8 +522,10 @@ export const MobileNavDrawer: React.FC<Props> = ({
           }}
           style={DRAWER_ITEM}
           onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLElement).style.background =
-              'rgba(27,58,92,0.35)')
+            ((e.currentTarget as HTMLElement).style.background = withAlpha(
+              BRAND_NAVY,
+              0.35,
+            ))
           }
           onMouseLeave={(e) =>
             ((e.currentTarget as HTMLElement).style.background = 'transparent')
@@ -526,8 +544,10 @@ export const MobileNavDrawer: React.FC<Props> = ({
           }}
           style={DRAWER_ITEM}
           onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLElement).style.background =
-              'rgba(27,58,92,0.35)')
+            ((e.currentTarget as HTMLElement).style.background = withAlpha(
+              BRAND_NAVY,
+              0.35,
+            ))
           }
           onMouseLeave={(e) =>
             ((e.currentTarget as HTMLElement).style.background = 'transparent')

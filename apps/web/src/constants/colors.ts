@@ -33,6 +33,8 @@ export const SURFACE_PANEL = '#111B2F';
 export const SURFACE_CARD = '#16223A';
 export const OUTLINE_SUBTLE = '#1C2740';
 export const PANEL_BORDER = '#1F2D48';
+/** Base color for dark drop-shadows — pass through withAlpha() for elevation shadows. */
+export const SHADOW_DARK = '#080C14';
 
 // ─── Brand Heritage ────────────────────────────────────────
 

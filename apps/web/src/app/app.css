@@ -10,8 +10,8 @@
 .app-header {
   text-align: center;
   padding: 1rem 2rem;
-  background: #111b2f;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface-panel, #111b2f);
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
 }
 
 .app-header h1 {
@@ -31,9 +31,9 @@
 }
 
 .app-nav {
-  background: #111b2f;
+  background: var(--surface-panel, #111b2f);
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
 }
 
 .app-nav ul {
@@ -61,7 +61,7 @@
 
 .app-nav a:hover {
   color: var(--color, #f8fafc);
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--glass-border, rgba(255, 255, 255, 0.08));
 }
 
 .app-nav a.active {

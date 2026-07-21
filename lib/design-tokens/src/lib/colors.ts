@@ -87,6 +87,36 @@ export const positions = {
   utility: '#C5A55A',
 } as const;
 
+// Roster-list position badge accents (players.tsx) — distinct from the
+// `positions` panel accents above; same value in both themes.
+export const baseballPositionBadges = {
+  P: '#C41E3A',
+  C: '#E67E22',
+  '1B': '#27AE60',
+  '2B': '#27AE60',
+  '3B': '#27AE60',
+  SS: '#27AE60',
+  OF: '#4A90D9',
+  DH: '#9B59B6',
+  RP: '#C41E3A',
+  SP: '#C41E3A',
+} as const;
+
+export const footballPositionBadges = {
+  QB: '#4A90D9',
+  RB: '#27AE60',
+  WR: '#9B59B6',
+  TE: '#E67E22',
+  FLEX: '#C49A6C',
+  K: '#95A5A6',
+  DST: '#C41E3A',
+  DL: '#C25A2A',
+  LB: '#9B7A3D',
+  DB: '#6B3FA0',
+  SUPERFLEX: '#D4AF37',
+  IDP: '#5B7FA6',
+} as const;
+
 export const glassDark = {
   surface: 'rgba(10, 15, 26, 0.75)',
   surfaceLight: 'rgba(10, 15, 26, 0.55)',
