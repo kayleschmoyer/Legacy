@@ -210,7 +210,15 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
       {children}
     </button>
   ),
-  DateTimePicker: () => <input data-testid="datetime-picker" />,
+  DateTimePicker: ({ value, onChange }: any) => (
+    <input
+      data-testid="datetime-picker"
+      value={value ? value.toISOString() : ''}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+        onChange?.(new Date(e.target.value))
+      }
+    />
+  ),
 }));
 
 jest.mock('@tamagui/lucide-icons', () => ({
@@ -1747,6 +1755,78 @@ describe('getSubmitErrorMessage (LS-6069)', () => {
       getSubmitErrorMessage(new Error('TypeError: fetch is not a function')),
     ).toBe(
       'Unable to save league. Your settings are still filled in — try again or come back later.',
+    );
+  });
+});
+
+describe('LeagueCreatePage — stale draft date at submit time (LS-6076)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-01-01T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('blocks submission when a draft date that was valid at pick time has since passed', async () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    // Pick a draft date 60 seconds in the future — valid at pick time.
+    const pickedDate = new Date('2026-01-01T12:01:00.000Z');
+    fireEvent.change(screen.getByTestId('datetime-picker'), {
+      target: { value: pickedDate.toISOString() },
+    });
+
+    // Idle the form past the picked date without touching any field, so the
+    // memoized validationErrors never recomputes — this reproduces LS-6076.
+    jest.setSystemTime(new Date('2026-01-01T12:01:30.000Z'));
+
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Draft date must be in the future/i),
+      ).toBeInTheDocument(),
+    );
+    expect(mockCreateLeague).not.toHaveBeenCalled();
+  });
+
+  it('allows submission when the draft date is still in the future at submit time', async () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+
+    const pickedDate = new Date('2026-01-02T12:00:00.000Z');
+    fireEvent.change(screen.getByTestId('datetime-picker'), {
+      target: { value: pickedDate.toISOString() },
+    });
+
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+    expect(mockCreateLeague).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          input: expect.objectContaining({
+            startDate: pickedDate.toISOString(),
+          }),
+        }),
+      }),
     );
   });
 });

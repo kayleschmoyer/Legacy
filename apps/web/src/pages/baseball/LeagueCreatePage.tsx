@@ -1807,6 +1807,18 @@ export function LeagueCreatePage(): React.JSX.Element {
       return;
     }
 
+    // Re-validate against the current time rather than relying solely on the
+    // memoized validationErrors (LS-6076): the useMemo above is keyed on
+    // formData, so it does not recompute merely because time has passed. A
+    // long-idle form can hold a draftDate that was valid when picked but has
+    // since slipped into the past.
+    const freshErrors = validateFormFull(formData);
+    const freshErrorCount = Object.keys(freshErrors).length;
+    if (freshErrorCount > 0) {
+      setSubmitError(Object.values(freshErrors)[0]);
+      return;
+    }
+
     try {
       const trimmedLeagueName = formData.leagueName.trim();
       const result = await createLeagueAndTeams({
