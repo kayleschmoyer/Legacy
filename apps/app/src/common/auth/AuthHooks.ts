@@ -92,15 +92,30 @@ function useLastUpdateTime(): number {
   return updateTime;
 }
 
+// Greppable marker for a genuine secure-storage read failure (device
+// Keystore/Keychain error, SecureStore unavailable, etc.) as opposed to a
+// clean empty read (logged-out user, no value stored — which logs nothing and
+// simply resolves to null). Alerting/grep can key off this token to tell the
+// two cases apart, since both otherwise return null (LS-7627).
+export const SECURE_STORAGE_READ_FAILURE_MARKER = 'secure-storage-read-failure';
+
 export async function readKeychainValue(
   secret: Secret,
 ): Promise<string | null> {
   try {
+    // A missing value resolves to null here (no log) — that is the ordinary
+    // logged-out path. The catch below only fires on a genuine secure-storage
+    // failure, and logs distinguishably so it can be alerted on separately.
     return await secureStorage.getItem(secret);
   } catch (error) {
+    // Keep returning null so callers' "no token" handling is unchanged, but log
+    // at error level with an explicit marker + the secret name so a real
+    // secure-storage failure is greppable/alertable, distinct from a clean
+    // empty read (LS-7627). `secret` is an enum key name, not the secret value.
     LOGGER.error(
-      'Error reading secure storage:',
+      `[${SECURE_STORAGE_READ_FAILURE_MARKER}] Failed to read secret from secure storage`,
       error instanceof Error ? error : new Error(String(error)),
+      { secret },
     );
     return null;
   }

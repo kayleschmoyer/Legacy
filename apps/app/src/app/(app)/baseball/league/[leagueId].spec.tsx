@@ -45,8 +45,10 @@ jest.mock('@legacy-sports/app-config/native', () => ({
     get appBaseUrl() {
       return mockAppBaseUrl;
     },
+    // Deterministic so the WS-token effect's autoConnect gating
+    // (!isNaN(numLeagueId) && !!wsUrl && !!wsToken) hinges only on the token (LS-7627).
     get websocketUrl() {
-      return undefined;
+      return 'wss://ws.test.example';
     },
   },
 }));
@@ -525,6 +527,77 @@ describe('BaseballLeagueId', () => {
     it('does not render CommissionerScreen for non-commissioners', () => {
       render(<BaseballLeagueId />);
       expect(screen.queryByTestId('commissioner-screen')).toBeNull();
+    });
+  });
+
+  describe('WebSocket token effect (LS-7627)', () => {
+    type WsProps = { token?: string; autoConnect?: boolean };
+
+    const getReadKeychainValue = () =>
+      jest.requireMock<{ readKeychainValue: jest.Mock }>(
+        '../../../../common/auth/AuthHooks',
+      ).readKeychainValue;
+
+    const getUseWebSocket = () =>
+      jest.requireMock<{ useWebSocket: jest.Mock }>(
+        '@legacy-sports/shared-components',
+      ).useWebSocket;
+
+    const getLogger = () =>
+      jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
+        '@legacy-sports/logging',
+      ).LOGGER;
+
+    const lastWsProps = (): WsProps | undefined => {
+      const calls = getUseWebSocket().mock.calls as unknown as WsProps[][];
+      return calls.length ? calls[calls.length - 1][0] : undefined;
+    };
+
+    const KEYCHAIN_ERROR_MESSAGE = 'Failed to read WS token from keychain';
+
+    it('sets wsToken and enables autoConnect when the keychain read returns a token', async () => {
+      getReadKeychainValue().mockResolvedValueOnce('ws-jwt-token');
+      render(<BaseballLeagueId />);
+
+      await waitFor(() => {
+        expect(lastWsProps()?.token).toBe('ws-jwt-token');
+      });
+      expect(lastWsProps()?.autoConnect).toBe(true);
+      expect(getLogger().error).not.toHaveBeenCalledWith(
+        KEYCHAIN_ERROR_MESSAGE,
+        expect.anything(),
+      );
+    });
+
+    it('leaves wsToken undefined and logs no error when no token is stored (null read)', async () => {
+      getReadKeychainValue().mockResolvedValueOnce(null);
+      render(<BaseballLeagueId />);
+
+      await waitFor(() => {
+        expect(getReadKeychainValue()).toHaveBeenCalledWith('INTERNAL_JWT');
+      });
+      expect(lastWsProps()?.token).toBeUndefined();
+      expect(lastWsProps()?.autoConnect).toBe(false);
+      expect(getLogger().error).not.toHaveBeenCalledWith(
+        KEYCHAIN_ERROR_MESSAGE,
+        expect.anything(),
+      );
+    });
+
+    it('logs an error and leaves wsToken undefined when the keychain read rejects', async () => {
+      getReadKeychainValue().mockRejectedValueOnce(
+        new Error('keystore unavailable'),
+      );
+      render(<BaseballLeagueId />);
+
+      await waitFor(() => {
+        expect(getLogger().error).toHaveBeenCalledWith(
+          KEYCHAIN_ERROR_MESSAGE,
+          expect.any(Error),
+        );
+      });
+      expect(lastWsProps()?.token).toBeUndefined();
+      expect(lastWsProps()?.autoConnect).toBe(false);
     });
   });
 

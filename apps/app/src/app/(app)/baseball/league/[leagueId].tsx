@@ -86,6 +86,17 @@ export default function LeagueId(): React.JSX.Element {
   const userInfo = useAuthorizedUserInfo();
   const [wsToken, setWsToken] = useState<string | undefined>();
 
+  // Read the internal JWT from secure storage to authenticate the league
+  // WebSocket. A missing/failed read leaves `wsToken` undefined, which gates
+  // `autoConnect` below — the real-time channel simply stays disconnected.
+  //
+  // Note on the try/catch: `readKeychainValue` already catches every error from
+  // secure storage internally and resolves to `null` (see AuthHooks.ts) — a
+  // locked device / no-biometric-enrollment / SecureStore-unavailable failure
+  // surfaces there as a distinguishable error log, not a rejection here. This
+  // local try/catch is therefore defense-in-depth against an unexpected
+  // synchronous throw, not the primary failure signal; the observable "secure
+  // storage broke" vs "user logged out" distinction lives in AuthHooks (LS-7627).
   useEffect(() => {
     let active = true;
     void (async () => {

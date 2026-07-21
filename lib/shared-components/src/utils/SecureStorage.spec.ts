@@ -159,3 +159,58 @@ describe('native — cross-session persistence gaps (LS-4966)', () => {
     await expect(mod.secureStorage.getItem('session-key')).resolves.toBeNull();
   });
 });
+
+// A genuine device SecureStore failure (locked device, no biometric
+// enrollment, Keystore/Keychain error) surfaces as a rejected getItemAsync.
+// getItem must swallow it and fall back to the in-memory store rather than
+// throw, so a hard secure-storage failure and a legitimately-empty read both
+// resolve to a value/null without crashing the caller (LS-7627).
+describe('native — getItem SecureStore-throws fallback (LS-7627)', () => {
+  let mod: {
+    secureStorage: ISecureStorage;
+    __resetForTesting: () => void;
+  };
+
+  const getItemAsyncMock = () =>
+    ExpoSecureStoreMock.getItemAsync as unknown as jest.Mock;
+
+  beforeAll(async () => {
+    mod = await import('./SecureStorage.native');
+  });
+
+  beforeEach(() => {
+    mod.__resetForTesting();
+    mockResetExpoStore();
+  });
+
+  afterAll(() => {
+    mod.__resetForTesting();
+    mockResetExpoStore();
+  });
+
+  it('resolves null without throwing when getItemAsync rejects and nothing is cached', async () => {
+    // Warm-up read forces initializeStorage() to consume its own registry
+    // getItemAsync call first, so the rejection below lands on the real read.
+    await mod.secureStorage.getItem('warm-up');
+
+    getItemAsyncMock().mockRejectedValueOnce(
+      new Error('SecureStore unavailable (device locked)'),
+    );
+
+    await expect(mod.secureStorage.getItem('auth-token')).resolves.toBeNull();
+  });
+
+  it('resolves the in-memory value without throwing when getItemAsync rejects after a prior set', async () => {
+    // setItem writes through to the in-memory fallback and completes
+    // initialization, so the next getItemAsync call is the read under test.
+    await mod.secureStorage.setItem('auth-token', 'cached-jwt');
+
+    getItemAsyncMock().mockRejectedValueOnce(
+      new Error('SecureStore unavailable (device locked)'),
+    );
+
+    await expect(mod.secureStorage.getItem('auth-token')).resolves.toBe(
+      'cached-jwt',
+    );
+  });
+});
