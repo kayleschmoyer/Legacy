@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
 import { Target, TrendingUp } from '@tamagui/lucide-icons';
 import {
@@ -38,6 +38,62 @@ interface CategoryScores {
 
 export interface MatchupWinProbabilityPanelProps {
   matchup: MatchupFragment | null | undefined;
+}
+
+interface ProjectionInputs {
+  players: MatchupPlayerFragment[];
+  scoringSettings: NonNullable<
+    ReturnType<typeof useLeagueScoringSettings>['settings']
+  >;
+  gamesPerMatchup: number;
+  team1Id: number | null | undefined;
+  team2Id: number | null | undefined;
+}
+
+// Only the fields the Monte Carlo projection actually reads – used to build a
+// content signature so an Apollo refetch that leaves these unchanged (e.g. an
+// unrelated cache update elsewhere on the page) doesn't re-trigger the 10,000
+// -iteration simulation below.
+function buildProjectionSignature(inputs: ProjectionInputs | null): string {
+  if (!inputs) return '';
+  return JSON.stringify({
+    players: inputs.players.map((p) => ({
+      id: p.id,
+      positionId: p.positionId,
+      teamId: p.teamId,
+      numberOfGames: p.numberOfGames,
+      games: p.games,
+      seasonBatting: p.seasonBatting,
+      seasonPitching: p.seasonPitching,
+      seasonFielding: p.seasonFielding,
+    })),
+    scoringSettings: inputs.scoringSettings,
+    gamesPerMatchup: inputs.gamesPerMatchup,
+    team1Id: inputs.team1Id,
+    team2Id: inputs.team2Id,
+  });
+}
+
+/**
+ * Returns `inputs` as-is on the first call and on any call whose content
+ * signature differs from the last one seen; otherwise returns the previously
+ * returned reference so identity-only changes (e.g. Apollo returning a new
+ * object for unchanged data) don't invalidate a downstream `useMemo`.
+ */
+function useStableProjectionInputs(
+  inputs: ProjectionInputs | null,
+): ProjectionInputs | null {
+  const signature = buildProjectionSignature(inputs);
+  const cache = useRef<{ signature: string; inputs: ProjectionInputs | null }>({
+    signature,
+    inputs,
+  });
+
+  if (cache.current.signature !== signature) {
+    cache.current = { signature, inputs };
+  }
+
+  return cache.current.inputs;
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -249,6 +305,18 @@ export function MatchupWinProbabilityPanel({
     );
   }, [matchup?.team2Id, teamsData]);
 
+  const rawProjectionInputs: ProjectionInputs | null =
+    playersData?.getMatchupPlayers && scoringSettings && matchup
+      ? {
+          players: playersData.getMatchupPlayers,
+          scoringSettings,
+          gamesPerMatchup: matchup.gamesPerMatchup ?? 0,
+          team1Id: matchup.team1Id,
+          team2Id: matchup.team2Id,
+        }
+      : null;
+  const projectionInputs = useStableProjectionInputs(rawProjectionInputs);
+
   const { team1Category, team2Category, winProb } = useMemo(() => {
     const empty: CategoryScores = {
       batting: 0,
@@ -257,12 +325,12 @@ export function MatchupWinProbabilityPanel({
       total: 0,
     };
 
-    if (!playersData?.getMatchupPlayers || !scoringSettings || !matchup) {
+    if (!projectionInputs) {
       return { team1Category: empty, team2Category: empty, winProb: null };
     }
 
-    const players = playersData.getMatchupPlayers;
-    const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
+    const { players, scoringSettings, gamesPerMatchup, team1Id } =
+      projectionInputs;
 
     // Per-category actual scores for a single game
     const gameCategoryScores = (
@@ -342,7 +410,7 @@ export function MatchupWinProbabilityPanel({
       const projFielding =
         actual.fielding + (perGame?.fieldingPerGame ?? 0) * remaining;
 
-      const target = player.teamId === matchup.team1Id ? t1 : t2;
+      const target = player.teamId === team1Id ? t1 : t2;
       target.batting += projBatting;
       target.pitching += projPitching;
       target.fielding += projFielding;
@@ -363,7 +431,7 @@ export function MatchupWinProbabilityPanel({
       team2Category: { ...t2, total: team2Total },
       winProb: wp,
     };
-  }, [playersData, scoringSettings, matchup]);
+  }, [projectionInputs]);
 
   // Only show for non-final matchups with available projections
   if (!matchup || matchup.status === MatchupStatus.Completed || !winProb) {

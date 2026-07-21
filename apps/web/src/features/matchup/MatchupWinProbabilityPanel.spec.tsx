@@ -256,6 +256,59 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(screen.queryByText('Win Probability')).not.toBeInTheDocument();
   });
 
+  it('does not re-run the win-probability simulation when playersData identity changes but content is unchanged (LS-5911)', () => {
+    let queryCallCount = 0;
+    mockUseGetMatchupPlayersQuery.mockImplementation(() => {
+      queryCallCount += 1;
+      // New array + object references each call (as Apollo returns on an
+      // unrelated cache update), but identical content to the previous call.
+      return {
+        data: { getMatchupPlayers: PLAYERS.map((p) => ({ ...p })) },
+      };
+    });
+    mockUseGetLeagueTeamsQuery.mockReturnValue({
+      data: {
+        leagueTeams: [
+          { id: 101, name: 'Aces' },
+          { id: 102, name: 'Bolts' },
+        ],
+      },
+    });
+    mockUseLeagueScoringSettings.mockReturnValue({
+      settings: { batting: {}, pitching: {}, fielding: {} },
+    });
+    mockComputeScoring.mockReturnValue(0);
+    mockCalculateMatchupProjection.mockReturnValue({
+      totalPerGame: 100,
+      battingPerGame: 50,
+      pitchingPerGame: 30,
+      fieldingPerGame: 20,
+    });
+    mockCalculateMatchupWinProbability.mockReturnValue({
+      team1WinProbability: 0.62,
+      team2WinProbability: 0.38,
+      tiesProbability: 0,
+      team1ProjectedScore: 100.5,
+      team2ProjectedScore: 88.25,
+      simulationCount: 5000,
+    });
+
+    const matchup = makeMatchup();
+    const { rerender } = render(
+      <MatchupWinProbabilityPanel matchup={matchup} />,
+    );
+    expect(mockCalculateMatchupWinProbability).toHaveBeenCalledTimes(1);
+
+    rerender(<MatchupWinProbabilityPanel matchup={matchup} />);
+
+    // Confirm the query hook really did return a new object identity on the
+    // second render (otherwise this test would pass trivially).
+    expect(queryCallCount).toBeGreaterThan(1);
+    // The heavy simulation must not re-run since the underlying content did
+    // not change.
+    expect(mockCalculateMatchupWinProbability).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to actual scores (no throw) when projection calculation throws', () => {
     primeProjectionMocks();
     mockCalculateMatchupProjection.mockImplementation(() => {
