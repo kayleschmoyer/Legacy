@@ -12,28 +12,12 @@ import {
 import { PageMeta } from '../../components/PageMeta';
 import { FONT_BODY, FONT_DISPLAY, FONT_MONO } from '../../constants/typography';
 import {
-  BG_DARK,
-  BORDER_STRONG,
   BRAND_GOLD,
-  BRAND_GOLD_LIGHT,
   BRAND_NAVY,
-  BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
-  INFO_FG,
-  OUTLINE_SUBTLE,
-  SCORE_LOSS,
   SUCCESS_FG,
-  SURFACE_CARD,
-  SURFACE_HOVER,
-  SURFACE_PANEL,
-  SURFACE_SUBTLE,
-  TEXT_FG2,
-  TEXT_MUTED,
   TEXT_ON_GOLD,
-  TEXT_PRIMARY,
-  TEXT_TERTIARY,
-  WHITE,
   withAlpha,
 } from '../../constants/colors';
 
@@ -78,8 +62,9 @@ function decodeJwtParts(token: string): JwtDecoded {
 }
 
 // ─── JSON syntax tinting ──────────────────────────────────────────────────────
-// Mirrors the design mockup's .json-block colour scheme: keys = gold, strings =
-// success-fg, numbers = info-fg, booleans/null = danger-fg, punctuation = fg4.
+// Mirrors the design mockup's .json-block colour scheme: keys = brandGoldLight,
+// strings = green10, numbers = blue11, booleans/null = brandSeamRedLight,
+// punctuation = color10.
 
 const JSON_TOKEN_RE =
   /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([{}[\],:])/g;
@@ -99,14 +84,14 @@ function renderJsonWithTints(value: unknown): React.ReactNode {
     const [token] = match;
     let color: string | undefined;
     if (match[1] != null)
-      color = BRAND_GOLD_LIGHT; // key
+      color = 'var(--brandGoldLight)'; // key
     else if (match[2] != null)
-      color = SUCCESS_FG; // string (--success-fg)
+      color = 'var(--green10)'; // string
     else if (match[3] != null)
-      color = SCORE_LOSS; // bool/null (--danger-fg)
+      color = 'var(--brandSeamRedLight)'; // bool/null
     else if (match[4] != null)
-      color = INFO_FG; // number (--info-fg)
-    else if (match[5] != null) color = TEXT_TERTIARY; // punctuation (--fg4)
+      color = 'var(--blue11)'; // number
+    else if (match[5] != null) color = 'var(--color10)'; // punctuation
     parts.push(
       color != null ? (
         <span key={key++} style={{ color }}>
@@ -137,8 +122,8 @@ function StatCard({ label, value, accent }: StatCardProps) {
       padding={14}
       borderRadius={8}
       style={{
-        background: SURFACE_CARD,
-        border: `1px solid ${OUTLINE_SUBTLE}`,
+        background: 'var(--surfaceCard)',
+        border: `1px solid var(--outlineSubtle)`,
         minWidth: 100,
       }}
     >
@@ -148,7 +133,7 @@ function StatCard({ label, value, accent }: StatCardProps) {
           fontSize: 11,
           letterSpacing: '0.12em',
           textTransform: 'uppercase',
-          color: TEXT_TERTIARY,
+          color: 'var(--color10)',
         }}
       >
         {label}
@@ -159,7 +144,7 @@ function StatCard({ label, value, accent }: StatCardProps) {
           fontWeight: 800,
           fontSize: 28,
           lineHeight: 1,
-          color: accent ?? TEXT_PRIMARY,
+          color: accent ?? 'var(--color)',
           fontVariantNumeric: 'tabular-nums',
         }}
       >
@@ -196,9 +181,13 @@ function AdminSection({
       borderWidth={1}
       overflow="hidden"
       animation="quick"
+      // Animated Tamagui components must use $token props, not var(--token):
+      // the react-native animation driver interpolates colour values through
+      // RN's normalizer, which cannot parse a CSS custom property and returns
+      // null — crashing the page at runtime.
+      backgroundColor="$surfacePanel"
+      borderColor={open ? '$outlineStrong' : '$outlineSubtle'}
       style={{
-        background: SURFACE_PANEL,
-        borderColor: open ? BORDER_STRONG : OUTLINE_SUBTLE,
         transition: 'border-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1)',
       }}
     >
@@ -229,7 +218,7 @@ function AdminSection({
             fontFamily: FONT_MONO,
             fontSize: 12,
             fontWeight: 500,
-            color: TEXT_TERTIARY,
+            color: 'var(--color10)',
             letterSpacing: '0.04em',
             fontVariantNumeric: 'tabular-nums',
           }}
@@ -245,7 +234,7 @@ function AdminSection({
             fontWeight: 800,
             fontSize: 22,
             letterSpacing: '-0.01em',
-            color: TEXT_PRIMARY,
+            color: 'var(--color)',
           }}
         >
           {title}
@@ -258,11 +247,11 @@ function AdminSection({
               fontSize: 12,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
               padding: '4px 10px',
-              border: `1px solid ${OUTLINE_SUBTLE}`,
+              border: `1px solid var(--outlineSubtle)`,
               borderRadius: 9999,
-              background: SURFACE_SUBTLE,
+              background: 'var(--surfaceSubtle)',
               fontVariantNumeric: 'tabular-nums',
             }}
           >
@@ -276,7 +265,7 @@ function AdminSection({
           fill="none"
           aria-hidden
           style={{
-            color: open ? BRAND_GOLD : TEXT_MUTED,
+            color: open ? 'var(--brandGold)' : 'var(--textMuted)',
             transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
             transition: 'transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1)',
             flexShrink: 0,
@@ -335,8 +324,8 @@ function NavCard({ to, icon, label, description }: NavCardProps) {
         gap: 10,
         padding: '18px 20px',
         borderRadius: 12,
-        background: hovered ? SURFACE_HOVER : SURFACE_CARD,
-        border: `1px solid ${hovered ? BORDER_STRONG : OUTLINE_SUBTLE}`,
+        background: hovered ? 'var(--color4)' : 'var(--surfaceCard)',
+        border: `1px solid ${hovered ? 'var(--outlineStrong)' : 'var(--outlineSubtle)'}`,
         textDecoration: 'none',
         transition: 'background 150ms ease, border-color 150ms ease',
         flex: '1 1 160px',
@@ -353,7 +342,7 @@ function NavCard({ to, icon, label, description }: NavCardProps) {
           justifyContent: 'center',
           background: withAlpha(BRAND_NAVY, 0.6),
           border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`,
-          color: BRAND_GOLD_LIGHT,
+          color: 'var(--brandGoldLight)',
           flexShrink: 0,
         }}
       >
@@ -364,7 +353,7 @@ function NavCard({ to, icon, label, description }: NavCardProps) {
           fontFamily: FONT_DISPLAY,
           fontWeight: 800,
           fontSize: 15,
-          color: TEXT_PRIMARY,
+          color: 'var(--color)',
           letterSpacing: '-0.01em',
         }}
       >
@@ -375,7 +364,7 @@ function NavCard({ to, icon, label, description }: NavCardProps) {
         style={{
           fontFamily: FONT_BODY,
           fontSize: 13,
-          color: TEXT_MUTED,
+          color: 'var(--textMuted)',
           lineHeight: 1.45,
         }}
       >
@@ -563,10 +552,10 @@ export function AdminPage(): React.JSX.Element | null {
             gap: 10,
             padding: '12px 16px',
             borderRadius: 10,
-            background: '#1B3A5C',
-            border: '1px solid rgba(197,165,90,0.35)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-            color: '#e8e0d0',
+            background: 'var(--brandNavy)',
+            border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
+            boxShadow: '0 8px 32px var(--shadowColor)',
+            color: 'var(--color11)',
             fontSize: 13,
             fontWeight: 500,
             lineHeight: 1.5,
@@ -603,7 +592,7 @@ export function AdminPage(): React.JSX.Element | null {
     <YStack
       minHeight="100vh"
       style={{
-        background: BG_DARK,
+        background: 'var(--background)',
         backgroundImage: `
           radial-gradient(ellipse at 50% -10%, ${withAlpha(BRAND_NAVY, 0.35)} 0%, transparent 55%),
           radial-gradient(ellipse at 90% 0%, ${withAlpha(BRAND_SEAM_RED, 0.06)} 0%, transparent 50%)
@@ -630,7 +619,7 @@ export function AdminPage(): React.JSX.Element | null {
           gap={6}
           paddingBottom={20}
           marginBottom={24}
-          style={{ borderBottom: `1px solid ${OUTLINE_SUBTLE}` }}
+          style={{ borderBottom: `1px solid var(--outlineSubtle)` }}
         >
           <XStack alignItems="center" gap={8}>
             <span
@@ -638,7 +627,7 @@ export function AdminPage(): React.JSX.Element | null {
               style={{
                 width: 24,
                 height: 1,
-                background: BRAND_GOLD,
+                background: 'var(--brandGold)',
                 display: 'inline-block',
               }}
             />
@@ -649,7 +638,7 @@ export function AdminPage(): React.JSX.Element | null {
                 fontSize: 12,
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
-                color: BRAND_GOLD,
+                color: 'var(--brandGold)',
               }}
             >
               Backstage
@@ -663,7 +652,7 @@ export function AdminPage(): React.JSX.Element | null {
               fontSize: 'clamp(28px, 5vw, 48px)',
               lineHeight: 1.05,
               letterSpacing: '-0.015em',
-              color: WHITE,
+              color: 'var(--textOnAccent)',
             }}
           >
             Admin Console
@@ -674,14 +663,14 @@ export function AdminPage(): React.JSX.Element | null {
               fontFamily: FONT_BODY,
               fontSize: 16,
               lineHeight: 1.55,
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
               maxWidth: '62ch',
             }}
           >
             Platform overview and developer tools. Manage users via{' '}
             <Link
               to="/admin/users"
-              style={{ color: BRAND_GOLD_LIGHT, textDecoration: 'none' }}
+              style={{ color: 'var(--brandGoldLight)', textDecoration: 'none' }}
             >
               User Management
             </Link>
@@ -711,7 +700,11 @@ export function AdminPage(): React.JSX.Element | null {
               viewBox="0 0 24 24"
               fill="none"
               aria-hidden
-              style={{ color: SCORE_LOSS, flexShrink: 0, marginTop: 1 }}
+              style={{
+                color: 'var(--brandSeamRedLight)',
+                flexShrink: 0,
+                marginTop: 1,
+              }}
             >
               <path
                 d="M12 9v4m0 4h.01M10.29 3.86l-8.07 14a2 2 0 001.71 3h16.14a2 2 0 001.71-3l-8.07-14a2 2 0 00-3.42 0z"
@@ -729,7 +722,7 @@ export function AdminPage(): React.JSX.Element | null {
                   fontSize: 13,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: SCORE_LOSS,
+                  color: 'var(--brandSeamRedLight)',
                 }}
               >
                 Impersonation Active
@@ -738,7 +731,7 @@ export function AdminPage(): React.JSX.Element | null {
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 14,
-                  color: TEXT_FG2,
+                  color: 'var(--color11)',
                   lineHeight: 1.5,
                 }}
               >
@@ -747,7 +740,7 @@ export function AdminPage(): React.JSX.Element | null {
                   style={{
                     fontFamily: FONT_MONO,
                     fontSize: 13,
-                    color: SCORE_LOSS,
+                    color: 'var(--brandSeamRedLight)',
                     background: withAlpha(BRAND_SEAM_RED, 0.15),
                     padding: '1px 6px',
                     borderRadius: 4,
@@ -777,7 +770,7 @@ export function AdminPage(): React.JSX.Element | null {
                 fontSize: 11,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: TEXT_TERTIARY,
+                color: 'var(--color10)',
                 marginRight: 4,
               }}
             >
@@ -794,7 +787,7 @@ export function AdminPage(): React.JSX.Element | null {
                 fontSize: 12,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                color: BRAND_GOLD_LIGHT,
+                color: 'var(--brandGoldLight)',
                 textDecoration: 'none',
                 background: withAlpha(BRAND_GOLD, 0.08),
                 border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
@@ -815,7 +808,7 @@ export function AdminPage(): React.JSX.Element | null {
                 fontSize: 12,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                color: BRAND_GOLD_LIGHT,
+                color: 'var(--brandGoldLight)',
                 textDecoration: 'none',
                 background: withAlpha(BRAND_GOLD, 0.08),
                 border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
@@ -835,14 +828,14 @@ export function AdminPage(): React.JSX.Element | null {
               margin: '0 0 12px',
               fontFamily: FONT_BODY,
               fontSize: 14,
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
             }}
           >
             The 5 most recently registered accounts. For search, filtering, role
             management, and impersonation, use the{' '}
             <Link
               to="/admin/users"
-              style={{ color: BRAND_GOLD_LIGHT, textDecoration: 'none' }}
+              style={{ color: 'var(--brandGoldLight)', textDecoration: 'none' }}
             >
               User Management page
             </Link>
@@ -857,8 +850,8 @@ export function AdminPage(): React.JSX.Element | null {
               borderRadius={8}
               overflow="hidden"
               style={{
-                background: OUTLINE_SUBTLE,
-                border: `1px solid ${OUTLINE_SUBTLE}`,
+                background: 'var(--outlineSubtle)',
+                border: `1px solid var(--outlineSubtle)`,
               }}
             >
               {recentUsers.map((u) => {
@@ -868,10 +861,10 @@ export function AdminPage(): React.JSX.Element | null {
                   .charAt(0)
                   .toUpperCase();
                 const avBackground = isYou
-                  ? `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_NAVY_DARK} 100%)`
+                  ? `linear-gradient(135deg, var(--brandGold) 0%, var(--brandNavyDark) 100%)`
                   : isAdmin
-                    ? `linear-gradient(135deg, ${BRAND_NAVY_LIGHT} 0%, ${BRAND_NAVY_DARK} 100%)`
-                    : `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_GOLD} 100%)`;
+                    ? `linear-gradient(135deg, var(--brandNavyLight) 0%, var(--brandNavyDark) 100%)`
+                    : `linear-gradient(135deg, var(--brandNavy) 0%, var(--brandGold) 100%)`;
 
                 return (
                   <XStack
@@ -881,8 +874,8 @@ export function AdminPage(): React.JSX.Element | null {
                     paddingHorizontal={16}
                     paddingVertical={14}
                     animation="quick"
-                    style={{ background: SURFACE_CARD }}
-                    hoverStyle={{ backgroundColor: SURFACE_HOVER }}
+                    backgroundColor="$surfaceCard"
+                    hoverStyle={{ backgroundColor: '$color4' }}
                   >
                     <YStack
                       width={40}
@@ -893,7 +886,7 @@ export function AdminPage(): React.JSX.Element | null {
                       flexShrink={0}
                       style={{
                         background: avBackground,
-                        color: isYou ? TEXT_ON_GOLD : WHITE,
+                        color: isYou ? TEXT_ON_GOLD : 'var(--textOnAccent)',
                         fontFamily: FONT_DISPLAY,
                         fontWeight: 800,
                         fontSize: 16,
@@ -907,7 +900,7 @@ export function AdminPage(): React.JSX.Element | null {
                           fontFamily: FONT_BODY,
                           fontWeight: 600,
                           fontSize: 14,
-                          color: u.username ? TEXT_PRIMARY : TEXT_TERTIARY,
+                          color: u.username ? 'var(--color)' : 'var(--color10)',
                           fontStyle: u.username ? 'normal' : 'italic',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -920,7 +913,7 @@ export function AdminPage(): React.JSX.Element | null {
                         style={{
                           fontFamily: FONT_MONO,
                           fontSize: 12,
-                          color: TEXT_MUTED,
+                          color: 'var(--textMuted)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -941,14 +934,14 @@ export function AdminPage(): React.JSX.Element | null {
                         flexShrink: 0,
                         ...(isAdmin
                           ? {
-                              color: BRAND_GOLD_LIGHT,
+                              color: 'var(--brandGoldLight)',
                               border: `1px solid ${withAlpha(BRAND_GOLD, 0.45)}`,
                               background: withAlpha(BRAND_GOLD, 0.1),
                             }
                           : {
-                              color: TEXT_MUTED,
-                              border: `1px solid ${OUTLINE_SUBTLE}`,
-                              background: SURFACE_SUBTLE,
+                              color: 'var(--textMuted)',
+                              border: `1px solid var(--outlineSubtle)`,
+                              background: 'var(--surfaceSubtle)',
                             }),
                       }}
                     >
@@ -971,7 +964,7 @@ export function AdminPage(): React.JSX.Element | null {
               fontSize: 12,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: BRAND_GOLD_LIGHT,
+              color: 'var(--brandGoldLight)',
               textDecoration: 'none',
               background: withAlpha(BRAND_GOLD, 0.08),
               border: `1px solid ${withAlpha(BRAND_GOLD, 0.25)}`,
@@ -992,7 +985,7 @@ export function AdminPage(): React.JSX.Element | null {
               margin: '6px 0 0',
               fontFamily: FONT_BODY,
               fontSize: 14,
-              color: TEXT_MUTED,
+              color: 'var(--textMuted)',
               maxWidth: '60ch',
             }}
           >
@@ -1016,7 +1009,7 @@ export function AdminPage(): React.JSX.Element | null {
               viewBox="0 0 24 24"
               fill="none"
               aria-hidden
-              style={{ color: BRAND_GOLD, flexShrink: 0, marginTop: 2 }}
+              style={{ color: 'var(--brandGold)', flexShrink: 0, marginTop: 2 }}
             >
               <path
                 d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
@@ -1030,7 +1023,7 @@ export function AdminPage(): React.JSX.Element | null {
               style={{
                 fontFamily: FONT_BODY,
                 fontSize: 13,
-                color: BRAND_GOLD,
+                color: 'var(--brandGold)',
                 lineHeight: 1.5,
               }}
             >
@@ -1049,9 +1042,9 @@ export function AdminPage(): React.JSX.Element | null {
             rows={4}
             style={{
               width: '100%',
-              background: SURFACE_CARD,
-              border: `1px solid ${OUTLINE_SUBTLE}`,
-              color: TEXT_PRIMARY,
+              background: 'var(--surfaceCard)',
+              border: `1px solid var(--outlineSubtle)`,
+              color: 'var(--color)',
               fontFamily: FONT_MONO,
               fontSize: 12.5,
               lineHeight: 1.55,
@@ -1080,10 +1073,10 @@ export function AdminPage(): React.JSX.Element | null {
                 padding: '9px 14px',
                 borderRadius: 12,
                 cursor: isImpersonating ? 'not-allowed' : 'pointer',
-                color: WHITE,
-                background: BRAND_NAVY,
-                border: `1px solid ${BRAND_NAVY_LIGHT}`,
-                boxShadow: '0 1px 2px rgba(8, 12, 20, 0.4)',
+                color: 'var(--textOnAccent)',
+                background: 'var(--brandNavy)',
+                border: `1px solid var(--brandNavyLight)`,
+                boxShadow: '0 1px 2px var(--shadowColor)',
                 minHeight: 40,
                 opacity: isImpersonating ? 0.55 : 1,
               }}
@@ -1109,7 +1102,11 @@ export function AdminPage(): React.JSX.Element | null {
                 viewBox="0 0 24 24"
                 fill="none"
                 aria-hidden
-                style={{ color: SCORE_LOSS, flexShrink: 0, marginTop: 1 }}
+                style={{
+                  color: 'var(--brandSeamRedLight)',
+                  flexShrink: 0,
+                  marginTop: 1,
+                }}
               >
                 <path
                   d="M12 9v4m0 4h.01M10.29 3.86l-8.07 14a2 2 0 001.71 3h16.14a2 2 0 001.71-3l-8.07-14a2 2 0 00-3.42 0z"
@@ -1123,7 +1120,7 @@ export function AdminPage(): React.JSX.Element | null {
                 style={{
                   fontFamily: FONT_BODY,
                   fontSize: 14,
-                  color: SCORE_LOSS,
+                  color: 'var(--brandSeamRedLight)',
                 }}
               >
                 {jwtError}
@@ -1154,7 +1151,7 @@ export function AdminPage(): React.JSX.Element | null {
           to { background-position: -200% 0; }
         }
         .adm-nav-link:focus-visible {
-          outline: 2px solid ${BRAND_GOLD};
+          outline: 2px solid var(--brandGold);
           outline-offset: 2px;
           border-radius: 2px;
         }
@@ -1162,7 +1159,7 @@ export function AdminPage(): React.JSX.Element | null {
           text-decoration: underline;
         }
         .adm-action-link:focus-visible {
-          outline: 2px solid ${BRAND_GOLD};
+          outline: 2px solid var(--brandGold);
           outline-offset: 2px;
         }`}</style>
     </YStack>
@@ -1186,20 +1183,20 @@ function ExpiryBanner({ isExpired, expiresAt }: ExpiryBannerProps) {
   const palette =
     state === 'valid'
       ? {
-          bg: 'rgba(34, 110, 74, 0.14)',
-          border: 'rgba(34, 110, 74, 0.5)',
-          fg: SUCCESS_FG,
+          bg: 'var(--successMuted)',
+          border: withAlpha(SUCCESS_FG, 0.5),
+          fg: 'var(--green10)',
         }
       : state === 'expired'
         ? {
             bg: withAlpha(BRAND_SEAM_RED, 0.14),
             border: withAlpha(BRAND_SEAM_RED, 0.5),
-            fg: SCORE_LOSS,
+            fg: 'var(--brandSeamRedLight)',
           }
         : {
-            bg: SURFACE_SUBTLE,
-            border: BORDER_STRONG,
-            fg: TEXT_MUTED,
+            bg: 'var(--surfaceSubtle)',
+            border: 'var(--outlineStrong)',
+            fg: 'var(--textMuted)',
           };
 
   const label =
@@ -1244,7 +1241,7 @@ function ExpiryBanner({ isExpired, expiresAt }: ExpiryBannerProps) {
           style={{
             fontFamily: state === 'none' ? FONT_BODY : FONT_MONO,
             fontSize: 13,
-            color: TEXT_FG2,
+            color: 'var(--color11)',
             fontVariantNumeric: 'tabular-nums',
           }}
         >
@@ -1269,8 +1266,8 @@ function JsonBlock({ label, alg, children }: JsonBlockProps) {
       borderRadius={8}
       overflow="hidden"
       style={{
-        background: SURFACE_CARD,
-        border: `1px solid ${OUTLINE_SUBTLE}`,
+        background: 'var(--surfaceCard)',
+        border: `1px solid var(--outlineSubtle)`,
       }}
     >
       <XStack
@@ -1280,7 +1277,7 @@ function JsonBlock({ label, alg, children }: JsonBlockProps) {
         paddingVertical={10}
         style={{
           background: `linear-gradient(180deg, ${withAlpha(BRAND_NAVY, 0.18)}, transparent)`,
-          borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
+          borderBottom: `1px solid var(--outlineSubtle)`,
         }}
       >
         <span
@@ -1290,7 +1287,7 @@ function JsonBlock({ label, alg, children }: JsonBlockProps) {
             fontSize: 11.5,
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
-            color: TEXT_FG2,
+            color: 'var(--color11)',
           }}
         >
           {label}
@@ -1300,7 +1297,7 @@ function JsonBlock({ label, alg, children }: JsonBlockProps) {
             style={{
               fontFamily: FONT_MONO,
               fontSize: 11,
-              color: BRAND_GOLD_LIGHT,
+              color: 'var(--brandGoldLight)',
               background: withAlpha(BRAND_GOLD, 0.1),
               border: `1px solid ${withAlpha(BRAND_GOLD, 0.3)}`,
               padding: '2px 8px',
@@ -1318,7 +1315,7 @@ function JsonBlock({ label, alg, children }: JsonBlockProps) {
           fontFamily: FONT_MONO,
           fontSize: 12.5,
           lineHeight: 1.6,
-          color: TEXT_PRIMARY,
+          color: 'var(--color)',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
           overflowX: 'auto',
@@ -1333,15 +1330,15 @@ function JsonBlock({ label, alg, children }: JsonBlockProps) {
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
 
 function UsersSkeleton() {
-  const skBg = `linear-gradient(90deg, ${SURFACE_CARD} 0%, ${SURFACE_HOVER} 50%, ${SURFACE_CARD} 100%)`;
+  const skBg = `linear-gradient(90deg, var(--surfaceCard) 0%, var(--color4) 50%, var(--surfaceCard) 100%)`;
   return (
     <YStack
       gap={1}
       borderRadius={8}
       overflow="hidden"
       style={{
-        background: OUTLINE_SUBTLE,
-        border: `1px solid ${OUTLINE_SUBTLE}`,
+        background: 'var(--outlineSubtle)',
+        border: `1px solid var(--outlineSubtle)`,
       }}
       aria-busy
       aria-label="Loading users"
@@ -1353,7 +1350,7 @@ function UsersSkeleton() {
           gap={14}
           paddingHorizontal={16}
           paddingVertical={14}
-          style={{ background: SURFACE_CARD }}
+          style={{ background: 'var(--surfaceCard)' }}
         >
           <YStack
             width={44}

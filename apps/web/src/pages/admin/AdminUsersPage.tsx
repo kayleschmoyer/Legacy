@@ -234,7 +234,7 @@ export default function AdminUsersPage() {
             style={{
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
-              color: BRAND_SEAM_RED,
+              color: 'var(--brandSeamRed)',
               display: 'block',
               marginBottom: 4,
             }}
@@ -243,7 +243,7 @@ export default function AdminUsersPage() {
           </Text>
           <Paragraph size="$3" color="$color">
             You are viewing admin tools as{' '}
-            <Text fontWeight="700" style={{ color: BRAND_SEAM_RED }}>
+            <Text fontWeight="700" style={{ color: 'var(--brandSeamRed)' }}>
               {auth.user?.impersonatedBy?.username ?? 'Unknown Admin'}
             </Text>
             . Mutating actions are disabled for this session.
@@ -297,9 +297,9 @@ export default function AdminUsersPage() {
             backgroundColor={
               sortField === field ? withAlpha(BRAND_NAVY, 0.12) : undefined
             }
-            borderColor={sortField === field ? BRAND_NAVY : '$borderColor'}
+            borderColor={sortField === field ? '$brandNavy' : '$borderColor'}
             borderWidth={1}
-            color={sortField === field ? BRAND_NAVY : '$color'}
+            color={sortField === field ? '$brandNavy' : '$color'}
             fontWeight={sortField === field ? '700' : '400'}
           >
             {SORT_FIELD_LABELS[field]}
@@ -323,10 +323,10 @@ export default function AdminUsersPage() {
                 : undefined
             }
             borderColor={
-              accessLevelFilter === level ? BRAND_NAVY : '$borderColor'
+              accessLevelFilter === level ? '$brandNavy' : '$borderColor'
             }
             borderWidth={1}
-            color={accessLevelFilter === level ? BRAND_NAVY : '$color'}
+            color={accessLevelFilter === level ? '$brandNavy' : '$color'}
             fontWeight={accessLevelFilter === level ? '700' : '400'}
           >
             {ACCESS_LEVEL_LABELS[level]}
@@ -417,7 +417,7 @@ export default function AdminUsersPage() {
                         <Text
                           fontSize={11}
                           fontWeight="700"
-                          color={BRAND_GOLD}
+                          color="$brandGold"
                           textTransform="uppercase"
                           letterSpacing={0.5}
                           style={{
@@ -467,9 +467,9 @@ export default function AdminUsersPage() {
                           ? withAlpha(BRAND_SEAM_RED, 0.12)
                           : withAlpha(BRAND_NAVY, 0.12)
                       }
-                      borderColor={isUserAdmin ? BRAND_SEAM_RED : BRAND_NAVY}
+                      borderColor={isUserAdmin ? '$brandSeamRed' : '$brandNavy'}
                       borderWidth={1}
-                      color={isUserAdmin ? BRAND_SEAM_RED : BRAND_NAVY}
+                      color={isUserAdmin ? '$brandSeamRed' : '$brandNavy'}
                       hoverStyle={{
                         backgroundColor: isUserAdmin
                           ? withAlpha(BRAND_SEAM_RED, 0.2)
@@ -551,10 +551,10 @@ export default function AdminUsersPage() {
                         : undefined
                     }
                     borderColor={
-                      page === currentPage ? BRAND_NAVY : '$borderColor'
+                      page === currentPage ? '$brandNavy' : '$borderColor'
                     }
                     borderWidth={1}
-                    color={page === currentPage ? BRAND_NAVY : '$color'}
+                    color={page === currentPage ? '$brandNavy' : '$color'}
                     fontWeight={page === currentPage ? '700' : '400'}
                   >
                     {page}

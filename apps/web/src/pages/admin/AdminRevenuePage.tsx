@@ -28,13 +28,11 @@ import {
 import { PageMeta } from '../../components/PageMeta';
 import { useFeatureValue } from '../../context/GrowthBookProvider';
 import {
+  AMBER,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
   EMERALD_LIGHT,
-  OUTLINE_SUBTLE,
-  SURFACE_CARD,
-  SURFACE_PANEL,
   TEXT_MUTED,
   withAlpha,
 } from '../../constants/colors';
@@ -108,7 +106,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   active: EMERALD_LIGHT,
   trialing: BRAND_GOLD_LIGHT,
-  past_due: '#F59E0B',
+  past_due: AMBER,
   inactive: TEXT_MUTED,
   canceled: BRAND_SEAM_RED,
 };
@@ -131,7 +129,7 @@ function MetricCard({
   label,
   value,
   sub,
-  accent = BRAND_GOLD_LIGHT,
+  accent = 'var(--brandGoldLight)',
 }: MetricCardProps) {
   const labelSlug = label
     .toLowerCase()
@@ -141,8 +139,8 @@ function MetricCard({
     <StatCard
       data-testid={`admin-revenue-kpi-${labelSlug}`}
       style={{
-        background: SURFACE_PANEL,
-        borderColor: OUTLINE_SUBTLE,
+        background: 'var(--surfacePanel)',
+        borderColor: 'var(--outlineSubtle)',
       }}
     >
       <YStack gap="$1">
@@ -150,7 +148,7 @@ function MetricCard({
           size="$2"
           fontWeight="600"
           style={{
-            color: TEXT_MUTED,
+            color: 'var(--textMuted)',
             textTransform: 'uppercase',
             letterSpacing: 0.8,
           }}
@@ -165,7 +163,7 @@ function MetricCard({
           {value}
         </Paragraph>
         {sub != null && (
-          <Paragraph size="$2" style={{ color: TEXT_MUTED }}>
+          <Paragraph size="$2" style={{ color: 'var(--textMuted)' }}>
             {sub}
           </Paragraph>
         )}
@@ -220,23 +218,23 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
         <Card
           padding="$5"
           style={{
-            background: SURFACE_PANEL,
+            background: 'var(--surfacePanel)',
             borderColor: withAlpha(BRAND_SEAM_RED, 0.4),
           }}
         >
           <YStack gap="$3" alignItems="center" paddingVertical="$4">
-            <Lock size={40} color={BRAND_SEAM_RED} />
+            <Lock size={40} color="$brandSeamRed" />
             <YStack gap="$2" alignItems="center">
               <Paragraph
                 size="$6"
                 fontWeight="700"
-                style={{ color: BRAND_SEAM_RED }}
+                style={{ color: 'var(--brandSeamRed)' }}
               >
                 Admin Access Required
               </Paragraph>
               <Paragraph
                 size="$4"
-                style={{ color: TEXT_MUTED, textAlign: 'center' }}
+                style={{ color: 'var(--textMuted)', textAlign: 'center' }}
               >
                 This page is restricted to administrators. If you believe you
                 should have access, please contact support.
@@ -262,7 +260,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
         <Paragraph
           size="$8"
           fontWeight="700"
-          style={{ color: BRAND_GOLD_LIGHT }}
+          style={{ color: 'var(--brandGoldLight)' }}
         >
           Revenue Analytics
         </Paragraph>
@@ -284,7 +282,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
           padding="$4"
           style={{
             background: withAlpha(BRAND_SEAM_RED, 0.15),
-            borderColor: BRAND_SEAM_RED,
+            borderColor: 'var(--brandSeamRed)',
           }}
         >
           <Paragraph color="$color">Failed to load revenue data.</Paragraph>
@@ -295,15 +293,15 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
         <Card
           padding="$4"
           style={{
-            background: SURFACE_PANEL,
-            borderColor: OUTLINE_SUBTLE,
+            background: 'var(--surfacePanel)',
+            borderColor: 'var(--outlineSubtle)',
           }}
         >
           <YStack gap="$2">
             <Paragraph size="$5" fontWeight="600" color="$color">
               No revenue data available
             </Paragraph>
-            <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+            <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
               Revenue statistics could not be loaded. There may be no
               subscription activity yet, or the metrics service is temporarily
               unavailable. Try refreshing in a few minutes.
@@ -321,7 +319,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                 label="MRR"
                 value={fmtCurrency(stats.mrrCents)}
                 sub="Monthly Recurring Revenue"
-                accent={BRAND_GOLD_LIGHT}
+                accent="var(--brandGoldLight)"
               />
             )}
             {stats.arrCents != null && (
@@ -329,32 +327,32 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                 label="ARR"
                 value={fmtCurrency(stats.arrCents)}
                 sub="Annual Recurring Revenue"
-                accent={BRAND_GOLD_LIGHT}
+                accent="var(--brandGoldLight)"
               />
             )}
             <MetricCard
               label="Total Subscribers"
               value={fmt(stats.totalSubscribers ?? 0)}
               sub="Active + trialing"
-              accent={EMERALD_LIGHT}
+              accent="var(--green9)"
             />
             <MetricCard
               label="Premium Users"
               value={fmt(stats.totalPremiumUsers ?? 0)}
               sub={`${fmt(stats.totalFreeUsers ?? 0)} free`}
-              accent={BRAND_GOLD_LIGHT}
+              accent="var(--brandGoldLight)"
             />
             <MetricCard
               label="Premium Share"
               value={pct(stats.conversionRate ?? 0)}
               sub="% of all users"
-              accent={BRAND_NAVY_LIGHT}
+              accent="var(--brandNavyLight)"
             />
             <MetricCard
               label="New This Month"
               value={fmt(stats.newSubscribersThisMonth ?? 0)}
               sub="New premium subscriptions"
-              accent={BRAND_GOLD_LIGHT}
+              accent="var(--brandGoldLight)"
             />
             <MetricCard
               label="Total Users"
@@ -366,8 +364,8 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
           {/* Status Breakdown */}
           <ChartCard
             style={{
-              background: SURFACE_CARD,
-              borderColor: OUTLINE_SUBTLE,
+              background: 'var(--surfaceCard)',
+              borderColor: 'var(--outlineSubtle)',
             }}
           >
             <YStack gap="$3">
@@ -375,7 +373,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                 <Paragraph size="$6" fontWeight="600" color="$color">
                   Subscription Status Breakdown
                 </Paragraph>
-                <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
                   Distribution of subscriptions by current status
                 </Paragraph>
               </YStack>
@@ -483,10 +481,10 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                           />
                           <Tooltip
                             contentStyle={{
-                              background: SURFACE_CARD,
-                              border: `1px solid ${OUTLINE_SUBTLE}`,
+                              background: 'var(--surfaceCard)',
+                              border: '1px solid var(--outlineSubtle)',
                               borderRadius: 8,
-                              color: '#F8FAFC',
+                              color: 'var(--color)',
                             }}
                             cursor={{ fill: withAlpha(TEXT_MUTED, 0.05) }}
                           />
@@ -499,7 +497,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                       </ResponsiveContainer>
                     </YStack>
                   ) : (
-                    <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                    <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
                       Charts require JavaScript to display.
                     </Paragraph>
                   )}
@@ -511,8 +509,8 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
           {/* Subscriber Growth */}
           <ChartCard
             style={{
-              background: SURFACE_CARD,
-              borderColor: OUTLINE_SUBTLE,
+              background: 'var(--surfaceCard)',
+              borderColor: 'var(--outlineSubtle)',
             }}
           >
             <YStack gap="$3">
@@ -520,7 +518,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                 <Paragraph size="$6" fontWeight="600" color="$color">
                   Subscriber Growth
                 </Paragraph>
-                <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
                   New premium subscriptions per month (last 12 months)
                 </Paragraph>
               </YStack>
@@ -600,10 +598,10 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                           />
                           <Tooltip
                             contentStyle={{
-                              background: SURFACE_CARD,
-                              border: `1px solid ${OUTLINE_SUBTLE}`,
+                              background: 'var(--surfaceCard)',
+                              border: '1px solid var(--outlineSubtle)',
                               borderRadius: 8,
-                              color: '#F8FAFC',
+                              color: 'var(--color)',
                             }}
                             formatter={(value) => [
                               fmt(Number(value)),
@@ -623,13 +621,13 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                       </ResponsiveContainer>
                     </YStack>
                   ) : (
-                    <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                    <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
                       Charts require JavaScript to display.
                     </Paragraph>
                   )}
                 </>
               ) : (
-                <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
                   No subscription data for the last 12 months.
                 </Paragraph>
               )}
@@ -639,15 +637,15 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
           {/* Subscribers by Platform (revenue data pending Stripe/IAP integration) */}
           <ChartCard
             style={{
-              background: SURFACE_CARD,
-              borderColor: OUTLINE_SUBTLE,
+              background: 'var(--surfaceCard)',
+              borderColor: 'var(--outlineSubtle)',
             }}
           >
             <YStack gap="$2">
               <Paragraph size="$6" fontWeight="600" color="$color">
                 Subscribers by Platform
               </Paragraph>
-              <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+              <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
                 Platform-level revenue breakdown requires Stripe API aggregation
                 and IAP reporting integration.
               </Paragraph>
@@ -669,7 +667,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                   <Paragraph
                     size="$3"
                     fontWeight="700"
-                    style={{ color: BRAND_GOLD_LIGHT }}
+                    style={{ color: 'var(--brandGoldLight)' }}
                   >
                     {fmt(stats.stripeSubscribers ?? 0)} subscribers
                   </Paragraph>
@@ -688,7 +686,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                       border: `1px solid ${withAlpha(TEXT_MUTED, 0.2)}`,
                     }}
                   >
-                    <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+                    <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
                       {iapRevenueEnabled
                         ? platform.label
                         : `${platform.label} — Coming soon`}
@@ -702,18 +700,21 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
           {/* Analytics Events Note */}
           <ChartCard
             style={{
-              background: SURFACE_CARD,
-              borderColor: OUTLINE_SUBTLE,
+              background: 'var(--surfaceCard)',
+              borderColor: 'var(--outlineSubtle)',
             }}
           >
             <YStack gap="$2">
               <Paragraph size="$6" fontWeight="600" color="$color">
                 Premium Feature Analytics
               </Paragraph>
-              <Paragraph size="$3" style={{ color: TEXT_MUTED }}>
+              <Paragraph size="$3" style={{ color: 'var(--textMuted)' }}>
                 Feature click events (
                 <Text
-                  style={{ fontFamily: 'monospace', color: BRAND_GOLD_LIGHT }}
+                  style={{
+                    fontFamily: 'monospace',
+                    color: 'var(--brandGoldLight)',
+                  }}
                 >
                   premium_feature_click
                 </Text>
@@ -723,7 +724,7 @@ export default function AdminRevenuePage(): React.JSX.Element | null {
                   href="https://analytics.google.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: BRAND_GOLD_LIGHT }}
+                  style={{ color: 'var(--brandGoldLight)' }}
                 >
                   GA4 dashboard
                 </a>
