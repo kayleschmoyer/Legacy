@@ -134,3 +134,48 @@ describe('MatchupNavigationControls — blocks stepping while allMatchups is emp
     expect(onMatchupChange).not.toHaveBeenCalled();
   });
 });
+
+describe('MatchupNavigationControls — team name resolution (LS-5890)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupMocks();
+  });
+
+  it('shows "TBD" when a team slot has no teamId (awaiting playoff seeding)', () => {
+    const matchup = createMatchup({ id: '5', weekNumber: 2, team2Id: null });
+    jest.mocked(useGetMatchupsByWeekQuery).mockReturnValue({
+      data: { getMatchupsByWeek: [matchup] },
+      loading: false,
+    } as unknown as ReturnType<typeof useGetMatchupsByWeekQuery>);
+    render(
+      <MatchupNavigationControls
+        currentMatchup={matchup}
+        leagueId={10}
+        allMatchups={[matchup]}
+        onMatchupChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('TBD')).toBeTruthy();
+    expect(screen.getByText('Alpha Squad')).toBeTruthy();
+  });
+
+  it('shows "Removed team" when a teamId is set but not found in the league teams (team deleted)', () => {
+    const matchup = createMatchup({ id: '6', weekNumber: 2, team2Id: 999 });
+    jest.mocked(useGetMatchupsByWeekQuery).mockReturnValue({
+      data: { getMatchupsByWeek: [matchup] },
+      loading: false,
+    } as unknown as ReturnType<typeof useGetMatchupsByWeekQuery>);
+    render(
+      <MatchupNavigationControls
+        currentMatchup={matchup}
+        leagueId={10}
+        allMatchups={[matchup]}
+        onMatchupChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Removed team')).toBeTruthy();
+    expect(screen.getByText('Alpha Squad')).toBeTruthy();
+  });
+});

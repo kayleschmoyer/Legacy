@@ -262,7 +262,10 @@ export function MatchupNavigationControls({
   }, [teamsData]);
 
   const teamName = useCallback(
-    (id: number | null | undefined) => teamMap.get(id ?? 0) ?? 'TBD',
+    (id: number | null | undefined) => {
+      if (id == null) return 'TBD';
+      return teamMap.get(id) ?? 'Removed team';
+    },
     [teamMap],
   );
 
