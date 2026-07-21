@@ -309,6 +309,26 @@ describe('MatchupTab — week stepper Next-button bound (LS-5888)', () => {
   });
 });
 
+describe('MatchupTab — zero totalGames guard (LS-5884)', () => {
+  it('does not divide by zero and shows "No games scheduled" when totalGames is 0', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: {
+        ...baseMatchup,
+        gamesPerMatchup: 0,
+        selectedGamesCount: 0,
+      },
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab({ gamesPerMatchup: 0 });
+    expect(screen.getByText('No games scheduled')).toBeInTheDocument();
+    expect(
+      document.querySelector('.ls-games-remaining'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('MatchupTab — schedule card', () => {
   it('renders schedule card when matchup has startTime and endTime', () => {
     mockUseMatchupById.mockReturnValue({
