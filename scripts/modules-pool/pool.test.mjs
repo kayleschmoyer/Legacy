@@ -57,6 +57,7 @@ function makeHealthyNodeModules(nmPath) {
   writeFileSync(join(nmPath, 'nx', 'package.json'), '{"name":"nx"}');
   mkdirSync(join(nmPath, '.bin'), { recursive: true });
   writeFileSync(join(nmPath, '.bin', 'placeholder'), '');
+  writeFileSync(join(nmPath, '.bin', 'nx'), '');
 }
 
 function makeWorktree(root, name, lock = LOCK_A) {
@@ -575,6 +576,7 @@ function makeFakePnpm(binDir) {
         'echo {"name":"nx"} > node_modules\\nx\\package.json',
         'mkdir node_modules\\.bin',
         'echo x > node_modules\\.bin\\placeholder',
+        'echo x > node_modules\\.bin\\nx',
       ].join('\r\n') + '\r\n',
     );
   } else {
@@ -583,7 +585,8 @@ function makeFakePnpm(binDir) {
       p,
       '#!/bin/sh\nmkdir -p node_modules/nx node_modules/.bin\n' +
         'echo \'{"name":"nx"}\' > node_modules/nx/package.json\n' +
-        'echo x > node_modules/.bin/placeholder\n',
+        'echo x > node_modules/.bin/placeholder\n' +
+        'echo x > node_modules/.bin/nx\n',
     );
     chmodSync(p, 0o755);
   }
@@ -648,6 +651,37 @@ test('--check exits 1 and names each finding on a corrupt slot', () => {
     assert.match(output, /@nx\/devkit_tmp_38916: orphan _tmp_ dir/);
     assert.match(output, /left-pad_tmp_123: orphan _tmp_ dir/);
     assert.match(output, /\.pnpm\/foo@1\.0\.0_tmp_99: orphan _tmp_ dir/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--check exits 1 when nx package exists and .bin is non-empty but .bin/nx itself is missing (PR #6130 incident)', () => {
+  // Reproduces the corruption seen recovering PR #6130: a partial install left
+  // node_modules/nx/ present and node_modules/.bin/ non-empty (other shims
+  // installed), but node_modules/.bin/nx absent — the old shallow check
+  // (nx dir exists + .bin non-empty) reported this slot as healthy.
+  const root = freshMainRepo();
+  try {
+    const wt = makeWorktree(root, 'wt1');
+    const hash = runLink([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--print-hash',
+    ]).trim();
+    const slotNm = join(root, '.modules-pool', hash, 'node_modules');
+    mkdirSync(join(slotNm, 'nx'), { recursive: true });
+    writeFileSync(join(slotNm, 'nx', 'package.json'), '{"name":"nx"}');
+    mkdirSync(join(slotNm, '.bin'), { recursive: true });
+    writeFileSync(join(slotNm, '.bin', 'placeholder'), ''); // some other bin, not nx
+
+    const { status, output } = runLinkExpectFail([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--check',
+    ]);
+    assert.equal(status, 1, '--check must exit 1 when .bin/nx is missing');
+    assert.match(output, /\.bin\/nx missing/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -5565,26 +5565,35 @@ const handleCallTool = async (
 
       // Detect broken node_modules symlink before running — prevents confusing
       // ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL / "Command not found" cascades.
+      // Exception: a repair invocation of link.mjs itself must be allowed through
+      // even with a broken symlink — otherwise this guard and the repair command
+      // deadlock each other (the guard refuses everything, including the one
+      // command that would fix what it's refusing over).
+      const isModulesPoolRepair = /scripts[/\\]modules-pool[/\\]link\.mjs/.test(
+        command,
+      );
       const nmPath = join(targetDir, 'node_modules');
-      try {
-        lstatSync(nmPath); // throws if entry absent entirely
-        if (!existsSync(nmPath)) {
-          // lstat succeeded (entry exists) but existsSync returned false → broken symlink
-          return {
-            content: [
-              {
-                type: 'text',
-                text:
-                  `node_modules symlink is broken in ${targetDir} — the symlink entry exists but its target is missing.\n` +
-                  'Run `node scripts/modules-pool/link.mjs` from the worktree root to repair it, then retry.',
-              },
-            ],
-            isError: true,
-          };
+      if (!isModulesPoolRepair) {
+        try {
+          lstatSync(nmPath); // throws if entry absent entirely
+          if (!existsSync(nmPath)) {
+            // lstat succeeded (entry exists) but existsSync returned false → broken symlink
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    `node_modules symlink is broken in ${targetDir} — the symlink entry exists but its target is missing.\n` +
+                    'Run `node scripts/modules-pool/link.mjs` from the worktree root to repair it, then retry.',
+                },
+              ],
+              isError: true,
+            };
+          }
+        } catch {
+          // node_modules is simply absent (not a symlink at all); let the command
+          // run and fail naturally — absence may be intentional for non-Node dirs.
         }
-      } catch {
-        // node_modules is simply absent (not a symlink at all); let the command
-        // run and fail naturally — absence may be intentional for non-Node dirs.
       }
 
       try {

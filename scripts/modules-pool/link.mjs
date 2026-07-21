@@ -334,6 +334,12 @@ function assessSlot(nm) {
   } catch {
     findings.push('.bin missing or unreadable');
   }
+  // The nx package dir existing and .bin being non-empty (other bins present)
+  // is not proof the nx executable itself was linked — a partial install can
+  // leave .bin/nx absent while unrelated shims are still there. Check for it
+  // by name (this is what `make`/nx invocations actually resolve via PATH).
+  if (!existsSync(join(nm, '.bin', 'nx')))
+    findings.push('.bin/nx missing (nx executable not linked)');
   if (process.platform === 'win32' && !winPathIsContainer(nm)) {
     findings.push('path is not a traversable directory');
   }
