@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { formatTerminalSnapshot } from '../job-formatters.js';
 import { MAX_WAIT_MS, listJobs, snapshotJob, waitForJob } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
@@ -20,7 +21,22 @@ function notFound(jobId: string): ToolResult {
   };
 }
 
-function snapshotResult(snapshot: JobSnapshot): ToolResult {
+async function snapshotResult(snapshot: JobSnapshot): Promise<ToolResult> {
+  // Terminal snapshots from job-backed tools (meta.kind) get the same
+  // structured result the originating tool would have returned inline.
+  const formatted = await formatTerminalSnapshot(snapshot);
+  if (formatted) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({ jobId: snapshot.jobId, ...formatted.body }),
+        },
+      ],
+      ...(formatted.isError ? { isError: true } : {}),
+    };
+  }
+
   const body: Record<string, unknown> = {
     jobId: snapshot.jobId,
     status: snapshot.status,
@@ -41,7 +57,9 @@ function snapshotResult(snapshot: JobSnapshot): ToolResult {
   };
 }
 
-export function jobStatus(params: { jobId: string }): ToolResult {
+export async function jobStatus(params: {
+  jobId: string;
+}): Promise<ToolResult> {
   const snapshot = snapshotJob(params.jobId);
   if (!snapshot) return notFound(params.jobId);
   return snapshotResult(snapshot);

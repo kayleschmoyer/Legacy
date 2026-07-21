@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 // Module mocks — must be declared before the import under test
 // ---------------------------------------------------------------------------
 
-jest.mock('node:child_process', () => ({ execFile: jest.fn() }));
+jest.mock('../jobs.js', () => ({ runJobWithBudget: jest.fn() }));
 jest.mock('node:fs', () => ({ existsSync: jest.fn(() => true) }));
 jest.mock('node:fs/promises', () => ({
   readFile: jest.fn(),
@@ -30,13 +30,14 @@ jest.mock('../truncate-output.js', () => ({
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import * as childProcess from 'node:child_process';
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
+import { runJobWithBudget } from '../jobs.js';
+import type { JobSnapshot, StartJobOptions } from '../jobs.js';
 import { runE2ESpecs } from './run-e2e-specs.js';
 
-const mockExecFile = childProcess.execFile as jest.MockedFunction<
-  typeof childProcess.execFile
+const mockRunJob = runJobWithBudget as jest.MockedFunction<
+  typeof runJobWithBudget
 >;
 const mockExistsSync = fs.existsSync as jest.MockedFunction<
   typeof fs.existsSync
@@ -54,18 +55,27 @@ const mockRm = fsPromises.rm as jest.MockedFunction<typeof fsPromises.rm>;
 // Helpers
 // ---------------------------------------------------------------------------
 
-type ExecFileCallback = (
-  err: NodeJS.ErrnoException | null,
-  stdout: string,
-  stderr: string,
-) => void;
+/** Configure runJobWithBudget to resolve with a done snapshot echoing job meta. */
+function setupJob(log: string): void {
+  mockRunJob.mockImplementation(async (jobOpts: StartJobOptions) => {
+    const snapshot: JobSnapshot = {
+      jobId: 'nx-test-job',
+      status: 'done',
+      label: jobOpts.label,
+      cwd: jobOpts.cwd,
+      elapsedSec: 1,
+      exitCode: 0,
+      error: null,
+      meta: jobOpts.meta,
+      log,
+    };
+    return snapshot;
+  });
+}
 
-function setupExecFile(stdout: string, stderr = ''): void {
-  (mockExecFile as unknown as jest.Mock).mockImplementation(
-    (_cmd: unknown, _args: unknown, _opts: unknown, callback: unknown) => {
-      (callback as ExecFileCallback)(null, stdout, stderr);
-    },
-  );
+/** The StartJobOptions passed to the (mocked) job runner in the first call. */
+function jobCallOpts(): StartJobOptions {
+  return mockRunJob.mock.calls[0][0];
 }
 
 const PASSING_REPORT = JSON.stringify({
@@ -97,7 +107,7 @@ describe('runE2ESpecs — integration mode', () => {
         return Promise.resolve(FRESH_JWT) as never;
       return Promise.resolve(PASSING_REPORT) as never;
     });
-    setupExecFile('', '');
+    setupJob('');
   });
 
   afterEach(() => {
@@ -108,8 +118,8 @@ describe('runE2ESpecs — integration mode', () => {
 
   it('uses playwright.integration.config.ts', async () => {
     await runE2ESpecs({ specs: [SPEC], integration: true });
-    const args = mockExecFile.mock.calls[0][1] as string[];
-    expect(args.find((a) => a.startsWith('--config='))).toMatch(
+    const args = jobCallOpts().args;
+    expect(args.find((a) => a.includes('--config='))).toMatch(
       /playwright\.integration\.config\.ts/,
     );
   });
@@ -140,36 +150,31 @@ describe('runE2ESpecs — integration mode', () => {
 
   it('omits E2E_PORT and E2E_AUTH_MODE from env in integration mode', async () => {
     await runE2ESpecs({ specs: [SPEC], integration: true });
-    const opts = mockExecFile.mock.calls[0][2] as {
-      env?: Record<string, string>;
-    };
-    expect(opts.env?.['E2E_AUTH_MODE']).toBeUndefined();
-    expect(opts.env?.['E2E_PORT']).toBeUndefined();
+    const env = jobCallOpts().env ?? {};
+    expect(env['E2E_AUTH_MODE']).toBeUndefined();
+    expect(env['E2E_PORT']).toBeUndefined();
   });
 
   it('always passes --workers=1', async () => {
     await runE2ESpecs({ specs: [SPEC], integration: true });
-    expect(mockExecFile.mock.calls[0][1] as string[]).toContain('--workers=1');
+    expect(jobCallOpts().args).toContain('--workers=1');
   });
 
-  it('applies INTEGRATION_TIMEOUT_MS (480 000 ms) instead of hermetic timeout', async () => {
+  it('applies INTEGRATION_TIMEOUT_MS (480 000 ms) as the process timeout', async () => {
     await runE2ESpecs({ specs: [SPEC], integration: true });
-    const opts = mockExecFile.mock.calls[0][2] as { timeout?: number };
-    expect(opts.timeout).toBe(480_000);
+    expect(jobCallOpts().timeoutMs).toBe(480_000);
   });
 
   // --- Tracing ---
 
   it('appends --trace=on when withTracing:true', async () => {
     await runE2ESpecs({ specs: [SPEC], integration: true, withTracing: true });
-    expect(mockExecFile.mock.calls[0][1] as string[]).toContain('--trace=on');
+    expect(jobCallOpts().args).toContain('--trace=on');
   });
 
   it('does not append --trace=on when withTracing is omitted', async () => {
     await runE2ESpecs({ specs: [SPEC], integration: true });
-    expect(mockExecFile.mock.calls[0][1] as string[]).not.toContain(
-      '--trace=on',
-    );
+    expect(jobCallOpts().args).not.toContain('--trace=on');
   });
 
   it('includes traceArtifacts in the response when traces are found', async () => {
@@ -214,9 +219,8 @@ describe('runE2ESpecs — integration mode', () => {
   // --- GraphQL errors ---
 
   it('extracts graphqlErrors from output lines containing "errors"', async () => {
-    setupExecFile(
+    setupJob(
       'some line\n{"errors":[{"message":"Unauthorized"}]}\nanother line\n',
-      '',
     );
     const result = await runE2ESpecs({ specs: [SPEC], integration: true });
     const payload = JSON.parse(result.content[0].text) as {
@@ -227,7 +231,7 @@ describe('runE2ESpecs — integration mode', () => {
   });
 
   it('omits graphqlErrors field when no error lines found', async () => {
-    setupExecFile('all good\nno problems here\n', '');
+    setupJob('all good\nno problems here\n');
     const result = await runE2ESpecs({ specs: [SPEC], integration: true });
     const payload = JSON.parse(result.content[0].text) as Record<
       string,

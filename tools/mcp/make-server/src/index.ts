@@ -30,6 +30,8 @@ const server = new McpServer({
 server.tool(
   'make_run',
   'Prefer this over `make <target>` via shell. Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc. ' +
+    'Fast targets return their result in one call. A target still running after ~45s returns { status: "running", jobId } instead of blocking into the ~60s MCP transport timeout — ' +
+    'the target keeps running in the background; call make_run_wait({ jobId }) to continue waiting, do NOT re-run the target. ' +
     'Stepwise validation (timeout-prone cloud/ephemeral sessions): the pc pipeline is also runnable as checkpointed chunks — ' +
     'pc-db-prep, pc-typecheck, pc-format, pc-lint, pc-workflows, pc-test, pc-build — equivalent to `pc` ONLY when ALL steps run in that order. ' +
     'NOTE: runner-apply has an interactive confirmation prompt — always pass variables="NO_CONFIRM=1" when invoking it, ' +
@@ -51,21 +53,21 @@ server.tool(
       .positive()
       .optional()
       .describe(
-        'Custom timeout in milliseconds. Defaults: 600000 (10 min) for heavy targets ' +
+        'Process-level timeout in milliseconds (runaway backstop — NOT a transport guard). ' +
+          'Defaults: 600000 (10 min) for heavy targets ' +
           '(pc, pre-commit, build-all, test-all, install, full-check, dev-setup, ami-build, runner-apply), ' +
           '300000 (5 min) for all others. ' +
           'Pass 900000 for make pc on a cold cache. ' +
-          'On timeout, returns { timedOut: true, partialOutput } instead of throwing.',
+          'On timeout, the result carries { timedOut: true } with the captured output.',
       ),
     runInBackground: z
       .boolean()
       .optional()
       .describe(
-        'When true, spawn the make process in the background and return immediately with a { jobId }. ' +
+        'When true, return immediately with a { jobId } instead of waiting out the ~45s sync budget. ' +
           'Use make_run_wait({ jobId }) to block until completion (re-call if it returns status: "running"), ' +
           'or make_run_status({ jobId }) for a non-blocking snapshot. ' +
-          'Recommended for heavy targets (pc, build-all, test-all, install) in cloud sessions ' +
-          'where the MCP transport timeout (~60s) would kill a synchronous call.',
+          'The default already backgrounds the process safely — this flag just skips the initial bounded wait.',
       ),
     verbose: z
       .boolean()
@@ -83,13 +85,15 @@ server.tool(
 // --- make_run_status ---
 server.tool(
   'make_run_status',
-  'Get the current status and output of a background make_run job started with runInBackground: true. ' +
+  'Get the current status and output of a background make_run job. ' +
     'Returns instantly: { status: "running" | "done" | "failed", ... }. ' +
     'For heavy targets (pc, pre-commit, full-check) also returns structured step results on completion.',
   {
     jobId: z
       .string()
-      .describe('Job ID returned by make_run({ runInBackground: true })'),
+      .describe(
+        'Job ID from a make_run / validate_pr result (status: "running")',
+      ),
   },
   (params) => makeRunStatus(params),
 );
@@ -104,7 +108,9 @@ server.tool(
   {
     jobId: z
       .string()
-      .describe('Job ID returned by make_run({ runInBackground: true })'),
+      .describe(
+        'Job ID from a make_run / validate_pr result (status: "running")',
+      ),
     maxWaitMs: z
       .number()
       .int()
@@ -659,7 +665,9 @@ server.tool(
   'Semantic one-shot for the mandatory migrate-before-pc gate: checks DB migration status → applies pending migrations → runs make pc. ' +
     'Guarantees the AGENTS.md invariant order and short-circuits on migration failure (does not run pc on a broken DB). ' +
     'Returns { migrations: { applied, pending, needsMigration }, pc: { passed, steps, errors } }. ' +
-    'Use runPcInBackground: true in cloud sessions to avoid the ~60s MCP transport timeout; poll with make_run_wait({ jobId }). ' +
+    'The default runs make pc as a background job with a ~45s bounded wait: if pc is still running the result is ' +
+    '{ pc: { status: "running", jobId } } — poll with make_run_wait({ jobId }), never re-invoke while it runs. ' +
+    'runPcInBackground: true skips the bounded wait and returns the jobId immediately. ' +
     'Use sanctionedChunks: true to run the seven pc steps individually (pc-db-prep → pc-typecheck → pc-format → pc-lint → pc-workflows → pc-test → pc-build); ' +
     'each call is budgeted to ~45s and may return { pc: { status: "in_progress", ... } } with resume instructions ' +
     '(re-invoke with startAtChunk, or make_run_wait a still-running chunk job) — never restart validation from scratch.',
@@ -696,9 +704,9 @@ server.tool(
       .boolean()
       .optional()
       .describe(
-        'Spawn make pc as a background job and return immediately with a { jobId }. ' +
-          'Use make_run_wait({ jobId }) to poll for completion. ' +
-          'Recommended for cloud sessions where the MCP transport timeout would kill a synchronous make pc call.',
+        'Spawn make pc as a background job and return immediately with a { jobId } instead of waiting out ' +
+          'the ~45s sync budget. Use make_run_wait({ jobId }) to poll for completion. ' +
+          'The default already backgrounds make pc safely — this flag just skips the initial bounded wait.',
       ),
   },
   async (params) => validatePR(params),

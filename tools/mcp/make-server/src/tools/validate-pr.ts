@@ -1,12 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { join, isAbsolute, resolve, relative } from 'node:path';
 import { readdirSync, existsSync } from 'node:fs';
-import {
-  runCommand,
-  runMake,
-  getRepoRoot,
-  TimeoutError,
-} from '../run-command.js';
+import { runCommand, getRepoRoot } from '../run-command.js';
 import {
   startMakeInBackground,
   waitForJobDone,
@@ -161,12 +156,9 @@ const CHUNK_SYNC_BUDGET_MS = 45_000;
  *
  * Replaces the three-step chain: db_migration_status → db_migrate → make_run({ target: 'pc' }).
  * Guarantees the invariant order and short-circuits on migration failure (does not run pc on
- * a broken DB). The `runPcInBackground` flag spawns make pc as a background job — use this
- * in cloud sessions where the ~60s MCP transport timeout would kill a synchronous pc call;
- * poll with make_run_wait({ jobId }).
- *
- * Note: LS-8052 (make_run timeout increase) must land for synchronous mode to reliably
- * complete `make pc`. Until then, use runPcInBackground: true.
+ * a broken DB). Every mode runs make pc as a background job (LS-8558): the default waits out
+ * a bounded sync budget and hands back a jobId when pc is still running; `runPcInBackground`
+ * skips the bounded wait and returns the jobId immediately. Poll with make_run_wait({ jobId }).
  */
 function err(message: string): ToolResult {
   return { isError: true, content: [{ type: 'text', text: message }] };
@@ -389,72 +381,70 @@ export async function validatePR(
     };
   }
 
-  // Synchronous make pc
-  try {
-    const pcOutput = await runMake(['pc'], workDir, 900_000);
-    const steps = parseSteps(pcOutput);
-    const hasPassedMarker = /All pre-commit checks passed/i.test(pcOutput);
-    const failed = steps.filter((s) => s.status === 'failed');
-    const passed =
-      failed.length === 0 && (hasPassedMarker || steps.length === 0);
+  // Default: budgeted background `make pc`. The old synchronous path blocked
+  // up to 900s and was killed by the ~60s MCP transport timeout in cloud
+  // sessions; now the monolithic pc always runs as a background job, waits
+  // out the remaining sync budget, and hands back a jobId when still running.
+  const { jobId, logPath } = startMakeInBackground(
+    ['pc'],
+    'pc',
+    workDir,
+    900_000,
+  );
+  const record = await waitForJobDone(jobId, CHUNK_SYNC_BUDGET_MS);
+
+  if (record && !record.done) {
     return {
-      isError: !passed,
       content: [
         {
           type: 'text',
           text: minifiedJson({
             migrations: migrationResult,
             pc: {
-              passed,
-              steps: steps.length > 0 ? steps : undefined,
-              output: truncateOutput(pcOutput, MAX_OUTPUT_CHARS),
-            },
-          }),
-        },
-      ],
-    };
-  } catch (e) {
-    if (e instanceof TimeoutError) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: minifiedJson({
-              migrations: migrationResult,
-              pc: {
-                passed: false,
-                timedOut: true,
-                partialOutput: truncateOutput(
-                  e.partialOutput,
-                  MAX_OUTPUT_CHARS,
-                ),
-                hint: 'Pass runPcInBackground: true to avoid MCP transport timeout on heavy targets.',
-              },
-            }),
-          },
-        ],
-      };
-    }
-    const msg = e instanceof Error ? e.message : String(e);
-    const steps = parseSteps(msg);
-    const errors = extractErrors(msg);
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: minifiedJson({
-            migrations: migrationResult,
-            pc: {
-              passed: false,
-              steps: steps.length > 0 ? steps : undefined,
-              errors: errors.length > 0 ? errors : undefined,
-              output: truncateOutput(msg, MAX_OUTPUT_CHARS),
+              status: 'running',
+              jobId,
+              logPath,
+              hint:
+                `make pc is running as background job ${jobId}. ` +
+                `Call make_run_wait({ jobId: "${jobId}" }) until it completes — ` +
+                'do NOT re-invoke validate_pr while it runs.',
             },
           }),
         },
       ],
     };
   }
+
+  const pcLog = record ? readJobLog(record) : '';
+  const timedOut =
+    record?.error != null && /internal timeout/i.test(record.error);
+  const steps = parseSteps(pcLog);
+  const hasPassedMarker = /All pre-commit checks passed/i.test(pcLog);
+  const anyStepFailed = steps.some((s) => s.status === 'failed');
+  const passed =
+    record != null &&
+    record.exitCode === 0 &&
+    record.error === null &&
+    !anyStepFailed &&
+    (hasPassedMarker || steps.length === 0);
+  const errors = passed ? [] : extractErrors(pcLog);
+  return {
+    isError: !passed,
+    content: [
+      {
+        type: 'text',
+        text: minifiedJson({
+          migrations: migrationResult,
+          pc: {
+            passed,
+            ...(timedOut ? { timedOut: true } : {}),
+            steps: steps.length > 0 ? steps : undefined,
+            errors: errors.length > 0 ? errors : undefined,
+            ...(record?.error ? { error: record.error } : {}),
+            output: truncateOutput(pcLog, MAX_OUTPUT_CHARS),
+          },
+        }),
+      },
+    ],
+  };
 }

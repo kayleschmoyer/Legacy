@@ -82,7 +82,8 @@ server.tool(
 // --- nx_install_package ---
 server.tool(
   'nx_install_package',
-  'Prefer this over running `pnpm add -w` (or `pnpm add -Dw` for dev dependencies) via shell. Refuses if node_modules is a symlink. Checks for @types/ companion. Install an npm package at workspace root.',
+  'Prefer this over running `pnpm add -w` (or `pnpm add -Dw` for dev dependencies) via shell. Refuses if node_modules is a symlink. Checks for @types/ companion. Install an npm package at workspace root. ' +
+    'Fast installs return in one call; an install still running after ~45s returns { status: "running", jobId } — poll nx_job_wait({ jobId }), do NOT re-run (re-invoking joins the in-flight install).',
   {
     name: z
       .string()
@@ -108,7 +109,8 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-target.ts (the canonical enforcement source).
 server.tool(
   'nx_run',
-  'Prefer this over `pnpm exec nx run <project>:<target>` via shell. Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format.',
+  'Prefer this over `pnpm exec nx run <project>:<target>` via shell. Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format. ' +
+    'Fast targets return pass/fail output in one call. A run still going after ~45s returns { status: "running", jobId } instead of blocking into the ~60s MCP transport timeout — call nx_job_wait({ jobId }) to continue waiting; do NOT re-run (re-invoking joins the in-flight run).',
   {
     project: z.string().describe('Project name'),
     target: z.string().describe('Target to run'),
@@ -147,7 +149,8 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-affected.ts (the canonical enforcement source).
 server.tool(
   'nx_run_affected',
-  'Prefer this over `pnpm exec nx affected -t <target>` via shell. Run an Nx target on all affected projects. Allowed: build, test, lint, typecheck, codegen.',
+  'Prefer this over `pnpm exec nx affected -t <target>` via shell. Run an Nx target on all affected projects. Allowed: build, test, lint, typecheck, codegen. ' +
+    'A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait({ jobId }) to continue waiting; do NOT re-run (re-invoking joins the in-flight run).',
   {
     target: z.string().describe('Target to run on affected projects'),
     base: z
@@ -210,7 +213,8 @@ server.tool(
     '(api.legacy-fantasy.com) with workers=1 to avoid throttling. ' +
     'Checks e2e JWT freshness (~/.legacy-sports/e2e-token.json) and E2EPOOLPASSWORD before launching. ' +
     'Set withTracing: true to enable Playwright tracing; trace.zip paths are returned in traceArtifacts. ' +
-    'Returns a compact summary: pass/fail counts, failing test details, and (integration only) graphqlErrors and traceArtifacts.',
+    'Returns a compact summary: pass/fail counts, failing test details, and (integration only) graphqlErrors and traceArtifacts. ' +
+    'A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait({ jobId }) for the same structured summary once done; do NOT re-run (re-invoking joins the in-flight run).',
   {
     specs: z
       .array(z.string())
@@ -281,7 +285,8 @@ server.tool(
 // --- nx_job_status ---
 server.tool(
   'nx_job_status',
-  'Cheap, instant snapshot of a background job started by nx_run_pc_chunk. Returns ' +
+  'Cheap, instant snapshot of a background job started by a job-backed nx tool ' +
+    '(nx_run_pc_chunk, nx_run, nx_run_affected, nx_run_e2e_specs, nx_install_package). Returns ' +
     '{ status, elapsedSec, logTail } while running (never an error), or the final ' +
     'pass/fail output once done. Use nx_job_wait to block until completion.',
   {

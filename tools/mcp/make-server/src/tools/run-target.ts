@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { runMake, getRepoRoot, TimeoutError } from '../run-command.js';
+import { getRepoRoot } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 import {
   MAX_OUTPUT_CHARS,
@@ -11,7 +11,14 @@ import {
   buildCompactOutput,
   parseAndValidateVariables,
 } from './run-target-utils.js';
-import { startMakeInBackground } from './make-run-bg.js';
+import {
+  SYNC_BUDGET_MS,
+  buildStatusResult,
+  readJobLog,
+  startMakeInBackground,
+  waitForJobDone,
+} from './make-run-bg.js';
+import type { JobRecord } from './make-run-bg.js';
 
 /**
  * Parse the list of files rewritten by the formatter from a make pc error message.
@@ -137,12 +144,6 @@ interface RunTargetParams {
   verbose?: boolean;
 }
 
-/** Return the last N lines of output for timeout partial-output fields. */
-function tailLines(output: string, n = 100): string {
-  const lines = output.split('\n');
-  return lines.length <= n ? output : lines.slice(-n).join('\n');
-}
-
 export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
   const { target, worktreePath, variables } = params;
 
@@ -205,17 +206,21 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
   // Caller-provided timeoutMs overrides the default; useful for make pc on a cold cache.
   const timeoutMs = params.timeoutMs ?? defaultTimeoutMs;
 
-  // Background mode: spawn the process, return a jobId immediately so the caller
-  // can poll with make_run_status / make_run_wait. Avoids the ~60s MCP client
-  // transport timeout that kills long-running synchronous tool calls in cloud sessions.
+  // Every invocation runs as a background job — the synchronous path was
+  // killed by the ~60s MCP transport timeout in cloud sessions long before
+  // its 300–600s process timeouts could matter. runInBackground keeps its
+  // immediate-return contract; the default path waits up to a bounded sync
+  // budget so fast targets still complete in one call while slow ones hand
+  // back a jobId to poll with make_run_wait.
+  const { jobId, logPath } = startMakeInBackground(
+    args,
+    target,
+    workDir,
+    timeoutMs,
+    params.verbose ?? false,
+  );
+
   if (params.runInBackground) {
-    const { jobId, logPath } = startMakeInBackground(
-      args,
-      target,
-      workDir,
-      timeoutMs,
-      params.verbose ?? false,
-    );
     return {
       content: [
         {
@@ -237,239 +242,10 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     };
   }
 
-  try {
-    const output = await runMake(args, workDir, timeoutMs);
-
-    if (STRUCTURED_TARGETS.has(target)) {
-      const steps = parseSteps(output);
-      // Check for the "All pre-commit checks passed" marker. While this is the
-      // intended success signal, explicitly-failed steps always override it — the
-      // marker can appear in NX cached output from a prior run while the current
-      // run actually fails.
-      const hasPassedMarker = /All pre-commit checks passed/i.test(output);
-      const failedCount = steps.filter((s) => s.status === 'failed').length;
-      const anyStepFailed = failedCount > 0;
-      const allPassed =
-        !anyStepFailed && (hasPassedMarker || steps.length === 0);
-      const result: Record<string, unknown> = {
-        success: allPassed,
-        target,
-        worktreePath: workDir,
-        summary: allPassed
-          ? `${target} passed${steps.length > 0 ? ` (${steps.length} steps)` : ''}`
-          : `${target} failed${failedCount > 0 ? ` (${failedCount} ${failedCount === 1 ? 'step failed' : 'steps failed'})` : ''}`,
-      };
-      if (steps.length > 0) result.steps = steps;
-      result.output = params.verbose
-        ? truncateOutput(output, MAX_OUTPUT_CHARS)
-        : buildCompactOutput(output, MAX_OUTPUT_CHARS);
-      return {
-        content: [{ type: 'text', text: minifiedJson(result) }],
-      };
-    }
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: minifiedJson({
-            success: true,
-            target,
-            worktreePath: workDir,
-            output: params.verbose
-              ? truncateOutput(output, MAX_OUTPUT_CHARS)
-              : buildCompactOutput(output, MAX_OUTPUT_CHARS),
-          }),
-        },
-      ],
-    };
-  } catch (error) {
-    if (error instanceof TimeoutError) {
-      const partialOutput = truncateOutput(
-        tailLines(error.partialOutput),
-        MAX_OUTPUT_CHARS,
-      );
-      const result: Record<string, unknown> = {
-        success: false,
-        timedOut: true,
-        target,
-        worktreePath: workDir,
-        timeoutMs,
-        summary: `${target} timed out after ${timeoutMs}ms — pass a larger timeoutMs to allow more time`,
-        partialOutput,
-      };
-      return {
-        content: [{ type: 'text', text: minifiedJson(result) }],
-        isError: true,
-      };
-    }
-
-    const errorMsg = error instanceof Error ? error.message : String(error);
-
-    if (STRUCTURED_TARGETS.has(target)) {
-      // Auto-recovery: formatter rewrote files alongside uncommitted changes.
-      // Commit just the formatter-rewritten files so the next make pc run sees
-      // a clean formatter state and can proceed to validate the code.
-      const rewrittenFiles = parseFormatterRewrittenFiles(errorMsg);
-      if (rewrittenFiles && rewrittenFiles.length > 0) {
-        try {
-          // Guard: if the index already has staged changes, --only would sweep
-          // them into the formatter commit.  Bail out with a clear error instead.
-          try {
-            execFileSync(
-              'git',
-              ['-C', workDir, 'diff', '--cached', '--quiet'],
-              {
-                encoding: 'utf8',
-              },
-            );
-          } catch {
-            // Non-zero exit means staged changes exist.
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: minifiedJson({
-                    success: false,
-                    target,
-                    worktreePath: workDir,
-                    autoFormatterCommit: false,
-                    error:
-                      'Auto-recovery aborted: the git index has staged changes that would be swept into the formatter commit. ' +
-                      'Please commit or unstage your staged changes, then re-run make pc.',
-                  }),
-                },
-              ],
-              isError: true,
-            };
-          }
-          execFileSync('git', ['-C', workDir, 'add', '--', ...rewrittenFiles], {
-            encoding: 'utf8',
-          });
-          execFileSync(
-            'git',
-            [
-              '-C',
-              workDir,
-              'commit',
-              '--only',
-              '-m',
-              'style: apply formatting',
-              '--',
-              ...rewrittenFiles,
-            ],
-            { encoding: 'utf8' },
-          );
-          // Retry make pc now that formatter output is committed.
-          try {
-            const retryOutput = await runMake(args, workDir, timeoutMs);
-            const retrySteps = parseSteps(retryOutput);
-            const hasPassedMarker = /All pre-commit checks passed/i.test(
-              retryOutput,
-            );
-            const allPassed =
-              retrySteps.every((s) => s.status !== 'failed') &&
-              (hasPassedMarker || retrySteps.length === 0);
-            const retryResult: Record<string, unknown> = {
-              success: allPassed,
-              target,
-              worktreePath: workDir,
-              autoFormatterCommit: true,
-              summary: allPassed
-                ? `${target} passed (formatter output auto-committed)`
-                : `${target} failed after auto-committing formatter output`,
-            };
-            if (retrySteps.length > 0) retryResult.steps = retrySteps;
-            retryResult.output = params.verbose
-              ? truncateOutput(retryOutput, MAX_OUTPUT_CHARS)
-              : buildCompactOutput(retryOutput, MAX_OUTPUT_CHARS);
-            return {
-              content: [{ type: 'text', text: minifiedJson(retryResult) }],
-              isError: !allPassed,
-            };
-          } catch (retryError) {
-            // Retry also failed — report real errors but flag that formatter was committed.
-            const retryMsg =
-              retryError instanceof Error
-                ? retryError.message
-                : String(retryError);
-            const retrySteps = parseSteps(retryMsg);
-            const retryErrors = extractErrors(retryMsg);
-            const retryResult: Record<string, unknown> = {
-              success: false,
-              target,
-              worktreePath: workDir,
-              autoFormatterCommit: true,
-              summary: `${target} failed (formatter output was auto-committed; fix remaining errors)`,
-            };
-            if (retrySteps.length > 0) retryResult.steps = retrySteps;
-            if (retryErrors.length > 0) retryResult.errors = retryErrors;
-            retryResult.output = params.verbose
-              ? truncateOutput(retryMsg, MAX_OUTPUT_CHARS)
-              : buildCompactOutput(retryMsg, MAX_OUTPUT_CHARS);
-            return {
-              content: [{ type: 'text', text: minifiedJson(retryResult) }],
-              isError: true,
-            };
-          }
-        } catch (gitError) {
-          // Git operations failed — unstage any staged files (best-effort cleanup)
-          // then return a structured error that surfaces the recovery attempt and
-          // git failure reason, so the agent is not misled by the original make pc error.
-          try {
-            execFileSync(
-              'git',
-              ['-C', workDir, 'reset', 'HEAD', '--', ...rewrittenFiles],
-              { encoding: 'utf8' },
-            );
-          } catch {
-            // Ignore — best-effort cleanup only.
-          }
-          const gitErrMsg =
-            gitError instanceof Error
-              ? (gitError as Error & { stderr?: string }).stderr?.trim() ||
-                gitError.message
-              : String(gitError);
-          const gitSteps = parseSteps(errorMsg);
-          const gitErrors = extractErrors(errorMsg);
-          const gitResult: Record<string, unknown> = {
-            success: false,
-            target,
-            worktreePath: workDir,
-            autoFormatterFailed: true,
-            summary: `${target} failed (formatter auto-recovery failed: ${gitErrMsg})`,
-          };
-          if (gitSteps.length > 0) gitResult.steps = gitSteps;
-          if (gitErrors.length > 0) gitResult.errors = gitErrors;
-          gitResult.output = params.verbose
-            ? truncateOutput(errorMsg, MAX_OUTPUT_CHARS)
-            : buildCompactOutput(errorMsg, MAX_OUTPUT_CHARS);
-          return {
-            content: [{ type: 'text', text: minifiedJson(gitResult) }],
-            isError: true,
-          };
-        }
-      }
-
-      const steps = parseSteps(errorMsg);
-      const errors = extractErrors(errorMsg);
-      const result: Record<string, unknown> = {
-        success: false,
-        target,
-        worktreePath: workDir,
-        summary: `${target} failed`,
-      };
-      if (steps.length > 0) result.steps = steps;
-      if (errors.length > 0) result.errors = errors;
-      result.output = params.verbose
-        ? truncateOutput(errorMsg, MAX_OUTPUT_CHARS)
-        : buildCompactOutput(errorMsg, MAX_OUTPUT_CHARS);
-      return {
-        content: [{ type: 'text', text: minifiedJson(result) }],
-        isError: true,
-      };
-    }
-
+  const deadline = Date.now() + SYNC_BUDGET_MS;
+  const record = await waitForJobDone(jobId, SYNC_BUDGET_MS);
+  // The job was just started, so the registry lookup cannot miss.
+  if (!record) {
     return {
       content: [
         {
@@ -478,11 +254,186 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             success: false,
             target,
             worktreePath: workDir,
-            error: truncateOutput(errorMsg, MAX_OUTPUT_CHARS),
+            error: `Job "${jobId}" vanished from the registry — re-run the target.`,
           }),
         },
       ],
       isError: true,
     };
   }
+  if (!record.done) {
+    return buildStatusResult(record, false);
+  }
+
+  return finishCompletedRun(record, {
+    target,
+    workDir,
+    args,
+    timeoutMs,
+    deadline,
+    verbose: params.verbose ?? false,
+  });
+}
+
+interface RunContext {
+  target: string;
+  workDir: string;
+  args: string[];
+  timeoutMs: number;
+  /** Sync-budget deadline shared with any auto-recovery retry. */
+  deadline: number;
+  verbose: boolean;
+}
+
+/** Format a terminal job record, applying formatter auto-recovery for structured targets. */
+async function finishCompletedRun(
+  record: JobRecord,
+  ctx: RunContext,
+): Promise<ToolResult> {
+  const timedOut =
+    record.error != null && /internal timeout/i.test(record.error);
+  const extras: Record<string, unknown> = timedOut
+    ? {
+        timedOut: true,
+        timeoutMs: ctx.timeoutMs,
+        hint: `${ctx.target} hit its ${ctx.timeoutMs}ms process timeout — pass a larger timeoutMs to allow more time`,
+      }
+    : {};
+
+  const failed = record.exitCode !== 0 || record.error !== null;
+  if (failed && !timedOut && STRUCTURED_TARGETS.has(ctx.target)) {
+    const log = readJobLog(record);
+    const rewrittenFiles = parseFormatterRewrittenFiles(log);
+    if (rewrittenFiles && rewrittenFiles.length > 0) {
+      return autoCommitFormatterAndRetry(rewrittenFiles, log, ctx);
+    }
+  }
+
+  return buildStatusResult(record, true, extras);
+}
+
+/**
+ * Auto-recovery: the formatter rewrote files alongside uncommitted changes.
+ * Commit just the formatter-rewritten files so the next run sees a clean
+ * formatter state, then retry the target as a new background job within the
+ * remaining sync budget.
+ */
+async function autoCommitFormatterAndRetry(
+  rewrittenFiles: string[],
+  failureLog: string,
+  ctx: RunContext,
+): Promise<ToolResult> {
+  try {
+    // Guard: if the index already has staged changes, --only would sweep
+    // them into the formatter commit.  Bail out with a clear error instead.
+    try {
+      execFileSync('git', ['-C', ctx.workDir, 'diff', '--cached', '--quiet'], {
+        encoding: 'utf8',
+      });
+    } catch {
+      // Non-zero exit means staged changes exist.
+      return {
+        content: [
+          {
+            type: 'text',
+            text: minifiedJson({
+              success: false,
+              target: ctx.target,
+              worktreePath: ctx.workDir,
+              autoFormatterCommit: false,
+              error:
+                'Auto-recovery aborted: the git index has staged changes that would be swept into the formatter commit. ' +
+                'Please commit or unstage your staged changes, then re-run make pc.',
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+    execFileSync('git', ['-C', ctx.workDir, 'add', '--', ...rewrittenFiles], {
+      encoding: 'utf8',
+    });
+    execFileSync(
+      'git',
+      [
+        '-C',
+        ctx.workDir,
+        'commit',
+        '--only',
+        '-m',
+        'style: apply formatting',
+        '--',
+        ...rewrittenFiles,
+      ],
+      { encoding: 'utf8' },
+    );
+  } catch (gitError) {
+    // Git operations failed — unstage any staged files (best-effort cleanup)
+    // then return a structured error that surfaces the recovery attempt and
+    // git failure reason, so the agent is not misled by the original failure.
+    try {
+      execFileSync(
+        'git',
+        ['-C', ctx.workDir, 'reset', 'HEAD', '--', ...rewrittenFiles],
+        { encoding: 'utf8' },
+      );
+    } catch {
+      // Ignore — best-effort cleanup only.
+    }
+    const gitErrMsg =
+      gitError instanceof Error
+        ? (gitError as Error & { stderr?: string }).stderr?.trim() ||
+          gitError.message
+        : String(gitError);
+    const gitSteps = parseSteps(failureLog);
+    const gitErrors = extractErrors(failureLog);
+    const gitResult: Record<string, unknown> = {
+      success: false,
+      target: ctx.target,
+      worktreePath: ctx.workDir,
+      autoFormatterFailed: true,
+      summary: `${ctx.target} failed (formatter auto-recovery failed: ${gitErrMsg})`,
+    };
+    if (gitSteps.length > 0) gitResult.steps = gitSteps;
+    if (gitErrors.length > 0) gitResult.errors = gitErrors;
+    gitResult.output = ctx.verbose
+      ? truncateOutput(failureLog, MAX_OUTPUT_CHARS)
+      : buildCompactOutput(failureLog, MAX_OUTPUT_CHARS);
+    return {
+      content: [{ type: 'text', text: minifiedJson(gitResult) }],
+      isError: true,
+    };
+  }
+
+  // Retry now that formatter output is committed — as a background job within
+  // whatever remains of the sync budget.
+  const { jobId: retryJobId } = startMakeInBackground(
+    ctx.args,
+    ctx.target,
+    ctx.workDir,
+    ctx.timeoutMs,
+    ctx.verbose,
+  );
+  const remaining = Math.max(ctx.deadline - Date.now(), 1_000);
+  const retryRecord = await waitForJobDone(retryJobId, remaining);
+  if (!retryRecord) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            success: false,
+            target: ctx.target,
+            worktreePath: ctx.workDir,
+            autoFormatterCommit: true,
+            error: `Retry job "${retryJobId}" vanished from the registry — re-run the target.`,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+  return buildStatusResult(retryRecord, retryRecord.done, {
+    autoFormatterCommit: true,
+  });
 }

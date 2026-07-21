@@ -258,15 +258,16 @@ Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool e
 | `make lint-touch-map`                                                         | `make_run({ target: "lint-touch-map" })`                                                                                                                                                                                                                                                                                                                                                           |
 | `db_migration_status` → `db_migrate` → `make_run({ target: "pc" })` (3 steps) | `validate_pr({ worktreePath?, sanctionedChunks?, runPcInBackground?, startAtChunk? })` — semantic one-shot; checks migration status, applies if needed, then runs pc. Use `sanctionedChunks: true` in cloud sessions; each call is budgeted to ~45s and may return `{ pc: { status: "in_progress" } }` with resume instructions (`startAtChunk`, or `make_run_wait` on a still-running chunk job). |
 
-**Heavy non-validation targets in cloud sessions — use background execution.** Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every tool call, which kills a synchronous `make_run` for a long target (`build-all`, `test-all`, `install`) before it can finish — regardless of `timeoutMs`. For these, pass `runInBackground: true` and poll. (Validation is **not** in this list — route it per [Validation Routing](#validation-routing).)
+**Heavy targets are transport-safe by default (LS-8558).** Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every tool call. `make_run` (and the job-backed nx tools `nx_run`, `nx_run_affected`, `nx_run_e2e_specs`, `nx_install_package`) now always run the underlying process as a background job with a ~45s bounded wait: fast targets return their result in one call, and anything slower returns `{ status: "running", jobId }` instead of blocking into the transport timeout. Never re-invoke the tool while its job runs — poll instead:
 
 ```
-make_run({ target: "build-all", runInBackground: true })   // → { jobId, status: "running" }
-make_run_wait({ jobId })                                     // blocks ≤55s; re-call if it returns status: "running"
-make_run_status({ jobId })                                   // non-blocking snapshot (status + log tail)
+make_run({ target: "build-all" })   // fast → full result; slow → { jobId, status: "running" }
+make_run_wait({ jobId })            // blocks ≤55s; re-call if it returns status: "running"
+make_run_status({ jobId })          // non-blocking snapshot (status + log tail)
+// nx tools poll with nx_job_wait({ jobId }) / nx_job_status({ jobId }) instead
 ```
 
-`make_run_wait` returns the full structured result (with `steps[]` for multi-step targets like `pre-commit`/`full-check`) once the job reaches `done`/`failed`. In local sessions the synchronous form is fine; `runInBackground` is only required where the transport timeout applies.
+`make_run_wait` returns the full structured result (with `steps[]` for multi-step targets like `pre-commit`/`full-check`) once the job reaches `done`/`failed`; `nx_job_wait` likewise returns the originating tool's structured result (e.g. the playwright report for `nx_run_e2e_specs`). `runInBackground: true` still exists to skip the initial bounded wait and return the jobId immediately. (Validation routing is unchanged — see [Validation Routing](#validation-routing).)
 
 **`make_run` output is compact by default.** The `output` field omits prettier per-file listings (collapsed to `[Formatting: N files checked, M changed]`) and truncates each step body to 20 lines with a `[N more lines — run step directly for full output]` note. Pass `verbose: true` only when you genuinely need the full raw output for debugging.
 

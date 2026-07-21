@@ -14,6 +14,7 @@ import {
 } from './run-target-utils.js';
 
 export interface JobRecord {
+  jobId: string;
   pid: number;
   logPath: string;
   startTime: number;
@@ -24,6 +25,14 @@ export interface JobRecord {
   error: string | null;
   verbose: boolean;
 }
+
+/**
+ * Single-call sync budget for job-backed tools — stays safely under the ~60s
+ * MCP transport timeout in cloud sessions. Targets that finish inside the
+ * budget return their result in one call; slower ones return a running
+ * snapshot with a jobId to poll via make_run_wait.
+ */
+export const SYNC_BUDGET_MS = 45_000;
 
 // In-memory registry — lives for the lifetime of the MCP server process.
 const jobRegistry = new Map<string, JobRecord>();
@@ -68,6 +77,7 @@ export function startMakeInBackground(
   });
 
   const record: JobRecord = {
+    jobId,
     pid: child.pid ?? 0,
     logPath,
     startTime: Date.now(),
@@ -111,7 +121,11 @@ export function startMakeInBackground(
   return { jobId, logPath };
 }
 
-function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
+export function buildStatusResult(
+  record: JobRecord,
+  full: boolean,
+  extras: Record<string, unknown> = {},
+): ToolResult {
   const log = readLog(record.logPath);
   const elapsedSec = Math.round((Date.now() - record.startTime) / 1000);
 
@@ -123,11 +137,13 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
           type: 'text',
           text: minifiedJson({
             status: 'running',
+            jobId: record.jobId,
             target: record.target,
             elapsedSec,
+            ...extras,
             logTail,
             hint:
-              'Job still running. Re-invoke make_run_wait({ jobId }) to continue waiting ' +
+              `Job still running. Re-invoke make_run_wait({ jobId: "${record.jobId}" }) to continue waiting ` +
               '(each call waits up to 55s and returns a status snapshot — never an error ' +
               'while the job is in progress). Do NOT re-run the target.',
           }),
@@ -152,9 +168,11 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
     const result: Record<string, unknown> = {
       status: record.done ? (success ? 'done' : 'failed') : 'running',
       success,
+      jobId: record.jobId,
       target: record.target,
       worktreePath: record.workDir,
       elapsedSec,
+      ...extras,
       summary: success
         ? `${record.target} passed${steps.length > 0 ? ` (${steps.length} steps)` : ''}`
         : `${record.target} failed${failedCount > 0 ? ` (${failedCount} step${failedCount === 1 ? '' : 's'} failed)` : ''}`,
@@ -182,9 +200,11 @@ function buildStatusResult(record: JobRecord, full: boolean): ToolResult {
         text: minifiedJson({
           status: record.done ? (success ? 'done' : 'failed') : 'running',
           success,
+          jobId: record.jobId,
           target: record.target,
           worktreePath: record.workDir,
           elapsedSec,
+          ...extras,
           ...(record.error ? { error: record.error } : {}),
           output: record.verbose
             ? truncateOutput(output, MAX_OUTPUT_CHARS)

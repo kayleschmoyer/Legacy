@@ -5,39 +5,12 @@ import { join } from 'node:path';
 
 // run-command.ts uses import.meta.url which is incompatible with the commonjs
 // tsconfig used by Jest. Mock it here the same way validate-pr.spec.ts does.
-// FakeTimeoutError is defined inside the factory so it is available at hoist time.
-jest.mock('../run-command.js', () => {
-  class FakeTimeoutError extends Error {
-    partialOutput: string;
-    constructor(msg: string, partial = '') {
-      super(msg);
-      this.name = 'TimeoutError';
-      this.partialOutput = partial;
-    }
-  }
-  return {
-    getRepoRoot: jest.fn(() => '/tmp/fake-repo-root'),
-    TimeoutError: FakeTimeoutError,
-    runMake: jest.fn(),
-  };
-});
+jest.mock('../run-command.js', () => ({
+  getRepoRoot: jest.fn(() => '/tmp/fake-repo-root'),
+}));
 
 import { runTarget } from './run-target.js';
 import { makeRunWait } from './make-run-bg.js';
-
-type RunCommandMock = {
-  runMake: jest.MockedFunction<() => Promise<string>>;
-  TimeoutError: new (
-    msg: string,
-    partial?: string,
-  ) => Error & {
-    partialOutput: string;
-  };
-};
-
-function getRunCommandMock(): RunCommandMock {
-  return jest.requireMock('../run-command.js') as RunCommandMock;
-}
 
 /** Pull the parsed JSON payload out of a ToolResult's text content. */
 function payload(result: {
@@ -134,29 +107,56 @@ describe('runTarget — runInBackground: true', () => {
   }, 20_000);
 });
 
-describe('runTarget — timeout handling', () => {
+describe('runTarget — default path (budgeted background job)', () => {
+  let workDir: string;
+
   beforeAll(() => {
-    const { runMake, TimeoutError } = getRunCommandMock();
-    runMake.mockRejectedValue(
-      new TimeoutError('Process timed out after 500ms', 'partial output'),
+    workDir = mkdtempSync(join(tmpdir(), 'make-rt-default-test-'));
+    writeFileSync(
+      join(workDir, 'Makefile'),
+      'kill-stale:\n\t@echo ok\n' +
+        // diagnose sleeps ~1.5s via node so the 500ms process timeout fires.
+        'diagnose:\n\t@node -e "setTimeout(function(){}, 1500)"\n',
     );
   });
 
-  afterAll(() => {
-    getRunCommandMock().runMake.mockReset();
-  });
+  afterAll(async () => {
+    // The killed job's node grandchild survives child.kill() (make-only kill —
+    // the tree-kill gap tracked in LS-8564) and holds workDir open on Windows.
+    // Outwait it, then retry the removal to absorb any EBUSY tail.
+    await new Promise((r) => setTimeout(r, 2_000));
+    rmSync(workDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 500,
+    });
+  }, 15_000);
 
-  it('returns timedOut: true when runMake throws TimeoutError', async () => {
+  it('fast target completes within the sync budget and returns done/success', async () => {
     const result = await runTarget({
       target: 'kill-stale',
-      worktreePath: '/tmp/fake-repo-root',
+      worktreePath: workDir,
+    });
+    expect(result.isError).toBeFalsy();
+    const body = payload(result);
+    expect(body.status).toBe('done');
+    expect(body.success).toBe(true);
+    expect(typeof body.jobId).toBe('string');
+    expect(body.target).toBe('kill-stale');
+  }, 20_000);
+
+  it('returns timedOut: true when the process timeout kills the target', async () => {
+    const result = await runTarget({
+      target: 'diagnose',
+      worktreePath: workDir,
       timeoutMs: 500,
     });
     expect(result.isError).toBe(true);
     const body = payload(result);
     expect(body.timedOut).toBe(true);
     expect(body.success).toBe(false);
-    expect(body.target).toBe('kill-stale');
+    expect(body.target).toBe('diagnose');
     expect(body.timeoutMs).toBe(500);
-  });
+  }, 20_000);
 });

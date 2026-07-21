@@ -1,10 +1,14 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { registerJobFormatter } from '../job-formatters.js';
+import type { FormattedJobResult } from '../job-formatters.js';
+import { runJobWithBudget } from '../jobs.js';
+import type { JobSnapshot } from '../jobs.js';
+import { SYNC_BUDGET_MS, pnpmJobSpec } from '../nx-job.js';
 import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -403,89 +407,138 @@ export async function runE2ESpecs(
     }
   }
 
-  const env: NodeJS.ProcessEnv = { ...process.env };
+  const env: Record<string, string> = {};
   if (!integration) {
     env['E2E_AUTH_MODE'] = 'ci';
     env['CI'] = 'true';
     env['E2E_PORT'] = String(port);
   }
 
-  // --- Run Playwright (capture output even on non-zero exit) ---
-
-  // Use pnpm.cmd on Windows to avoid shell:true (which would expose cmd.exe
-  // injection vectors like ^ and %). On non-Windows, pnpm is a plain binary.
-  const executable = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+  // --- Run Playwright as a background job with a bounded sync wait ---
+  // Fast spec runs return their parsed report in one call; slower runs return
+  // a jobId whose completion (observed via nx_job_wait) is formatted by the
+  // 'e2e-specs' job formatter into the same structured report. Running pnpm
+  // through the platform shell on Windows also fixes the historical EINVAL
+  // from spawning pnpm.cmd without a shell; inputs are pre-validated against
+  // UNSAFE_CHARS above, and shell-relevant args are quoted (cmd-escape.ts).
   const timeoutMs = integration ? INTEGRATION_TIMEOUT_MS : E2E_TIMEOUT_MS;
-
-  const runResult = await new Promise<{
-    stdout: string;
-    stderr: string;
-    timedOut: boolean;
-  }>((resolve) => {
-    execFile(
-      executable,
-      args,
-      {
-        cwd,
-        timeout: timeoutMs,
-        maxBuffer: 10 * 1024 * 1024,
-        env,
-        windowsHide: true,
+  const jobSpec = pnpmJobSpec(args);
+  const snapshot = await runJobWithBudget(
+    {
+      command: jobSpec.command,
+      args: jobSpec.args,
+      shell: jobSpec.shell,
+      cwd,
+      label: `playwright ${integration ? 'integration' : 'e2e'} (${resolvedSpecs.length} spec${resolvedSpecs.length === 1 ? '' : 's'})`,
+      timeoutMs,
+      idempotencyKey: `e2e-specs:${cwd}:${args.join(' ')}`,
+      env,
+      meta: {
+        kind: 'e2e-specs',
+        resultsFile,
+        e2eAppDir,
+        integration,
+        withTracing,
+        port,
+        preconditionWarnings,
+        timeoutMs,
       },
-      (err, stdout, stderr) => {
-        const timedOut =
-          (err as (NodeJS.ErrnoException & { killed?: boolean }) | null)
-            ?.killed ?? false;
-        resolve({
-          stdout: stdout ?? '',
-          stderr: stderr ?? '',
-          timedOut,
-        });
-      },
-    );
-  });
+    },
+    SYNC_BUDGET_MS,
+  );
 
-  if (runResult.timedOut) {
+  if (snapshot.status === 'running' || snapshot.status === 'orphaned') {
     return {
       content: [
         {
           type: 'text',
-          text: `Playwright timed out after ${timeoutMs / 1000}s.\n\n${truncateOutput(
-            [runResult.stderr, runResult.stdout].filter(Boolean).join('\n'),
-            MAX_OUTPUT_CHARS,
-          )}`,
+          text: minifiedJson({
+            mode: integration ? 'integration' : 'hermetic',
+            status: snapshot.status,
+            jobId: snapshot.jobId,
+            elapsedSec: snapshot.elapsedSec,
+            ...(preconditionWarnings.length > 0
+              ? { preconditionWarnings }
+              : {}),
+            logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+            hint: snapshot.hint,
+          }),
         },
       ],
+      ...(snapshot.status === 'orphaned' ? { isError: true } : {}),
+    };
+  }
+
+  const formatted = await buildE2eResult(snapshot);
+  return {
+    content: [{ type: 'text', text: minifiedJson(formatted.body) }],
+    ...(formatted.isError ? { isError: true } : {}),
+  };
+}
+
+/** Shape of the job metadata written by runE2ESpecs for deferred formatting. */
+interface E2eJobMeta {
+  resultsFile?: unknown;
+  e2eAppDir?: unknown;
+  integration?: unknown;
+  withTracing?: unknown;
+  port?: unknown;
+  preconditionWarnings?: unknown;
+  timeoutMs?: unknown;
+}
+
+/**
+ * Build the structured e2e result body from a terminal job snapshot. Shared
+ * between the inline (within sync budget) path and the deferred nx_job_wait
+ * formatter so callers get the same report either way.
+ */
+async function buildE2eResult(
+  snapshot: JobSnapshot,
+): Promise<FormattedJobResult> {
+  const meta = (snapshot.meta ?? {}) as E2eJobMeta;
+  const integration = meta.integration === true;
+  const withTracing = meta.withTracing === true;
+  const resultsFile =
+    typeof meta.resultsFile === 'string' ? meta.resultsFile : null;
+  const e2eAppDir = typeof meta.e2eAppDir === 'string' ? meta.e2eAppDir : null;
+  const port = typeof meta.port === 'number' ? meta.port : null;
+  const preconditionWarnings = Array.isArray(meta.preconditionWarnings)
+    ? (meta.preconditionWarnings as string[])
+    : [];
+  const timeoutMs = typeof meta.timeoutMs === 'number' ? meta.timeoutMs : null;
+
+  const combinedOutput = truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS);
+
+  // Process killed by the job runner's runaway backstop.
+  if (snapshot.error && /internal timeout/i.test(snapshot.error)) {
+    return {
+      body: {
+        error: `Playwright timed out${timeoutMs != null ? ` after ${timeoutMs / 1000}s` : ''}.`,
+        output: combinedOutput,
+      },
       isError: true,
     };
   }
 
-  // --- Parse results ---
-
   let report: PWReport | null = null;
-  try {
-    const raw = await readFile(resultsFile, 'utf-8');
-    report = JSON.parse(raw) as PWReport;
-  } catch {
-    // File not written — playwright couldn't start (bad config, missing binary, etc.)
+  if (resultsFile) {
+    try {
+      const raw = await readFile(resultsFile, 'utf-8');
+      report = JSON.parse(raw) as PWReport;
+    } catch {
+      // File not written — playwright couldn't start (bad config, missing binary, etc.)
+    }
   }
-
-  const combinedOutput = truncateOutput(
-    [runResult.stderr, runResult.stdout].filter(Boolean).join('\n'),
-    MAX_OUTPUT_CHARS,
-  );
 
   if (report == null) {
     const modeInfo = integration
       ? 'integration mode (live backend)'
       : `E2E_AUTH_MODE=ci, E2E_PORT=${port}`;
     return {
-      content: [
-        {
-          type: 'text',
-          text: `Playwright did not produce a results file (${modeInfo}).\n\n${combinedOutput}`,
-        },
-      ],
+      body: {
+        error: `Playwright did not produce a results file (${modeInfo}).`,
+        output: combinedOutput,
+      },
       isError: true,
     };
   }
@@ -498,34 +551,38 @@ export async function runE2ESpecs(
 
   // Integration-mode extras: trace artifacts and GraphQL error summary.
   const traceZips =
-    integration && withTracing ? await findTraceZips(e2eAppDir) : [];
+    integration && withTracing && e2eAppDir
+      ? await findTraceZips(e2eAppDir)
+      : [];
   const graphqlErrors = integration
     ? extractGraphqlErrors(combinedOutput)
     : undefined;
 
   return {
-    content: [
-      {
-        type: 'text',
-        text: minifiedJson({
-          success: failed === 0 && flaky === 0,
-          mode: integration ? 'integration' : 'hermetic',
-          ...(port != null ? { port } : {}),
-          ...(preconditionWarnings.length > 0 ? { preconditionWarnings } : {}),
-          stats: {
-            total: passed + failed + flaky + skipped,
-            passed,
-            failed,
-            flaky,
-            skipped,
-            durationMs: stats.duration ?? null,
-          },
-          failingTests: extractFailingTests(report),
-          ...(traceZips.length > 0 ? { traceArtifacts: traceZips } : {}),
-          ...(graphqlErrors ? { graphqlErrors } : {}),
-          output: combinedOutput,
-        }),
+    body: {
+      success: failed === 0 && flaky === 0,
+      mode: integration ? 'integration' : 'hermetic',
+      ...(port != null ? { port } : {}),
+      ...(preconditionWarnings.length > 0 ? { preconditionWarnings } : {}),
+      stats: {
+        total: passed + failed + flaky + skipped,
+        passed,
+        failed,
+        flaky,
+        skipped,
+        durationMs: stats.duration ?? null,
       },
-    ],
+      failingTests: extractFailingTests(report),
+      ...(traceZips.length > 0 ? { traceArtifacts: traceZips } : {}),
+      ...(graphqlErrors ? { graphqlErrors } : {}),
+      output: combinedOutput,
+    },
+    // Failing tests are reported via success:false in the body, not as a tool
+    // error — matches the pre-conversion contract.
+    isError: false,
   };
 }
+
+// Deferred-completion formatter: a slow spec run whose completion is observed
+// via nx_job_wait gets the same structured report as the inline path.
+registerJobFormatter('e2e-specs', (snapshot) => buildE2eResult(snapshot));

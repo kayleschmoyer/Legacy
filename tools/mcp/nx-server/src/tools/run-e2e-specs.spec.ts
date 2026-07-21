@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 // Module mocks — must be declared before the import under test
 // ---------------------------------------------------------------------------
 
-jest.mock('node:child_process', () => ({ execFile: jest.fn() }));
+jest.mock('../jobs.js', () => ({ runJobWithBudget: jest.fn() }));
 jest.mock('node:fs', () => ({ existsSync: jest.fn(() => true) }));
 jest.mock('node:fs/promises', () => ({
   readFile: jest.fn(),
@@ -44,13 +44,14 @@ jest.mock('../truncate-output.js', () => ({
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import * as childProcess from 'node:child_process';
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
+import { runJobWithBudget } from '../jobs.js';
+import type { JobSnapshot, StartJobOptions } from '../jobs.js';
 import { runE2ESpecs } from './run-e2e-specs.js';
 
-const mockExecFile = childProcess.execFile as jest.MockedFunction<
-  typeof childProcess.execFile
+const mockRunJob = runJobWithBudget as jest.MockedFunction<
+  typeof runJobWithBudget
 >;
 const mockExistsSync = fs.existsSync as jest.MockedFunction<
   typeof fs.existsSync
@@ -64,22 +65,35 @@ const mockRm = fsPromises.rm as jest.MockedFunction<typeof fsPromises.rm>;
 // Helpers
 // ---------------------------------------------------------------------------
 
-type ExecFileCallback = (
-  err: NodeJS.ErrnoException | null,
-  stdout: string,
-  stderr: string,
-) => void;
+/** Configure runJobWithBudget to resolve with a terminal snapshot echoing job meta. */
+function setupJob(
+  log: string,
+  opts: { failed?: boolean; timedOut?: boolean } = {},
+): void {
+  mockRunJob.mockImplementation(async (jobOpts: StartJobOptions) => {
+    const failed = (opts.failed ?? false) || (opts.timedOut ?? false);
+    const snapshot: JobSnapshot = {
+      jobId: 'nx-test-job',
+      status: failed ? 'failed' : 'done',
+      label: jobOpts.label,
+      cwd: jobOpts.cwd,
+      elapsedSec: 1,
+      exitCode: failed ? 1 : 0,
+      error: opts.timedOut
+        ? `Process killed after ${jobOpts.timeoutMs}ms (internal timeout)`
+        : failed
+          ? 'exited with code 1'
+          : null,
+      meta: jobOpts.meta,
+      log,
+    };
+    return snapshot;
+  });
+}
 
-function setupExecFile(stdout: string, stderr = '', killed = false): void {
-  (mockExecFile as unknown as jest.Mock).mockImplementation(
-    (_cmd: unknown, _args: unknown, _opts: unknown, callback: unknown) => {
-      const cb = callback as ExecFileCallback;
-      const err = killed
-        ? Object.assign(new Error('killed'), { killed: true })
-        : null;
-      cb(err, stdout, stderr);
-    },
-  );
+/** The StartJobOptions passed to the (mocked) job runner in the first call. */
+function jobCallOpts(): StartJobOptions {
+  return mockRunJob.mock.calls[0][0];
 }
 
 const PASSING_REPORT = JSON.stringify({
@@ -186,7 +200,7 @@ describe('runE2ESpecs', () => {
     });
 
     it('allows backslash in spec path (Windows paths)', async () => {
-      setupExecFile('', '');
+      setupJob('');
       mockReadFile.mockResolvedValue(PASSING_REPORT as never);
       const result = await runE2ESpecs({
         specs: ['src\\tests\\auth.spec.ts'],
@@ -195,7 +209,7 @@ describe('runE2ESpecs', () => {
     });
 
     it('allows backslash in grep (regex anchors like \\b)', async () => {
-      setupExecFile('', '');
+      setupJob('');
       mockReadFile.mockResolvedValue(PASSING_REPORT as never);
       const result = await runE2ESpecs({
         specs: ['src/tests/auth.spec.ts'],
@@ -224,17 +238,8 @@ describe('runE2ESpecs', () => {
   // --- Playwright execution ---
 
   describe('playwright execution', () => {
-    it('returns error when playwright times out', async () => {
-      (mockExecFile as unknown as jest.Mock).mockImplementation(
-        (_cmd: unknown, _args: unknown, _opts: unknown, callback: unknown) => {
-          const cb = callback as ExecFileCallback;
-          cb(
-            Object.assign(new Error('killed'), { killed: true }),
-            '',
-            'timeout stderr',
-          );
-        },
-      );
+    it('returns error when playwright hits the process timeout', async () => {
+      setupJob('timeout output', { timedOut: true });
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
       expect(result.isError).toBe(true);
@@ -242,7 +247,7 @@ describe('runE2ESpecs', () => {
     });
 
     it('returns error when playwright does not produce a results file', async () => {
-      setupExecFile('some output', 'some error');
+      setupJob('some output');
       mockReadFile.mockRejectedValue(new Error('ENOENT') as never);
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
@@ -250,8 +255,34 @@ describe('runE2ESpecs', () => {
       expect(result.content[0].text).toMatch(/did not produce a results file/);
     });
 
+    it('returns a running snapshot with a jobId when the run exceeds the sync budget', async () => {
+      mockRunJob.mockImplementation(async (jobOpts: StartJobOptions) => ({
+        jobId: 'nx-running-job',
+        status: 'running' as const,
+        label: jobOpts.label,
+        cwd: jobOpts.cwd,
+        elapsedSec: 45,
+        exitCode: null,
+        error: null,
+        meta: jobOpts.meta,
+        logTail: 'Running 3 tests…',
+        hint: 'Call nx_job_wait',
+      }));
+
+      const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
+      expect(result.isError).toBeUndefined();
+      const payload = JSON.parse(result.content[0].text) as {
+        status: string;
+        jobId: string;
+        hint: string;
+      };
+      expect(payload.status).toBe('running');
+      expect(payload.jobId).toBe('nx-running-job');
+      expect(payload.hint).toMatch(/nx_job_wait/);
+    });
+
     it('returns success:true when all tests pass', async () => {
-      setupExecFile('', '');
+      setupJob('');
       mockReadFile.mockResolvedValue(PASSING_REPORT as never);
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
@@ -268,7 +299,7 @@ describe('runE2ESpecs', () => {
     });
 
     it('returns success:false with failing test details when tests fail', async () => {
-      setupExecFile('', '');
+      setupJob('');
       mockReadFile.mockResolvedValue(FAILING_REPORT as never);
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
@@ -295,20 +326,19 @@ describe('runE2ESpecs', () => {
       );
     });
 
-    it('passes E2E_AUTH_MODE=ci and E2E_PORT in the environment', async () => {
-      setupExecFile('', '');
+    it('passes E2E_AUTH_MODE=ci and E2E_PORT in the job environment', async () => {
+      setupJob('');
       mockReadFile.mockResolvedValue(PASSING_REPORT as never);
 
       await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
 
-      const callArgs = mockExecFile.mock.calls[0];
-      const opts = callArgs[2] as { env?: Record<string, string> };
+      const opts = jobCallOpts();
       expect(opts.env?.['E2E_AUTH_MODE']).toBe('ci');
       expect(opts.env?.['E2E_PORT']).toMatch(/^\d+$/);
     });
 
     it('appends --grep flag when grep option is provided', async () => {
-      setupExecFile('', '');
+      setupJob('');
       mockReadFile.mockResolvedValue(PASSING_REPORT as never);
 
       await runE2ESpecs({
@@ -316,13 +346,11 @@ describe('runE2ESpecs', () => {
         grep: '@critical',
       });
 
-      const callArgs = mockExecFile.mock.calls[0];
-      const args = callArgs[1] as string[];
-      expect(args).toContain('--grep=@critical');
+      expect(jobCallOpts().args).toContain('--grep=@critical');
     });
 
     it('uses specified project browser', async () => {
-      setupExecFile('', '');
+      setupJob('');
       mockReadFile.mockResolvedValue(PASSING_REPORT as never);
 
       await runE2ESpecs({
@@ -330,9 +358,7 @@ describe('runE2ESpecs', () => {
         project: 'firefox',
       });
 
-      const callArgs = mockExecFile.mock.calls[0];
-      const args = callArgs[1] as string[];
-      expect(args).toContain('--project=firefox');
+      expect(jobCallOpts().args).toContain('--project=firefox');
     });
   });
 
@@ -354,7 +380,7 @@ describe('runE2ESpecs', () => {
         }
         return Promise.resolve(PASSING_REPORT) as never;
       });
-      setupExecFile('', '');
+      setupJob('');
     });
 
     afterEach(() => {
@@ -366,8 +392,8 @@ describe('runE2ESpecs', () => {
         specs: [INTEGRATION_SPEC],
         integration: true,
       });
-      const args = mockExecFile.mock.calls[0][1] as string[];
-      expect(args.find((a) => a.startsWith('--config='))).toMatch(
+      const args = jobCallOpts().args;
+      expect(args.find((a) => a.includes('--config='))).toMatch(
         /playwright\.integration\.config\.ts/,
       );
       expect(args).toContain('--workers=1');
@@ -390,10 +416,7 @@ describe('runE2ESpecs', () => {
         payload.preconditionWarnings?.some((w) => /e2e JWT not found/.test(w)),
       ).toBe(true);
 
-      const opts = mockExecFile.mock.calls[0][2] as {
-        env?: Record<string, string>;
-      };
-      expect(opts.env?.['E2E_AUTH_MODE']).toBeUndefined();
+      expect(jobCallOpts().env?.['E2E_AUTH_MODE']).toBeUndefined();
     });
 
     it('appends --trace=on only when withTracing:true', async () => {
@@ -402,7 +425,7 @@ describe('runE2ESpecs', () => {
         integration: true,
         withTracing: true,
       });
-      expect(mockExecFile.mock.calls[0][1] as string[]).toContain('--trace=on');
+      expect(jobCallOpts().args).toContain('--trace=on');
     });
   });
 });

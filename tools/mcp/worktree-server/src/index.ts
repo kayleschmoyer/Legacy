@@ -1348,7 +1348,9 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'integer',
             minimum: 0,
             description:
-              'Cap output to the last N lines. Use 0 for no truncation. Useful for high-volume commands like "make pc" (~430 KB) where only the final pass/fail lines matter. A header showing the omitted line count is prepended.',
+              'Cap output to the last N lines. Use 0 for no truncation. A header showing the omitted line count is prepended. ' +
+              'NOTE: worktree_run executes synchronously with a 120s cap — do NOT route long-running work (make pc, builds, installs) through it; ' +
+              'use nx_run_pc_chunk / make_run / nx_run, which background slow work and return a pollable jobId (LS-8558).',
           },
         },
         required: ['command'],

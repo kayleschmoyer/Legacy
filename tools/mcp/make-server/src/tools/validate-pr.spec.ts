@@ -137,7 +137,7 @@ describe('validatePR', () => {
       const result = await validatePR({});
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toMatch(/Migration failed/);
-      expect(mockRunMake).not.toHaveBeenCalled();
+      expect(mockStartMakeInBackground).not.toHaveBeenCalled();
     });
   });
 
@@ -148,6 +148,22 @@ describe('validatePR', () => {
         pc: { passed: boolean };
       };
       expect(payload.pc.passed).toBe(true);
+    });
+
+    it('returns pc.status running with a jobId when pc outlives the sync budget', async () => {
+      mockWaitForJobDone.mockResolvedValueOnce({
+        ...doneRecord(),
+        done: false,
+        exitCode: null,
+      });
+      const result = await validatePR({});
+      expect(result.isError).toBeFalsy();
+      const payload = JSON.parse(result.content[0].text) as {
+        pc: { status: string; jobId: string; hint: string };
+      };
+      expect(payload.pc.status).toBe('running');
+      expect(payload.pc.jobId).toBe('job-123');
+      expect(payload.pc.hint).toContain('make_run_wait');
     });
   });
 

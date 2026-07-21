@@ -131,6 +131,29 @@ describe('background job registry', () => {
     await waitForJob(third.jobId, 20_000);
   }, 30_000);
 
+  it('persists meta and echoes it on snapshots; env vars reach the child', async () => {
+    // `make noop-env` echoes $NX_JOBS_TEST_VAR (recipe added per-test below).
+    writeFileSync(
+      join(workDir, 'Makefile'),
+      'noop:\n\t@echo ok\n' +
+        'slow:\n\t@node -e "setTimeout(function () {}, 5000)"\n' +
+        'noop-env:\n\t@node -e "console.log(process.env.NX_JOBS_TEST_VAR)"\n',
+    );
+    const { jobId } = startJob({
+      command: 'make',
+      args: ['noop-env'],
+      cwd: workDir,
+      label: 'noop-env',
+      timeoutMs: 30_000,
+      env: { NX_JOBS_TEST_VAR: 'hello-from-env' },
+      meta: { kind: 'test-kind', extra: 42 },
+    });
+    const snapshot = await waitForJob(jobId, 20_000);
+    expect(snapshot?.status).toBe('done');
+    expect(snapshot?.log).toContain('hello-from-env');
+    expect(snapshot?.meta).toEqual({ kind: 'test-kind', extra: 42 });
+  }, 25_000);
+
   it('marks a job failed with an internal-timeout error when it exceeds timeoutMs', async () => {
     const { jobId } = startJob({
       command: 'make',

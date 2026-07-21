@@ -13,7 +13,10 @@
  * Only applied when `needsShell` is true (Windows + npm wrapper commands).
  */
 export function escapeCmdShellArg(arg: string): string {
-  if (/[|<>]/.test(arg)) {
+  // Whitespace is quoted too: with `shell: true` Node joins args with spaces,
+  // so an unquoted arg containing a space would split into two shell words
+  // (e.g. a --config= path or the "Mobile Chrome" playwright project).
+  if (/[|<>\s]/.test(arg)) {
     return `"${arg}"`;
   }
   return arg;

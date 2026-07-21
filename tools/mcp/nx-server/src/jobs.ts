@@ -38,6 +38,8 @@ export interface JobSnapshot {
   elapsedSec: number;
   exitCode: number | null;
   error: string | null;
+  /** Caller-supplied metadata (e.g. result-formatter kind and its inputs). */
+  meta?: Record<string, unknown>;
   /** Last LOG_TAIL_CHARS of output — present on running/orphaned snapshots. */
   logTail?: string;
   /** Full output — present on terminal (done/failed) snapshots. */
@@ -58,6 +60,8 @@ interface JobMeta {
   done: boolean;
   exitCode: number | null;
   error: string | null;
+  /** Caller-supplied metadata — persisted so a restarted server can still format results. */
+  meta?: Record<string, unknown>;
 }
 
 interface JobRecord extends JobMeta {
@@ -78,6 +82,21 @@ export interface StartJobOptions {
    * running returns the existing job instead of spawning a duplicate.
    */
   idempotencyKey?: string;
+  /**
+   * Run the command through the platform shell. Required on Windows for npm
+   * wrapper commands (pnpm/npm/npx) which are `.cmd` batch scripts — spawning
+   * them without a shell throws EINVAL since the CVE-2024-27980 hardening.
+   * Callers must pre-escape args (see cmd-escape.ts) when enabling this.
+   */
+  shell?: boolean;
+  /** Extra environment variables, merged over process.env (PATH preserved). */
+  env?: Record<string, string>;
+  /**
+   * Arbitrary metadata persisted with the job. Used by result formatters
+   * (meta.kind) to rebuild a tool-specific result when completion is observed
+   * later via nx_job_wait / nx_job_status.
+   */
+  meta?: Record<string, unknown>;
 }
 
 // In-memory registry — authoritative for jobs spawned by this server process.
@@ -115,6 +134,7 @@ function persistMeta(record: JobRecord): void {
     done: record.done,
     exitCode: record.exitCode,
     error: record.error,
+    meta: record.meta,
   };
   try {
     writeFileSync(record.metaPath, JSON.stringify(meta));
@@ -201,6 +221,7 @@ export function snapshotJob(jobId: string): JobSnapshot | null {
     elapsedSec,
     exitCode: record.exitCode,
     error: record.error,
+    ...(record.meta ? { meta: record.meta } : {}),
   };
 
   if (record.done) {
@@ -282,6 +303,20 @@ export function startJob(opts: StartJobOptions): {
         cwd: opts.cwd,
         stdio: ['ignore', fd, fd],
         windowsHide: true,
+        shell: opts.shell ?? false,
+        ...(opts.env
+          ? {
+              env: {
+                ...process.env,
+                ...opts.env,
+                // Preserve the host PATH so spawned processes can find
+                // binaries even if the caller-supplied env includes a
+                // PATH/Path key (mirrors run-command.ts).
+                ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
+                ...(process.env.Path ? { Path: process.env.Path } : {}),
+              },
+            }
+          : {}),
         // POSIX: make the child a process-group leader so killJobTree can
         // signal the whole tree via -pid. Windows tree-kill uses taskkill /T.
         detached: process.platform !== 'win32',
@@ -304,6 +339,7 @@ export function startJob(opts: StartJobOptions): {
     done: false,
     exitCode: null,
     error: null,
+    meta: opts.meta,
     logPath,
     metaPath,
   };

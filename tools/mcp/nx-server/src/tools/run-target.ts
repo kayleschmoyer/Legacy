@@ -1,7 +1,15 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { getRepoRoot, runNx } from '../run-command.js';
+import { runJobWithBudget } from '../jobs.js';
+import { SYNC_BUDGET_MS, nxJobSpec } from '../nx-job.js';
+import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
+
+// 30-minute process timeout — a runaway backstop only, NOT a transport guard
+// (that is the sync budget + bounded nx_job_wait calls). Generous on purpose:
+// a cold Nx cache can push a single build/test run well past 5 minutes, and
+// killing legitimate work forces a retry loop that never converges (LS-8353).
+const NX_RUN_TIMEOUT_MS = 30 * 60 * 1000;
 
 const ALLOWED_TARGETS = new Set([
   'build',
@@ -204,13 +212,49 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       nxArgs.push('--updateSnapshot');
     }
 
-    // Jest writes test names, pass/fail counts, and the summary to stderr.
-    // Capture stderr alongside stdout so agents can verify which tests ran.
-    const output = await runNx(nxArgs, cwd, {
-      env: params.env,
-      includeStderr: params.target === 'test',
-    });
+    // Run as a background job with a bounded sync wait: fast targets return
+    // their result in one call, slow ones return a jobId to poll via
+    // nx_job_wait — never blocking into the ~60s cloud MCP transport timeout.
+    // The job log captures stdout and stderr interleaved, so Jest's
+    // stderr-written test summary is always included.
+    const spec = nxJobSpec(nxArgs);
+    const snapshot = await runJobWithBudget(
+      {
+        command: spec.command,
+        args: spec.args,
+        shell: spec.shell,
+        cwd,
+        label: `nx run ${runSpec}`,
+        timeoutMs: NX_RUN_TIMEOUT_MS,
+        // Blind retries (e.g. after a lost transport) join the in-flight run
+        // instead of spawning a duplicate nx process.
+        idempotencyKey: `nx-run:${cwd}:${nxArgs.join(' ')}`,
+        env: params.env,
+      },
+      SYNC_BUDGET_MS,
+    );
 
+    if (snapshot.status === 'running' || snapshot.status === 'orphaned') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: minifiedJson({
+              project: params.project,
+              target: params.target,
+              status: snapshot.status,
+              jobId: snapshot.jobId,
+              elapsedSec: snapshot.elapsedSec,
+              logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+              hint: snapshot.hint,
+            }),
+          },
+        ],
+        ...(snapshot.status === 'orphaned' ? { isError: true } : {}),
+      };
+    }
+
+    const passed = snapshot.status === 'done';
     return {
       content: [
         {
@@ -218,10 +262,13 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
           text: minifiedJson({
             project: params.project,
             target: params.target,
-            output: truncateOutput(output, MAX_OUTPUT_CHARS),
+            passed,
+            ...(snapshot.error ? { error: snapshot.error } : {}),
+            output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
           }),
         },
       ],
+      ...(passed ? {} : { isError: true }),
     };
   } catch (error) {
     return {

@@ -2,10 +2,17 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { readFile, readdir, access } from 'node:fs/promises';
 import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { registerJobFormatter } from '../job-formatters.js';
+import { runJobWithBudget } from '../jobs.js';
+import type { JobSnapshot } from '../jobs.js';
+import { SYNC_BUDGET_MS, pnpmJobSpec } from '../nx-job.js';
 import { getRepoRoot, runPnpm } from '../run-command.js';
+import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
-const INSTALL_TIMEOUT = 300_000; // 5 minutes — installs can be slow with lock contention
+// Runaway backstop only — transport safety comes from the sync budget +
+// bounded nx_job_wait calls. Cold installs with lock contention can be slow.
+const INSTALL_TIMEOUT = 600_000;
 
 interface InstallPackageParams {
   name: string;
@@ -142,65 +149,47 @@ export async function installPackage(
   // Symlink guard already ran above, so it's safe to call pnpm directly.
   const addArgs = ['add', '-w', ...(params.dev ? ['-D'] : []), spec];
 
-  try {
-    const output = await runPnpm(addArgs, cwd, INSTALL_TIMEOUT);
+  // Background job + bounded sync wait — see run-target.ts for rationale.
+  const jobSpec = pnpmJobSpec(addArgs);
+  const snapshot = await runJobWithBudget(
+    {
+      command: jobSpec.command,
+      args: jobSpec.args,
+      shell: jobSpec.shell,
+      cwd,
+      label: `pnpm add ${spec}`,
+      timeoutMs: INSTALL_TIMEOUT,
+      idempotencyKey: `pnpm-add:${cwd}:${spec}:${params.dev ? 'dev' : 'prod'}`,
+      meta: {
+        kind: 'install',
+        name: params.name,
+        dev: params.dev ?? false,
+        cwd,
+      },
+    },
+    SYNC_BUDGET_MS,
+  );
 
-    // --- Post-install checks ---
-    const warnings: string[] = [];
-
-    // 1. Check for nested node_modules
-    const nestedDirs = await findNestedNodeModules(cwd);
-    if (nestedDirs.length > 0) {
-      warnings.push(
-        `Found nested node_modules (potential version duplication): ${nestedDirs.join(', ')}. ` +
-          'Consider adding pnpm.overrides in root package.json to pin the version.',
-      );
-    }
-
-    // 2. Check if @types/ companion is needed
-    let typesStatus: string;
-    if (params.name.startsWith('@types/')) {
-      typesStatus = 'installed_directly';
-    } else if (await hasBuiltinTypes(params.name, cwd)) {
-      typesStatus = 'bundled';
-    } else if (await typesCompanionExists(params.name, cwd)) {
-      typesStatus = 'companion_available';
-      warnings.push(
-        `Package "${params.name}" does not bundle types. A @types/ companion exists in the registry. ` +
-          'Consider installing it as a dev dependency for full type support.',
-      );
-    } else {
-      typesStatus = 'none_available';
-    }
-
-    // 3. Read installed version from root package.json
-    let installedVersion: string | undefined;
-    try {
-      const pkgJson = JSON.parse(
-        await readFile(join(cwd, 'package.json'), 'utf-8'),
-      );
-      const deps = { ...pkgJson.dependencies, ...pkgJson.devDependencies };
-      installedVersion = deps[params.name] as string | undefined;
-    } catch {
-      // Non-critical — version reporting is best-effort
-    }
-
+  if (snapshot.status === 'running' || snapshot.status === 'orphaned') {
     return {
       content: [
         {
           type: 'text',
           text: minifiedJson({
             package: params.name,
-            installedVersion,
-            dev: params.dev ?? false,
-            typesStatus,
-            ...(warnings.length > 0 && { warnings }),
-            output,
+            status: snapshot.status,
+            jobId: snapshot.jobId,
+            elapsedSec: snapshot.elapsedSec,
+            logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+            hint: snapshot.hint,
           }),
         },
       ],
+      ...(snapshot.status === 'orphaned' ? { isError: true } : {}),
     };
-  } catch (error) {
+  }
+
+  if (snapshot.status === 'failed') {
     return {
       content: [
         {
@@ -208,11 +197,121 @@ export async function installPackage(
           text: minifiedJson({
             error: 'INSTALL_FAILED',
             package: params.name,
-            message: error instanceof Error ? error.message : String(error),
+            message: snapshot.error ?? `pnpm add ${spec} failed`,
+            output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
           }),
         },
       ],
       isError: true,
     };
   }
+
+  // --- Post-install checks (full set — registry lookups included) ---
+  const warnings: string[] = [];
+
+  // 1. Check for nested node_modules
+  const nestedDirs = await findNestedNodeModules(cwd);
+  if (nestedDirs.length > 0) {
+    warnings.push(
+      `Found nested node_modules (potential version duplication): ${nestedDirs.join(', ')}. ` +
+        'Consider adding pnpm.overrides in root package.json to pin the version.',
+    );
+  }
+
+  // 2. Check if @types/ companion is needed
+  let typesStatus: string;
+  if (params.name.startsWith('@types/')) {
+    typesStatus = 'installed_directly';
+  } else if (await hasBuiltinTypes(params.name, cwd)) {
+    typesStatus = 'bundled';
+  } else if (await typesCompanionExists(params.name, cwd)) {
+    typesStatus = 'companion_available';
+    warnings.push(
+      `Package "${params.name}" does not bundle types. A @types/ companion exists in the registry. ` +
+        'Consider installing it as a dev dependency for full type support.',
+    );
+  } else {
+    typesStatus = 'none_available';
+  }
+
+  // 3. Read installed version from root package.json
+  const installedVersion = await readInstalledVersion(cwd, params.name);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: minifiedJson({
+          package: params.name,
+          installedVersion,
+          dev: params.dev ?? false,
+          typesStatus,
+          ...(warnings.length > 0 && { warnings }),
+          output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
+        }),
+      },
+    ],
+  };
 }
+
+/** Read the installed version spec from root package.json (best-effort). */
+async function readInstalledVersion(
+  cwd: string,
+  name: string,
+): Promise<string | undefined> {
+  try {
+    const pkgJson = JSON.parse(
+      await readFile(join(cwd, 'package.json'), 'utf-8'),
+    );
+    const deps = { ...pkgJson.dependencies, ...pkgJson.devDependencies };
+    return deps[name] as string | undefined;
+  } catch {
+    // Non-critical — version reporting is best-effort
+    return undefined;
+  }
+}
+
+// Deferred-completion formatter: when a slow install finishes and the result
+// is observed via nx_job_wait, rebuild the install summary from filesystem
+// state only. Registry lookups (pnpm info) are skipped — they could push the
+// bounded wait call past the transport window.
+registerJobFormatter('install', async (snapshot: JobSnapshot) => {
+  const meta = snapshot.meta as
+    | { name?: unknown; dev?: unknown; cwd?: unknown }
+    | undefined;
+  const name = typeof meta?.name === 'string' ? meta.name : null;
+  const cwd = typeof meta?.cwd === 'string' ? meta.cwd : null;
+  if (!name || !cwd) return null;
+
+  if (snapshot.status === 'failed') {
+    return {
+      body: {
+        error: 'INSTALL_FAILED',
+        package: name,
+        message: snapshot.error ?? `pnpm add ${name} failed`,
+        output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
+      },
+      isError: true,
+    };
+  }
+
+  const warnings: string[] = [];
+  const nestedDirs = await findNestedNodeModules(cwd);
+  if (nestedDirs.length > 0) {
+    warnings.push(
+      `Found nested node_modules (potential version duplication): ${nestedDirs.join(', ')}. ` +
+        'Consider adding pnpm.overrides in root package.json to pin the version.',
+    );
+  }
+  return {
+    body: {
+      package: name,
+      installedVersion: await readInstalledVersion(cwd, name),
+      dev: meta?.dev === true,
+      typesStatus: 'not_checked',
+      ...(warnings.length > 0 && { warnings }),
+      output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
+    },
+    isError: false,
+  };
+});
