@@ -1,6 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { Card, H4, Separator, styled, Text, XStack, YStack } from 'tamagui';
-import { ChevronRight, Users } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   calculateMatchupProjection,
@@ -8,8 +6,6 @@ import {
   type SeasonStats,
 } from '@legacy-sports/scoring';
 import {
-  getInjuryStatusColors,
-  getPositionColors,
   isPitcherPositionType,
   isStatsLoading,
   POSITION_SLOT_ORDER,
@@ -23,11 +19,6 @@ import {
 } from '@legacy-sports/graphql';
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
-import {
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY_LIGHT,
-  withAlpha,
-} from '../../constants/colors';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
   mapBattingStats,
@@ -36,510 +27,114 @@ import {
   mapPitchingStats,
 } from '../../lib/scoring/mapGraphQLToScoringFormat';
 import { outsToBaseballIP } from '../../lib/scoring/ipUtils';
+import './MatchupRosterComparison.css';
 
-// ── Styled Components ─────────────────────────────────────────────────────────
+// ── Position grouping (drives .mrc-g-* badge color classes) ────────────────
 
-const RosterCard = styled(Card, {
-  overflow: 'hidden',
-  borderRadius: '$6',
-  borderWidth: 1,
-  borderColor: '$surfacePanelBorder',
-  backgroundColor: '$background',
-  minWidth: 500,
-});
+type PositionGroup = 'catcher' | 'infield' | 'outfield' | 'pitcher' | 'utility';
 
-const SectionHeader = styled(XStack, {
-  alignItems: 'center',
-  gap: '$2',
-  paddingVertical: '$2.5',
-  paddingHorizontal: '$4',
-});
+function getPositionGroup(position: string | null | undefined): PositionGroup {
+  if (!position) return 'utility';
+  const pos = position.toUpperCase();
+  if (pos === 'C') return 'catcher';
+  if (['1B', '2B', '3B', 'SS', 'IF'].includes(pos)) return 'infield';
+  if (['LF', 'CF', 'RF', 'OF'].includes(pos)) return 'outfield';
+  if (pos === 'SP' || pos === 'RP') return 'pitcher';
+  return 'utility';
+}
 
-const ColumnHeader = styled(XStack, {
-  width: '100%',
-  paddingVertical: '$2',
-  paddingHorizontal: '$3',
-  backgroundColor: '$surfacePanel',
-  borderBottomWidth: 1,
-  borderBottomColor: '$surfacePanelBorder',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-});
+// ── Injury badge (LS-5905) ──────────────────────────────────────────────
 
-const TotalsRow = styled(XStack, {
-  width: '100%',
-  paddingVertical: '$3',
-  paddingHorizontal: '$3',
-  backgroundColor: '$surfacePanel',
-  borderTopWidth: 2,
-  borderTopColor: '$surfacePanelBorder',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-});
-
-const BenchToggle = styled(XStack, {
-  paddingVertical: '$3',
-  paddingHorizontal: '$4',
-  justifyContent: 'center',
-  alignItems: 'center',
-  gap: '$2',
-  cursor: 'pointer',
-  hoverStyle: { backgroundColor: '$gray2' },
-});
-
-const SectionTable = styled(YStack, {
-  overflow: 'hidden',
-  borderRadius: '$4',
-  borderWidth: 1,
-  borderColor: '$surfacePanelBorder',
-  backgroundColor: '$background',
-});
-
-// ── Skeleton loading components ─────────────────────────────────────────────
-// @keyframes skeleton-pulse is declared in apps/web/src/styles.css
-
-const skeletonPulseStyle = {
-  animationName: 'skeleton-pulse',
-  animationDuration: '1.5s',
-  animationIterationCount: 'infinite',
-  animationTimingFunction: 'ease-in-out',
-} as React.CSSProperties;
+/** Maps an injury status string to one of the badge color variants. */
+function injuryBadgeClass(status: string): string {
+  const normalized = status.toUpperCase();
+  if (
+    normalized.startsWith('IL') ||
+    normalized === 'OUT' ||
+    normalized === 'SUSPENDED'
+  ) {
+    return 'mrc-injury-danger';
+  }
+  if (normalized === 'DTD' || normalized === 'DAY-TO-DAY') {
+    return 'mrc-injury-warning';
+  }
+  return 'mrc-injury-neutral';
+}
 
 /** Compact badge showing a player's injury status (e.g. "IL-10", "DTD") (LS-5905). */
 function InjuryBadge({ status }: { status: string }) {
-  const colors = getInjuryStatusColors(status);
   return (
-    <Text
-      fontSize="$1"
-      fontWeight="700"
-      color={colors.text}
-      backgroundColor={colors.bg}
-      paddingHorizontal="$1.5"
-      paddingVertical={1}
-      borderRadius="$2"
-      textTransform="uppercase"
-      letterSpacing={0.3}
-      flexShrink={0}
-    >
+    <span className={`mrc-injury-badge ${injuryBadgeClass(status)}`}>
       {status}
-    </Text>
+    </span>
   );
 }
 
-function SkeletonPulse(props: React.ComponentProps<typeof YStack>) {
-  const { style, backgroundColor, ...rest } = props;
-  return (
-    <YStack
-      backgroundColor={backgroundColor ?? '$gray4'}
-      borderRadius="$2"
-      {...rest}
-      style={{ ...skeletonPulseStyle, ...(style as React.CSSProperties) }}
-    />
-  );
-}
+// ── Skeleton loading ─────────────────────────────────────────────────────
 
-function SkeletonRow({ isEven = false }: { isEven?: boolean }) {
+function SkeletonSlotRow() {
   return (
-    <XStack
-      paddingVertical="$2.5"
-      paddingHorizontal="$3"
-      backgroundColor={isEven ? undefined : '$gray2'}
-      borderBottomWidth={1}
-      borderBottomColor="$gray4"
-      justifyContent="space-between"
-      alignItems="center"
-    >
-      {/* Team 1 side */}
-      <XStack width="47%" alignItems="center" gap="$2">
-        <XStack flex={1} gap="$2" alignItems="center" minWidth={0}>
-          {/* Avatar circle */}
-          <SkeletonPulse width={32} height={32} borderRadius={16} />
-          {/* Name + subtitle + stat line */}
-          <YStack gap="$1" flex={1} minWidth={0}>
-            <SkeletonPulse height={13} width="75%" />
-            <SkeletonPulse height={9} width="55%" backgroundColor="$gray3" />
-            <SkeletonPulse
-              height={9}
-              width="40%"
-              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
-            />
-          </YStack>
-        </XStack>
-        {/* Projected */}
-        <YStack width={60} flexShrink={0} alignItems="center">
-          <SkeletonPulse width={32} height={13} />
-        </YStack>
-        {/* Actual */}
-        <YStack width={60} flexShrink={0} alignItems="center">
-          <SkeletonPulse width={38} height={16} />
-        </YStack>
-      </XStack>
-      {/* Separator */}
-      <Separator vertical height="100%" borderColor="$gray8" borderWidth={2} />
-      {/* Team 2 side */}
-      <XStack width="47%" alignItems="center" gap="$2">
-        {/* Actual */}
-        <YStack width={60} flexShrink={0} alignItems="center">
-          <SkeletonPulse width={38} height={16} />
-        </YStack>
-        {/* Projected */}
-        <YStack width={60} flexShrink={0} alignItems="center">
-          <SkeletonPulse width={32} height={13} />
-        </YStack>
-        <XStack
-          flex={1}
-          gap="$2"
-          alignItems="center"
-          justifyContent="flex-end"
-          minWidth={0}
-        >
-          {/* Name + subtitle + stat line */}
-          <YStack gap="$1" flex={1} alignItems="flex-end" minWidth={0}>
-            <SkeletonPulse height={13} width="75%" alignSelf="flex-end" />
-            <SkeletonPulse
-              height={9}
-              width="55%"
-              alignSelf="flex-end"
-              backgroundColor="$gray3"
-            />
-            <SkeletonPulse
-              height={9}
-              width="40%"
-              alignSelf="flex-end"
-              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
-            />
-          </YStack>
-          {/* Avatar circle */}
-          <SkeletonPulse width={32} height={32} borderRadius={16} />
-        </XStack>
-      </XStack>
-    </XStack>
-  );
-}
-
-function SkeletonTotalsRow() {
-  return (
-    <TotalsRow>
-      <XStack width="47%" alignItems="center" gap="$2">
-        <YStack flex={1} minWidth={0}>
-          <SkeletonPulse width={100} height={16} />
-        </YStack>
-        <YStack width={60} flexShrink={0} alignItems="center">
-          <SkeletonPulse width={36} height={13} />
-        </YStack>
-        <YStack width={60} flexShrink={0} alignItems="center">
-          <SkeletonPulse width={42} height={18} />
-        </YStack>
-      </XStack>
-      <Separator vertical height="100%" borderColor="$gray8" borderWidth={2} />
-      <XStack width="47%" alignItems="center" gap="$2">
-        <YStack width={60} flexShrink={0} alignItems="center">
-          <SkeletonPulse width={42} height={18} />
-        </YStack>
-        <YStack width={60} flexShrink={0} alignItems="center">
-          <SkeletonPulse width={36} height={13} />
-        </YStack>
-        <YStack flex={1} alignItems="flex-end" minWidth={0}>
-          <SkeletonPulse width={100} height={16} />
-        </YStack>
-      </XStack>
-    </TotalsRow>
-  );
-}
-
-function SkeletonLoading({
-  team1Name = 'Team 1',
-  team2Name = 'Team 2',
-}: {
-  team1Name?: string;
-  team2Name?: string;
-}) {
-  return (
-    <RosterCard>
-      {/* Card Header - real labels */}
-      <XStack
-        padding="$4"
-        justifyContent="space-between"
-        alignItems="center"
-        borderBottomWidth={1}
-        borderBottomColor="$surfacePanelBorder"
-      >
-        <XStack alignItems="center" gap="$2">
-          <Users size={18} color="var(--color)" />
-          <H4 color="$color">Player Matchups</H4>
-        </XStack>
-        <SkeletonPulse width={60} height={24} borderRadius={12} />
-      </XStack>
-
-      {/* Hitters Section */}
-      <SectionTable>
-        {/* Section Header - real label */}
-        <SectionHeader backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}>
-          <YStack
-            width={4}
-            height={16}
-            borderRadius={2}
-            backgroundColor={BRAND_NAVY_LIGHT}
+    <div className="mrc-slot">
+      <div className="mrc-cell mrc-t1">
+        <div className="mrc-pinfo">
+          <div
+            className="mrc-sk"
+            style={{ height: 15, width: '60%', marginLeft: 'auto' }}
           />
-          <Text
-            fontSize="$3"
-            fontWeight="700"
-            color={BRAND_GOLD_LIGHT}
-            letterSpacing={0.3}
-          >
-            STARTING LINEUP
-          </Text>
-        </SectionHeader>
-
-        {/* Column Headers - real labels */}
-        <ColumnHeader>
-          <XStack width="47%" alignItems="center" gap="$2">
-            <YStack width={40} flexShrink={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Pos
-              </Text>
-            </YStack>
-            <YStack flex={1} minWidth={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                {team1Name}
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Proj
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color={BRAND_GOLD_LIGHT}
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Actual
-              </Text>
-            </YStack>
-          </XStack>
-          <Separator vertical height="100%" borderColor="$surfacePanelBorder" />
-          <XStack width="47%" alignItems="center" gap="$2">
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color={BRAND_GOLD_LIGHT}
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Actual
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Proj
-              </Text>
-            </YStack>
-            <YStack flex={1} alignItems="flex-end" minWidth={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                {team2Name}
-              </Text>
-            </YStack>
-            <YStack width={40} flexShrink={0} alignItems="flex-end">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Pos
-              </Text>
-            </YStack>
-          </XStack>
-        </ColumnHeader>
-
-        {/* Batters sub-header */}
-        <SectionHeader backgroundColor="$green2">
-          <YStack
-            width={4}
-            height={16}
-            borderRadius={2}
-            backgroundColor="$green9"
+          <div
+            className="mrc-sk"
+            style={{
+              height: 11,
+              width: '80%',
+              marginTop: 6,
+              marginLeft: 'auto',
+            }}
           />
-          <Text
-            fontSize="$2"
-            fontWeight="700"
-            color="$green11"
-            letterSpacing={0.3}
-          >
-            BATTERS
-          </Text>
-        </SectionHeader>
-
-        {/* Skeleton batter rows */}
-        {Array.from({ length: 8 }).map((_, i) => (
-          <SkeletonRow key={`batter-${i}`} isEven={i % 2 === 0} />
-        ))}
-
-        {/* Totals skeleton */}
-        <SkeletonTotalsRow />
-      </SectionTable>
-
-      {/* Pitchers Section */}
-      <SectionTable marginTop="$4">
-        <SectionHeader backgroundColor="$green2">
-          <YStack
-            width={4}
-            height={16}
-            borderRadius={2}
-            backgroundColor="$green9"
+        </div>
+        <div className="mrc-sk" style={{ height: 34, width: 90 }} />
+      </div>
+      <div className="mrc-pos" />
+      <div className="mrc-cell mrc-t2">
+        <div className="mrc-pinfo">
+          <div className="mrc-sk" style={{ height: 15, width: '60%' }} />
+          <div
+            className="mrc-sk"
+            style={{ height: 11, width: '80%', marginTop: 6 }}
           />
-          <Text
-            fontSize="$2"
-            fontWeight="700"
-            color="$green11"
-            letterSpacing={0.3}
-          >
-            PITCHERS
-          </Text>
-        </SectionHeader>
+        </div>
+        <div className="mrc-sk" style={{ height: 34, width: 90 }} />
+      </div>
+    </div>
+  );
+}
 
-        {/* Column Headers - real labels */}
-        <ColumnHeader>
-          <XStack width="47%" alignItems="center" gap="$2">
-            <YStack width={40} flexShrink={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Pos
-              </Text>
-            </YStack>
-            <YStack flex={1} minWidth={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                {team1Name}
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Proj
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color={BRAND_GOLD_LIGHT}
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Actual
-              </Text>
-            </YStack>
-          </XStack>
-          <Separator vertical height="100%" borderColor="$surfacePanelBorder" />
-          <XStack width="47%" alignItems="center" gap="$2">
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color={BRAND_GOLD_LIGHT}
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Actual
-              </Text>
-            </YStack>
-            <YStack width={60} flexShrink={0} alignItems="center">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Proj
-              </Text>
-            </YStack>
-            <YStack flex={1} alignItems="flex-end" minWidth={0}>
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                {team2Name}
-              </Text>
-            </YStack>
-            <YStack width={40} flexShrink={0} alignItems="flex-end">
-              <Text
-                fontSize="$1"
-                fontWeight="700"
-                color="$textMuted"
-                textTransform="uppercase"
-                letterSpacing={0.5}
-              >
-                Pos
-              </Text>
-            </YStack>
-          </XStack>
-        </ColumnHeader>
-
-        {/* Skeleton pitcher rows */}
-        {Array.from({ length: 4 }).map((_, i) => (
-          <SkeletonRow key={`pitcher-${i}`} isEven={i % 2 === 0} />
-        ))}
-
-        {/* Totals skeleton */}
-        <SkeletonTotalsRow />
-      </SectionTable>
-    </RosterCard>
+function SkeletonLoading() {
+  return (
+    <div className="mrc-root">
+      <div className="mrc-wrap">
+        <div className="mrc-head">
+          <h1 className="mrc-title">Player Matchups</h1>
+        </div>
+        <div className="mrc-section">
+          <div className="mrc-section-bar">
+            <h3>Starting Lineup — Batters</h3>
+            <div className="mrc-rule" />
+          </div>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonSlotRow key={`sk-batter-${i}`} />
+          ))}
+        </div>
+        <div className="mrc-section">
+          <div className="mrc-section-bar">
+            <h3>Starting Lineup — Pitchers</h3>
+            <div className="mrc-rule" />
+          </div>
+          {Array.from({ length: 2 }).map((_, i) => (
+            <SkeletonSlotRow key={`sk-pitcher-${i}`} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -652,14 +247,14 @@ export function MatchupRosterComparison({
 
   // Separate and organize players by team and roster status (starter vs bench)
   const {
-    team1Starters,
     team1Bench,
-    team2Starters,
     team2Bench,
     team1Bullpen,
     team1BenchFielders,
     team2Bullpen,
     team2BenchFielders,
+    team1RosterCount,
+    team2RosterCount,
     batterSlotRows,
     pitcherSlotRows,
     team1BatterTotals,
@@ -759,14 +354,14 @@ export function MatchupRosterComparison({
 
     if (!data?.getMatchupPlayers) {
       return {
-        team1Starters: [],
         team1Bench: [],
+        team2Bench: [],
         team1Bullpen: [],
         team1BenchFielders: [],
-        team2Starters: [],
-        team2Bench: [],
         team2Bullpen: [],
         team2BenchFielders: [],
+        team1RosterCount: 0,
+        team2RosterCount: 0,
         batterSlotRows: [],
         pitcherSlotRows: [],
         team1BatterTotals: { projected: 0, actual: 0 },
@@ -786,14 +381,8 @@ export function MatchupRosterComparison({
     );
 
     // Separate starters (have positionId) from bench (positionId is null)
-    const team1Starters = team1All.filter(
-      (p: MatchupPlayerFragment) => p.positionId !== null,
-    );
     const team1Bench = team1All.filter(
       (p: MatchupPlayerFragment) => p.positionId === null,
-    );
-    const team2Starters = team2All.filter(
-      (p: MatchupPlayerFragment) => p.positionId !== null,
     );
     const team2Bench = team2All.filter(
       (p: MatchupPlayerFragment) => p.positionId === null,
@@ -936,14 +525,14 @@ export function MatchupRosterComparison({
     };
 
     return {
-      team1Starters,
       team1Bench,
-      team2Starters,
       team2Bench,
       team1Bullpen,
       team1BenchFielders,
       team2Bullpen,
       team2BenchFielders,
+      team1RosterCount: team1All.length,
+      team2RosterCount: team2All.length,
       batterSlotRows,
       pitcherSlotRows,
       team1BatterTotals,
@@ -965,38 +554,45 @@ export function MatchupRosterComparison({
 
   if (!team1Id || !team2Id) {
     return (
-      <RosterCard padding="$5">
-        <YStack alignItems="center" gap="$2">
-          <Users size={24} color="var(--textMuted)" />
-          <Text color="$textMuted">
-            Teams not assigned to this matchup yet.
-          </Text>
-        </YStack>
-      </RosterCard>
+      <div className="mrc-root">
+        <div className="mrc-wrap">
+          <div className="mrc-head">
+            <h1 className="mrc-title">Player Matchups</h1>
+          </div>
+          <div className="mrc-state-msg mrc-empty">
+            <div className="mrc-ic">VS</div>
+            <h3>No teams assigned yet</h3>
+            <p>
+              This matchup slot doesn&rsquo;t have both teams set. Once the
+              schedule locks, rosters will appear here.
+            </p>
+          </div>
+        </div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <RosterCard borderColor="$red6" padding="$5">
-        <Text color="$red11">
-          Error loading matchup players: {error.message}
-        </Text>
-      </RosterCard>
+      <div className="mrc-root">
+        <div className="mrc-wrap">
+          <div className="mrc-head">
+            <h1 className="mrc-title">Player Matchups</h1>
+          </div>
+          <div className="mrc-state-msg mrc-error">
+            <div className="mrc-ic">!</div>
+            <h3>Unable to load this matchup</h3>
+            <p>{error.message}</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  if (loading || positionsLoading) {
-    return <SkeletonLoading team1Name={team1Name} team2Name={team2Name} />;
+  if (loading || positionsLoading || scoringLoading) {
+    return <SkeletonLoading />;
   }
 
-  const maxBullpenRows = Math.max(team1Bullpen.length, team2Bullpen.length);
-  const maxBenchFielderRows = Math.max(
-    team1BenchFielders.length,
-    team2BenchFielders.length,
-  );
-
-  // Helper to render player row with position
   // Helper to format accumulated stats for display (only shows stats that contributed to this player's actual score)
   const formatAccumulatedStats = (
     player: MatchupPlayerFragment | undefined,
@@ -1012,7 +608,6 @@ export function MatchupRosterComparison({
 
     const stats: string[] = [];
 
-    // Map of stat field names to their display labels and extraction functions
     type BattingStatsType = NonNullable<
       NonNullable<MatchupPlayerFragment['games']>[number]['battingGame']
     >;
@@ -1033,66 +628,29 @@ export function MatchupRosterComparison({
     const battingGames = player.games.filter((g) => g.battingGame);
     if (battingGames.length > 0) {
       const battingStats: StatConfig<BattingStatsType>[] = [
-        {
-          label: 'R',
-          extract: (s: BattingStatsType) => s?.runs ?? 0,
-          scoringKey: 'r',
-        },
-        {
-          label: 'H',
-          extract: (s: BattingStatsType) => s?.hits ?? 0,
-          scoringKey: 'h',
-        },
-        {
-          label: '2B',
-          extract: (s: BattingStatsType) => s?.doubles ?? 0,
-          scoringKey: 'doubles',
-        },
-        {
-          label: '3B',
-          extract: (s: BattingStatsType) => s?.triples ?? 0,
-          scoringKey: 'triples',
-        },
-        {
-          label: 'HR',
-          extract: (s: BattingStatsType) => s?.homeRuns ?? 0,
-          scoringKey: 'hr',
-        },
-        {
-          label: 'RBI',
-          extract: (s: BattingStatsType) => s?.rbi ?? 0,
-          scoringKey: 'rbi',
-        },
-        {
-          label: 'SB',
-          extract: (s: BattingStatsType) => s?.stolenBases ?? 0,
-          scoringKey: 'sb',
-        },
+        { label: 'R', extract: (s) => s?.runs ?? 0, scoringKey: 'r' },
+        { label: 'H', extract: (s) => s?.hits ?? 0, scoringKey: 'h' },
+        { label: '2B', extract: (s) => s?.doubles ?? 0, scoringKey: 'doubles' },
+        { label: '3B', extract: (s) => s?.triples ?? 0, scoringKey: 'triples' },
+        { label: 'HR', extract: (s) => s?.homeRuns ?? 0, scoringKey: 'hr' },
+        { label: 'RBI', extract: (s) => s?.rbi ?? 0, scoringKey: 'rbi' },
+        { label: 'SB', extract: (s) => s?.stolenBases ?? 0, scoringKey: 'sb' },
         {
           label: 'CS',
-          extract: (s: BattingStatsType) => s?.caughtStealing ?? 0,
+          extract: (s) => s?.caughtStealing ?? 0,
           scoringKey: 'cs',
         },
-        {
-          label: 'BB',
-          extract: (s: BattingStatsType) => s?.baseOnBalls ?? 0,
-          scoringKey: 'bb',
-        },
-        {
-          label: 'SO',
-          extract: (s: BattingStatsType) => s?.strikeouts ?? 0,
-          scoringKey: 'so',
-        },
+        { label: 'BB', extract: (s) => s?.baseOnBalls ?? 0, scoringKey: 'bb' },
+        { label: 'SO', extract: (s) => s?.strikeouts ?? 0, scoringKey: 'so' },
         {
           label: 'HBP',
-          extract: (s: BattingStatsType) => s?.hitByPitch ?? 0,
+          extract: (s) => s?.hitByPitch ?? 0,
           scoringKey: 'hbp',
         },
       ];
 
       const battingParts: string[] = [];
 
-      // Always show batting line (H-AB) for non-pitcher positions
       const posType = player.positionId
         ? positionMap.get(player.positionId)
         : null;
@@ -1110,16 +668,13 @@ export function MatchupRosterComparison({
       }
 
       for (const stat of battingStats) {
-        // Check if this stat has a scoring value configured
         const scoringValue = scoringSettings.batting[stat.scoringKey];
         if (scoringValue !== undefined && scoringValue !== 0) {
-          // Calculate the total for this stat across all games
           const total = battingGames.reduce((sum, g) => {
             if (!g.battingGame) return sum;
             return sum + stat.extract(g.battingGame);
           }, 0);
 
-          // Only show if this player actually has non-zero value for this stat
           if (total !== 0) {
             battingParts.push(`${total}${stat.label}`);
           }
@@ -1135,46 +690,17 @@ export function MatchupRosterComparison({
     const pitchingGames = player.games.filter((g) => g.pitchingGame);
     if (pitchingGames.length > 0) {
       const pitchingStats: StatConfig<PitchingStatsType>[] = [
-        {
-          label: 'W',
-          extract: (s: PitchingStatsType) => s?.wins ?? 0,
-          scoringKey: 'w',
-        },
-        {
-          label: 'L',
-          extract: (s: PitchingStatsType) => s?.losses ?? 0,
-          scoringKey: 'l',
-        },
-        {
-          label: 'SV',
-          extract: (s: PitchingStatsType) => s?.saves ?? 0,
-          scoringKey: 'sv',
-        },
-        {
-          label: 'H',
-          extract: (s: PitchingStatsType) => s?.hits ?? 0,
-          scoringKey: 'h',
-        },
-        {
-          label: 'ER',
-          extract: (s: PitchingStatsType) => s?.earnedRuns ?? 0,
-          scoringKey: 'er',
-        },
-        {
-          label: 'BB',
-          extract: (s: PitchingStatsType) => s?.baseOnBalls ?? 0,
-          scoringKey: 'bb',
-        },
-        {
-          label: 'SO',
-          extract: (s: PitchingStatsType) => s?.strikeouts ?? 0,
-          scoringKey: 'so',
-        },
+        { label: 'W', extract: (s) => s?.wins ?? 0, scoringKey: 'w' },
+        { label: 'L', extract: (s) => s?.losses ?? 0, scoringKey: 'l' },
+        { label: 'SV', extract: (s) => s?.saves ?? 0, scoringKey: 'sv' },
+        { label: 'H', extract: (s) => s?.hits ?? 0, scoringKey: 'h' },
+        { label: 'ER', extract: (s) => s?.earnedRuns ?? 0, scoringKey: 'er' },
+        { label: 'BB', extract: (s) => s?.baseOnBalls ?? 0, scoringKey: 'bb' },
+        { label: 'SO', extract: (s) => s?.strikeouts ?? 0, scoringKey: 'so' },
       ];
 
       const pitchingParts: string[] = [];
 
-      // Handle IP separately (calculated from outsRecorded)
       const outsRecordedScoring = scoringSettings.pitching.outsRecorded;
       if (outsRecordedScoring !== undefined && outsRecordedScoring !== 0) {
         const totalOuts = pitchingGames.reduce(
@@ -1194,7 +720,6 @@ export function MatchupRosterComparison({
             return sum + stat.extract(g.pitchingGame);
           }, 0);
 
-          // Only show if this player actually has non-zero value for this stat
           if (total !== 0) {
             pitchingParts.push(`${total}${stat.label}`);
           }
@@ -1210,11 +735,7 @@ export function MatchupRosterComparison({
     const fieldingGames = player.games.filter((g) => g.fieldingGame);
     if (fieldingGames.length > 0) {
       const fieldingStats: StatConfig<FieldingStatsType>[] = [
-        {
-          label: 'E',
-          extract: (s: FieldingStatsType) => s?.errors ?? 0,
-          scoringKey: 'eDef',
-        },
+        { label: 'E', extract: (s) => s?.errors ?? 0, scoringKey: 'eDef' },
       ];
 
       const fieldingParts: string[] = [];
@@ -1226,7 +747,6 @@ export function MatchupRosterComparison({
             return sum + stat.extract(g.fieldingGame);
           }, 0);
 
-          // Only show if this player actually has non-zero value for this stat
           if (total !== 0) {
             fieldingParts.push(`${total}${stat.label}`);
           }
@@ -1241,1267 +761,444 @@ export function MatchupRosterComparison({
     return stats.join(' • ');
   };
 
-  const renderPlayerRow = (
-    team1Player: MatchupPlayerFragment | undefined,
-    team2Player: MatchupPlayerFragment | undefined,
-    index: number | string,
-    rowIndex = 0,
-    slotType?: string,
-  ) => {
-    const team1Actual =
-      team1Player?.games?.reduce(
-        (sum, game) => sum + (calculateGameScore?.(game) ?? 0),
-        0,
-      ) ?? 0;
-    const team2Actual =
-      team2Player?.games?.reduce(
-        (sum, game) => sum + (calculateGameScore?.(game) ?? 0),
-        0,
-      ) ?? 0;
-    const team1Proj = team1Player ? calculatePlayerProjection(team1Player) : 0;
-    const team2Proj = team2Player ? calculatePlayerProjection(team2Player) : 0;
+  // Suffix shown after the "Season {year} • {gp}/{gs} games" meta line —
+  // priority: loading > failed > off days > yet to play.
+  const metaSuffix = (
+    player: MatchupPlayerFragment,
+  ): { text: string; className: string } | null => {
+    const games = player.games ?? [];
+    if (games.length === 0) return { text: ' • Yet to play', className: '' };
+    const loadingCount = games.filter(
+      (g) =>
+        !g.pitcherStartSkipped &&
+        (g.statsLoadingStatus === 'loading' ||
+          g.statsLoadingStatus === 'pending'),
+    ).length;
+    if (loadingCount > 0) return { text: ' • Loading stats', className: '' };
+    const failedCount = games.filter(
+      (g) => !g.pitcherStartSkipped && g.statsLoadingStatus === 'failed',
+    ).length;
+    if (failedCount > 0)
+      return { text: ' • Stats unavailable', className: 'mrc-fail' };
+    const skippedCount = games.filter((g) => g.pitcherStartSkipped).length;
+    if (skippedCount > 0) {
+      return {
+        text: ` • ${skippedCount} off day${skippedCount > 1 ? 's' : ''}`,
+        className: '',
+      };
+    }
+    return null;
+  };
 
-    // Check if any games have been played
-    const team1HasPlayed =
-      (team1Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) >
-      0;
-    const team2HasPlayed =
-      (team2Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) >
-      0;
+  // Prorated projection to date → whether the player is beating their pace.
+  // Matches the original component: paced against the matchup-wide
+  // gamesPerMatchup, not the player's own numberOfGames (which differs for
+  // pitchers with a separate pitcherStartsPerMatchup).
+  const beatsProjection = (
+    player: MatchupPlayerFragment,
+    actual: number,
+    proj: number,
+  ): boolean | null => {
+    const gamesPlayed =
+      player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0;
+    if (gamesPlayed === 0) return null;
+    const expected = (proj / gamesPerMatchup) * gamesPlayed;
+    return actual >= expected;
+  };
 
-    // Calculate expected score based on games played (for color coding)
-    const team1GamesPlayed =
-      team1Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0;
-    const team2GamesPlayed =
-      team2Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0;
-    const team1ExpectedForGamesPlayed =
-      team1GamesPlayed > 0
-        ? (team1Proj / gamesPerMatchup) * team1GamesPlayed
-        : 0;
-    const team2ExpectedForGamesPlayed =
-      team2GamesPlayed > 0
-        ? (team2Proj / gamesPerMatchup) * team2GamesPlayed
-        : 0;
+  const openSeasonModal = (player: MatchupPlayerFragment) => {
+    if (player.playerId && player.player) {
+      setSelectedPlayer({
+        id: player.playerId,
+        name: `${player.player.firstName} ${player.player.lastName}`,
+      });
+      setSeasonStatsModalOpen(true);
+    }
+  };
 
-    // Determine color based on performance vs projection
-    const team1ScoreColor = !team1HasPlayed
-      ? '$gray9'
-      : team1Actual >= team1ExpectedForGamesPlayed
-        ? '$green10'
-        : '$red10';
-    const team2ScoreColor = !team2HasPlayed
-      ? '$gray9'
-      : team2Actual >= team2ExpectedForGamesPlayed
-        ? '$green10'
-        : '$red10';
-
-    const team1Position =
-      slotType ??
-      (team1Player?.positionId
-        ? positionMap.get(team1Player.positionId)
-        : (team1Player?.player?.eligiblePositions?.[0] ?? null));
-    const team2Position =
-      slotType ??
-      (team2Player?.positionId
-        ? positionMap.get(team2Player.positionId)
-        : (team2Player?.player?.eligiblePositions?.[0] ?? null));
-
-    // Get accumulated stats breakdown
-    const team1Stats = formatAccumulatedStats(team1Player);
-    const team2Stats = formatAccumulatedStats(team2Player);
-
-    // Injury status (IL/DTD/Suspended) — badge next to name, dimmed projected score (LS-5905)
-    const team1InjuryStatus = team1Player?.player?.injuryStatus ?? null;
-    const team2InjuryStatus = team2Player?.player?.injuryStatus ?? null;
-
-    // Position colors — same badge for both sides of a slot row, independent for bench rows
-    const team1PosBadge = getPositionColors(team1Position ?? slotType);
-    const team2PosBadge = getPositionColors(team2Position ?? slotType);
-
-    // Zebra stripe: alternate row background
-    const isEvenRow = rowIndex % 2 === 0;
-
-    // Matchup stats modal is only reachable when the player has an actual
-    // score to show — keep keyboard focus/activation in sync with that.
-    const team1Clickable = team1HasPlayed && Boolean(team1Player);
-    const team2Clickable = team2HasPlayed && Boolean(team2Player);
-
-    const openMatchupStatsModal = (player: MatchupPlayerFragment) => {
-      if (!player.player) return;
+  const openBreakdownModal = (player: MatchupPlayerFragment) => {
+    const hasPlayed =
+      (player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) > 0;
+    if (hasPlayed && player.player) {
       setSelectedMatchupPlayer(player);
       setSelectedMatchupPlayerName(
         `${player.player.firstName} ${player.player.lastName}`,
       );
       setMatchupStatsModalOpen(true);
-    };
+    }
+  };
 
-    const handleMatchupStatsKeyDown = (
-      clickable: boolean,
-      player: MatchupPlayerFragment | undefined,
-      event: React.KeyboardEvent,
-    ) => {
-      if (!clickable || !player) return;
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      openMatchupStatsModal(player);
-    };
+  // Renders one team's half of a slot row. `slotType` is passed for starter
+  // rows (both sides share a slot); bench/bullpen rows omit it since the two
+  // sides pair arbitrary players who may hold different positions — those
+  // rows fall back to each player's own position, shown inline.
+  const renderCell = (
+    team: 1 | 2,
+    player: MatchupPlayerFragment | undefined,
+    slotType: string | undefined,
+    isLead: boolean,
+  ) => {
+    const cls = team === 1 ? 'mrc-t1' : 'mrc-t2';
+    const mine = userTeamId != null && team === 1 ? ' mrc-mine' : '';
+
+    if (!player) {
+      return (
+        <div className={`mrc-cell ${cls}${mine}`}>
+          <div className="mrc-pinfo">
+            <span className="mrc-pname mrc-empty">Empty</span>
+          </div>
+          <div className="mrc-pscore">
+            <div className="mrc-sc mrc-proj">
+              <span className="mrc-lab">Proj</span>
+              <span className="mrc-num">—</span>
+            </div>
+            <div className="mrc-sc mrc-actual">
+              <span className="mrc-lab">Actual</span>
+              <span className="mrc-num">—</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const actual =
+      player.games?.reduce((sum, game) => sum + calculateGameScore(game), 0) ??
+      0;
+    const proj = calculatePlayerProjection(player);
+    const hasPlayed =
+      (player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) > 0;
+    const beats = beatsProjection(player, actual, proj);
+    const actualCls = beats === null ? '' : beats ? 'mrc-up' : 'mrc-down';
+    const suffix = metaSuffix(player);
+    const posLabel = slotType
+      ? undefined
+      : player.positionId
+        ? positionMap.get(player.positionId)
+        : (player.player?.eligiblePositions?.[0] ?? null);
+    const group = getPositionGroup(slotType ?? posLabel);
+    const statLine = formatAccumulatedStats(player);
+    const lead = isLead ? ' mrc-lead' : '';
+    // Injured players still play out their slot but are visually
+    // de-emphasized so a roster comparison doesn't read them as active (LS-5905).
+    const injuryStatus = player.player?.injuryStatus ?? null;
 
     return (
-      <XStack
-        key={index}
-        width="100%"
-        paddingVertical="$2.5"
-        paddingLeft="$3"
-        paddingRight="$3"
-        borderBottomWidth={1}
-        borderBottomColor="$gray4"
-        backgroundColor={isEvenRow ? undefined : '$gray2'}
-        hoverStyle={{ backgroundColor: '$gray3' }}
-        justifyContent="space-between"
-        alignItems="center"
-      >
-        {/* Team 1 Side - 47% */}
-        <XStack width="47%" alignItems="center" gap="$2">
-          {/* Team 1 Player - Flexible width */}
-          <XStack flex={1} gap="$2" alignItems="center" minWidth={0}>
-            {/* Position badge — always shown for slot rows, only when player exists for bench rows */}
-            {(slotType !== undefined || team1Player !== undefined) && (
-              <YStack
-                width={32}
-                height={32}
-                borderRadius={16}
-                backgroundColor={team1PosBadge.bg}
-                justifyContent="center"
-                alignItems="center"
-                flexShrink={0}
-              >
-                <Text fontSize="$1" fontWeight="800" color={team1PosBadge.text}>
-                  {(slotType ?? team1Position) || '?'}
-                </Text>
-              </YStack>
+      <div className={`mrc-cell ${cls}${mine}${lead}`}>
+        {!slotType && (
+          <span className={`mrc-pos-badge mrc-pos-badge-inline mrc-g-${group}`}>
+            {posLabel ?? '?'}
+          </span>
+        )}
+        <div className="mrc-pinfo">
+          <div className="mrc-pname-row">
+            <button
+              type="button"
+              className="mrc-pname"
+              onClick={() => openSeasonModal(player)}
+            >
+              {player.player?.firstName} {player.player?.lastName}
+            </button>
+            {injuryStatus && <InjuryBadge status={injuryStatus} />}
+          </div>
+          <div className="mrc-pmeta">
+            Season {player.season} •{' '}
+            {player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0}/
+            {player.numberOfGames ?? gamesPerMatchup} games
+            {suffix && (
+              <span className={`mrc-suffix ${suffix.className}`}>
+                {suffix.text}
+              </span>
             )}
-            <YStack
-              flex={1}
-              justifyContent="center"
-              minWidth={0}
-              overflow="hidden"
-            >
-              {team1Player ? (
-                <>
-                  <XStack alignItems="center" gap="$1.5" flexWrap="wrap">
-                    <Text
-                      fontSize="$3"
-                      fontWeight="600"
-                      color="$gray12"
-                      cursor="pointer"
-                      hoverStyle={{
-                        color: BRAND_GOLD_LIGHT,
-                        textDecoration: 'underline',
-                      }}
-                      onPress={() => {
-                        if (team1Player?.playerId && team1Player?.player) {
-                          setSelectedPlayer({
-                            id: team1Player.playerId,
-                            name: `${team1Player.player.firstName} ${team1Player.player.lastName}`,
-                          });
-                          setSeasonStatsModalOpen(true);
-                        }
-                      }}
-                    >
-                      {team1Player.player?.firstName}{' '}
-                      {team1Player.player?.lastName}
-                    </Text>
-                    {team1InjuryStatus && (
-                      <InjuryBadge status={team1InjuryStatus} />
-                    )}
-                  </XStack>
-                  <Text fontSize="$1" color="$gray10">
-                    Season {team1Player.season}
-                    {team1Player.games && team1Player.games.length > 0 ? (
-                      <>
-                        <Text color="$green10">
-                          {' '}
-                          •{' '}
-                          {
-                            team1Player.games.filter(
-                              (g) => !g.pitcherStartSkipped,
-                            ).length
-                          }
-                          /{team1Player.numberOfGames ?? gamesPerMatchup} games
-                        </Text>
-                        {(() => {
-                          const skippedCount = team1Player.games.filter(
-                            (g) => g.pitcherStartSkipped,
-                          ).length;
-                          const loadingCount = team1Player.games.filter(
-                            (g) =>
-                              !g.pitcherStartSkipped &&
-                              (g.statsLoadingStatus === 'loading' ||
-                                g.statsLoadingStatus === 'pending'),
-                          ).length;
-                          const failedCount = team1Player.games.filter(
-                            (g) =>
-                              !g.pitcherStartSkipped &&
-                              g.statsLoadingStatus === 'failed',
-                          ).length;
-
-                          if (loadingCount > 0) {
-                            return (
-                              <Text color={BRAND_GOLD_LIGHT}>
-                                {' '}
-                                • Loading stats ({loadingCount})
-                              </Text>
-                            );
-                          }
-                          if (failedCount > 0) {
-                            return (
-                              <Text color="$red10">
-                                {' '}
-                                • Failed ({failedCount})
-                              </Text>
-                            );
-                          }
-                          if (skippedCount > 0) {
-                            return (
-                              <Text color="$gray9">
-                                {' '}
-                                • {skippedCount} off day
-                                {skippedCount > 1 ? 's' : ''}
-                              </Text>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </>
-                    ) : (
-                      <Text color="$gray8"> • Yet to play</Text>
-                    )}
-                  </Text>
-                  {team1Stats && (
-                    <Text fontSize="$1" color={BRAND_GOLD_LIGHT} marginTop="$1">
-                      {team1Stats}
-                    </Text>
-                  )}
-                </>
-              ) : (
-                <Text
-                  fontSize="$3"
-                  color="$gray8"
-                  fontStyle={slotType !== undefined ? 'italic' : undefined}
-                >
-                  {slotType !== undefined ? 'Empty' : '—'}
-                </Text>
-              )}
-            </YStack>
-          </XStack>
-
-          {/* Team 1 Projected Score */}
-          <YStack
-            width={60}
-            flexShrink={0}
-            alignItems="center"
-            justifyContent="center"
+          </div>
+          {statLine && <div className="mrc-pstat">{statLine}</div>}
+        </div>
+        <div className="mrc-pscore">
+          <div
+            className={`mrc-sc mrc-proj${injuryStatus ? ' mrc-dimmed' : ''}`}
           >
-            <Text
-              fontSize="$2"
-              fontWeight="500"
-              color="$gray10"
-              opacity={team1InjuryStatus ? 0.5 : 1}
-            >
-              {team1Player ? team1Proj.toFixed(1) : '—'}
-            </Text>
-          </YStack>
-
-          {/* Team 1 Actual Score */}
-          <YStack
-            width={60}
-            flexShrink={0}
-            alignItems="center"
-            justifyContent="center"
+            <span className="mrc-lab">Proj</span>
+            <span className="mrc-num">{proj.toFixed(1)}</span>
+          </div>
+          <button
+            type="button"
+            className="mrc-sc mrc-actual"
+            onClick={() => openBreakdownModal(player)}
           >
-            <Text
-              fontSize="$4"
-              fontWeight="600"
-              color={team1ScoreColor}
-              cursor={team1Clickable ? 'pointer' : 'default'}
-              hoverStyle={
-                team1Clickable
-                  ? { textDecoration: 'underline', opacity: 0.8 }
-                  : {}
-              }
-              onPress={() => {
-                if (team1Clickable && team1Player) {
-                  openMatchupStatsModal(team1Player);
-                }
-              }}
-              role={team1Clickable ? 'button' : undefined}
-              tabIndex={team1Clickable ? 0 : undefined}
-              aria-label={
-                team1Clickable
-                  ? `View ${team1Player?.player?.firstName} ${team1Player?.player?.lastName} matchup stats`
-                  : undefined
-              }
-              onKeyDown={(event: React.KeyboardEvent) =>
-                handleMatchupStatsKeyDown(team1Clickable, team1Player, event)
-              }
-            >
-              {team1Player
-                ? team1HasPlayed
-                  ? team1Actual.toFixed(1)
-                  : '—'
-                : '—'}
-            </Text>
-          </YStack>
-        </XStack>
-
-        {/* Center Separator - Fixed position */}
-        <Separator
-          vertical
-          height="100%"
-          borderColor="$gray8"
-          borderWidth={2}
-        />
-
-        {/* Team 2 Side - 47% */}
-        <XStack width="47%" alignItems="center" gap="$2">
-          {/* Team 2 Actual Score */}
-          <YStack
-            width={60}
-            flexShrink={0}
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Text
-              fontSize="$4"
-              fontWeight="600"
-              color={team2ScoreColor}
-              cursor={team2Clickable ? 'pointer' : 'default'}
-              hoverStyle={
-                team2Clickable
-                  ? { textDecoration: 'underline', opacity: 0.8 }
-                  : {}
-              }
-              onPress={() => {
-                if (team2Clickable && team2Player) {
-                  openMatchupStatsModal(team2Player);
-                }
-              }}
-              role={team2Clickable ? 'button' : undefined}
-              tabIndex={team2Clickable ? 0 : undefined}
-              aria-label={
-                team2Clickable
-                  ? `View ${team2Player?.player?.firstName} ${team2Player?.player?.lastName} matchup stats`
-                  : undefined
-              }
-              onKeyDown={(event: React.KeyboardEvent) =>
-                handleMatchupStatsKeyDown(team2Clickable, team2Player, event)
-              }
-            >
-              {team2Player
-                ? team2HasPlayed
-                  ? team2Actual.toFixed(1)
-                  : '—'
-                : '—'}
-            </Text>
-          </YStack>
-
-          {/* Team 2 Projected Score */}
-          <YStack
-            width={60}
-            flexShrink={0}
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Text
-              fontSize="$2"
-              fontWeight="500"
-              color="$gray10"
-              opacity={team2InjuryStatus ? 0.5 : 1}
-            >
-              {team2Player ? team2Proj.toFixed(1) : '—'}
-            </Text>
-          </YStack>
-
-          {/* Team 2 Player - Flexible width */}
-          <XStack
-            flex={1}
-            gap="$2"
-            alignItems="center"
-            justifyContent="flex-end"
-            minWidth={0}
-          >
-            <YStack
-              flex={1}
-              alignItems="flex-end"
-              justifyContent="center"
-              minWidth={0}
-              overflow="hidden"
-            >
-              {team2Player ? (
-                <>
-                  <XStack
-                    alignItems="center"
-                    justifyContent="flex-end"
-                    gap="$1.5"
-                    flexWrap="wrap"
-                  >
-                    {team2InjuryStatus && (
-                      <InjuryBadge status={team2InjuryStatus} />
-                    )}
-                    <Text
-                      fontSize="$3"
-                      fontWeight="600"
-                      color="$gray12"
-                      textAlign="right"
-                      cursor="pointer"
-                      hoverStyle={{
-                        color: BRAND_GOLD_LIGHT,
-                        textDecoration: 'underline',
-                      }}
-                      onPress={() => {
-                        if (team2Player?.playerId && team2Player?.player) {
-                          setSelectedPlayer({
-                            id: team2Player.playerId,
-                            name: `${team2Player.player.firstName} ${team2Player.player.lastName}`,
-                          });
-                          setSeasonStatsModalOpen(true);
-                        }
-                      }}
-                    >
-                      {team2Player.player?.firstName}{' '}
-                      {team2Player.player?.lastName}
-                    </Text>
-                  </XStack>
-                  <Text fontSize="$1" color="$gray10" textAlign="right">
-                    Season {team2Player.season}
-                    {team2Player.games && team2Player.games.length > 0 ? (
-                      <>
-                        <Text color="$green10">
-                          {' '}
-                          •{' '}
-                          {
-                            team2Player.games.filter(
-                              (g) => !g.pitcherStartSkipped,
-                            ).length
-                          }
-                          /{team2Player.numberOfGames ?? gamesPerMatchup} games
-                        </Text>
-                        {(() => {
-                          const skippedCount = team2Player.games.filter(
-                            (g) => g.pitcherStartSkipped,
-                          ).length;
-                          const loadingCount = team2Player.games.filter(
-                            (g) =>
-                              !g.pitcherStartSkipped &&
-                              (g.statsLoadingStatus === 'loading' ||
-                                g.statsLoadingStatus === 'pending'),
-                          ).length;
-                          const failedCount = team2Player.games.filter(
-                            (g) =>
-                              !g.pitcherStartSkipped &&
-                              g.statsLoadingStatus === 'failed',
-                          ).length;
-
-                          if (loadingCount > 0) {
-                            return (
-                              <Text color={BRAND_GOLD_LIGHT}>
-                                {' '}
-                                • Loading stats ({loadingCount})
-                              </Text>
-                            );
-                          }
-                          if (failedCount > 0) {
-                            return (
-                              <Text color="$red10">
-                                {' '}
-                                • Failed ({failedCount})
-                              </Text>
-                            );
-                          }
-                          if (skippedCount > 0) {
-                            return (
-                              <Text color="$gray9">
-                                {' '}
-                                • {skippedCount} off day
-                                {skippedCount > 1 ? 's' : ''}
-                              </Text>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </>
-                    ) : (
-                      <Text color="$gray8"> • Yet to play</Text>
-                    )}
-                  </Text>
-                  {team2Stats && (
-                    <Text
-                      fontSize="$1"
-                      color={BRAND_GOLD_LIGHT}
-                      marginTop="$1"
-                      textAlign="right"
-                    >
-                      {team2Stats}
-                    </Text>
-                  )}
-                </>
-              ) : (
-                <Text
-                  fontSize="$3"
-                  color="$gray8"
-                  textAlign="right"
-                  fontStyle={slotType !== undefined ? 'italic' : undefined}
-                >
-                  {slotType !== undefined ? 'Empty' : '—'}
-                </Text>
-              )}
-            </YStack>
-            {/* Position badge — always shown for slot rows, only when player exists for bench rows */}
-            {(slotType !== undefined || team2Player !== undefined) && (
-              <YStack
-                width={32}
-                height={32}
-                borderRadius={16}
-                backgroundColor={team2PosBadge.bg}
-                justifyContent="center"
-                alignItems="center"
-                flexShrink={0}
-              >
-                <Text fontSize="$1" fontWeight="800" color={team2PosBadge.text}>
-                  {(slotType ?? team2Position) || '?'}
-                </Text>
-              </YStack>
-            )}
-          </XStack>
-        </XStack>
-      </XStack>
+            <span className="mrc-lab">Actual</span>
+            <span className={`mrc-num ${actualCls}`}>
+              {hasPlayed ? actual.toFixed(1) : '—'}
+            </span>
+          </button>
+        </div>
+      </div>
     );
   };
 
-  // Show loading state if scoring settings are loading
-  if (scoringLoading) {
+  const slotRow = (
+    key: string,
+    slotType: string | undefined,
+    team1Player: MatchupPlayerFragment | undefined,
+    team2Player: MatchupPlayerFragment | undefined,
+  ) => {
+    // Only starter rows share a single league slot (and therefore a single
+    // position) across both teams — bench/bullpen rows pair arbitrary
+    // players by index and rely on each cell's own inline badge instead.
+    const group = getPositionGroup(slotType);
+    const team1Actual =
+      team1Player?.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ??
+      0;
+    const team2Actual =
+      team2Player?.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ??
+      0;
+    const team1Played =
+      (team1Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) >
+      0;
+    const team2Played =
+      (team2Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) >
+      0;
+    const team1Lead =
+      team1Player != null &&
+      team2Player != null &&
+      team1Played &&
+      team2Played &&
+      team1Actual > team2Actual;
+    const team2Lead =
+      team1Player != null &&
+      team2Player != null &&
+      team1Played &&
+      team2Played &&
+      team2Actual > team1Actual;
+
     return (
-      <RosterCard>
-        <XStack padding="$4" justifyContent="space-between" alignItems="center">
-          <H4 color="$color">Player Matchups</H4>
-          <Text fontSize="$2" color="$textMuted">
-            Loading projections...
-          </Text>
-        </XStack>
-      </RosterCard>
+      <div className={`mrc-slot mrc-g-${group}`} key={key}>
+        {renderCell(1, team1Player, slotType, team1Lead)}
+        {slotType && (
+          <div className="mrc-pos">
+            <span className="mrc-pos-badge">{slotType}</span>
+          </div>
+        )}
+        {renderCell(2, team2Player, slotType, team2Lead)}
+      </div>
     );
-  }
+  };
 
+  const totalsRow = (
+    label: string,
+    team1Totals: { projected: number; actual: number },
+    team2Totals: { projected: number; actual: number },
+  ) => {
+    const team1Cls =
+      team1Totals.actual === team2Totals.actual
+        ? ''
+        : team1Totals.actual > team2Totals.actual
+          ? 'mrc-up'
+          : 'mrc-down';
+    const team2Cls =
+      team1Totals.actual === team2Totals.actual
+        ? ''
+        : team2Totals.actual > team1Totals.actual
+          ? 'mrc-up'
+          : 'mrc-down';
+    return (
+      <div className="mrc-totals">
+        <div className="mrc-tot-cell mrc-t1">
+          <div className="mrc-sc mrc-proj">
+            <span className="mrc-num">{team1Totals.projected.toFixed(1)}</span>
+          </div>
+          <div className="mrc-sc mrc-actual">
+            <span className={`mrc-num ${team1Cls}`}>
+              {team1Totals.actual.toFixed(1)}
+            </span>
+          </div>
+          <div className="mrc-filler" />
+        </div>
+        <div className="mrc-tot-lab">{label}</div>
+        <div className="mrc-tot-cell mrc-t2">
+          <div className="mrc-sc mrc-proj">
+            <span className="mrc-num">{team2Totals.projected.toFixed(1)}</span>
+          </div>
+          <div className="mrc-sc mrc-actual">
+            <span className={`mrc-num ${team2Cls}`}>
+              {team2Totals.actual.toFixed(1)}
+            </span>
+          </div>
+          <div className="mrc-filler" />
+        </div>
+      </div>
+    );
+  };
+
+  const maxBullpenRows = Math.max(team1Bullpen.length, team2Bullpen.length);
+  const maxBenchFielderRows = Math.max(
+    team1BenchFielders.length,
+    team2BenchFielders.length,
+  );
   const playerCount = data?.getMatchupPlayers?.length ?? 0;
-
   return (
-    <div
-      style={{
-        width: '100%',
-        overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch',
-      }}
-    >
-      <RosterCard>
-        {/* Card Header */}
-        <XStack
-          padding="$4"
-          justifyContent="space-between"
-          alignItems="center"
-          borderBottomWidth={1}
-          borderBottomColor="$surfacePanelBorder"
-        >
-          <XStack alignItems="center" gap="$2">
-            <Users size={18} color="var(--color)" />
-            <H4 color="$color">Player Matchups</H4>
-          </XStack>
-          <XStack
-            alignItems="center"
-            gap="$1.5"
-            paddingHorizontal="$3"
-            paddingVertical="$1"
-            borderRadius="$10"
-            backgroundColor="$surfacePanel"
-            borderWidth={1}
-            borderColor="$surfacePanelBorder"
-          >
-            <Text fontSize="$2" fontWeight="600" color="$textMuted">
-              {team1Starters.length + team1Bench.length} vs{' '}
-              {team2Starters.length + team2Bench.length}
-            </Text>
-          </XStack>
-        </XStack>
+    <div className="mrc-root">
+      <div className="mrc-wrap">
+        <div className="mrc-head">
+          <h1 className="mrc-title">Player Matchups</h1>
+          <span className="mrc-count">
+            <span>
+              {team1RosterCount} vs {team2RosterCount}
+            </span>{' '}
+            players
+          </span>
+        </div>
 
-        {/* Banner when server-side stats are still being processed */}
         {isStatsLoading(matchup.statsLoadingStatus) && (
-          <XStack
-            backgroundColor="$surfaceInteractive"
-            padding="$3"
-            borderBottomWidth={1}
-            borderBottomColor="$outlineSubtle"
-            gap="$2"
-            alignItems="flex-start"
-          >
-            <YStack gap="$1">
-              <Text fontSize="$2" color="$brandGoldLight" fontWeight="600">
-                Stats are updating
-              </Text>
-              <Text fontSize="$1" color="$brandGoldLight">
-                Scores will refresh automatically as game stats finish loading.
-              </Text>
-            </YStack>
-          </XStack>
+          <div className="mrc-banner mrc-updating">
+            <span className="mrc-dot" />
+            Stats are updating — scores refresh automatically as the games
+            finish processing.
+          </div>
         )}
-
-        {/* Warning if season stats are missing */}
         {seasonStatsMap.size === 0 && playerCount > 0 && (
-          <XStack
-            backgroundColor="$yellow2"
-            padding="$3"
-            borderBottomWidth={1}
-            borderBottomColor="$yellow6"
-            gap="$2"
-            alignItems="flex-start"
-          >
-            <YStack gap="$1">
-              <Text fontSize="$2" color="$yellow11" fontWeight="600">
-                Season statistics not available
-              </Text>
-              <Text fontSize="$1" color="$yellow10">
-                Projections are based on games played in this matchup only.
-              </Text>
-            </YStack>
-          </XStack>
+          <div className="mrc-banner mrc-noseason">
+            <span className="mrc-dot" />
+            Season statistics not available — projections are running on
+            in-matchup games only, not full-season data.
+          </div>
         )}
 
-        {/* Hitters Section Table */}
-        <SectionTable>
-          {/* Starters Section Header */}
-          <SectionHeader backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}>
-            <YStack
-              width={4}
-              height={16}
-              borderRadius={2}
-              backgroundColor={BRAND_NAVY_LIGHT}
-            />
-            <Text
-              fontSize="$3"
-              fontWeight="700"
-              color={BRAND_GOLD_LIGHT}
-              letterSpacing={0.3}
-            >
-              STARTING LINEUP
-            </Text>
-          </SectionHeader>
+        <div className="mrc-teams">
+          <div className="mrc-theadcell mrc-t1">
+            <div className="mrc-tname">
+              <h2>{team1Name}</h2>
+              {userTeamId != null && <span className="mrc-you">YOU</span>}
+            </div>
+            <div className="mrc-tcols">
+              <span>Proj</span>
+              <span>Actual</span>
+            </div>
+          </div>
+          <div className="mrc-tvs">VS</div>
+          <div className="mrc-theadcell mrc-t2">
+            <div className="mrc-tname">
+              <h2>{team2Name}</h2>
+            </div>
+            <div className="mrc-tcols">
+              <span>Proj</span>
+              <span>Actual</span>
+            </div>
+          </div>
+        </div>
 
-          {/* Header Row for Starters */}
-          <ColumnHeader>
-            {/* Team 1 Side - 47% */}
-            <XStack width="47%" alignItems="center" gap="$2">
-              <YStack width={40} flexShrink={0}>
-                <Text
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$textMuted"
-                  textTransform="uppercase"
-                  letterSpacing={0.5}
-                >
-                  Pos
-                </Text>
-              </YStack>
-              <YStack flex={1} minWidth={0} gap="$1">
-                <Text
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$textMuted"
-                  textTransform="uppercase"
-                  letterSpacing={0.5}
-                >
-                  {team1Name}
-                </Text>
-                {userTeamId != null && (
-                  <XStack
-                    paddingHorizontal="$1.5"
-                    paddingVertical="$0.5"
-                    borderRadius="$10"
-                    backgroundColor="$surfaceInteractive"
-                    alignSelf="flex-start"
-                  >
-                    <Text
-                      fontSize="$1"
-                      fontWeight="700"
-                      color="$brandGoldLight"
-                    >
-                      YOU
-                    </Text>
-                  </XStack>
-                )}
-              </YStack>
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$textMuted"
-                  textTransform="uppercase"
-                  letterSpacing={0.5}
-                >
-                  Proj
-                </Text>
-              </YStack>
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text
-                  fontSize="$1"
-                  fontWeight="700"
-                  color={BRAND_GOLD_LIGHT}
-                  textTransform="uppercase"
-                  letterSpacing={0.5}
-                >
-                  Actual
-                </Text>
-              </YStack>
-            </XStack>
-            <Separator
-              vertical
-              height="100%"
-              borderColor="$surfacePanelBorder"
-            />
-            {/* Team 2 Side - 47% */}
-            <XStack width="47%" alignItems="center" gap="$2">
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text
-                  fontSize="$1"
-                  fontWeight="700"
-                  color={BRAND_GOLD_LIGHT}
-                  textTransform="uppercase"
-                  letterSpacing={0.5}
-                >
-                  Actual
-                </Text>
-              </YStack>
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$textMuted"
-                  textTransform="uppercase"
-                  letterSpacing={0.5}
-                >
-                  Proj
-                </Text>
-              </YStack>
-              <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                <Text
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$textMuted"
-                  textTransform="uppercase"
-                  letterSpacing={0.5}
-                >
-                  {team2Name}
-                </Text>
-              </YStack>
-              <YStack width={40} flexShrink={0} alignItems="flex-end">
-                <Text
-                  fontSize="$1"
-                  fontWeight="700"
-                  color="$textMuted"
-                  textTransform="uppercase"
-                  letterSpacing={0.5}
-                >
-                  Pos
-                </Text>
-              </YStack>
-            </XStack>
-          </ColumnHeader>
+        {batterSlotRows.length > 0 && (
+          <div className="mrc-section">
+            <div className="mrc-section-bar">
+              <h3>Starting Lineup — Batters</h3>
+              <div className="mrc-rule" />
+            </div>
+            {batterSlotRows.map((row) =>
+              slotRow(
+                `batter-${row.slotId}`,
+                row.slotType,
+                row.team1Player,
+                row.team2Player,
+              ),
+            )}
+            {totalsRow('Hitters Total', team1BatterTotals, team2BatterTotals)}
+          </div>
+        )}
 
-          {/* Batters Section — one row per league batter slot (empty slots visible) */}
-          {batterSlotRows.length > 0 && (
-            <>
-              <SectionHeader backgroundColor="$green2">
-                <YStack
-                  width={4}
-                  height={16}
-                  borderRadius={2}
-                  backgroundColor="$green9"
-                />
-                <Text
-                  fontSize="$2"
-                  fontWeight="700"
-                  color="$green11"
-                  letterSpacing={0.3}
-                >
-                  BATTERS
-                </Text>
-              </SectionHeader>
-              <YStack>
-                {batterSlotRows.map((row, index) =>
-                  renderPlayerRow(
-                    row.team1Player,
-                    row.team2Player,
-                    `batter-${row.slotId}`,
-                    index,
-                    row.slotType,
-                  ),
-                )}
-              </YStack>
-            </>
-          )}
-
-          {/* Totals Row - Hitters */}
-          <TotalsRow>
-            {/* Team 1 Side - 47% */}
-            <XStack width="47%" alignItems="center" gap="$2">
-              <YStack flex={1} minWidth={0}>
-                <Text fontSize="$4" fontWeight="800" color="$color">
-                  Hitters Total
-                </Text>
-              </YStack>
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text fontSize="$2" fontWeight="600" color="$textMuted">
-                  {team1BatterTotals.projected.toFixed(1)}
-                </Text>
-              </YStack>
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text
-                  fontSize="$5"
-                  fontWeight="900"
-                  color={
-                    team1BatterTotals.actual >= team2BatterTotals.actual
-                      ? '$green10'
-                      : '$red10'
-                  }
-                >
-                  {team1BatterTotals.actual.toFixed(1)}
-                </Text>
-              </YStack>
-            </XStack>
-            <Separator
-              vertical
-              height="100%"
-              borderColor="$surfacePanelBorder"
-              borderWidth={2}
-            />
-            {/* Team 2 Side - 47% */}
-            <XStack width="47%" alignItems="center" gap="$2">
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text
-                  fontSize="$5"
-                  fontWeight="900"
-                  color={
-                    team2BatterTotals.actual >= team1BatterTotals.actual
-                      ? '$green10'
-                      : '$red10'
-                  }
-                >
-                  {team2BatterTotals.actual.toFixed(1)}
-                </Text>
-              </YStack>
-              <YStack width={60} flexShrink={0} alignItems="center">
-                <Text fontSize="$2" fontWeight="600" color="$textMuted">
-                  {team2BatterTotals.projected.toFixed(1)}
-                </Text>
-              </YStack>
-              <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                <Text fontSize="$4" fontWeight="800" color="$color">
-                  Hitters Total
-                </Text>
-              </YStack>
-            </XStack>
-          </TotalsRow>
-        </SectionTable>
-
-        {/* Pitchers Section Table — one row per league pitcher slot (empty slots visible) */}
         {pitcherSlotRows.length > 0 && (
-          <SectionTable marginTop="$4">
-            <SectionHeader backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}>
-              <YStack
-                width={4}
-                height={16}
-                borderRadius={2}
-                backgroundColor={BRAND_NAVY_LIGHT}
-              />
-              <Text
-                fontSize="$2"
-                fontWeight="700"
-                color={BRAND_GOLD_LIGHT}
-                letterSpacing={0.3}
-              >
-                PITCHERS
-              </Text>
-            </SectionHeader>
-            <YStack>
-              {pitcherSlotRows.map((row, index) =>
-                renderPlayerRow(
-                  row.team1Player,
-                  row.team2Player,
-                  `pitcher-${row.slotId}`,
-                  index,
-                  row.slotType,
-                ),
-              )}
-            </YStack>
-
-            {/* Totals Row - Pitchers */}
-            <TotalsRow>
-              {/* Team 1 Side - 47% */}
-              <XStack width="47%" alignItems="center" gap="$2">
-                <YStack flex={1} minWidth={0}>
-                  <Text fontSize="$4" fontWeight="800" color="$color">
-                    Pitchers Total
-                  </Text>
-                </YStack>
-                <YStack width={60} flexShrink={0} alignItems="center">
-                  <Text fontSize="$2" fontWeight="600" color="$textMuted">
-                    {team1PitcherTotals.projected.toFixed(1)}
-                  </Text>
-                </YStack>
-                <YStack width={60} flexShrink={0} alignItems="center">
-                  <Text
-                    fontSize="$5"
-                    fontWeight="900"
-                    color={
-                      team1PitcherTotals.actual >= team2PitcherTotals.actual
-                        ? '$green10'
-                        : '$red10'
-                    }
-                  >
-                    {team1PitcherTotals.actual.toFixed(1)}
-                  </Text>
-                </YStack>
-              </XStack>
-              <Separator
-                vertical
-                height="100%"
-                borderColor="$surfacePanelBorder"
-                borderWidth={2}
-              />
-              {/* Team 2 Side - 47% */}
-              <XStack width="47%" alignItems="center" gap="$2">
-                <YStack width={60} flexShrink={0} alignItems="center">
-                  <Text
-                    fontSize="$5"
-                    fontWeight="900"
-                    color={
-                      team2PitcherTotals.actual >= team1PitcherTotals.actual
-                        ? '$green10'
-                        : '$red10'
-                    }
-                  >
-                    {team2PitcherTotals.actual.toFixed(1)}
-                  </Text>
-                </YStack>
-                <YStack width={60} flexShrink={0} alignItems="center">
-                  <Text fontSize="$2" fontWeight="600" color="$textMuted">
-                    {team2PitcherTotals.projected.toFixed(1)}
-                  </Text>
-                </YStack>
-                <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                  <Text fontSize="$4" fontWeight="800" color="$color">
-                    Pitchers Total
-                  </Text>
-                </YStack>
-              </XStack>
-            </TotalsRow>
-          </SectionTable>
+          <div className="mrc-section">
+            <div className="mrc-section-bar">
+              <h3>Starting Lineup — Pitchers</h3>
+              <div className="mrc-rule" />
+            </div>
+            {pitcherSlotRows.map((row) =>
+              slotRow(
+                `pitcher-${row.slotId}`,
+                row.slotType,
+                row.team1Player,
+                row.team2Player,
+              ),
+            )}
+            {totalsRow(
+              'Pitchers Total',
+              team1PitcherTotals,
+              team2PitcherTotals,
+            )}
+          </div>
         )}
 
-        {/* Bench Section Table */}
         {(team1Bench.length > 0 || team2Bench.length > 0) && (
-          <SectionTable marginTop="$4">
-            <BenchToggle onPress={() => setShowBench(!showBench)}>
-              <span
-                aria-hidden="true"
-                style={{
-                  display: 'inline-flex',
-                  transition: 'transform 250ms ease',
-                  transform: showBench ? 'rotate(90deg)' : 'rotate(0deg)',
-                }}
-              >
-                <ChevronRight size={16} color="var(--textMuted)" />
-              </span>
-              <Text fontSize="$3" fontWeight="600" color="$textMuted">
-                {showBench ? 'Hide' : 'Show'} Bench
-              </Text>
-              <XStack
-                paddingHorizontal="$2"
-                paddingVertical="$0.5"
-                borderRadius="$10"
-                backgroundColor="$gray3"
-              >
-                <Text fontSize="$1" fontWeight="600" color="$textMuted">
-                  {team1Bench.length} vs {team2Bench.length}
-                </Text>
-              </XStack>
-            </BenchToggle>
-
-            {/* Animated bench content wrapper */}
-            <YStack
-              style={{
-                display: 'grid',
-                gridTemplateRows: showBench ? '1fr' : '0fr',
-                transition: 'grid-template-rows 300ms ease-in-out',
-              }}
+          <>
+            <button
+              type="button"
+              className="mrc-bench-toggle"
+              aria-expanded={showBench}
+              onClick={() => setShowBench(!showBench)}
             >
-              <YStack overflow="hidden">
-                {/* Bullpen Section (bench pitchers) */}
+              <h3>{showBench ? 'Hide' : 'Show'} Bench</h3>
+              <span className="mrc-cnt">
+                {team1Bench.length} vs {team2Bench.length}
+              </span>
+              <span className="mrc-chev" aria-hidden="true">
+                ▶
+              </span>
+            </button>
+            {showBench && (
+              <>
                 {(team1Bullpen.length > 0 || team2Bullpen.length > 0) && (
-                  <>
-                    {/* Bullpen Section Header */}
-                    <SectionHeader
-                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
-                    >
-                      <YStack
-                        width={4}
-                        height={16}
-                        borderRadius={2}
-                        backgroundColor={BRAND_NAVY_LIGHT}
-                      />
-                      <Text
-                        fontSize="$2"
-                        fontWeight="700"
-                        color={BRAND_GOLD_LIGHT}
-                        letterSpacing={0.3}
-                      >
-                        BULLPEN
-                      </Text>
-                    </SectionHeader>
-
-                    {/* Header Row for Bullpen */}
-                    <XStack
-                      width="100%"
-                      paddingVertical="$2.5"
-                      paddingLeft="$3"
-                      paddingRight="$3"
-                      backgroundColor="$gray2"
-                      borderBottomWidth={2}
-                      borderBottomColor="$gray7"
-                      justifyContent="space-between"
-                      alignItems="center"
-                    >
-                      {/* Team 1 Side - 47% */}
-                      <XStack width="47%" alignItems="center" gap="$2">
-                        <YStack flex={1} minWidth={0}>
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color={BRAND_GOLD_LIGHT}
-                            textTransform="uppercase"
-                          >
-                            Team 1 Bullpen
-                          </Text>
-                        </YStack>
-                        <YStack width={60} flexShrink={0} alignItems="center">
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color="$gray9"
-                            textTransform="uppercase"
-                          >
-                            Proj
-                          </Text>
-                        </YStack>
-                        <YStack width={60} flexShrink={0} alignItems="center">
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color="$gray10"
-                            textTransform="uppercase"
-                          >
-                            Actual
-                          </Text>
-                        </YStack>
-                      </XStack>
-                      <Separator
-                        vertical
-                        height="100%"
-                        borderColor="$gray8"
-                        borderWidth={2}
-                      />
-                      {/* Team 2 Side - 47% */}
-                      <XStack width="47%" alignItems="center" gap="$2">
-                        <YStack width={60} flexShrink={0} alignItems="center">
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color="$gray10"
-                            textTransform="uppercase"
-                          >
-                            Actual
-                          </Text>
-                        </YStack>
-                        <YStack width={60} flexShrink={0} alignItems="center">
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color="$gray9"
-                            textTransform="uppercase"
-                          >
-                            Proj
-                          </Text>
-                        </YStack>
-                        <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color={BRAND_GOLD_LIGHT}
-                            textTransform="uppercase"
-                          >
-                            Team 2 Bullpen
-                          </Text>
-                        </YStack>
-                      </XStack>
-                    </XStack>
-
-                    {/* Bullpen Rows */}
-                    <YStack>
-                      {Array.from({ length: maxBullpenRows }).map((_, index) =>
-                        renderPlayerRow(
-                          team1Bullpen[index],
-                          team2Bullpen[index],
-                          `bullpen-${index}`,
-                          index,
-                        ),
-                      )}
-                    </YStack>
-                  </>
+                  <div className="mrc-section">
+                    <div className="mrc-section-bar">
+                      <h3>Bullpen</h3>
+                      <div className="mrc-rule" />
+                    </div>
+                    {Array.from({ length: maxBullpenRows }).map((_, index) =>
+                      slotRow(
+                        `bullpen-${index}`,
+                        undefined,
+                        team1Bullpen[index],
+                        team2Bullpen[index],
+                      ),
+                    )}
+                  </div>
                 )}
-
-                {/* Bench Section (fielders) */}
                 {(team1BenchFielders.length > 0 ||
                   team2BenchFielders.length > 0) && (
-                  <>
-                    {/* Bench Section Header */}
-                    <SectionHeader
-                      backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
-                    >
-                      <YStack
-                        width={4}
-                        height={16}
-                        borderRadius={2}
-                        backgroundColor={BRAND_NAVY_LIGHT}
-                      />
-                      <Text
-                        fontSize="$2"
-                        fontWeight="700"
-                        color={BRAND_GOLD_LIGHT}
-                        letterSpacing={0.3}
-                      >
-                        BENCH
-                      </Text>
-                    </SectionHeader>
-
-                    {/* Header Row for Bench */}
-                    <ColumnHeader>
-                      {/* Team 1 Side - 47% */}
-                      <XStack width="47%" alignItems="center" gap="$2">
-                        <YStack flex={1} minWidth={0}>
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color={BRAND_GOLD_LIGHT}
-                            textTransform="uppercase"
-                          >
-                            Team 1 Bench
-                          </Text>
-                        </YStack>
-                        <YStack width={60} flexShrink={0} alignItems="center">
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color="$gray9"
-                            textTransform="uppercase"
-                          >
-                            Proj
-                          </Text>
-                        </YStack>
-                        <YStack width={60} flexShrink={0} alignItems="center">
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color="$gray10"
-                            textTransform="uppercase"
-                          >
-                            Actual
-                          </Text>
-                        </YStack>
-                      </XStack>
-                      <Separator
-                        vertical
-                        height="100%"
-                        borderColor="$gray8"
-                        borderWidth={2}
-                      />
-                      {/* Team 2 Side - 47% */}
-                      <XStack width="47%" alignItems="center" gap="$2">
-                        <YStack width={60} flexShrink={0} alignItems="center">
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color="$gray10"
-                            textTransform="uppercase"
-                          >
-                            Actual
-                          </Text>
-                        </YStack>
-                        <YStack width={60} flexShrink={0} alignItems="center">
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color="$gray9"
-                            textTransform="uppercase"
-                          >
-                            Proj
-                          </Text>
-                        </YStack>
-                        <YStack flex={1} alignItems="flex-end" minWidth={0}>
-                          <Text
-                            fontSize="$2"
-                            fontWeight="bold"
-                            color={BRAND_GOLD_LIGHT}
-                            textTransform="uppercase"
-                          >
-                            Team 2 Bench
-                          </Text>
-                        </YStack>
-                      </XStack>
-                    </ColumnHeader>
-
-                    {/* Bench Rows */}
-                    <YStack>
-                      {Array.from({ length: maxBenchFielderRows }).map(
-                        (_, index) =>
-                          renderPlayerRow(
-                            team1BenchFielders[index],
-                            team2BenchFielders[index],
-                            `bench-${index}`,
-                            index,
-                          ),
-                      )}
-                    </YStack>
-                  </>
+                  <div className="mrc-section">
+                    <div className="mrc-section-bar">
+                      <h3>Bench</h3>
+                      <div className="mrc-rule" />
+                    </div>
+                    {Array.from({ length: maxBenchFielderRows }).map(
+                      (_, index) =>
+                        slotRow(
+                          `bench-${index}`,
+                          undefined,
+                          team1BenchFielders[index],
+                          team2BenchFielders[index],
+                        ),
+                    )}
+                  </div>
                 )}
-              </YStack>
-            </YStack>
-          </SectionTable>
+              </>
+            )}
+          </>
         )}
+      </div>
 
-        {/* Player Season Stats Modal (for player name clicks) */}
-        <PlayerSeasonStatsModal
-          open={seasonStatsModalOpen}
-          onOpenChange={setSeasonStatsModalOpen}
-          playerId={selectedPlayer?.id ?? null}
-          playerName={selectedPlayer?.name ?? ''}
-        />
+      {/* Player Season Stats Modal (for player name clicks) */}
+      <PlayerSeasonStatsModal
+        open={seasonStatsModalOpen}
+        onOpenChange={setSeasonStatsModalOpen}
+        playerId={selectedPlayer?.id ?? null}
+        playerName={selectedPlayer?.name ?? ''}
+      />
 
-        {/* Player Matchup Stats Modal (for score clicks) */}
-        <PlayerMatchupStatsModal
-          open={matchupStatsModalOpen}
-          onOpenChange={setMatchupStatsModalOpen}
-          player={selectedMatchupPlayer}
-          playerName={selectedMatchupPlayerName}
-          scoringSettings={scoringSettings}
-        />
-      </RosterCard>
+      {/* Player Matchup Stats Modal (for score clicks) */}
+      <PlayerMatchupStatsModal
+        open={matchupStatsModalOpen}
+        onOpenChange={setMatchupStatsModalOpen}
+        player={selectedMatchupPlayer}
+        playerName={selectedMatchupPlayerName}
+        scoringSettings={scoringSettings}
+      />
     </div>
   );
 }

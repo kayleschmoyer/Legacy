@@ -1,0 +1,800 @@
+/* MatchupRosterComparison — handoff redesign (LS-5903).
+   All rules are scoped under .mrc-root to avoid colliding with
+   Tamagui-generated styles elsewhere in the app. Reflows via CSS
+   container queries (not viewport media queries) so the widget
+   stacks Team1/Team2 below 660px of its own container width,
+   regardless of surrounding page chrome.
+   JetBrains Mono is loaded here since this page tree doesn't
+   otherwise pull it in (league-detail-v2/styles.css loads it
+   independently for its own tree). */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+.mrc-root {
+  --brand-navy-dark: #143050;
+  --brand-gold: #c5a55a;
+  --brand-gold-light: #d4bb78;
+
+  --bg-hover: #0e1624;
+  --surface-subtle: #0d1526;
+  --surface-panel: #111b2f;
+  --surface-card: #16223a;
+  --surface-raised: #1c2a47;
+
+  --outline-subtle: #1c2740;
+  --outline-default: #2f3b53;
+  --outline-strong: #4d5d80;
+  --panel-border: #1f2d48;
+
+  --fg1: #f8fafc;
+  --fg1-strong: #ffffff;
+  --fg2: #dee6ff;
+  --fg3: #9caac5;
+  --fg4: #6c80ba;
+
+  --success-fg: #6fd39a;
+  --warning-fg: #e3b870;
+  --warning-soft: rgba(176, 118, 38, 0.22);
+  --warning-border: rgba(176, 118, 38, 0.55);
+  --danger-fg: #e07a8c;
+  --danger-soft: rgba(176, 46, 68, 0.22);
+  --danger-border: rgba(176, 46, 68, 0.55);
+  --info-fg: #8fb4e8;
+  --info-soft: rgba(70, 110, 176, 0.22);
+  --info-border: rgba(70, 110, 176, 0.55);
+
+  --pos-pitcher: #c41e3a;
+  --pos-catcher: #7c8794;
+  --pos-infield: #8b6f47;
+  --pos-outfield: #2d6a4f;
+  --pos-utility: #c5a55a;
+
+  --radius-2: 6px;
+  --radius-3: 8px;
+  --radius-4: 12px;
+  --radius-5: 16px;
+  --radius-6: 20px;
+
+  --shadow-xl: 0 20px 48px rgba(8, 12, 20, 0.75);
+
+  --font-display: 'Big Shoulders Display', 'Oswald', system-ui, sans-serif;
+  --font-body: 'Literata', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.mrc-root * {
+  box-sizing: border-box;
+}
+
+.mrc-wrap {
+  container-type: inline-size;
+  container-name: mrc;
+  width: 100%;
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+.mrc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.mrc-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--fg1-strong);
+  margin: 0;
+}
+@container mrc (min-width: 980px) {
+  .mrc-title {
+    font-size: 28px;
+  }
+}
+.mrc-count {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--fg2);
+  background: var(--surface-raised);
+  border: 1px solid var(--outline-default);
+  border-radius: 9999px;
+  padding: 6px 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Transient banners ───────────────────────────────────── */
+.mrc-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  line-height: 1.4;
+  border-radius: var(--radius-4);
+  padding: 11px 14px;
+  margin-bottom: 12px;
+}
+.mrc-banner .mrc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+.mrc-banner.mrc-updating {
+  background: var(--info-soft);
+  border: 1px solid var(--info-border);
+  color: var(--info-fg);
+}
+.mrc-banner.mrc-updating .mrc-dot {
+  background: var(--info-fg);
+  animation: mrc-pulse 1.4s ease-in-out infinite;
+}
+.mrc-banner.mrc-noseason {
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-fg);
+}
+.mrc-banner.mrc-noseason .mrc-dot {
+  background: var(--warning-fg);
+}
+@keyframes mrc-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ── Team column header (always 2-up) ────────────────────── */
+.mrc-teams {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 10px;
+}
+@container mrc (min-width: 800px) {
+  .mrc-teams {
+    grid-template-columns: 1fr 48px 1fr;
+  }
+}
+.mrc-theadcell {
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-5);
+  padding: 12px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mrc-theadcell.mrc-t1 {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mrc-theadcell.mrc-t2 {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  align-items: flex-end;
+  text-align: right;
+}
+.mrc-tvs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  color: var(--fg4);
+  background: var(--surface-subtle);
+  border-top: 1px solid var(--panel-border);
+  border-bottom: 1px solid var(--panel-border);
+}
+.mrc-tname {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.mrc-theadcell.mrc-t2 .mrc-tname {
+  flex-direction: row-reverse;
+}
+.mrc-tname h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.1;
+  color: var(--fg1-strong);
+  margin: 0;
+}
+@container mrc (min-width: 660px) {
+  .mrc-tname h2 {
+    font-size: 18px;
+  }
+}
+.mrc-you {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--brand-navy-dark);
+  background: var(--brand-gold-light);
+  border-radius: var(--radius-3);
+  padding: 2px 6px;
+}
+.mrc-tcols {
+  display: flex;
+  gap: 14px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg4);
+}
+.mrc-tcols span {
+  width: 42px;
+  text-align: center;
+}
+@container mrc (min-width: 660px) {
+  .mrc-tcols span {
+    width: 52px;
+  }
+}
+.mrc-theadcell.mrc-t1 .mrc-tcols {
+  flex-direction: row-reverse;
+}
+@container mrc (max-width: 659px) {
+  .mrc-tcols {
+    display: none;
+  }
+}
+
+/* ── Section ─────────────────────────────────────────────── */
+.mrc-section {
+  margin-top: 18px;
+}
+.mrc-section-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 8px;
+}
+.mrc-section-bar h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--brand-gold-light);
+  margin: 0;
+}
+.mrc-section-bar .mrc-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--outline-subtle);
+}
+
+.mrc-bench-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-5);
+  cursor: pointer;
+  margin-top: 18px;
+  transition: border-color 0.15s;
+  font: inherit;
+  color: inherit;
+}
+.mrc-bench-toggle:hover {
+  border-color: var(--outline-strong);
+}
+.mrc-bench-toggle h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--fg2);
+  margin: 0;
+}
+.mrc-bench-toggle .mrc-cnt {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--fg3);
+  background: var(--surface-raised);
+  border: 1px solid var(--outline-default);
+  border-radius: 9999px;
+  padding: 3px 10px;
+}
+.mrc-bench-toggle .mrc-chev {
+  margin-left: auto;
+  color: var(--fg3);
+  transition: transform 0.2s;
+  font-size: 14px;
+  display: inline-flex;
+}
+.mrc-bench-toggle[aria-expanded='true'] .mrc-chev {
+  transform: rotate(90deg);
+}
+
+/* ── Slot row (the reflowing unit) ───────────────────────── */
+.mrc-slot {
+  position: relative;
+  display: grid;
+  align-items: stretch;
+  border-radius: var(--radius-4);
+  margin-bottom: 8px;
+}
+@container mrc (min-width: 660px) {
+  .mrc-slot {
+    grid-template-columns: 1fr 40px 1fr;
+    grid-template-areas: 't1 pos t2';
+    column-gap: 0;
+  }
+  .mrc-slot .mrc-cell.mrc-t1 {
+    grid-area: t1;
+  }
+  .mrc-slot .mrc-pos {
+    grid-area: pos;
+  }
+  .mrc-slot .mrc-cell.mrc-t2 {
+    grid-area: t2;
+  }
+}
+@container mrc (min-width: 800px) {
+  .mrc-slot {
+    grid-template-columns: 1fr 48px 1fr;
+  }
+}
+@container mrc (max-width: 659px) {
+  .mrc-slot {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'pos' 't1' 't2';
+    background: var(--surface-card);
+    border: 1px solid var(--outline-subtle);
+    padding: 10px 12px 12px;
+  }
+  .mrc-slot .mrc-cell.mrc-t1 {
+    grid-area: t1;
+  }
+  .mrc-slot .mrc-pos {
+    grid-area: pos;
+  }
+  .mrc-slot .mrc-cell.mrc-t2 {
+    grid-area: t2;
+  }
+}
+
+.mrc-pos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mrc-pos-badge {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #fff;
+  border-radius: var(--radius-3);
+  padding: 4px 0;
+  min-width: 34px;
+  text-align: center;
+}
+@container mrc (max-width: 659px) {
+  .mrc-pos {
+    justify-content: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--outline-subtle);
+  }
+}
+
+/* inline per-cell badge, used for bench/bullpen rows where the two
+   sides don't share a slot position (unlike starter rows) */
+.mrc-pos-badge.mrc-pos-badge-inline {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.mrc-g-catcher .mrc-pos-badge {
+  background: var(--pos-catcher);
+}
+.mrc-g-infield .mrc-pos-badge {
+  background: var(--pos-infield);
+}
+.mrc-g-outfield .mrc-pos-badge {
+  background: var(--pos-outfield);
+}
+.mrc-g-pitcher .mrc-pos-badge {
+  background: var(--pos-pitcher);
+}
+.mrc-g-utility .mrc-pos-badge {
+  background: var(--pos-utility);
+  color: var(--brand-navy-dark);
+}
+
+/* team cell */
+.mrc-cell {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--outline-subtle);
+  min-width: 0;
+}
+@container mrc (min-width: 660px) {
+  .mrc-cell.mrc-t1 {
+    border-right: none;
+    border-radius: var(--radius-4) 0 0 var(--radius-4);
+    flex-direction: row-reverse;
+    text-align: right;
+  }
+  .mrc-cell.mrc-t2 {
+    border-left: none;
+    border-radius: 0 var(--radius-4) var(--radius-4) 0;
+    flex-direction: row;
+    text-align: left;
+  }
+  .mrc-pos {
+    background: var(--surface-card);
+    border-top: 1px solid var(--outline-subtle);
+    border-bottom: 1px solid var(--outline-subtle);
+  }
+}
+@container mrc (max-width: 659px) {
+  .mrc-cell {
+    border: none;
+    background: transparent;
+    padding: 8px 0 8px 10px;
+    align-items: center;
+    border-left: 2px solid var(--outline-strong);
+  }
+  .mrc-cell.mrc-mine {
+    border-left-color: var(--brand-gold);
+  }
+  .mrc-cell.mrc-t1 {
+    border-bottom: 1px solid var(--outline-subtle);
+    padding-bottom: 12px;
+  }
+}
+.mrc-cell.mrc-lead {
+  background: var(--surface-raised);
+}
+@container mrc (max-width: 659px) {
+  .mrc-cell.mrc-lead {
+    background: transparent;
+  }
+}
+
+.mrc-pinfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mrc-pname {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--fg1);
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: inherit;
+  min-height: 24px;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition:
+    text-decoration-color 0.15s,
+    color 0.15s;
+}
+.mrc-pname:hover {
+  color: var(--fg1-strong);
+  text-decoration-color: var(--brand-gold);
+}
+.mrc-pname.mrc-empty {
+  color: var(--fg4);
+  font-style: italic;
+  font-weight: 400;
+  cursor: default;
+  text-decoration: none;
+}
+
+/* Name + injury badge (LS-5905) */
+.mrc-pname-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mrc-cell.mrc-t1 .mrc-pname-row {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+.mrc-injury-badge {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--radius-2);
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.mrc-injury-badge.mrc-injury-danger {
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+}
+.mrc-injury-badge.mrc-injury-warning {
+  background: var(--warning-soft);
+  color: var(--warning-fg);
+}
+.mrc-injury-badge.mrc-injury-neutral {
+  background: var(--surface-raised);
+  color: var(--fg3);
+}
+/* Dims a player's projected-score figure when they're injured (LS-5905) */
+.mrc-sc.mrc-dimmed {
+  opacity: 0.5;
+}
+.mrc-pmeta {
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--fg4);
+}
+.mrc-pmeta .mrc-suffix {
+  color: var(--warning-fg);
+}
+.mrc-pmeta .mrc-suffix.mrc-fail {
+  color: var(--danger-fg);
+}
+.mrc-pstat {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--fg3);
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+/* score block */
+.mrc-pscore {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.mrc-cell.mrc-t1 .mrc-pscore {
+  flex-direction: row-reverse;
+}
+@container mrc (max-width: 659px) {
+  .mrc-cell .mrc-pscore {
+    flex-direction: row;
+  }
+}
+.mrc-sc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 42px;
+}
+@container mrc (min-width: 660px) {
+  .mrc-sc {
+    min-width: 52px;
+  }
+}
+.mrc-sc .mrc-lab {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg4);
+}
+@container mrc (min-width: 660px) {
+  .mrc-sc .mrc-lab {
+    display: none;
+  }
+}
+.mrc-sc .mrc-num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg2);
+}
+@container mrc (min-width: 660px) {
+  .mrc-sc .mrc-num {
+    font-size: 22px;
+  }
+}
+.mrc-sc.mrc-proj .mrc-num {
+  color: var(--fg3);
+  font-weight: 700;
+}
+button.mrc-sc {
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  cursor: pointer;
+  border-radius: var(--radius-2);
+  min-height: 44px;
+  justify-content: center;
+  font: inherit;
+}
+button.mrc-sc:hover {
+  background: var(--bg-hover);
+}
+.mrc-sc.mrc-actual .mrc-num.mrc-up {
+  color: var(--success-fg);
+}
+.mrc-sc.mrc-actual .mrc-num.mrc-down {
+  color: var(--danger-fg);
+}
+
+/* totals row */
+.mrc-totals {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr;
+  align-items: stretch;
+  margin-top: 6px;
+}
+@container mrc (min-width: 800px) {
+  .mrc-totals {
+    grid-template-columns: 1fr 48px 1fr;
+  }
+}
+@container mrc (max-width: 659px) {
+  .mrc-totals {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'lab' 't1' 't2';
+    background: var(--surface-panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-4);
+    padding: 4px 12px 10px;
+  }
+}
+.mrc-totals .mrc-tot-lab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg4);
+}
+@container mrc (max-width: 659px) {
+  .mrc-totals .mrc-tot-lab {
+    grid-area: lab;
+    justify-content: flex-start;
+    padding: 8px 0 6px;
+    border-bottom: 1px solid var(--outline-subtle);
+  }
+}
+.mrc-totals .mrc-tot-cell {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+}
+@container mrc (min-width: 660px) {
+  .mrc-totals .mrc-tot-cell.mrc-t1 {
+    flex-direction: row-reverse;
+    border-right: none;
+    border-radius: var(--radius-4) 0 0 var(--radius-4);
+  }
+  .mrc-totals .mrc-tot-cell.mrc-t2 {
+    border-left: none;
+    border-radius: 0 var(--radius-4) var(--radius-4) 0;
+  }
+  .mrc-totals .mrc-tot-lab {
+    background: var(--surface-panel);
+    border-top: 1px solid var(--panel-border);
+    border-bottom: 1px solid var(--panel-border);
+  }
+}
+@container mrc (max-width: 659px) {
+  .mrc-totals .mrc-tot-cell {
+    border: none;
+    background: transparent;
+    padding: 8px 0;
+  }
+  .mrc-totals .mrc-tot-cell.mrc-t1 {
+    border-bottom: 1px solid var(--outline-subtle);
+  }
+}
+.mrc-tot-cell .mrc-filler {
+  flex: 1;
+}
+
+/* ── Whole-widget states ─────────────────────────────────── */
+.mrc-state-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 56px 20px;
+  background: var(--surface-panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-6);
+}
+.mrc-state-msg .mrc-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.mrc-state-msg.mrc-error .mrc-ic {
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-fg);
+}
+.mrc-state-msg.mrc-empty .mrc-ic {
+  background: var(--surface-raised);
+  border: 1px solid var(--outline-default);
+  color: var(--fg3);
+}
+.mrc-state-msg h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--fg1-strong);
+  margin: 0;
+}
+.mrc-state-msg p {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--fg3);
+  margin: 0;
+  max-width: 340px;
+  line-height: 1.5;
+}
+
+/* skeleton */
+.mrc-sk {
+  background: linear-gradient(
+    90deg,
+    var(--surface-raised) 25%,
+    var(--outline-strong) 50%,
+    var(--surface-raised) 75%
+  );
+  background-size: 200% 100%;
+  animation: mrc-shimmer 1.3s ease-in-out infinite;
+  border-radius: var(--radius-2);
+}
+@keyframes mrc-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
