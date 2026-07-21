@@ -41,6 +41,19 @@ All defined in `lib/tamagui-config` for **both** `brandDark` and `brandLight`:
 When a prop genuinely needs a CSS string a token can't fill:
 
 - **Web:** use CSS variables — Tamagui emits every token as `var(--tokenName)`, which stays theme-aware: `background: 'linear-gradient(135deg, var(--surfacePanel), var(--brandNavy))'`. In `.css` files, same pattern (see `elite-draft/styles.ts` for the `var(--token, fallback)` form).
+  - ⚠️ **Never on an animated component.** If the element has an `animation` (or `animateOnly`) prop, a `var(--token)` colour **crashes the page at runtime**: Tamagui's react-native animation driver interpolates colours through RN's normalizer, which can't parse a CSS custom property, returns `null`, then `.map`s it. Build, typecheck and lint all stay green — it only fails in the browser. Use token props there instead:
+
+    ```tsx
+    // ✅ animated → $token props
+    <YStack animation="quick" backgroundColor="$surfaceCard"
+            hoverStyle={{ backgroundColor: '$color4' }} />
+
+    // ❌ animated + var() → TypeError: Cannot read properties of null (reading 'map')
+    <YStack animation="quick" style={{ background: 'var(--surfaceCard)' }} />
+    ```
+
+    A `var(--token)` on a _child_ of an animated component, or on any non-animated element, is fine. Enforced by `make lint-animated-theme-vars` (LS-8554).
+
 - **Native:** no CSS vars — use `useThemeTokens()` from `@legacy-sports/shared-components/ui` to resolve raw values for the active theme at render time:
 
   ```tsx

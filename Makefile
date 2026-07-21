@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index lint-theme-compliance update-theme-baseline format fmt typecheck validate \
+	lint lint-fix lint-workflows lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index lint-theme-compliance update-theme-baseline lint-animated-theme-vars format fmt typecheck validate \
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
@@ -301,6 +301,10 @@ lint-theme-compliance: ## Check theme-violation counts against the ratchet basel
 update-theme-baseline: ## Regenerate scripts/theme-compliance-baseline.json after reducing violations
 	@$(call echo_blue,Updating theme compliance baseline...)
 	@node scripts/check-theme-compliance.mjs --update
+
+lint-animated-theme-vars: ## Fail if an animated Tamagui component uses var(--token) colours (LS-8554)
+	@$(call echo_blue,Checking animated components for var(--token) colours...)
+	@node scripts/check-animated-theme-vars.mjs
 
 diagrams: ## Generate SVG files from Mermaid (.mmd) sources under .agents/skills/**/diagrams/
 	@$(call echo_blue,Generating diagrams...)

@@ -10,6 +10,9 @@
 //   rawHex    — hex color literals ('#0A0F1A', '#fff') in component code.
 //               Colors must come from Tamagui theme tokens ($surfaceCard, …)
 //               or var(--token) in raw-CSS strings, so both themes render.
+//               CAVEAT: var(--token) must NOT be used on a component with an
+//               animation prop — it crashes at runtime. Use $token props there.
+//               Enforced by scripts/check-animated-theme-vars.mjs (LS-8554).
 //   rawRgba   — rgb()/rgba() literals in component code (same rule).
 //   blueToken — $blue1–$blue12 Tamagui tokens (generic Tailwind blue; banned
 //               by the brand — use $brandNavy*/$brandGold* tokens).
@@ -165,8 +168,9 @@ function main() {
       '\nTheme-compliance check failed: this change adds hardcoded colors or ' +
         'banned tokens.\nUse Tamagui theme tokens ($surfaceCard, $brandNavy, ' +
         '$textMuted, …) or var(--token) in raw-CSS strings so both light and ' +
-        'dark themes render correctly.\nSee .agents/skills/ui/SKILL.md ' +
-        '(epic LS-8518).',
+        'dark themes render correctly.\nNote: on a component with an ' +
+        'animation prop use $token props — var(--token) crashes there ' +
+        '(LS-8554).\nSee .agents/skills/ui/SKILL.md (epic LS-8518).',
     );
     process.exit(1);
   }
