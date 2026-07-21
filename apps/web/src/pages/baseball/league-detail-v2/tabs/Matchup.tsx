@@ -480,6 +480,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
                   idx < gamesPlayed
                     ? 'done'
                     : idx === gamesPlayed &&
+                        gamesPlayed < totalGames &&
                         matchup?.status === MatchupStatus.InProgress
                       ? 'live'
                       : 'pending';

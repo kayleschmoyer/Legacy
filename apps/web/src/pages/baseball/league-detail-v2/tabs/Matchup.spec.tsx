@@ -329,6 +329,43 @@ describe('MatchupTab — zero totalGames guard (LS-5884)', () => {
   });
 });
 
+describe('MatchupTab — live-dot final-game race (LS-5883)', () => {
+  it('does not mark any dot live when gamesPlayed reaches totalGames even if status is still InProgress', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: {
+        ...baseMatchup,
+        status: 'in_progress',
+        gamesPerMatchup: 5,
+        selectedGamesCount: 5,
+      },
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab();
+    const dots = document.querySelectorAll('.ls-game-dot');
+    expect(dots).toHaveLength(5);
+    dots.forEach((dot) => expect(dot.className).not.toContain('live'));
+  });
+
+  it('still marks the current dot live while gamesPlayed is below totalGames and status is InProgress', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: {
+        ...baseMatchup,
+        status: 'in_progress',
+        gamesPerMatchup: 5,
+        selectedGamesCount: 2,
+      },
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab();
+    const dots = document.querySelectorAll('.ls-game-dot');
+    expect(dots[2].className).toContain('live');
+  });
+});
+
 describe('MatchupTab — schedule card', () => {
   it('renders schedule card when matchup has startTime and endTime', () => {
     mockUseMatchupById.mockReturnValue({
