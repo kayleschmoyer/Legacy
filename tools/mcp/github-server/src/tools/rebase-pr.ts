@@ -1,7 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { execFileSync } from 'node:child_process';
-import { getRepoRoot, getRepoOwnerName } from '../auth.js';
+import { execFile } from 'node:child_process';
+import { getRepoRoot, getRepoOwnerName, isLambda } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
+import { runWithSyncBudget, withCheckoutLock } from '../jobs.js';
+import type { JobLogger } from '../jobs.js';
 import type { ToolResult } from '../types.js';
 
 interface RebasePRParams {
@@ -48,42 +50,81 @@ const NON_INTERACTIVE_GIT_ENV = {
   GIT_SEQUENCE_EDITOR: NOOP_GIT_EDITOR_CMD,
 };
 
-function runGit(args: string[], cwd: string, timeout = 120_000): string {
-  try {
-    return execFileSync(GIT_CMD, args, {
-      cwd,
-      encoding: 'utf-8',
-      timeout,
-      maxBuffer: MAX_BUFFER,
-      env: {
-        ...process.env,
-        ...NON_INTERACTIVE_GIT_ENV,
+// Async (not execFileSync): rebase runs as an in-process background job, and a
+// sync exec would block the server's event loop — github_job_wait could never
+// answer while a rebase was in flight.
+function runGit(
+  args: string[],
+  cwd: string,
+  timeout = 120_000,
+): Promise<string> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    execFile(
+      GIT_CMD,
+      args,
+      {
+        cwd,
+        encoding: 'utf-8',
+        timeout,
+        maxBuffer: MAX_BUFFER,
+        windowsHide: true,
+        env: {
+          ...process.env,
+          ...NON_INTERACTIVE_GIT_ENV,
+        },
       },
-    });
-  } catch (err: unknown) {
-    const e = err as { message?: string; stdout?: string; stderr?: string };
-    const parts = [e.message, e.stdout, e.stderr].filter(Boolean);
-    throw new Error(parts.join('\n'));
-  }
+      (err, stdout, stderr) => {
+        if (err) {
+          const parts = [err.message, stdout, stderr].filter(Boolean);
+          rejectPromise(new Error(parts.join('\n')));
+        } else {
+          resolvePromise(stdout);
+        }
+      },
+    );
+  });
 }
 
 /** Get the current branch name, or HEAD SHA if detached. */
-function getCurrentRef(cwd: string): string {
+async function getCurrentRef(cwd: string): Promise<string> {
   try {
-    return runGit(['symbolic-ref', '--short', 'HEAD'], cwd).trim();
+    return (await runGit(['symbolic-ref', '--short', 'HEAD'], cwd)).trim();
   } catch {
-    return runGit(['rev-parse', 'HEAD'], cwd).trim();
+    return (await runGit(['rev-parse', 'HEAD'], cwd)).trim();
   }
 }
 
 /**
  * Rebase a PR branch onto its base branch (usually main).
  * Fetches origin, rebases, and force-pushes with lease.
+ *
+ * Stdio deployments run this under a bounded sync budget: fast rebases return
+ * their result inline; slow ones return { jobId, status: "running" } to poll
+ * with github_job_wait. The Lambda deployment (no git) keeps the direct path.
  */
 export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
+  if (isLambda()) return rebasePRWorker(params);
+  return runWithSyncBudget(`rebase-pr #${params.number}`, (log) =>
+    withCheckoutLock(() => rebasePRWorker(params, log)),
+  );
+}
+
+/**
+ * The actual rebase sequence. Exported for bulk-rebase, which runs many PRs
+ * inside a single job — callers other than rebasePR must hold the checkout
+ * lock themselves (withCheckoutLock) since this mutates the shared checkout.
+ */
+export async function rebasePRWorker(
+  params: RebasePRParams,
+  jobLog: JobLogger = () => {},
+): Promise<ToolResult> {
   const { number } = params;
   const cwd = getRepoRoot();
   const log: string[] = [];
+  const note = (line: string) => {
+    log.push(line);
+    jobLog(line);
+  };
 
   try {
     // Get PR branch info including repo owners for fork detection
@@ -96,7 +137,7 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
     const pr = data.repository.pullRequest;
 
     const { headRefName, baseRefName, headRepository, baseRepository } = pr;
-    log.push(`PR #${number}: ${headRefName} -> ${baseRefName}`);
+    note(`PR #${number}: ${headRefName} -> ${baseRefName}`);
 
     // Detect cross-repo (fork) PRs — we can only push to same-repo branches
     if (
@@ -125,7 +166,7 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
     // Thread 3: Ensure worktree is clean before checkout/rebase.
     // Filter out untracked agent runtime files (.claude/) and lock files —
     // they have no bearing on the rebase and must not block it.
-    const statusOutput = runGit(['status', '--porcelain'], cwd).trim();
+    const statusOutput = (await runGit(['status', '--porcelain'], cwd)).trim();
     const dirtyLines = statusOutput
       ? statusOutput.split('\n').filter((line) => {
           if (!line.startsWith('?? ')) return true; // tracked change — always dirty
@@ -155,32 +196,35 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
     }
 
     // Thread 2: Capture the original ref so we can restore reliably
-    const originalRef = getCurrentRef(cwd);
+    const originalRef = await getCurrentRef(cwd);
 
     try {
       // Fetch the latest refs
-      log.push('Fetching origin...');
-      runGit(['fetch', 'origin', headRefName, baseRefName], cwd, 30_000);
+      note('Fetching origin...');
+      await runGit(['fetch', 'origin', headRefName, baseRefName], cwd, 30_000);
 
       // Check out the PR branch (detached to avoid worktree conflicts)
-      log.push(`Checking out ${headRefName}...`);
-      runGit(['checkout', `origin/${headRefName}`], cwd);
+      note(`Checking out ${headRefName}...`);
+      await runGit(['checkout', `origin/${headRefName}`], cwd);
 
       // Create/update local branch ref
-      runGit(['checkout', '-B', headRefName], cwd);
+      await runGit(['checkout', '-B', headRefName], cwd);
 
       // Rebase onto base
-      log.push(`Rebasing onto origin/${baseRefName}...`);
+      note(`Rebasing onto origin/${baseRefName}...`);
       try {
-        const rebaseOut = runGit(['rebase', `origin/${baseRefName}`], cwd);
-        log.push(rebaseOut.trim() || 'Rebase successful');
+        const rebaseOut = await runGit(
+          ['rebase', `origin/${baseRefName}`],
+          cwd,
+        );
+        note(rebaseOut.trim() || 'Rebase successful');
       } catch (rebaseErr: unknown) {
         const e = rebaseErr as Error;
         const output = e.message || '';
 
         // Always attempt to abort a failed rebase to avoid leaving repo mid-rebase
         try {
-          runGit(['rebase', '--abort'], cwd);
+          await runGit(['rebase', '--abort'], cwd);
         } catch {
           // ignore abort errors — may not be mid-rebase
         }
@@ -189,9 +233,8 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
           // Get structured conflict file list
           let conflictFiles: string[] = [];
           try {
-            conflictFiles = runGit(
-              ['diff', '--name-only', '--diff-filter=U'],
-              cwd,
+            conflictFiles = (
+              await runGit(['diff', '--name-only', '--diff-filter=U'], cwd)
             )
               .trim()
               .split('\n')
@@ -222,8 +265,8 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
       }
 
       // Force push with lease
-      log.push('Pushing rebased branch...');
-      runGit(
+      note('Pushing rebased branch...');
+      await runGit(
         [
           'push',
           '--force-with-lease',
@@ -233,7 +276,7 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
         cwd,
         30_000,
       );
-      log.push('Push complete.');
+      note('Push complete.');
 
       return {
         content: [
@@ -253,7 +296,7 @@ export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
     } finally {
       // Threads 1 & 2: Always restore to the original ref
       try {
-        runGit(['checkout', originalRef], cwd);
+        await runGit(['checkout', originalRef], cwd);
       } catch {
         // Best effort — log but don't mask the original error
       }

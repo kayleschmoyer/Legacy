@@ -66,6 +66,8 @@ import { bulkReplyToReview } from './tools/bulk-reply-to-review.js';
 import { getJobLogs } from './tools/get-job-logs.js';
 import { openPR } from './tools/open-pr.js';
 import { diagnose } from './tools/diagnose.js';
+import { jobList, jobStatus, jobWait } from './tools/job-tools.js';
+import { MAX_WAIT_MS } from './jobs.js';
 
 // Node.js native fetch (undici) does not respect HTTPS_PROXY / GLOBAL_AGENT_HTTPS_PROXY
 // by default. In cloud sessions the egress proxy is required; set the global dispatcher
@@ -1210,7 +1212,7 @@ export function createServer(): McpServer {
   // --- github_bulk_rebase ---
   server.tool(
     'github_bulk_rebase',
-    "Batch variant of github_rebase_pr. Rebase many PR branches onto base and force-push (1-50). Runs sequentially because rebase mutates the local checkout. Returns { success, total, succeeded, failed } per the shared batch-tool convention — one PR's rebase conflict does not abort the rest. Conflict details are captured in the per-PR error.",
+    'Batch variant of github_rebase_pr. Rebase many PR branches onto base and force-push (1-50). Runs sequentially because rebase mutates the local checkout. Returns { success, total, succeeded, failed } per the shared batch-tool convention — one PR\'s rebase conflict does not abort the rest. Conflict details are captured in the per-PR error. Budgeted to ~45s of synchronous work: larger batches return { jobId, status: "running" } — poll with github_job_wait (per-PR progress in logTail) until it returns the final batch result. Do NOT re-run the command while the job is in progress.',
     {
       numbers: z
         .array(prNumberField('numbers[]'))
@@ -1961,7 +1963,8 @@ export function createServer(): McpServer {
       'Replaces the six-step worktree_push → github_create_pr → github_mark_pr_ready → github_manage_labels(add: bot:ready-for-review) sequence. ' +
       'The jira-link marker is auto-inserted when jiraKey is provided. ' +
       'Pass draft: true to leave the PR in draft state (skips mark-ready and label). ' +
-      'Pass push: false if the branch is already pushed.',
+      'Pass push: false if the branch is already pushed. ' +
+      'Budgeted to ~45s of synchronous work: a slow git push returns { jobId, status: "running" } — poll with github_job_wait until it returns the final result. Do NOT re-run the command while the job is in progress.',
     {
       title: z.string().trim().min(1).describe('PR title'),
       body: z.string().describe('PR body (markdown)'),
@@ -2018,6 +2021,50 @@ export function createServer(): McpServer {
     },
     async (params) => diagnose(params),
   );
+
+  // Job polling tools — stdio only. Git-heavy tools (github_rebase_pr,
+  // github_bulk_rebase, github_open_pr) run under a bounded sync budget and
+  // may return { jobId, status: "running" }; these tools poll that job. The
+  // Lambda deployment guards out git usage, so it has no jobs to poll.
+  if (!isLambda()) {
+    // --- github_job_status ---
+    server.tool(
+      'github_job_status',
+      'Non-blocking snapshot of a background job started by github_rebase_pr, github_bulk_rebase, or github_open_pr. Returns the originating tool\'s final result once done, or { status: "running", logTail } while in progress.',
+      {
+        jobId: z
+          .string()
+          .describe('Job id from a { status: "running" } tool result'),
+      },
+      async (params) => jobStatus(params),
+    );
+
+    // --- github_job_wait ---
+    server.tool(
+      'github_job_wait',
+      `Wait (bounded, ≤${MAX_WAIT_MS / 1000}s per call) for a background job started by github_rebase_pr, github_bulk_rebase, or github_open_pr. Returns the originating tool's final result once done; returns { status: "running" } with a log tail if the budget expires first — re-call until terminal. Never re-run the originating command while its job is running.`,
+      {
+        jobId: z
+          .string()
+          .describe('Job id from a { status: "running" } tool result'),
+        maxWaitMs: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(`Max wait in ms (default and cap: ${MAX_WAIT_MS})`),
+      },
+      async (params) => jobWait(params),
+    );
+
+    // --- github_job_list ---
+    server.tool(
+      'github_job_list',
+      'List recent background jobs (newest first). In-memory only — jobs do not survive an MCP server restart.',
+      {},
+      async () => jobList(),
+    );
+  }
 
   return server;
 }

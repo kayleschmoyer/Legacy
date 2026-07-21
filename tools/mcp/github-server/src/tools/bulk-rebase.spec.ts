@@ -1,11 +1,15 @@
 import { bulkRebase } from './bulk-rebase';
 
 jest.mock('./rebase-pr', () => ({
-  rebasePR: jest.fn(),
+  rebasePRWorker: jest.fn(),
 }));
 
-const { rebasePR: mockRebasePR } = jest.requireMock('./rebase-pr') as {
-  rebasePR: jest.Mock;
+jest.mock('../auth', () => ({
+  isLambda: jest.fn(() => false),
+}));
+
+const { rebasePRWorker: mockRebasePR } = jest.requireMock('./rebase-pr') as {
+  rebasePRWorker: jest.Mock;
 };
 
 beforeEach(() => {

@@ -24,6 +24,14 @@ Pull request and review lifecycle management via the GitHub REST and GraphQL API
 - **github_rebase_pr** — Rebase a PR branch onto base and force-push
 - **github_pr_commits** — List commits on a PR
 
+### Background Jobs (stdio only)
+
+The git-heavy tools (`github_rebase_pr`, `github_bulk_rebase`, `github_open_pr`'s push phase) run under a ~45s sync budget; slower work returns `{ jobId, status: "running" }` instead of blocking into the ~60s MCP transport timeout (LS-8562).
+
+- **github_job_wait** — Wait (bounded ≤55s per call) for a job; returns the originating tool's final result once done
+- **github_job_status** — Non-blocking job snapshot (status + log tail)
+- **github_job_list** — List recent jobs. In-memory only — jobs do not survive a server restart
+
 ### Reviews & Comments
 
 - **github_request_review** — Request reviewers on one or more PRs. Accepts single number or array. Requests Copilot by default.

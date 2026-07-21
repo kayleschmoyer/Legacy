@@ -4,6 +4,8 @@ import { existsSync } from 'node:fs';
 import { isAbsolute, resolve, relative } from 'node:path';
 import { getRepoOwnerName, getRepoRoot, isLambda } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
+import { runWithSyncBudget } from '../jobs.js';
+import type { JobLogger } from '../jobs.js';
 import {
   ensureJiraLinkMarker,
   extractPrimaryKey,
@@ -112,8 +114,24 @@ function getUpstreamBranch(cwd: string): Promise<string | null> {
  * github_manage_labels(add: bot:ready-for-review) → github_request_review sequence.
  * The bot:ready-for-review label is always applied (required for fix-push cycles to
  * re-trigger the Reviewer Bot). Pass draft: true to skip mark-ready and the label.
+ *
+ * Stdio deployments run this under a bounded sync budget because the git-push
+ * phase can exceed the ~60s MCP transport timeout: fast runs return the final
+ * result inline; slow ones return { jobId, status: "running" } to poll with
+ * github_job_wait. The Lambda deployment (push always skipped) keeps the
+ * direct path.
  */
 export async function openPR(params: OpenPRParams): Promise<ToolResult> {
+  if (isLambda()) return openPRWorker(params);
+  return runWithSyncBudget(`open-pr ${params.head ?? params.title}`, (log) =>
+    openPRWorker(params, log),
+  );
+}
+
+async function openPRWorker(
+  params: OpenPRParams,
+  jobLog: JobLogger = () => {},
+): Promise<ToolResult> {
   const lambda = isLambda();
   const shouldPush = params.push !== false;
 
@@ -159,7 +177,9 @@ export async function openPR(params: OpenPRParams): Promise<ToolResult> {
   let pushOutput: string | undefined;
   if (shouldPush && !lambda) {
     try {
+      jobLog('Pushing branch (force-with-lease)...');
       pushOutput = await runGitPush(cwd);
+      jobLog('Push complete.');
     } catch (e) {
       return err(
         `git push failed: ${e instanceof Error ? e.message : String(e)}`,
@@ -200,6 +220,7 @@ export async function openPR(params: OpenPRParams): Promise<ToolResult> {
     const repo = await getRepoOwnerName();
 
     // Step 1: Create PR (always as draft initially, per Author Agent Contract)
+    jobLog('Creating PR...');
     const pr = await githubRest<GitHubPRResponse>({
       method: 'POST',
       path: `/repos/${repo.owner}/${repo.name}/pulls`,

@@ -265,9 +265,12 @@ make_run({ target: "build-all" })   // fast → full result; slow → { jobId, s
 make_run_wait({ jobId })            // blocks ≤55s; re-call if it returns status: "running"
 make_run_status({ jobId })          // non-blocking snapshot (status + log tail)
 // nx tools poll with nx_job_wait({ jobId }) / nx_job_status({ jobId }) instead
+// git-heavy github tools poll with github_job_wait({ jobId }) / github_job_status({ jobId }) instead
 ```
 
 `make_run_wait` returns the full structured result (with `steps[]` for multi-step targets like `pre-commit`/`full-check`) once the job reaches `done`/`failed`; `nx_job_wait` likewise returns the originating tool's structured result (e.g. the playwright report for `nx_run_e2e_specs`). `runInBackground: true` still exists to skip the initial bounded wait and return the jobId immediately. (Validation routing is unchanged — see [Validation Routing](#validation-routing).)
+
+The same contract covers the git-heavy github tools (LS-8562): `github_rebase_pr` (stdio `local-git` server), `github_bulk_rebase`, and `github_open_pr`'s push phase each run under a ~45s sync budget and may return `{ jobId, status: "running" }` — poll with `github_job_wait` / `github_job_status` **on the same server that returned the jobId** (job registries are per-process). `github_bulk_rebase` reports per-PR progress in `logTail`. These jobs are in-process and do not survive an MCP server restart — if a jobId is lost, verify the outcome (`github_view_pr`, `worktree_status`) instead of re-running. Only the stdio deployments are affected; the Lambda deployment guards out git usage and is unchanged.
 
 **`make_run` output is compact by default.** The `output` field omits prettier per-file listings (collapsed to `[Formatting: N files checked, M changed]`) and truncates each step body to 20 lines with a `[N more lines — run step directly for full output]` note. Pass `verbose: true` only when you genuinely need the full raw output for debugging.
 
