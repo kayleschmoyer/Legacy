@@ -239,6 +239,24 @@ test.describe('League Creation @critical', () => {
     await leaguePage.button('Auction', { exact: true }).expectVisible();
   });
 
+  test('toggling League Visibility to Public shows the name/invite visibility warning (LS-6059)', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.gotoCreate();
+
+    const publicWarning = leaguePage.text(
+      /Its name and invite become visible to any signed-in user/i,
+    );
+
+    // Private is the default — the Public-only warning is not rendered yet.
+    await publicWarning.expectCount(0);
+
+    await leaguePage.clickButton(/🌐 Public/i);
+
+    // Selecting Public surfaces the visibility guidance inline (LS-6059).
+    await publicWarning.expectVisible();
+  });
+
   test('should show informational content about league creation', async ({
     leaguePage,
   }) => {

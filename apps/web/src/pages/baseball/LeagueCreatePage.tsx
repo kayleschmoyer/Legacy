@@ -2396,7 +2396,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                       label="League Visibility"
                       hint={
                         formData.isPublic
-                          ? 'Anyone can browse and join this league'
+                          ? 'Anyone can browse and join this league. Its name and invite become visible to any signed-in user.'
                           : 'Only people with your invite code can join'
                       }
                     >
