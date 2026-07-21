@@ -104,7 +104,15 @@ export const getEnvironmentConfig = (): EnvironmentConfig => ({
     if (!Number.isFinite(parsed)) return 1.0;
     return Math.min(1, Math.max(0, parsed));
   })(),
-  googleAnalyticsMeasurementId: config.googleAnalyticsMeasurementId,
+  // Same __e2e override pattern as websocketUrl/jiraProxyUrl — the E2E build
+  // sets no VITE_GA_MEASUREMENT_ID, so tests that need to observe GA4 events
+  // inject a deterministic ID via window.__e2eGaMeasurementId (LS-7628).
+  googleAnalyticsMeasurementId:
+    typeof window !== 'undefined' &&
+    navigator.webdriver === true &&
+    typeof window.__e2eGaMeasurementId === 'string'
+      ? window.__e2eGaMeasurementId
+      : config.googleAnalyticsMeasurementId,
   // Same __e2e override pattern as websocketUrl — prevents Vite from
   // constant-folding the empty string and lets E2E tests inject a proxy URL.
   jiraProxyUrl:

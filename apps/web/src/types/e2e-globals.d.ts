@@ -17,4 +17,6 @@ interface Window {
   __e2eGiphyApiKey?: string;
   /** OAuth proxy URL override for E2E tests — never set in production. */
   __e2eOauthProxyUrl?: string;
+  /** GA4 measurement ID override for E2E tests — never set in production. */
+  __e2eGaMeasurementId?: string;
 }

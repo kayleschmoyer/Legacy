@@ -13,6 +13,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { MatchupDetailPage } from './MatchupDetailPage';
+import { trackMatchupViewed } from '../../utils/analytics';
 
 // --- router ------------------------------------------------------------------
 const mockNavigate = jest.fn();
@@ -26,6 +27,10 @@ jest.mock('react-router-dom', () => ({
 jest.mock('../../utils/analytics', () => ({
   trackMatchupViewed: jest.fn(),
 }));
+
+const mockTrackMatchupViewed = trackMatchupViewed as jest.MockedFunction<
+  typeof trackMatchupViewed
+>;
 
 // --- hooks ---------------------------------------------------------------------
 const baseMatchup = {
@@ -53,10 +58,14 @@ const mockUseMatchupById = jest.fn<MockMatchupByIdResult, [number | null]>(
   }),
 );
 
+const mockUseCurrentWeek = jest.fn<{ currentWeek: number }, [number | null]>(
+  () => ({ currentWeek: 3 }),
+);
+
 jest.mock('../../hooks/useMatchup', () => ({
   useMatchupById: (matchupId: number | null) => mockUseMatchupById(matchupId),
   useMatchupsForLeague: jest.fn(() => ({ matchups: [] })),
-  useCurrentWeek: jest.fn(() => ({ currentWeek: 3 })),
+  useCurrentWeek: (leagueId: number | null) => mockUseCurrentWeek(leagueId),
 }));
 
 jest.mock('../../hooks/useIsPremium', () => ({
@@ -267,5 +276,56 @@ describe('MatchupDetailPage forbidden vs not-found state (LS-5900)', () => {
     expect(
       screen.queryByText('You no longer have access to this league'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchupDetailPage – GA4 matchup_viewed tracking (LS-7628)', () => {
+  beforeEach(() => {
+    mockTrackMatchupViewed.mockClear();
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: undefined,
+    });
+    mockUseCurrentWeek.mockReturnValue({ currentWeek: 3 });
+  });
+
+  it('fires once on initial mount with the (league, matchup, week) tuple', () => {
+    render(<MatchupDetailPage />);
+
+    // useParams is mocked to leagueId: '100', matchupId: '1'; the third
+    // argument is currentWeek from useCurrentWeek (mocked to 3 in
+    // beforeEach), not baseMatchup.weekNumber — they just happen to match.
+    expect(mockTrackMatchupViewed).toHaveBeenCalledTimes(1);
+    expect(mockTrackMatchupViewed).toHaveBeenCalledWith(1, 100, 3);
+  });
+
+  it('does not re-fire on re-render when the tuple is unchanged, even if the matchup object identity changes', () => {
+    const { rerender } = render(<MatchupDetailPage />);
+    expect(mockTrackMatchupViewed).toHaveBeenCalledTimes(1);
+
+    // Simulate an Apollo cache update returning a new object reference for
+    // the same matchup — the effect re-runs (matchup identity changed) but
+    // lastTrackedMatchupViewKeyRef must suppress a duplicate event since
+    // league/matchup/week are unchanged.
+    mockUseMatchupById.mockReturnValue({
+      matchup: { ...baseMatchup },
+      loading: false,
+      error: undefined,
+    });
+    rerender(<MatchupDetailPage />);
+
+    expect(mockTrackMatchupViewed).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires again when navigating to a new (league, matchup, week) tuple', () => {
+    const { rerender } = render(<MatchupDetailPage />);
+    expect(mockTrackMatchupViewed).toHaveBeenCalledTimes(1);
+
+    mockUseCurrentWeek.mockReturnValue({ currentWeek: 4 });
+    rerender(<MatchupDetailPage />);
+
+    expect(mockTrackMatchupViewed).toHaveBeenCalledTimes(2);
+    expect(mockTrackMatchupViewed).toHaveBeenLastCalledWith(1, 100, 4);
   });
 });

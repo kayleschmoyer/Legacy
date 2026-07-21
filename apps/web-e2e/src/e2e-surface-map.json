@@ -2338,6 +2338,14 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/matchup-detail-analytics-tracking.spec.ts": [
+      "apps/web/src/pages/matchup/**",
+      "apps/web/src/utils/analytics.ts",
+      "apps/web/src/config/environment.ts",
+      "apps/web/src/types/e2e-globals.d.ts",
+      "apps/web-e2e/src/e2e-globals.d.ts",
+      "lib/app-config/src/lib/**"
+    ],
     "apps/web-e2e/src/tests/matchup-detail.spec.ts": [
       "apps/web/src/pages/matchup/**",
       "apps/web/src/features/matchup/**",
