@@ -12,6 +12,7 @@ import {
   AnalyticsPage,
   DiscordCallbackScreen,
   DraftPage,
+  FootballPlayersComparePage,
   ForgotPasswordPage,
   LeaguePage,
   MatchupPage,
@@ -45,6 +46,8 @@ import { PlaywrightWebDriver } from '../driver';
 export interface PageObjectFixtures {
   analyticsPage: AnalyticsPage;
   draftPage: DraftPage;
+  /** The football player-comparison route (`/football/players/compare`). */
+  footballComparePage: FootballPlayersComparePage;
   forgotPasswordPage: ForgotPasswordPage;
   resetPasswordPage: ResetPasswordPage;
   leaguePage: LeaguePage;
@@ -92,6 +95,12 @@ const pageObjects = {
     // it is constructed with the Playwright driver adapter. Unmigrated page
     // objects below still take the raw `page`.
     await use(new DraftPage(new PlaywrightWebDriver(page)));
+  },
+  footballComparePage: async (
+    { page }: { page: Page },
+    use: (pageObject: FootballPlayersComparePage) => Promise<void>,
+  ) => {
+    await use(new FootballPlayersComparePage(new PlaywrightWebDriver(page)));
   },
   forgotPasswordPage: async (
     { page }: { page: Page },

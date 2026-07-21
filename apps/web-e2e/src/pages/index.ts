@@ -1,6 +1,7 @@
 export { AnalyticsPage } from './analytics.page';
 export { DiscordCallbackScreen } from './discord-callback.page';
 export { DraftPage } from './draft.page';
+export { FootballPlayersComparePage } from './football-players-compare.page';
 export { ForgotPasswordPage } from './forgot-password.page';
 export { LeaguePage } from './league.page';
 export { MatchupPage } from './matchup.page';
