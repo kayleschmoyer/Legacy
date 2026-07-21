@@ -236,7 +236,7 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(screen.queryByText('Win Probability')).not.toBeInTheDocument();
   });
 
-  it('renders nothing when there are no projection-eligible players', () => {
+  it('renders the pre-season fallback for a scheduled matchup with no projection-eligible players', () => {
     primeProjectionMocks();
     mockUseGetMatchupPlayersQuery.mockReturnValue({
       data: { getMatchupPlayers: [] },
@@ -244,7 +244,10 @@ describe('MatchupWinProbabilityPanel', () => {
 
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
 
-    expect(screen.queryByText('Win Probability')).not.toBeInTheDocument();
+    expect(screen.getByText('Win Probability')).toBeInTheDocument();
+    expect(
+      screen.getByText('Win probability will appear once games are scheduled.'),
+    ).toBeInTheDocument();
     expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
   });
 
@@ -309,7 +312,23 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(mockCalculateMatchupWinProbability).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to actual scores (no throw) when projection calculation throws', () => {
+  it('renders nothing when totals are 0 for a non-scheduled, non-completed matchup', () => {
+    primeProjectionMocks();
+    mockUseGetMatchupPlayersQuery.mockReturnValue({
+      data: { getMatchupPlayers: [] },
+    });
+
+    render(
+      <MatchupWinProbabilityPanel
+        matchup={makeMatchup({ status: MatchupStatus.InProgress })}
+      />,
+    );
+
+    expect(screen.queryByText('Win Probability')).not.toBeInTheDocument();
+    expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the pre-season card (no throw) when projection calculation throws', () => {
     primeProjectionMocks();
     mockCalculateMatchupProjection.mockImplementation(() => {
       throw new Error('bad scoring config');
@@ -318,9 +337,11 @@ describe('MatchupWinProbabilityPanel', () => {
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
 
     // No played games and a thrown projection means both teams stay at 0 —
-    // no simulation runs and nothing renders, but the render itself must not
-    // throw or unhandled-reject.
-    expect(screen.queryByText('Win Probability')).not.toBeInTheDocument();
+    // no simulation runs, and the pre-season fallback renders instead of the
+    // full panel; the render itself must not throw or unhandled-reject.
+    expect(
+      screen.getByText('Win probability will appear once games are scheduled.'),
+    ).toBeInTheDocument();
     expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
   });
 });
