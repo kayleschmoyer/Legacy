@@ -7,11 +7,25 @@ import { state } from '../state.js';
 import { jsonResult } from '../format.js';
 import type { ToolResult } from '../types.js';
 
-export const DEV_SERVER_TIMEOUT_MESSAGE = 'Dev server did not become ready';
-
 const READINESS_POLL_INTERVAL_MS = 500;
 const READINESS_CONNECT_TIMEOUT_MS = 1000;
 const OUTPUT_TAIL_BYTES = 4000;
+
+// The readiness wait must stay comfortably under the ~60s cloud MCP transport
+// limit (LS-8561): a tool call that blocks longer is killed by the transport
+// before it can return. A server that is not ready within this budget is
+// returned as a starting-snapshot instead — the caller polls
+// browser_dev_status for readiness.
+export const READINESS_WAIT_MAX_MS = 45_000;
+
+/**
+ * Clamp rather than reject so callers following the old guidance (e.g.
+ * timeoutMs: 180000) still work — they just get the starting-snapshot
+ * response sooner and poll browser_dev_status for readiness.
+ */
+export function clampReadinessWait(timeoutMs?: number): number {
+  return Math.min(timeoutMs ?? READINESS_WAIT_MAX_MS, READINESS_WAIT_MAX_MS);
+}
 
 export interface DevServerStartParams {
   worktreePath: string;
@@ -20,7 +34,7 @@ export interface DevServerStartParams {
 }
 
 /** Try to TCP-connect to a single host:port. Resolves true on success, false on any failure. */
-function tryConnect(port: number, host: string): Promise<boolean> {
+export function tryConnect(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = createConnection({ port, host });
     let settled = false;
@@ -37,31 +51,36 @@ function tryConnect(port: number, host: string): Promise<boolean> {
 }
 
 /**
- * Wait for the dev server to start accepting connections.
+ * Probe whether the dev server is accepting connections on either loopback.
  *
  * On Windows, Vite (with `server.host: 'localhost'`) often binds to `::1`
  * (IPv6) only — probing `127.0.0.1` will time out even though the server is
  * fully up. We probe both IPv4 and IPv6 loopback in parallel and succeed as
  * soon as either accepts a connection.
  */
-function waitForReady(port: number, timeoutMs: number): Promise<void> {
+export async function probeLoopback(port: number): Promise<boolean> {
+  const [v4, v6] = await Promise.all([
+    tryConnect(port, '127.0.0.1'),
+    tryConnect(port, '::1'),
+  ]);
+  return v4 || v6;
+}
+
+/**
+ * Wait for the dev server to start accepting connections. Resolves `true` when
+ * a loopback probe succeeds, `false` when the budget elapses first — never
+ * rejects, because "not ready yet" is a normal outcome (LS-8561).
+ */
+function waitForReady(port: number, budgetMs: number): Promise<boolean> {
   const start = Date.now();
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const check = async () => {
-      if (Date.now() - start > timeoutMs) {
-        reject(
-          new Error(
-            `${DEV_SERVER_TIMEOUT_MESSAGE} on port ${port} within ${Math.round(timeoutMs / 1000)}s`,
-          ),
-        );
+      if (Date.now() - start > budgetMs) {
+        resolve(false);
         return;
       }
-      const [v4, v6] = await Promise.all([
-        tryConnect(port, '127.0.0.1'),
-        tryConnect(port, '::1'),
-      ]);
-      if (v4 || v6) {
-        resolve();
+      if (await probeLoopback(port)) {
+        resolve(true);
         return;
       }
       setTimeout(check, READINESS_POLL_INTERVAL_MS);
@@ -90,12 +109,16 @@ function attachOutputCapture(child: ChildProcess, tail: OutputTail): void {
   child.stderr?.on('data', (data: Buffer) => tail.append(data.toString()));
 }
 
-/** Wait for either readiness or early child-process exit, whichever fires first. */
-function waitForReadyOrExit(
+/**
+ * Wait for readiness, budget exhaustion, or early child-process exit —
+ * whichever fires first. Resolves `'ready'` or `'starting'`; rejects only when
+ * the child dies before becoming ready.
+ */
+export function waitForReadyOrExit(
   child: ChildProcess,
   port: number,
-  timeoutMs: number,
-): Promise<void> {
+  budgetMs: number,
+): Promise<'ready' | 'starting'> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const settle = (fn: () => void) => {
@@ -112,9 +135,8 @@ function waitForReadyOrExit(
         ),
       );
     });
-    waitForReady(port, timeoutMs).then(
-      () => settle(() => resolve()),
-      (err) => settle(() => reject(err)),
+    waitForReady(port, budgetMs).then((ready) =>
+      settle(() => resolve(ready ? 'ready' : 'starting')),
     );
   });
 }
@@ -123,7 +145,7 @@ export async function devServerStart(
   params: DevServerStartParams,
 ): Promise<ToolResult> {
   const { worktreePath } = params;
-  const timeoutMs = params.timeoutMs ?? 60_000;
+  const readinessWaitMs = clampReadinessWait(params.timeoutMs);
 
   // Validate worktree path exists
   if (!existsSync(worktreePath)) {
@@ -220,32 +242,39 @@ export async function devServerStart(
     // Detach the child so it outlives this tool call
     child.unref();
 
-    // Wait for the server to be ready (or for the child to exit early)
-    await waitForReadyOrExit(child, port, timeoutMs);
+    // Wait briefly for readiness (or early child exit). The wait is bounded by
+    // READINESS_WAIT_MAX_MS so this tool call always returns before the cloud
+    // MCP transport limit — a slow-but-healthy startup is NOT an error.
+    const outcome = await waitForReadyOrExit(child, port, readinessWaitMs);
 
     // Single-object actionable result of a "start" action — `url` is the
     // primary affordance here (not a repeated list row), so it is kept.
     return jsonResult({
       ok: true,
+      ready: outcome === 'ready',
       port,
       pid: child.pid,
       worktreePath,
       url: `http://localhost:${port}`,
+      ...(outcome === 'starting'
+        ? {
+            hint: `Dev server (pid ${child.pid}) is still starting; this call returned early instead of blocking. Poll browser_dev_status until port ${port} shows listening: true, then proceed. If it never becomes ready, check for a broken node_modules symlink (\`node scripts/modules-pool/link.mjs\`) or a stale process on the port (\`make kill-stale\`), and stop it with browser_dev_stop({ port: ${port} }).`,
+          }
+        : {}),
     });
   } catch (err) {
-    // Clean up tracked state if startup failed
+    // The child exited before becoming ready (or spawn failed) — clean up
+    // tracked state. Budget exhaustion no longer lands here (LS-8561).
     state.devServers.delete(port);
     const message = err instanceof Error ? err.message : String(err);
-    const isTimeout = message.startsWith(DEV_SERVER_TIMEOUT_MESSAGE);
     const tail = outputTail.toString();
     return jsonResult(
       {
         ok: false,
         error: `Failed to start dev server: ${message}`,
         processOutputTail: tail || '(no output captured)',
-        remedy: isTimeout
-          ? `The server did not start in time. Inspect processOutputTail above for the last ${OUTPUT_TAIL_BYTES} bytes of nx/Vite output. Common causes: (a) Vite bound only to ::1 or 127.0.0.1 — the probe checks both, so see if the "Local:" line ever printed; (b) node_modules symlink broken (run \`node scripts/modules-pool/link.mjs\` or \`make install\`); (c) stale process holding the port (run \`make kill-stale\`). Retry with a larger timeoutMs (e.g. 180000) if the machine is slow.`
-          : 'Check that the worktree has node_modules installed (`node scripts/modules-pool/link.mjs` or `make install`) and that the port is not in use.',
+        remedy:
+          'Inspect processOutputTail above for the nx/Vite failure. Check that the worktree has node_modules installed (`node scripts/modules-pool/link.mjs` or `make install`) and that the port is not in use (`make kill-stale`).',
       },
       true,
     );

@@ -17,7 +17,7 @@ const server = new McpServer({
 // Tool 1: browser_dev_start
 server.tool(
   'browser_dev_start',
-  'Start a Vite/React dev server (nx serve web) in a worktree directory. Allocates a port from 4300-4399 automatically unless specified. The server runs in the background and is tracked for the duration of this MCP session. Use browser_dev_stop or browser_cleanup to shut it down.',
+  'Start a Vite/React dev server (nx serve web) in a worktree directory. Allocates a port from 4300-4399 automatically unless specified. The server runs in the background and is tracked for the duration of this MCP session. Waits up to 45s for readiness, then returns without blocking: on a slow startup the result has ready: false — poll browser_dev_status until the port shows listening: true. Use browser_dev_stop or browser_cleanup to shut it down.',
   {
     worktreePath: z
       .string()
@@ -39,7 +39,7 @@ server.tool(
       .min(1000)
       .optional()
       .describe(
-        'How long to wait for the dev server to become ready (ms). Default: 60000 (60s). Increase for slow machines or large Next.js apps.',
+        'Readiness wait budget (ms). Default and maximum: 45000 (45s) — larger values are clamped so the call always returns before the ~60s MCP transport limit. When the budget elapses the call still succeeds with ready: false; poll browser_dev_status for readiness.',
       ),
   },
   async (params) => devServerStart(params),
@@ -70,7 +70,7 @@ server.tool(
 // Tool 3: browser_dev_status
 server.tool(
   'browser_dev_status',
-  'List dev servers and browser state. Includes MCP-managed servers (managed: true) and pre-existing servers detected by scanning ports 4200-4399 (managed: false). Always call this before browser_dev_start to check if a server is already running.',
+  'List dev servers and browser state. Includes MCP-managed servers (managed: true, with a live listening readiness probe) and pre-existing servers detected by scanning ports 4200-4399 (managed: false). Always call this before browser_dev_start to check if a server is already running, and poll it after a browser_dev_start that returned ready: false.',
   {},
   async () => devServerStatus(),
 );

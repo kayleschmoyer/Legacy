@@ -2,6 +2,7 @@ import { createConnection } from 'node:net';
 import { pick } from '@legacy-sports/mcp-format';
 import { state } from '../state.js';
 import { DEV_SERVER_FIELDS, jsonResult } from '../format.js';
+import { probeLoopback } from './dev-server-start.js';
 import type { ToolResult } from '../types.js';
 
 const SCAN_PORT_START = 4200;
@@ -40,8 +41,16 @@ async function scanForExternalServers(): Promise<
 }
 
 export async function devServerStatus(): Promise<ToolResult> {
-  const managed = Array.from(state.devServers.values()).map((s) =>
-    pick({ ...s, managed: true }, DEV_SERVER_FIELDS),
+  // `listening` is probed live on both loopbacks (Windows Vite often binds
+  // ::1 only) so callers can poll this tool for readiness after
+  // browser_dev_start returns a starting-snapshot (LS-8561).
+  const managed = await Promise.all(
+    Array.from(state.devServers.values()).map(async (s) =>
+      pick(
+        { ...s, managed: true, listening: await probeLoopback(s.port) },
+        DEV_SERVER_FIELDS,
+      ),
+    ),
   );
 
   const external = await scanForExternalServers();

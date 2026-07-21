@@ -45,4 +45,8 @@ export const DEV_SERVER_FIELDS = [
   'pid',
   'startedAt',
   'managed',
+  // Live TCP-probe result, present on managed rows only (browser_dev_status)
+  // — the readiness signal callers poll for after browser_dev_start returns
+  // early with ready: false (LS-8561). `pick` skips it where absent.
+  'listening',
 ] as const;

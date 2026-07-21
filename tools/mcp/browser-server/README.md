@@ -16,6 +16,16 @@ MCP server giving agents the ability to start dev servers, navigate pages, captu
 | `browser_screenshot_upload` | Upload PNG to GitHub draft release for PR embed         |
 | `browser_cleanup`           | Close browser + kill all dev servers                    |
 
+## Non-Blocking Start
+
+`browser_dev_start` waits at most **45s** for the dev server to accept
+connections — bounded so the tool call always returns before the ~60s cloud MCP
+transport limit (LS-8561). On a slow startup it still succeeds with
+`ready: false` and a hint; poll `browser_dev_status`, whose managed rows carry a
+live `listening` probe (both IPv4 and IPv6 loopback), until the server is up.
+An early child-process exit is still reported as an error with the captured
+output tail.
+
 ## Port Management
 
 Ports are allocated from 4300-4399 to avoid conflicts with:
