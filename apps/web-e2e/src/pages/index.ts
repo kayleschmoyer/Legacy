@@ -5,6 +5,7 @@ export { LeaguePage } from './league.page';
 export { MatchupPage } from './matchup.page';
 export { PlayersPage } from './players.page';
 export { ProfileSettingsScreen } from './profile-settings.page';
+export { RedirectResolverPage } from './redirect.page';
 export { ResetPasswordPage } from './reset-password.page';
 export { RosterPage } from './roster.page';
 export { StandingsPage } from './standings.page';

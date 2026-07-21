@@ -16,6 +16,7 @@ import {
   MatchupPage,
   PlayersPage,
   ProfileSettingsScreen,
+  RedirectResolverPage,
   ResetPasswordPage,
   RosterPage,
   StandingsPage,
@@ -56,6 +57,11 @@ export interface PageObjectFixtures {
   discordCallbackScreen: DiscordCallbackScreen;
   /** The Profile Settings screen (/profile/settings) — the callback redirect target. */
   profileSettingsScreen: ProfileSettingsScreen;
+  /**
+   * The resolver / redirect + legacy-alias routes (ADR-0016 driver-typed).
+   * Drives /matchup/:id, /standings, and legacy aliases (LS-8464).
+   */
+  redirectPage: RedirectResolverPage;
   /**
    * The persistent header / nav bar. A component (not a page object) composed
    * here scoped to the `banner` landmark — present on every authenticated
@@ -132,6 +138,12 @@ const pageObjects = {
     use: (pageObject: ProfileSettingsScreen) => Promise<void>,
   ) => {
     await use(new ProfileSettingsScreen(new PlaywrightWebDriver(page)));
+  },
+  redirectPage: async (
+    { page }: { page: Page },
+    use: (pageObject: RedirectResolverPage) => Promise<void>,
+  ) => {
+    await use(new RedirectResolverPage(new PlaywrightWebDriver(page)));
   },
   navHeader: async (
     { page }: { page: Page },
