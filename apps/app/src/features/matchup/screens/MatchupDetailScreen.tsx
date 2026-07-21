@@ -1,9 +1,10 @@
 import React, { useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Spinner, Text, YStack } from 'tamagui';
+import { Text, YStack } from 'tamagui';
 import {
   MatchupDetailLayout,
+  MatchupDetailSkeleton,
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components/matchup';
 import { MatchupRosterComparison } from '@legacy-sports/shared-components';
@@ -57,12 +58,9 @@ export default function MatchupDetailScreen() {
 
   if (matchupLoading) {
     return (
-      <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
-        <Spinner size="large" />
-        <Text marginTop="$3" color="$gray11">
-          Loading matchup details...
-        </Text>
-      </YStack>
+      <ScrollView>
+        <MatchupDetailSkeleton />
+      </ScrollView>
     );
   }
 

@@ -214,10 +214,10 @@ test.describe('Matchup Detail – scoreboard @regression', () => {
     await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
   });
 
-  test('does not show loading spinner after data loads', async ({
+  test('does not show loading skeleton after data loads', async ({
     matchupPage,
   }) => {
-    await matchupPage.text('Loading matchup details...').expectHidden();
+    await matchupPage.loadingIndicator.expectHidden();
   });
 
   test('does not show not-found state', async ({ matchupPage }) => {
@@ -235,7 +235,7 @@ test.describe('Matchup Detail – scoreboard @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Matchup Detail – loading state @regression', () => {
-  test('shows loading spinner while data is pending', async ({
+  test('shows loading skeleton while data is pending', async ({
     page,
     matchupPage,
   }) => {
@@ -273,14 +273,14 @@ test.describe('Matchup Detail – loading state @regression', () => {
       },
     );
 
-    // web-only timing: gate the spinner before the mocked query resolves
+    // web-only timing: gate the skeleton before the mocked query resolves
     await page.goto(MATCHUP_URL, { waitUntil: 'commit' });
 
-    // The loading branch renders both a Tamagui Spinner and the text.  Match
-    // by text but allow more time — V2 main bundle hydration plus the Apollo
-    // query setup can take several seconds before the loading branch paints
-    // when the network request is gated.
-    await matchupPage.text('Loading matchup details...').expectVisible({
+    // The loading branch renders the layout-matching skeleton. Allow more
+    // time — V2 main bundle hydration plus the Apollo query setup can take
+    // several seconds before the loading branch paints when the network
+    // request is gated.
+    await matchupPage.loadingIndicator.expectVisible({
       timeout: 15_000,
     });
 

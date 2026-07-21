@@ -93,6 +93,10 @@ jest.mock('@legacy-sports/shared-components/matchup', () => {
       jest
         .requireActual<typeof import('react')>('react')
         .createElement(View, { testID: 'recap-panel' }),
+    MatchupDetailSkeleton: () =>
+      jest
+        .requireActual<typeof import('react')>('react')
+        .createElement(View, { testID: 'skeleton' }),
   };
 });
 
@@ -150,7 +154,6 @@ jest.mock('tamagui', () => {
   return {
     YStack: passthrough(View),
     Text: passthrough(Text),
-    Spinner: () => React.createElement(View, { testID: 'spinner' }),
     ScrollView: passthrough(View),
   };
 });
@@ -186,10 +189,10 @@ beforeEach(() => {
 });
 
 describe('MatchupDetailScreen', () => {
-  it('shows a loading spinner while the matchup is fetching', () => {
+  it('shows a loading skeleton while the matchup is fetching', () => {
     mockMatchupLoading = true;
     render(<MatchupDetailScreen />);
-    expect(screen.getByTestId('spinner')).toBeTruthy();
+    expect(screen.getByTestId('skeleton')).toBeTruthy();
   });
 
   it('shows an error message when the matchup fetch fails', () => {

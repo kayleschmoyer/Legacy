@@ -26,9 +26,10 @@ export class MatchupPage extends BaseScreen {
   /**
    * Navigate to a matchup detail page. The driver's `open` resolves on document
    * load; specs gate on the element they need next via the retrying `expect*`
-   * surface. (The loading-state spec, which must catch the spinner before the
-   * gated query resolves, drives navigation itself with `waitUntil: 'commit'` —
-   * a web-only timing lever outside the portable navigation contract.)
+   * surface. (The loading-state spec, which must catch the loading skeleton
+   * before the gated query resolves, drives navigation itself with
+   * `waitUntil: 'commit'` — a web-only timing lever outside the portable
+   * navigation contract.)
    */
   async goto(
     leagueId: number,
@@ -99,6 +100,11 @@ export class MatchupPage extends BaseScreen {
   /** The main matchup content region (`role="main"`, labelled "Matchup details"). */
   get mainRegion(): UIElement {
     return this.driver.byRole('main', { name: 'Matchup details' });
+  }
+
+  /** The layout-matching loading skeleton shown while the matchup query is pending. */
+  get loadingIndicator(): UIElement {
+    return this.driver.byLabel('Loading matchup details');
   }
 
   // ── Reads: week navigation ───────────────────────────────────────

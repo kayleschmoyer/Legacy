@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
-import { Button, H2, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Button, H2, Text, XStack, YStack } from 'tamagui';
 import {
   MatchupDetailLayout,
+  MatchupDetailSkeleton,
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components/matchup';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
@@ -93,19 +94,7 @@ export function MatchupDetailPage() {
   }, [matchup, matchupIdNum, leagueIdNum, currentWeek]);
 
   if (loading) {
-    return (
-      <YStack
-        padding="$4"
-        alignItems="center"
-        justifyContent="center"
-        minHeight={400}
-      >
-        <Spinner size="large" color={BRAND_NAVY_LIGHT} />
-        <Text marginTop="$2" color="$gray11">
-          Loading matchup details...
-        </Text>
-      </YStack>
-    );
+    return <MatchupDetailSkeleton />;
   }
 
   if (error && isForbiddenError(error)) {
