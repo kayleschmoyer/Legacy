@@ -89,6 +89,10 @@ const ALLOWED_TARGETS = new Set([
   'lint-fix',
   'lint-workflows',
   'lint-skills',
+  // Read-only self-review checks (LS-8565) — the review skill routes these
+  // through make_run.
+  'lint-review-patterns',
+  'lint-touch-map',
   'format',
   'fmt',
   'format-commit',

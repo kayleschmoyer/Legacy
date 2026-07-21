@@ -25,6 +25,14 @@ describe('runTarget — allowlist gate', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('not in the allowed target list');
   });
+
+  it('allows the review-skill lint targets (LS-8565)', async () => {
+    // The refusal message enumerates the allowlist — assert the read-only
+    // self-review targets are on it without launching a real make process.
+    const result = await runTarget({ target: '__not_a_real_target__' });
+    expect(result.content[0].text).toContain('lint-review-patterns');
+    expect(result.content[0].text).toContain('lint-touch-map');
+  });
 });
 
 describe('runTarget — variable injection guard', () => {
