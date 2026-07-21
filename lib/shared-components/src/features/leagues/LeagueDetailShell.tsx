@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform } from 'react-native';
-import { ScrollView, Text, XStack, YStack } from 'tamagui';
+import { ScrollView, Text, useMedia, XStack, YStack } from 'tamagui';
 import { Chip, type ChipTone } from '../../components/Chip';
 import { Select } from '../../components/Select';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
@@ -770,6 +770,24 @@ function TabButton({
   );
 }
 
+/**
+ * Moves the first commissioner-only tab to the second slot (right after the
+ * leading tab, e.g. Overview) so it stays within a phone-width viewport without
+ * horizontal scrolling. All other tabs keep their relative order. Returns a new
+ * array; the input is not mutated. No-op when there is no commish tab or it is
+ * already in the first two slots.
+ */
+function hoistCommissionerTab(
+  tabs: readonly LeagueTabDef[],
+): readonly LeagueTabDef[] {
+  const index = tabs.findIndex((t) => t.commishOnly);
+  if (index <= 1) return tabs;
+  const reordered = [...tabs];
+  const [commish] = reordered.splice(index, 1);
+  reordered.splice(1, 0, commish);
+  return reordered;
+}
+
 export function LeagueTabBar({
   tabs,
   activeTab,
@@ -787,9 +805,23 @@ export function LeagueTabBar({
   pendingTradeCount?: number;
   onAnalytics?: () => void;
 }): React.JSX.Element {
+  // Tamagui's `useMedia` resolves to a loose type under this project's ESLint
+  // type program; bind it through an explicit signature so the call and its
+  // result are type-safe rather than suppressing the lint rule (see useThemeColors
+  // in utils/themeColors.ts for the same pattern applied to useThemeName).
+  const readMedia = useMedia as () => { xs?: boolean };
+  const media = readMedia();
   const visible = tabs.filter(
     (t) => (!t.memberOnly || isMember) && (!t.commishOnly || isCommissioner),
   );
+  // The tab bar scrolls horizontally, so the trailing commissioner-only tab
+  // sits off-screen on a phone and commissioners can't discover their admin
+  // (LS-7562). On phone-width viewports only (`xs` = ≤660px, so tablets/desktop
+  // keep the canonical order), hoist it next to the leading tab. The canonical
+  // order (tabConfig.ts / native tab arrays) is left untouched — only the
+  // rendered list is reordered, and the entry stays a role="tab" in the tablist.
+  const ordered =
+    isCommissioner && media.xs ? hoistCommissionerTab(visible) : visible;
   return (
     <YStack
       marginVertical={24}
@@ -802,7 +834,7 @@ export function LeagueTabBar({
         contentContainerStyle={{ minWidth: '100%' }}
       >
         <XStack gap={2} role="tablist" aria-label="League sections">
-          {visible.map((t) => (
+          {ordered.map((t) => (
             <TabButton
               key={t.id}
               label={t.label}

@@ -373,6 +373,35 @@ test.describe('Commissioner Tab — navigation @smoke', () => {
       page.getByRole('heading', { name: 'Test Commissioner League', level: 1 }),
     ).toBeVisible();
   });
+
+  test('commissioner tab is reachable without horizontal scroll on a phone-width viewport', async ({
+    page,
+  }) => {
+    // LS-7562: with 9 tabs the commissioner tab used to sit off-screen at the
+    // right edge of the horizontally-scrolling bar on a phone. It is now hoisted
+    // to an early slot on phone widths so it is reachable without scrolling.
+    await page.setViewportSize({ width: 375, height: 667 });
+    await setupGraphQL(page, { league: makeLeague({ owner: 1 }) });
+    await page.goto('/baseball/league/1/overview');
+    await page.waitForLoadState('load');
+
+    const commissionerTab = page
+      .getByRole('tablist', { name: 'League sections' })
+      .getByRole('tab', { name: 'Commissioner' });
+    await expect(commissionerTab).toBeVisible();
+
+    // `toBeVisible()` only checks the element is rendered/unhidden — it does not
+    // guarantee the tab sits within the viewport. Assert its bounding box fits
+    // fully inside the 375px viewport at the initial (un-scrolled) position, so
+    // a commissioner can tap it without scrolling the tab bar.
+    const viewportWidth = page.viewportSize()?.width ?? 375;
+    const box = await commissionerTab.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+      viewportWidth,
+    );
+  });
 });
 
 // ── Commissioner Tab — Non-Commissioner Access ────────────────────────────────

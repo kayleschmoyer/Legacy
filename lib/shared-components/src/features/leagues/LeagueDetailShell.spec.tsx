@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, within } from '@testing-library/react';
+import { useMedia } from 'tamagui';
 import {
   getDraftStatusChipDef,
   type HeroLeague,
@@ -8,6 +9,11 @@ import {
   type LeagueTabDef,
 } from './LeagueDetailShell';
 import { render } from '../../test-utils';
+
+// `useMedia` is already stubbed to `jest.fn(() => ({}))` by the package-wide
+// `tamagui` mock in jest-setup-web.js — every breakpoint false (desktop) by
+// default. Override per-test with `(useMedia as jest.Mock).mockReturnValue(...)`
+// to simulate phone widths.
 
 // `Settings` (commish tab) and `Roster` (member tab) are chosen for clarity.
 const TABS: readonly LeagueTabDef[] = [
@@ -49,6 +55,11 @@ function renderShell(overrides: Partial<LeagueDetailShellProps> = {}) {
 }
 
 describe('LeagueDetailShell', () => {
+  beforeEach(() => {
+    // Default to a wide viewport (no breakpoint matches) unless a test opts in.
+    (useMedia as jest.Mock).mockReturnValue({});
+  });
+
   it('renders the league name in the hero', () => {
     const { getAllByText } = renderShell();
     expect(getAllByText('Dead Ball Dynasty').length).toBeGreaterThan(0);
@@ -111,6 +122,41 @@ describe('LeagueDetailShell', () => {
     });
     expect(queryByText('Roster')).toBeNull();
     expect(queryByText('Settings')).toBeNull();
+  });
+
+  // LS-7562: on a phone-width viewport the trailing commissioner tab scrolls
+  // off-screen. It is hoisted next to the leading tab so commissioners can reach
+  // it without horizontally scrolling the bar.
+  it('hoists the commissioner tab next to Overview on a phone-width viewport', () => {
+    (useMedia as jest.Mock).mockReturnValue({ xs: true });
+    const { getByRole } = renderShell();
+    const labels = within(getByRole('tablist', { name: 'League sections' }))
+      .getAllByRole('tab')
+      .map((el) => el.textContent);
+    expect(labels[0]).toBe('Overview');
+    expect(labels[1]).toBe('Settings');
+  });
+
+  it('keeps the commissioner tab in its canonical trailing slot on wide viewports', () => {
+    (useMedia as jest.Mock).mockReturnValue({}); // desktop: no breakpoint matches
+    const { getByRole } = renderShell();
+    const labels = within(getByRole('tablist', { name: 'League sections' }))
+      .getAllByRole('tab')
+      .map((el) => el.textContent);
+    expect(labels[labels.length - 1]).toBe('Settings');
+  });
+
+  it('does not reorder tabs for a non-commissioner on a phone-width viewport', () => {
+    (useMedia as jest.Mock).mockReturnValue({ xs: true });
+    const { getByRole, queryByText } = renderShell({
+      role: 'member',
+      isCommissioner: false,
+    });
+    expect(queryByText('Settings')).toBeNull();
+    const labels = within(getByRole('tablist', { name: 'League sections' }))
+      .getAllByRole('tab')
+      .map((el) => el.textContent);
+    expect(labels).toEqual(['Overview', 'Roster', 'Trades']);
   });
 
   it('fires onTabChange when a tab is pressed', () => {
