@@ -155,6 +155,41 @@ describe('DeviceFlow', () => {
       expect(body.expires_in).toBe(600);
       expect(body.interval).toBe(5);
     });
+
+    it('omits the stage from verification_uri on a custom domain', async () => {
+      const event = makeEvent({
+        body: JSON.stringify({ client_type: 'cli' }),
+        requestContext: {
+          stage: 'dev',
+          domainName: 'api.legacy-fantasy.com',
+        } as APIGatewayEvent['requestContext'],
+      });
+      const result = await handleDeviceAuthorize(event);
+      expect(result.statusCode).toBe(200);
+      const body = parseBody<DeviceAuthorizeResponse>(result.body);
+      expect(body.verification_uri).toBe(
+        'https://api.legacy-fantasy.com/oauth/device/verify',
+      );
+      expect(body.verification_uri_complete).toBe(
+        `https://api.legacy-fantasy.com/oauth/device/verify?user_code=${body.user_code}`,
+      );
+    });
+
+    it('includes the stage in verification_uri on the execute-api domain', async () => {
+      const event = makeEvent({
+        body: JSON.stringify({ client_type: 'cli' }),
+        requestContext: {
+          stage: 'dev',
+          domainName: 'abc123.execute-api.us-east-1.amazonaws.com',
+        } as APIGatewayEvent['requestContext'],
+      });
+      const result = await handleDeviceAuthorize(event);
+      expect(result.statusCode).toBe(200);
+      const body = parseBody<DeviceAuthorizeResponse>(result.body);
+      expect(body.verification_uri).toBe(
+        'https://abc123.execute-api.us-east-1.amazonaws.com/dev/oauth/device/verify',
+      );
+    });
   });
 
   describe('handleDeviceCompleteLocal', () => {

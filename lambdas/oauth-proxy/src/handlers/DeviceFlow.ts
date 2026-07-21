@@ -681,12 +681,19 @@ export const handleDeviceCompleteLocal = async (
 };
 
 /**
- * Get base URL from API Gateway event
+ * Get base URL from API Gateway event.
+ *
+ * The stage segment only exists on the default execute-api URL
+ * (https://<id>.execute-api.<region>.amazonaws.com/<stage>/...). The custom
+ * domain (api.<domain>) maps the stage at the root via its base-path mapping,
+ * so appending the stage there mints URLs that no gateway resource matches
+ * and API Gateway rejects with "Missing Authentication Token".
  */
 function getBaseUrl(event: APIGatewayEvent): string {
-  const stage = event.requestContext.stage;
-  const domainName = event.requestContext.domainName;
-  return `https://${domainName}/${stage}`;
+  const { stage, domainName } = event.requestContext;
+  return !domainName || domainName.includes('.execute-api.')
+    ? `https://${domainName}/${stage}`
+    : `https://${domainName}`;
 }
 
 /**
