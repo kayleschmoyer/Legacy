@@ -95,7 +95,7 @@ See [references/drive.md](references/drive.md) Step 6 for the full event-handlin
 
 Fetch unresolved threads, apply fixes, validate, commit, push, and resolve threads. Cap at 2 fix-review rounds -- after round 2, resolve remaining threads as "acknowledged" and proceed. After re-requesting review, the next review event arrives automatically as a push notification (call `mcp__github__subscribe_pr_activity` only if that built-in tool is actually present in the session — it is absent from most current sessions, and its absence is not a monitoring failure) — do **not** use `sleep N && gh api .../reviews` polling (see Critical Rule 13).
 
-**Cloud (Claude Code on the web)**: Use built-in tools for operations where authorship is visible (replying to threads, requesting Copilot review). This prevents agent comments from appearing under the user's personal GitHub username. See the cloud review workflow in [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) and the cloud section in [references/fix-reviews.md](references/fix-reviews.md).
+**Cloud (Claude Code on the web)**: Use built-in tools for operations where authorship is visible (e.g. replying to threads). This prevents agent comments from appearing under the user's personal GitHub username. See the cloud review workflow in [`cloud-agent-mode/SKILL.md`](../cloud-agent-mode/SKILL.md) and the cloud section in [references/fix-reviews.md](references/fix-reviews.md).
 
 > Details: [references/fix-reviews.md](references/fix-reviews.md)
 

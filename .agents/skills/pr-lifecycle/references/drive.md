@@ -29,7 +29,6 @@ The core loop is: **inspect → fix → wait → repeat** until the PR is merged
 | Fix CI failures (code changes)     |     YES     |     NO      |
 | Re-run flaky CI                    |     YES     |     YES     |
 | Resolve process/meta threads       |     YES     |     YES     |
-| Request Copilot review             |     YES     |     YES     |
 | Jira status transitions            |     YES     |     YES     |
 | Merge the PR                       |     YES     |     YES     |
 

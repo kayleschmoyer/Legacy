@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: 'Create a pull request with Jira linkage, standard template, and Copilot review request. Load when the user says "create PR", "open PR", or after code changes are ready to ship.'
+description: 'Create a pull request with Jira linkage and standard template. Load when the user says "create PR", "open PR", or after code changes are ready to ship.'
 ---
 
 # Skill: Create PR

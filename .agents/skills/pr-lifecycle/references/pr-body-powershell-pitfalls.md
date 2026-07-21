@@ -23,11 +23,7 @@ with properly escaped content via a variable.
 # 2. Create PR using --body-file
 gh pr create --title "LS-#### fix(scope): description" --body-file ".github/tmp-pr-body.md" --base main
 
-# 3. Request Copilot review via API
-$prNumber = gh pr view --json number --jq .number
-'{"reviewers":["copilot-pull-request-reviewer[bot]"]}' | gh api "repos/{owner}/{repo}/pulls/$prNumber/requested_reviewers" --method POST --input -
-
-# 4. Clean up the temp file
+# 3. Clean up the temp file
 Remove-Item ".github/tmp-pr-body.md" -ErrorAction SilentlyContinue
 ```
 
