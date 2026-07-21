@@ -498,6 +498,28 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const validatedPlayerPool =
         playerPool as (typeof VALID_PLAYER_POOLS)[number];
 
+      // ── selectionMethod input validation (LS-6070) ──────────────────────
+      // A raw mutation call bypasses the client's enum typing, so an
+      // untrusted selectionMethod string was previously cast and forwarded
+      // to leagueService.createLeague() with no runtime check.
+      const VALID_SELECTION_METHODS = [
+        'standard',
+        'auction',
+        'random',
+      ] as const;
+      if (
+        selectionMethod != null &&
+        !(VALID_SELECTION_METHODS as readonly string[]).includes(
+          selectionMethod,
+        )
+      ) {
+        throw UserInputError(
+          `Invalid selectionMethod: "${selectionMethod}". Allowed values: ${VALID_SELECTION_METHODS.join(', ')}.`,
+        );
+      }
+      const validatedSelectionMethod = (selectionMethod ??
+        'standard') as (typeof VALID_SELECTION_METHODS)[number];
+
       // ── scoringFormat validation ─────────────────────────────────────────
       const VALID_SCORING_FORMATS = ['standard', 'half_ppr', 'ppr'] as const;
       if (
@@ -614,7 +636,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
             inputSchedulingDivisionalWeightPct ?? null,
           playerPool: validatedPlayerPool,
           draftMode: draftMode as 'live' | 'automated',
-          selectionMethod: selectionMethod as 'standard' | 'auction' | 'random',
+          selectionMethod: validatedSelectionMethod,
           draftOrder: draftOrder as 'snake' | 'linear',
           waiverType:
             inputWaiverType === 'faab'
@@ -862,6 +884,28 @@ builder.mutationField('startDraft', (t) =>
         throw UserInputError(`League ${leagueId} not found`);
       }
 
+      // args.selectionMethod is a raw GraphQL string arg — validate against
+      // the enum before use so a tampered mutation can't smuggle an
+      // unknown value through to DraftService (LS-6070). Kept outside the
+      // try/catch (like the commissioner/league-exists checks above) so it
+      // short-circuits before the savedDraft lookup and isn't rewrapped as a
+      // generic DRAFT_START_FAILED error.
+      const VALID_SELECTION_METHODS = [
+        'standard',
+        'auction',
+        'random',
+      ] as const;
+      if (
+        args.selectionMethod != null &&
+        !(VALID_SELECTION_METHODS as readonly string[]).includes(
+          args.selectionMethod,
+        )
+      ) {
+        throw UserInputError(
+          `Invalid selectionMethod: "${args.selectionMethod}". Allowed values: ${VALID_SELECTION_METHODS.join(', ')}.`,
+        );
+      }
+
       try {
         // Read saved draft settings from the database
         const [savedDraft] = await context.db
@@ -880,6 +924,7 @@ builder.mutationField('startDraft', (t) =>
         const draftMode = (args.draftMode ??
           savedDraft?.draftMode ??
           'live') as 'live' | 'automated';
+
         const selectionMethod = (args.selectionMethod ??
           savedDraft?.selectionMethod ??
           'standard') as 'standard' | 'auction' | 'random';

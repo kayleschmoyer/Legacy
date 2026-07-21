@@ -1166,6 +1166,37 @@ describe('League Mutations', () => {
       ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
     });
 
+    it('rejects an unknown selectionMethod from a tampered mutation (LS-6070)', async () => {
+      // Commissioner check passes, league exists; savedDraft lookup never
+      // runs because the enum check short-circuits before it.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.orderBy = jest.fn().mockReturnValue(mockDb);
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ id: 1 }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().startDraft;
+      if (!field?.resolve) {
+        throw new Error('startDraft resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { leagueId: 1, selectionMethod: 'bogus' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message:
+          'Invalid selectionMethod: "bogus". Allowed values: standard, auction, random.',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
     it('should preserve a GraphQLError code thrown inside the try block instead of rewrapping it (LS-5156)', async () => {
       // Commissioner passes the access gate; league exists; savedDraft empty so
       // the resolver calls createDraftForLeague, which we make throw a GraphQLError.
@@ -1469,6 +1500,35 @@ describe('League Mutations', () => {
       expect(mockCreateLeague).toHaveBeenCalledWith(
         expect.objectContaining({ baseballHofOnly: false }),
       );
+    });
+  });
+
+  describe('createLeagueAndTeams mutation — selectionMethod enum validation (LS-6070)', () => {
+    const baseInput = {
+      leagueName: 'Tampered League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+    };
+
+    it('rejects an unknown selectionMethod from a tampered mutation', async () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { ...baseInput, selectionMethod: 'bogus' } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        'Invalid selectionMethod: "bogus". Allowed values: standard, auction, random.',
+      );
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
     });
   });
 
