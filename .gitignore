@@ -365,6 +365,9 @@ scratch/*
 # PR-watch opt-out marker (per-checkout runtime file)
 .claude/.pr-watch-opt-out
 
+# PR-watch armed heartbeat flags (runtime, written by scripts/watch-pr.sh)
+.claude/.pr-watch-armed-*
+
 # Copilot CLI session marker (runtime file written by session-start hook)
 .copilot-session
 .twig

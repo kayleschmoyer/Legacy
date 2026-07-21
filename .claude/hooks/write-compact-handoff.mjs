@@ -17,7 +17,7 @@
  * across the compact boundary. Always exits 0.
  */
 
-import { writeFileSync } from 'fs';
+import { writeFileSync, readdirSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -62,6 +62,29 @@ const tail = evidence
   )
   .join('\n');
 
+// --- PR watch flags (LS-8544): report heartbeat freshness across the compact
+// boundary so the resumed agent re-arms a dead watch but never double-arms a
+// live one (a duplicate monitor doubles poll traffic and risks auto-stop).
+const watchFlags = [];
+try {
+  const claudeDir = join(projectDir(input), '.claude');
+  for (const f of readdirSync(claudeDir)) {
+    if (!f.startsWith('.pr-watch-armed-')) continue;
+    const age = Math.round(
+      (Date.now() - statSync(join(claudeDir, f)).mtimeMs) / 1000,
+    );
+    watchFlags.push(
+      `- PR #${f.slice('.pr-watch-armed-'.length)}: heartbeat ${age}s ago — ${
+        age < 300
+          ? 'LIVE, do NOT re-arm'
+          : 'STALE, the watch died; re-arm (Monitor + scripts/watch-pr.sh) after resuming'
+      }`,
+    );
+  }
+} catch {
+  /* fail open */
+}
+
 const status =
   statusLines.length === 0
     ? '(clean)'
@@ -94,6 +117,10 @@ ${commits || '(none)'}
 
 ## Recent tool activity (last ${Math.min(evidence.length, 25)} of ${evidence.length} calls)
 ${tail || '(no evidence ledger for this session)'}
+
+## PR watch (LS-8544)
+${watchFlags.join('\n') || '- no armed watch flags — if an open PR is mid-flight, arm Monitor + scripts/watch-pr.sh <PR#> (persistent: true) before idling'}
+- A persistent Monitor normally survives compaction. Re-arm ONLY if the flag above is stale or absent.
 
 ## Resuming
 - Uncommitted or unpushed work listed above is YOURS to finish — commit, push, and drive the PR to merge.

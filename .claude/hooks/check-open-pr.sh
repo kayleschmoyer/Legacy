@@ -44,27 +44,29 @@ esac
 # --- gh CLI required ---
 command -v gh >/dev/null 2>&1 || exit 0
 
-# --- Look up the PR for this branch ---
-PR_JSON=$(gh pr list --head "$BRANCH" --state all --json number,state,isDraft,labels --limit 1 2>/dev/null || true)
-[ -z "$PR_JSON" ] || [ "$PR_JSON" = "[]" ] && exit 0
+# --- Look up the PR for this branch (view carries mergeable; list does not) ---
+PR_JSON=$(gh pr view "$BRANCH" --json number,state,isDraft,labels,mergeable,headRefOid 2>/dev/null || true)
+[ -z "$PR_JSON" ] && exit 0
 
-# Parse with python (no jq on Windows). Emits: "<number>|<state>|<isDraft>|<labels-csv>"
+# Parse with python (no jq on Windows).
+# Emits: "<number>|<state>|<isDraft>|<labels-csv>|<mergeable>|<head-sha>"
 PARSED=$(PR_JSON="$PR_JSON" python -c '
 import json, os, sys
-data = json.loads(os.environ["PR_JSON"])
-if not data:
+pr = json.loads(os.environ["PR_JSON"])
+if not pr:
     sys.exit(0)
-pr = data[0]
 num = pr["number"]
 state = pr["state"]
 draft = "true" if pr["isDraft"] else "false"
 labels = ",".join(l["name"] for l in pr.get("labels", []))
-print("{}|{}|{}|{}".format(num, state, draft, labels))
+mergeable = pr.get("mergeable") or "UNKNOWN"
+sha = (pr.get("headRefOid") or "")[:7]
+print("{}|{}|{}|{}|{}|{}".format(num, state, draft, labels, mergeable, sha))
 ' 2>/dev/null || true)
 
 [ -z "$PARSED" ] && exit 0
 
-IFS='|' read -r PR_NUMBER PR_STATE PR_IS_DRAFT PR_LABELS <<< "$PARSED"
+IFS='|' read -r PR_NUMBER PR_STATE PR_IS_DRAFT PR_LABELS PR_MERGEABLE PR_HEAD_SHA <<< "$PARSED"
 
 # --- Terminal states: allow stop ---
 case "$PR_STATE" in
@@ -76,11 +78,85 @@ case ",$PR_LABELS," in
   *,needs-human-security-review,*|*,needs-human-arbitration,*|*,review-bot-override,*) exit 0 ;;
 esac
 
+WORKTREE_SLUG=$(basename "$WORKTREE_NORM")
+
+# --- Merge conflict: block with an actionable directive (LS-8544) ---
+# Conflicts are the one blocker that never wakes an idle session (the base-push
+# sweep surfaces them only as an API check run + label + comment — no event).
+# Catching the agent at stop time is therefore load-bearing, so conflict blocks
+# use their OWN counter, keyed to the head SHA: a fresh conflict always gets a
+# fresh block budget even if the generic guard below already bypassed, and a
+# rebase (new SHA) resets it naturally. mergeable==CONFLICTING is GitHub's own
+# computation; the CI: Conflicts label is corroborating only (it flaps — see
+# check-conflicts-sweep.yml).
+HAS_CONFLICT=0
+[ "$PR_MERGEABLE" = "CONFLICTING" ] && HAS_CONFLICT=1
+case ",$PR_LABELS," in
+  *,"CI: Conflicts",*) [ "$PR_MERGEABLE" != "MERGEABLE" ] && HAS_CONFLICT=1 ;;
+esac
+
+if [ "$HAS_CONFLICT" -eq 1 ]; then
+  CONFLICT_COUNTER="${TMPDIR:-/tmp}/claude-conflict-block-${WORKTREE_SLUG}"
+  conflict_count=0
+  if [ -f "$CONFLICT_COUNTER" ]; then
+    read -r rec_sha rec_count < "$CONFLICT_COUNTER" 2>/dev/null || true
+    if [ "${rec_sha:-}" = "$PR_HEAD_SHA" ] && [[ "${rec_count:-}" =~ ^[0-9]+$ ]]; then
+      conflict_count="$rec_count"
+    fi
+  fi
+  conflict_count=$((conflict_count + 1))
+  printf '%s %s' "$PR_HEAD_SHA" "$conflict_count" > "$CONFLICT_COUNTER" 2>/dev/null || true
+
+  if [ "$conflict_count" -ge 3 ]; then
+    {
+      echo ""
+      echo "⚠️  CONFLICT STOP GUARD BYPASSED — blocked ${conflict_count} time(s) on ${PR_HEAD_SHA}, allowing stop"
+      echo "  PR #${PR_NUMBER} still has merge conflicts with main. Human attention required."
+      echo ""
+    } >&2
+    exit 0
+  fi
+  {
+    echo ""
+    echo "⛔ STOP BLOCKED — PR #${PR_NUMBER} has merge conflicts with main (LS-8544)"
+    echo "  Resolve them NOW: run the /rebase skill (rebase onto origin/main, resolve"
+    echo "  conflicts, git push --force-with-lease), then re-apply bot:ready-for-review."
+    echo "  This is actionable immediately — do not wait for CI or reviews first."
+    echo ""
+  } >&2
+  exit 2
+fi
+
+# --- Armed watch: allow a CI-wait stop without burning block budget (LS-8544) ---
+# scripts/watch-pr.sh heartbeats this flag on every poll and removes it on exit.
+# A fresh flag (mtime < 5 min) proves a live watch will re-invoke the session on
+# any actionable PR event, so idling is safe and correct. A stale flag means the
+# watch died — fall through to the normal guard.
+WATCH_FLAG=".claude/.pr-watch-armed-${PR_NUMBER}"
+if [ -f "$WATCH_FLAG" ]; then
+  flag_mtime=$(stat -c %Y "$WATCH_FLAG" 2>/dev/null || \
+               stat -f %m "$WATCH_FLAG" 2>/dev/null || \
+               echo 0)
+  flag_age=$(( $(date +%s) - flag_mtime ))
+  if [ "$flag_age" -lt 300 ]; then
+    {
+      echo ""
+      echo "✅ PR #${PR_NUMBER} watch is armed (flag ${flag_age}s old) — stop allowed; the watch monitor will re-invoke this session on the next actionable PR event."
+      echo ""
+    } >&2
+    exit 0
+  fi
+  {
+    echo ""
+    echo "⚠️  Watch flag for PR #${PR_NUMBER} is STALE (${flag_age}s old) — the watch monitor has died. Re-arm it (Monitor + scripts/watch-pr.sh ${PR_NUMBER}) before idling."
+    echo ""
+  } >&2
+fi
+
 # --- Max-block bypass to avoid infinite stop loops ---
 # Same pattern as check-incomplete-work.sh: per-worktree counter with 1-hour
 # staleness window. After MAX_BLOCKS attempts, allow stop with a warning.
 MAX_BLOCKS=3
-WORKTREE_SLUG=$(basename "$WORKTREE_NORM")
 STOP_BLOCK_COUNTER="${TMPDIR:-/tmp}/claude-open-pr-block-${WORKTREE_SLUG}"
 STALE_SECONDS=3600
 
@@ -108,7 +184,7 @@ fi
 if [ "$PR_IS_DRAFT" = "true" ]; then
   MSG="Draft PR #${PR_NUMBER} is not a terminal state. Mark ready with github_mark_pr_ready before ending the session, or explain why you cannot."
 else
-  MSG="PR #${PR_NUMBER} is open and ready for review but not merged. Per AGENTS.md (Drive to merge), continue watching to merge, or surface a specific blocker."
+  MSG="PR #${PR_NUMBER} is open and ready for review but not merged. Per AGENTS.md (Drive to merge): fix anything actionable now; if you are only waiting on in-flight CI/review, arm the watch monitor (Monitor tool + scripts/watch-pr.sh ${PR_NUMBER}, persistent: true) so this session is re-invoked on the next event — an armed watch makes stopping safe and is the sanctioned way to idle."
 fi
 
 if [ "$block_count" -ge "$MAX_BLOCKS" ]; then

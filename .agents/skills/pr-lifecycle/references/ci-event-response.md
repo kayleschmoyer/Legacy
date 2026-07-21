@@ -5,7 +5,7 @@ description: 'Triage and respond to CI and GitHub events received by a cloud age
 
 # Skill: CI Event Response
 
-This skill is the single reference point for a cloud agent session that has been woken by a GitHub or CI event. Cloud sessions have no background polling loop — they wake exactly when an event fires. Every event needs a rapid triage decision: act, skip, or escalate.
+This skill is the single reference point for an agent session that has been woken by a GitHub or CI event. A wake arrives either as a native push notification or — in Claude Code sessions — as an event line from the armed watch monitor (`scripts/watch-pr.sh`, armed per [drive.md Step 6](drive.md#step-6-event-handling-loop); the watch is load-bearing, notifications are an accelerant). Every event needs a rapid triage decision: act, skip, or escalate.
 
 ## Critical Preconditions
 
@@ -51,7 +51,7 @@ Find the event type in the left column, read across for the first action. Detail
 
 **Trigger**: `No Merge Conflicts` check run fails on the PR, or `CI: Conflicts` label is added.
 
-The `check-conflicts.yml` workflow is dispatched from the PR's head branch (not from `main`) so that the resulting check run is associated with the PR's head commit SHA. This is what makes it visible to CI monitoring. When you see this failure, the PR branch has diverged from `main`.
+`check-conflicts.yml` runs on PR-side events (opened/synchronize/reopened/edited). When _main_ advances instead, `check-conflicts-sweep.yml` detects the conflict and POSTs a fresh API-owned `No Merge Conflicts` check run onto the PR's head SHA (newest-run-wins), plus the `CI: Conflicts` label and a sticky comment. **Neither path produces an event that wakes an idle session on its own** — the armed watch monitor is what delivers this trigger (LS-8544). When you see it, the PR branch has diverged from `main`.
 
 **Response**:
 
@@ -196,7 +196,8 @@ Not every event requires a response. Skip when:
 After pushing any fix (conflict resolution, CI fix, or review fix):
 
 1. Apply `bot:ready-for-review` label — this fires the Reviewer Bot for the next cycle AND re-arms CI orchestration: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`. This is the most common stall: plain pushes do NOT trigger a new review cycle without this label.
-2. Continue watching. The next event will arrive when CI completes or a new review is posted.
+2. Confirm the watch monitor is still armed — if `.claude/.pr-watch-armed-<PR#>` is stale (>5 min) or absent, re-arm it (`Monitor` + `scripts/watch-pr.sh <PR#>`, `persistent: true`) before idling.
+3. Continue watching. The next event will arrive when CI completes or a new review is posted.
 
 ---
 

@@ -208,13 +208,18 @@ worktree_push()
 
 ### Step 6: Event handling loop
 
-After fixing all known issues, Claude Code will surface PR events natively — no wait tool needed.
+After fixing all known issues, **arm the canonical PR watch, then idle** — the watch re-invokes this session on the next actionable event:
 
-> **Precondition for waiting on PR events**: continue to the next workflow step after pushing — Claude Code surfaces CI failures, review threads, and comment events as push notifications. Treat `github_view_pr` and `ci_view_run` as one-shot lookups (e.g. to fetch a `runId` after a failure event), not poll targets. `Start-Sleep`/`sleep` + repeated reads never deliver earlier signal than the native notification. See the [mcp-first CI Operations section](../../mcp-first/SKILL.md#ci-operations).
+```
+Monitor({ command: "bash <worktree>/scripts/watch-pr.sh <PR#>",
+          persistent: true, description: "PR #<N> watch" })
+```
+
+> **Precondition for waiting on PR events (LS-8544)**: never end a turn with the PR in a non-terminal state unless the watch is armed. The watch polls harness-side (zero tokens) and emits only actionable transitions — red required contexts, corroborated conflicts, new reviews, escalation labels, SKIPPED-pipeline stalls, MERGED/CLOSED — and heartbeats `.claude/.pr-watch-armed-<PR#>` so the stop guard permits idling. Native push notifications remain a bonus accelerant, but they are not load-bearing: **merge-conflict transitions from main advancing are never delivered natively**, and CI/review notifications have observably failed to arrive (stuck PRs #6161/#6163). Treat `github_view_pr` and `ci_view_run` as one-shot lookups (e.g. to fetch a `runId` after a failure event), never poll targets — `Start-Sleep`/`sleep` + repeated reads are still banned. See the [mcp-first CI Operations section](../../mcp-first/SKILL.md#ci-operations).
 >
-> **Not everything arrives as an event**: CI _success_, merges, and **merge-conflict transitions are never delivered** — a PR that goes conflicting because main advanced will not wake the session. On every wake-up (any event, or a scheduled check-in), re-check conflict state via `github_pr_why_blocked` or the `CI: Conflicts` label before assuming the last known state still holds.
+> **On every wake-up**, re-check overall PR state via `github_pr_why_blocked` before assuming the last known state still holds — events can supersede each other while the session is idle.
 >
-> **And events only reach a bound session** — see the `worktree_set` gotcha below. If this session never completed Step 4 (PR-branch checkout + `worktree_set`) — e.g. it is a chip or cloud session still on its auto-generated `claude/<name>` branch — this loop will never wake: re-arm `bot:ready-for-review`, report the hand-off, and stop instead of entering the loop.
+> **And a watch/notification only helps a bound, PR-branch session** — see the `worktree_set` gotcha below. If this session never completed Step 4 (PR-branch checkout + `worktree_set`) — e.g. it is a chip or cloud session still on its auto-generated `claude/<name>` branch — do not enter this loop at all: re-arm `bot:ready-for-review`, report the hand-off, and stop.
 
 React to each event as it arrives. Handle each event:
 
