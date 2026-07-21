@@ -2319,7 +2319,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     required
                     hint={
                       formData.numberOfTeams % 2 === 1
-                        ? 'Teams are odd — divisions must also be odd.'
+                        ? 'Teams are odd — divisions must also be odd, and one team will have a bye each week all season.'
                         : 'Even numbers produce cleanest divisions. 12 is standard.'
                     }
                   >

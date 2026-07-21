@@ -1234,6 +1234,52 @@ describe('LeagueCreatePage — Divisional vs 1 division (LS-6105)', () => {
   });
 });
 
+describe('LeagueCreatePage — odd team count bye-week hint (LS-6061)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+  });
+
+  it('shows a bye-week warning when the team count is odd and 1 division is forced', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+
+    expect(
+      screen.getByText(/one team will have a bye each week all season/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a bye-week warning when the team count is odd and divisional (odd division count) is selected', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: '9' }));
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+
+    expect(
+      screen.getByText(/one team will have a bye each week all season/i),
+    ).toBeInTheDocument();
+  });
+
+  it('does not show the bye-week warning for an even team count', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    fireEvent.click(screen.getByRole('button', { name: '12' }));
+
+    expect(
+      screen.queryByText(/one team will have a bye each week all season/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Even numbers produce cleanest divisions\. 12 is standard\./i,
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('LeagueCreatePage — draft date sidebar fallback (LS-6077)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
