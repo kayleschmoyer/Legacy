@@ -34,6 +34,16 @@ export interface PremiumGateProps {
   featureDescription?: string;
   /** Content to tease (blurred) for free users or render normally for premium. */
   children: React.ReactNode;
+  /**
+   * Fully hides the blurred content from assistive tech (aria-hidden) instead
+   * of leaving it perceivable-but-inert. Use only where the underlying data
+   * is a genuine paywall bypass risk if read by a screen reader (e.g. full
+   * AI-generated recap text) — see LS-5873/BMD-003. Defaults to `false` so
+   * gates that intentionally show a real, non-interactive preview to free
+   * users (e.g. the Player Stats teaser) keep their existing accessibility
+   * tree presence.
+   */
+  hideBlurredContentFromAssistiveTech?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +86,7 @@ export function PremiumGate({
   featureName,
   featureDescription,
   children,
+  hideBlurredContentFromAssistiveTech = false,
 }: PremiumGateProps): React.ReactNode {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   // Live monthly-equivalent price (annual total / 12). Falls back to display
@@ -120,6 +131,9 @@ export function PremiumGate({
           width="100%"
           maxWidth="100%"
           pointerEvents={isPremium ? undefined : 'none'}
+          aria-hidden={
+            !isPremium && hideBlurredContentFromAssistiveTech ? true : undefined
+          }
           style={
             isPremium
               ? undefined

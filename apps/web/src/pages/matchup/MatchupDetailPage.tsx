@@ -278,6 +278,7 @@ export function MatchupDetailPage() {
               isPremium={canSeeRecap}
               featureName="AI Matchup Recap"
               featureDescription="Get AI-generated narrative recaps that summarize your matchup story, highlights, and standout performances."
+              hideBlurredContentFromAssistiveTech
             >
               <MatchupRecapPanel matchupId={matchupIdNum} />
             </PremiumGate>

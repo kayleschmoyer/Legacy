@@ -31,7 +31,9 @@ type Children = { children?: React.ReactNode; [key: string]: unknown };
 type ButtonProps = Children & { onPress?: () => void };
 
 jest.mock('tamagui', () => {
-  const PassThrough = ({ children }: Children) => <div>{children}</div>;
+  const PassThrough = ({ children, ...rest }: Children) => (
+    <div {...rest}>{children}</div>
+  );
   const Button = ({ children, onPress }: ButtonProps) => (
     <button type="button" onClick={onPress}>
       {children}
@@ -210,5 +212,46 @@ describe('PremiumGate', () => {
     expect(trackPremiumFeatureBlocked).toHaveBeenCalledTimes(2);
     expect(trackPremiumFeatureBlocked).toHaveBeenNthCalledWith(1, 'Feature A');
     expect(trackPremiumFeatureBlocked).toHaveBeenNthCalledWith(2, 'Feature B');
+  });
+
+  it('hides the blurred content from assistive tech for free users when opted in (LS-5873)', () => {
+    render(
+      <PremiumGate
+        isPremium={false}
+        featureName="AI Matchup Recap"
+        hideBlurredContentFromAssistiveTech
+      >
+        <div>locked content</div>
+      </PremiumGate>,
+    );
+
+    const gatedContent = screen.getByText('locked content');
+    expect(gatedContent.closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('does not hide content from assistive tech for premium users even when opted in', () => {
+    render(
+      <PremiumGate
+        isPremium
+        featureName="AI Matchup Recap"
+        hideBlurredContentFromAssistiveTech
+      >
+        <div>unlocked content</div>
+      </PremiumGate>,
+    );
+
+    const gatedContent = screen.getByText('unlocked content');
+    expect(gatedContent.closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('leaves blurred content perceivable by assistive tech by default (e.g. non-interactive public previews)', () => {
+    render(
+      <PremiumGate isPremium={false} featureName="Player Comparison">
+        <div>preview content</div>
+      </PremiumGate>,
+    );
+
+    const gatedContent = screen.getByText('preview content');
+    expect(gatedContent.closest('[aria-hidden="true"]')).toBeNull();
   });
 });
