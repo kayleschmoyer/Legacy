@@ -1,321 +1,328 @@
 import { createAnimations } from '@tamagui/animations-react-native';
-import { config } from '@tamagui/config';
+import { config, createGenericFont } from '@tamagui/config';
+import {
+  brand,
+  chromeDark,
+  chromeLight,
+  darkSurface,
+  darkText,
+  colors as designTokenColors,
+  glassDark,
+  glassLight,
+  lightSurface,
+  lightText,
+  positions,
+  positionsLight,
+  scaleDark,
+  scaleLight,
+  semantic,
+  shadowBase,
+  withAlpha,
+} from '@legacy-sports/design-tokens';
 import { createTamagui, type TamaguiInternalConfig } from 'tamagui';
 
 // Legacy Sports — Heritage-meets-modern brand themes
 // Identity: "Night stadium" dark with vintage sport character
 // Baseball: deep navy + seam red + aged gold
 // Football: turf green + amber
-// Typography: serif headings (Playfair Display) + clean body (Inter) + tabular mono
-// Keep existing token names for full compatibility; ensure AA contrast
+// Typography: display headings (Big Shoulders Display) + body (Literata) + tabular mono
+// All hex/rgba values are sourced from @legacy-sports/design-tokens — the
+// single palette source of truth (LS-8525). Keep existing token names for
+// full compatibility; ensure AA contrast.
+
+const lightGold = designTokenColors.light.brandGoldOverride;
 
 const brandDark = {
   // Backgrounds — unified deep navy (single source of truth)
-  background: '#0A0F1A', // deep navy/charcoal
-  backgroundHover: '#0E1624',
-  backgroundPress: '#0B1220',
-  backgroundFocus: '#13203A',
-  backgroundStrong: '#17253F',
-  backgroundTransparent: 'rgba(10, 15, 26, 0.85)',
+  background: darkSurface.bg,
+  backgroundHover: darkSurface.bgHover,
+  backgroundPress: darkSurface.bgPress,
+  backgroundFocus: chromeDark.backgroundFocus,
+  backgroundStrong: chromeDark.backgroundStrong,
+  backgroundTransparent: withAlpha(darkSurface.bg, 0.85),
 
   // Surfaces (elevations)
-  color1: '#0D1526',
-  color2: '#111B2F',
-  color3: '#16223A',
-  color4: '#1C2A47',
-  color5: '#243357',
-  color6: '#2E3F6B',
-  color7: '#394B7E',
-  color8: '#475B95',
-  color9: '#5B6FA8',
-  color10: '#6C80BA',
-  color11: '#DEE6FF', // subtle text on dark surfaces
-  color12: '#F5F7FA', // high contrast text
+  color1: darkSurface.surfaceSubtle,
+  color2: darkSurface.surfacePanel,
+  color3: darkSurface.surfaceCard,
+  color4: darkSurface.surfaceRaised,
+  color5: chromeDark.color5,
+  color6: chromeDark.color6,
+  color7: chromeDark.color7,
+  color8: chromeDark.color8,
+  color9: chromeDark.color9,
+  color10: darkText.fg4,
+  color11: darkText.fg2, // subtle text on dark surfaces
+  color12: chromeDark.color12, // high contrast text
 
   // Extended surfaces for dashboards & roster layouts
-  surfacePanel: '#111B2F',
-  surfacePanelBorder: '#1F2D48',
-  surfaceCard: '#16223A',
-  surfaceSubtle: '#0D1526',
-  surfaceInteractive: 'rgba(27, 58, 92, 0.22)',
-  accentMuted: 'rgba(27, 58, 92, 0.30)',
-  successMuted: 'rgba(34, 197, 94, 0.18)',
-  warningMuted: 'rgba(245, 158, 11, 0.18)',
-  errorMuted: 'rgba(196, 30, 58, 0.18)',
-  outlineSubtle: '#1C2740',
-  outlineStrong: '#2F3B53',
-  textMuted: '#9CAAC5',
-  textOnAccent: '#F8FAFC',
+  surfacePanel: darkSurface.surfacePanel,
+  surfacePanelBorder: darkSurface.panelBorder,
+  surfaceCard: darkSurface.surfaceCard,
+  surfaceRaised: darkSurface.surfaceRaised,
+  surfaceSubtle: darkSurface.surfaceSubtle,
+  surfaceInteractive: withAlpha(brand.navy, 0.22),
+  accentMuted: withAlpha(brand.navy, 0.3),
+  successMuted: chromeDark.successMuted,
+  warningMuted: chromeDark.warningMuted,
+  errorMuted: withAlpha(brand.seamRed, 0.18),
+  outlineSubtle: darkSurface.outlineSubtle,
+  outlineDefault: darkSurface.outlineDefault,
+  outlineStrong: darkSurface.outlineDefault,
+  textMuted: darkText.fg3,
+  textOnAccent: darkText.fgOnAccent,
   // Dark text for gold/amber-filled surfaces (buttons, chips) — gold is a
   // mid-light hue in both themes, so this stays constant across themes.
   textOnGold: '#1A1206',
 
+  // Text tiers (semantic — cf. Goal #2 in LS-8525)
+  fg1: darkText.fg1,
+  fg2: darkText.fg2,
+  fg3: darkText.fg3,
+  fg4: darkText.fg4,
+  fgOnAccent: darkText.fgOnAccent,
+
   // Glass surface tokens — for glassmorphism overlays & cards
-  glassSurface: 'rgba(10, 15, 26, 0.75)',
-  glassSurfaceLight: 'rgba(10, 15, 26, 0.55)',
-  glassBorder: 'rgba(255, 255, 255, 0.08)',
-  glassBorderHover: 'rgba(255, 255, 255, 0.14)',
-  glassTextSubdued: 'rgba(248, 250, 252, 0.65)',
-  glassTextMuted: 'rgba(248, 250, 252, 0.45)',
+  glassSurface: glassDark.surface,
+  glassSurfaceLight: glassDark.surfaceLight,
+  glassBorder: glassDark.border,
+  glassBorderHover: glassDark.borderHover,
+  glassTextSubdued: withAlpha(darkText.fg1, 0.65),
+  glassTextMuted: withAlpha(darkText.fg1, 0.45),
 
   // Semi-transparent background — used for glassmorphism sticky headers
   // e.g. `backgroundColor: '$background075'` with `backdropFilter: 'blur(...)'`
-  background075: 'rgba(10, 15, 26, 0.75)',
+  background075: glassDark.surface,
 
   // Heritage brand accents
-  brandNavy: '#1B3A5C', // deep baseball navy
-  brandNavyLight: '#2C4A7C', // lighter navy for gradients
-  brandNavyDark: '#143050', // darker navy for press states
-  brandSeamRed: '#C41E3A', // baseball seam red
-  brandSeamRedLight: '#E63950', // lighter seam red for hover/glow
-  brandSeamRedDark: '#8B1A2B', // darker seam red for press states
-  brandGold: '#C5A55A', // aged gold — trophies, pennants, vintage borders
-  brandGoldLight: '#D4BB78', // lighter gold for hover
-  brandGoldDark: '#A68B3E', // darker gold for press states
+  brandNavy: brand.navy, // deep baseball navy
+  brandNavyLight: brand.navyLight, // lighter navy for gradients
+  brandNavyDark: brand.navyDark, // darker navy for press states
+  brandSeamRed: brand.seamRed, // baseball seam red
+  brandSeamRedLight: brand.seamRedLight, // lighter seam red for hover/glow
+  brandSeamRedDark: brand.seamRedDark, // darker seam red for press states
+  brandGold: brand.gold, // aged gold — trophies, pennants, vintage borders
+  brandGoldLight: brand.goldLight, // lighter gold for hover
+  brandGoldDark: brand.goldDark, // darker gold for press states
 
   // Text
-  color: '#F8FAFC',
-  colorHover: '#FFFFFF',
-  colorPress: '#E2E8F0',
-  colorFocus: '#FFFFFF',
-  colorTransparent: 'rgba(248, 250, 252, 0.85)',
+  color: darkText.fg1,
+  colorHover: darkText.fg1Strong,
+  colorPress: chromeDark.colorPress,
+  colorFocus: darkText.fg1Strong,
+  colorTransparent: withAlpha(darkText.fg1, 0.85),
 
   // Borders
-  borderColor: '#2F3B53',
-  borderColorHover: '#3A4866',
-  borderColorPress: '#263043',
-  borderColorFocus: '#4D5D80',
+  borderColor: darkSurface.outlineDefault,
+  borderColorHover: chromeDark.borderColorHover,
+  borderColorPress: chromeDark.borderColorPress,
+  borderColorFocus: darkSurface.outlineStrong,
 
   // Shadows
-  shadowColor: 'rgba(8, 12, 20, 0.6)',
-  shadowColorHover: 'rgba(8, 12, 20, 0.7)',
-  shadowColorPress: 'rgba(8, 12, 20, 0.5)',
-  shadowColorFocus: 'rgba(8, 12, 20, 0.8)',
+  shadowColor: withAlpha(shadowBase.dark, 0.6),
+  shadowColorHover: withAlpha(shadowBase.dark, 0.7),
+  shadowColorPress: withAlpha(shadowBase.dark, 0.5),
+  shadowColorFocus: withAlpha(shadowBase.dark, 0.8),
 
   // Primary (deep navy blue — brand-shifted from generic Tailwind blue)
-  blue1: '#0A1A37',
-  blue2: '#0E2652',
-  blue3: '#12316B',
-  blue4: '#173B83',
-  blue5: '#1C479C',
-  blue6: '#2156B6',
-  blue7: '#2869D1',
-  blue8: '#2F7FEC',
-  blue9: '#3B82F6', // links/focus
-  blue10: '#60A5FA',
-  blue11: '#93C5FD',
-  blue12: '#EAF2FF',
+  ...scaleDark, // blue9 = links/focus, green7 = turf
+  red6: brand.seamRed, // seam red (heritage)
+  red7: brand.seamRedLight,
 
-  // Success
-  green1: '#072915',
-  green2: '#0C3A20',
-  green3: '#104B2A',
-  green4: '#145C34',
-  green5: '#166A3B',
-  green6: '#178143',
-  green7: '#199A4C', // turf
-  green8: '#22C55E', // success base
-  green9: '#4ADE80',
-  green10: '#86EFAC',
-  green11: '#BBF7D0',
-  green12: '#ECFDF5',
-
-  // Error — seam-red-adjacent
-  red1: '#3A0A12',
-  red2: '#5C121B',
-  red3: '#7F1D1D',
-  red4: '#991B1B',
-  red5: '#B91C1C',
-  red6: '#C41E3A', // seam red (heritage)
-  red7: '#E63950',
-  red8: '#F87171',
-  red9: '#FCA5A5',
-  red10: '#FECACA',
-  red11: '#FEE2E2',
-  red12: '#FEF2F2',
-
-  // Secondary (amber / gold) — football UI hints + heritage gold
-  amber1: '#2A1805',
-  amber2: '#3B2107',
-  amber3: '#4A2A09',
-  amber4: '#5A330B',
-  amber5: '#6B3D0E',
-  amber6: '#8C4E12',
-  amber7: '#B35F15',
-  amber8: '#D97706',
-  amber9: '#F59E0B',
-  amber10: '#FBBF24',
-  amber11: '#FDE68A',
-  amber12: '#FEF3C7',
+  // Status-variant colors — StatusBadge semantic map
+  statusInfoBg: semantic.infoSoft,
+  statusInfoFg: semantic.infoFg,
+  statusInfoBorder: semantic.infoBorder,
+  statusSuccessBg: semantic.successSoft,
+  statusSuccessFg: semantic.successFg,
+  statusSuccessBorder: semantic.successBorder,
+  statusWarningBg: semantic.warningSoft,
+  statusWarningFg: semantic.warningFg,
+  statusWarningBorder: semantic.warningBorder,
+  statusDangerBg: semantic.dangerSoft,
+  statusDangerFg: semantic.dangerFg,
+  statusDangerBorder: semantic.dangerBorder,
+  statusNeutralBg: semantic.neutralSoft,
+  statusNeutralFg: semantic.neutralFg,
+  statusNeutralBorder: semantic.neutralBorder,
+  statusAccentBg: semantic.accentSoft,
+  statusAccentFg: semantic.accentFg,
+  statusAccentBorder: semantic.accentBorder,
 
   // Sport-specific accents (semantic helpers)
-  sportBaseballPrimary: '#1B3A5C', // deep navy
-  sportBaseballSecondary: '#C41E3A', // seam red
-  sportFootballPrimary: '#16A34A', // turf green
-  sportFootballSecondary: '#F59E0B', // amber
+  sportBaseballPrimary: brand.navy, // deep navy
+  sportBaseballSecondary: brand.seamRed, // seam red
+  sportFootballPrimary: chromeDark.sportFootballPrimary, // turf green
+  sportFootballSecondary: chromeDark.sportFootballSecondary, // amber
 
   // Position colors — baseball-themed
-  positionPitcher: '#C41E3A', // seam red — the baseball itself
-  positionCatcher: '#7C8794', // steel gray — catcher's gear
-  positionInfield: '#8B6F47', // warm brown — infield dirt
-  positionOutfield: '#2D6A4F', // field green — outfield grass
-  positionUtility: '#C5A55A', // aged gold — versatility/trophy
+  positionPitcher: positions.pitcher, // seam red — the baseball itself
+  positionCatcher: positions.catcher, // steel gray — catcher's gear
+  positionInfield: positions.infield, // warm brown — infield dirt
+  positionOutfield: positions.outfield, // field green — outfield grass
+  positionUtility: positions.utility, // aged gold — versatility/trophy
 
-  focusRing: '#60A5FA',
+  focusRing: chromeDark.focusRing,
 };
 
 const brandLight = {
   // Backgrounds (neutral warm gray)
-  background: '#FFFFFF',
-  backgroundHover: '#F8FAFC',
-  backgroundPress: '#F2F4F8',
-  backgroundFocus: '#E8F0FF',
-  backgroundStrong: '#E6EAF2',
-  backgroundTransparent: 'rgba(255, 255, 255, 0.85)',
+  background: lightSurface.bg,
+  backgroundHover: lightSurface.bgHover,
+  backgroundPress: lightSurface.bgPress,
+  backgroundFocus: chromeLight.backgroundFocus,
+  backgroundStrong: chromeLight.backgroundStrong,
+  backgroundTransparent: withAlpha(lightSurface.bg, 0.85),
 
   // Surfaces — offset from #FFFFFF background so cards/panels are visually distinct
-  color1: '#F5F7FA',
-  color2: '#EDF1F7',
-  color3: '#E4EAF2',
-  color4: '#D9E1EC',
-  color5: '#D5DDE8',
-  color6: '#C3CDDA',
-  color7: '#9CAAC5',
-  color8: '#7D8EAD',
-  color9: '#5F7295',
-  color10: '#4A5B82',
-  color11: '#1F2937', // main text
-  color12: '#0B1220', // strongest text
+  color1: lightSurface.surfaceCard,
+  color2: lightSurface.surfaceSubtle,
+  color3: chromeLight.color3,
+  color4: chromeLight.color4,
+  color5: chromeLight.color5,
+  color6: chromeLight.color6,
+  color7: chromeLight.color7,
+  color8: lightText.fg4,
+  color9: chromeLight.color9,
+  color10: chromeLight.color10,
+  color11: lightText.fg2, // main text
+  color12: lightText.fg1, // strongest text
 
   // Extended surfaces for dashboards & roster layouts
-  surfacePanel: '#EFF4FB',
-  surfacePanelBorder: '#D0DAE8',
-  surfaceCard: '#F5F7FA',
-  surfaceSubtle: '#EDF1F7',
-  surfaceInteractive: 'rgba(27, 58, 92, 0.06)',
-  accentMuted: 'rgba(27, 58, 92, 0.10)',
-  successMuted: 'rgba(34, 197, 94, 0.12)',
-  warningMuted: 'rgba(245, 158, 11, 0.14)',
-  errorMuted: 'rgba(196, 30, 58, 0.12)',
-  outlineSubtle: '#E1E7F0',
-  outlineStrong: '#C3CDDA',
-  textMuted: '#4A6080',
-  textOnAccent: '#FFFFFF',
+  surfacePanel: lightSurface.surfacePanel,
+  surfacePanelBorder: lightSurface.panelBorder,
+  surfaceCard: lightSurface.surfaceCard,
+  surfaceRaised: lightSurface.surfaceRaised,
+  surfaceSubtle: lightSurface.surfaceSubtle,
+  surfaceInteractive: withAlpha(brand.navy, 0.06),
+  accentMuted: withAlpha(brand.navy, 0.1),
+  successMuted: chromeLight.successMuted,
+  warningMuted: chromeLight.warningMuted,
+  errorMuted: withAlpha(brand.seamRed, 0.12),
+  outlineSubtle: lightSurface.outlineSubtle,
+  outlineDefault: lightSurface.outlineDefault,
+  outlineStrong: chromeLight.outlineStrong,
+  textMuted: lightText.fg3,
+  textOnAccent: lightText.fgOnAccent,
   textOnGold: '#1A1206',
 
+  // Text tiers (semantic — cf. Goal #2 in LS-8525)
+  fg1: lightText.fg1,
+  fg2: lightText.fg2,
+  fg3: lightText.fg3,
+  fg4: lightText.fg4,
+  fgOnAccent: lightText.fgOnAccent,
+
   // Glass surface tokens — for glassmorphism overlays & cards
-  glassSurface: 'rgba(255, 255, 255, 0.75)',
-  glassSurfaceLight: 'rgba(255, 255, 255, 0.55)',
-  glassBorder: 'rgba(0, 0, 0, 0.06)',
-  glassBorderHover: 'rgba(0, 0, 0, 0.12)',
-  glassTextSubdued: 'rgba(11, 18, 32, 0.65)',
-  glassTextMuted: 'rgba(11, 18, 32, 0.45)',
+  glassSurface: glassLight.surface,
+  glassSurfaceLight: glassLight.surfaceLight,
+  glassBorder: glassLight.border,
+  glassBorderHover: glassLight.borderHover,
+  glassTextSubdued: withAlpha(lightText.fg1, 0.65),
+  glassTextMuted: withAlpha(lightText.fg1, 0.45),
 
   // Semi-transparent background — used for glassmorphism sticky headers
   // e.g. `backgroundColor: '$background075'` with `backdropFilter: 'blur(...)'`
-  background075: 'rgba(255, 255, 255, 0.75)',
+  background075: glassLight.surface,
 
   // Heritage brand accents
-  brandNavy: '#1B3A5C',
-  brandNavyLight: '#2C4A7C',
-  brandNavyDark: '#143050',
-  brandSeamRed: '#C41E3A',
-  brandSeamRedLight: '#E63950',
-  brandSeamRedDark: '#8B1A2B',
-  brandGold: '#B8942B',
-  brandGoldLight: '#D4B24A',
-  brandGoldDark: '#967828',
+  brandNavy: brand.navy,
+  brandNavyLight: brand.navyLight,
+  brandNavyDark: brand.navyDark,
+  brandSeamRed: brand.seamRed,
+  brandSeamRedLight: brand.seamRedLight,
+  brandSeamRedDark: brand.seamRedDark,
+  brandGold: lightGold.gold,
+  brandGoldLight: lightGold.goldLight,
+  brandGoldDark: lightGold.goldDark,
 
   // Text
-  color: '#0B1220',
-  colorHover: '#111827',
-  colorPress: '#1F2937',
-  colorFocus: '#0B1220',
-  colorTransparent: 'rgba(11, 18, 32, 0.85)',
+  color: lightText.fg1,
+  colorHover: chromeLight.colorHover,
+  colorPress: lightText.fg2,
+  colorFocus: lightText.fg1,
+  colorTransparent: withAlpha(lightText.fg1, 0.85),
 
   // Borders
-  borderColor: '#CBD5E1',
-  borderColorHover: '#B7C3D4',
-  borderColorPress: '#9EABC1',
-  borderColorFocus: '#7F90AE',
+  borderColor: lightSurface.outlineDefault,
+  borderColorHover: chromeLight.borderColorHover,
+  borderColorPress: chromeLight.borderColorPress,
+  borderColorFocus: lightSurface.outlineStrong,
 
   // Shadows
-  shadowColor: 'rgba(2, 6, 23, 0.12)',
-  shadowColorHover: 'rgba(2, 6, 23, 0.18)',
-  shadowColorPress: 'rgba(2, 6, 23, 0.08)',
-  shadowColorFocus: 'rgba(2, 6, 23, 0.22)',
+  shadowColor: withAlpha(shadowBase.light, 0.12),
+  shadowColorHover: withAlpha(shadowBase.light, 0.18),
+  shadowColorPress: withAlpha(shadowBase.light, 0.08),
+  shadowColorFocus: withAlpha(shadowBase.light, 0.22),
 
   // Primary (blue)
-  blue1: '#EFF6FF',
-  blue2: '#DBEAFE',
-  blue3: '#C7DBFD',
-  blue4: '#9DC3FB',
-  blue5: '#74A9F7',
-  blue6: '#4F8EF4',
-  blue7: '#2F73EC',
-  blue8: '#2563EB',
-  blue9: '#1D4ED8', // brand link
-  blue10: '#1E40AF',
-  blue11: '#1E3A8A',
-  blue12: '#0B1220',
+  ...scaleLight, // blue9 = brand link, green7 = turf
+  blue12: lightText.fg1,
+  red6: brand.seamRedLight, // seam red (heritage)
+  red7: brand.seamRed,
 
-  // Success
-  green1: '#ECFDF5',
-  green2: '#D1FAE5',
-  green3: '#A7F3D0',
-  green4: '#6EE7B7',
-  green5: '#34D399',
-  green6: '#22C55E',
-  green7: '#16A34A', // turf
-  green8: '#15803D',
-  green9: '#166534',
-  green10: '#14532D',
-  green11: '#0F3C22',
-  green12: '#072315',
-
-  // Error — seam-red-adjacent
-  red1: '#FEF2F2',
-  red2: '#FEE2E2',
-  red3: '#FECACA',
-  red4: '#FCA5A5',
-  red5: '#F87171',
-  red6: '#E63950', // seam red (heritage)
-  red7: '#C41E3A',
-  red8: '#B91C1C',
-  red9: '#991B1B',
-  red10: '#7F1D1D',
-  red11: '#5C121B',
-  red12: '#3A0A12',
-
-  // Secondary (amber / gold) — football UI hints + heritage gold
-  amber1: '#FFFBEB',
-  amber2: '#FEF3C7',
-  amber3: '#FDE68A',
-  amber4: '#FCD34D',
-  amber5: '#FBBF24',
-  amber6: '#F59E0B',
-  amber7: '#D97706',
-  amber8: '#B45309',
-  amber9: '#92400E',
-  amber10: '#78350F',
-  amber11: '#4A250A',
-  amber12: '#2A1805',
+  // Status-variant colors — StatusBadge semantic map
+  statusInfoBg: semantic.infoSoft,
+  statusInfoFg: semantic.infoFg,
+  statusInfoBorder: semantic.infoBorder,
+  statusSuccessBg: semantic.successSoft,
+  statusSuccessFg: semantic.successFg,
+  statusSuccessBorder: semantic.successBorder,
+  statusWarningBg: semantic.warningSoft,
+  statusWarningFg: semantic.warningFg,
+  statusWarningBorder: semantic.warningBorder,
+  statusDangerBg: semantic.dangerSoft,
+  statusDangerFg: semantic.dangerFg,
+  statusDangerBorder: semantic.dangerBorder,
+  statusNeutralBg: semantic.neutralSoft,
+  statusNeutralFg: semantic.neutralFg,
+  statusNeutralBorder: semantic.neutralBorder,
+  statusAccentBg: semantic.accentSoft,
+  statusAccentFg: semantic.accentFg,
+  statusAccentBorder: semantic.accentBorder,
 
   // Sport-specific accents (semantic helpers)
-  sportBaseballPrimary: '#1B3A5C', // deep navy
-  sportBaseballSecondary: '#C41E3A', // seam red
-  sportFootballPrimary: '#16A34A', // turf green
-  sportFootballSecondary: '#F59E0B', // amber
+  sportBaseballPrimary: brand.navy, // deep navy
+  sportBaseballSecondary: brand.seamRed, // seam red
+  sportFootballPrimary: chromeLight.sportFootballPrimary, // turf green
+  sportFootballSecondary: chromeLight.sportFootballSecondary, // amber
 
   // Position colors — baseball-themed
-  positionPitcher: '#C41E3A', // seam red
-  positionCatcher: '#5A6670', // steel gray
-  positionInfield: '#7C5B3D', // warm brown — dirt
-  positionOutfield: '#2D6A4F', // field green
-  positionUtility: '#B8942B', // aged gold
+  positionPitcher: positionsLight.pitcher, // seam red
+  positionCatcher: positionsLight.catcher, // steel gray
+  positionInfield: positionsLight.infield, // warm brown — dirt
+  positionOutfield: positionsLight.outfield, // field green
+  positionUtility: positionsLight.utility, // aged gold
 
-  focusRing: '#2563EB',
+  focusRing: chromeLight.focusRing,
 };
+
+// Brand fonts (docs/design/brand.md) — Big Shoulders Display for
+// display/headings, Literata for body/UI. `face` maps each registered
+// weight to the platform font resource:
+//   - Web: the CSS `font-family` name declared in `apps/web/public/fonts/fonts.css`.
+//   - Native: the name each font is registered under via `expo-font`'s
+//     `useFonts()` in `apps/app/src/app/_layout.tsx` (must match exactly).
+const headingFont = createGenericFont(
+  "'Big Shoulders Display', system-ui, sans-serif",
+  {
+    face: {
+      600: { normal: 'BigShouldersDisplay-SemiBold' },
+      700: { normal: 'BigShouldersDisplay-Bold' },
+      800: { normal: 'BigShouldersDisplay-ExtraBold' },
+    },
+  },
+);
+
+const bodyFont = createGenericFont(
+  "'Literata', Georgia, 'Times New Roman', serif",
+  {
+    face: {
+      400: { normal: 'Literata-Regular', italic: 'Literata-Italic' },
+      600: { normal: 'Literata-SemiBold' },
+    },
+  },
+);
 
 // Custom configuration extending the base config
 // Extract the base animation definitions from @tamagui/config.
@@ -419,6 +426,11 @@ const animations = createAnimations({
 const customConfig = {
   ...config,
   animations,
+  fonts: {
+    ...config.fonts,
+    heading: headingFont,
+    body: bodyFont,
+  },
   themes: {
     ...config.themes,
     // Branded themes

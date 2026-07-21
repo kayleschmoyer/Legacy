@@ -21,6 +21,7 @@ export * from '../components/PanelCard';
 export * from '../components/UnifiedLoadingPanel';
 export * from '../components/Table';
 export * from '../features/common/SearchBar';
+export * from '../hooks/useThemeTokens';
 export {
   OAuthProvider,
   SecureStorageProvider,

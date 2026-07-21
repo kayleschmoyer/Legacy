@@ -100,6 +100,15 @@ jest.mock('@legacy-sports/logging', () => ({
 
 jest.mock('expo-router', () => ({ Slot: () => null }));
 
+jest.mock('expo-font', () => ({
+  useFonts: (): [boolean, Error | undefined] => [true, undefined],
+}));
+
+jest.mock('expo-splash-screen', () => ({
+  preventAutoHideAsync: jest.fn().mockResolvedValue(undefined),
+  hideAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 interface GrowthBookSpies {

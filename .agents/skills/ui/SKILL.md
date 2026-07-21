@@ -21,26 +21,39 @@ Load this skill when creating or styling UI components, choosing colors, working
 
 All defined in `lib/tamagui-config` for **both** `brandDark` and `brandLight`:
 
-| Need                                     | Token                                                                                               |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Page background / text                   | `$background`, `$color`                                                                             |
-| Surface tiers (subtle → panel → card)    | `$surfaceSubtle`, `$surfacePanel`, `$surfaceCard`                                                   |
-| Borders                                  | `$surfacePanelBorder`, `$outlineSubtle`, `$outlineStrong`, `$borderColor`                           |
-| Text tiers                               | `$color12` (high contrast), `$color` (primary), `$textMuted`, `$textOnAccent`                       |
-| Primary interactive (buttons, selected)  | `$brandNavyLight` bg, `$brandNavy` hover, `$brandNavyDark` press                                    |
-| Accent text/badges (earned moments only) | `$brandGoldLight`, `$brandGold`                                                                     |
-| Destructive / error / losing             | `$brandSeamRed`, `$brandSeamRedDark` press                                                          |
-| Tinted interactive surfaces              | `$surfaceInteractive`, `$accentMuted`, `$successMuted`, `$warningMuted`                             |
-| Glassmorphism                            | `$background075`, `$glassSurface`, `$glassBorder`, `$glassBorderHover`                              |
-| Position colors                          | `$positionPitcher`, `$positionCatcher`, `$positionInfield`, `$positionOutfield`, `$positionUtility` |
-| Focus ring                               | `$focusRing`                                                                                        |
+| Need                                     | Token                                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Page background / text                   | `$background`, `$color`                                                                                       |
+| Surface tiers (subtle → panel → card)    | `$surfaceSubtle`, `$surfacePanel`, `$surfaceCard`                                                             |
+| Borders                                  | `$surfacePanelBorder`, `$outlineSubtle`, `$outlineStrong`, `$borderColor`                                     |
+| Text tiers                               | `$color12` (high contrast), `$color` (primary), `$textMuted`, `$textOnAccent`, or `$fg1`–`$fg4`/`$fgOnAccent` |
+| Primary interactive (buttons, selected)  | `$brandNavyLight` bg, `$brandNavy` hover, `$brandNavyDark` press                                              |
+| Accent text/badges (earned moments only) | `$brandGoldLight`, `$brandGold`                                                                               |
+| Destructive / error / losing             | `$brandSeamRed`, `$brandSeamRedDark` press                                                                    |
+| Tinted interactive surfaces              | `$surfaceInteractive`, `$accentMuted`, `$successMuted`, `$warningMuted`                                       |
+| Glassmorphism                            | `$background075`, `$glassSurface`, `$glassBorder`, `$glassBorderHover`                                        |
+| Position colors                          | `$positionPitcher`, `$positionCatcher`, `$positionInfield`, `$positionOutfield`, `$positionUtility`           |
+| Focus ring                               | `$focusRing`                                                                                                  |
+| Status badges (StatusBadge variant map)  | `$status{Info,Success,Warning,Danger,Neutral,Accent}{Bg,Fg,Border}`                                           |
 
 ## Raw-CSS Strings (gradients, box-shadows, canvas)
 
 When a prop genuinely needs a CSS string a token can't fill:
 
 - **Web:** use CSS variables — Tamagui emits every token as `var(--tokenName)`, which stays theme-aware: `background: 'linear-gradient(135deg, var(--surfacePanel), var(--brandNavy))'`. In `.css` files, same pattern (see `elite-draft/styles.ts` for the `var(--token, fallback)` form).
-- **Native:** no CSS vars — resolve from the active theme at render time (theme-aware helper arriving with LS-8525; until then prefer restructuring so a token prop works).
+- **Native:** no CSS vars — use `useThemeTokens()` from `@legacy-sports/shared-components/ui` to resolve raw values for the active theme at render time:
+
+  ```tsx
+  import { useThemeTokens } from '@legacy-sports/shared-components/ui';
+
+  const { surface, text, shadows } = useThemeTokens();
+  <View
+    style={{ backgroundColor: surface.surfaceCard, shadowColor: text.fg1 }}
+  />;
+  ```
+
+  Prefer a token prop wherever one exists — reach for `useThemeTokens()` only when the prop genuinely needs a raw value (gradient stops, native shadow objects, canvas).
+
 - Never build the string from hex constants.
 
 ## Tamagui Patterns

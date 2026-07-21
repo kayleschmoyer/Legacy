@@ -77,6 +77,14 @@ export const semantic = {
   infoSoft: 'rgba(70, 110, 176, 0.22)',
   infoBorder: 'rgba(70, 110, 176, 0.55)',
   focusRing: '#4E8ED6',
+  // Status-badge-only variants (no numeric "base" — bg/fg/border triplets
+  // matching the successFg/successSoft/successBorder pattern above).
+  neutralFg: '#9CAAC5',
+  neutralSoft: 'rgba(127, 144, 174, 0.12)',
+  neutralBorder: '#2F3B53',
+  accentFg: '#D4BB78',
+  accentSoft: 'rgba(197, 165, 90, 0.12)',
+  accentBorder: 'rgba(197, 165, 90, 0.4)',
 } as const;
 
 export const positions = {
@@ -115,6 +123,180 @@ export const footballPositionBadges = {
   DB: '#6B3FA0',
   SUPERFLEX: '#D4AF37',
   IDP: '#5B7FA6',
+} as const;
+
+// Light-theme position colors are desaturated for AA contrast on white
+// surfaces (mirrors the brandGoldOverride pattern below for `utility`).
+export const positionsLight = {
+  pitcher: '#C41E3A',
+  catcher: '#5A6670',
+  infield: '#7C5B3D',
+  outfield: '#2D6A4F',
+  utility: '#B8942B',
+} as const;
+
+// Base RGB triple (as a hex string) that `tamagui-config`'s shadowColor*
+// tokens are alpha-blended from — kept separate from `shadows.ts`'s
+// pre-composed rgba() strings since tamagui-config needs distinct alpha
+// steps (hover/press/focus) derived from the same base.
+export const shadowBase = {
+  dark: '#080C14',
+  light: '#020617',
+} as const;
+
+/** Convert a `#rrggbb` hex color to an `rgba(r, g, b, alpha)` string. */
+export function withAlpha(hex: string, alpha: number): string {
+  const normalized = hex.replace('#', '');
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Values `tamagui-config`'s brand themes need that have no equivalent
+// semantic name elsewhere in this module — kept here (rather than inline in
+// tamagui-config) so every hex/rgba literal in the theme still has a single
+// source of truth.
+export const chromeDark = {
+  backgroundFocus: '#13203A',
+  backgroundStrong: '#17253F',
+  color5: '#243357',
+  color6: '#2E3F6B',
+  color7: '#394B7E',
+  color8: '#475B95',
+  color9: '#5B6FA8',
+  color12: '#F5F7FA',
+  colorPress: '#E2E8F0',
+  borderColorHover: '#3A4866',
+  borderColorPress: '#263043',
+  successMuted: 'rgba(34, 197, 94, 0.18)',
+  warningMuted: 'rgba(245, 158, 11, 0.18)',
+  sportFootballPrimary: '#16A34A',
+  sportFootballSecondary: '#F59E0B',
+  focusRing: '#60A5FA',
+} as const;
+
+export const chromeLight = {
+  backgroundFocus: '#E8F0FF',
+  backgroundStrong: '#E6EAF2',
+  color3: '#E4EAF2',
+  color4: '#D9E1EC',
+  color5: '#D5DDE8',
+  color6: '#C3CDDA',
+  color7: '#9CAAC5',
+  color9: '#5F7295',
+  color10: '#4A5B82',
+  colorHover: '#111827',
+  outlineStrong: '#C3CDDA',
+  borderColorHover: '#B7C3D4',
+  borderColorPress: '#9EABC1',
+  successMuted: 'rgba(34, 197, 94, 0.12)',
+  warningMuted: 'rgba(245, 158, 11, 0.14)',
+  sportFootballPrimary: '#16A34A',
+  sportFootballSecondary: '#F59E0B',
+  focusRing: '#2563EB',
+} as const;
+
+// The 12-step Tailwind-style ramps `@tamagui/config` expects for its base
+// $blue/$green/$red/$amber tokens. Brand-tuned so any internal Tamagui
+// component still relying on them (directly using these tokens in app code
+// is banned — see .agents/skills/ui/references/brand-colors.md) stays on
+// brand rather than falling back to generic Tailwind blue.
+export const scaleDark = {
+  blue1: '#0A1A37',
+  blue2: '#0E2652',
+  blue3: '#12316B',
+  blue4: '#173B83',
+  blue5: '#1C479C',
+  blue6: '#2156B6',
+  blue7: '#2869D1',
+  blue8: '#2F7FEC',
+  blue9: '#3B82F6',
+  blue10: '#60A5FA',
+  blue11: '#93C5FD',
+  blue12: '#EAF2FF',
+  green1: '#072915',
+  green2: '#0C3A20',
+  green3: '#104B2A',
+  green4: '#145C34',
+  green5: '#166A3B',
+  green6: '#178143',
+  green7: '#199A4C',
+  green8: '#22C55E',
+  green9: '#4ADE80',
+  green10: '#86EFAC',
+  green11: '#BBF7D0',
+  green12: '#ECFDF5',
+  red1: '#3A0A12',
+  red2: '#5C121B',
+  red3: '#7F1D1D',
+  red4: '#991B1B',
+  red5: '#B91C1C',
+  red8: '#F87171',
+  red9: '#FCA5A5',
+  red10: '#FECACA',
+  red11: '#FEE2E2',
+  red12: '#FEF2F2',
+  amber1: '#2A1805',
+  amber2: '#3B2107',
+  amber3: '#4A2A09',
+  amber4: '#5A330B',
+  amber5: '#6B3D0E',
+  amber6: '#8C4E12',
+  amber7: '#B35F15',
+  amber8: '#D97706',
+  amber9: '#F59E0B',
+  amber10: '#FBBF24',
+  amber11: '#FDE68A',
+  amber12: '#FEF3C7',
+} as const;
+
+export const scaleLight = {
+  blue1: '#EFF6FF',
+  blue2: '#DBEAFE',
+  blue3: '#C7DBFD',
+  blue4: '#9DC3FB',
+  blue5: '#74A9F7',
+  blue6: '#4F8EF4',
+  blue7: '#2F73EC',
+  blue8: '#2563EB',
+  blue9: '#1D4ED8',
+  blue10: '#1E40AF',
+  blue11: '#1E3A8A',
+  green1: '#ECFDF5',
+  green2: '#D1FAE5',
+  green3: '#A7F3D0',
+  green4: '#6EE7B7',
+  green5: '#34D399',
+  green6: '#22C55E',
+  green7: '#16A34A',
+  green8: '#15803D',
+  green9: '#166534',
+  green10: '#14532D',
+  green11: '#0F3C22',
+  green12: '#072315',
+  red1: '#FEF2F2',
+  red2: '#FEE2E2',
+  red3: '#FECACA',
+  red4: '#FCA5A5',
+  red5: '#F87171',
+  red8: '#B91C1C',
+  red9: '#991B1B',
+  red10: '#7F1D1D',
+  red11: '#5C121B',
+  red12: '#3A0A12',
+  amber1: '#FFFBEB',
+  amber2: '#FEF3C7',
+  amber3: '#FDE68A',
+  amber4: '#FCD34D',
+  amber5: '#FBBF24',
+  amber6: '#F59E0B',
+  amber7: '#D97706',
+  amber8: '#B45309',
+  amber9: '#92400E',
+  amber10: '#78350F',
+  amber11: '#4A250A',
+  amber12: '#2A1805',
 } as const;
 
 export const glassDark = {

@@ -2,6 +2,8 @@ import * as React from 'react';
 import { useEffect } from 'react';
 import { TamaguiProvider, Theme } from 'tamagui';
 import { Slot } from 'expo-router';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import {
   GrowthBook,
   GrowthBookProvider,
@@ -26,6 +28,26 @@ import { setUserProperties } from '../utils/analytics';
 import { installGlobalErrorCapture } from '../lib/installGlobalErrorCapture';
 
 const isDev = process.env.NODE_ENV !== 'production';
+
+// Keep the splash screen up until the brand fonts (docs/design/brand.md —
+// Big Shoulders Display / Literata) finish loading via useFonts() below, so
+// Tamagui's $heading/$body never briefly render the Inter fallback.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Safe to ignore — the splash screen may already be hidden (e.g. Fast Refresh).
+});
+
+// Registered names must match the `face` keys in
+// lib/tamagui-config/src/lib/tamagui-config.ts exactly.
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports -- Metro/Expo asset loading requires `require()` for binary font files; it returns an opaque module ID, not a typed value. Standard expo-font pattern, no ESM alternative in this bundler setup. */
+const BRAND_FONTS = {
+  'BigShouldersDisplay-SemiBold': require('../../assets/fonts/BigShouldersDisplay-SemiBold.ttf'),
+  'BigShouldersDisplay-Bold': require('../../assets/fonts/BigShouldersDisplay-Bold.ttf'),
+  'BigShouldersDisplay-ExtraBold': require('../../assets/fonts/BigShouldersDisplay-ExtraBold.ttf'),
+  'Literata-Regular': require('../../assets/fonts/Literata-Regular.ttf'),
+  'Literata-SemiBold': require('../../assets/fonts/Literata-SemiBold.ttf'),
+  'Literata-Italic': require('../../assets/fonts/Literata-Italic.ttf'),
+};
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports */
 
 // Construct the GrowthBook instance lazily rather than at module-evaluation
 // time. `config.growthbookClientKey` resolves `Constants.expoConfig?.extra`,
@@ -175,6 +197,24 @@ export default function Layout() {
       );
     });
   }, [growthbook]);
+
+  const [fontsLoaded, fontError] = useFonts(BRAND_FONTS);
+
+  useEffect(() => {
+    if (!fontsLoaded && !fontError) return;
+    if (fontError) {
+      LOGGER.warn('[Fonts] Brand font load failed (non-fatal):', fontError);
+    }
+    SplashScreen.hideAsync().catch(() => {
+      // Safe to ignore — see preventAutoHideAsync() above.
+    });
+  }, [fontsLoaded, fontError]);
+
+  // Keep the splash screen visible (return null, not a fallback UI) until
+  // fonts resolve — Tamagui's $heading/$body must never render Inter.
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     // TamaguiProvider must wrap ErrorBoundary: ErrorBoundary's fallback UI

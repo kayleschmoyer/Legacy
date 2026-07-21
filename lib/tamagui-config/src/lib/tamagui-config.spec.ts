@@ -7,6 +7,12 @@ jest.mock('@tamagui/config', () => ({
     shorthands: {},
     settings: {},
   },
+  createGenericFont: jest.fn(
+    (family: string, font: Record<string, unknown> = {}) => ({
+      family,
+      ...font,
+    }),
+  ),
 }));
 
 jest.mock('tamagui', () => ({
