@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, Text, VisuallyHidden, XStack, YStack } from 'tamagui';
 import { MatchupStatus } from '@legacy-sports/graphql';
+import { PACE_TINT_THRESHOLDS } from './paceThresholds';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -147,8 +148,8 @@ function paceColor(
   const target = proj * (gamesPlayed / totalGames);
   if (target <= 0) return undefined;
   const ratio = actual / target;
-  if (ratio > 1.1) return GREEN;
-  if (ratio < 0.9) return RED;
+  if (ratio > PACE_TINT_THRESHOLDS.good) return GREEN;
+  if (ratio < PACE_TINT_THRESHOLDS.bad) return RED;
   return undefined;
 }
 

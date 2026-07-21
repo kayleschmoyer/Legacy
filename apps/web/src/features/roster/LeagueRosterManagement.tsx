@@ -11,6 +11,7 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
+import { PACE_TINT_THRESHOLDS } from '@legacy-sports/shared-components/matchup';
 import {
   ALLOWED_POSITIONS,
   PITCHING_POSITIONS,
@@ -174,9 +175,9 @@ export const getPaceColor = (
   if (totalGames > 0 && gamesPlayed < 2) return undefined;
   const target = projection * frac;
   if (target <= 0) return undefined;
-  const ratio = (score - target) / target;
-  if (ratio >= 0.1) return PACE_GREEN;
-  if (ratio <= -0.1) return PACE_RED;
+  const ratio = score / target;
+  if (ratio >= PACE_TINT_THRESHOLDS.good) return PACE_GREEN;
+  if (ratio <= PACE_TINT_THRESHOLDS.bad) return PACE_RED;
   return undefined;
 };
 

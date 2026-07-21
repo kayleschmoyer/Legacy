@@ -1,4 +1,5 @@
 import React from 'react';
+import { PACE_TINT_THRESHOLDS } from '@legacy-sports/shared-components/matchup';
 import { I } from './Icons';
 
 export type AvatarColor = 'navy' | 'red' | 'green' | 'brown' | 'purple';
@@ -133,9 +134,9 @@ const paceColorStyle = (p: PlayerRowVM): React.CSSProperties | undefined => {
   if (total > 0 && p.gamesPlayed != null && p.gamesPlayed < 2) return undefined;
   const target = p.proj * frac;
   if (target <= 0) return undefined;
-  const ratio = (p.actual - target) / target;
-  if (ratio >= 0.1) return { color: 'var(--success-fg)' };
-  if (ratio <= -0.1) return { color: 'var(--danger-fg)' };
+  const ratio = p.actual / target;
+  if (ratio >= PACE_TINT_THRESHOLDS.good) return { color: 'var(--success-fg)' };
+  if (ratio <= PACE_TINT_THRESHOLDS.bad) return { color: 'var(--danger-fg)' };
   return undefined;
 };
 

@@ -14,3 +14,4 @@ export * from './MatchupNavigationControls';
 export * from './MatchupDetailLayout';
 export * from './PlayoffBracket';
 export * from './usePlayoffBracket';
+export * from './paceThresholds';
