@@ -8,6 +8,7 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
+import { LOGGER } from '@legacy-sports/logging';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { useDraftWebSocket } from './useDraftWebSocket';
 
@@ -165,5 +166,163 @@ describe('useDraftWebSocket — draft completion (LS-3823)', () => {
     expect(params.setDraftComplete).toHaveBeenCalledWith(true);
 
     jest.useRealTimers();
+  });
+});
+
+// ── Reconnect recovery (LS-8506) ───────────────────────────────────────────
+
+/**
+ * Rollbar item 194: `Failed to refetch available players after websocket
+ * reconnect` was logged with `String(e)`, flattening an `AbortError` (Apollo
+ * cancelling an in-flight query on navigation) into a bare string. That
+ * destroyed the underlying cause and bypassed the AbortError noise filter in
+ * lib/rollbar, so a benign cancellation surfaced as a production error — and a
+ * genuine failure would have been just as undiagnosable, retried zero times,
+ * and invisible to the user staring at a stale player list.
+ */
+describe('useDraftWebSocket — reconnect refetch recovery (LS-8506)', () => {
+  /** Drives the WS through connect -> drop -> reconnect. */
+  function reconnect() {
+    act(() => mockInstance._emit('connected'));
+    act(() => mockInstance._emit('disconnected'));
+    act(() => mockInstance._emit('connected'));
+  }
+
+  /** Flushes the backoff waits between retry attempts. */
+  async function flushBackoff() {
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+  }
+
+  let errorSpy: jest.SpyInstance;
+  let debugSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    errorSpy = jest.spyOn(LOGGER, 'error').mockImplementation(() => undefined);
+    debugSpy = jest.spyOn(LOGGER, 'debug').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+    debugSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  it('does not fire recovery refetches on the initial connect', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => mockInstance._emit('connected'));
+
+    // The initial page-load queries already fetched this data — recovering on
+    // the first connect is a duplicate round-trip, and it mislabels itself as
+    // reconnect recovery in any error it logs.
+    expect(params.refetchAvailablePlayers).not.toHaveBeenCalled();
+  });
+
+  it('refetches available players on a genuine reconnect', async () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    reconnect();
+    await flushBackoff();
+
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(params.showToast).not.toHaveBeenCalled();
+  });
+
+  it('retries a failing refetch with backoff and stays quiet once it succeeds', async () => {
+    const params = makeDefaultParams();
+    params.refetchAvailablePlayers = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('network hiccup'))
+      .mockResolvedValue(undefined);
+
+    renderHook(() => useDraftWebSocket(params));
+
+    reconnect();
+    await flushBackoff();
+
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(2);
+    // A transient failure that recovers is not an error the user or Rollbar
+    // needs to hear about.
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(params.showToast).not.toHaveBeenCalled();
+  });
+
+  it('logs the underlying error object and warns the user when all retries fail', async () => {
+    const cause = new Error('500 Internal Server Error');
+    const params = makeDefaultParams();
+    params.refetchAvailablePlayers = jest.fn().mockRejectedValue(cause);
+
+    renderHook(() => useDraftWebSocket(params));
+
+    reconnect();
+    await flushBackoff();
+
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(3);
+
+    // The cause must reach the log payload as the Error itself — `String(e)`
+    // would drop `name`/`stack` and defeat the lib/rollbar AbortError filter.
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Failed to refetch available players after websocket reconnect',
+      { attempts: 3, error: cause },
+    );
+
+    // A stale available-players list is directly actionable by the user: they
+    // can try to draft an already-taken player.
+    expect(params.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('may be out of date'),
+      'warning',
+    );
+  });
+
+  it('stays silent when the refetch is aborted by navigation or unmount', async () => {
+    const abortError = new DOMException(
+      'The operation was aborted.',
+      'AbortError',
+    );
+    const params = makeDefaultParams();
+    params.refetchAvailablePlayers = jest.fn().mockRejectedValue(abortError);
+
+    renderHook(() => useDraftWebSocket(params));
+
+    reconnect();
+    await flushBackoff();
+
+    // Cancellation is expected browser behaviour, not a failure: no retry, no
+    // error-level log, no user-facing warning.
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(params.showToast).not.toHaveBeenCalled();
+    expect(debugSpy).toHaveBeenCalledWith(
+      'Refetch of available players cancelled after websocket reconnect',
+      { error: abortError },
+    );
+  });
+
+  it('cancels pending retries on unmount', async () => {
+    const params = makeDefaultParams();
+    params.refetchAvailablePlayers = jest
+      .fn()
+      .mockRejectedValue(new Error('network hiccup'));
+
+    const { unmount } = renderHook(() => useDraftWebSocket(params));
+
+    reconnect();
+    // First attempt has rejected and the backoff timer is pending.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    unmount();
+    await flushBackoff();
+
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(params.showToast).not.toHaveBeenCalled();
   });
 });

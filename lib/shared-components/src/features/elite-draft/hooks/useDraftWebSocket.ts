@@ -22,6 +22,29 @@ import {
 import type { AvailableDraftPlayer, DraftPlayer } from '../types';
 import { normalizeTeamId } from '../utils';
 
+/** Total attempts (initial try + retries) for each post-reconnect refetch. */
+const RECONNECT_REFETCH_ATTEMPTS = 3;
+/** Base delay for the exponential backoff between reconnect refetch attempts. */
+const RECONNECT_REFETCH_BASE_DELAY_MS = 500;
+
+type ReconnectRefetchOutcome = 'ok' | 'cancelled' | 'failed';
+
+/**
+ * True when a rejection is a cancellation rather than a real failure.
+ *
+ * Apollo aborts in-flight queries when the component unmounts or the user
+ * navigates away, rejecting the refetch promise with an `AbortError`
+ * (a `DOMException` in browsers, a plain `Error` in jsdom). Retrying or
+ * reporting these is pointless — the caller no longer exists (LS-502/LS-8506).
+ */
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
+}
+
 interface UseDraftWebSocketParams {
   leagueId: number | null;
   draftId: number | null;
@@ -360,43 +383,104 @@ export function useDraftWebSocket({
 
   // Reconnection recovery
   const wsWasConnected = useRef(false);
+  const wsHasEverConnected = useRef(false);
   useEffect(() => {
-    if (wsConnected && wsWasConnected.current && draftId) {
-      void refetchCurrentPick({ draftId }).catch((e: unknown) => {
-        LOGGER.error(
-          'Failed to refetch current pick after websocket reconnect',
-          String(e),
-        );
-      });
-      void refetchPickHistory().catch((e: unknown) => {
-        LOGGER.error(
-          'Failed to refetch pick history after websocket reconnect',
-          String(e),
-        );
-      });
-      void refetchAvailablePlayers().catch((e: unknown) => {
-        LOGGER.error(
-          'Failed to refetch available players after websocket reconnect',
-          String(e),
-        );
-      });
-      void refetchAutoPickStatuses().catch((e: unknown) => {
-        LOGGER.error(
-          'Failed to refetch auto-pick statuses after websocket reconnect',
-          String(e),
-        );
-      });
-      void refetchDraft().catch((e: unknown) => {
-        LOGGER.error(
-          'Failed to refetch draft after websocket reconnect',
-          String(e),
-        );
-      });
-    }
+    // Recover only on a genuine disconnect -> reconnect edge. The previous
+    // condition (`wsConnected && wsWasConnected.current`) was true on *every*
+    // re-run of this effect while connected, so it fired on the ordinary
+    // `draftId: null -> 42` transition during initial page load — issuing a
+    // duplicate set of refetches that the initial queries had already made,
+    // and mislabelling them as reconnect recovery (LS-8506).
+    const isReconnect =
+      wsConnected && !wsWasConnected.current && wsHasEverConnected.current;
     wsWasConnected.current = wsConnected;
+    if (wsConnected) wsHasEverConnected.current = true;
+    if (!isReconnect || draftId === null) return undefined;
+
+    let cancelled = false;
+    const pendingWaits = new Map<ReturnType<typeof setTimeout>, () => void>();
+
+    // Cleanup resolves pending waits rather than only clearing their timers, so
+    // a backoff suspended at unmount resumes once and exits via the `cancelled`
+    // check at the top of the retry loop instead of hanging forever.
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          pendingWaits.delete(timer);
+          resolve();
+        }, ms);
+        pendingWaits.set(timer, resolve);
+      });
+
+    /**
+     * Run one post-reconnect refetch, retrying transient failures with
+     * exponential backoff. The underlying error is logged as a structured
+     * object (not `String(e)`) so `name`/`stack`/Apollo's `graphQLErrors`
+     * survive into the Rollbar payload — stringifying it destroyed the cause
+     * and bypassed the `AbortError` noise filter in lib/rollbar (LS-8506).
+     */
+    const refetchWithRetry = async (
+      label: string,
+      run: () => Promise<unknown>,
+    ): Promise<ReconnectRefetchOutcome> => {
+      for (let attempt = 1; attempt <= RECONNECT_REFETCH_ATTEMPTS; attempt++) {
+        if (cancelled) return 'cancelled';
+        try {
+          await run();
+          return 'ok';
+        } catch (error: unknown) {
+          if (cancelled || isAbortError(error)) {
+            LOGGER.debug(
+              `Refetch of ${label} cancelled after websocket reconnect`,
+              { error },
+            );
+            return 'cancelled';
+          }
+          if (attempt === RECONNECT_REFETCH_ATTEMPTS) {
+            LOGGER.error(
+              `Failed to refetch ${label} after websocket reconnect`,
+              { attempts: attempt, error },
+            );
+            return 'failed';
+          }
+          await wait(RECONNECT_REFETCH_BASE_DELAY_MS * 2 ** (attempt - 1));
+        }
+      }
+      return 'failed';
+    };
+
+    void refetchWithRetry('current pick', () =>
+      refetchCurrentPick({ draftId }),
+    );
+    void refetchWithRetry('pick history', refetchPickHistory);
+    void refetchWithRetry('auto-pick statuses', refetchAutoPickStatuses);
+    void refetchWithRetry('draft', refetchDraft);
+    // The available-players list is the one stale-state a user can act on: an
+    // out-of-date board lets them try to draft an already-taken player. Warn
+    // them explicitly rather than failing silently.
+    void refetchWithRetry('available players', refetchAvailablePlayers).then(
+      (outcome) => {
+        if (outcome === 'failed' && !cancelled) {
+          showToast(
+            'Could not refresh the player list after reconnecting — it may be out of date. Reload the page before drafting.',
+            'warning',
+          );
+        }
+      },
+    );
+
+    return () => {
+      cancelled = true;
+      pendingWaits.forEach((resolve, timer) => {
+        clearTimeout(timer);
+        resolve();
+      });
+      pendingWaits.clear();
+    };
   }, [
     wsConnected,
     draftId,
+    showToast,
     refetchCurrentPick,
     refetchPickHistory,
     refetchAvailablePlayers,
