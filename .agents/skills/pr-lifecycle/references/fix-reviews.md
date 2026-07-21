@@ -23,7 +23,7 @@ This aims to keep most PRs to ≤ 2 review rounds by avoiding unnecessary re-rev
 
 ## Workflow (single PR)
 
-1. **Activate worktree context (FIRST)**: call `worktree_set({ key: "LS-####" })` (sibling worktrees) or `worktree_set({ key: "<absolute .claude/worktrees/... path>" })` (ephemeral worktrees). Do this before any git operations — it ensures `worktree_diff`, `worktree_commit`, and `worktree_push` target the correct worktree path. Never use raw `git -C <path> diff/commit/push` when a worktree MCP tool is available.
+1. **Activate worktree context (FIRST)**: call `worktree_set({ key: "LS-####" })` (sibling worktrees) or `worktree_set({ key: "<absolute .claude/worktrees/... path>" })` (ephemeral worktrees). Do this before any git operations — it ensures `worktree_diff`, `worktree_commit`, and `worktree_push` target the correct worktree path. Never use raw `git -C <path> diff/commit/push` when a worktree MCP tool is available. If this session did not create the PR, also stamp it for provenance: `bash scripts/link-pr-session.sh <PR#>` ([why](../SKILL.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570)).
 2. **Fetch threads**: `github_get_review_threads(number: <PR#>)`
 3. **Fix ALL threads before modifying files**: read every thread's `path`, `line`, and `body` first, then apply all fixes in one pass. Do not commit or push until all threads are addressed.
    - **Re-ground in ticket scope before applying any fix**: extract the Jira ticket key from the PR title (`LS-\d+` pattern), then call `jira_view(key: "LS-####")` and re-read the ticket's **Acceptance Criteria** and **Out of Scope** sections. Use them as a guardrail when triaging suggestions:

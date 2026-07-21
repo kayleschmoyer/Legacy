@@ -20,6 +20,7 @@ Unified single-PR remediation. Takes one PR number and drives it toward mergeabl
 1. **GitHub auth**: `github_auth_status()` must return `configured: true`. If not, stop and prompt.
 2. **Jira auth** (optional but recommended): `jira_auth_status()` — used to fetch ticket context before applying review fixes.
 3. **Worktree**: you must be in a worktree for the PR's branch. If not, use `worktree_attach({ branch: "<branch>" })` or create one. This is also what binds PR event notifications to the session: a session spawned on an auto-generated `claude/<name>` branch (chip or launcher worktree) is **not** connected to the PR. Either check out the PR's head branch and call `worktree_set` (see [drive.md Step 4](./drive.md#step-4-enter-worktree-local-only)), or treat the session as fire-and-forget — fix → push → re-arm `bot:ready-for-review` → report — and never end the turn "waiting for the next event": an unbound session is never woken (branch binding is cached at session start — anthropics/claude-code#18690).
+4. **Stamp the session onto the PR**: `bash scripts/link-pr-session.sh <PR#>` — leaves a provenance marker in the body and gives the desktop its best chance to link the session to the PR. See [pr-lifecycle SKILL.md § Agent-session marker](../SKILL.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570).
 
 ## Workflow
 

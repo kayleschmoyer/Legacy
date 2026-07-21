@@ -154,6 +154,12 @@ Then set up node_modules (required in both cases):
 node scripts/modules-pool/link.mjs
 ```
 
+Finally, stamp this session onto the PR (desktop linkage + provenance — see [pr-lifecycle SKILL.md § Agent-session marker](../SKILL.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570)):
+
+```
+bash scripts/link-pr-session.sh <PR#>
+```
+
 ### Step 5: Fix blocking issues
 
 Work through blockers in priority order. Treat each pass through Step 5 as a **remediation round**: gather the blockers that are already known, apply the needed fixes, validate once, push once, then re-enter the wait loop. Do not split already-known review and CI fixes into separate pushes unless the first push is required to reveal the next blocker.
@@ -317,6 +323,7 @@ Summarize:
 ## Gotchas
 
 - **`worktree_set` is required for native CI event routing** — Claude Code Desktop routes CI/PR push notifications to the session whose active worktree matches the branch. Without calling `worktree_set` after any checkout or attach, the session enters the Step 6 event loop but never receives events and spins indefinitely. Note: `worktree_set` requires a local worktree entry to exist; for sessions that cannot create a local checkout, native events are unavailable — `worktree_watch_pr` (LS-7904) will close this gap when shipped.
+- **`worktree_set` does NOT link the session to the PR in the desktop UI** — the session's branch association is snapshotted at creation, and MCP calls are invisible to the desktop's PR detection, so a pickup session's PR status bar usually stays empty. Stamp the PR with `bash scripts/link-pr-session.sh <PR#>` (Step 4) for provenance and the best available shot at linkage — but note the tested caveat in [pr-lifecycle SKILL.md § Agent-session marker](../SKILL.md#agent-session-marker-pr--session-linkage--provenance--one-home-ls-8570): a body edit alone has not been observed to trigger desktop linkage; an empty status bar after stamping is an upstream desktop limitation, not a workflow bug (LS-8570).
 - **Don't stop after the first fix** — the event loop is the core of this skill. A PR often needs multiple rounds (fix CI → new review → fix review → CI again → merge). Replying to a review or pushing a fix is a mid-loop event, never a stopping point — see [Terminal states](#terminal-states-the-only-places-this-loop-may-stop). The most common abandonment is exiting on an open `JUSTIFY:` or a `SKIPPED`/red CI pipeline.
 - **`mergeable: UNKNOWN` is not a blocker** — GitHub may still be computing. Wait for the next event rather than treating it as an error.
 - **Check Runs vs. Commit Statuses** — `github_retrigger_check` only works on Check Runs. `bot-review` uses the Statuses API. If "check not found", use `github_list_commit_statuses({ prNumber: <PR#> })` instead. See pr-lifecycle SKILL.md Critical Rule 8.

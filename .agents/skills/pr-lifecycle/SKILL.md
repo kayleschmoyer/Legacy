@@ -105,6 +105,27 @@ Orchestrate maintenance across all open PRs: one-pass triage that handles API-on
 
 > Details: [references/sweep.md](references/sweep.md) (local, chip-dispatch) · [references/sweep-cloud.md](references/sweep-cloud.md) (cloud, API-only). Dependabot queue triage: [sweep-dependabot skill](../sweep-dependabot/SKILL.md).
 
+### Agent-session marker (PR ↔ session linkage + provenance) — one home, LS-8570
+
+Any local session that picks up an existing PR it did not create (drive-pr, fix-pr, respond-to-review, sweep chips) must stamp itself onto the PR before entering the work loop:
+
+```bash
+bash scripts/link-pr-session.sh <PR#>
+```
+
+The script appends one idempotent marker line to the PR body via `gh pr edit --body-file`:
+
+```
+<!-- agent-session: <CLAUDE_CODE_SESSION_ID> (<YYYY-MM-DD>) -->
+```
+
+Two effects, and why `gh` (not MCP) is load-bearing here:
+
+- **Provenance (guaranteed).** Marker lines accumulate over the PR's life — a durable record of every agent session that worked it, resolvable back to transcripts via the session id.
+- **Desktop linkage (best-effort).** Claude Code Desktop links a session to a PR by detecting a PR on the _session's own branch_, or by parsing **harness-visible** `gh`/`git` PR interactions. MCP connector calls (`github_open_pr`, `github_manage_labels`, …) are invisible to the harness and never establish linkage — which is why pickup sessions historically showed an empty PR status bar. Caveat from live testing (desktop 2.1.215, LS-8570): `gh pr create` in-session reliably links (any branch) and Bash `git push` to the PR branch has been observed to link, but a `gh pr edit` body edit alone did **not**. Treat foreign-branch status-bar linkage as best-effort — the stamp is still the right first move (it is the only harness-visible interaction most pickup sessions perform), and an empty status bar after stamping is an upstream desktop limitation, not a workflow bug.
+
+Skip only when: the PR is on the session's own branch (linkage is automatic — though stamping is still harmless and keeps provenance complete), or the environment has no `gh`/`CLAUDE_CODE_SESSION_ID` (cloud/API-only sessions — the script fails loudly and the miss is acceptable).
+
 ## Sub-skills
 
 This skill consolidates the full PR-lifecycle cluster. Load the matching reference for your specific trigger:
