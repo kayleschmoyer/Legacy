@@ -2016,4 +2016,149 @@ describe('League Mutations', () => {
       );
     });
   });
+
+  describe('createLeagueAndTeams mutation — salaryCap validation (LS-6115)', () => {
+    const adminContext = {
+      user: { id: 1, isAdmin: true },
+      db: mockDb,
+    };
+
+    const capInput = {
+      leagueName: 'Cap League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+      salaryCapEnabled: true,
+    };
+
+    it('rejects salaryCap: 0 on the create path', async () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { ...capInput, salaryCap: 0 } },
+          adminContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Salary cap must be between');
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a negative salaryCap on the create path', async () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { ...capInput, salaryCap: -5 } },
+          adminContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Salary cap must be between');
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects an absurdly large salaryCap on the create path', async () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { ...capInput, salaryCap: 9_999_999_999 } },
+          adminContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Salary cap must be between');
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects a missing salaryCap when salaryCapEnabled is true on the create path', async () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: capInput },
+          adminContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Salary cap must be between');
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a valid salaryCap through on the create path', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 3,
+          name: 'Cap League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        { input: { ...capInput, salaryCap: 260 } },
+        adminContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ salaryCap: 260, salaryCapEnabled: true }),
+      );
+    });
+
+    it('rejects an absurdly large salaryCap on the update path even when the cap is currently disabled (LS-6115)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // 1) membership lookup → commissioner, 2) current league cap state →
+      // disabled, so the entitlement gate is skipped and the value check is
+      // reached directly.
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ salaryCapEnabled: false }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1, salaryCap: 9_999_999_999 } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Salary cap must be between');
+    });
+  });
 });

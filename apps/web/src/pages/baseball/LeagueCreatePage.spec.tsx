@@ -2621,3 +2621,65 @@ describe('LeagueCreatePage — submit error banner auto-scroll (LS-6066)', () =>
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('validateFormFull — salaryCap validation (LS-6115)', () => {
+  const baseForm: CreateLeagueFormData = {
+    sport: 'baseball',
+    leagueName: 'Test League',
+    numberOfTeams: 12,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'standard',
+    draftOrder: 'snake',
+    maxRosterSize: 26,
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
+    isPublic: false,
+    gamesPerMatchup: 5,
+    baseballEraFilter: 'all',
+    baseballHofOnly: false,
+    salaryCapEnabled: true,
+    salaryCap: undefined,
+    auctionBudget: 200,
+    auctionMinBid: 1,
+    pickTimeLimitSeconds: 120,
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
+  };
+
+  it('requires a salaryCap when the cap is enabled', () => {
+    const errs = validateFormFull({ ...baseForm, salaryCap: undefined });
+    expect(errs.salaryCap).toBe('Salary cap amount is required.');
+  });
+
+  it('rejects salaryCap: 0 (LS-6115 — previously passed validation)', () => {
+    const errs = validateFormFull({ ...baseForm, salaryCap: 0 });
+    expect(errs.salaryCap).toMatch(/between/);
+  });
+
+  it('rejects a negative salaryCap', () => {
+    const errs = validateFormFull({ ...baseForm, salaryCap: -100 });
+    expect(errs.salaryCap).toMatch(/between/);
+  });
+
+  it('rejects an absurdly large salaryCap', () => {
+    const errs = validateFormFull({ ...baseForm, salaryCap: 9_999_999_999 });
+    expect(errs.salaryCap).toMatch(/between/);
+  });
+
+  it('accepts a valid salaryCap', () => {
+    const errs = validateFormFull({ ...baseForm, salaryCap: 260 });
+    expect(errs.salaryCap).toBeUndefined();
+  });
+
+  it('does not validate salaryCap when the cap is disabled', () => {
+    const errs = validateFormFull({
+      ...baseForm,
+      salaryCapEnabled: false,
+      salaryCap: 0,
+    });
+    expect(errs.salaryCap).toBeUndefined();
+  });
+});

@@ -67,6 +67,8 @@ import {
   DEFAULT_NUM_DIVISIONS,
   FREE_LEAGUE_LIMIT,
   MAX_LEAGUE_NAME_LENGTH,
+  MAX_SALARY_CAP,
+  MIN_SALARY_CAP,
 } from '../../constants/league';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
@@ -436,6 +438,8 @@ const LEAGUE_FORM_MESSAGES = {
     'Custom era years should only be set when Custom Era is selected.',
   draftDateInPast: 'Draft date must be in the future.',
   salaryCapRequired: 'Salary cap amount is required.',
+  salaryCapOutOfRange: (min: number, max: number) =>
+    `Salary cap must be between ${min} and ${max}.`,
   salaryFloorNegative: 'Salary floor cannot be negative.',
   luxuryTaxThresholdNegative: 'Luxury tax threshold cannot be negative.',
   minSalaryTooLow: 'Minimum salary must be at least 1.',
@@ -528,9 +532,14 @@ export function validateFormFull(
   }
   if (f.draftDate && f.draftDate < new Date())
     errs.draftDate = LEAGUE_FORM_MESSAGES.draftDateInPast;
-  if (f.salaryCapEnabled && f.salaryCap === undefined)
-    errs.salaryCap = LEAGUE_FORM_MESSAGES.salaryCapRequired;
   if (f.salaryCapEnabled) {
+    if (f.salaryCap === undefined)
+      errs.salaryCap = LEAGUE_FORM_MESSAGES.salaryCapRequired;
+    else if (f.salaryCap < MIN_SALARY_CAP || f.salaryCap > MAX_SALARY_CAP)
+      errs.salaryCap = LEAGUE_FORM_MESSAGES.salaryCapOutOfRange(
+        MIN_SALARY_CAP,
+        MAX_SALARY_CAP,
+      );
     if (f.salaryFloor !== undefined && f.salaryFloor < 0)
       errs.salaryFloor = LEAGUE_FORM_MESSAGES.salaryFloorNegative;
     if (f.luxuryTaxThreshold !== undefined && f.luxuryTaxThreshold < 0)

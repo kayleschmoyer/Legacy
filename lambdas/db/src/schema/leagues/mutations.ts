@@ -123,6 +123,8 @@ export function validateAuctionMinBid(value: number | null | undefined): void {
     );
   }
 }
+const MIN_SALARY_CAP = 1;
+const MAX_SALARY_CAP = 1_000_000_000;
 
 // ── Input / payload types ──────────────────────────────────────────────────
 
@@ -367,6 +369,15 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           ENTITLEMENTS.salary_cap_leagues,
           'Salary cap leagues require a premium subscription. Upgrade to unlock salary cap features.',
         );
+        if (
+          inputSalaryCap == null ||
+          inputSalaryCap < MIN_SALARY_CAP ||
+          inputSalaryCap > MAX_SALARY_CAP
+        ) {
+          throw UserInputError(
+            `Salary cap must be between ${MIN_SALARY_CAP} and ${MAX_SALARY_CAP}`,
+          );
+        }
       }
 
       // Auction draft is a premium selection method (LS-5159). Free users
@@ -2314,8 +2325,13 @@ builder.mutationField('updateLeagueSettings', (t) =>
       }
 
       if (salaryCap !== undefined) {
-        if (salaryCap !== null && salaryCap < 1) {
-          throw new Error('Salary cap must be a positive integer');
+        if (
+          salaryCap !== null &&
+          (salaryCap < MIN_SALARY_CAP || salaryCap > MAX_SALARY_CAP)
+        ) {
+          throw UserInputError(
+            `Salary cap must be between ${MIN_SALARY_CAP} and ${MAX_SALARY_CAP}`,
+          );
         }
         leagueUpdate.salaryCap = salaryCap ?? null;
         if (salaryCap !== null)
