@@ -174,6 +174,12 @@ const DEFAULT_MOBILE_OAUTH_CONFIG = {
 jest.mock('./mobileOAuthConfig', () => ({
   getMobileOAuthConfig: (...args: unknown[]): unknown =>
     mockGetMobileOAuthConfig(...args),
+  // validateOAuthProxyUrl is called inside successHandler as defense-in-depth.
+  // The real implementation skips production checks under __DEV__ (Jest), so a
+  // pass-through that only throws on undefined/empty is equivalent behavior.
+  validateOAuthProxyUrl: (url: string | undefined): void => {
+    if (!url) throw new Error('OAuth proxy URL is not configured');
+  },
 }));
 
 // Mock analytics so failure-tracking calls don't hit Firebase in tests
@@ -494,6 +500,26 @@ describe('AuthHooks', () => {
       expect(mockTrackGoogleSignInFailure).toHaveBeenCalledWith(
         'UNKNOWN_ERROR',
       );
+    });
+
+    it('calls onFailure when the code exchange fetch is aborted', async () => {
+      // Verify the abort path: when the AbortController fires (e.g. after the
+      // 15 s timeout), fetch rejects with AbortError and onFailure is called.
+      // We test the rejection handler directly rather than via fake timers to
+      // avoid interaction issues between jest fake timers and act().
+      mockSignIn.mockResolvedValue({ serverAuthCode: 'auth-code-123' });
+      mockFetch.mockRejectedValue(
+        new DOMException('The operation was aborted.', 'AbortError'),
+      );
+
+      const onFailure = jest.fn();
+      const { result } = renderHook(() => useAuthHandlers({ onFailure }));
+
+      await act(async () => {
+        await result.current.googleLogin();
+      });
+
+      expect(onFailure).toHaveBeenCalled();
     });
 
     // MOB-020: DEVELOPER_ERROR (Google status code 10) means the signing cert

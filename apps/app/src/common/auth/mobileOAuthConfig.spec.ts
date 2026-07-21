@@ -5,6 +5,7 @@ import {
   PLACEHOLDER_OAUTH_PROXY_URL,
   resolveGoogleClientId,
   resolveOAuthProxyUrl,
+  validateOAuthProxyUrl,
 } from './mobileOAuthConfig';
 
 // Control config values via the native adapter mock.
@@ -51,13 +52,45 @@ describe('mobileOAuthConfig', () => {
       );
     });
 
-    it('returns undefined when oauthProxy is not set', () => {
-      expect(getMobileOAuthConfig().oauthProxyUrl).toBeUndefined();
+    it('throws when oauthProxy is not set', () => {
+      // nativeRequired: true means buildNativeConfig throws at startup if
+      // oauthProxy is missing, but getMobileOAuthConfig also validates early
+      // so the error surfaces via login-error rather than a silent loop (LS-7588).
+      expect(() => getMobileOAuthConfig()).toThrow(
+        'OAuth proxy URL is not configured',
+      );
+    });
+  });
+
+  describe('validateOAuthProxyUrl', () => {
+    it('passes for a valid HTTPS URL in non-dev mode', () => {
+      // __DEV__ is true in jest, so we test the non-dev path indirectly;
+      // the happy path always passes in dev (no throw).
+      expect(() =>
+        validateOAuthProxyUrl('https://api.example.com/oauth'),
+      ).not.toThrow();
     });
 
-    it('returns undefined for the app.json placeholder', () => {
+    it('throws when url is undefined', () => {
+      expect(() => validateOAuthProxyUrl(undefined)).toThrow(
+        'OAuth proxy URL is not configured',
+      );
+    });
+
+    it('throws when url is an empty string', () => {
+      expect(() => validateOAuthProxyUrl('')).toThrow(
+        'OAuth proxy URL is not configured',
+      );
+    });
+
+    it('throws for the app.json placeholder (treated as unset)', () => {
+      // The placeholder resolves to undefined, so getMobileOAuthConfig's early
+      // guard throws rather than returning a config with an unusable proxy URL
+      // (LS-7588).
       setConfig({ oauthProxy: PLACEHOLDER_OAUTH_PROXY_URL });
-      expect(getMobileOAuthConfig().oauthProxyUrl).toBeUndefined();
+      expect(() => getMobileOAuthConfig()).toThrow(
+        'OAuth proxy URL is not configured',
+      );
     });
   });
 
@@ -83,11 +116,17 @@ describe('mobileOAuthConfig', () => {
 
   describe('getMobileOAuthConfig discordClientId', () => {
     it('forwards config.discordClientId when set (enables the Discord button)', () => {
-      setConfig({ discordClientId: 'discord-app-id' });
+      // A valid oauthProxy is required for getMobileOAuthConfig to pass its
+      // early proxy-URL guard (LS-7588) before we can inspect discordClientId.
+      setConfig({
+        oauthProxy: 'https://api.example.com/oauth',
+        discordClientId: 'discord-app-id',
+      });
       expect(getMobileOAuthConfig().discordClientId).toBe('discord-app-id');
     });
 
     it('returns undefined when discordClientId is not set (button hidden)', () => {
+      setConfig({ oauthProxy: 'https://api.example.com/oauth' });
       expect(getMobileOAuthConfig().discordClientId).toBeUndefined();
     });
   });

@@ -16,7 +16,10 @@ import {
 import { getEnvVarOptional } from '@legacy-sports/env-utilities';
 import { LOGGER } from '@legacy-sports/logging';
 import { captureError } from '@legacy-sports/rollbar/native';
-import { getMobileOAuthConfig } from './mobileOAuthConfig';
+import {
+  getMobileOAuthConfig,
+  validateOAuthProxyUrl,
+} from './mobileOAuthConfig';
 import { APPLE_SIGN_IN_CANCELLED, signInWithApple } from './appleAuth';
 import { DISCORD_SIGN_IN_CANCELLED, signInWithDiscord } from './discordAuth';
 import { onSessionExpired } from './sessionEvents';
@@ -67,6 +70,11 @@ function notifyAuthStateSubscribers(): void {
   }
 }
 
+// Maximum time to wait for the OAuth code exchange before aborting (LS-7588).
+// A hung fetch to a misconfigured URL (e.g. localhost) would otherwise leave
+// the user in an indeterminate state with no error and no spinner.
+const OAUTH_EXCHANGE_TIMEOUT_MS = 15_000;
+
 // Use platform-specific secure storage from platform-components
 const secureStorage: ISecureStorage = SecureStorageProvider;
 
@@ -90,7 +98,10 @@ export async function readKeychainValue(
   try {
     return await secureStorage.getItem(secret);
   } catch (error) {
-    LOGGER.error('Error reading secure storage:', String(error));
+    LOGGER.error(
+      'Error reading secure storage:',
+      error instanceof Error ? error : new Error(String(error)),
+    );
     return null;
   }
 }
@@ -157,11 +168,18 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
 
   const successHandler = useCallback(
     async (response: OAuthResponse) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        OAUTH_EXCHANGE_TIMEOUT_MS,
+      );
+
       try {
         const { oauthProxyUrl } = getMobileOAuthConfig();
-        if (!oauthProxyUrl) {
-          throw new Error('OAuth proxy URL is not configured');
-        }
+        // validateOAuthProxyUrl is called inside getMobileOAuthConfig; calling it
+        // again here narrows the type and provides defence-in-depth for any path
+        // that bypasses getMobileOAuthConfig (e.g. tests, future refactors).
+        validateOAuthProxyUrl(oauthProxyUrl);
 
         // Payload assembly (incl. the serverAuthCode/redirect_uri
         // disambiguation) and transport now live in the shared
@@ -169,7 +187,9 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
         // (the root cause of LS-5082 and LS-5084). Only the mobile-specific
         // token storage (secure storage) stays here.
         const authPayload = buildGoogleAuthPayload(response);
-        const result = await exchangeGoogleCode(oauthProxyUrl, authPayload);
+        const result = await exchangeGoogleCode(oauthProxyUrl, authPayload, {
+          signal: controller.signal,
+        });
 
         await storeToken({ jwt: result.jwt });
 
@@ -177,11 +197,17 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
           onSuccess();
         }
       } catch (error) {
-        // Log full detail internally, surface only a generic message to the UI.
-        LOGGER.error('Authentication success handler error:', String(error));
+        // Log full detail internally (LS-7588: surface in logcat for future
+        // investigations), surface only a generic message to the UI.
+        LOGGER.error(
+          'OAuth code exchange failed:',
+          error instanceof Error ? error : new Error(String(error)),
+        );
         if (onFailure) {
           onFailure(GENERIC_AUTH_ERROR);
         }
+      } finally {
+        clearTimeout(timeoutId);
       }
     },
     [onSuccess, onFailure],

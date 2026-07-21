@@ -207,6 +207,7 @@ export const APP_TEST_IDS = {
   loginTitle: 'login-title',
   loginError: 'login-error',
   loginLoading: 'login-loading',
+  loginOAuthExchanging: 'login-oauth-exchanging',
   homeScreen: 'home-screen',
   homeTitle: 'home-title',
   homeContent: 'home-content',

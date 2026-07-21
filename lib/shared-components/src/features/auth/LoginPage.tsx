@@ -319,7 +319,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               ) : (
                 <BrandIcon name="google" size={20} decorative />
               )}
-              <Text color="#1f1f1f" fontWeight="700" fontSize={14}>
+              <Text
+                testID={
+                  isGoogleLoading || isConfiguring
+                    ? 'login-oauth-exchanging'
+                    : undefined
+                }
+                color="#1f1f1f"
+                fontWeight="700"
+                fontSize={14}
+              >
                 {isGoogleLoading
                   ? 'Connecting to Google…'
                   : isConfiguring
