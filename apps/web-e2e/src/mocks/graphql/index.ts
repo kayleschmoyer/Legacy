@@ -80,6 +80,15 @@ export {
 } from './player.mocks';
 
 export {
+  type MockLeagueAnalytics,
+  type MockTeamStatistics,
+  type MockPowerRanking,
+  type MockPlayoffProjection,
+  mockLeagueAnalytics,
+  leagueAnalyticsResponse,
+} from './analytics.mocks';
+
+export {
   type MockTeamStanding,
   type MockPlayoffMatchup,
   type MockPlayoffBracket,

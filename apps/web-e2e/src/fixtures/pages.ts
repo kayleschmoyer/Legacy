@@ -9,6 +9,7 @@ import {
 } from './auth-enhanced';
 import { test as leagueDataBase } from './auth';
 import {
+  AnalyticsPage,
   DiscordCallbackScreen,
   DraftPage,
   ForgotPasswordPage,
@@ -42,6 +43,7 @@ import { PlaywrightWebDriver } from '../driver';
  * that stays in fixtures and route handlers (ADR-0015 §6).
  */
 export interface PageObjectFixtures {
+  analyticsPage: AnalyticsPage;
   draftPage: DraftPage;
   forgotPasswordPage: ForgotPasswordPage;
   resetPasswordPage: ResetPasswordPage;
@@ -76,6 +78,12 @@ export interface PageObjectFixtures {
  * custom specs receive the same page objects.
  */
 const pageObjects = {
+  analyticsPage: async (
+    { page }: { page: Page },
+    use: (pageObject: AnalyticsPage) => Promise<void>,
+  ) => {
+    await use(new AnalyticsPage(new PlaywrightWebDriver(page)));
+  },
   draftPage: async (
     { page }: { page: Page },
     use: (pageObject: DraftPage) => Promise<void>,
