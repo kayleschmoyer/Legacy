@@ -393,6 +393,43 @@ test.describe('Form field accessibility @regression', () => {
       );
     });
 
+    test('league name aria-describedby is wired to non-empty hint text after validation (LS-6095)', async ({
+      page,
+    }) => {
+      await setupLeagueCreationMock(page);
+      await page.goto('/baseball/league/create');
+      await page.waitForLoadState('networkidle');
+
+      // Button is always enabled (only disabled while loading). Fill a short name (<3 chars)
+      // so client-side validation fires and the page stays on /baseball/league/create.
+      const nameInput = page.getByPlaceholder('Enter your league name');
+      await nameInput.fill('AB');
+
+      // Trigger validation
+      const submitBtn = page.getByRole('button', { name: /create/i }).first();
+      await expect(submitBtn).toBeVisible();
+      await expect(submitBtn).toBeEnabled();
+      await submitBtn.click();
+      await page.waitForTimeout(300);
+
+      const validationDetails = await evaluateValidationA11y(page);
+      const leagueNameField = validationDetails.find(
+        (f) => f.id === 'league-name-input',
+      );
+
+      expect(leagueNameField).toBeDefined();
+      expect(leagueNameField?.ariaDescribedBy?.trim()).not.toEqual('');
+      expect(leagueNameField?.describedByElements.length).toBeGreaterThan(0);
+      for (const described of leagueNameField?.describedByElements ?? []) {
+        expect(described.exists).toBe(true);
+        expect(described.textContent.length).toBeGreaterThan(0);
+      }
+
+      await expect(page.locator('body')).not.toContainText(
+        'Unexpected Application Error',
+      );
+    });
+
     test('form structure is present on league creation page', async ({
       page,
     }) => {

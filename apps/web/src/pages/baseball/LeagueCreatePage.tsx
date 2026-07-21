@@ -1023,6 +1023,7 @@ interface FieldRowProps {
   label: string;
   labelId?: string;
   hint?: string;
+  hintId?: string;
   required?: boolean;
   /** Stable test id for scoping E2E locators to this field's controls. */
   testId?: string;
@@ -1033,6 +1034,7 @@ function FieldRow({
   label,
   labelId,
   hint,
+  hintId,
   required,
   testId,
   children,
@@ -1064,7 +1066,7 @@ function FieldRow({
       </XStack>
       {children}
       {hint && (
-        <Text fontFamily="$body" fontSize={12} color="$gray9">
+        <Text id={hintId} fontFamily="$body" fontSize={12} color="$gray9">
           {hint}
         </Text>
       )}
@@ -2304,10 +2306,13 @@ export function LeagueCreatePage(): React.JSX.Element {
                       labelId="league-name-label"
                       required
                       hint="3–50 characters. Shown on standings, invites, and the draft board."
+                      hintId="league-name-hint"
                     >
                       <Input
                         id="league-name-input"
                         aria-labelledby="league-name-label"
+                        aria-describedby="league-name-hint"
+                        aria-invalid={!!validationErrors.leagueName}
                         size="$4"
                         testID="create-league-name-input"
                         placeholder="Enter your league name"
@@ -2556,6 +2561,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                     <FieldRow
                       label="Games Per Matchup"
                       hint={`Games played in each weekly matchup. Max ${GAMES_PER_MATCHUP_BY_SPORT[formData.sport]?.max ?? 162} for ${formData.sport}.`}
+                      hintId="games-per-matchup-hint"
                     >
                       <XStack alignItems="center" gap="$3">
                         <Input
@@ -2584,9 +2590,20 @@ export function LeagueCreatePage(): React.JSX.Element {
                           backgroundColor="$color1"
                           disabled={isFormDisabled}
                           width={100}
+                          aria-describedby={
+                            validationErrors.gamesPerMatchup
+                              ? 'games-per-matchup-hint games-per-matchup-error'
+                              : 'games-per-matchup-hint'
+                          }
+                          aria-invalid={!!validationErrors.gamesPerMatchup}
                         />
                         {validationErrors.gamesPerMatchup && (
-                          <Text fontFamily="$body" fontSize={12} color="$red10">
+                          <Text
+                            id="games-per-matchup-error"
+                            fontFamily="$body"
+                            fontSize={12}
+                            color="$red10"
+                          >
                             {validationErrors.gamesPerMatchup}
                           </Text>
                         )}
@@ -3051,6 +3068,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                         <FieldRow
                           label="Auction Budget per Team"
                           hint={`Total dollars each manager has to fill a roster. ${AUCTION_BUDGET_RANGE.min}–${AUCTION_BUDGET_RANGE.max}.`}
+                          hintId="auction-budget-hint"
                         >
                           <Input
                             size="$3"
@@ -3072,11 +3090,13 @@ export function LeagueCreatePage(): React.JSX.Element {
                                 : '$borderColor'
                             }
                             disabled={isFormDisabled}
+                            aria-describedby="auction-budget-hint"
                           />
                         </FieldRow>
                         <FieldRow
                           label="Minimum Bid"
                           hint={`Lowest opening bid accepted. ${AUCTION_MIN_BID_RANGE.min}–${AUCTION_MIN_BID_RANGE.max}.`}
+                          hintId="auction-min-bid-hint"
                         >
                           <XStack alignItems="center" gap="$3">
                             <Input
@@ -3099,9 +3119,16 @@ export function LeagueCreatePage(): React.JSX.Element {
                                   : '$borderColor'
                               }
                               disabled={isFormDisabled}
+                              aria-describedby={
+                                validationErrors.auctionMinBid
+                                  ? 'auction-min-bid-hint auction-min-bid-error'
+                                  : 'auction-min-bid-hint'
+                              }
+                              aria-invalid={!!validationErrors.auctionMinBid}
                             />
                             {validationErrors.auctionMinBid && (
                               <Text
+                                id="auction-min-bid-error"
                                 fontFamily="$body"
                                 fontSize={12}
                                 color="$red10"
