@@ -31,7 +31,7 @@
  *
  * Usage:
  *   node scripts/modules-pool/link.mjs [--worktree=<path>] [--main-repo=<path>]
- *                                      [--no-salt] [--print-hash]
+ *                                      [--no-salt] [--print-hash] [--check] [--rebuild]
  *
  * --worktree    Absolute path to the worktree. Defaults to cwd.
  * --main-repo   Absolute path to the main repo root (holds .modules-pool). Auto-
@@ -39,6 +39,16 @@
  *               sibling `<repo>.worktrees/<name>` layouts, or the main repo itself).
  * --no-salt     Hash the lockfile only (omit the pnpm version salt).
  * --print-hash  Print the resolved hash and exit (no filesystem changes).
+ * --check       Doctor mode: run the deep health check on this lockfile's slot,
+ *               print every finding, and exit 0 (healthy) / 1 (unhealthy or
+ *               missing). No filesystem changes.
+ * --rebuild     Quarantine this lockfile's slot (rename to <hash>.corrupt-<ts>)
+ *               even if it passes the health check, then re-materialise. Use to
+ *               force recovery from corruption the health check cannot see.
+ *
+ * Corruption recovery is otherwise automatic: an unhealthy slot (orphan pnpm
+ * `*_tmp_*` dirs, packages missing package.json — the LS-8546/LS-8548 interrupted-
+ * install signature) is quarantined and rebuilt on the next plain run.
  */
 
 import {
@@ -109,11 +119,34 @@ console.log(`  pool     : ${poolRoot}`);
 console.log(`  hash     : ${hash}`);
 console.log('');
 
-if (isHealthy(slotNm)) {
+const slotState = assessSlot(slotNm);
+
+if (args['check']) {
+  if (slotState.healthy) {
+    console.log('[check] slot is healthy.');
+    process.exit(0);
+  }
+  console.log('[check] slot is UNHEALTHY:');
+  for (const f of slotState.findings) console.log(`  - ${f}`);
+  console.log('');
+  console.log(
+    'Re-run without --check to quarantine and rebuild it automatically.',
+  );
+  process.exit(1);
+}
+
+if (slotState.healthy && !args['rebuild']) {
   console.log('[hit] pool slot already built — linking.');
   linkWorktreeToSlot(slotNm);
   console.log('[ok] node_modules → pool slot (cache hit).');
 } else {
+  if (existsSync(slotDir)) {
+    quarantineSlot(
+      args['rebuild'] && slotState.healthy
+        ? ['--rebuild requested']
+        : slotState.findings,
+    );
+  }
   console.log('[miss] no healthy slot for this lockfile — materialising.');
   materialiseSlot(noFrozenLockfile);
   linkWorktreeToSlot(slotNm);
@@ -142,10 +175,12 @@ function materialiseSlot(noFrozen = false) {
   console.log(`[install] pnpm install ${installFlag} (in worktree)…`);
   pnpmInstall(worktree, noFrozen);
 
-  if (!isHealthy(nmPath)) {
+  const fresh = assessSlot(nmPath);
+  if (!fresh.healthy) {
     fail(
-      'pnpm install completed but worktree node_modules is not healthy ' +
-        '(missing nx or empty .bin). Aborting before publish.',
+      'pnpm install completed but worktree node_modules is not healthy. ' +
+        'Aborting before publish. Findings:\n  - ' +
+        fresh.findings.join('\n  - '),
     );
   }
 
@@ -268,14 +303,139 @@ function readPackageManager(wt) {
   }
 }
 
-/** A node_modules tree is healthy if nx is present and .bin is populated. */
+/** A node_modules tree is healthy if it passes the deep assessment. */
 function isHealthy(nm) {
+  return assessSlot(nm).healthy;
+}
+
+/**
+ * Deep health assessment of a node_modules tree. Returns
+ * `{ healthy: boolean, findings: string[] }` — findings name each defect.
+ *
+ * Beyond the original quick checks (nx present, .bin populated, path
+ * traversable), it scans for the corruption signature an interrupted install
+ * leaves when it writes through a consumer symlink into a shared slot
+ * (LS-8546/LS-8548): orphan `<name>_tmp_<pid>` staging dirs from pnpm's
+ * atomic-rename, and package dirs missing package.json. The scan covers
+ * top-level packages and one level into @scopes; `.pnpm` children are
+ * name-checked only (a single readdir, no per-entry stats) to keep the cost on
+ * every session start to one readdir pass + one stat per package (~a few
+ * hundred ms worst-case on Windows).
+ */
+function assessSlot(nm) {
+  const findings = [];
+  if (!existsSync(nm)) {
+    return { healthy: false, findings: ['slot not built'] };
+  }
+  if (!existsSync(join(nm, 'nx'))) findings.push('nx package missing');
   try {
-    if (!existsSync(join(nm, 'nx'))) return false;
-    if (readdirSync(join(nm, '.bin')).length === 0) return false;
-    return process.platform === 'win32' ? winPathIsContainer(nm) : true;
+    if (readdirSync(join(nm, '.bin')).length === 0)
+      findings.push('.bin is empty');
   } catch {
-    return false;
+    findings.push('.bin missing or unreadable');
+  }
+  if (process.platform === 'win32' && !winPathIsContainer(nm)) {
+    findings.push('path is not a traversable directory');
+  }
+  findings.push(...findCorruption(nm));
+  return { healthy: findings.length === 0, findings };
+}
+
+function findCorruption(nm) {
+  // pnpm's interrupted-install staging-dir name pattern: `<name>_tmp_<pid>`.
+  // Anchored to the end so a legitimate package whose name merely contains
+  // `_tmp_<digits>` (e.g. `.pnpm/x_tmp_1@1.0.0`) is not flagged.
+  // (A function-local const: the main flow runs before module-level consts
+  // this far down would be initialised — only function declarations hoist.)
+  const TMP_DIR_RE = /_tmp_\d+$/;
+  const findings = [];
+  let entries;
+  try {
+    entries = readdirSync(nm);
+  } catch (err) {
+    return [`cannot read node_modules: ${String(err.message ?? err)}`];
+  }
+  for (const name of entries) {
+    if (name.startsWith('.')) {
+      // Dot entries are pnpm-internal (.bin, .pnpm, .modules.yaml, caches).
+      // .pnpm can hold thousands of entries — name-scan only, no stats.
+      if (name === '.pnpm') {
+        for (const sub of safeReaddirNames(join(nm, '.pnpm'))) {
+          if (TMP_DIR_RE.test(sub))
+            findings.push(
+              `.pnpm/${sub}: orphan _tmp_ dir (interrupted install)`,
+            );
+        }
+      }
+      continue;
+    }
+    if (TMP_DIR_RE.test(name)) {
+      findings.push(`${name}: orphan _tmp_ dir (interrupted install)`);
+      continue;
+    }
+    if (name.startsWith('@')) {
+      for (const sub of safeReaddirNames(join(nm, name))) {
+        if (TMP_DIR_RE.test(sub)) {
+          findings.push(
+            `${name}/${sub}: orphan _tmp_ dir (interrupted install)`,
+          );
+          continue;
+        }
+        checkPackageDir(join(nm, name, sub), `${name}/${sub}`, findings);
+      }
+      continue;
+    }
+    checkPackageDir(join(nm, name), name, findings);
+  }
+  return findings;
+}
+
+/**
+ * A package entry is corrupt when it is a directory (after following symlinks —
+ * hoisted top-level packages are links into .pnpm) without a package.json, or a
+ * broken symlink. Plain files (stray READMEs etc.) are ignored.
+ */
+function checkPackageDir(dir, label, findings) {
+  let st;
+  try {
+    st = statSync(dir);
+  } catch {
+    findings.push(
+      `${label}: broken entry (unresolvable symlink or unreadable)`,
+    );
+    return;
+  }
+  if (!st.isDirectory()) return;
+  if (!existsSync(join(dir, 'package.json')))
+    findings.push(`${label}: missing package.json`);
+}
+
+/**
+ * Rename an unhealthy slot aside so materialisation publishes into a clean
+ * path. The quarantined copy (`<hash>.corrupt-<ts>`) is never in gc's live set,
+ * so `modules-pool/gc.mjs` reaps it once it ages out — no manual cleanup needed.
+ */
+function quarantineSlot(findings) {
+  const dest = `${slotDir}.corrupt-${Date.now()}`;
+  console.log('[quarantine] slot is unhealthy:');
+  for (const f of findings) console.log(`  - ${f}`);
+  console.log(`  renaming aside → ${dest}`);
+  try {
+    renameSync(slotDir, dest);
+  } catch (err) {
+    fail(
+      `Failed to quarantine the corrupt slot: ${String(err.message ?? err)}\n` +
+        'A process is likely holding files in it open (nx daemon, node, an editor).\n' +
+        'Stop those processes (e.g. `make kill-stale`) and re-run this script.',
+    );
+  }
+}
+
+function safeReaddirNames(p) {
+  try {
+    return readdirSync(p);
+  } catch {
+    return [];
   }
 }
 

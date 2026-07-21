@@ -69,6 +69,18 @@ if (userAgent && !userAgent.startsWith('pnpm')) {
 const nmPath = path.join(__dirname, '..', 'node_modules');
 
 /**
+ * True when a node_modules symlink points into the shared modules pool
+ * (<main-repo>/.modules-pool/<hash>/node_modules). Mirrors .pnpmfile.cjs.
+ */
+function isPoolTarget(target) {
+  const resolved = path.resolve(path.dirname(nmPath), target);
+  const needle = `${path.sep}.modules-pool${path.sep}`;
+  return process.platform === 'win32'
+    ? resolved.toLowerCase().includes(needle.toLowerCase())
+    : resolved.includes(needle);
+}
+
+/**
  * Check if lockfiles have uncommitted changes (staged or unstaged).
  * If clean, `pnpm install` is deterministic — it just materializes what's
  * already committed. Safe for symlinked worktrees sharing the same lockfile.
@@ -86,12 +98,56 @@ function isLockfileDirty() {
   }
 }
 
-if (!forceInstall) {
-  // Guard 1: Block if this node_modules is a symlink (running in a worktree)
+// Guard 1: Block if this node_modules is a symlink.
+// readlinkSync succeeds only for symlinks; for a real directory it throws
+// EINVAL / UNKNOWN and we fall through to Guard 2.
+{
+  let target = null;
   try {
-    // readlinkSync succeeds only for symlinks.
-    // For a real directory it throws EINVAL / UNKNOWN.
-    const target = fs.readlinkSync(nmPath);
+    target = fs.readlinkSync(nmPath);
+  } catch {
+    // Not a symlink — continue to Guard 2.
+  }
+
+  // Guard 1a: symlink into the shared modules pool. Pool slots are IMMUTABLE
+  // snapshots shared by the main repo and every worktree on the same lockfile;
+  // by the time this lifecycle script runs, pnpm may ALREADY have written
+  // through the link (preinstall fires after linking — see the timing note
+  // above), so abort loudly and unconditionally: FORCE_INSTALL=1 does not
+  // bypass this case (LS-8548). The primary pre-link defence is
+  // .pnpmfile.cjs → afterAllResolved; this is the last-resort backstop.
+  if (target !== null && isPoolTarget(target)) {
+    console.error('');
+    console.error('='.repeat(70));
+    console.error(
+      ' BLOCKED: node_modules is a symlink into the shared modules pool',
+    );
+    console.error('='.repeat(70));
+    console.error('');
+    console.error(' Target: ' + target);
+    console.error('');
+    console.error(' Pool slots (.modules-pool) are IMMUTABLE snapshots shared');
+    console.error(' by the main repo and every worktree on the same lockfile.');
+    console.error(' Installing through this symlink corrupts the slot for ALL');
+    console.error(' of them. This install may already have written into it —');
+    console.error(' verify and recover with:');
+    console.error('   node scripts/modules-pool/link.mjs --check');
+    console.error(
+      '   node scripts/modules-pool/link.mjs   (auto-rebuilds if corrupt)',
+    );
+    console.error('');
+    console.error(' Never install through a pool symlink. To (re-)link this');
+    console.error(' checkout instead:');
+    console.error('   node scripts/modules-pool/link.mjs');
+    console.error('');
+    console.error(' FORCE_INSTALL=1 does not bypass this check.');
+    console.error('');
+    console.error('='.repeat(70));
+    process.exit(1);
+  }
+
+  // Guard 1b: any other node_modules symlink (legacy shared-with-main layout).
+  if (target !== null && !forceInstall) {
     console.error('');
     console.error('='.repeat(70));
     console.error(
@@ -105,8 +161,10 @@ if (!forceInstall) {
     console.error(' node_modules and break every other symlinked worktree.');
     console.error('');
     console.error(' To fix:');
-    console.error('   1. Remove the symlink:  rm -rf node_modules');
-    console.error('   2. Re-run:               make install');
+    console.error('   1. Remove the symlink:   cmd /c "rmdir node_modules"');
+    console.error(
+      '   2. Re-link via the pool: node scripts/modules-pool/link.mjs',
+    );
     console.error('   -- or --');
     console.error(
       '   Re-run worktree setup:   make wt-setup WT=' +
@@ -117,8 +175,6 @@ if (!forceInstall) {
     console.error('');
     console.error('='.repeat(70));
     process.exit(1);
-  } catch {
-    // EINVAL / ENOENT / UNKNOWN = not a symlink. Continue to Guard 2.
   }
 }
 

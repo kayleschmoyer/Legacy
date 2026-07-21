@@ -97,7 +97,7 @@ One command does everything. It is the replacement for `setup-worktree-node-modu
    2. Move that `node_modules` into `pool\<hash>.tmp.<pid>`, then **atomically rename** to `pool\<hash>` (same volume → instant; the rename is the commit point and makes concurrent materialisation safe — a loser just discards its tmp dir).
    3. Symlink the worktree's `node_modules` → `pool\<hash>`.
 
-"Healthy" reuses today's checks: `.bin` populated, `nx` present, symlink resolvable, and the `.modules.yaml` `virtualStoreDir` sanity check already implemented in `setup-worktree-node-modules.mjs`.
+"Healthy" is a deep assessment (LS-8548): `.bin` populated, `nx` present, path traversable, **plus a corruption scan** — no orphan `<name>_tmp_<pid>` staging dirs (pnpm's atomic-rename leftovers from an interrupted install) at the top level, inside `@scopes`, or among `.pnpm`'s children, and every top-level / scoped package dir has a `package.json`. An unhealthy slot is never linked: it is quarantined (renamed to `<hash>.corrupt-<timestamp>`) and re-materialised — see §4.7.
 
 ### 4.2 Adding a package never disturbs anyone
 
@@ -163,6 +163,20 @@ Why it stays cheap for tooling (the legitimate worry with an in-repo tree): ever
 The inner `node_modules` directories are auto-skipped by virtually every tool already (they are literally named `node_modules`). The only thing the entries above protect is the **wrapper** `.modules-pool/<hash>` path being _walked into_ to reach them — git-ignore alone covers the git/Nx/ripgrep walkers; the explicit excludes cover tsc/eslint/prettier.
 
 > One watch item for the validation phase (Q6 below): confirm the **Nx daemon's file watcher** and **Metro/Watchman** (React Native) do not index `.modules-pool/`. Nx respects `.nxignore`/`.gitignore` for watching; Metro has its own `blockList` and may need an explicit pattern. This is the same class of concern that `.claude/worktrees/` already passes today.
+
+### 4.7 Corruption detection & recovery (LS-8548)
+
+Immutability is a convention, not a filesystem guarantee: a `pnpm install` run in a checkout whose `node_modules` symlinks into the pool writes **through** the symlink into the shared slot — this corrupted slot `f53654c1b1b63399` during LS-8546 (an interrupted install left `@nx/devkit` without a `package.json` plus an orphan `@nx/devkit_tmp_<pid>` dir, breaking every consumer at once with "Failed to load 3 Nx plugin(s)"). Three defence layers now exist:
+
+1. **Install guards.** `.pnpmfile.cjs → afterAllResolved` (fires before any `node_modules` write) and `scripts/preinstall-guard.js` (lifecycle backstop — it fires after pnpm links, so it can only abort, not prevent) both refuse any install when `node_modules` symlinks into `.modules-pool`, pointing at `scripts/modules-pool/link.mjs` instead. For pool symlinks this refusal is unconditional — `FORCE_INSTALL=1` does **not** bypass it, because there is no legitimate install through a pool link. (Marking slots read-only was considered and rejected: on Windows — the primary platform — the directory read-only attribute does not prevent child creation/renames, and ACL manipulation is too invasive for a dev tool.)
+2. **Deep health check.** `link.mjs`'s `isHealthy()` scans for the interrupted-install signature (orphan `*_tmp_*` dirs, package dirs missing `package.json`) on every run, so a corrupted slot can no longer masquerade as a cache hit.
+3. **Automatic recovery.** When the slot for the current lockfile is unhealthy, a plain `node scripts/modules-pool/link.mjs` run quarantines it (rename to `<hash>.corrupt-<timestamp>` — safe because no healthy consumer should be using it) and re-materialises from scratch. Quarantined copies are orphans to `modules gc` and age out automatically. Manual tooling:
+   - `node scripts/modules-pool/link.mjs --check` — doctor mode: print every finding for the current slot, exit 0/1, change nothing.
+   - `node scripts/modules-pool/link.mjs --rebuild` — force quarantine + re-materialise even when the health check passes.
+
+   If the quarantine rename fails (Windows: a process holds files in the slot open), stop stale processes (`make kill-stale`) and re-run.
+
+> **Editing `.pnpmfile.cjs`?** pnpm records a `pnpmfileChecksum` in `pnpm-lock.yaml`; any edit to the hook file invalidates it and every `--frozen-lockfile` install (all of CI) fails with "lockfile out of sync". Refresh it in the same commit: detach the pool symlink (`cmd /c "rmdir node_modules"`), run `pnpm install --lockfile-only` (writes only the lockfile; the guards deliberately allow this flag), re-link with `node scripts/modules-pool/link.mjs`, and commit the one-line lockfile change.
 
 ## 5. Open questions
 

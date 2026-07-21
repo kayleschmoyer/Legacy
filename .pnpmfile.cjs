@@ -30,6 +30,20 @@ function symlinkTarget(nmPath) {
   }
 }
 
+/**
+ * True when a node_modules symlink points into the shared modules pool
+ * (<main-repo>/.modules-pool/<hash>/node_modules). Pool slots are IMMUTABLE
+ * and shared by every consumer on the machine, so installs through such a
+ * link are never allowed — not even with FORCE_INSTALL=1 (LS-8548).
+ */
+function isPoolTarget(nmPath, target) {
+  const resolved = path.resolve(path.dirname(nmPath), target);
+  const needle = `${path.sep}.modules-pool${path.sep}`;
+  return process.platform === 'win32'
+    ? resolved.toLowerCase().includes(needle.toLowerCase())
+    : resolved.includes(needle);
+}
+
 /** True if any staged/unstaged changes exist to lockfile or package.json. */
 function isLockfileDirty(cwd) {
   try {
@@ -50,15 +64,59 @@ module.exports = {
      * Throwing aborts the install cleanly; pnpm prints the error and exits 1.
      */
     afterAllResolved(lockfile, context) {
-      if (forceInstall) return lockfile;
-
       const cwd = process.cwd();
       const nmPath = path.join(cwd, 'node_modules');
+      const target = symlinkTarget(nmPath);
+
+      // Guard A0: block if node_modules symlinks into the shared modules pool.
+      // A pool slot is an IMMUTABLE snapshot shared by the main repo and every
+      // worktree on the same lockfile — an install writing through the link
+      // corrupts them all at once (LS-8546/LS-8548). There is no legitimate
+      // reason to install through a pool link, so FORCE_INSTALL=1 does NOT
+      // bypass this guard.
+      //
+      // Exception: `--lockfile-only` resolves and rewrites pnpm-lock.yaml
+      // without touching node_modules, so it cannot mutate the slot. It is
+      // also the sanctioned way to refresh the lockfile's pnpmfileChecksum
+      // after this file changes — blocking it would leave pool-linked
+      // checkouts (i.e. every local checkout) unable to regenerate it. The
+      // hook runs inside the pnpm process, so the CLI flag is visible on
+      // process.argv.
+      const lockfileOnly = process.argv.includes('--lockfile-only');
+      if (target !== null && !lockfileOnly && isPoolTarget(nmPath, target)) {
+        throw new Error(
+          [
+            '',
+            '='.repeat(70),
+            ' BLOCKED (pre-link): node_modules is a symlink into the shared',
+            ' modules pool (.modules-pool) — install aborted',
+            '='.repeat(70),
+            '',
+            ' Target: ' + target,
+            '',
+            ' Pool slots are IMMUTABLE snapshots shared by the main repo and',
+            ' every worktree on the same lockfile. Installing here would write',
+            ' through the symlink and corrupt the slot for ALL of them.',
+            ' No files were written.',
+            '',
+            ' Never run an install through a pool symlink. Instead:',
+            '   node scripts/modules-pool/link.mjs',
+            ' (re-links this checkout to the slot matching its lockfile,',
+            '  materialising a fresh slot if needed).',
+            '',
+            ' FORCE_INSTALL=1 does not bypass this check.',
+            '',
+            '='.repeat(70),
+          ].join('\n'),
+        );
+      }
+
+      if (forceInstall) return lockfile;
 
       // Guard A: block if THIS node_modules is a symlink (worktree calling
-      // `pnpm install` directly instead of via `make install`).
-      const target = symlinkTarget(nmPath);
-      if (target !== null) {
+      // `pnpm install` directly instead of via `make install`). Same
+      // `--lockfile-only` exception as Guard A0: no node_modules writes.
+      if (target !== null && !lockfileOnly) {
         throw new Error(
           [
             '',

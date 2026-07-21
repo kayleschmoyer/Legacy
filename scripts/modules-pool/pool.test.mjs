@@ -23,9 +23,12 @@ import {
   realpathSync,
   utimesSync,
   readdirSync,
+  chmodSync,
+  copyFileSync,
+  symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
@@ -44,9 +47,14 @@ function freshMainRepo() {
   return root;
 }
 
-/** A fake but "healthy" node_modules: has nx/ and a populated .bin/. */
+/**
+ * A fake but "healthy" node_modules: has nx/ (with a package.json — the deep
+ * health check treats a package dir without one as corruption) and a
+ * populated .bin/.
+ */
 function makeHealthyNodeModules(nmPath) {
   mkdirSync(join(nmPath, 'nx'), { recursive: true });
+  writeFileSync(join(nmPath, 'nx', 'package.json'), '{"name":"nx"}');
   mkdirSync(join(nmPath, '.bin'), { recursive: true });
   writeFileSync(join(nmPath, '.bin', 'placeholder'), '');
 }
@@ -523,3 +531,387 @@ test(
     }
   },
 );
+
+// --- deep health check, quarantine & rebuild (LS-8548) -----------------------
+// The LS-8546 incident: an interrupted `pnpm install` writing through a
+// consumer symlink left `@nx/devkit` as a partial dir without package.json and
+// a complete `@nx/devkit_tmp_38916` beside it — and the shallow isHealthy()
+// still linked the slot as a cache hit. These tests pin the deep check, the
+// quarantine-and-rebuild flow, and the install guards.
+
+/** Plant the LS-8546 corruption signature into a healthy slot. */
+function corruptSlot(slotNm) {
+  mkdirSync(join(slotNm, '@nx', 'devkit'), { recursive: true }); // no package.json
+  mkdirSync(join(slotNm, '@nx', 'devkit_tmp_38916'), { recursive: true });
+  writeFileSync(join(slotNm, '@nx', 'devkit_tmp_38916', 'package.json'), '{}');
+}
+
+/** Run link.mjs expecting a non-zero exit; returns { status, output }. */
+function runLinkExpectFail(args, env) {
+  try {
+    const out = runLink(args, env);
+    return { status: 0, output: out };
+  } catch (err) {
+    return {
+      status: err.status,
+      output: `${err.stdout ?? ''}\n${err.stderr ?? ''}`,
+    };
+  }
+}
+
+/**
+ * A fake `pnpm` on PATH that "installs" by creating a minimal healthy
+ * node_modules in cwd — lets tests exercise the materialise path without a
+ * real pnpm install.
+ */
+function makeFakePnpm(binDir) {
+  mkdirSync(binDir, { recursive: true });
+  if (process.platform === 'win32') {
+    writeFileSync(
+      join(binDir, 'pnpm.cmd'),
+      [
+        '@echo off',
+        'mkdir node_modules\\nx',
+        'echo {"name":"nx"} > node_modules\\nx\\package.json',
+        'mkdir node_modules\\.bin',
+        'echo x > node_modules\\.bin\\placeholder',
+      ].join('\r\n') + '\r\n',
+    );
+  } else {
+    const p = join(binDir, 'pnpm');
+    writeFileSync(
+      p,
+      '#!/bin/sh\nmkdir -p node_modules/nx node_modules/.bin\n' +
+        'echo \'{"name":"nx"}\' > node_modules/nx/package.json\n' +
+        'echo x > node_modules/.bin/placeholder\n',
+    );
+    chmodSync(p, 0o755);
+  }
+}
+
+/** Env overriding PATH so the fake pnpm wins the lookup. */
+function fakePnpmEnv(binDir) {
+  const env = { ...process.env };
+  const current = env.PATH ?? env.Path ?? '';
+  delete env.Path;
+  env.PATH = binDir + delimiter + current;
+  return env;
+}
+
+/** Create a directory symlink the same way link.mjs does. */
+function makeDirSymlink(linkPath, target) {
+  if (process.platform === 'win32') {
+    execFileSync('cmd', ['/c', 'mklink', '/D', linkPath, target], {
+      encoding: 'utf-8',
+    });
+  } else {
+    symlinkSync(target, linkPath);
+  }
+}
+
+test('--check exits 0 on a healthy slot', () => {
+  // --check never links, so this needs no symlink capability.
+  const root = freshMainRepo();
+  try {
+    const wt = makeWorktree(root, 'wt1');
+    prebuildSlot(root, wt);
+    const out = runLink([`--worktree=${wt}`, `--main-repo=${root}`, '--check']);
+    assert.match(out, /slot is healthy/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--check exits 1 and names each finding on a corrupt slot', () => {
+  const root = freshMainRepo();
+  try {
+    const wt = makeWorktree(root, 'wt1');
+    const hash = runLink([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--print-hash',
+    ]).trim();
+    const slotNm = join(root, '.modules-pool', hash, 'node_modules');
+    makeHealthyNodeModules(slotNm);
+    corruptSlot(slotNm);
+    // Extra signatures: a top-level orphan tmp dir and a .pnpm orphan tmp dir.
+    mkdirSync(join(slotNm, 'left-pad_tmp_123'));
+    mkdirSync(join(slotNm, '.pnpm', 'foo@1.0.0_tmp_99'), { recursive: true });
+
+    const { status, output } = runLinkExpectFail([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--check',
+    ]);
+    assert.equal(status, 1, '--check must exit 1 on a corrupt slot');
+    assert.match(output, /@nx\/devkit: missing package\.json/);
+    assert.match(output, /@nx\/devkit_tmp_38916: orphan _tmp_ dir/);
+    assert.match(output, /left-pad_tmp_123: orphan _tmp_ dir/);
+    assert.match(output, /\.pnpm\/foo@1\.0\.0_tmp_99: orphan _tmp_ dir/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--check exits 1 when the slot is not built', () => {
+  const root = freshMainRepo();
+  try {
+    const wt = makeWorktree(root, 'wt1');
+    const { status, output } = runLinkExpectFail([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--check',
+    ]);
+    assert.equal(status, 1);
+    assert.match(output, /slot not built/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test(
+  'a corrupt slot is quarantined and rebuilt instead of linked',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'wt1');
+      const hash = prebuildSlot(root, wt);
+      const pool = join(root, '.modules-pool');
+      const slotNm = join(pool, hash, 'node_modules');
+      corruptSlot(slotNm);
+
+      const shim = join(root, 'fake-bin');
+      makeFakePnpm(shim);
+      const out = runLink(
+        [`--worktree=${wt}`, `--main-repo=${root}`],
+        fakePnpmEnv(shim),
+      );
+
+      assert.match(out, /\[quarantine\]/, 'must announce the quarantine');
+      assert.match(out, /slot materialised and linked/);
+      const quarantined = readdirSync(pool).filter((n) =>
+        n.startsWith(`${hash}.corrupt-`),
+      );
+      assert.equal(quarantined.length, 1, 'corrupt slot must be renamed aside');
+      assert.ok(
+        existsSync(join(pool, quarantined[0], 'node_modules', '@nx', 'devkit')),
+        'quarantined copy must retain the corrupt content',
+      );
+      assert.ok(
+        existsSync(join(slotNm, 'nx', 'package.json')),
+        'a fresh healthy slot must be published under the same hash',
+      );
+      assert.ok(
+        !existsSync(join(slotNm, '@nx', 'devkit_tmp_38916')),
+        'the fresh slot must not contain the corruption',
+      );
+      assert.equal(
+        realpathSync(join(wt, 'node_modules')),
+        realpathSync(slotNm),
+        'worktree must link to the rebuilt slot',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  '--rebuild quarantines and re-materialises even a healthy slot',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'wt1');
+      const hash = prebuildSlot(root, wt);
+      const pool = join(root, '.modules-pool');
+
+      const shim = join(root, 'fake-bin');
+      makeFakePnpm(shim);
+      const out = runLink(
+        [`--worktree=${wt}`, `--main-repo=${root}`, '--rebuild'],
+        fakePnpmEnv(shim),
+      );
+
+      assert.match(out, /--rebuild requested/);
+      assert.match(out, /slot materialised and linked/);
+      const quarantined = readdirSync(pool).filter((n) =>
+        n.startsWith(`${hash}.corrupt-`),
+      );
+      assert.equal(quarantined.length, 1, 'healthy slot must be renamed aside');
+      assert.ok(
+        existsSync(join(pool, hash, 'node_modules', 'nx', 'package.json')),
+        'a fresh slot must be published under the same hash',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+// --- install guards: no writes through a pool symlink (LS-8548) --------------
+
+const PNPMFILE = join(here, '..', '..', '.pnpmfile.cjs');
+const PREINSTALL_GUARD = join(here, '..', 'preinstall-guard.js');
+
+/** Fixture: a checkout whose node_modules symlinks into a pool slot. */
+function makePoolLinkedCheckout(root) {
+  const slotNm = join(
+    root,
+    '.modules-pool',
+    'aaaabbbbccccdddd',
+    'node_modules',
+  );
+  makeHealthyNodeModules(slotNm);
+  const checkout = join(root, 'checkout');
+  mkdirSync(checkout, { recursive: true });
+  makeDirSymlink(join(checkout, 'node_modules'), slotNm);
+  return checkout;
+}
+
+test(
+  'pnpmfile pre-link hook blocks installs through a pool symlink even with FORCE_INSTALL=1',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const checkout = makePoolLinkedCheckout(root);
+      let failed = null;
+      try {
+        execFileSync(
+          'node',
+          [
+            '-e',
+            `require(${JSON.stringify(PNPMFILE)}).hooks.afterAllResolved({}, { log() {} });`,
+          ],
+          {
+            cwd: checkout,
+            encoding: 'utf-8',
+            env: { ...process.env, FORCE_INSTALL: '1' },
+          },
+        );
+      } catch (err) {
+        failed = err;
+      }
+      assert.ok(failed, 'hook must throw for a pool symlink');
+      const output = String(failed.stderr ?? '');
+      assert.match(output, /BLOCKED \(pre-link\)/);
+      assert.match(output, /modules pool/);
+      assert.match(output, /scripts\/modules-pool\/link\.mjs/);
+      assert.match(output, /FORCE_INSTALL=1 does not bypass/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'pnpmfile hook allows --lockfile-only through a pool symlink (no node_modules writes)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const checkout = makePoolLinkedCheckout(root);
+      // --lockfile-only resolves + rewrites pnpm-lock.yaml only; it is the
+      // sanctioned way to refresh pnpmfileChecksum after .pnpmfile.cjs edits.
+      const out = execFileSync(
+        'node',
+        [
+          '-e',
+          `process.argv.push('--lockfile-only');` +
+            `const r = require(${JSON.stringify(PNPMFILE)}).hooks.afterAllResolved({ ok: 1 }, { log() {} });` +
+            `process.stdout.write(JSON.stringify(r));`,
+        ],
+        { cwd: checkout, encoding: 'utf-8' },
+      );
+      assert.equal(out, '{"ok":1}', 'hook must return the lockfile untouched');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'preinstall guard blocks installs through a pool symlink even with FORCE_INSTALL=1',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      // The guard resolves node_modules relative to its own __dirname
+      // (<root>/scripts/..), so install a copy into the fixture repo.
+      mkdirSync(join(root, 'scripts'), { recursive: true });
+      copyFileSync(
+        PREINSTALL_GUARD,
+        join(root, 'scripts', 'preinstall-guard.js'),
+      );
+      const slotNm = join(
+        root,
+        '.modules-pool',
+        'aaaabbbbccccdddd',
+        'node_modules',
+      );
+      makeHealthyNodeModules(slotNm);
+      makeDirSymlink(join(root, 'node_modules'), slotNm);
+
+      const { status, output } = runNodeExpectFail(
+        join(root, 'scripts', 'preinstall-guard.js'),
+        {
+          FORCE_INSTALL: '1',
+          npm_config_user_agent: 'pnpm/9.12.1 node/v22.0.0',
+        },
+      );
+      assert.equal(status, 1, 'guard must exit 1 for a pool symlink');
+      assert.match(output, /shared modules pool/);
+      assert.match(output, /scripts\/modules-pool\/link\.mjs/);
+      assert.match(output, /FORCE_INSTALL=1 does not bypass/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'preinstall guard still honours FORCE_INSTALL=1 for non-pool symlinks',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      mkdirSync(join(root, 'scripts'), { recursive: true });
+      copyFileSync(
+        PREINSTALL_GUARD,
+        join(root, 'scripts', 'preinstall-guard.js'),
+      );
+      const target = join(root, 'some-shared', 'node_modules');
+      makeHealthyNodeModules(target);
+      makeDirSymlink(join(root, 'node_modules'), target);
+
+      const { status } = runNodeExpectFail(
+        join(root, 'scripts', 'preinstall-guard.js'),
+        {
+          FORCE_INSTALL: '1',
+          npm_config_user_agent: 'pnpm/9.12.1 node/v22.0.0',
+        },
+      );
+      assert.equal(status, 0, 'non-pool symlink must stay bypassable');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+/** Run a node script expecting a possible non-zero exit. */
+function runNodeExpectFail(scriptPath, env) {
+  try {
+    const out = execFileSync('node', [scriptPath], {
+      encoding: 'utf-8',
+      env: { ...process.env, ...env },
+    });
+    return { status: 0, output: out };
+  } catch (err) {
+    return {
+      status: err.status,
+      output: `${err.stdout ?? ''}\n${err.stderr ?? ''}`,
+    };
+  }
+}
