@@ -110,6 +110,40 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}-
 
+    # LS-8550: Shard 2/3 has failed intermittently across unrelated specs since
+    # LS-8517 (whose code-level route-race fix did not resolve it), with the
+    # leading hypothesis being self-hosted spot-runner resource variance —
+    # instance_types in terraform/runners/variables.tf mixes compute-optimized
+    # (c7a/c6a/c7i.xlarge, ~8GB RAM) and general-purpose (m7a.xlarge, ~16GB RAM)
+    # spot capacity, so which one a given shard lands on is non-deterministic.
+    # That hypothesis has never been checked against real data because no
+    # per-shard resource snapshot existed. This step is diagnostic only — it
+    # never fails the job — so the next flaky occurrence has instance-type/
+    # CPU/memory/load evidence to compare across shards instead of guessing.
+    - name: "📈 Runner resource snapshot (pre-test)"
+      if: inputs.should-run-e2e == 'true'
+      shell: bash
+      run: |
+        echo "::group::📈 Runner resource snapshot (shard ${{ inputs.shard }}, pre-test)"
+        IMDS_TOKEN=$(curl -s -m 2 -X PUT 'http://169.254.169.254/latest/api/token' \
+          -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' 2>/dev/null || true)
+        imds() {
+          curl -s -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
+            "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null || echo "unavailable"
+        }
+        {
+          echo "## 📈 Runner snapshot — shard ${{ inputs.shard }} (pre-test)"
+          echo "- **Instance type**: $(imds instance-type)"
+          echo "- **Instance ID**: $(imds instance-id)"
+          echo "- **vCPUs**: $(nproc 2>/dev/null || echo 'unavailable')"
+          echo "- **Memory (free -m)**:"
+          echo '```'
+          free -m 2>/dev/null || echo "unavailable"
+          echo '```'
+          echo "- **Load average**: $(cat /proc/loadavg 2>/dev/null || echo 'unavailable')"
+        } | tee -a "$GITHUB_STEP_SUMMARY"
+        echo "::endgroup::"
+
     - name: "🎭 E2E Tests (Critical User Paths)"
       id: e2e-tests
       if: inputs.should-run-e2e == 'true'
@@ -337,6 +371,28 @@ runs:
           exit 1
         fi
 
+        echo "::endgroup::"
+
+    # LS-8550: paired with the pre-test snapshot above — comparing the two
+    # shows whether memory/load drifted meaningfully over the run (e.g. leaked
+    # browser processes) versus the runner simply starting on lower-spec spot
+    # capacity. always() so this still captures data on a failing run, which is
+    # the case we actually care about.
+    - name: "📈 Runner resource snapshot (post-test)"
+      if: always() && inputs.should-run-e2e == 'true'
+      shell: bash
+      run: |
+        echo "::group::📈 Runner resource snapshot (shard ${{ inputs.shard }}, post-test)"
+        {
+          echo "## 📈 Runner snapshot — shard ${{ inputs.shard }} (post-test)"
+          echo "- **Memory (free -m)**:"
+          echo '```'
+          free -m 2>/dev/null || echo "unavailable"
+          echo '```'
+          echo "- **Load average**: $(cat /proc/loadavg 2>/dev/null || echo 'unavailable')"
+          echo "- **Chromium processes still running**: $(pgrep -c -f chrom 2>/dev/null || echo 0)"
+          echo "- **Node processes still running**: $(pgrep -c -f node 2>/dev/null || echo 0)"
+        } | tee -a "$GITHUB_STEP_SUMMARY"
         echo "::endgroup::"
 
     - name: "📊 E2E Test Summary"
