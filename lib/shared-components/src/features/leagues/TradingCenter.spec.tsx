@@ -73,6 +73,12 @@ let mockViewerTeamReturn: {
 
 let mockProposeTradeFn: jest.Mock;
 
+// Trade action mutations. Default to immediate resolve so existing tests are
+// unaffected; per-trade-pending tests (BLD-036) reassign these to deferred
+// promises they resolve manually to observe the in-flight disabled state.
+let mockAcceptTradeFn: jest.Mock = jest.fn().mockResolvedValue({});
+let mockRejectTradeFn: jest.Mock = jest.fn().mockResolvedValue({});
+
 const mockLoadProposerRoster = jest.fn();
 const mockRefetch = jest.fn().mockResolvedValue({});
 
@@ -92,8 +98,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockLoadProposerRoster,
     mockProposerRosterReturn,
   ]),
-  useAcceptTradeMutation: () => [jest.fn().mockResolvedValue({})],
-  useRejectTradeMutation: () => [jest.fn().mockResolvedValue({})],
+  useAcceptTradeMutation: jest.fn(() => [mockAcceptTradeFn]),
+  useRejectTradeMutation: jest.fn(() => [mockRejectTradeFn]),
   useCancelTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useVetoTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useProposeTradeMutation: jest.fn(() => [mockProposeTradeFn]),
@@ -645,6 +651,135 @@ describe('TradingCenter — salary-cap awareness', () => {
     );
     await findByTestId('trade-cap-preview-700');
     expect(queryByTestId('trade-cap-warning-700')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-trade pending state (BLD-036 / LS-5969)
+//
+// Regression guard: an in-flight Accept/Reject/Cancel mutation must disable
+// ONLY the card whose action is running — never every pending trade globally.
+// The bug was a shared `mutationPending` boolean fed to every card; the fix
+// tracks the in-flight tradeId (`actionLoading`) and each card disables only
+// when `actionLoading === trade.id`.
+// ---------------------------------------------------------------------------
+
+describe('TradingCenter — per-trade pending state (BLD-036)', () => {
+  const OFFER_A_ID = 401;
+  const OFFER_B_ID = 402;
+
+  // Two incoming pending offers for the user's team from the same proposing
+  // team. No player legs → the stale-player / roster-error disable paths stay
+  // inert, so the ONLY thing that can disable a button is the per-trade
+  // in-flight state under test.
+  const offerA = makeOffer({ id: OFFER_A_ID });
+  const offerB = makeOffer({ id: OFFER_B_ID });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setPendingOffers([offerA, offerB]);
+    mockProposerRosterReturn = { data: undefined };
+    mockLeagueTradesReturn = {
+      data: undefined,
+      loading: false,
+      refetch: jest.fn(),
+    };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockLeagueByIdReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
+    mockAcceptTradeFn = jest.fn().mockResolvedValue({});
+    mockRejectTradeFn = jest.fn().mockResolvedValue({});
+  });
+
+  it('disables only the acted-on card while its Accept mutation is in flight', async () => {
+    // Deferred accept: stays pending until we resolve it, so we can observe
+    // the in-flight disabled state.
+    let resolveAccept: (value?: unknown) => void = () => undefined;
+    mockAcceptTradeFn = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveAccept = resolve;
+        }),
+    );
+
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+
+    const acceptA = await utils.findByTestId(`trade-accept-${OFFER_A_ID}`);
+    // Both cards start interactive.
+    expect(acceptA).not.toBeDisabled();
+    expect(utils.getByTestId(`trade-accept-${OFFER_B_ID}`)).not.toBeDisabled();
+    expect(utils.getByTestId(`trade-reject-${OFFER_B_ID}`)).not.toBeDisabled();
+
+    // Accept card A — its mutation stays pending.
+    await act(async () => {
+      fireEvent.click(acceptA);
+      await Promise.resolve();
+    });
+
+    // Card A is disabled while its own mutation runs...
+    await waitFor(() => {
+      expect(utils.getByTestId(`trade-accept-${OFFER_A_ID}`)).toBeDisabled();
+    });
+    expect(utils.getByTestId(`trade-reject-${OFFER_A_ID}`)).toBeDisabled();
+
+    // ...but card B stays fully interactive — this is the regression the bug
+    // violated (all cards disabled globally on any pending mutation).
+    expect(utils.getByTestId(`trade-accept-${OFFER_B_ID}`)).not.toBeDisabled();
+    expect(utils.getByTestId(`trade-reject-${OFFER_B_ID}`)).not.toBeDisabled();
+
+    // Resolving the mutation re-enables card A.
+    await act(async () => {
+      resolveAccept();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(
+        utils.getByTestId(`trade-accept-${OFFER_A_ID}`),
+      ).not.toBeDisabled();
+    });
+  });
+
+  it('lets the user act on a different trade while one trade is pending', async () => {
+    let resolveAccept: (value?: unknown) => void = () => undefined;
+    mockAcceptTradeFn = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveAccept = resolve;
+        }),
+    );
+
+    const utils = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+
+    const acceptA = await utils.findByTestId(`trade-accept-${OFFER_A_ID}`);
+    await act(async () => {
+      fireEvent.click(acceptA);
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(utils.getByTestId(`trade-accept-${OFFER_A_ID}`)).toBeDisabled();
+    });
+
+    // Reject on card B is still enabled and actually fires while A is pending.
+    const rejectB = utils.getByTestId(`trade-reject-${OFFER_B_ID}`);
+    expect(rejectB).not.toBeDisabled();
+    await act(async () => {
+      fireEvent.click(rejectB);
+      await Promise.resolve();
+    });
+    expect(mockRejectTradeFn).toHaveBeenCalledWith({
+      variables: { tradeId: OFFER_B_ID },
+    });
+
+    resolveAccept();
   });
 });
 
