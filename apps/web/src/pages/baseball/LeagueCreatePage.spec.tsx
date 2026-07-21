@@ -39,6 +39,11 @@ import {
 } from './LeagueCreatePage';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
 
+// jsdom does not implement scrollIntoView; the submit error banner auto-scroll
+// (LS-6066) calls it on every submitError transition, so stub it globally
+// rather than per-describe-block.
+Element.prototype.scrollIntoView = jest.fn();
+
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
@@ -232,18 +237,21 @@ jest.mock('@tamagui/lucide-icons', () => ({
 jest.mock('tamagui', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ReactLocal = require('react');
-  const passthrough = ({ children, ...rest }: any) =>
-    ReactLocal.createElement(
-      'div',
-      {
-        'data-testid': rest['data-testid'] ?? rest.testID,
-        role: rest.role ?? rest.accessibilityRole,
-        'aria-label': rest['aria-label'] ?? rest.accessibilityLabel,
-        'aria-live': rest['aria-live'],
-        onClick: rest.onPress,
-      },
-      children,
-    );
+  const passthrough = ReactLocal.forwardRef(
+    ({ children, ...rest }: any, ref: any) =>
+      ReactLocal.createElement(
+        'div',
+        {
+          ref,
+          'data-testid': rest['data-testid'] ?? rest.testID,
+          role: rest.role ?? rest.accessibilityRole,
+          'aria-label': rest['aria-label'] ?? rest.accessibilityLabel,
+          'aria-live': rest['aria-live'],
+          onClick: rest.onPress,
+        },
+        children,
+      ),
+  );
   return {
     Card: passthrough,
     H1: ({ children }: any) => ReactLocal.createElement('h1', null, children),
@@ -2545,5 +2553,71 @@ describe('LeagueCreatePage — premiumLoading cold-load era display (LS-6088)', 
       screen.queryByTestId('era-entitlements-loading'),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('skeleton-block')).not.toBeInTheDocument();
+  });
+});
+
+describe('LeagueCreatePage — submit error banner auto-scroll (LS-6066)', () => {
+  let scrollIntoViewMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    scrollIntoViewMock = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
+  });
+
+  afterEach(() => {
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  function submitWithLeagueName() {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+  }
+
+  it('scrolls the banner into view when a submit error first appears', async () => {
+    mockCreateLeague.mockRejectedValue(new Error('Failed to fetch'));
+
+    submitWithLeagueName();
+
+    await screen.findByTestId('submit-error-banner');
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: 'smooth',
+    });
+  });
+
+  it('does not re-trigger the scroll on a re-render while the banner is already showing', async () => {
+    mockCreateLeague.mockRejectedValue(new Error('Failed to fetch'));
+
+    submitWithLeagueName();
+    await screen.findByTestId('submit-error-banner');
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+
+    // A re-render triggered by unrelated state (typing) must not re-fire the
+    // scroll while submitError stays the same truthy value.
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League 2' },
+    });
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not trigger a scroll when the banner is dismissed', async () => {
+    mockCreateLeague.mockRejectedValue(new Error('Failed to fetch'));
+
+    submitWithLeagueName();
+    await screen.findByTestId('submit-error-banner');
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss/i }));
+
+    expect(screen.queryByTestId('submit-error-banner')).not.toBeInTheDocument();
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -1660,6 +1660,21 @@ export function LeagueCreatePage(): React.JSX.Element {
     code?: string;
     correlationId: string;
   } | null>(null);
+  const submitErrorBannerRef = useRef<HTMLDivElement>(null);
+  const prevSubmitErrorRef = useRef<string | null>(null);
+
+  // Scroll the submit error banner into view on the null-to-truthy
+  // transition only (LS-6066) — if the form is scrolled past the top when
+  // submit fails, the banner renders above the fold and the user assumes
+  // nothing happened. Re-renders while an error is already showing (e.g.
+  // repeated submit clicks) must not re-trigger the scroll.
+  useEffect(() => {
+    if (submitError && !prevSubmitErrorRef.current) {
+      submitErrorBannerRef.current?.scrollIntoView?.({ behavior: 'smooth' });
+    }
+    prevSubmitErrorRef.current = submitError;
+  }, [submitError]);
+
   const [selectionResetNotice, setSelectionResetNotice] = useState<
     string | null
   >(null);
@@ -2206,6 +2221,8 @@ export function LeagueCreatePage(): React.JSX.Element {
         {/* ── Submit error banner ── */}
         {submitError && (
           <XStack
+            ref={submitErrorBannerRef}
+            data-testid="submit-error-banner"
             role="alert"
             aria-live="assertive"
             gap="$3"
