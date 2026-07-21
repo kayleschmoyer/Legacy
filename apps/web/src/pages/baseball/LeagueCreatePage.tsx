@@ -425,12 +425,15 @@ const LEAGUE_FORM_MESSAGES = {
   // sticky bar's aggregated error list (LS-6090) can't collide with the
   // CustomEraRange field labels in E2E getByText() locators.
   customEraRequired: 'Both custom-era boundary years are required.',
+  customEraNotFourDigits: 'Custom era years must be 4-digit years.',
   customEraOrderInvalid:
     "Custom era's first year must be on or before its last year.",
   customEraStartYearOutOfRange: (min: number, max: number) =>
     `Custom era's first year must be between ${min} and ${max}.`,
   customEraEndYearOutOfRange: (min: number, max: number) =>
     `Custom era's last year must be between ${min} and ${max}.`,
+  customEraStrayFields:
+    'Custom era years should only be set when Custom Era is selected.',
   draftDateInPast: 'Draft date must be in the future.',
   salaryCapRequired: 'Salary cap amount is required.',
   salaryFloorNegative: 'Salary floor cannot be negative.',
@@ -456,6 +459,10 @@ export function isPoolTooSmall(
 }
 
 // ── Validation (returns all errors, not just first) ──────────────────────────
+
+function isFourDigitYear(year: number): boolean {
+  return Number.isInteger(year) && year >= 1000 && year <= 9999;
+}
 
 export function validateFormFull(
   f: CreateLeagueFormData,
@@ -495,6 +502,11 @@ export function validateFormFull(
   if (f.baseballEraFilter === 'custom') {
     if (f.customEraStartYear == null || f.customEraEndYear == null)
       errs.customEra = LEAGUE_FORM_MESSAGES.customEraRequired;
+    else if (
+      !isFourDigitYear(f.customEraStartYear) ||
+      !isFourDigitYear(f.customEraEndYear)
+    )
+      errs.customEra = LEAGUE_FORM_MESSAGES.customEraNotFourDigits;
     else if (f.customEraStartYear > f.customEraEndYear)
       errs.customEra = LEAGUE_FORM_MESSAGES.customEraOrderInvalid;
     else {
@@ -511,6 +523,8 @@ export function validateFormFull(
           currentYear,
         );
     }
+  } else if (f.customEraStartYear != null || f.customEraEndYear != null) {
+    errs.customEra = LEAGUE_FORM_MESSAGES.customEraStrayFields;
   }
   if (f.draftDate && f.draftDate < new Date())
     errs.draftDate = LEAGUE_FORM_MESSAGES.draftDateInPast;

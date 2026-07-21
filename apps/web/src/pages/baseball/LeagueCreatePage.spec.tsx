@@ -1446,7 +1446,7 @@ describe('validateFormFull — auction budget/min bid (LS-6092, upper bound LS-6
   });
 });
 
-describe('validateFormFull — custom era year bounds (LS-6082)', () => {
+describe('validateFormFull — custom era year bounds (LS-6082, LS-6093)', () => {
   const baseFormData: CreateLeagueFormData = {
     sport: 'baseball',
     leagueName: 'Test League',
@@ -1491,6 +1491,24 @@ describe('validateFormFull — custom era year bounds (LS-6082)', () => {
     expect(errs.customEra).toBeUndefined();
   });
 
+  it('rejects a non-4-digit custom era start year', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      customEraStartYear: 40,
+      customEraEndYear: 1960,
+    });
+    expect(errs.customEra).toBeDefined();
+  });
+
+  it('rejects a non-4-digit custom era end year', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      customEraStartYear: 1940,
+      customEraEndYear: 99999,
+    });
+    expect(errs.customEra).toBeDefined();
+  });
+
   it('rejects a start year before MLB existed (1800) instead of silently passing', () => {
     const errs = validateFormFull({
       ...baseFormData,
@@ -1516,6 +1534,26 @@ describe('validateFormFull — custom era year bounds (LS-6082)', () => {
       customEraEndYear: 1900,
     });
     expect(errs.customEra).toBeDefined();
+  });
+
+  it('rejects customEraStartYear/customEraEndYear set when eraFilter is not custom', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      baseballEraFilter: 'all',
+      customEraStartYear: 1940,
+      customEraEndYear: 1960,
+    });
+    expect(errs.customEra).toBeDefined();
+  });
+
+  it('does not flag customEra when eraFilter is not custom and years are unset', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      baseballEraFilter: 'all',
+      customEraStartYear: undefined,
+      customEraEndYear: undefined,
+    });
+    expect(errs.customEra).toBeUndefined();
   });
 
   it('rejects an end year one past the current year', () => {
