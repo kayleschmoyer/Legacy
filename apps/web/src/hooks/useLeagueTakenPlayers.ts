@@ -39,6 +39,11 @@ export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
       return;
     }
 
+    // Guards against a stale response from a superseded fetch (e.g. leagueId
+    // or refreshKey changing again before the in-flight request resolves)
+    // overwriting the state set by a newer fetch (LS-2454).
+    let cancelled = false;
+
     const fetchMembers = async () => {
       setLoading(true);
       try {
@@ -60,6 +65,8 @@ export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
         );
 
         const results = await Promise.all(promises);
+        if (cancelled) return;
+
         const ids = new Set<number>();
 
         results.forEach((res) => {
@@ -75,13 +82,14 @@ export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
         setTakenPlayerIds(ids);
         setResolvedKey(refreshKey);
       } catch (err) {
+        if (cancelled) return;
         LOGGER.error(
           'Failed to fetch league rosters',
           err instanceof Error ? err : String(err),
         );
         setResolvedKey(refreshKey);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -91,6 +99,10 @@ export function useLeagueTakenPlayers(leagueId: number, refreshKey?: unknown) {
         err instanceof Error ? err : String(err),
       );
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [teamsData, teamsLoading, client, refreshKey]);
 
   return {

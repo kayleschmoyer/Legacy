@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useLeagueTakenPlayers } from './useLeagueTakenPlayers';
 
 jest.mock('@apollo/client/react', () => ({
@@ -109,5 +109,50 @@ describe('useLeagueTakenPlayers — refreshKey re-fetches roster (LS-4032)', () 
     rerender({ key: 'a' });
 
     expect(query.mock.calls.length).toBe(calls);
+  });
+
+  it('does not let a stale (superseded) fetch overwrite the state set by a newer fetch (LS-2454)', async () => {
+    const pending: { resolve: (v: unknown) => void }[] = [];
+    const query = jest.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push({ resolve });
+        }),
+    );
+    useApolloClient.mockReturnValue({ query });
+
+    const { result, rerender } = renderHook(
+      ({ key }: { key: number }) => useLeagueTakenPlayers(1, key),
+      { initialProps: { key: 0 } },
+    );
+
+    await waitFor(() => expect(pending.length).toBe(2));
+
+    // Bump refreshKey before the first fetch resolves — supersedes it.
+    rerender({ key: 1 });
+
+    await waitFor(() => expect(pending.length).toBe(4));
+
+    // Resolve the newer (second) fetch first — player 2 is taken. act() flushes
+    // the resulting state updates (React schedules updates from outside act()
+    // asynchronously, so a bare microtask/setTimeout(0) can observe stale state).
+    await act(async () => {
+      pending[2].resolve({ data: { teamMembers: [{ player: { id: 2 } }] } });
+      pending[3].resolve({ data: { teamMembers: [] } });
+      await Promise.resolve();
+    });
+
+    expect(result.current.takenPlayerIds.has(2)).toBe(true);
+    expect(result.current.loading).toBe(false);
+
+    // Resolve the stale (first) fetch late — must NOT overwrite the newer result.
+    await act(async () => {
+      pending[0].resolve({ data: { teamMembers: [{ player: { id: 1 } }] } });
+      pending[1].resolve({ data: { teamMembers: [] } });
+      await Promise.resolve();
+    });
+
+    expect(result.current.takenPlayerIds.has(1)).toBe(false);
+    expect(result.current.takenPlayerIds.has(2)).toBe(true);
   });
 });
