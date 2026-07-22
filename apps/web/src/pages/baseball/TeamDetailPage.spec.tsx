@@ -48,8 +48,18 @@ jest.mock('../../features/baseball/TeamAssistantManagerSettings', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/roster', () => ({
-  RosterBoard: ({ readOnly }: { readOnly?: boolean }) => (
-    <div data-testid="roster-board" data-read-only={String(!!readOnly)} />
+  RosterBoard: ({
+    readOnly,
+    error,
+  }: {
+    readOnly?: boolean;
+    error?: Error | null;
+  }) => (
+    <div
+      data-testid="roster-board"
+      data-read-only={String(!!readOnly)}
+      data-error={error ? error.message : ''}
+    />
   ),
 }));
 
@@ -327,6 +337,25 @@ describe('TeamDetailPage – lineup editor (LS-5360)', () => {
 
     const board = screen.getByTestId('roster-board');
     expect(board).toHaveAttribute('data-read-only', 'true');
+  });
+
+  it('passes the positions query error through to RosterBoard instead of silently hiding it (LS-6038)', () => {
+    const graphql = jest.requireMock<{
+      useGetPositionsForLeagueQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetPositionsForLeagueQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: new Error('Failed to fetch league positions'),
+    });
+
+    render(<TeamDetailPage />);
+
+    const board = screen.getByTestId('roster-board');
+    expect(board).toHaveAttribute(
+      'data-error',
+      'Failed to fetch league positions',
+    );
   });
 });
 

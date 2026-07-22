@@ -126,11 +126,14 @@ export function TeamDetailPage() {
   });
 
   // Get league positions to map positionId → positionType (e.g. "SP", "C")
-  const { data: positionsData, loading: positionsLoading } =
-    useGetPositionsForLeagueQuery({
-      variables: { leagueId: leagueId || 0 },
-      skip: !leagueId,
-    });
+  const {
+    data: positionsData,
+    loading: positionsLoading,
+    error: positionsError,
+  } = useGetPositionsForLeagueQuery({
+    variables: { leagueId: leagueId || 0 },
+    skip: !leagueId,
+  });
 
   const leaguePositions = useMemo<readonly LeaguePositionFragment[]>(
     () =>
@@ -608,6 +611,7 @@ export function TeamDetailPage() {
             void handleLineupSwap(incoming, target, displaced);
           }}
           readOnly={!isGM}
+          error={positionsError}
         />
       </YStack>
 
