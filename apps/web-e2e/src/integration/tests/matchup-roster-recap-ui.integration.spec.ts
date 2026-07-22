@@ -207,9 +207,14 @@ test.describe
       });
     });
 
-    await test.step('Verify Pos column header', async () => {
-      // The outer column header row has a "Pos" label for position slot
-      await expect(page.getByText('Pos').first()).toBeVisible({
+    await test.step('Verify position slot column renders', async () => {
+      // The responsive MatchupRosterComparison redesign (LS-5903, #6177)
+      // replaced the standalone "Pos" column header with a per-slot position
+      // badge in the comparison table's center column (e.g. "SP", "1B", "C").
+      // Assert at least one position badge renders to confirm the position
+      // column is present — resilient to the header-label removal rather than
+      // matching the now-absent exact "Pos" text (LS-8577).
+      await expect(page.locator('.mrc-pos-badge').first()).toBeVisible({
         timeout: 20_000,
       });
     });
