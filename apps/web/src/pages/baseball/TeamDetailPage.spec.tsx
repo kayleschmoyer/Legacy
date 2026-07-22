@@ -7,7 +7,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 /* eslint-disable @typescript-eslint/no-unsafe-return -- mock factory spreads */
-import React from 'react';
+import React, { forwardRef as mockForwardRef } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TeamDetailPage } from './TeamDetailPage';
 
@@ -184,11 +184,13 @@ jest.mock('tamagui', () => {
 
   return {
     Dialog,
-    Button: ({ children, onPress, disabled }: any) => (
-      <button onClick={onPress} disabled={!!disabled}>
+    // Forwards ref so app code that restores focus to a trigger button
+    // (LS-6049) can be exercised in tests.
+    Button: mockForwardRef(({ children, onPress, disabled }: any, ref: any) => (
+      <button ref={ref} onClick={onPress} disabled={!!disabled}>
         {children}
       </button>
-    ),
+    )),
     Input: ({ value, onChangeText, placeholder }: any) => (
       <input
         value={value ?? ''}
@@ -285,6 +287,33 @@ describe('TeamDetailPage – clear branding confirmation (LS-4063)', () => {
         });
       });
     });
+
+    // LS-6049: focus must return to the trigger button, not stay trapped in
+    // the (now-unmounted) dialog or fall back to the document body.
+    it('returns focus to the Clear button when Cancel is clicked', () => {
+      render(<TeamDetailPage />);
+
+      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
+      fireEvent.click(clearButtons[0]);
+
+      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+      expect(clearButtons[0]).toHaveFocus();
+    });
+
+    it('returns focus to the Clear button when the clear is confirmed', async () => {
+      render(<TeamDetailPage />);
+
+      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
+      fireEvent.click(clearButtons[0]);
+
+      fireEvent.click(screen.getByRole('button', { name: /^clear logo$/i }));
+
+      await waitFor(() => {
+        expect(mockUpdateBranding).toHaveBeenCalled();
+      });
+      expect(clearButtons[0]).toHaveFocus();
+    });
   });
 
   // ── Banner ────────────────────────────────────────────────────────────────
@@ -329,6 +358,32 @@ describe('TeamDetailPage – clear branding confirmation (LS-4063)', () => {
           variables: { teamId: 1, leagueId: 100, bannerUrl: '' },
         });
       });
+    });
+
+    // LS-6049: same focus-restoration guarantee for the banner trigger.
+    it('returns focus to the Clear button when Cancel is clicked', () => {
+      render(<TeamDetailPage />);
+
+      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
+      fireEvent.click(clearButtons[1]);
+
+      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+      expect(clearButtons[1]).toHaveFocus();
+    });
+
+    it('returns focus to the Clear button when the clear is confirmed', async () => {
+      render(<TeamDetailPage />);
+
+      const clearButtons = screen.getAllByRole('button', { name: /^clear$/i });
+      fireEvent.click(clearButtons[1]);
+
+      fireEvent.click(screen.getByRole('button', { name: /^clear banner$/i }));
+
+      await waitFor(() => {
+        expect(mockUpdateBranding).toHaveBeenCalled();
+      });
+      expect(clearButtons[1]).toHaveFocus();
     });
   });
 });

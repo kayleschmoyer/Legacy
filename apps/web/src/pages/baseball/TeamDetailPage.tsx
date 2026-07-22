@@ -13,6 +13,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import type { TamaguiElement } from 'tamagui';
 import { Skeleton } from '@legacy-sports/shared-components';
 import {
   LeaguePositionFragment,
@@ -195,6 +196,17 @@ export function TeamDetailPage() {
 
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
+  // LS-6049: restore focus to the trigger button when the clear-branding
+  // dialog closes (relying on document.activeElement at open time is
+  // unreliable — e.g. Safari does not focus <button> on mouse click).
+  const avatarClearButtonRef = useRef<TamaguiElement>(null);
+  const bannerClearButtonRef = useRef<TamaguiElement>(null);
+
+  const focusClearTrigger = (target: 'logo' | 'banner') => {
+    const ref =
+      target === 'banner' ? bannerClearButtonRef : avatarClearButtonRef;
+    ref.current?.focus();
+  };
 
   // Get team members (which includes leagueId)
   const {
@@ -897,6 +909,7 @@ export function TeamDetailPage() {
                         Current: {currentAvatarUrl}
                       </Text>
                       <Button
+                        ref={avatarClearButtonRef}
                         size="$2"
                         chromeless
                         onPress={() => setPendingClear('logo')}
@@ -953,6 +966,7 @@ export function TeamDetailPage() {
                         Current: {currentBannerUrl}
                       </Text>
                       <Button
+                        ref={bannerClearButtonRef}
                         size="$2"
                         chromeless
                         onPress={() => setPendingClear('banner')}
@@ -1103,7 +1117,11 @@ export function TeamDetailPage() {
         modal
         open={pendingClear !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingClear(null);
+          if (!open && pendingClear) {
+            const target = pendingClear;
+            setPendingClear(null);
+            focusClearTrigger(target);
+          }
         }}
       >
         <Dialog.Portal>
@@ -1145,7 +1163,11 @@ export function TeamDetailPage() {
             </Dialog.Description>
             <XStack gap="$3" justifyContent="flex-end">
               <Button
-                onPress={() => setPendingClear(null)}
+                onPress={() => {
+                  const target = pendingClear;
+                  setPendingClear(null);
+                  if (target) focusClearTrigger(target);
+                }}
                 disabled={brandingLoading}
               >
                 Cancel
@@ -1155,6 +1177,7 @@ export function TeamDetailPage() {
                 onPress={() => {
                   const target = pendingClear;
                   setPendingClear(null);
+                  if (target) focusClearTrigger(target);
                   if (target === 'banner') void handleClearBanner();
                   else if (target === 'logo') void handleClearAvatar();
                 }}
