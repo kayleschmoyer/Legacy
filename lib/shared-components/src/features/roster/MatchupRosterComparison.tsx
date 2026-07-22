@@ -17,6 +17,7 @@ import {
   BRAND_NAVY_LIGHT,
   withAlpha,
 } from '../../utils/colors';
+import { PositionBadge } from '../../components/PositionBadge';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,18 +57,17 @@ function PlayerRow({ player }: { player: RosterPlayer }) {
       gap="$2"
     >
       {player.position && (
-        <YStack
+        <PositionBadge
+          position={player.position}
           backgroundColor={posColors.bg}
+          textColor={posColors.text}
           paddingHorizontal="$1.5"
           paddingVertical="$0.5"
           borderRadius="$2"
           minWidth={32}
-          alignItems="center"
-        >
-          <Text fontSize="$1" fontWeight="700" color={posColors.text}>
-            {player.position}
-          </Text>
-        </YStack>
+          fontSize="$1"
+          fontWeight="700"
+        />
       )}
       <Text
         fontSize="$2"

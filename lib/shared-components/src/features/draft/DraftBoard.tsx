@@ -8,6 +8,7 @@ import {
   SportPosition,
 } from '../../types';
 import { SPORT_CONFIGS } from '../../config/sports';
+import { PositionBadge } from '../../components/PositionBadge';
 
 // Utility function for position colors
 const DEFAULT_POSITION_COLOR = '#6B7280';
@@ -108,17 +109,17 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         >
           {`${player.firstName} ${player.lastName}`}
         </Text>
-        <YStack
-          backgroundColor={getPositionColor(player.position, sport)}
+        <PositionBadge
+          position={player.position}
+          color={getPositionColor(player.position, sport)}
+          variant="solid"
           paddingHorizontal="$2"
           paddingVertical="$1"
           borderRadius="$2"
+          fontSize="$2"
+          fontWeight="600"
           opacity={isDrafted ? 0.7 : 1}
-        >
-          <Text fontSize="$2" fontWeight="600" color="white">
-            {player.position}
-          </Text>
-        </YStack>
+        />
       </XStack>
 
       <Text

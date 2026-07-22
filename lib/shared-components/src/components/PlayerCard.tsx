@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
+import { PositionBadge } from './PositionBadge';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -116,24 +117,19 @@ export function PlayerCard({
         {/* Name + sub line */}
         <YStack gap={2} flex={1} minWidth={0}>
           <XStack alignItems="center" gap={6}>
-            {/* Position chip */}
-            <XStack
+            <PositionBadge
+              position={position}
+              color={positionColor}
+              variant="solid"
+              textColor="$textOnAccent"
               paddingHorizontal={8}
               paddingVertical={3}
               borderRadius={4}
-              backgroundColor={positionColor}
-              flexShrink={0}
-            >
-              <Text
-                fontFamily="$heading"
-                fontWeight="700"
-                fontSize={10}
-                letterSpacing={0.8}
-                color="$textOnAccent"
-              >
-                {position}
-              </Text>
-            </XStack>
+              fontSize={10}
+              fontWeight="700"
+              fontFamily="$heading"
+              letterSpacing={0.8}
+            />
             <Text
               fontFamily="$body"
               fontWeight="600"

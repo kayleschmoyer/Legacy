@@ -263,6 +263,12 @@ export type { NavBarProps, NavLink } from './components/NavBar';
 // Aliased to avoid collision with the legacy PlayerCard in features/players.
 export { PlayerCard as DSPlayerCard } from './components/PlayerCard';
 export type { PlayerCardProps as DSPlayerCardProps } from './components/PlayerCard';
+export { PositionBadge } from './components/PositionBadge';
+export type {
+  PositionBadgeProps,
+  PositionBadgeShape,
+  PositionBadgeVariant,
+} from './components/PositionBadge';
 
 // Shared formatting utilities
 export * from './utils/scoreFormatting';

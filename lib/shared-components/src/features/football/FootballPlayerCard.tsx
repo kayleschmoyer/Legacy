@@ -23,6 +23,7 @@ import {
   withAlpha,
 } from '../../utils/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../utils/typography';
+import { PositionBadge } from '../../components/PositionBadge';
 
 /**
  * Portable shape for a football player rendered by {@link FootballPlayerCard}.
@@ -125,31 +126,6 @@ function TeamBadge({
         textAlign="center"
       >
         {teamAbbr ?? '?'}
-      </Text>
-    </YStack>
-  );
-}
-
-function PositionBadge({ position }: { position: string | null | undefined }) {
-  const pos = position ?? '?';
-  const color = getPositionColor(pos);
-  return (
-    <YStack
-      paddingHorizontal={7}
-      paddingVertical={2}
-      borderRadius={4}
-      backgroundColor={withAlpha(color, 0.15)}
-      borderWidth={1}
-      borderColor={withAlpha(color, 0.5)}
-    >
-      <Text
-        fontSize={11}
-        fontWeight="700"
-        color={color}
-        fontFamily={FONT_BODY}
-        letterSpacing={0.5}
-      >
-        {pos}
       </Text>
     </YStack>
   );
@@ -397,7 +373,17 @@ export function FootballPlayerCard({
               'Unknown Player'}
           </Text>
           <XStack gap={6} alignItems="center">
-            <PositionBadge position={isDst ? 'DST' : pos} />
+            <PositionBadge
+              position={isDst ? 'DST' : (pos ?? '?')}
+              color={getPositionColor(isDst ? 'DST' : pos)}
+              showBorder
+              paddingHorizontal={7}
+              paddingVertical={2}
+              borderRadius={4}
+              fontSize={11}
+              fontFamily={FONT_BODY}
+              letterSpacing={0.5}
+            />
             {player.nflTeam && (
               <Text fontSize={12} color={TEXT_MUTED} fontFamily={FONT_BODY}>
                 {player.nflTeam ?? ''}

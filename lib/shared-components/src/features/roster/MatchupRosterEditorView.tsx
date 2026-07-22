@@ -15,6 +15,7 @@ import {
   isEligibleForSlot,
   POSITION_SLOT_ORDER,
 } from './rosterUtils';
+import { PositionBadge } from '../../components/PositionBadge';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -325,19 +326,14 @@ export function MatchupRosterEditorView({
         gap="$2"
       >
         {/* Position badge */}
-        <YStack
-          width={36}
-          height={36}
-          borderRadius={18}
+        <PositionBadge
+          position={slot.type}
+          shape="circle"
           backgroundColor={badge.bg}
-          justifyContent="center"
-          alignItems="center"
-          flexShrink={0}
-        >
-          <Text fontSize="$2" fontWeight="800" color={badge.text}>
-            {slot.type}
-          </Text>
-        </YStack>
+          textColor={badge.text}
+          fontSize="$2"
+          fontWeight="800"
+        />
 
         {/* Empty label */}
         <YStack flex={1} minWidth={0}>
@@ -440,19 +436,14 @@ export function MatchupRosterEditorView({
           gap="$2"
         >
           {/* Position badge */}
-          <YStack
-            width={36}
-            height={36}
-            borderRadius={18}
+          <PositionBadge
+            position={posType ?? 'BN'}
+            shape="circle"
             backgroundColor={badge.bg}
-            justifyContent="center"
-            alignItems="center"
-            flexShrink={0}
-          >
-            <Text fontSize="$2" fontWeight="800" color={badge.text}>
-              {posType ?? 'BN'}
-            </Text>
-          </YStack>
+            textColor={badge.text}
+            fontSize="$2"
+            fontWeight="800"
+          />
 
           {/* Player info */}
           <YStack flex={1} minWidth={0}>

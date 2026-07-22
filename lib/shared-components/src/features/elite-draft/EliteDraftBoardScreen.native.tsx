@@ -24,8 +24,8 @@ import {
   useDraftWebSocket,
   usePlayerData,
 } from './hooks';
-import { withAlpha } from '../../utils/colors';
 import { useAuth } from '../../features/auth';
+import { PositionBadge } from '../../components/PositionBadge';
 
 // ---------------------------------------------------------------------------
 // Props (same interface as the web version)
@@ -378,16 +378,16 @@ function PlayerRow({
             <Text fontWeight="700" fontSize="$4">
               {player.name}
             </Text>
-            <Text
+            <PositionBadge
+              position={player.position}
+              color={posColor}
+              alpha={0.12}
+              paddingHorizontal="$1"
+              paddingVertical={0}
+              borderRadius="$1"
               fontSize="$2"
               fontWeight="600"
-              color={posColor}
-              backgroundColor={withAlpha(posColor, 0.12)}
-              paddingHorizontal="$1"
-              borderRadius="$1"
-            >
-              {player.position}
-            </Text>
+            />
           </XStack>
           <XStack space="$3" marginTop="$1">
             {player.isPitcher ? (

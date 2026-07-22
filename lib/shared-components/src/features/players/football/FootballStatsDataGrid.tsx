@@ -22,6 +22,7 @@ import {
   withAlpha,
 } from '../../../utils/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../shell/tokens';
+import { PositionBadge } from '../../../components/PositionBadge';
 import { EmptyCard, ErrorCard, LoadingSkeleton } from '../shell/StateCards';
 import { StatsGridHeaderCell } from '../shell/StatsGridHeaderCell';
 import { StatsGridPagination } from '../shell/StatsGridPagination';
@@ -116,24 +117,17 @@ function FootballGridRow({
         paddingVertical={10}
         alignItems="center"
       >
-        <YStack
+        <PositionBadge
+          position={posLabel ?? '?'}
+          color={posColor}
+          showBorder
           paddingHorizontal={6}
           paddingVertical={2}
           borderRadius={4}
-          backgroundColor={withAlpha(posColor, 0.15)}
-          borderWidth={1}
-          borderColor={withAlpha(posColor, 0.5)}
-        >
-          <Text
-            fontSize={11}
-            fontWeight="700"
-            color={posColor}
-            fontFamily={FONT_BODY}
-            letterSpacing={0.5}
-          >
-            {posLabel ?? '?'}
-          </Text>
-        </YStack>
+          fontSize={11}
+          fontFamily={FONT_BODY}
+          letterSpacing={0.5}
+        />
       </XStack>
       <XStack
         width={TEAM_WIDTH}

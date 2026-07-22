@@ -12,6 +12,7 @@ import {
 import { Animated, Dimensions, FlatList } from '../../platform-components';
 import { Filter, Player, SportPosition, TrendingInfo } from '../../types';
 import { SPORT_CONFIGS } from '../../config/sports';
+import { PositionBadge } from '../../components/PositionBadge';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_TABLET = SCREEN_WIDTH > 768;
@@ -153,17 +154,16 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
               <Text fontSize="$2" color="$gray10">
                 {player.team}
               </Text>
-              <YStack
-                backgroundColor={getPositionColor(player.position, sport)}
-                borderRadius="$2"
+              <PositionBadge
+                position={player.position}
+                color={getPositionColor(player.position, sport)}
+                variant="solid"
                 paddingHorizontal="$2"
                 paddingVertical="$1"
-                alignItems="center"
-              >
-                <Text fontSize="$1" fontWeight="bold" color="white">
-                  {player.position}
-                </Text>
-              </YStack>
+                borderRadius="$2"
+                fontSize="$1"
+                fontWeight="bold"
+              />
               <YStack
                 backgroundColor={getInjuryColor(player.injury)}
                 borderRadius="$2"

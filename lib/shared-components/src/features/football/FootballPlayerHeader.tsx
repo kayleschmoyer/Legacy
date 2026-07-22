@@ -20,6 +20,7 @@ import {
   withAlpha,
 } from '../../utils/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../utils/typography';
+import { PositionBadge } from '../../components/PositionBadge';
 
 /**
  * Portable player shape consumed by {@link FootballPlayerHeader}.
@@ -129,30 +130,6 @@ function PlayerAvatar({
   );
 }
 
-function PositionBadge({ position }: { position: string }) {
-  const color = getPositionColor(position);
-  return (
-    <YStack
-      paddingHorizontal={8}
-      paddingVertical={3}
-      borderRadius={5}
-      backgroundColor={withAlpha(color, 0.15)}
-      borderWidth={1}
-      borderColor={withAlpha(color, 0.5)}
-    >
-      <Text
-        fontSize={12}
-        fontWeight="700"
-        color={color}
-        fontFamily={FONT_BODY}
-        letterSpacing={0.5}
-      >
-        {position}
-      </Text>
-    </YStack>
-  );
-}
-
 function FreeAgentBadge() {
   return (
     <YStack
@@ -228,7 +205,19 @@ export function FootballPlayerHeader({ player }: FootballPlayerHeaderProps) {
         </Text>
 
         <XStack gap={8} alignItems="center" flexWrap="wrap">
-          {positionLabel && <PositionBadge position={positionLabel} />}
+          {positionLabel && (
+            <PositionBadge
+              position={positionLabel}
+              color={getPositionColor(positionLabel)}
+              showBorder
+              paddingHorizontal={8}
+              paddingVertical={3}
+              borderRadius={5}
+              fontSize={12}
+              fontFamily={FONT_BODY}
+              letterSpacing={0.5}
+            />
+          )}
           {!player.nflTeam && <FreeAgentBadge />}
           {player.pfrId && (
             <Anchor

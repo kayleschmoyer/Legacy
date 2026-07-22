@@ -10,6 +10,7 @@ import {
 } from './rosterEligibility';
 import { getPositionColors } from './rosterUtils';
 import { getPlayerName } from '../../utils/playerFormatting';
+import { PositionBadge } from '../../components/PositionBadge';
 
 // ── Platform-agnostic shapes ────────────────────────────────────────────────
 // Minimal structural types satisfied by both web and native `TeamMemberFragment`
@@ -144,23 +145,16 @@ function SlotRow({
       animation="quick"
       onPress={effectiveReadOnly ? undefined : onPress}
     >
-      <YStack
-        width={36}
-        height={36}
-        borderRadius={18}
+      <PositionBadge
+        position={posType}
+        shape="circle"
         backgroundColor={badge.bg}
-        justifyContent="center"
-        alignItems="center"
-        flexShrink={0}
+        textColor={badge.text}
+        fontSize="$2"
+        fontWeight="800"
       >
-        {disabled ? (
-          <Spinner size="small" color={badge.text} />
-        ) : (
-          <Text fontSize="$2" fontWeight="800" color={badge.text}>
-            {posType}
-          </Text>
-        )}
-      </YStack>
+        {disabled ? <Spinner size="small" color={badge.text} /> : undefined}
+      </PositionBadge>
       <YStack flex={1} minWidth={0}>
         <Text fontSize="$3" fontWeight="600" color="$gray12" numberOfLines={1}>
           {assignedName ?? getPositionLabel(posType)}
@@ -238,19 +232,14 @@ function BenchRow({
       animation="quick"
       onPress={effectiveReadOnly ? undefined : onPress}
     >
-      <YStack
-        width={36}
-        height={36}
-        borderRadius={18}
+      <PositionBadge
+        position="BN"
+        shape="circle"
         backgroundColor={badge.bg}
-        justifyContent="center"
-        alignItems="center"
-        flexShrink={0}
-      >
-        <Text fontSize="$2" fontWeight="800" color={badge.text}>
-          BN
-        </Text>
-      </YStack>
+        textColor={badge.text}
+        fontSize="$2"
+        fontWeight="800"
+      />
       <YStack flex={1} minWidth={0}>
         <Text fontSize="$3" fontWeight="600" color="$gray12" numberOfLines={1}>
           {name}

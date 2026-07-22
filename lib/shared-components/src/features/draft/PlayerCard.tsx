@@ -1,6 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { Animated } from '../../platform-components';
+import { PositionBadge } from '../../components/PositionBadge';
 
 // Types
 export interface Player {
@@ -186,18 +187,16 @@ function PlayerCard({
           </YStack>
 
           <XStack alignItems="center" space="$1">
-            <YStack
-              backgroundColor={getPositionColor(player.position, sport)}
-              borderRadius="$2"
+            <PositionBadge
+              position={player.position}
+              color={getPositionColor(player.position, sport)}
+              variant="solid"
               paddingHorizontal="$2"
               paddingVertical="$1"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Text fontSize="$1" fontWeight="bold" color="white">
-                {player.position}
-              </Text>
-            </YStack>
+              borderRadius="$2"
+              fontSize="$1"
+              fontWeight="bold"
+            />
 
             {player.injury && player.injury !== 'healthy' && (
               <YStack

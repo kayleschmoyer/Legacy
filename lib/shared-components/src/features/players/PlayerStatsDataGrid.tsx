@@ -47,6 +47,7 @@ import {
   TEXT_HIGH_CONTRAST,
   TEXT_MUTED,
 } from '../../utils/colors';
+import { PositionBadge } from '../../components/PositionBadge';
 
 const BG_PAGE = '#0A0F1A';
 const BG_ELEVATED = '#16223A';
@@ -1191,29 +1192,19 @@ export function PlayerStatsDataGrid({
                       }
                     >
                       {isNameCol && posKey ? (
-                        <XStack
-                          alignItems="center"
-                          justifyContent="center"
+                        <PositionBadge
+                          position={posKey}
+                          color={posColor}
+                          variant="solid"
                           paddingHorizontal={7}
                           paddingVertical={3}
-                          style={{
-                            minWidth: 32,
-                            borderRadius: 4,
-                            background: posColor,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontFamily: FONT_DISPLAY,
-                              fontWeight: '800',
-                              fontSize: 10,
-                              letterSpacing: '0.08em',
-                              color: '#fff',
-                            }}
-                          >
-                            {posKey}
-                          </Text>
-                        </XStack>
+                          borderRadius={4}
+                          minWidth={32}
+                          fontSize={10}
+                          fontWeight="800"
+                          fontFamily={FONT_DISPLAY}
+                          letterSpacing="0.08em"
+                        />
                       ) : null}
                       <Text
                         numberOfLines={1}
