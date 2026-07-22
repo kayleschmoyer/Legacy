@@ -294,12 +294,20 @@ async function setupGraphQL(
 // ── Tests: Team Info Display ─────────────────────────────────────────────────
 
 test.describe('Team Detail – team info display @regression', () => {
-  test('displays the league ID below the team name', async ({ page }) => {
+  test('displays a link to the league instead of the raw league ID', async ({
+    page,
+  }) => {
     await setupGraphQL(page);
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('League ID: 1')).toBeVisible();
+    await expect(page.getByText(/league id/i)).not.toBeVisible();
+    const leagueLink = page.getByRole('button', {
+      name: 'Part of Test League',
+    });
+    await expect(leagueLink).toBeVisible();
+    await leagueLink.click();
+    await expect(page).toHaveURL(/\/baseball\/league\/1$/);
   });
 
   test('shows custom avatar image when avatarUrl is set', async ({ page }) => {

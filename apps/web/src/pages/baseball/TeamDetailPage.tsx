@@ -784,10 +784,25 @@ export function TeamDetailPage() {
               </XStack>
             )}
           </XStack>
-          {leagueId && (
-            <Text fontSize="$3" color="$gray11">
-              League ID: {leagueId}
-            </Text>
+          {leagueId && leagueData?.league?.name && (
+            <Button
+              unstyled
+              size="$1"
+              data-testid="team-detail-league-link"
+              onPress={() => navigate(`/baseball/league/${leagueId}`)}
+              backgroundColor="transparent"
+              borderWidth={0}
+              padding={0}
+              alignSelf="flex-start"
+            >
+              <Text
+                fontSize="$3"
+                color="$gray11"
+                textDecorationLine="underline"
+              >
+                Part of {leagueData.league.name}
+              </Text>
+            </Button>
           )}
           {!permissionLoading && !isOwner && !isCommissioner && (
             <Text fontSize="$3" color="$gray11" fontStyle="italic">

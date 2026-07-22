@@ -956,3 +956,48 @@ describe('TeamDetailPage – analytics tracking (LS-7686)', () => {
     expect(mockTrackTeamViewed).toHaveBeenCalledTimes(1);
   });
 });
+
+// ── League link, not raw ID (LS-6052) ──────────────────────────────────────
+
+describe('TeamDetailPage – league identity link (LS-6052)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchMembers.mockResolvedValue({});
+  });
+
+  it('never renders the raw league ID as text', () => {
+    render(<TeamDetailPage />);
+
+    expect(screen.queryByText(/league id/i)).not.toBeInTheDocument();
+  });
+
+  it('renders "Part of <League Name>" and navigates to the league detail page on click', () => {
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          name: 'The Dynasty League',
+          userMembership: { permissionLevel: 'general_manager' },
+        },
+      },
+      loading: false,
+      error: undefined,
+    });
+
+    render(<TeamDetailPage />);
+
+    const link = screen.getByRole('button', {
+      name: /part of the dynasty league/i,
+    });
+    expect(link).toBeInTheDocument();
+    expect(screen.queryByText(/league id/i)).not.toBeInTheDocument();
+
+    fireEvent.click(link);
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/100');
+  });
+});
