@@ -33,6 +33,26 @@ export interface DevServerStartParams {
   timeoutMs?: number;
 }
 
+/**
+ * Resolve the absolute path to the nx binary in a worktree's node_modules,
+ * preferring the Windows `.cmd` shim when present. Returns `null` if neither
+ * exists (e.g. node_modules isn't set up).
+ *
+ * Always returns an OS-native (join()-produced) path rather than a hardcoded
+ * forward-slash string — with shell:true on Windows, cmd.exe treats "/" as a
+ * switch delimiter when parsing an unqualified command token, so a relative
+ * "node_modules/.bin/nx" gets split at the first slash and cmd tries to run a
+ * program literally named "node_modules", failing with "'node_modules' is not
+ * recognized...". Backslash-separated absolute paths don't trigger that split.
+ */
+export function resolveNxExecutable(worktreePath: string): string | null {
+  const nxBin = join(worktreePath, 'node_modules', '.bin', 'nx');
+  const nxBinCmd = `${nxBin}.cmd`;
+  if (existsSync(nxBinCmd)) return nxBinCmd;
+  if (existsSync(nxBin)) return nxBin;
+  return null;
+}
+
 /** Try to TCP-connect to a single host:port. Resolves true on success, false on any failure. */
 export function tryConnect(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -181,13 +201,12 @@ export async function devServerStart(
   // Pre-check: verify the nx binary exists in the worktree's node_modules.
   // Worktrees use a symlink/junction to the main repo's node_modules; if it's
   // missing, `pnpm exec nx` will fail with an unhelpful error.
-  const nxBin = join(worktreePath, 'node_modules', '.bin', 'nx');
-  const nxBinCmd = nxBin + '.cmd';
-  if (!existsSync(nxBin) && !existsSync(nxBinCmd)) {
+  const nxExecutable = resolveNxExecutable(worktreePath);
+  if (!nxExecutable) {
     return jsonResult(
       {
         ok: false,
-        error: `nx binary not found at ${nxBin}. The worktree's node_modules may not be set up.`,
+        error: `nx binary not found at ${join(worktreePath, 'node_modules', '.bin', 'nx')}. The worktree's node_modules may not be set up.`,
         remedy:
           'Run `node scripts/modules-pool/link.mjs` or `make install` inside the worktree to restore node_modules, then retry.',
       },
@@ -199,28 +218,23 @@ export async function devServerStart(
 
   try {
     // Start Vite/React dev server via nx serve web --port=<port>.
-    // We invoke node_modules/.bin/nx directly (shell:true resolves .cmd on Windows)
-    // rather than `make dev-web` because the Makefile target does not forward PORT
-    // and nx's @nx/vite:dev-server executor ignores the PORT env var — the port
-    // must be passed as a --port CLI flag.
-    //
+    // We invoke the nx binary directly (rather than `make dev-web`) because the
+    // Makefile target does not forward PORT and nx's @nx/vite:dev-server executor
+    // ignores the PORT env var — the port must be passed as a --port CLI flag.
+    const isWindows = process.platform === 'win32';
+
     // stdout AND stderr are piped so we can (a) include the tail in error
     // diagnostics and (b) keep the OS pipe buffer from filling and stalling
     // the child. The output is consumed by `attachOutputCapture` below.
-    const isWindows = process.platform === 'win32';
-    const child = spawn(
-      'node_modules/.bin/nx',
-      ['serve', 'web', `--port=${port}`],
-      {
-        cwd: worktreePath,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: !isWindows,
-        shell: true,
-        env: {
-          ...process.env,
-        },
+    const child = spawn(nxExecutable, ['serve', 'web', `--port=${port}`], {
+      cwd: worktreePath,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: !isWindows,
+      shell: true,
+      env: {
+        ...process.env,
       },
-    );
+    });
 
     if (!child.pid) {
       return jsonResult(

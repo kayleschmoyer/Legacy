@@ -1,11 +1,15 @@
 import { describe, expect, it } from '@jest/globals';
 import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join, sep } from 'node:path';
 
 import {
   READINESS_WAIT_MAX_MS,
   clampReadinessWait,
   probeLoopback,
+  resolveNxExecutable,
   waitForReadyOrExit,
 } from './dev-server-start.js';
 
@@ -51,6 +55,63 @@ describe('clampReadinessWait', () => {
 
   it('never exceeds the ~60s MCP transport limit', () => {
     expect(READINESS_WAIT_MAX_MS).toBeLessThan(60_000);
+  });
+});
+
+describe('resolveNxExecutable', () => {
+  function makeWorktreeWithBin(files: string[]): string {
+    const worktreePath = mkdtempSync(join(tmpdir(), 'dev-server-start-'));
+    const binDir = join(worktreePath, 'node_modules', '.bin');
+    mkdirSync(binDir, { recursive: true });
+    for (const file of files) {
+      writeFileSync(join(binDir, file), '');
+    }
+    return worktreePath;
+  }
+
+  it('returns null when node_modules/.bin has no nx binary', () => {
+    const worktreePath = makeWorktreeWithBin([]);
+    try {
+      expect(resolveNxExecutable(worktreePath)).toBeNull();
+    } finally {
+      rmSync(worktreePath, { recursive: true, force: true });
+    }
+  });
+
+  it('returns the .cmd shim when both nx and nx.cmd exist', () => {
+    const worktreePath = makeWorktreeWithBin(['nx', 'nx.cmd']);
+    try {
+      const executable = resolveNxExecutable(worktreePath);
+      expect(executable).toBe(
+        join(worktreePath, 'node_modules', '.bin', 'nx.cmd'),
+      );
+    } finally {
+      rmSync(worktreePath, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to the extensionless binary when no .cmd shim exists', () => {
+    const worktreePath = makeWorktreeWithBin(['nx']);
+    try {
+      const executable = resolveNxExecutable(worktreePath);
+      expect(executable).toBe(join(worktreePath, 'node_modules', '.bin', 'nx'));
+    } finally {
+      rmSync(worktreePath, { recursive: true, force: true });
+    }
+  });
+
+  it('never returns a forward-slash-only relative path (the cmd.exe "/" split bug)', () => {
+    const worktreePath = makeWorktreeWithBin(['nx', 'nx.cmd']);
+    try {
+      const executable = resolveNxExecutable(worktreePath);
+      expect(executable).not.toBeNull();
+      // Must be absolute and use the OS-native separator, so cmd.exe never
+      // sees a lone "/"-delimited relative token to mis-tokenize.
+      expect(executable!.startsWith(worktreePath)).toBe(true);
+      expect(executable).toContain(sep);
+    } finally {
+      rmSync(worktreePath, { recursive: true, force: true });
+    }
   });
 });
 
