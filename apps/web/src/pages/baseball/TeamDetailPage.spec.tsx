@@ -64,8 +64,27 @@ jest.mock('@legacy-sports/shared-components/roster', () => ({
   ),
 }));
 
+// LS-6046: real (pure, side-effect-free) implementations — mocked per the
+// established convention (Team.spec.tsx) since the package root also
+// exports native-only components that jest can't resolve in this suite.
 jest.mock('@legacy-sports/shared-components', () => ({
   Skeleton: () => <div data-testid="settings-skeleton" />,
+  TEAM_BRANDING_PRESET_COLORS: [
+    '#1B3A5C',
+    '#C41E3A',
+    '#2D6A4F',
+    '#8B6F47',
+    '#7C6CAE',
+    '#C5A55A',
+    '#0E7490',
+    '#9F1239',
+  ],
+  normalizeTeamColor: (c: string | null | undefined, fallback: string) => {
+    if (!c) return fallback;
+    if (c.startsWith('#')) return c.toUpperCase();
+    if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c.toUpperCase()}`;
+    return c;
+  },
 }));
 
 // ── GraphQL ───────────────────────────────────────────────────────────────────
@@ -112,6 +131,8 @@ jest.mock('@legacy-sports/graphql', () => ({
           name: 'Test Team',
           avatarUrl: 'https://example.com/logo.png',
           bannerUrl: 'https://example.com/banner.jpg',
+          primaryColor: '#123ABC',
+          secondaryColor: '#ABC123',
         },
       ],
     },
@@ -347,6 +368,125 @@ describe('TeamDetailPage – branding save toast accessibility (LS-6045)', () =>
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('Avatar URL must start with https://');
     expect(mockUpdateBranding).not.toHaveBeenCalled();
+  });
+});
+
+// ── Team Colors (LS-6046) ───────────────────────────────────────────────────
+
+describe('TeamDetailPage – team colors (LS-6046)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+  });
+
+  it('AC1: renders primary/secondary color pickers seeded from the team', () => {
+    render(<TeamDetailPage />);
+
+    expect(screen.getByText('Team Colors')).toBeInTheDocument();
+    expect(screen.getByLabelText('Primary Color hex')).toHaveValue('#123ABC');
+    expect(screen.getByLabelText('Secondary Color hex')).toHaveValue('#ABC123');
+    expect(
+      screen.getByLabelText('Primary Color color picker'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Secondary Color color picker'),
+    ).toBeInTheDocument();
+  });
+
+  it('AC1: seeds from the shared preset defaults when the team has no saved colors', () => {
+    const graphql = jest.requireMock<{ useGetLeagueTeamsQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetLeagueTeamsQuery.mockReturnValueOnce({
+      data: {
+        leagueTeams: [
+          {
+            id: 1,
+            name: 'Test Team',
+            avatarUrl: 'https://example.com/logo.png',
+            bannerUrl: 'https://example.com/banner.jpg',
+            primaryColor: null,
+            secondaryColor: null,
+          },
+        ],
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetchTeams,
+    });
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByLabelText('Primary Color hex')).toHaveValue('#1B3A5C');
+    expect(screen.getByLabelText('Secondary Color hex')).toHaveValue('#C5A55A');
+  });
+
+  it('AC2: selecting a preset swatch and saving calls updateTeamBranding with the new color', async () => {
+    render(<TeamDetailPage />);
+
+    fireEvent.click(screen.getByLabelText('Pick primary color #C41E3A'));
+    fireEvent.click(screen.getByRole('button', { name: /^save colors$/i }));
+
+    await waitFor(() => {
+      expect(mockUpdateBranding).toHaveBeenCalledWith({
+        variables: {
+          teamId: 1,
+          leagueId: 100,
+          primaryColor: '#C41E3A',
+          secondaryColor: '#ABC123',
+        },
+      });
+    });
+  });
+
+  it('AC2: typing a valid 6-digit hex and saving persists it', async () => {
+    render(<TeamDetailPage />);
+
+    fireEvent.change(screen.getByLabelText('Secondary Color hex'), {
+      target: { value: '#00FF00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^save colors$/i }));
+
+    await waitFor(() => {
+      expect(mockUpdateBranding).toHaveBeenCalledWith({
+        variables: {
+          teamId: 1,
+          leagueId: 100,
+          primaryColor: '#123ABC',
+          secondaryColor: '#00FF00',
+        },
+      });
+    });
+  });
+
+  it('AC3: an invalid/incomplete hex value is not saved and shows a validation message', () => {
+    render(<TeamDetailPage />);
+
+    fireEvent.change(screen.getByLabelText('Primary Color hex'), {
+      target: { value: '#12' },
+    });
+
+    expect(
+      screen.getByText(/enter a valid 6-digit hex color/i),
+    ).toBeInTheDocument();
+    // The underlying color state never updated, so Save stays disabled.
+    expect(
+      screen.getByRole('button', { name: /^save colors$/i }),
+    ).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /^save colors$/i }));
+    expect(mockUpdateBranding).not.toHaveBeenCalled();
+  });
+
+  it('AC4: the color pickers render for a GM with no premium gating', () => {
+    render(<TeamDetailPage />);
+
+    const colorsSection = screen.getByText('Team Colors').closest('div');
+    expect(colorsSection).not.toBeNull();
+    expect(screen.queryByText(/premium/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Primary Color hex')).toBeInTheDocument();
+    expect(screen.getByLabelText('Secondary Color hex')).toBeInTheDocument();
   });
 });
 

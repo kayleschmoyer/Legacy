@@ -28,6 +28,10 @@ import {
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
 import { RosterBoard } from '@legacy-sports/shared-components/roster';
+import {
+  normalizeTeamColor,
+  TEAM_BRANDING_PRESET_COLORS,
+} from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import { TeamAssistantManagerSettings } from '../../features/baseball/TeamAssistantManagerSettings';
@@ -47,12 +51,120 @@ import { useIsPremium } from '../../hooks/useIsPremium';
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
+
+interface ColorInputGroupProps {
+  label: string;
+  value: string;
+  presetColors: readonly string[];
+  onChange: (color: string) => void;
+}
+
+/**
+ * LS-6046: swatch presets + hex/native color input, mirroring the pattern
+ * already shipped on the league-detail-v2 Team tab (Team.tsx:20-98). Kept
+ * local to this page rather than extracted/shared — see ticket Out of Scope.
+ */
+const ColorInputGroup: React.FC<ColorInputGroupProps> = ({
+  label,
+  value,
+  presetColors,
+  onChange,
+}) => {
+  const [hexInput, setHexInput] = useState(value);
+
+  useEffect(() => {
+    setHexInput(value);
+  }, [value]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.startsWith('#')
+      ? e.target.value
+      : `#${e.target.value}`;
+    setHexInput(v);
+    if (HEX_COLOR_RE.test(v)) onChange(v);
+  };
+
+  return (
+    <YStack gap="$2">
+      <Text fontSize="$3" fontWeight="500">
+        {label}
+      </Text>
+      <XStack gap="$2" flexWrap="wrap">
+        {presetColors.map((c) => (
+          <button
+            key={c}
+            type="button"
+            aria-label={`Pick ${label.toLowerCase()} ${c}`}
+            aria-pressed={value === c}
+            onClick={() => onChange(c)}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              background: c,
+              border:
+                value === c
+                  ? `2px solid ${BRAND_GOLD_LIGHT}`
+                  : `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.35)}`,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          />
+        ))}
+      </XStack>
+      <XStack gap="$2" alignItems="center">
+        <input
+          type="color"
+          aria-label={`${label} color picker`}
+          value={HEX_COLOR_RE.test(value) ? value : BRAND_NAVY_LIGHT}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setHexInput(e.target.value);
+          }}
+          style={{
+            width: 32,
+            height: 32,
+            padding: 0,
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer',
+            background: 'none',
+          }}
+        />
+        <input
+          type="text"
+          aria-label={`${label} hex`}
+          value={hexInput}
+          onChange={handleTextChange}
+          placeholder="#RRGGBB"
+          maxLength={7}
+          style={{
+            width: 100,
+            fontFamily: 'monospace',
+            fontSize: 13,
+            padding: '4px 8px',
+            borderRadius: 4,
+            border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.35)}`,
+          }}
+        />
+      </XStack>
+      {hexInput && !HEX_COLOR_RE.test(hexInput) && (
+        <Text fontSize="$2" style={{ color: BRAND_SEAM_RED }}>
+          Enter a valid 6-digit hex color (e.g. #RRGGBB).
+        </Text>
+      )}
+    </YStack>
+  );
+};
 
 /**
  * TeamDetailPage - Display team roster and allow editing for General Managers.
  *
  * LS-355: GMs can now set a team avatar (logo) and banner image via HTTPS URL.
  * LS-1810: GMs can upload custom logo images, screened for NSFW content via Cloudflare AI.
+ * LS-6046: GMs can also set primary/secondary team colors, ungated (colors are
+ * a free capability — see the ticket's Technical Approach for the precedent).
  */
 export function TeamDetailPage() {
   const { teamId } = useParams<{ teamId: string }>();
@@ -71,6 +183,14 @@ export function TeamDetailPage() {
   const [bannerUploading, setBannerUploading] = useState(false);
   const [pendingClear, setPendingClear] = useState<'logo' | 'banner' | null>(
     null,
+  );
+
+  // LS-6046: team color state, seeded from the team once loaded (see effect below)
+  const [primaryColor, setPrimaryColor] = useState<string>(
+    TEAM_BRANDING_PRESET_COLORS[0],
+  );
+  const [secondaryColor, setSecondaryColor] = useState<string>(
+    TEAM_BRANDING_PRESET_COLORS[5],
   );
 
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
@@ -143,6 +263,27 @@ export function TeamDetailPage() {
       ),
     [positionsData],
   );
+
+  // Find the team from leagueTeams, falling back to teamById for empty-roster teams
+  const team =
+    teamsData?.leagueTeams?.find(
+      (t: { id?: number | null }) => t?.id === teamIdNum,
+    ) ?? teamByIdData?.team;
+  const seedTeamId = team?.id;
+  const teamPrimaryColor = team?.primaryColor;
+  const teamSecondaryColor = team?.secondaryColor;
+
+  // LS-6046: (re-)seed color pickers whenever the underlying team's saved
+  // colors change, mirroring useTeamBranding's re-seed effect.
+  useEffect(() => {
+    if (seedTeamId == null) return;
+    setPrimaryColor(
+      normalizeTeamColor(teamPrimaryColor, TEAM_BRANDING_PRESET_COLORS[0]),
+    );
+    setSecondaryColor(
+      normalizeTeamColor(teamSecondaryColor, TEAM_BRANDING_PRESET_COLORS[5]),
+    );
+  }, [seedTeamId, teamPrimaryColor, teamSecondaryColor]);
 
   useEffect(() => {
     if (teamIdNum && leagueId) {
@@ -294,11 +435,6 @@ export function TeamDetailPage() {
   if (leagueError)
     return <Text>Error loading league details: {leagueError.message}</Text>;
 
-  // Find the team from leagueTeams, falling back to teamById for empty-roster teams
-  const team =
-    teamsData?.leagueTeams?.find(
-      (t: { id?: number | null }) => t?.id === teamIdNum,
-    ) ?? teamByIdData?.team;
   const teamMembers = membersData.teamMembers;
 
   const currentAvatarUrl = team?.avatarUrl ?? null;
@@ -352,6 +488,49 @@ export function TeamDetailPage() {
         err instanceof Error ? err.message : 'Failed to save branding',
       );
     }
+  };
+
+  // LS-6046: colors persist independently of the avatar/banner form above —
+  // the pickers always reflect the current (or default) team colors, dirty
+  // tracked against the last-saved values.
+  const savedPrimaryColor = normalizeTeamColor(
+    team?.primaryColor,
+    TEAM_BRANDING_PRESET_COLORS[0],
+  );
+  const savedSecondaryColor = normalizeTeamColor(
+    team?.secondaryColor,
+    TEAM_BRANDING_PRESET_COLORS[5],
+  );
+  const colorsDirty =
+    primaryColor !== savedPrimaryColor ||
+    secondaryColor !== savedSecondaryColor;
+
+  const handleSaveColors = async () => {
+    if (!leagueId || !colorsDirty) return;
+    setBrandingError(null);
+    setBrandingSuccess(false);
+    try {
+      await updateTeamBranding({
+        variables: {
+          teamId: teamIdNum,
+          leagueId,
+          primaryColor,
+          secondaryColor,
+        },
+      });
+      await refetchTeams();
+      setBrandingSuccess(true);
+      setTimeout(() => setBrandingSuccess(false), 3000);
+    } catch (err: unknown) {
+      setBrandingError(
+        err instanceof Error ? err.message : 'Failed to save colors',
+      );
+    }
+  };
+
+  const handleDiscardColors = () => {
+    setPrimaryColor(savedPrimaryColor);
+    setSecondaryColor(savedSecondaryColor);
   };
 
   const handleClearAvatar = async () => {
@@ -848,6 +1027,66 @@ export function TeamDetailPage() {
                   {brandingLoading ? 'Saving…' : 'Save Branding'}
                 </Button>
               </form>
+            </YStack>
+
+            {/* Team Colors (LS-6046) — free capability, not premium-gated */}
+            <YStack
+              gap="$3"
+              padding="$4"
+              borderRadius="$4"
+              borderWidth={1}
+              borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+              backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.06)}
+            >
+              <Text
+                fontSize="$5"
+                fontWeight="600"
+                style={{ color: BRAND_GOLD_LIGHT }}
+              >
+                Team Colors
+              </Text>
+              <Text fontSize="$3" color="$gray11">
+                Pick your team&apos;s primary and secondary colors. Choose a
+                preset swatch or enter a custom hex value.
+              </Text>
+
+              <ColorInputGroup
+                label="Primary Color"
+                value={primaryColor}
+                presetColors={TEAM_BRANDING_PRESET_COLORS}
+                onChange={setPrimaryColor}
+              />
+              <ColorInputGroup
+                label="Secondary Color"
+                value={secondaryColor}
+                presetColors={TEAM_BRANDING_PRESET_COLORS}
+                onChange={setSecondaryColor}
+              />
+
+              <XStack gap="$2" alignItems="center">
+                <Button
+                  onPress={() => {
+                    void handleSaveColors();
+                  }}
+                  disabled={brandingLoading || !colorsDirty}
+                  style={{
+                    backgroundColor:
+                      brandingLoading || !colorsDirty
+                        ? withAlpha(BRAND_NAVY_LIGHT, 0.4)
+                        : BRAND_NAVY_LIGHT,
+                    color: 'white',
+                  }}
+                  hoverStyle={{ backgroundColor: BRAND_NAVY }}
+                  pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+                >
+                  {brandingLoading ? 'Saving…' : 'Save Colors'}
+                </Button>
+                {colorsDirty && !brandingLoading && (
+                  <Button size="$3" chromeless onPress={handleDiscardColors}>
+                    Discard changes
+                  </Button>
+                )}
+              </XStack>
             </YStack>
 
             {/* Assistant Manager Settings */}
