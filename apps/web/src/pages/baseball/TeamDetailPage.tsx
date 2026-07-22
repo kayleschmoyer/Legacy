@@ -540,14 +540,7 @@ export function TeamDetailPage() {
               onError={() => setAvatarImgError(true)}
             />
           ) : (
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: '700',
-                color: 'white',
-                lineHeight: '1',
-              }}
-            >
+            <Text fontSize="$8" fontWeight="bold" color="white">
               {(team?.name ?? 'T').charAt(0).toUpperCase()}
             </Text>
           )}
