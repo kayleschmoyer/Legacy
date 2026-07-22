@@ -300,6 +300,10 @@ export type CareerBatting = {
   /** Defensive WAR (dWAR) from Baseball Reference. Career total is the sum of per-season dwar values, rounded to one decimal. Null until dwar data is imported. */
   defensiveWAR?: Maybe<Scalars['Float']['output']>;
   doubles?: Maybe<Scalars['Int']['output']>;
+  /** Career fantasy points using default scoring settings (lib/scoring/src/baseball/DefaultScoring.ts). */
+  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  /** Average fantasy points per game using default scoring settings. 0 for players with no recorded games. */
+  fantasyPointsPerGame?: Maybe<Scalars['Float']['output']>;
   games?: Maybe<Scalars['Int']['output']>;
   groundedIntoDoublePlays?: Maybe<Scalars['Int']['output']>;
   hitByPitch?: Maybe<Scalars['Int']['output']>;
@@ -370,6 +374,10 @@ export type CareerPitching = {
   completeGames?: Maybe<Scalars['Int']['output']>;
   earnedRuns?: Maybe<Scalars['Int']['output']>;
   era?: Maybe<Scalars['String']['output']>;
+  /** Career fantasy points using default scoring settings (lib/scoring/src/baseball/DefaultScoring.ts). */
+  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  /** Average fantasy points per game using default scoring settings. 0 for players with no recorded games. */
+  fantasyPointsPerGame?: Maybe<Scalars['Float']['output']>;
   games?: Maybe<Scalars['Int']['output']>;
   gamesFinished?: Maybe<Scalars['Int']['output']>;
   gamesStarted?: Maybe<Scalars['Int']['output']>;
@@ -8520,6 +8528,8 @@ export type CareerBattingFragment = {
   offensiveWAR?: number | null;
   defensiveWAR?: number | null;
   totalWAR?: number | null;
+  fantasyPoints?: number | null;
+  fantasyPointsPerGame?: number | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -8560,6 +8570,8 @@ export type CareerPitchingFragment = {
   strikeoutsPerNine?: number | null;
   winPercentage?: number | null;
   pitchingWAR?: number | null;
+  fantasyPoints?: number | null;
+  fantasyPointsPerGame?: number | null;
   player?: {
     __typename?: 'Player';
     id?: number | null;
@@ -9505,6 +9517,8 @@ export type GetCareerBattingStatsQuery = {
         offensiveWAR?: number | null;
         defensiveWAR?: number | null;
         totalWAR?: number | null;
+        fantasyPoints?: number | null;
+        fantasyPointsPerGame?: number | null;
         player?: {
           __typename?: 'Player';
           id?: number | null;
@@ -9574,6 +9588,8 @@ export type GetCareerPitchingStatsQuery = {
     strikeoutsPerNine?: number | null;
     winPercentage?: number | null;
     pitchingWAR?: number | null;
+    fantasyPoints?: number | null;
+    fantasyPointsPerGame?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -14182,6 +14198,8 @@ export const CareerBattingFragmentDoc = gql`
     offensiveWAR
     defensiveWAR
     totalWAR
+    fantasyPoints
+    fantasyPointsPerGame
     player {
       id
       firstName
@@ -14221,6 +14239,8 @@ export const CareerPitchingFragmentDoc = gql`
     strikeoutsPerNine
     winPercentage
     pitchingWAR
+    fantasyPoints
+    fantasyPointsPerGame
     player {
       id
       firstName

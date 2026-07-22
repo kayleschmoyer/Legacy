@@ -338,6 +338,16 @@ type CareerBatting {
   """
   defensiveWAR: Float
   doubles: Int
+
+  """
+  Career fantasy points using default scoring settings (lib/scoring/src/baseball/DefaultScoring.ts).
+  """
+  fantasyPoints: Float
+
+  """
+  Average fantasy points per game using default scoring settings. 0 for players with no recorded games.
+  """
+  fantasyPointsPerGame: Float
   games: Int
   groundedIntoDoublePlays: Int
   hitByPitch: Int
@@ -413,6 +423,16 @@ type CareerPitching {
   completeGames: Int
   earnedRuns: Int
   era: String
+
+  """
+  Career fantasy points using default scoring settings (lib/scoring/src/baseball/DefaultScoring.ts).
+  """
+  fantasyPoints: Float
+
+  """
+  Average fantasy points per game using default scoring settings. 0 for players with no recorded games.
+  """
+  fantasyPointsPerGame: Float
   games: Int
   gamesFinished: Int
   gamesStarted: Int

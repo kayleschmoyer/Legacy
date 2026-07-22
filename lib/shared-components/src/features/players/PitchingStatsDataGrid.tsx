@@ -25,10 +25,6 @@ import { Platform } from 'react-native';
 import { Button, Input, Select, Spinner, Text, XStack, YStack } from 'tamagui';
 import { PITCHING_POSITIONS } from '@legacy-sports/utils';
 import {
-  computeScoring,
-  DEFAULT_PITCHING_SCORING,
-} from '@legacy-sports/scoring';
-import {
   type CareerPitchingFragment,
   type GetCareerPitchingStatsQueryVariables,
   useGetCareerPitchingStatsCountQuery,
@@ -143,36 +139,15 @@ export interface PitchingStatsDataGridProps {
 export const PITCHING_NAME_COLUMN_KEY = 'playerName';
 
 // =============================================================================
-// Helpers
-// =============================================================================
-
-function computePitchingFantasyPoints(
-  player: CareerPitchingFragment | null | undefined,
-): number {
-  if (!player) return 0;
-  return computeScoring(
-    {
-      bb: player.baseOnBalls ?? 0,
-      er: player.earnedRuns ?? 0,
-      h: player.hits ?? 0,
-      l: player.losses ?? 0,
-      outsRecorded: player.outsRecorded ?? 0,
-      so: player.strikeouts ?? 0,
-      sv: player.saves ?? 0,
-      w: player.wins ?? 0,
-    },
-    DEFAULT_PITCHING_SCORING,
-  );
-}
-
-// =============================================================================
 // Column Configuration
 // =============================================================================
 
 // Column order mirrors docs/agents/pages/players/stats.md (Pitcher Columns section):
 // Name · Position · [Team omitted — not available on CareerPitching data model] ·
 // G · GS · W · L · IP · ERA · SO · BB · WHIP · SHO · SV · K/9
-// Additional non-spec columns (CG, H, ER, WAR, FPTS) follow at the end.
+// Additional non-spec columns (CG, H, ER, WAR) follow at the end. Fantasy points
+// are the app's headline number, so every stats-grid view leads its stat
+// columns with career FPTS + FP/G (LS-8569 / LS-8566).
 export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
   {
     key: 'playerName',
@@ -192,6 +167,28 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     align: 'left',
     priority: 'medium',
     description: 'Positions played, sorted by most games',
+  },
+  {
+    key: 'fantasyPoints',
+    label: 'FPTS',
+    sortable: true,
+    width: '80px',
+    align: 'center',
+    priority: 'high',
+    description: 'Career fantasy points using default scoring settings',
+    formatter: (v: unknown) =>
+      v != null ? Math.round(v as number).toString() : '—',
+  },
+  {
+    key: 'fantasyPointsPerGame',
+    label: 'FPTS/G',
+    sortable: true,
+    width: '80px',
+    align: 'center',
+    priority: 'high',
+    description:
+      'Average fantasy points per game using default scoring settings',
+    formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
   },
   {
     key: 'games',
@@ -349,25 +346,6 @@ export const PITCHING_STATS_COLUMNS: readonly PitchingGridColumn[] = [
     description: 'Pitching Wins Above Replacement',
     formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
   },
-  {
-    key: 'fantasyPoints',
-    label: 'FPTS',
-    sortable: false,
-    width: '80px',
-    align: 'center',
-    priority: 'high',
-    description: 'Career fantasy points using default scoring settings',
-  },
-  {
-    key: 'fantasyPointsPerGame',
-    label: 'FPTS/G',
-    sortable: false,
-    width: '80px',
-    align: 'center',
-    priority: 'high',
-    description:
-      'Average fantasy points per game using default scoring settings',
-  },
 ] as const;
 
 const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
@@ -388,6 +366,9 @@ const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   hits: 'hits',
   earnedRuns: 'earnedRuns',
   pitchingWAR: 'pitchingWAR',
+  // Fantasy points (computed server-side, sortable via a real SQL expression — LS-8569)
+  fantasyPoints: 'fantasyPoints',
+  fantasyPointsPerGame: 'fantasyPointsPerGame',
 };
 
 // =============================================================================
@@ -946,34 +927,17 @@ export function PitchingStatsDataGrid({
                                 const extraOuts = outs % 3;
                                 return `${wholeInnings}.${extraOuts}`;
                               })()
-                            : column.key === 'fantasyPoints'
-                              ? Math.round(
-                                  computePitchingFantasyPoints(player),
-                                ).toString()
-                              : column.key === 'fantasyPointsPerGame'
-                                ? (() => {
-                                    const games = player?.games ?? 0;
-                                    const fpts =
-                                      computePitchingFantasyPoints(player);
-                                    return games > 0
-                                      ? (fpts / games).toFixed(1)
-                                      : '0.0';
-                                  })()
-                                : column.formatter
-                                  ? column.formatter(
-                                      player?.[
-                                        column.key as keyof typeof player
-                                      ],
-                                    )
-                                  : (() => {
-                                      const rawVal =
-                                        player?.[
-                                          column.key as keyof typeof player
-                                        ];
-                                      return typeof rawVal === 'object'
-                                        ? '—'
-                                        : String(rawVal ?? '—');
-                                    })();
+                            : column.formatter
+                              ? column.formatter(
+                                  player?.[column.key as keyof typeof player],
+                                )
+                              : (() => {
+                                  const rawVal =
+                                    player?.[column.key as keyof typeof player];
+                                  return typeof rawVal === 'object'
+                                    ? '—'
+                                    : String(rawVal ?? '—');
+                                })();
                     return (
                       <XStack
                         key={column.key}

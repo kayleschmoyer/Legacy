@@ -149,6 +149,13 @@ export interface SeasonStatisticsQueryOptions {
  * Map a `queryOptions.orderBy` value (as a string from the GraphQL wire) to a
  * Drizzle SQL ORDER BY clause for the `career_pitching` view. Exported so the
  * mapping can be unit tested without a database connection.
+ *
+ * `fantasyPoints` and `fantasyPointsPerGame` mirror `DEFAULT_PITCHING_SCORING`
+ * from lib/scoring/src/baseball/DefaultScoring.ts. The weights are inlined
+ * rather than imported because `@legacy-sports/scoring` depends on
+ * `@legacy-sports/db-client` — pulling the package back in would create a
+ * dependency cycle (see getCareerBattingOrderByClause in
+ * ../query-builders/TypeSafeQueryBuilder.ts for the same pattern on batting).
  */
 export function getCareerPitchingOrderByClause(
   orderBy: string | undefined,
@@ -156,6 +163,10 @@ export function getCareerPitchingOrderByClause(
 ): SQL<unknown> {
   const dir = orderDirection === 'desc' ? 'DESC' : 'ASC';
   switch (orderBy) {
+    case 'fantasyPoints':
+      return sql`(COALESCE(${PublicSchema.careerPitching.w}, 0) * 5 + COALESCE(${PublicSchema.careerPitching.sv}, 0) * 5 + COALESCE(${PublicSchema.careerPitching.so}, 0) * 1 + COALESCE(${PublicSchema.careerPitching.outsRecorded}, 0) * 1 + COALESCE(${PublicSchema.careerPitching.bb}, 0) * -1 + COALESCE(${PublicSchema.careerPitching.h}, 0) * -1 + COALESCE(${PublicSchema.careerPitching.er}, 0) * -2 + COALESCE(${PublicSchema.careerPitching.l}, 0) * -2) ${sql.raw(dir)} NULLS LAST`;
+    case 'fantasyPointsPerGame':
+      return sql`((COALESCE(${PublicSchema.careerPitching.w}, 0) * 5 + COALESCE(${PublicSchema.careerPitching.sv}, 0) * 5 + COALESCE(${PublicSchema.careerPitching.so}, 0) * 1 + COALESCE(${PublicSchema.careerPitching.outsRecorded}, 0) * 1 + COALESCE(${PublicSchema.careerPitching.bb}, 0) * -1 + COALESCE(${PublicSchema.careerPitching.h}, 0) * -1 + COALESCE(${PublicSchema.careerPitching.er}, 0) * -2 + COALESCE(${PublicSchema.careerPitching.l}, 0) * -2)::numeric / NULLIF(${PublicSchema.careerPitching.g}, 0)) ${sql.raw(dir)} NULLS LAST`;
     case 'wins':
       return sql`${PublicSchema.careerPitching.w} ${sql.raw(dir)} NULLS LAST`;
     case 'losses':

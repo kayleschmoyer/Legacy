@@ -6,6 +6,86 @@ import { hasEntitlement, requireEntitlement } from './authorization';
 import { ENTITLEMENTS } from './entitlements';
 
 /**
+ * Mirrors DEFAULT_BATTING_SCORING / DEFAULT_PITCHING_SCORING from
+ * lib/scoring/src/baseball/DefaultScoring.ts. Inlined rather than imported —
+ * `@legacy-sports/scoring` depends on `@legacy-sports/db-client`, and this
+ * module is required early in schema/index.ts's registration order; pulling
+ * scoring in here left `PublicSchema` (from db-client) partially initialized
+ * by the time football.ts's module-level FOOTBALL_STAT_SORTS map ran later,
+ * breaking unrelated football resolver tests (LS-8569).
+ */
+function computeLinearScore<T extends Record<string, number | null>>(
+  stats: T,
+  weights: Partial<Record<keyof T, number>>,
+): number {
+  let sum = 0;
+  for (const key in weights) {
+    const weight = weights[key];
+    const value = stats[key];
+    if (weight != null && value != null) {
+      sum += weight * value;
+    }
+  }
+  return sum;
+}
+
+/** Mirrors DEFAULT_BATTING_SCORING (lib/scoring/src/baseball/DefaultScoring.ts). */
+const BATTING_SCORING_WEIGHTS = {
+  cs: -1,
+  doubles: 2,
+  h: 1,
+  hbp: 1,
+  hr: 4,
+  r: 1,
+  rbi: 1,
+  sb: 2,
+  so: -0.5,
+  triples: 3,
+};
+
+/** Mirrors DEFAULT_PITCHING_SCORING (lib/scoring/src/baseball/DefaultScoring.ts). */
+const PITCHING_SCORING_WEIGHTS = {
+  bb: -1,
+  er: -2,
+  h: -1,
+  l: -2,
+  outsRecorded: 1,
+  so: 1,
+  sv: 5,
+  w: 5,
+};
+
+/** Picks the numeric fields BATTING_SCORING_WEIGHTS needs off a CareerBatting row. */
+function battingScoringRecord(stats: {
+  h: number | null;
+  doubles: number | null;
+  triples: number | null;
+  hr: number | null;
+  r: number | null;
+  rbi: number | null;
+  sb: number | null;
+  cs: number | null;
+  hbp: number | null;
+  so: number | null;
+}) {
+  return stats;
+}
+
+/** Picks the numeric fields PITCHING_SCORING_WEIGHTS needs off a CareerPitching row. */
+function pitchingScoringRecord(stats: {
+  bb: number | null;
+  er: number | null;
+  h: number | null;
+  l: number | null;
+  outsRecorded: number | null;
+  so: number | null;
+  sv: number | null;
+  w: number | null;
+}) {
+  return stats;
+}
+
+/**
  * Statistics Schema - Connection-Based Pagination
  *
  * All statistics queries use relay-style connections with:
@@ -345,6 +425,38 @@ CareerBattingRef.implement({
         'Non-null only when both offensive and defensive WAR data are available.',
       resolve: (stats) => stats.totalWar ?? null,
     }),
+    /**
+     * Career fantasy points using DEFAULT_BATTING_SCORING (LS-8569). A real
+     * weighted-sum SQL expression backs sorting on this field (see
+     * `totalScore` in TypeSafeQueryBuilder.ts) — unlike football, MLB default
+     * scoring is a linear combination of stored career columns.
+     */
+    fantasyPoints: t.field({
+      type: 'Float',
+      nullable: true,
+      description:
+        'Career fantasy points using default scoring settings ' +
+        '(lib/scoring/src/baseball/DefaultScoring.ts).',
+      resolve: (stats) =>
+        computeLinearScore(
+          battingScoringRecord(stats),
+          BATTING_SCORING_WEIGHTS,
+        ),
+    }),
+    fantasyPointsPerGame: t.field({
+      type: 'Float',
+      nullable: true,
+      description:
+        'Average fantasy points per game using default scoring settings. ' +
+        '0 for players with no recorded games.',
+      resolve: (stats) =>
+        stats.g
+          ? computeLinearScore(
+              battingScoringRecord(stats),
+              BATTING_SCORING_WEIGHTS,
+            ) / stats.g
+          : 0,
+    }),
     // Player relationship
     player: t.field({
       type: 'Player',
@@ -529,6 +641,37 @@ CareerPitchingRef.implement({
         const ip = stats.outsRecorded / 3;
         return ip === 0 ? null : (9 * stats.bb) / ip;
       },
+    }),
+    /**
+     * Career fantasy points using DEFAULT_PITCHING_SCORING (LS-8569). A real
+     * weighted-sum SQL expression backs sorting on this field (see the
+     * `fantasyPoints` case in getCareerPitchingOrderByClause).
+     */
+    fantasyPoints: t.field({
+      type: 'Float',
+      nullable: true,
+      description:
+        'Career fantasy points using default scoring settings ' +
+        '(lib/scoring/src/baseball/DefaultScoring.ts).',
+      resolve: (stats) =>
+        computeLinearScore(
+          pitchingScoringRecord(stats),
+          PITCHING_SCORING_WEIGHTS,
+        ),
+    }),
+    fantasyPointsPerGame: t.field({
+      type: 'Float',
+      nullable: true,
+      description:
+        'Average fantasy points per game using default scoring settings. ' +
+        '0 for players with no recorded games.',
+      resolve: (stats) =>
+        stats.g
+          ? computeLinearScore(
+              pitchingScoringRecord(stats),
+              PITCHING_SCORING_WEIGHTS,
+            ) / stats.g
+          : 0,
     }),
     // Player relationship
     player: t.field({

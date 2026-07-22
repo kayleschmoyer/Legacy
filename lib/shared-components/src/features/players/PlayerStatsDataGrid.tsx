@@ -262,6 +262,30 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
     description: 'Player name with position chip',
   },
   {
+    // Fantasy points are the app's headline number, so every stats-grid view
+    // leads its stat columns with career FPTS + FP/G (LS-8569 / LS-8566).
+    key: 'fantasyPoints',
+    label: 'FPTS',
+    sortable: true,
+    width: '68px',
+    align: 'right',
+    priority: 'high',
+    description: 'Career fantasy points using default scoring settings',
+    formatter: (v: unknown) =>
+      v != null ? Math.round(v as number).toString() : '—',
+  },
+  {
+    key: 'fantasyPointsPerGame',
+    label: 'FPTS/G',
+    sortable: true,
+    width: '72px',
+    align: 'right',
+    priority: 'high',
+    description:
+      'Average fantasy points per game using default scoring settings',
+    formatter: (v: unknown) => (v != null ? (v as number).toFixed(1) : '—'),
+  },
+  {
     key: 'games',
     label: 'G',
     sortable: true,

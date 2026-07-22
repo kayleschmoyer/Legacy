@@ -58,4 +58,42 @@ describe('getCareerPitchingOrderByClause', () => {
       new RegExp(`"career_pitching"\\."${column}" DESC NULLS LAST`),
     );
   });
+
+  describe('fantasyPoints (FPTS) — LS-8569', () => {
+    it('emits the DEFAULT_PITCHING_SCORING weighted sum, not just wins', () => {
+      const sql = renderOrderBy('fantasyPoints');
+
+      // Must combine multiple pitching columns — proving we don't hit the
+      // wins-DESC default fallthrough.
+      expect(sql).toMatch(/"career_pitching"\."w"/);
+      expect(sql).toMatch(/"career_pitching"\."sv"/);
+      expect(sql).toMatch(/"career_pitching"\."so"/);
+      expect(sql).toMatch(/"career_pitching"\."outs_recorded"/);
+      expect(sql).toMatch(/"career_pitching"\."bb"/);
+      expect(sql).toMatch(/"career_pitching"\."h"/);
+      expect(sql).toMatch(/"career_pitching"\."er"/);
+      expect(sql).toMatch(/"career_pitching"\."l"/);
+
+      // Weights from DEFAULT_PITCHING_SCORING
+      expect(sql).toMatch(/\* 5/); // w & sv
+      expect(sql).toMatch(/\* -2/); // er & l penalties
+      expect(sql).toMatch(/\* -1/); // bb & h penalties
+
+      expect(sql).toMatch(/DESC NULLS LAST$/);
+    });
+
+    it('honours ascending direction', () => {
+      expect(renderOrderBy('fantasyPoints', 'asc')).toMatch(/ASC NULLS LAST$/);
+    });
+  });
+
+  describe('fantasyPointsPerGame (FPTS/G) — LS-8569', () => {
+    it('divides the weighted sum by career_pitching.g', () => {
+      const sql = renderOrderBy('fantasyPointsPerGame');
+
+      expect(sql).toMatch(/NULLIF\("career_pitching"\."g", 0\)/);
+      expect(sql).toMatch(/\* 5/); // w/sv weight still present in numerator
+      expect(sql).toMatch(/DESC NULLS LAST$/);
+    });
+  });
 });

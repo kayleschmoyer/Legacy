@@ -294,6 +294,10 @@ export type CareerBatting = {
   /** Defensive WAR (dWAR) from Baseball Reference. Career total is the sum of per-season dwar values, rounded to one decimal. Null until dwar data is imported. */
   defensiveWAR?: Maybe<Scalars['Float']['output']>;
   doubles?: Maybe<Scalars['Int']['output']>;
+  /** Career fantasy points using default scoring settings (lib/scoring/src/baseball/DefaultScoring.ts). */
+  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  /** Average fantasy points per game using default scoring settings. 0 for players with no recorded games. */
+  fantasyPointsPerGame?: Maybe<Scalars['Float']['output']>;
   games?: Maybe<Scalars['Int']['output']>;
   groundedIntoDoublePlays?: Maybe<Scalars['Int']['output']>;
   hitByPitch?: Maybe<Scalars['Int']['output']>;
@@ -364,6 +368,10 @@ export type CareerPitching = {
   completeGames?: Maybe<Scalars['Int']['output']>;
   earnedRuns?: Maybe<Scalars['Int']['output']>;
   era?: Maybe<Scalars['String']['output']>;
+  /** Career fantasy points using default scoring settings (lib/scoring/src/baseball/DefaultScoring.ts). */
+  fantasyPoints?: Maybe<Scalars['Float']['output']>;
+  /** Average fantasy points per game using default scoring settings. 0 for players with no recorded games. */
+  fantasyPointsPerGame?: Maybe<Scalars['Float']['output']>;
   games?: Maybe<Scalars['Int']['output']>;
   gamesFinished?: Maybe<Scalars['Int']['output']>;
   gamesStarted?: Maybe<Scalars['Int']['output']>;

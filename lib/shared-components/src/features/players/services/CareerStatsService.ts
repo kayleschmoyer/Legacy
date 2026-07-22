@@ -11,10 +11,6 @@
 import * as React from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
-  computeScoring,
-  DEFAULT_BATTING_SCORING,
-} from '@legacy-sports/scoring';
-import {
   CareerBattingFragment,
   GetAllPlayers,
   GetCareerBattingStats,
@@ -281,22 +277,6 @@ export function transformCareerStats(
   const lastName = playerData?.lastName ?? '';
   const displayName = `${firstName} ${lastName}`.trim() || `Player ${playerId}`;
 
-  // Compute fantasy points using the canonical scoring function and default settings.
-  const battingRecord = {
-    h: hits,
-    doubles,
-    triples,
-    hr: homeRuns,
-    r: runs,
-    rbi,
-    sb: stolenBases,
-    cs: caughtStealing,
-    hbp: hitByPitch,
-    so: strikeouts,
-  };
-  const fantasyPoints = computeScoring(battingRecord, DEFAULT_BATTING_SCORING);
-  const fantasyPointsPerGame = games > 0 ? fantasyPoints / games : 0;
-
   return {
     id: `player-${playerId}`,
     playerId,
@@ -331,8 +311,8 @@ export function transformCareerStats(
     formattedSluggingPercentage: formatStatistic(sluggingPercentage),
     formattedOPS: formatStatistic(ops),
     offensiveWAR: rawStats.offensiveWAR ?? null,
-    fantasyPoints,
-    fantasyPointsPerGame,
+    fantasyPoints: rawStats.fantasyPoints ?? 0,
+    fantasyPointsPerGame: rawStats.fantasyPointsPerGame ?? 0,
     // Parse positions played from the new field
     positionsPlayed: parsePositionsPlayed(rawStats.positionsPlayed),
     formattedPositions: formatPositionsPlayed(rawStats.positionsPlayed),

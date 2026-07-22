@@ -52,6 +52,8 @@ const mockRawPlayerStats: CareerBattingStatsRaw = {
   battingAverage: 0.305,
   onBasePercentage: 0.377,
   sluggingPercentage: 0.555,
+  fantasyPoints: 12582.5,
+  fantasyPointsPerGame: 3.815,
   player: {
     id: 1486,
     firstName: 'Babe',
@@ -85,6 +87,8 @@ const mockEmptyPlayerStats: CareerBattingStatsRaw = {
   battingAverage: null,
   onBasePercentage: null,
   sluggingPercentage: null,
+  fantasyPoints: 0,
+  fantasyPointsPerGame: 0,
 };
 
 const mockGraphQLResponse: MockedResponse = {
@@ -488,6 +492,8 @@ describe('CareerStatsService - Integration', () => {
       battingAverage: 0.284,
       onBasePercentage: 0.365,
       sluggingPercentage: 0.5,
+      fantasyPoints: 5125,
+      fantasyPointsPerGame: 5125 / 1500,
     };
 
     const result = transformCareerStats(realisticStats);
@@ -528,6 +534,8 @@ describe('CareerStatsService - Integration', () => {
       battingAverage: 1.0, // Perfect batting average
       onBasePercentage: 1.0,
       sluggingPercentage: 4.0, // Theoretical maximum for one at-bat
+      fantasyPoints: 7,
+      fantasyPointsPerGame: 7,
     };
 
     const result = transformCareerStats(edgeCaseStats);

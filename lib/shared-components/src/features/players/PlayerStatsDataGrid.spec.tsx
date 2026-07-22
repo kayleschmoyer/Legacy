@@ -74,6 +74,8 @@ const mockPlayerData: CareerBattingStatsRaw[] = [
     battingAverage: 0.305,
     onBasePercentage: 0.377,
     sluggingPercentage: 0.555,
+    fantasyPoints: 12582.5,
+    fantasyPointsPerGame: 3.815,
   },
   {
     __typename: 'CareerBatting',
@@ -108,6 +110,8 @@ const mockPlayerData: CareerBattingStatsRaw[] = [
     battingAverage: 0.167,
     onBasePercentage: 0.281,
     sluggingPercentage: 0.185,
+    fantasyPoints: 2,
+    fantasyPointsPerGame: 2 / 170,
   },
 ];
 

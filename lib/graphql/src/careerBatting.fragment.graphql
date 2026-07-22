@@ -27,6 +27,8 @@ fragment CareerBatting on CareerBatting {
   offensiveWAR
   defensiveWAR
   totalWAR
+  fantasyPoints
+  fantasyPointsPerGame
   player {
     id
     firstName

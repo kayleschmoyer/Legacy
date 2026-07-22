@@ -29,6 +29,8 @@ fragment CareerPitching on CareerPitching {
   strikeoutsPerNine
   winPercentage
   pitchingWAR
+  fantasyPoints
+  fantasyPointsPerGame
   player {
     id
     firstName
