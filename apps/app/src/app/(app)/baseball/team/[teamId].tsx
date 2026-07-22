@@ -6,6 +6,7 @@ import { computeAverageScoring, computeScoring } from '@legacy-sports/scoring';
 import {
   BRAND_NAVY_LIGHT,
   SecureStorageProvider,
+  TeamAssistantManagerSettings,
   TeamBrandingControl,
   type TeamBrandingTeam,
   UnifiedLoadingPanel,
@@ -286,7 +287,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
       );
     case 'Settings':
       return isOwner ? (
-        <YStack padding="$4">
+        <YStack padding="$4" gap="$4">
           <TeamBrandingControl
             teamId={teamId}
             leagueId={leagueId}
@@ -299,6 +300,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
             }
             onError={handleError}
           />
+          <TeamAssistantManagerSettings teamId={teamId} />
         </YStack>
       ) : (
         <YStack padding="$4">

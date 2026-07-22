@@ -56,6 +56,9 @@ jest.mock('@legacy-sports/shared-components', () => {
     SecureStorageProvider: {
       getItem: jest.fn(() => Promise.resolve('mock-jwt')),
     },
+    TeamAssistantManagerSettings: () => (
+      <View testID="team-assistant-manager-settings" />
+    ),
   };
 });
 
@@ -429,5 +432,53 @@ describe('BaseballTeam route — Settings tab logo-upload gating (LS-7685)', () 
     await expect(lastTeamBrandingProps?.getAuthToken?.()).resolves.toBe(
       'mock-jwt',
     );
+  });
+});
+
+describe('BaseballTeam route — assistant manager settings parity (LS-6029, AC1)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    lastProjections = undefined;
+
+    mockUseGetTeamByIdQuery.mockReturnValue({
+      loading: false,
+      data: { team: mockTeam },
+    });
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { userMembership: { permissionLevel: 'owner' } } },
+    });
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: { leagueScoringProfile: { multiplierGroups: [] } },
+    });
+    mockUseGetMatchupPlayersQuery.mockReturnValue({
+      loading: false,
+      data: { getMatchupPlayers: [] },
+    });
+    mockUseGetPositionsForLeagueQuery.mockReturnValue({
+      loading: false,
+      data: { leaguePositions: mockPositions },
+    });
+    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
+    mockUseSubscription.mockReturnValue({ isPremium: true });
+  });
+
+  it('renders TeamAssistantManagerSettings in the Settings tab for the team owner', () => {
+    render(<BaseballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+    expect(screen.getByTestId('team-assistant-manager-settings')).toBeTruthy();
+  });
+
+  it('does not render the Settings tab (or assistant manager settings) for a non-owner', () => {
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 999 } });
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { userMembership: { permissionLevel: 'member' } } },
+    });
+    render(<BaseballTeam />);
+    expect(screen.queryByTestId('tab-Settings')).toBeNull();
+    expect(screen.queryByTestId('team-assistant-manager-settings')).toBeNull();
   });
 });

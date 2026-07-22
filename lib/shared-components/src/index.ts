@@ -133,6 +133,7 @@ export * from './Dropdown';
 export * from './features/teams/TeamPicker';
 export * from './features/teams/TeamBrandingControl';
 export * from './features/teams/useTeamBranding';
+export * from './features/teams/TeamAssistantManagerSettings';
 
 // Sport-agnostic filter UI
 export * from './features/shared/FilterOptions';
