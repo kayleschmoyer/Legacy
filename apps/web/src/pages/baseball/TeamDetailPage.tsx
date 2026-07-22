@@ -796,12 +796,21 @@ export function TeamDetailPage() {
 
                 {/* Feedback */}
                 {brandingError && (
-                  <Text fontSize="$3" style={{ color: BRAND_SEAM_RED }}>
+                  <Text
+                    fontSize="$3"
+                    style={{ color: BRAND_SEAM_RED }}
+                    role="alert"
+                  >
                     {brandingError}
                   </Text>
                 )}
                 {brandingSuccess && (
-                  <Text fontSize="$3" color="$green9">
+                  <Text
+                    fontSize="$3"
+                    color="$green9"
+                    role="status"
+                    aria-live="polite"
+                  >
                     Branding saved!
                   </Text>
                 )}

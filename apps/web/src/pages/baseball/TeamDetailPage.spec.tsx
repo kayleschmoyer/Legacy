@@ -174,7 +174,11 @@ jest.mock('tamagui', () => {
     Paragraph: ({ children }: any) => <p>{children}</p>,
     Separator: () => <hr />,
     Spinner: () => <span data-testid="spinner" />,
-    Text: ({ children }: any) => <span>{children}</span>,
+    Text: ({ children, role, 'aria-live': ariaLive }: any) => (
+      <span role={role} aria-live={ariaLive}>
+        {children}
+      </span>
+    ),
     XStack: ({ children, testID }: any) => (
       <div {...(testID ? { 'data-testid': testID } : {})}>{children}</div>
     ),
@@ -300,6 +304,44 @@ describe('TeamDetailPage – clear branding confirmation (LS-4063)', () => {
         });
       });
     });
+  });
+});
+
+// ── Branding save toast accessibility (LS-6045) ────────────────────────────
+
+describe('TeamDetailPage – branding save toast accessibility (LS-6045)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+  });
+
+  it('announces a successful save via a role="status" aria-live="polite" region', async () => {
+    render(<TeamDetailPage />);
+
+    fireEvent.change(
+      screen.getByPlaceholderText('https://example.com/my-logo.png'),
+      { target: { value: 'https://example.com/new-logo.png' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Branding saved!');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('announces a validation error via a role="alert" region', () => {
+    render(<TeamDetailPage />);
+
+    fireEvent.change(
+      screen.getByPlaceholderText('https://example.com/my-logo.png'),
+      { target: { value: 'not-a-url' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Avatar URL must start with https://');
+    expect(mockUpdateBranding).not.toHaveBeenCalled();
   });
 });
 
