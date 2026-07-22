@@ -16,6 +16,10 @@ on:
     paths:
       - "lib/db-client/migrations/**"
       - "lambdas/db/src/**"
+      # Drizzle models are the other half of the schema contract — a model-only
+      # edit can drift from the physical columns without touching a migration
+      # (LS-8553), and the conformance spec only guards that if it runs here.
+      - "lib/db-client/src/drizzle/**"
   workflow_dispatch:
     inputs:
       ref:

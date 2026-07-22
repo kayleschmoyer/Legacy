@@ -287,7 +287,9 @@ export const gameFootballDefenseIdp = pgTable(
     soloTkl: smallint('solo_tkl'),
     astTkl: smallint('ast_tkl'),
     sacks: numeric('sacks', { precision: 4, scale: 1 }),
-    interceptions: smallint('interceptions'),
+    // Physical column is `int` (20260525_050000_create_game_football_defense_idp.ts),
+    // matching footballSeasonDefenseIdp — the model name was never a real column.
+    interceptions: smallint('int'),
     pd: smallint('pd'),
     ff: smallint('ff'),
     fr: smallint('fr'),
@@ -483,7 +485,10 @@ export const footballSeasonDefense = pgTable(
     g: smallint('g'),
     sacks: numeric('sacks', { precision: 5, scale: 1 }),
     int: smallint('int'),
-    fumRec: smallint('fum_rec'),
+    // Physical column is `fumbles_rec` (PFR's native stat name) — created by
+    // 20260524_000000_create_football_season_stats.ts, which wins over the later
+    // no-op `CREATE TABLE IF NOT EXISTS` in 20260524_100200 that used `fum_rec`.
+    fumRec: smallint('fumbles_rec'),
     defTd: smallint('def_td'),
     safeties: smallint('safeties'),
     ptsAllowed: smallint('pts_allowed'),
@@ -656,7 +661,9 @@ export const careerFootballDefense = pgTable(
     g: smallint('g'),
     sacks: numeric('sacks', { precision: 5, scale: 1 }),
     int: smallint('int'),
-    fumRec: smallint('fum_rec'),
+    // Physical column is `fumbles_rec` — see the note on footballSeasonDefense;
+    // 20260524_000000_create_career_football_tables.ts wins over 20260524_100400.
+    fumRec: smallint('fumbles_rec'),
     defTd: smallint('def_td'),
     safeties: smallint('safeties'),
     ptsAllowedPerG: numeric('pts_allowed_per_g', { precision: 5, scale: 2 }),

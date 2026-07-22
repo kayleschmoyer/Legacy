@@ -331,7 +331,7 @@ async function upsertCareerDefense(
         g: sql`excluded.g`,
         sacks: sql`excluded.sacks`,
         int: sql`excluded.int`,
-        fumRec: sql`excluded.fum_rec`,
+        fumRec: sql`excluded.fumbles_rec`,
         defTd: sql`excluded.def_td`,
         safeties: sql`excluded.safeties`,
         ptsAllowedPerG: sql`excluded.pts_allowed_per_g`,
