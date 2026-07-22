@@ -56,14 +56,23 @@ jest.mock('@legacy-sports/shared-components/roster', () => ({
   RosterBoard: ({
     readOnly,
     error,
+    teamPlayers,
   }: {
     readOnly?: boolean;
     error?: Error | null;
+    teamPlayers?: ReadonlyArray<{
+      id?: number | null;
+      isLocked?: boolean | null;
+    }>;
   }) => (
     <div
       data-testid="roster-board"
       data-read-only={String(!!readOnly)}
       data-error={error ? error.message : ''}
+      data-locked-ids={(teamPlayers ?? [])
+        .filter((p) => p?.isLocked)
+        .map((p) => p?.id)
+        .join(',')}
     />
   ),
 }));
@@ -999,5 +1008,106 @@ describe('TeamDetailPage – league identity link (LS-6052)', () => {
 
     fireEvent.click(link);
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/100');
+  });
+});
+
+// ── Lineup Editor Lock-Window Enforcement (LS-6035) ─────────────────────────
+//
+// TeamMember.isLocked (lib/graphql/src/teamMember.fragment.graphql) is the
+// signal RosterBoard uses to block edits to a player whose game has started
+// (see RosterBoard.spec.tsx for the enforcement behavior itself). Nothing
+// previously verified that TeamDetailPage forwards that flag unchanged from
+// the team-members query into RosterBoard's teamPlayers prop.
+
+describe('TeamDetailPage – lineup editor lock-window enforcement (LS-6035)', () => {
+  const mockTeamMembers = (
+    members: ReadonlyArray<{
+      id: number;
+      positionId: number | null;
+      isLocked?: boolean;
+    }>,
+  ) => {
+    const graphql = jest.requireMock<{ useGetTeamMembersQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetTeamMembersQuery.mockReturnValue({
+      data: {
+        teamMembers: members.map((m) => ({
+          leagueId: 100,
+          player: { firstName: 'Test', lastName: 'Player' },
+          ...m,
+        })),
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetchMembers,
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchMembers.mockResolvedValue({});
+    mockUpdateTeamMemberPosition.mockResolvedValue({});
+    mockSwapTeamMemberPositions.mockResolvedValue({});
+
+    // Reset to the GM baseline regardless of mock state left behind by
+    // preceding describe blocks (e.g. the visitor/premium/loading overrides
+    // above).
+    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetUserTeamIdQuery.mockReturnValue({
+      data: { userTeamId: 1 },
+      loading: false,
+      error: undefined,
+    });
+  });
+
+  it('forwards a locked team member to RosterBoard with isLocked: true', () => {
+    mockTeamMembers([
+      { id: 10, positionId: 1, isLocked: true },
+      { id: 11, positionId: null, isLocked: false },
+    ]);
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByTestId('roster-board')).toHaveAttribute(
+      'data-locked-ids',
+      '10',
+    );
+  });
+
+  it('does not mark an unlocked team member as locked', () => {
+    mockTeamMembers([
+      { id: 10, positionId: 1, isLocked: false },
+      { id: 11, positionId: null, isLocked: false },
+    ]);
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByTestId('roster-board')).toHaveAttribute(
+      'data-locked-ids',
+      '',
+    );
+  });
+
+  it('preserves per-player lock state independent of the read-only (visitor) gate', () => {
+    mockTeamMembers([{ id: 10, positionId: 1, isLocked: true }]);
+    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetUserTeamIdQuery.mockReturnValue({
+      data: { userTeamId: 999 },
+      loading: false,
+      error: undefined,
+    });
+
+    render(<TeamDetailPage />);
+
+    const board = screen.getByTestId('roster-board');
+    expect(board).toHaveAttribute('data-read-only', 'true');
+    expect(board).toHaveAttribute('data-locked-ids', '10');
   });
 });
