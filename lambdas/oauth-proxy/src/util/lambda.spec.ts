@@ -9,7 +9,12 @@ jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { debug, info, warn, error },
 }));
 
-import { describeErrorCause, parseEventBody, sanitizeHeaders } from './lambda';
+import {
+  describeErrorCause,
+  getRequestBaseUrl,
+  parseEventBody,
+  sanitizeHeaders,
+} from './lambda';
 
 function makeEvent(
   body: string | null,
@@ -30,6 +35,33 @@ function makeEvent(
     isBase64Encoded: false,
   };
 }
+
+describe('getRequestBaseUrl', () => {
+  function makeContextEvent(domainName: string, stage: string) {
+    return {
+      ...makeEvent(null),
+      requestContext: {
+        domainName,
+        stage,
+      } as APIGatewayEvent['requestContext'],
+    };
+  }
+
+  it('includes the stage on the default execute-api domain', () => {
+    const event = makeContextEvent(
+      'abc123.execute-api.us-east-1.amazonaws.com',
+      'dev',
+    );
+    expect(getRequestBaseUrl(event)).toBe(
+      'https://abc123.execute-api.us-east-1.amazonaws.com/dev',
+    );
+  });
+
+  it('omits the stage on a custom domain (stage is mapped at the root)', () => {
+    const event = makeContextEvent('api.legacy-fantasy.com', 'dev');
+    expect(getRequestBaseUrl(event)).toBe('https://api.legacy-fantasy.com');
+  });
+});
 
 describe('parseEventBody', () => {
   beforeEach(() => {

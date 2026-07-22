@@ -76,6 +76,9 @@ jest.mock('../util/cookie', () => ({
 }));
 
 jest.mock('../util/lambda', () => ({
+  // Keep the real getRequestBaseUrl (and friends) — getRedirectUri depends on
+  // it, and stubbing the whole module would silently 500 the authorize flow.
+  ...jest.requireActual<typeof import('../util/lambda')>('../util/lambda'),
   parseEventBody: jest.fn(
     (event: APIGatewayEvent): Record<string, unknown> =>
       JSON.parse(event.body ?? '{}') as Record<string, unknown>,
@@ -508,6 +511,37 @@ describe('handleGoogleAuthorize — CSRF state binding', () => {
 
     const location = (result.headers?.['Location'] as string | undefined) ?? '';
     expect(location).toContain('state=test-csrf-token.device-code-xyz');
+  });
+
+  it('omits the stage from redirect_uri on a custom domain (LS-8557 follow-up)', async () => {
+    // A stage-prefixed redirect_uri on the custom domain is not registered on
+    // the Google OAuth client (Error 400: redirect_uri_mismatch) and would not
+    // route back through API Gateway anyway.
+    const base = makeEvent({});
+    const event = {
+      ...base,
+      requestContext: {
+        ...base.requestContext,
+        domainName: 'api.legacy-fantasy.com',
+      },
+    };
+    const result = await handleGoogleAuthorize(event);
+
+    expect(result.statusCode).toBe(302);
+    const location = new URL(result.headers?.['Location'] as string);
+    expect(location.searchParams.get('redirect_uri')).toBe(
+      'https://api.legacy-fantasy.com/oauth/google/callback',
+    );
+  });
+
+  it('includes the stage in redirect_uri on the execute-api domain', async () => {
+    const result = await handleGoogleAuthorize(makeEvent({}));
+
+    expect(result.statusCode).toBe(302);
+    const location = new URL(result.headers?.['Location'] as string);
+    expect(location.searchParams.get('redirect_uri')).toBe(
+      'https://test.execute-api.us-east-1.amazonaws.com/dev/oauth/google/callback',
+    );
   });
 });
 

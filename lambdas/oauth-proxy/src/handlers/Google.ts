@@ -29,7 +29,7 @@ import {
   generateOauthState,
   verifyOauthState,
 } from '../util/oauth-state';
-import { parseEventBody } from '../util/lambda';
+import { getRequestBaseUrl, parseEventBody } from '../util/lambda';
 import { withDbClient } from '../util/db';
 import { notifyNewUserSignup } from '../util/discord';
 import { getAuthSuccessHtml, htmlEscape } from '../util/html';
@@ -321,12 +321,16 @@ export const handleGoogleCallback = async (
 };
 
 /**
- * Get OAuth redirect URI for the current environment
+ * Get OAuth redirect URI for the current environment.
+ *
+ * Delegates to getRequestBaseUrl so the stage segment is only included on the
+ * default execute-api domain — on the custom domain the stage is mapped at the
+ * root, and a stage-prefixed redirect_uri both fails Google's registered-URI
+ * check (Error 400: redirect_uri_mismatch) and would not route back to the
+ * lambda anyway (LS-8557).
  */
 function getRedirectUri(event: APIGatewayEvent): string {
-  const stage = event.requestContext.stage;
-  const domainName = event.requestContext.domainName;
-  return `https://${domainName}/${stage}/oauth/google/callback`;
+  return `${getRequestBaseUrl(event)}/oauth/google/callback`;
 }
 
 /**

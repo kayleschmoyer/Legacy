@@ -11,7 +11,7 @@ import { LOGGER } from '@legacy-sports/logging';
 
 import { getUserByEmail } from '@legacy-sports/db-client';
 import crypto from 'crypto';
-import { parseEventBody } from '../util/lambda';
+import { getRequestBaseUrl, parseEventBody } from '../util/lambda';
 import { testPassword } from '../Users';
 import { createJwt } from '../util/jwt';
 import { withDbClient } from '../util/db';
@@ -328,7 +328,7 @@ export const handleDeviceAuthorize = async (
 
     await storeFlow(flow);
 
-    const baseUrl = getBaseUrl(event);
+    const baseUrl = getRequestBaseUrl(event);
     const verificationUri = `${baseUrl}/oauth/device/verify`;
 
     LOGGER.info('Device authorization created', {
@@ -479,7 +479,7 @@ export const handleDeviceVerify = async (
       };
     }
 
-    const baseUrl = getBaseUrl(event);
+    const baseUrl = getRequestBaseUrl(event);
     const googleAuthUrl = `${baseUrl}/oauth/google/authorize?state=${deviceCode}`;
 
     return {
@@ -679,22 +679,6 @@ export const handleDeviceCompleteLocal = async (
     };
   }
 };
-
-/**
- * Get base URL from API Gateway event.
- *
- * The stage segment only exists on the default execute-api URL
- * (https://<id>.execute-api.<region>.amazonaws.com/<stage>/...). The custom
- * domain (api.<domain>) maps the stage at the root via its base-path mapping,
- * so appending the stage there mints URLs that no gateway resource matches
- * and API Gateway rejects with "Missing Authentication Token".
- */
-function getBaseUrl(event: APIGatewayEvent): string {
-  const { stage, domainName } = event.requestContext;
-  return !domainName || domainName.includes('.execute-api.')
-    ? `https://${domainName}/${stage}`
-    : `https://${domainName}`;
-}
 
 /**
  * Generate HTML for device verification page

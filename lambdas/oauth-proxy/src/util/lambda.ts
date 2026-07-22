@@ -31,12 +31,21 @@ export function parseEventBody<T>(
 
 /**
  * Build the externally-reachable base URL for the current request from the API
- * Gateway context, e.g. `https://api.example.com/prod`. Used to construct links
- * (such as password-reset URLs) that point back at the proxy's own endpoints.
+ * Gateway context. Used to construct links (password-reset URLs, device-flow
+ * verification URLs, the Google OAuth redirect_uri) that point back at the
+ * proxy's own endpoints.
+ *
+ * The stage segment only exists on the default execute-api URL
+ * (https://<id>.execute-api.<region>.amazonaws.com/<stage>/...). The custom
+ * domain (api.<domain>) maps the stage at the root via its base-path mapping,
+ * so appending the stage there mints URLs that no gateway resource matches
+ * and API Gateway rejects with "Missing Authentication Token".
  */
 export function getRequestBaseUrl(event: APIGatewayEvent): string {
   const { domainName, stage } = event.requestContext;
-  return `https://${domainName}/${stage}`;
+  return !domainName || domainName.includes('.execute-api.')
+    ? `https://${domainName}/${stage}`
+    : `https://${domainName}`;
 }
 
 const SAFE_HEADER_ALLOWLIST = new Set([

@@ -131,8 +131,10 @@ describe('handleForgotPassword', () => {
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
 
     const [, sentUrl] = mockSendEmail.mock.calls[0];
+    // api.example.com is a custom domain, so the stage segment is omitted
+    // (see getRequestBaseUrl) — a /prod prefix there would not route.
     expect(sentUrl).toContain(
-      'https://api.example.com/prod/oauth/reset-password?token=',
+      'https://api.example.com/oauth/reset-password?token=',
     );
   });
 
