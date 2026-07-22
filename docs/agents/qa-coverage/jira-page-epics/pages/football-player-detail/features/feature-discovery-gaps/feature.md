@@ -35,7 +35,6 @@ every gap below is scoped to Web.
 | Football Game Logs                            | LS-5433 | Game-log table, season filter, bye-week handling          |
 | Football Player Header                        | LS-5434 | Team swatch, position chip, name/team rendering, a11y     |
 | Passing / Rushing / Receiving Stat Breakdowns | LS-5435 | Offensive career stat tables for QB / RB / WR / TE        |
-| Injury Status and News                        | LS-5436 | Injury status badge, news feed, provenance (FPD-029)      |
 
 ## GAP Findings
 

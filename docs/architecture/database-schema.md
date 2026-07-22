@@ -663,6 +663,8 @@ Methods: `highest_category`, `total_season_points`, `head_to_head_record`,
 
 **Emergency Sub Rule Enum**: `none`, `injury_only`, `injury_or_rest`, `commissioner_approval`
 
+> ⚠️ **Pending change (LS-8609):** the injury-based values `injury_only` and `injury_or_rest` are slated for removal under the platform-wide injury-feature removal (epic LS-8604 — historical-data platform, no injury concept). They still exist in the database enum today; LS-8609 owns the product decision on their replacement and the data migration for leagues currently using them.
+
 **Key Features**:
 
 - Unique constraint: `league_id` ensures one rule set per league

@@ -16,8 +16,6 @@ This directory contains technical architecture documentation for the Legacy Spor
 - **[Schema Validation](schema-validation.md)** - Drizzle ORM patterns and type safety
 - **[Season Selection Architecture](season-selection-architecture.md)** - Per-player season assignment and game selection
 - **[League State Machine](league-state-machine.md)** - League lifecycle, week/matchup progression, playoffs, and season transitions (with SVG diagrams)
-- **[Injury Data Provenance](injury-data-provenance.md)** - Source/provenance model and audit-trail requirements for injury status data; what support needs to resolve a disputed status
-- **[Injury Analysis Tiers](injury-analysis-tiers.md)** - Free baseline (status badge + last-updated) vs. premium (practice history, analyst writeups, return-from-IR projections) split for the expert injury analysis surface
 
 ## 🎯 Understanding the Architecture
 

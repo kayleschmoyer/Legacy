@@ -156,9 +156,11 @@ Recommendations). Worth aligning the three lists.
 
 ## 4. Planned / documented but not yet built
 
-| Feature                                         | Intended entitlement key | Status                                                                                                                                                                                                        |
-| ----------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Expert injury analysis (Football Player Detail) | `expert_injury_analysis` | Documented in [`docs/architecture/injury-analysis-tiers.md`](injury-analysis-tiers.md) (LS-6254 / FPD-026). **Not** in `ENTITLEMENTS`, **not** in Stripe, **not** implemented. Net-new work owned by FPD-026. |
+None currently. The previously listed **expert injury analysis** (Football
+Player Detail, intended key `expert_injury_analysis`, LS-6254 / FPD-026) was
+cancelled by the platform-wide injury-feature removal (LS-8604) — Legacy Sports
+is a historical-data platform, so injuries cannot occur. It was never added to
+`ENTITLEMENTS` or Stripe, so no billing cleanup was needed.
 
 ---
 

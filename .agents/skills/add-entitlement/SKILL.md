@@ -66,4 +66,4 @@ Skip Steps 2–4 — reuse the existing `ENTITLEMENTS` key — and do Steps 5–
 - [database](../database/SKILL.md) — the `subscription_tier` column is denormalized onto `app_internal.users` by the `stripe-webhook` lambda; no migration is needed to add an entitlement.
 - `docs/product/subscription-tiers.md` — authoritative tier policy (read first).
 - `docs/architecture/premium-gating-inventory.md` — enforcement-coverage gap inventory (what's gated where).
-- `docs/architecture/injury-analysis-tiers.md` — worked example of tiering a green-field feature.
+- `docs/product/subscription-tiers.md#change-log` — the 2026-07-07 `advanced_scheduling` entry (LS-6106 / CLB-014): worked example of tiering a green-field feature end-to-end (tier decision → entitlement key → resolver gate → UI gate).

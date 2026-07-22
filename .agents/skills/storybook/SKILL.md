@@ -253,7 +253,9 @@ type Story = StoryObj<typeof meta>;
 
 export const Info: Story = { args: { variant: 'info', label: 'Info' } };
 export const Success: Story = { args: { variant: 'success', label: 'Live' } };
-export const Warning: Story = { args: { variant: 'warning', label: 'Injury' } };
+export const Warning: Story = {
+  args: { variant: 'warning', label: 'Bye Week' },
+};
 export const Error: Story = { args: { variant: 'error', label: 'Out' } };
 ```
 
