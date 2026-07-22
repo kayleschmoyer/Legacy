@@ -7,17 +7,12 @@
  * broken screen:
  *   - Loading: spinner shown while queries are pending
  *   - Invalid team ID: non-numeric teamId in the URL
- *   - GraphQL query failure (any error code): generic "Error loading team" message
+ *   - GraphQL query failure with a NOT_FOUND code: dedicated "Team not found" message
+ *   - GraphQL query failure with any other code: generic "Error loading team" message
  *
- * Note: TeamDetailPage.tsx intends a *dedicated* "Team not found" message for
- * a NOT_FOUND-coded GraphQL error, distinct from the generic error message.
- * That branch currently can never trigger — its detection uses the Apollo
- * Client 3 `ApolloError.graphQLErrors` shape, but this repo is on Apollo
- * Client 4, whose errors are `CombinedGraphQLErrors` instances exposing
- * `.errors` instead. Every members-query GraphQL error (NOT_FOUND included)
- * therefore falls through to the generic message. Tracked as a bug: LS-8315.
- * The tests below assert today's actual (generic-only) behavior; extend them
- * once LS-8315 lands.
+ * NOT_FOUND detection uses the Apollo Client 4 `CombinedGraphQLErrors` shape
+ * (LS-8315 — previously dead code checking the Apollo Client 3
+ * `ApolloError.graphQLErrors` shape, which this repo's error objects never have).
  *
  * All GraphQL responses are mocked so these tests run without a live backend.
  * Route: /baseball/teams/:teamId
@@ -121,18 +116,18 @@ test.describe('Team Detail Page — invalid team ID @regression', () => {
 // ── Tests: GraphQL query failure ──────────────────────────────────────────────
 
 test.describe('Team Detail Page — GraphQL query failure @regression', () => {
-  test('shows "Error loading team" when the team members query returns a NOT_FOUND error', async ({
+  test('shows "Team not found" when the team members query returns a NOT_FOUND error', async ({
     page,
   }) => {
-    // See the file-level note: dedicated NOT_FOUND messaging is currently
-    // unreachable (LS-8315) — this asserts today's actual generic-error behavior.
     await mockGraphQL(page, 'notFound');
     await page.goto(VALID_TEAM_URL);
     await page.waitForLoadState('load');
 
     const main = page.getByTestId('main-content');
-    await expect(main.getByText('Error loading team')).toBeVisible();
-    await expect(main.getByText(/something went wrong/i)).toBeVisible();
+    await expect(main.getByText('Team not found')).toBeVisible();
+    await expect(
+      main.getByText(/doesn.t exist or you may not have access/i),
+    ).toBeVisible();
   });
 
   test('shows "Error loading team" for a generic GraphQL error', async ({

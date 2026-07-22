@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import {
   Button,
   Dialog,
@@ -250,12 +251,9 @@ export function TeamDetailPage() {
   if (loading) return <Spinner />;
 
   if (membersError) {
-    const graphQLErrors =
-      'graphQLErrors' in membersError
-        ? (membersError.graphQLErrors as ReadonlyArray<{
-            extensions?: Record<string, unknown>;
-          }>)
-        : [];
+    const graphQLErrors = CombinedGraphQLErrors.is(membersError)
+      ? membersError.errors
+      : [];
     const isNotFound = graphQLErrors.some(
       (e) => e.extensions?.['code'] === 'NOT_FOUND',
     );
