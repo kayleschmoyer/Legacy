@@ -1,0 +1,115 @@
+# NFL stats-grid query (LS-8566). Separate from FootballPlayers/
+# FootballPlayerHeader on purpose: the grid needs the full per-category career
+# stat columns plus totalCount, and widening the shared header fragment would
+# grow every existing consumer's query (detail modal, draft preview) toward the
+# server's query-complexity ceiling.
+
+fragment FootballPlayerStatsRow on FootballPlayer {
+  id
+  firstName
+  lastName
+  position
+  isDst
+  nflTeam
+  injuryStatus
+  careerStats {
+    fantasyPoints
+    passing {
+      g
+      cmp
+      att
+      yds
+      td
+      int
+      rating
+    }
+    rushing {
+      g
+      att
+      yds
+      td
+      lng
+      fumbles
+    }
+    receiving {
+      g
+      rec
+      tgt
+      yds
+      td
+      lng
+    }
+    kicking {
+      g
+      fgm
+      fga
+      fgPct
+      xpm
+      xpa
+      lng
+    }
+    defense {
+      g
+      sacks
+      int
+      fumRec
+      defTd
+      safeties
+      ptsAllowedPerG
+      ydsAllowedPerG
+    }
+    idp {
+      g
+      soloTkl
+      astTkl
+      totalTkl
+      sacks
+      int
+      pd
+      ff
+      fr
+      defTd
+    }
+  }
+}
+
+query FootballPlayerStatsGrid(
+  $positions: [String!]
+  $nflTeam: String
+  $conference: String
+  $freeAgent: Boolean
+  $search: String
+  $after: String
+  $first: Int
+  $injuryStatus: String
+  $minProjectedPoints: Float
+  $maxAdpRank: Int
+  $sortBy: String
+  $sortDir: String
+  $category: String
+) {
+  footballPlayers(
+    positions: $positions
+    nflTeam: $nflTeam
+    conference: $conference
+    freeAgent: $freeAgent
+    search: $search
+    after: $after
+    first: $first
+    injuryStatus: $injuryStatus
+    minProjectedPoints: $minProjectedPoints
+    maxAdpRank: $maxAdpRank
+    sortBy: $sortBy
+    sortDir: $sortDir
+    category: $category
+  ) {
+    nodes {
+      ...FootballPlayerStatsRow
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}

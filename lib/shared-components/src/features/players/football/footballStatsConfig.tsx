@@ -11,14 +11,23 @@ import {
   FOOTBALL_SEARCH_DEBOUNCE_MS,
   FOOTBALL_SEARCH_MIN_LENGTH,
   FOOTBALL_TEAM_OPTIONS,
+  FOOTBALL_VIEW_TABS,
   type FootballAvailability,
   type FootballPosition,
   type FootballSortField,
   type FootballStatsFilters,
+  type FootballStatsView,
   INJURY_STATUS_OPTIONS,
   isFootballSortField,
+  normalizeFootballView,
+  resolveSortForView,
   TEAM_ALL,
 } from './footballStatsHelpers';
+import {
+  FOOTBALL_STAT_COLUMNS_BY_VIEW,
+  FOOTBALL_VIEW_TITLES,
+} from './footballStatsColumns';
+import { TabContentFade } from '../shell/TabContentFade';
 import { Platform } from '../../../platform-components';
 import {
   BG_DARK,
@@ -61,6 +70,7 @@ export interface FootballStatsPageProps {
   onShare?: (url: string) => void;
   /** Mirror committed filter state to the host (URL round-trip). */
   onFiltersChange?: (state: {
+    view: FootballStatsView;
     pageSize: number;
     filters: FootballStatsFilters;
   }) => void;
@@ -143,8 +153,9 @@ function useDebounce<T>(value: T, delay: number): T {
 
 /**
  * Football player-stats controller. Owns the live-filter model (multi-select
- * positions, team/conference/FA, debounced search, sort, premium injury /
- * projected-points / ADP, availability) and the cursor-paginated
+ * positions, team/conference/FA, debounced search, premium injury /
+ * projected-points / ADP, availability), the stats-grid view tabs (Overview +
+ * six category leader boards, LS-8566), the server-side sort, and the paged
  * {@link FootballStatsDataGrid}, exposed as the sport-neutral
  * {@link SportStatsController} the shared shell renders (LS-8442). Unlike
  * baseball there is no draft→Apply state machine — every control commits live.
@@ -166,6 +177,12 @@ export function useFootballController(
     onRetry,
     onClearFilters,
   } = props;
+
+  // Active stats-grid view/tab (LS-8566). Seeded once from the URL (matching
+  // the initialFilters pattern); subsequent changes flow through the tab strip.
+  const [view, setView] = useState<FootballStatsView>(() =>
+    normalizeFootballView(initialFilters.view),
+  );
 
   const [positions, setPositions] = useState<FootballPosition[]>(
     () => initialFilters.positions ?? [],
@@ -224,9 +241,14 @@ export function useFootballController(
       : NaN;
   const maxAdpArg = Number.isFinite(parsedMaxAdp) ? parsedMaxAdp : undefined;
 
+  // The effective sort the grid displays and the server receives — an unset or
+  // foreign-view sort resolves to the view's default leaders ordering.
+  const effectiveSort = resolveSortForView(view, sortField, sortDir);
+
   const queryVars = useMemo(
     () =>
       buildFootballQueryVars({
+        view,
         positions,
         team,
         search: debouncedSearch,
@@ -237,6 +259,7 @@ export function useFootballController(
         maxAdpRank: maxAdpArg,
       }),
     [
+      view,
       positions,
       team,
       debouncedSearch,
@@ -269,9 +292,10 @@ export function useFootballController(
     if (injuryStatusArg) filters.injuryStatus = injuryStatusArg;
     if (minProjectedArg != null) filters.minProjectedPoints = minProjectedArg;
     if (maxAdpArg != null) filters.maxAdpRank = maxAdpArg;
-    onFiltersChange({ pageSize, filters });
+    onFiltersChange({ view, pageSize, filters });
   }, [
     onFiltersChange,
+    view,
     positions,
     team,
     debouncedSearch,
@@ -283,6 +307,24 @@ export function useFootballController(
     pageSize,
   ]);
 
+  // Tab change resets the sort to the new view's default leaders ordering — a
+  // stat sort from the previous tab is invalid on the next one. Clearing (not
+  // copying) the sort keeps the view-default sort out of the URL.
+  const handleViewChange = useCallback((next: string) => {
+    setView(normalizeFootballView(next));
+    setSortField(undefined);
+    setSortDir('asc');
+  }, []);
+
+  // Header click on the grid — commits an explicit sort.
+  const handleSortChange = useCallback(
+    (field: FootballSortField, dir: 'asc' | 'desc') => {
+      setSortField(field);
+      setSortDir(dir);
+    },
+    [],
+  );
+
   const togglePosition = useCallback((pos: FootballPosition) => {
     setPositions((cur) =>
       cur.includes(pos) ? cur.filter((p) => p !== pos) : [...cur, pos],
@@ -293,6 +335,7 @@ export function useFootballController(
     if (!onShare) return;
     onShare(
       buildFootballStatsQuery({
+        view,
         positions,
         team,
         search: debouncedSearch,
@@ -306,6 +349,7 @@ export function useFootballController(
     );
   }, [
     onShare,
+    view,
     positions,
     team,
     debouncedSearch,
@@ -320,6 +364,7 @@ export function useFootballController(
   const urlPreview = useMemo(
     () =>
       buildFootballStatsQuery({
+        view,
         positions,
         team,
         search: debouncedSearch,
@@ -331,6 +376,7 @@ export function useFootballController(
         maxAdpRank: maxAdpArg,
       }),
     [
+      view,
       positions,
       team,
       debouncedSearch,
@@ -728,25 +774,38 @@ export function useFootballController(
             </Text>
           </XStack>
         )}
-        <FootballStatsDataGrid
-          queryVars={queryVars}
-          pageSize={pageSize}
-          resetKey={resetKey}
-          onPlayerSelect={handlePlayerSelect}
-          rosteredPlayerIds={
-            showAvailabilityFilter ? rosteredPlayerIds : undefined
-          }
-          availabilityFilter={
-            showAvailabilityFilter ? availabilityFilter : undefined
-          }
-        />
+        <TabContentFade key={view}>
+          <FootballStatsDataGrid
+            queryVars={queryVars}
+            columns={FOOTBALL_STAT_COLUMNS_BY_VIEW[view]}
+            title={FOOTBALL_VIEW_TITLES[view]}
+            pageSize={pageSize}
+            resetKey={resetKey}
+            sortField={effectiveSort.sortField}
+            sortDir={effectiveSort.sortDir}
+            onSortChange={handleSortChange}
+            onPageSizeChange={setPageSize}
+            onPlayerSelect={handlePlayerSelect}
+            rosteredPlayerIds={
+              showAvailabilityFilter ? rosteredPlayerIds : undefined
+            }
+            availabilityFilter={
+              showAvailabilityFilter ? availabilityFilter : undefined
+            }
+            loadingColumnCount={3 + FOOTBALL_STAT_COLUMNS_BY_VIEW[view].length}
+          />
+        </TabContentFade>
       </YStack>
     );
   }, [
     isPremium,
+    view,
     queryVars,
     pageSize,
     resetKey,
+    effectiveSort.sortField,
+    effectiveSort.sortDir,
+    handleSortChange,
     handlePlayerSelect,
     showAvailabilityFilter,
     rosteredPlayerIds,
@@ -764,9 +823,10 @@ export function useFootballController(
     canExport: false,
     exportFormats: [],
     onExport: () => undefined,
-    tabs: [],
-    activeTab: '',
-    onTabChange: () => undefined,
+    tabs: FOOTBALL_VIEW_TABS.map((t) => ({ id: t.key, label: t.label })),
+    activeTab: view,
+    onTabChange: handleViewChange,
+    tablistAriaLabel: 'Stat category',
     renderToolbarControls,
     hasPendingChanges: false,
     onApply: undefined,
@@ -783,7 +843,7 @@ export function useFootballController(
     shellState: state,
     onRetry,
     onClearFilters: handleClearFilters,
-    loadingColumnCount: 3,
+    loadingColumnCount: 3 + FOOTBALL_STAT_COLUMNS_BY_VIEW[view].length,
     renderContent,
   };
 }

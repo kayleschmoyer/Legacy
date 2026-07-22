@@ -41,8 +41,15 @@ export type { ExportFormat, PlayerStatsExportData } from './PlayerStatsPage';
 // NFL player statistics — sport-agnostic shell binding (LS-8442)
 export { FootballStatsPage } from './FootballStatsPage';
 export type { FootballStatsPageProps } from './football/footballStatsConfig';
-export type { FootballStatsFilters } from './football/footballStatsHelpers';
-export { parseFootballPositions } from './football/footballStatsHelpers';
+export type {
+  FootballStatsFilters,
+  FootballStatsView,
+} from './football/footballStatsHelpers';
+export {
+  isFootballSortField,
+  normalizeFootballView,
+  parseFootballPositions,
+} from './football/footballStatsHelpers';
 
 // Column-visibility helpers + serialization (LS-7105 / PST-001)
 export {

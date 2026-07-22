@@ -1187,6 +1187,11 @@ Cursor-paginated list of football players (LS-255)
 type FootballPlayersConnection {
   nodes: [FootballPlayer!]!
   pageInfo: FootballPlayersPageInfo!
+
+  """
+  Total players matching the filters across all pages. Computed only when this field is selected (LS-8566) — drives the stats-grid pager.
+  """
+  totalCount: Int!
 }
 
 type FootballPlayersPageInfo {
@@ -3222,6 +3227,7 @@ type Query {
   """
   footballPlayers(
     after: String
+    category: String
     conference: String
     first: Int
     freeAgent: Boolean

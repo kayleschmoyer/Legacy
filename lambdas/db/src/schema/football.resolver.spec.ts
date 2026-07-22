@@ -36,6 +36,8 @@ describe('football resolvers', () => {
   let mockDb: {
     select: jest.Mock;
     from: jest.Mock;
+    $dynamic: jest.Mock;
+    innerJoin: jest.Mock;
     where: jest.Mock;
     orderBy: jest.Mock;
     limit: jest.Mock;
@@ -53,6 +55,8 @@ describe('football resolvers', () => {
     mockDb = {
       select: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
+      $dynamic: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
@@ -141,16 +145,64 @@ describe('football resolvers', () => {
           playerId: 'playerId',
           position: 'position',
         },
-        careerFootballPassing: { playerId: 'playerId' },
-        careerFootballRushing: { playerId: 'playerId' },
-        careerFootballReceiving: { playerId: 'playerId' },
-        careerFootballKicking: { playerId: 'playerId' },
-        careerFootballDefense: { playerId: 'playerId' },
+        // Career tables carry per-table-prefixed sentinel values so LS-8566
+        // stat-sort assertions can tell which table a sort expression or join
+        // target came from (the plain-string mocks are compiled into bind
+        // params by PgDialect in the assertions).
+        careerFootballPassing: {
+          playerId: 'careerPassing.playerId',
+          g: 'careerPassing.g',
+          cmp: 'careerPassing.cmp',
+          att: 'careerPassing.att',
+          yds: 'careerPassing.yds',
+          td: 'careerPassing.td',
+          int: 'careerPassing.int',
+          rating: 'careerPassing.rating',
+        },
+        careerFootballRushing: {
+          playerId: 'careerRushing.playerId',
+          g: 'careerRushing.g',
+          att: 'careerRushing.att',
+          yds: 'careerRushing.yds',
+          td: 'careerRushing.td',
+          lng: 'careerRushing.lng',
+          fumbles: 'careerRushing.fumbles',
+        },
+        careerFootballReceiving: {
+          playerId: 'careerReceiving.playerId',
+          g: 'careerReceiving.g',
+          rec: 'careerReceiving.rec',
+          tgt: 'careerReceiving.tgt',
+          yds: 'careerReceiving.yds',
+          td: 'careerReceiving.td',
+          lng: 'careerReceiving.lng',
+        },
+        careerFootballKicking: {
+          playerId: 'careerKicking.playerId',
+          g: 'careerKicking.g',
+          fgm: 'careerKicking.fgm',
+          fga: 'careerKicking.fga',
+          xpm: 'careerKicking.xpm',
+          xpa: 'careerKicking.xpa',
+          lng: 'careerKicking.lng',
+        },
+        careerFootballDefense: {
+          playerId: 'careerDefense.playerId',
+          g: 'careerDefense.g',
+          sacks: 'careerDefense.sacks',
+          int: 'careerDefense.int',
+          fumRec: 'careerDefense.fumRec',
+          defTd: 'careerDefense.defTd',
+          safeties: 'careerDefense.safeties',
+          ptsAllowedPerG: 'careerDefense.ptsAllowedPerG',
+          ydsAllowedPerG: 'careerDefense.ydsAllowedPerG',
+        },
         careerFootballDefenseIdp: {
           playerId: 'playerId',
           g: 'g',
           soloTkl: 'soloTkl',
           astTkl: 'astTkl',
+          totalTkl: 'totalTkl',
           sacks: 'sacks',
           int: 'int',
           pd: 'pd',
@@ -294,7 +346,7 @@ describe('football resolvers', () => {
         undefined as never,
       )) as FootballPlayersResult;
 
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         nodes: [],
         pageInfo: { hasNextPage: false, endCursor: null },
       });
@@ -1020,7 +1072,7 @@ describe('football resolvers', () => {
           undefined as never,
         )) as FootballPlayersResult;
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
           nodes: [],
           pageInfo: { hasNextPage: false, endCursor: null },
         });
@@ -1044,6 +1096,292 @@ describe('football resolvers', () => {
         expect(result.nodes).toEqual([]);
         // Admin short-circuit means a single query (players), no tier lookup.
         expect(mockDb.then).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // ── Stat sorting + category joins + totalCount (LS-8566) ─────────────────
+    describe('stat sorting and category (LS-8566)', () => {
+      function compileSql(arg: unknown): { sql: string; params: unknown[] } {
+        return new PgDialect().sqlToQuery(arg as never);
+      }
+
+      it('emits a NULLS LAST stat ordering with the id tiebreaker for a stat sortBy', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            sortBy: 'passing.yds',
+            sortDir: 'desc',
+            category: 'passing',
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        const orderByCall = mockDb.orderBy.mock.calls[0];
+        const { sql: orderSql, params } = compileSql(orderByCall[0]);
+        expect(orderSql).toContain('DESC NULLS LAST');
+        expect(params).toContain('careerPassing.yds');
+        expect(orderByCall[1]).toBe('asc:id');
+      });
+
+      it('ascending stat sort also pushes NULLs last', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            sortBy: 'idp.totalTkl',
+            sortDir: 'asc',
+            category: 'idp',
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        const { sql: orderSql, params } = compileSql(
+          mockDb.orderBy.mock.calls[0][0],
+        );
+        expect(orderSql).toContain('ASC NULLS LAST');
+        expect(params).toContain('totalTkl');
+      });
+
+      it('inner-joins the matching career table for the category', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            category: 'rushing',
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.innerJoin).toHaveBeenCalledTimes(1);
+        expect(mockDb.innerJoin).toHaveBeenCalledWith(
+          expect.objectContaining({ yds: 'careerRushing.yds' }),
+          expect.anything(),
+        );
+      });
+
+      it("category 'idp' joins the IDP aggregate view", async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, search: null, after: null, category: 'idp' },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.innerJoin).toHaveBeenCalledWith(
+          expect.objectContaining({ soloTkl: 'soloTkl' }),
+          expect.anything(),
+        );
+      });
+
+      it("category 'defense' joins the DST career table and pins isDst", async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, search: null, after: null, category: 'defense' },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.innerJoin).toHaveBeenCalledWith(
+          expect.objectContaining({ fumRec: 'careerDefense.fumRec' }),
+          expect.anything(),
+        );
+        // isDst=true guard rides along in the WHERE conditions.
+        const { params } = compileSql(mockDb.where.mock.calls[0][0]);
+        expect(params).toContain(true);
+      });
+
+      it('does not join any career table without a category', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, search: null, after: null, sortBy: 'name' },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.innerJoin).not.toHaveBeenCalled();
+      });
+
+      it('players-table sorts remain valid alongside a category', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            sortBy: 'name',
+            category: 'passing',
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.innerJoin).toHaveBeenCalledTimes(1);
+        expect(mockDb.orderBy).toHaveBeenCalledWith(
+          'asc:lastName',
+          'asc:firstName',
+          'asc:id',
+        );
+      });
+
+      it('keeps the offset cursor semantics with a category join', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: '42',
+            sortBy: 'passing.td',
+            sortDir: 'desc',
+            category: 'passing',
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.offset).toHaveBeenCalledWith(42);
+      });
+
+      it('throws BAD_USER_INPUT for an unknown stat sortBy key', async () => {
+        await expect(
+          getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              sortBy: 'passing.nope',
+              category: 'passing',
+            },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      });
+
+      it('throws BAD_USER_INPUT for a stat sortBy without a category', async () => {
+        await expect(
+          getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              sortBy: 'passing.yds',
+            },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      });
+
+      it('throws BAD_USER_INPUT for a stat sortBy whose prefix mismatches the category', async () => {
+        await expect(
+          getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              sortBy: 'passing.yds',
+              category: 'rushing',
+            },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      });
+
+      it('throws BAD_USER_INPUT for an invalid category', async () => {
+        await expect(
+          getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              category: 'special-teams',
+            },
+            mockContext,
+            undefined as never,
+          ),
+        ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+      });
+
+      describe('totalCount (lazy)', () => {
+        type ConnectionWithCount = FootballPlayersResult & {
+          getTotalCount: () => Promise<number>;
+        };
+
+        it('does not run the COUNT query unless getTotalCount is invoked', async () => {
+          mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+          const result = (await getResolver()(
+            {},
+            { position: null, search: null, after: null },
+            mockContext,
+            undefined as never,
+          )) as ConnectionWithCount;
+
+          expect(typeof result.getTotalCount).toBe('function');
+          // Only the players query ran.
+          expect(mockDb.then).toHaveBeenCalledTimes(1);
+        });
+
+        it('runs the COUNT with the same category join and memoizes it', async () => {
+          mockDb.then
+            .mockImplementationOnce((resolve) => resolve([])) // players query
+            .mockImplementation((resolve) => resolve([{ count: 321 }])); // count query
+
+          const result = (await getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              category: 'kicking',
+            },
+            mockContext,
+            undefined as never,
+          )) as ConnectionWithCount;
+
+          await expect(result.getTotalCount()).resolves.toBe(321);
+          await expect(result.getTotalCount()).resolves.toBe(321);
+
+          // players query + exactly one COUNT despite two invocations.
+          expect(mockDb.then).toHaveBeenCalledTimes(2);
+          // Both the rows query and the COUNT joined the kicking table.
+          expect(mockDb.innerJoin).toHaveBeenCalledTimes(2);
+          expect(mockDb.innerJoin).toHaveBeenLastCalledWith(
+            expect.objectContaining({ fgm: 'careerKicking.fgm' }),
+            expect.anything(),
+          );
+        });
       });
     });
 

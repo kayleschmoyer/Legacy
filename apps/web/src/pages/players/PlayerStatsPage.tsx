@@ -7,7 +7,9 @@ import {
 } from 'react-router-dom';
 import {
   FootballStatsPage,
+  isFootballSortField,
   isValidBattingSortField,
+  normalizeFootballView,
   normalizeViewMode,
   parseFootballPositions,
   parseVisibleColumns,
@@ -19,6 +21,7 @@ import {
 import type {
   ExportFormat,
   FootballStatsFilters,
+  FootballStatsView,
   PlayerStatsExportData,
   PlayerStatsFilters,
   PlayerWithStats,
@@ -1159,13 +1162,15 @@ export function PlayerStatsRoute() {
   const footballEnabled = useFeatureValue('football_enabled', true);
   const showFootball = sport === 'nfl' && footballEnabled !== false;
 
-  // Switch the viewed sport by updating the `sport` URL param in place. Pushes
-  // (not replace) so Back returns to the previously viewed sport.
+  // Switch the viewed sport with a FRESH param set containing only `sport`.
+  // Sport-specific filters (NFL `position=QB`/`view=passing`/stat `sortBy`,
+  // MLB `view=hitters`/stat ranges, an open `playerId` modal) are invalid in
+  // the other sport's parser and must never leak across a switch (LS-8566 —
+  // NFL `position=QB` used to corrupt the MLB position filter). Pushes (not
+  // replace) so Back returns to the previously viewed sport with its filters.
   const handleSelectSport = useCallback(
     (next: 'mlb' | 'nfl') => {
-      const params = new URLSearchParams(window.location.search);
-      params.set('sport', next);
-      setSearchParams(params);
+      setSearchParams(new URLSearchParams([['sport', next]]));
     },
     [setSearchParams],
   );
@@ -1204,6 +1209,10 @@ export function PlayerStatsRoute() {
   // rewrites when the param is present and non-canonical — an absent or already
   // canonical `view` is left untouched. `replace` avoids polluting history.
   useEffect(() => {
+    // MLB-only: NFL owns its own `view` vocabulary (overview/passing/…,
+    // LS-8566) — running the MLB normalizer against it would rewrite every
+    // NFL tab to view=combined.
+    if (sport !== 'mlb') return;
     const rawView = searchParams.get('view');
     if (rawView === null) return;
     const canonical = normalizeViewMode(rawView as PlayerStatsViewMode);
@@ -1211,7 +1220,7 @@ export function PlayerStatsRoute() {
     const next = new URLSearchParams(searchParams);
     next.set('view', canonical);
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [sport, searchParams, setSearchParams]);
 
   // Hydrate the stats-format preference from the server when signed in, so a
   // user who set it on another device sees the same format here. Mirrors the
@@ -1528,65 +1537,27 @@ export function PlayerStatsRoute() {
     [sport],
   );
 
-  // NFL view — render the football statistics browser inline through the shared
-  // PlayerStatsShell (LS-8442), the same shell the MLB browser renders through,
-  // instead of redirecting away or embedding the bespoke football page. Placed
-  // after all hooks to satisfy Rules of Hooks; the standalone /football/players
-  // route still renders the bespoke FootballPlayersPage.
-  if (showFootball) {
-    // Seed the football controller from the URL params the route persists.
-    const nflInitialFilters: Partial<FootballStatsFilters> = {};
-    // Validate each position against the known FootballPosition literals —
-    // a hand-crafted URL must never inject arbitrary strings (LS-8442 review).
-    const posRaw = searchParams.get('position');
-    if (posRaw) {
-      const positions = parseFootballPositions(posRaw);
-      if (positions.length > 0) {
-        nflInitialFilters.positions = positions;
-      }
-    }
-    const teamParam = sanitizeSearchParam(searchParams.get('team'));
-    if (teamParam) nflInitialFilters.team = teamParam;
-    const searchParam = sanitizeSearchParam(searchParams.get('search'));
-    if (searchParam) nflInitialFilters.searchTerm = searchParam;
-    const sortByParam = searchParams.get('sortBy');
-    if (
-      sortByParam === 'name' ||
-      sortByParam === 'position' ||
-      sortByParam === 'team'
-    ) {
-      nflInitialFilters.sortField = sortByParam;
-      nflInitialFilters.sortDir =
-        searchParams.get('sortDir') === 'desc' ? 'desc' : 'asc';
-    }
-    const injuryParam = sanitizeSearchParam(searchParams.get('injuryStatus'));
-    if (injuryParam) nflInitialFilters.injuryStatus = injuryParam;
-    const minProjParam = searchParams.get('minProjectedPoints');
-    if (minProjParam && Number.isFinite(Number(minProjParam))) {
-      nflInitialFilters.minProjectedPoints = Number(minProjParam);
-    }
-    const maxAdpParam = searchParams.get('maxAdpRank');
-    if (maxAdpParam && Number.isFinite(Number.parseInt(maxAdpParam, 10))) {
-      nflInitialFilters.maxAdpRank = Number.parseInt(maxAdpParam, 10);
-    }
-    const rawNflPageSize = Number.parseInt(
-      searchParams.get('pageSize') ?? '',
-      10,
-    );
-    const nflInitialPageSize = [25, 50, 100].includes(rawNflPageSize)
-      ? rawNflPageSize
-      : 25;
+  // ── NFL handlers ──────────────────────────────────────────────────────────
+  // Hoisted to the top level and memoized with stable deps (never the live
+  // `searchParams`). The football controller mirrors committed filters to the
+  // URL through an effect that depends on `onFiltersChange` — an inline
+  // (per-render) identity re-fires that effect after its own setSearchParams,
+  // looping the page and stomping sport switches. Mirrors the MLB
+  // handleFiltersChange fix (LS-8260); the loop itself was LS-8566.
 
-    // Mirror committed football filters to the URL (sport=nfl preserved so a
-    // shared link restores the football view). Any open detail modal's
-    // ?playerId is carried through from the live URL so a filter commit doesn't
-    // close it (mirrors the MLB handleFiltersChange rationale, LS-8260).
-    const handleNflFiltersChange = (state: {
+  // Mirror committed football filters to the URL (sport=nfl preserved so a
+  // shared link restores the football view; `view` restores the active tab).
+  // Any open detail modal's ?playerId is carried through from the live URL so
+  // a filter commit doesn't close it.
+  const handleNflFiltersChange = useCallback(
+    (state: {
+      view: FootballStatsView;
       pageSize: number;
       filters: FootballStatsFilters;
     }) => {
       const params = new URLSearchParams();
       params.set('sport', 'nfl');
+      params.set('view', state.view);
       params.set('pageSize', String(state.pageSize));
       const f = state.filters;
       if (f.positions && f.positions.length > 0) {
@@ -1610,21 +1581,76 @@ export function PlayerStatsRoute() {
       );
       if (openPlayerId) params.set('playerId', openPlayerId);
       setSearchParams(params, { replace: true });
-    };
+    },
+    [setSearchParams],
+  );
 
-    // A row click writes ?playerId, opening the detail modal in place (pushes
-    // history so Back closes it), matching the MLB deep-link behaviour.
-    const handleNflPlayerDetails = (playerId: number) => {
+  // A row click writes ?playerId, opening the detail modal in place (pushes
+  // history so Back closes it), matching the MLB deep-link behaviour.
+  const handleNflPlayerDetails = useCallback(
+    (playerId: number) => {
       const params = new URLSearchParams(window.location.search);
       params.set('playerId', String(playerId));
       setSearchParams(params);
-    };
+    },
+    [setSearchParams],
+  );
 
-    const handleNflViewFullPage = () => {
-      if (selectedPlayerId !== null && Number.isFinite(selectedPlayerId)) {
-        navigate(`/football/players/${selectedPlayerId}`);
+  const handleNflViewFullPage = useCallback(() => {
+    if (selectedPlayerId !== null && Number.isFinite(selectedPlayerId)) {
+      navigate(`/football/players/${selectedPlayerId}`);
+    }
+  }, [navigate, selectedPlayerId]);
+
+  // NFL view — render the football statistics browser inline through the shared
+  // PlayerStatsShell (LS-8442), the same shell the MLB browser renders through,
+  // instead of redirecting away or embedding the bespoke football page. Placed
+  // after all hooks to satisfy Rules of Hooks; the standalone /football/players
+  // route still renders the bespoke FootballPlayersPage.
+  if (showFootball) {
+    // Seed the football controller from the URL params the route persists.
+    const nflInitialFilters: Partial<FootballStatsFilters> = {};
+    // Validate each position against the known FootballPosition literals —
+    // a hand-crafted URL must never inject arbitrary strings (LS-8442 review).
+    const posRaw = searchParams.get('position');
+    if (posRaw) {
+      const positions = parseFootballPositions(posRaw);
+      if (positions.length > 0) {
+        nflInitialFilters.positions = positions;
       }
-    };
+    }
+    const teamParam = sanitizeSearchParam(searchParams.get('team'));
+    if (teamParam) nflInitialFilters.team = teamParam;
+    const searchParam = sanitizeSearchParam(searchParams.get('search'));
+    if (searchParam) nflInitialFilters.searchTerm = searchParam;
+    // Active stats-grid tab (LS-8566); unknown values normalize to overview.
+    nflInitialFilters.view = normalizeFootballView(searchParams.get('view'));
+    // Allow-list the sort against the grid's full field set (players-table +
+    // namespaced stat keys) via the shared guard; the controller re-validates
+    // the field against the active view before it reaches GraphQL.
+    const sortByParam = searchParams.get('sortBy');
+    if (sortByParam !== null && isFootballSortField(sortByParam)) {
+      nflInitialFilters.sortField = sortByParam;
+      nflInitialFilters.sortDir =
+        searchParams.get('sortDir') === 'desc' ? 'desc' : 'asc';
+    }
+    const injuryParam = sanitizeSearchParam(searchParams.get('injuryStatus'));
+    if (injuryParam) nflInitialFilters.injuryStatus = injuryParam;
+    const minProjParam = searchParams.get('minProjectedPoints');
+    if (minProjParam && Number.isFinite(Number(minProjParam))) {
+      nflInitialFilters.minProjectedPoints = Number(minProjParam);
+    }
+    const maxAdpParam = searchParams.get('maxAdpRank');
+    if (maxAdpParam && Number.isFinite(Number.parseInt(maxAdpParam, 10))) {
+      nflInitialFilters.maxAdpRank = Number.parseInt(maxAdpParam, 10);
+    }
+    const rawNflPageSize = Number.parseInt(
+      searchParams.get('pageSize') ?? '',
+      10,
+    );
+    const nflInitialPageSize = [25, 50, 100].includes(rawNflPageSize)
+      ? rawNflPageSize
+      : 25;
 
     return (
       <div

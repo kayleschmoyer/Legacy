@@ -34,15 +34,15 @@ import {
   useGetCareerPitchingStatsCountQuery,
   useGetCareerPitchingStatsQuery,
 } from '@legacy-sports/graphql';
-import { getPageRange } from './paginationUtils';
 import { resolveVisibleColumns } from './columnVisibility';
 import { formatPositionsPlayed } from './services/CareerStatsService';
+import { StatsGridHeaderCell } from './shell/StatsGridHeaderCell';
+import { StatsGridPagination } from './shell/StatsGridPagination';
 
 // ─── Brand color constants (mirror apps/web/src/constants/colors.ts) ──────────
 const BRAND_NAVY = '#1B3A5C';
 const BRAND_NAVY_LIGHT = '#2C4A7C';
 const BRAND_NAVY_DARK = '#143050';
-const BRAND_GOLD = '#C5A55A';
 const BRAND_GOLD_LIGHT = '#D4BB78';
 const TEXT_HIGH_CONTRAST = '#F5F7FA';
 const TEXT_MUTED = '#9CAAC5';
@@ -823,75 +823,25 @@ export function PitchingStatsDataGrid({
             const sortField =
               COLUMN_TO_SORT_FIELD_MAP[column.key] || column.key;
             const isActiveSortColumn = queryParams.orderBy === sortField;
-            const isDescending = queryParams.orderDirection === 'desc';
 
             return (
-              <XStack
+              <StatsGridHeaderCell
                 key={column.key}
-                width={column.width || 'auto'}
+                label={column.label}
+                sortable={column.sortable}
+                isActive={isActiveSortColumn}
+                direction={
+                  queryParams.orderDirection === 'desc' ? 'desc' : 'asc'
+                }
+                onSort={(nextDirection) =>
+                  handleSort(column.key, nextDirection)
+                }
+                align={column.align}
+                width={column.width}
                 minWidth={column.minWidth}
                 flexGrow={1}
-                justifyContent={
-                  column.align === 'center'
-                    ? 'center'
-                    : column.align === 'right'
-                      ? 'flex-end'
-                      : 'flex-start'
-                }
-                alignItems="center"
                 paddingHorizontal="$1"
-                paddingVertical="$1"
-                borderRadius="$2"
-                style={{
-                  background: isActiveSortColumn
-                    ? 'rgba(196,165,90,0.18)'
-                    : 'transparent',
-                  transition: 'background 0.15s ease',
-                }}
-                hoverStyle={
-                  column.sortable
-                    ? {
-                        backgroundColor: isActiveSortColumn
-                          ? ('rgba(196,165,90,0.25)' as never)
-                          : ('rgba(255,255,255,0.07)' as never),
-                      }
-                    : undefined
-                }
-                pressStyle={column.sortable ? { scale: 0.97 } : undefined}
-                cursor={column.sortable ? 'pointer' : 'default'}
-                onPress={
-                  column.sortable
-                    ? () => {
-                        const currentDirection =
-                          isActiveSortColumn && isDescending ? 'asc' : 'desc';
-                        handleSort(column.key, currentDirection);
-                      }
-                    : undefined
-                }
-              >
-                <XStack gap="$1" alignItems="center">
-                  <Text
-                    numberOfLines={1}
-                    userSelect="none"
-                    style={{
-                      fontFamily: FONT_DISPLAY,
-                      fontWeight: '700',
-                      fontSize: 11,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: isActiveSortColumn ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                      transition: 'color 0.15s ease',
-                    }}
-                  >
-                    {column.label}
-                  </Text>
-                  {column.sortable && isActiveSortColumn && (
-                    <Text style={{ fontSize: 10, color: BRAND_GOLD }}>
-                      {isDescending ? '▼' : '▲'}
-                    </Text>
-                  )}
-                </XStack>
-              </XStack>
+              />
             );
           })}
         </XStack>
@@ -1063,156 +1013,22 @@ export function PitchingStatsDataGrid({
     </YStack>
   );
 
-  const renderPagination = () => {
-    const pageRange = getPageRange(currentPageNumber, totalPages);
-
-    return (
-      <YStack gap="$2">
-        <XStack
-          justifyContent="space-between"
-          alignItems="center"
-          padding="$3"
-          flexWrap="wrap"
-          gap="$2"
-          style={{
-            background: `rgba(22,34,58,0.65)`,
-            border: `1px solid rgba(44,74,124,0.35)`,
-            borderRadius: 12,
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-          }}
-        >
-          <XStack gap="$2" alignItems="center">
-            <Text
-              fontSize="$3"
-              fontWeight="600"
-              style={{ color: TEXT_HIGH_CONTRAST }}
-            >
-              Page {currentPageNumber} of {totalPages}
-            </Text>
-            <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
-              ({totalCount.toLocaleString()} total)
-            </Text>
-          </XStack>
-
-          <XStack gap="$2" alignItems="center">
-            <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
-              Show:
-            </Text>
-            {[10, 25, 50, 100].map((size) => (
-              <Button
-                key={size}
-                size="$2"
-                onPress={() => handlePageSizeChange(size)}
-                disabled={loading}
-                style={{
-                  background:
-                    pageSize === size
-                      ? `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`
-                      : 'rgba(10,15,26,0.5)',
-                  border:
-                    pageSize === size
-                      ? `1px solid rgba(196,165,90,0.4)`
-                      : `1px solid rgba(44,74,124,0.35)`,
-                  borderRadius: 8,
-                  color: pageSize === size ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                  minWidth: 36,
-                }}
-              >
-                {size}
-              </Button>
-            ))}
-          </XStack>
-
-          <XStack gap="$2">
-            <Button
-              size="$3"
-              disabled={!hasPreviousPage || loading}
-              onPress={() => handlePageChange('prev')}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-                border: `1px solid rgba(196,165,90,0.25)`,
-                borderRadius: 10,
-                color: BRAND_GOLD_LIGHT,
-                opacity: !hasPreviousPage || loading ? 0.4 : 1,
-              }}
-            >
-              ← Prev
-            </Button>
-            <Button
-              size="$3"
-              disabled={!hasNextPage || loading}
-              onPress={() => handlePageChange('next')}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-                border: `1px solid rgba(196,165,90,0.25)`,
-                borderRadius: 10,
-                color: BRAND_GOLD_LIGHT,
-                opacity: !hasNextPage || loading ? 0.4 : 1,
-              }}
-            >
-              Next →
-            </Button>
-          </XStack>
-        </XStack>
-
-        {/* Page number quick-jump buttons */}
-        {totalPages > 1 && (
-          <XStack
-            justifyContent="center"
-            alignItems="center"
-            padding="$2"
-            flexWrap="wrap"
-            gap="$1"
-            style={{
-              background: `rgba(22,34,58,0.5)`,
-              border: `1px solid rgba(44,74,124,0.25)`,
-              borderRadius: 10,
-            }}
-          >
-            {pageRange.map((page, index) => {
-              if (page === -1) {
-                return (
-                  <Text
-                    key={`ellipsis-${index}`}
-                    fontSize="$3"
-                    paddingHorizontal="$2"
-                    style={{ color: TEXT_MUTED }}
-                  >
-                    ...
-                  </Text>
-                );
-              }
-
-              const isCurrentPage = page === currentPageNumber;
-              return (
-                <Button
-                  key={page}
-                  size="$2"
-                  onPress={() => handleGoToPage(page)}
-                  disabled={loading || isCurrentPage}
-                  minWidth={32}
-                  style={{
-                    background: isCurrentPage
-                      ? `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`
-                      : 'transparent',
-                    border: isCurrentPage
-                      ? `1px solid rgba(196,165,90,0.45)`
-                      : `1px solid transparent`,
-                    borderRadius: 8,
-                    color: isCurrentPage ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                    fontWeight: isCurrentPage ? '700' : '400',
-                  }}
-                >
-                  {page}
-                </Button>
-              );
-            })}
-          </XStack>
-        )}
-      </YStack>
-    );
-  };
+  const renderPagination = () => (
+    <StatsGridPagination
+      currentPage={currentPageNumber}
+      totalPages={totalPages}
+      totalCount={totalCount}
+      pageSize={pageSize}
+      loading={loading}
+      hasPreviousPage={hasPreviousPage}
+      hasNextPage={hasNextPage}
+      prevLabel="← Prev"
+      onPrev={() => handlePageChange('prev')}
+      onNext={() => handlePageChange('next')}
+      onGoToPage={handleGoToPage}
+      onPageSizeChange={handlePageSizeChange}
+    />
+  );
 
   // =============================================================================
   // Main Render

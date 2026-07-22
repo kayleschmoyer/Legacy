@@ -117,6 +117,37 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
     if (mode === 'hitters' || mode === 'batting') return 'hitters';
     return 'combined';
   },
+  // Batting sort-field guard used by the MLB URL parser — only reached when a
+  // `sortBy` param is present (the LS-8566 tests set one).
+  isValidBattingSortField: (value: string) =>
+    ['homeRuns', 'battingAvg', 'hits', 'rbi', 'name'].includes(value),
+  // Football stats-grid helpers (LS-8566) — lightweight mirrors of the shared
+  // implementations, enough for the route's parse/guard paths.
+  normalizeFootballView: (raw: string | null | undefined) =>
+    raw != null &&
+    [
+      'overview',
+      'passing',
+      'rushing',
+      'receiving',
+      'kicking',
+      'idp',
+      'defense',
+    ].includes(raw)
+      ? raw
+      : 'overview',
+  isFootballSortField: (value: string) =>
+    ['name', 'position', 'team'].includes(value) ||
+    /^(passing|rushing|receiving|kicking|idp|defense)\.[A-Za-z]+$/.test(value),
+  parseFootballPositions: (raw: string | null) =>
+    (raw ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) =>
+        ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DST', 'DL', 'LB', 'DB'].includes(
+          s,
+        ),
+      ),
   // Column-visibility helpers consumed by the host's URL parse/serialize +
   // localStorage paths (LS-7105 / PST-001). Lightweight stand-ins are enough for
   // the route-level assertions here.
@@ -342,6 +373,99 @@ describe('PlayerStatsRoute sport switcher', () => {
     expect(
       screen.queryByRole('button', { name: /view nfl statistics/i }),
     ).not.toBeInTheDocument();
+  });
+
+  // LS-8566: handleSelectSport builds a FRESH param set. NFL params
+  // (position=QB, view=passing, stat sortBy) leaking into the MLB parser
+  // corrupted its position filter; and vice versa.
+  it('switches sports with a fresh sport-only param set (no cross-sport leakage)', async () => {
+    mockSearchParams = new URLSearchParams(
+      'sport=nfl&position=QB&view=passing&sortBy=passing.yds&pageSize=50',
+    );
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    fireEvent.click(
+      screen.getByRole('button', { name: /view mlb statistics/i }),
+    );
+    const params = mockSetSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(params.get('sport')).toBe('mlb');
+    expect([...params.keys()]).toEqual(['sport']);
+    // Push (no replace option) so Back restores the previous sport view.
+    expect(mockSetSearchParams.mock.calls[0][1]).toBeUndefined();
+  });
+});
+
+// LS-8566: the NFL handlers used to be defined inline inside the showFootball
+// branch, giving `onFiltersChange` a fresh identity every render. The football
+// controller's URL-mirror effect depends on that identity, so each render
+// re-fired the effect → setSearchParams(replace) → re-render → infinite loop
+// that also stomped sport switches back to sport=nfl.
+describe('PlayerStatsRoute NFL filter mirroring (LS-8566)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockFootballEnabled = true;
+  });
+
+  it('passes a stable onFiltersChange identity across re-renders (loop regression)', async () => {
+    const { rerender } = render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    const first = mockFootballStatsPageProps.onFiltersChange;
+    expect(typeof first).toBe('function');
+    rerender(<PlayerStatsRoute />);
+    expect(mockFootballStatsPageProps.onFiltersChange).toBe(first);
+  });
+
+  it('seeds the football controller with view and namespaced sort from the URL', async () => {
+    mockSearchParams = new URLSearchParams(
+      'sport=nfl&view=passing&sortBy=passing.yds&sortDir=desc',
+    );
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    expect(mockFootballStatsPageProps.initialFilters).toMatchObject({
+      view: 'passing',
+      sortField: 'passing.yds',
+      sortDir: 'desc',
+    });
+  });
+
+  it('normalizes an unknown view param to overview and drops an unknown sortBy', async () => {
+    mockSearchParams = new URLSearchParams(
+      'sport=nfl&view=batting&sortBy=fpts',
+    );
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    const initialFilters = mockFootballStatsPageProps.initialFilters as Record<
+      string,
+      unknown
+    >;
+    expect(initialFilters.view).toBe('overview');
+    expect(initialFilters.sortField).toBeUndefined();
+  });
+
+  it('mirrors committed filters to the URL with sport and view pinned (replace)', async () => {
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    const onFiltersChange = mockFootballStatsPageProps.onFiltersChange as (
+      state: unknown,
+    ) => void;
+    act(() =>
+      onFiltersChange({
+        view: 'rushing',
+        pageSize: 50,
+        filters: { positions: ['RB'] },
+      }),
+    );
+    const call = mockSetSearchParams.mock.calls.at(-1) as [
+      URLSearchParams,
+      { replace?: boolean } | undefined,
+    ];
+    expect(call[0].get('sport')).toBe('nfl');
+    expect(call[0].get('view')).toBe('rushing');
+    expect(call[0].get('pageSize')).toBe('50');
+    expect(call[0].get('position')).toBe('RB');
+    expect(call[1]).toEqual({ replace: true });
   });
 });
 

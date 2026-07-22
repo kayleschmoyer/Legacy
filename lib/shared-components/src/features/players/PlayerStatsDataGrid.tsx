@@ -33,10 +33,10 @@ import {
   type PlayerCareerStats,
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
-import { getPageRange } from './paginationUtils';
 import { resolveVisibleColumns } from './columnVisibility';
+import { StatsGridHeaderCell } from './shell/StatsGridHeaderCell';
+import { StatsGridPagination } from './shell/StatsGridPagination';
 import {
-  BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_DARK,
@@ -929,91 +929,27 @@ export function PlayerStatsDataGrid({
             const sortField =
               COLUMN_TO_SORT_FIELD_MAP[column.key as string] || column.key;
             const isActiveSortColumn = queryParams.orderBy === sortField;
-            const isDescending = queryParams.orderDirection === 'desc';
             const isPlayerCol = column.key === 'displayName';
 
             return (
-              <XStack
+              <StatsGridHeaderCell
                 key={column.key}
-                width={column.width || 'auto'}
+                label={column.label}
+                sortable={column.sortable}
+                isActive={isActiveSortColumn}
+                direction={
+                  queryParams.orderDirection === 'desc' ? 'desc' : 'asc'
+                }
+                onSort={(nextDirection) =>
+                  handleSort(column.key, nextDirection)
+                }
+                align={column.align}
+                width={column.width}
                 minWidth={column.minWidth}
                 flexGrow={isPlayerCol ? 0 : 1}
-                flexShrink={0}
-                justifyContent={
-                  column.align === 'center'
-                    ? 'center'
-                    : column.align === 'right'
-                      ? 'flex-end'
-                      : 'flex-start'
-                }
-                alignItems="center"
                 paddingHorizontal="$2"
-                paddingVertical="$1"
-                borderRadius="$2"
-                style={{
-                  background: isActiveSortColumn
-                    ? 'rgba(196,165,90,0.18)'
-                    : isPlayerCol
-                      ? BRAND_NAVY_DARK
-                      : 'transparent',
-                  transition: 'background 0.15s ease',
-                  ...(isPlayerCol
-                    ? {
-                        position: 'sticky',
-                        left: 0,
-                        zIndex: 2,
-                      }
-                    : {}),
-                }}
-                hoverStyle={
-                  column.sortable
-                    ? {
-                        backgroundColor: isActiveSortColumn
-                          ? ('rgba(196,165,90,0.25)' as never)
-                          : ('rgba(255,255,255,0.07)' as never),
-                      }
-                    : undefined
-                }
-                pressStyle={column.sortable ? { scale: 0.97 } : undefined}
-                cursor={column.sortable ? 'pointer' : 'default'}
-                onPress={
-                  column.sortable
-                    ? () => {
-                        const currentDirection =
-                          isActiveSortColumn && isDescending ? 'asc' : 'desc';
-                        handleSort(column.key, currentDirection);
-                      }
-                    : undefined
-                }
-              >
-                <XStack gap="$1" alignItems="center">
-                  <Text
-                    numberOfLines={1}
-                    userSelect="none"
-                    style={{
-                      fontFamily: FONT_DISPLAY,
-                      fontWeight: '700',
-                      fontSize: 11,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: isActiveSortColumn ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                      transition: 'color 0.15s ease',
-                    }}
-                  >
-                    {column.label}
-                  </Text>
-                  {column.sortable && isActiveSortColumn && (
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        color: BRAND_GOLD,
-                      }}
-                    >
-                      {isDescending ? '▼' : '▲'}
-                    </Text>
-                  )}
-                </XStack>
-              </XStack>
+                sticky={isPlayerCol}
+              />
             );
           })}
         </XStack>
@@ -1281,160 +1217,19 @@ export function PlayerStatsDataGrid({
   /**
    * Renders pagination controls with page jumping
    */
-  const renderPagination = () => {
-    const pageRange = getPageRange(currentPageNumber, totalPages);
-
-    return (
-      <YStack gap="$2">
-        {/* Main pagination controls */}
-        <XStack
-          justifyContent="space-between"
-          alignItems="center"
-          padding="$3"
-          flexWrap="wrap"
-          gap="$2"
-          style={{
-            background: `rgba(22,34,58,0.65)`,
-            border: `1px solid rgba(44,74,124,0.35)`,
-            borderRadius: 12,
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-          }}
-        >
-          {/* Page info */}
-          <XStack gap="$2" alignItems="center">
-            <Text
-              fontSize="$3"
-              fontWeight="600"
-              style={{ color: TEXT_HIGH_CONTRAST }}
-            >
-              Page {currentPageNumber} of {totalPages}
-            </Text>
-            <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
-              ({totalCount.toLocaleString()} total)
-            </Text>
-          </XStack>
-
-          {/* Page size selector */}
-          <XStack gap="$2" alignItems="center">
-            <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
-              Show:
-            </Text>
-            {[10, 25, 50, 100].map((size) => (
-              <Button
-                key={size}
-                size="$2"
-                onPress={() => handlePageSizeChange(size)}
-                disabled={loading}
-                style={{
-                  background:
-                    pageSize === size
-                      ? `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`
-                      : 'rgba(10,15,26,0.5)',
-                  border:
-                    pageSize === size
-                      ? `1px solid rgba(196,165,90,0.4)`
-                      : `1px solid rgba(44,74,124,0.35)`,
-                  borderRadius: 8,
-                  color: pageSize === size ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                  minWidth: 36,
-                }}
-              >
-                {size}
-              </Button>
-            ))}
-          </XStack>
-
-          {/* Prev/Next navigation */}
-          <XStack gap="$2">
-            <Button
-              size="$3"
-              disabled={currentPageNumber === 1 || loading}
-              onPress={() => handlePageChange('prev')}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-                border: `1px solid rgba(196,165,90,0.25)`,
-                borderRadius: 10,
-                color: BRAND_GOLD_LIGHT,
-                opacity: currentPageNumber === 1 || loading ? 0.4 : 1,
-              }}
-            >
-              ← Previous
-            </Button>
-            <Button
-              size="$3"
-              disabled={currentPageNumber === totalPages || loading}
-              onPress={() => handlePageChange('next')}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-                border: `1px solid rgba(196,165,90,0.25)`,
-                borderRadius: 10,
-                color: BRAND_GOLD_LIGHT,
-                opacity: currentPageNumber === totalPages || loading ? 0.4 : 1,
-              }}
-            >
-              Next →
-            </Button>
-          </XStack>
-        </XStack>
-
-        {/* Page number quick-jump buttons */}
-        {totalPages > 1 && (
-          <XStack
-            justifyContent="center"
-            alignItems="center"
-            padding="$2"
-            flexWrap="wrap"
-            gap="$1"
-            style={{
-              background: `rgba(22,34,58,0.5)`,
-              border: `1px solid rgba(44,74,124,0.25)`,
-              borderRadius: 10,
-            }}
-          >
-            {pageRange.map((page, index) => {
-              if (page === -1) {
-                return (
-                  <Text
-                    key={`ellipsis-${index}`}
-                    fontSize="$3"
-                    paddingHorizontal="$2"
-                    style={{ color: TEXT_MUTED }}
-                  >
-                    ...
-                  </Text>
-                );
-              }
-
-              const isCurrentPage = page === currentPageNumber;
-              return (
-                <Button
-                  key={page}
-                  size="$2"
-                  onPress={() => handleGoToPage(page)}
-                  disabled={loading || isCurrentPage}
-                  minWidth={32}
-                  style={{
-                    background: isCurrentPage
-                      ? `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`
-                      : 'transparent',
-                    border: isCurrentPage
-                      ? `1px solid rgba(196,165,90,0.45)`
-                      : `1px solid transparent`,
-                    borderRadius: 8,
-                    color: isCurrentPage ? BRAND_GOLD_LIGHT : TEXT_MUTED,
-                    fontWeight: isCurrentPage ? '700' : '400',
-                  }}
-                >
-                  {page}
-                </Button>
-              );
-            })}
-          </XStack>
-        )}
-      </YStack>
-    );
-  };
+  const renderPagination = () => (
+    <StatsGridPagination
+      currentPage={currentPageNumber}
+      totalPages={totalPages}
+      totalCount={totalCount}
+      pageSize={pageSize}
+      loading={loading}
+      onPrev={() => handlePageChange('prev')}
+      onNext={() => handlePageChange('next')}
+      onGoToPage={handleGoToPage}
+      onPageSizeChange={handlePageSizeChange}
+    />
+  );
 
   // =============================================================================
   // Main Render

@@ -35,6 +35,7 @@ import {
   sql,
   SQL,
 } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { builder } from './builder';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 import { requireEntitlement } from './authorization';
@@ -1777,6 +1778,8 @@ const FootballPlayersConnectionRef = builder.objectRef<{
     hasNextPage: boolean;
     endCursor: string | null;
   };
+  /** Lazy memoized COUNT over the same filters — see the resolver (LS-8566). */
+  getTotalCount: () => Promise<number>;
 }>('FootballPlayersConnection');
 
 FootballPlayersConnectionRef.implement({
@@ -1791,6 +1794,13 @@ FootballPlayersConnectionRef.implement({
       type: FootballPlayersPageInfoRef,
       nullable: false,
       resolve: (parent) => parent.pageInfo,
+    }),
+    totalCount: t.int({
+      nullable: false,
+      description:
+        'Total players matching the filters across all pages. Computed only ' +
+        'when this field is selected (LS-8566) — drives the stats-grid pager.',
+      resolve: (parent) => parent.getTotalCount(),
     }),
   }),
 });
@@ -1925,16 +1935,220 @@ const CONFERENCE_TEAMS: Record<NflConference, NflTeamAbbr[]> = {
   ],
 };
 
-// Sortable columns that live directly on the `players` table (LS-6473). Stat-
-// based sorts (yards, TDs, fantasy points) would require joining the season-
-// stats tables and are intentionally out of scope here.
-const VALID_FOOTBALL_PLAYER_SORTS = ['name', 'position', 'team'] as const;
+// Sortable columns that live directly on the `players` table (LS-6473).
+const PLAYER_COLUMN_SORTS = ['name', 'position', 'team'] as const;
 
-type FootballPlayerSort = (typeof VALID_FOOTBALL_PLAYER_SORTS)[number];
+type FootballPlayerColumnSort = (typeof PLAYER_COLUMN_SORTS)[number];
 
-function isValidPlayerSort(s: string): s is FootballPlayerSort {
-  return (VALID_FOOTBALL_PLAYER_SORTS as readonly string[]).includes(s);
+function isPlayerColumnSort(s: string): s is FootballPlayerColumnSort {
+  return (PLAYER_COLUMN_SORTS as readonly string[]).includes(s);
 }
+
+// Career-stat categories the stats grid can view and sort (LS-8566). Category
+// names map 1:1 to their backing storage — `idp` is the individual-defender
+// aggregate view, `defense` the DST career table — mirroring the
+// careerStatCategoriesForPlayer routing above. Stat sorts were originally
+// scoped out in LS-6473; LS-8566 adds them via an INNER JOIN on the category
+// table, which doubles as the category filter (a "passing leaders" board only
+// contains players with a career passing row).
+const FOOTBALL_STAT_CATEGORIES = [
+  'passing',
+  'rushing',
+  'receiving',
+  'kicking',
+  'idp',
+  'defense',
+] as const;
+
+type FootballStatCategory = (typeof FOOTBALL_STAT_CATEGORIES)[number];
+
+function isStatCategory(c: string): c is FootballStatCategory {
+  return (FOOTBALL_STAT_CATEGORIES as readonly string[]).includes(c);
+}
+
+const CATEGORY_TABLES = {
+  passing: PublicSchema.careerFootballPassing,
+  rushing: PublicSchema.careerFootballRushing,
+  receiving: PublicSchema.careerFootballReceiving,
+  kicking: PublicSchema.careerFootballKicking,
+  idp: PublicSchema.careerFootballDefenseIdp,
+  defense: PublicSchema.careerFootballDefense,
+} as const;
+
+// Namespaced stat sort keys (`<category>.<field>`) → the sortable expression on
+// the joined career table. A stat sort is only valid alongside its matching
+// `category` arg, so the expression's table is always joined. `kicking.fgPct`
+// is computed in SQL (ratio, order-equivalent to the rounded percentage the
+// FootballCareerKicking.fgPct field exposes — LS-6244).
+const FOOTBALL_STAT_SORTS: Record<
+  string,
+  { category: FootballStatCategory; expr: SQL | AnyPgColumn }
+> = {
+  'passing.g': {
+    category: 'passing',
+    expr: PublicSchema.careerFootballPassing.g,
+  },
+  'passing.cmp': {
+    category: 'passing',
+    expr: PublicSchema.careerFootballPassing.cmp,
+  },
+  'passing.att': {
+    category: 'passing',
+    expr: PublicSchema.careerFootballPassing.att,
+  },
+  'passing.yds': {
+    category: 'passing',
+    expr: PublicSchema.careerFootballPassing.yds,
+  },
+  'passing.td': {
+    category: 'passing',
+    expr: PublicSchema.careerFootballPassing.td,
+  },
+  'passing.int': {
+    category: 'passing',
+    expr: PublicSchema.careerFootballPassing.int,
+  },
+  'passing.rating': {
+    category: 'passing',
+    expr: PublicSchema.careerFootballPassing.rating,
+  },
+  'rushing.g': {
+    category: 'rushing',
+    expr: PublicSchema.careerFootballRushing.g,
+  },
+  'rushing.att': {
+    category: 'rushing',
+    expr: PublicSchema.careerFootballRushing.att,
+  },
+  'rushing.yds': {
+    category: 'rushing',
+    expr: PublicSchema.careerFootballRushing.yds,
+  },
+  'rushing.td': {
+    category: 'rushing',
+    expr: PublicSchema.careerFootballRushing.td,
+  },
+  'rushing.lng': {
+    category: 'rushing',
+    expr: PublicSchema.careerFootballRushing.lng,
+  },
+  'rushing.fumbles': {
+    category: 'rushing',
+    expr: PublicSchema.careerFootballRushing.fumbles,
+  },
+  'receiving.g': {
+    category: 'receiving',
+    expr: PublicSchema.careerFootballReceiving.g,
+  },
+  'receiving.rec': {
+    category: 'receiving',
+    expr: PublicSchema.careerFootballReceiving.rec,
+  },
+  'receiving.tgt': {
+    category: 'receiving',
+    expr: PublicSchema.careerFootballReceiving.tgt,
+  },
+  'receiving.yds': {
+    category: 'receiving',
+    expr: PublicSchema.careerFootballReceiving.yds,
+  },
+  'receiving.td': {
+    category: 'receiving',
+    expr: PublicSchema.careerFootballReceiving.td,
+  },
+  'receiving.lng': {
+    category: 'receiving',
+    expr: PublicSchema.careerFootballReceiving.lng,
+  },
+  'kicking.g': {
+    category: 'kicking',
+    expr: PublicSchema.careerFootballKicking.g,
+  },
+  'kicking.fgm': {
+    category: 'kicking',
+    expr: PublicSchema.careerFootballKicking.fgm,
+  },
+  'kicking.fga': {
+    category: 'kicking',
+    expr: PublicSchema.careerFootballKicking.fga,
+  },
+  'kicking.fgPct': {
+    category: 'kicking',
+    expr: sql`(${PublicSchema.careerFootballKicking.fgm}::float / NULLIF(${PublicSchema.careerFootballKicking.fga}, 0))`,
+  },
+  'kicking.xpm': {
+    category: 'kicking',
+    expr: PublicSchema.careerFootballKicking.xpm,
+  },
+  'kicking.xpa': {
+    category: 'kicking',
+    expr: PublicSchema.careerFootballKicking.xpa,
+  },
+  'kicking.lng': {
+    category: 'kicking',
+    expr: PublicSchema.careerFootballKicking.lng,
+  },
+  'idp.g': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.g },
+  'idp.soloTkl': {
+    category: 'idp',
+    expr: PublicSchema.careerFootballDefenseIdp.soloTkl,
+  },
+  'idp.astTkl': {
+    category: 'idp',
+    expr: PublicSchema.careerFootballDefenseIdp.astTkl,
+  },
+  'idp.totalTkl': {
+    category: 'idp',
+    expr: PublicSchema.careerFootballDefenseIdp.totalTkl,
+  },
+  'idp.sacks': {
+    category: 'idp',
+    expr: PublicSchema.careerFootballDefenseIdp.sacks,
+  },
+  'idp.int': {
+    category: 'idp',
+    expr: PublicSchema.careerFootballDefenseIdp.int,
+  },
+  'idp.pd': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.pd },
+  'idp.ff': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.ff },
+  'idp.fr': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.fr },
+  'idp.defTd': {
+    category: 'idp',
+    expr: PublicSchema.careerFootballDefenseIdp.defTd,
+  },
+  'defense.g': {
+    category: 'defense',
+    expr: PublicSchema.careerFootballDefense.g,
+  },
+  'defense.sacks': {
+    category: 'defense',
+    expr: PublicSchema.careerFootballDefense.sacks,
+  },
+  'defense.int': {
+    category: 'defense',
+    expr: PublicSchema.careerFootballDefense.int,
+  },
+  'defense.fumRec': {
+    category: 'defense',
+    expr: PublicSchema.careerFootballDefense.fumRec,
+  },
+  'defense.defTd': {
+    category: 'defense',
+    expr: PublicSchema.careerFootballDefense.defTd,
+  },
+  'defense.safeties': {
+    category: 'defense',
+    expr: PublicSchema.careerFootballDefense.safeties,
+  },
+  'defense.ptsAllowedPerG': {
+    category: 'defense',
+    expr: PublicSchema.careerFootballDefense.ptsAllowedPerG,
+  },
+  'defense.ydsAllowedPerG': {
+    category: 'defense',
+    expr: PublicSchema.careerFootballDefense.ydsAllowedPerG,
+  },
+};
 
 builder.queryField('footballPlayers', (t) =>
   t.field({
@@ -1961,11 +2175,16 @@ builder.queryField('footballPlayers', (t) =>
       injuryStatus: t.arg.string({ required: false }),
       minProjectedPoints: t.arg.float({ required: false }),
       maxAdpRank: t.arg.int({ required: false }),
-      // Sort over columns on the players table only — 'name' (lastName,
-      // firstName), 'position', or 'team' (nflTeam). Unset preserves the
-      // historical default of ordering by id (LS-6473).
+      // Sort over players-table columns ('name' = lastName/firstName,
+      // 'position', 'team' = nflTeam) or, with a matching `category`, a
+      // namespaced career-stat key like 'passing.yds' (LS-8566). Unset
+      // preserves the historical default of ordering by id (LS-6473).
       sortBy: t.arg.string({ required: false }),
       sortDir: t.arg.string({ required: false }),
+      // Career-stat category (LS-8566). INNER JOINs the matching career table,
+      // restricting rows to players with stats in that category — the leader-
+      // board semantics of the stats-grid tabs. Required for stat sortBy keys.
+      category: t.arg.string({ required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -1999,8 +2218,37 @@ builder.queryField('footballPlayers', (t) =>
           ? parsedOffset
           : 0;
 
-      if (args.sortBy != null && !isValidPlayerSort(args.sortBy)) {
-        throw UserInputError(`Invalid sortBy: ${args.sortBy}`);
+      const category =
+        args.category != null && args.category !== '' ? args.category : null;
+      if (category != null && !isStatCategory(category)) {
+        throw UserInputError(`Invalid category: ${category}`);
+      }
+
+      // A sortBy is either a players-table column or a namespaced stat key
+      // whose prefix must equal the supplied category (the key's table is only
+      // joined when its category is requested).
+      let statSort: {
+        category: FootballStatCategory;
+        expr: SQL | AnyPgColumn;
+      } | null = null;
+      if (args.sortBy != null) {
+        if (!isPlayerColumnSort(args.sortBy)) {
+          const candidate = FOOTBALL_STAT_SORTS[args.sortBy];
+          if (!candidate) {
+            throw UserInputError(`Invalid sortBy: ${args.sortBy}`);
+          }
+          if (category == null) {
+            throw UserInputError(
+              `Stat sortBy '${args.sortBy}' requires category: '${candidate.category}'`,
+            );
+          }
+          if (candidate.category !== category) {
+            throw UserInputError(
+              `Stat sortBy '${args.sortBy}' does not match category: '${category}'`,
+            );
+          }
+          statSort = candidate;
+        }
       }
       const sortDir = args.sortDir ?? 'asc';
       if (sortDir !== 'asc' && sortDir !== 'desc') {
@@ -2009,6 +2257,14 @@ builder.queryField('footballPlayers', (t) =>
       const dir = sortDir === 'desc' ? desc : asc;
 
       const conditions: SQL[] = [eq(PublicSchema.players.sport, 'football')];
+
+      // The DST career table is only ever populated for synthetic team-defense
+      // players (careerStatCategoriesForPlayer routing), but pin the semantics
+      // with an explicit isDst guard so the DST leader board can never surface
+      // an individual player even if historical data drifts.
+      if (category === 'defense') {
+        conditions.push(eq(PublicSchema.players.isDst, true));
+      }
 
       // Merge the single `position` and multi `positions` args into one deduped
       // filter, expanding the pseudo-positions (FLEX / SUPERFLEX / IDP) to their
@@ -2116,32 +2372,49 @@ builder.queryField('footballPlayers', (t) =>
       // Append id as a stable tiebreaker so pages don't overlap or skip rows
       // when the sort column has duplicate values (e.g. many WRs, same team).
       const orderBy: SQL[] = [];
-      switch (args.sortBy) {
-        case 'name':
-          orderBy.push(
-            dir(PublicSchema.players.lastName),
-            dir(PublicSchema.players.firstName),
-            asc(PublicSchema.players.id),
-          );
-          break;
-        case 'position':
-          orderBy.push(
-            dir(PublicSchema.players.position),
-            asc(PublicSchema.players.id),
-          );
-          break;
-        case 'team':
-          orderBy.push(
-            dir(PublicSchema.players.nflTeam),
-            asc(PublicSchema.players.id),
-          );
-          break;
-        default:
-          orderBy.push(dir(PublicSchema.players.id));
-          break;
+      if (statSort) {
+        // Individual stat columns are nullable even when the career row exists
+        // — push those rows to the end in either direction so leaders stay on
+        // page one. The offset cursor stays valid: ordering remains total and
+        // deterministic thanks to the id tiebreaker.
+        orderBy.push(
+          sortDir === 'desc'
+            ? sql`${statSort.expr} DESC NULLS LAST`
+            : sql`${statSort.expr} ASC NULLS LAST`,
+          asc(PublicSchema.players.id),
+        );
+      } else {
+        switch (args.sortBy) {
+          case 'name':
+            orderBy.push(
+              dir(PublicSchema.players.lastName),
+              dir(PublicSchema.players.firstName),
+              asc(PublicSchema.players.id),
+            );
+            break;
+          case 'position':
+            orderBy.push(
+              dir(PublicSchema.players.position),
+              asc(PublicSchema.players.id),
+            );
+            break;
+          case 'team':
+            orderBy.push(
+              dir(PublicSchema.players.nflTeam),
+              asc(PublicSchema.players.id),
+            );
+            break;
+          default:
+            orderBy.push(dir(PublicSchema.players.id));
+            break;
+        }
       }
 
-      const rows = await db
+      // Dynamic mode so the category join can be applied conditionally. The
+      // join is PK-to-PK (career_*.player_id is the primary key) and doubles
+      // as the category filter — see the category arg description.
+      const categoryTable = category != null ? CATEGORY_TABLES[category] : null;
+      let query = db
         .select({
           id: PublicSchema.players.id,
           firstName: PublicSchema.players.firstName,
@@ -2159,6 +2432,14 @@ builder.queryField('footballPlayers', (t) =>
           adpRank: PublicSchema.players.adpRank,
         })
         .from(PublicSchema.players)
+        .$dynamic();
+      if (categoryTable) {
+        query = query.innerJoin(
+          categoryTable,
+          eq(categoryTable.playerId, PublicSchema.players.id),
+        );
+      }
+      const rows = await query
         .where(and(...conditions))
         .orderBy(...orderBy)
         .limit(limit + 1)
@@ -2168,12 +2449,37 @@ builder.queryField('footballPlayers', (t) =>
       const nodes = rows.slice(0, limit);
       const endCursor = nodes.length > 0 ? String(offset + nodes.length) : null;
 
+      // Lazy total count (LS-8566): the COUNT query reuses the same join +
+      // conditions but only runs when the totalCount field is actually
+      // selected, so pre-existing FootballPlayers consumers (draft preview,
+      // detail flows) pay nothing. Memoized so multiple selections of the
+      // field in one request still cost one query.
+      let totalCountPromise: Promise<number> | null = null;
+      const getTotalCount = () => {
+        totalCountPromise ??= (async () => {
+          let countQuery = db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(PublicSchema.players)
+            .$dynamic();
+          if (categoryTable) {
+            countQuery = countQuery.innerJoin(
+              categoryTable,
+              eq(categoryTable.playerId, PublicSchema.players.id),
+            );
+          }
+          const [row] = await countQuery.where(and(...conditions));
+          return row?.count ?? 0;
+        })();
+        return totalCountPromise;
+      };
+
       return {
         nodes,
         pageInfo: {
           hasNextPage,
           endCursor,
         },
+        getTotalCount,
       };
     },
   }),

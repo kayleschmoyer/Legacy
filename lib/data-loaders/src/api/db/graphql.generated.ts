@@ -1038,6 +1038,8 @@ export type FootballPlayersConnection = {
   __typename?: 'FootballPlayersConnection';
   nodes: Array<FootballPlayer>;
   pageInfo: FootballPlayersPageInfo;
+  /** Total players matching the filters across all pages. Computed only when this field is selected (LS-8566) — drives the stats-grid pager. */
+  totalCount: Scalars['Int']['output'];
 };
 
 export type FootballPlayersPageInfo = {
@@ -3228,6 +3230,7 @@ export type QueryFootballPlayerLeagueAvailabilityArgs = {
 
 export type QueryFootballPlayersArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  category?: InputMaybe<Scalars['String']['input']>;
   conference?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
