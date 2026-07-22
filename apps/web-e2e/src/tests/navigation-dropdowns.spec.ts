@@ -16,12 +16,29 @@ import { expect, test } from '../fixtures/pages';
 
 const BASE = '/about';
 
+/**
+ * These specs exercise the **desktop** header — the primary nav pill tabs, the
+ * user-profile dropdown, and the Help & support menu. That whole cluster lives
+ * in `NavContent`, which is `display: none` below the `$gtMd` breakpoint
+ * (980px, see lib/design-tokens breakpoints): at a mobile viewport the desktop
+ * trigger is present in the DOM but never visible, so clicks time out.
+ *
+ * The mobile counterpart (hamburger → drawer) is a distinct component with its
+ * own @critical coverage in `mobile-responsive-nav.spec.ts`, so these tests
+ * must not be re-pointed at the drawer. Instead we pin a desktop viewport —
+ * mirroring how `mobile-responsive-nav.spec.ts` pins `MOBILE_VIEWPORT` — so the
+ * desktop-header assertions stay meaningful under any project, including the
+ * Mobile Chrome (Pixel 5) device project wired by LS-8457 (LS-8501).
+ */
+const DESKTOP_VIEWPORT = { width: 1280, height: 800 };
+
 // ---------------------------------------------------------------------------
 // Nav pill tabs (replaced the old Sports/Players dropdowns)
 // ---------------------------------------------------------------------------
 
 test.describe('Navigation – Nav pill tabs @smoke', () => {
   test.beforeEach(async ({ page }) => {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
     await page.goto(BASE);
     await page.waitForLoadState('load');
   });
@@ -69,6 +86,7 @@ test.describe('Navigation – Nav pill tabs @smoke', () => {
 
 test.describe('Navigation – User Profile dropdown @critical', () => {
   test.beforeEach(async ({ page }) => {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
     await page.goto(BASE);
     await page.waitForLoadState('load');
   });
@@ -104,6 +122,7 @@ test.describe('Navigation – keyboard accessibility @regression', () => {
     page,
     navHeader,
   }) => {
+    await page.setViewportSize(DESKTOP_VIEWPORT);
     await page.goto(BASE);
     await page.waitForLoadState('load');
 

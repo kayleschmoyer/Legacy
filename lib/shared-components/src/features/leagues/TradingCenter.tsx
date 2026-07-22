@@ -70,6 +70,7 @@ import {
   formatSalary,
   formatSalaryDelta,
 } from './tradeCapPreview';
+import { Platform } from '../../platform-components';
 import { Button } from '../../Button';
 import { Dropdown } from '../../Dropdown';
 import { LeagueTradeBlock } from '../matchup/LeagueTradeBlock';
@@ -902,7 +903,14 @@ function ProposeTradeDialog({
 
   return (
     <YStack
-      position="absolute"
+      // On web, anchor the modal overlay to the viewport (`fixed`) rather than
+      // the document (`absolute`). At a mobile viewport the trades panel is far
+      // taller than the screen, so an `absolute` inset:0 overlay spans the tall
+      // document and `justifyContent: center` centers the dialog around the
+      // middle of that document — off the current fold, where its controls are
+      // unreachable. Native keeps `absolute` (React Native has no `fixed`).
+      // (LS-8501)
+      position={Platform.OS === 'web' ? 'fixed' : 'absolute'}
       top={0}
       left={0}
       right={0}

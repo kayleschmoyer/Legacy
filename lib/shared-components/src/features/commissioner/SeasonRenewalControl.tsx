@@ -143,6 +143,11 @@ export function SeasonRenewalControl({
             gap="$4"
             padding="$4"
             width={520}
+            // Cap to the viewport so the dialog — and its right-aligned
+            // "Confirm New Season" button — stays fully on-screen on narrow
+            // (phone) viewports where a fixed 520px width would overflow the
+            // right edge and push the confirm control off-screen (LS-8501).
+            maxWidth="90%"
           >
             <Dialog.Title id="season-renewal-title" color="$brandGoldLight">
               Start New Season for "{leagueName}"?

@@ -344,9 +344,15 @@ test.describe('WebSocket – connection lifecycle @critical', () => {
     await page.goto(LEAGUE_URL);
     await page.waitForLoadState('load');
 
-    // League name should be visible (use .first() — the chip appears in both
-    // desktop nav and mobile header slots, both always in DOM)
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // League name should be visible. The chip renders in both the desktop-nav
+    // and mobile-header slots and both stay in the DOM, but only one is shown
+    // per viewport (the other is display:none via `$gtMd` gating). `.first()`
+    // would deterministically resolve to the desktop slot — hidden at the
+    // Mobile Chrome viewport — so filter to the visible occurrence instead so
+    // the assertion is viewport-agnostic (LS-8501).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
     // No uncaught error overlay
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',

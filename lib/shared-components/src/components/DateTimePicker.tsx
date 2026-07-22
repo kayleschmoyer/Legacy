@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Popover, Text, XStack, YStack } from 'tamagui';
+import { Adapt, Button, Popover, Text, XStack, YStack } from 'tamagui';
 import {
   Calendar,
   ChevronLeft,
@@ -9,6 +9,12 @@ import {
 } from '@tamagui/lucide-icons';
 import { to12Hour, to24Hour } from './dateTimePickerUtils';
 import { Platform } from '../platform-components';
+
+// `Adapt`'s `when` prop is typed as `MediaQueryKeyString`, which resolves to
+// `never` for this workspace's config in the shared-components typecheck, so a
+// bare media key is not assignable. Narrow through `unknown` the same way the
+// Select component does (its `asAdaptWhen` helper) to pass a media breakpoint.
+const asAdaptWhen = (value: unknown): never => value as never;
 
 export interface DateTimePickerProps {
   value?: Date;
@@ -269,6 +275,31 @@ export function DateTimePicker({
         open={isOpen}
         onOpenChange={setIsOpen}
       >
+        {/*
+         * On small WEB viewports (phones) the anchored popover is taller than
+         * the screen and its bottom "Apply" button lands off the fold, where it
+         * cannot be scrolled into view (the popover is a viewport-anchored
+         * floating layer). Adapt it into a bottom Sheet there — anchored to the
+         * viewport and internally scrollable, so every control is reachable.
+         * Gated to `Platform.OS === 'web'` so native (which always renders this
+         * custom picker) keeps its current behaviour (LS-8501).
+         */}
+        {Platform.OS === 'web' ? (
+          <Adapt when={asAdaptWhen('sm')}>
+            <Popover.Sheet modal dismissOnSnapToBottom snapPoints={[90]}>
+              <Popover.Sheet.Overlay
+                animation="quick"
+                enterStyle={{ opacity: 0 }}
+                exitStyle={{ opacity: 0 }}
+              />
+              <Popover.Sheet.Frame padding="$3" backgroundColor="$surfaceCard">
+                <Popover.Sheet.ScrollView>
+                  <Adapt.Contents />
+                </Popover.Sheet.ScrollView>
+              </Popover.Sheet.Frame>
+            </Popover.Sheet>
+          </Adapt>
+        ) : null}
         <XStack alignItems="center" space="$2">
           {/* Two-field trigger: date field + time field side by side */}
           <Popover.Trigger asChild flex={1}>

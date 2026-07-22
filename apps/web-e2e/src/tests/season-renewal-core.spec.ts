@@ -335,9 +335,16 @@ test.describe('Season Renewal Flow — settings inheritance @critical', () => {
       'Unexpected Application Error',
     );
 
-    // Verify the league name is displayed (inherited)
+    // Verify the league name is displayed (inherited). The name renders in
+    // both the desktop-nav and mobile-header chips and both stay in the DOM,
+    // but only one is shown per viewport (`$gtMd` gating). Filter to the
+    // visible occurrence so `.first()` doesn't resolve to the hidden desktop
+    // chip at the Mobile Chrome viewport (LS-8501).
     await expect(
-      page.getByText(NEW_LEAGUE_NAME, { exact: false }).first(),
+      page
+        .getByText(NEW_LEAGUE_NAME, { exact: false })
+        .filter({ visible: true })
+        .first(),
     ).toBeVisible({ timeout: 10_000 });
 
     // Expand the "League Settings" accordion section (collapsed by default).

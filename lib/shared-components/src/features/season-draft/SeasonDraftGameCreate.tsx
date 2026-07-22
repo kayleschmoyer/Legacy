@@ -115,7 +115,12 @@ export const SeasonDraftGameCreate: React.FC<SeasonDraftGameCreateProps> = ({
         maxWidth={1100}
         alignSelf="center"
         padding="$5"
-        $sm={{ padding: '$3' }}
+        // Because this feature supplies its own ScrollView viewport, the app
+        // shell's `<main>` bottom padding (which clears the fixed mobile bottom
+        // nav bar) does not reach this content. Pad the bottom on phone widths
+        // so the trailing Cancel / Create Game action row is not hidden behind
+        // the ~80px fixed MobileBottomBar (LS-8501).
+        $sm={{ padding: '$3', paddingBottom: 96 }}
         gap="$5"
       >
         {onCancel && (
