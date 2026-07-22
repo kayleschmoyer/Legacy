@@ -15,6 +15,7 @@ fragment TeamMember on TeamMember {
     lastName
     brefId
     eligiblePositions
+    injuryStatus
     careerBatting {
       games
     }

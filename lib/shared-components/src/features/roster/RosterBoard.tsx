@@ -8,7 +8,11 @@ import {
   playerHasBatting,
   playerHasPitchingOnly,
 } from './rosterEligibility';
-import { getPositionColors } from './rosterUtils';
+import {
+  getInjuryStatusColors,
+  getPositionColors,
+  isInactiveInjuryStatus,
+} from './rosterUtils';
 import { getPlayerName } from '../../utils/playerFormatting';
 import { PositionBadge } from '../../components/PositionBadge';
 
@@ -32,10 +36,34 @@ export interface RosterBoardPlayer {
     firstName?: string | null;
     lastName?: string | null;
     eligiblePositions?: readonly string[] | null;
+    injuryStatus?: string | null;
   } | null;
 }
 
 type SlotState = 'idle' | 'selected' | 'eligible-empty' | 'eligible-swap';
+
+/** Compact injury-status pill shown next to a player's name (LS-6037). */
+function InjuryStatusBadge({ status }: { status: string }): React.JSX.Element {
+  const colors = getInjuryStatusColors(status);
+  return (
+    <XStack
+      paddingHorizontal="$1.5"
+      paddingVertical={1}
+      borderRadius="$2"
+      backgroundColor={colors.bg}
+      flexShrink={0}
+    >
+      <Text
+        fontSize="$1"
+        fontWeight="700"
+        color={colors.text}
+        aria-label={`Injury status: ${status}`}
+      >
+        {status}
+      </Text>
+    </XStack>
+  );
+}
 
 export interface RosterBoardProps<
   P extends RosterBoardPlayer,
@@ -70,6 +98,7 @@ interface SlotRowProps {
   positionType: string;
   assignedName: string | null;
   assignedEligible: readonly string[];
+  assignedInjuryStatus?: string | null;
   selectedName: string | null;
   state: SlotState;
   readOnly: boolean;
@@ -83,6 +112,7 @@ function SlotRow({
   positionType,
   assignedName,
   assignedEligible,
+  assignedInjuryStatus,
   selectedName,
   state,
   readOnly,
@@ -156,9 +186,19 @@ function SlotRow({
         {disabled ? <Spinner size="small" color={badge.text} /> : undefined}
       </PositionBadge>
       <YStack flex={1} minWidth={0}>
-        <Text fontSize="$3" fontWeight="600" color="$gray12" numberOfLines={1}>
-          {assignedName ?? getPositionLabel(posType)}
-        </Text>
+        <XStack alignItems="center" gap="$1.5">
+          <Text
+            fontSize="$3"
+            fontWeight="600"
+            color="$gray12"
+            numberOfLines={1}
+          >
+            {assignedName ?? getPositionLabel(posType)}
+          </Text>
+          {assignedName && isInactiveInjuryStatus(assignedInjuryStatus) && (
+            <InjuryStatusBadge status={assignedInjuryStatus as string} />
+          )}
+        </XStack>
         <Text
           fontSize="$1"
           color={isLocked && assignedName ? '$amber11' : '$gray10'}
@@ -191,6 +231,7 @@ interface BenchRowProps {
   name: string;
   eligible: readonly string[];
   primaryPosition: string;
+  injuryStatus?: string | null;
   selected: boolean;
   readOnly: boolean;
   isLocked?: boolean;
@@ -202,6 +243,7 @@ function BenchRow({
   name,
   eligible,
   primaryPosition,
+  injuryStatus,
   selected,
   readOnly,
   isLocked = false,
@@ -241,9 +283,19 @@ function BenchRow({
         fontWeight="800"
       />
       <YStack flex={1} minWidth={0}>
-        <Text fontSize="$3" fontWeight="600" color="$gray12" numberOfLines={1}>
-          {name}
-        </Text>
+        <XStack alignItems="center" gap="$1.5">
+          <Text
+            fontSize="$3"
+            fontWeight="600"
+            color="$gray12"
+            numberOfLines={1}
+          >
+            {name}
+          </Text>
+          {isInactiveInjuryStatus(injuryStatus) && (
+            <InjuryStatusBadge status={injuryStatus as string} />
+          )}
+        </XStack>
         <Text
           fontSize="$1"
           color={isLocked ? '$amber11' : '$gray10'}
@@ -497,6 +549,7 @@ export function RosterBoard<
         positionType={position.positionType ?? ''}
         assignedName={assigned ? getPlayerName(assigned) : null}
         assignedEligible={assigned?.player?.eligiblePositions ?? []}
+        assignedInjuryStatus={assigned?.player?.injuryStatus}
         selectedName={selectedName}
         state={state}
         readOnly={readOnly}
@@ -616,6 +669,7 @@ export function RosterBoard<
                     name={getPlayerName(p)}
                     eligible={p.player?.eligiblePositions ?? []}
                     primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
+                    injuryStatus={p.player?.injuryStatus}
                     selected={selected?.id === p.id}
                     readOnly={readOnly}
                     isLocked={p.isLocked ?? false}
@@ -642,6 +696,7 @@ export function RosterBoard<
                     name={getPlayerName(p)}
                     eligible={p.player?.eligiblePositions ?? []}
                     primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
+                    injuryStatus={p.player?.injuryStatus}
                     selected={selected?.id === p.id}
                     readOnly={readOnly}
                     isLocked={p.isLocked ?? false}

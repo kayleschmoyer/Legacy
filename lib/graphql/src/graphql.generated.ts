@@ -7901,6 +7901,7 @@ export type UpdateTeamMemberPositionMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -7938,6 +7939,7 @@ export type SwapTeamMemberPositionsMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -8039,6 +8041,7 @@ export type SetNicknameMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -10219,6 +10222,7 @@ export type GetLeagueTradeBlockQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -10792,6 +10796,7 @@ export type GetTeamMembersQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -12747,6 +12752,7 @@ export type SetTradeBlockMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -12859,6 +12865,7 @@ export type TeamMemberFragment = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
+    injuryStatus?: string | null;
     seasonsPlayed?: number | null;
     careerBatting?: {
       __typename?: 'CareerBatting';
@@ -15016,6 +15023,7 @@ export const TeamMemberFragmentDoc = gql`
       lastName
       brefId
       eligiblePositions
+      injuryStatus
       careerBatting {
         games
       }
