@@ -12,7 +12,7 @@ import { listChildren } from './tools/list-children.js';
 import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
-import { consolidatedTransition, VALID_STATUSES } from './tools/transition.js';
+import { consolidatedTransition, COMMON_STATUSES } from './tools/transition.js';
 import { view, type IncludeOption } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { bulkEdit } from './tools/bulk-edit.js';
@@ -504,7 +504,7 @@ server.tool(
 server.tool(
   'jira_transition',
   'Transition one or more tickets to a new status. Accepts a single key or an array (1-50). ' +
-    'Supports forward (In Progress/In Review/Done) and backward (To Do/Backlog) transitions; ' +
+    `Any status the workflow exposes works (common: ${COMMON_STATUSES.join(', ')}); ` +
     "the transition id is resolved dynamically from the issue's available workflow transitions, " +
     'and an actionable error listing the available targets is returned if the workflow disallows it. ' +
     'When using a single key, cascade=true auto-transitions open subtasks to Done. ' +
@@ -515,7 +515,12 @@ server.tool(
   {
     keys: jiraKeysSchema.optional(),
     key: jiraKeysSchema.optional().describe('Deprecated: use `keys`.'),
-    status: z.enum(VALID_STATUSES).describe('Target status'),
+    status: z
+      .string()
+      .min(1)
+      .describe(
+        `Target status, resolved dynamically against the issue's available workflow transitions (common: ${COMMON_STATUSES.join(', ')})`,
+      ),
     action: z
       .enum(['transition', 'claim'])
       .default('transition')
@@ -571,7 +576,7 @@ server.tool(
       .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
       .min(1)
       .max(50),
-    status: z.enum(VALID_STATUSES),
+    status: z.string().min(1),
   },
   async (params) => {
     process.stderr.write(

@@ -17,7 +17,8 @@ import { listChildren } from './tools/list-children.js';
 import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
-import { consolidatedTransition, VALID_STATUSES } from './tools/transition.js';
+import { addComment } from './tools/add-comment.js';
+import { consolidatedTransition, COMMON_STATUSES } from './tools/transition.js';
 import { view, type IncludeOption } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
@@ -83,7 +84,8 @@ const ticketSchema = z.object({
     .optional(),
 });
 
-function createMcpServer(): McpServer {
+/** Exported for the registration spec (lambda.spec.ts). */
+export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: 'legacy-sports-jira',
     version: '1.0.0',
@@ -215,7 +217,12 @@ function createMcpServer(): McpServer {
     {
       keys: jiraKeysSchema.optional(),
       key: jiraKeysSchema.optional(),
-      status: z.enum(VALID_STATUSES),
+      status: z
+        .string()
+        .min(1)
+        .describe(
+          `Target status, resolved dynamically against the issue's available workflow transitions (common: ${COMMON_STATUSES.join(', ')})`,
+        ),
       action: z.enum(['transition', 'claim']).default('transition'),
       assignee: z.string().email().optional(),
       cascade: z.boolean().default(false),
@@ -253,7 +260,7 @@ function createMcpServer(): McpServer {
         .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
         .min(1)
         .max(50),
-      status: z.enum(VALID_STATUSES),
+      status: z.string().min(1),
     },
     async (params) => {
       process.stderr.write(
@@ -330,6 +337,15 @@ function createMcpServer(): McpServer {
       reason: z.string().optional(),
     },
     async (p) => deleteTicket(p),
+  );
+  server.tool(
+    'jira_add_comment',
+    'Post a comment to a Jira ticket. Use this instead of jira_edit_ticket when appending Implementation Notes or other additive content — comments do not overwrite the description.',
+    {
+      key: z.string().describe('Ticket key (e.g. LS-1234)'),
+      body: z.string().min(1).describe('Comment body as plain text'),
+    },
+    async (p) => addComment(p),
   );
   server.tool(
     'jira_get_bucket_epic',

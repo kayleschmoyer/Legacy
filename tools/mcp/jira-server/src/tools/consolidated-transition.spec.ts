@@ -53,15 +53,15 @@ beforeEach(() => {
 });
 
 describe('consolidatedTransition — validation', () => {
-  it('rejects invalid status before calling Jira', async () => {
+  it('rejects an empty status before calling Jira', async () => {
     const result = await consolidatedTransition({
       keys: 'LS-1',
-      status: 'Frozen',
+      status: '  ',
     });
     const data = parse(result);
     expect(result.isError).toBe(true);
     expect(data['success']).toBe(false);
-    expect(String(data['error'])).toContain('Invalid status "Frozen"');
+    expect(String(data['error'])).toContain('non-empty');
     expect(mockJiraRequest).not.toHaveBeenCalled();
   });
 
@@ -151,6 +151,31 @@ describe('consolidatedTransition — transition action', () => {
     expect(results['LS-1']).toEqual({ status: 'Done' });
     expect(results['LS-2']).toEqual({ status: 'Done' });
     expect(results['LS-3']).toEqual({ status: 'Done' });
+  });
+
+  it("transitions a ticket to Won't Do via dynamic resolution", async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve({
+            transitions: [
+              { id: '3', name: "Won't Do", to: { name: "Won't Do" } },
+            ],
+          });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await consolidatedTransition({
+      keys: 'LS-1',
+      status: "Won't Do",
+    });
+    const data = parse(result);
+    expect(data['success']).toBe(true);
+    expect(data['results']).toEqual({
+      'LS-1': { status: "Won't Do" },
+    });
   });
 
   it('reports per-key errors on partial failure', async () => {

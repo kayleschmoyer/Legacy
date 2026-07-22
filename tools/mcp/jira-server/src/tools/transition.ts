@@ -5,14 +5,20 @@ import { matchesStatus } from '../locale.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { claimTicket } from './claim-ticket.js';
 
-export const VALID_STATUSES = [
+/**
+ * Statuses commonly exposed by the LS workflow, listed in tool descriptions as
+ * examples. NOT a validation gate: the target status is resolved dynamically
+ * against the issue's available workflow transitions, so any status the
+ * workflow exposes (including ones not listed here) is reachable.
+ */
+export const COMMON_STATUSES = [
   'Backlog',
   'To Do',
   'In Progress',
   'In Review',
   'Done',
+  "Won't Do",
 ] as const;
-export type ValidStatus = (typeof VALID_STATUSES)[number];
 
 export type TransitionAction = 'transition' | 'claim';
 
@@ -59,14 +65,14 @@ export async function transition(
 ): Promise<CallToolResult> {
   const { key, status, cascade = false } = params;
 
-  if (!VALID_STATUSES.includes(status as ValidStatus)) {
+  if (status.trim().length === 0) {
     return {
       content: [
         {
           type: 'text',
           text: JSON.stringify({
             success: false,
-            error: `Invalid status "${status}". Must be one of: ${VALID_STATUSES.join(', ')}`,
+            error: `Status must be a non-empty string (e.g. ${COMMON_STATUSES.join(', ')}).`,
           }),
         },
       ],
@@ -105,7 +111,7 @@ export async function transition(
     const warnings: string[] = [];
     const cascadedKeys: string[] = [];
 
-    if (status === 'Done') {
+    if (matchesStatus(status, 'Done')) {
       try {
         const allIssues = await searchJqlAll<SubtaskFields>({
           jql: `parent = ${JSON.stringify(key)} AND status != "Done"`,
@@ -239,9 +245,9 @@ export async function consolidatedTransition(
     );
   }
 
-  if (!VALID_STATUSES.includes(params.status as ValidStatus)) {
+  if (params.status.trim().length === 0) {
     return errorResult(
-      `Invalid status "${params.status}". Must be one of: ${VALID_STATUSES.join(', ')}`,
+      `Status must be a non-empty string (e.g. ${COMMON_STATUSES.join(', ')}).`,
       params.deprecation,
     );
   }
@@ -253,7 +259,7 @@ export async function consolidatedTransition(
     );
   }
 
-  if (action === 'claim' && params.status !== 'In Progress') {
+  if (action === 'claim' && !matchesStatus(params.status, 'In Progress')) {
     return errorResult(
       `action: 'claim' only supports status: 'In Progress' (got "${params.status}").`,
       params.deprecation,
