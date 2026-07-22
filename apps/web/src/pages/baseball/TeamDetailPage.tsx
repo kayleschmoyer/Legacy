@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
+import type { ErrorLike } from '@apollo/client';
 import {
   Button,
   Dialog,
@@ -438,10 +439,33 @@ export function TeamDetailPage() {
       </YStack>
     );
   }
-  if (teamsError)
-    return <Text>Error loading league teams: {teamsError.message}</Text>;
-  if (leagueError)
-    return <Text>Error loading league details: {leagueError.message}</Text>;
+  const renderQueryErrorState = (
+    error: ErrorLike | undefined,
+    logMessage: string,
+  ) => {
+    if (!error) return null;
+    LOGGER.error(logMessage, error, { teamId: teamIdNum, leagueId });
+    return (
+      <YStack padding="$6" gap="$3" alignItems="center">
+        <H3>Error loading team</H3>
+        <Text color="$colorSubtle">
+          We couldn&apos;t load this team. Please retry.
+        </Text>
+      </YStack>
+    );
+  };
+
+  const teamsErrorState = renderQueryErrorState(
+    teamsError,
+    'Failed to load league teams',
+  );
+  if (teamsErrorState) return teamsErrorState;
+
+  const leagueErrorState = renderQueryErrorState(
+    leagueError,
+    'Failed to load league details',
+  );
+  if (leagueErrorState) return leagueErrorState;
 
   const teamMembers = membersData.teamMembers;
 
