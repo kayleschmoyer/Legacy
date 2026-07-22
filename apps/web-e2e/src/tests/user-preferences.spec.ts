@@ -3,7 +3,8 @@
  *
  * Covers the /preferences route: page loading, appearance section with theme
  * chip options, enable-animations toggle, and auto-save behaviour. No GraphQL
- * is required — preferences are stored in localStorage.
+ * is required — preferences are stored in localStorage. All element access goes
+ * through the injected `settingsPage` object (ADR-0015).
  *
  * Note: Theme selection behaviour (System/Light/Dark chip toggling) overlaps
  * with dark-mode.spec.ts. The overlap is intentional here to verify the chips
@@ -11,33 +12,31 @@
  * full visual-mode switching logic.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 
 // ---------------------------------------------------------------------------
 // Tests – static elements
 // ---------------------------------------------------------------------------
 
 test.describe('User Preferences – static elements @smoke', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/preferences');
-    await page.waitForLoadState('load');
+  test.beforeEach(async ({ settingsPage }) => {
+    await settingsPage.preferences.goto();
   });
 
-  test('loads the preferences page without errors', async ({ page }) => {
+  test('loads the preferences page without errors', async ({
+    page,
+    settingsPage,
+  }) => {
     await expect(page).toHaveURL('/preferences');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await settingsPage.preferences.expectHeading();
   });
 
-  test('shows the Preferences heading', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /preferences/i }),
-    ).toBeVisible();
+  test('shows the Preferences heading', async ({ settingsPage }) => {
+    await settingsPage.preferences.expectHeading();
   });
 
-  test('shows the auto-save subtitle', async ({ page }) => {
-    await expect(page.getByText(/save automatically/i)).toBeVisible();
+  test('shows the auto-save subtitle', async ({ settingsPage }) => {
+    await settingsPage.preferences.expectAutoSaveSubtitle();
   });
 });
 
@@ -46,50 +45,37 @@ test.describe('User Preferences – static elements @smoke', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('User Preferences – Appearance section @regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/preferences');
-    await page.waitForLoadState('load');
+  test.beforeEach(async ({ settingsPage }) => {
+    await settingsPage.preferences.goto();
   });
 
-  test('shows the Appearance section heading', async ({ page }) => {
-    await expect(page.getByText('Appearance')).toBeVisible();
+  test('shows the Appearance section heading', async ({ settingsPage }) => {
+    await settingsPage.preferences.expectAppearanceHeading();
   });
 
-  test('shows Theme label and options', async ({ page }) => {
-    await expect(page.getByText('Theme', { exact: true }).first()).toBeVisible({
-      timeout: 30000,
-    });
-    await expect(page.getByText('System', { exact: true }).first()).toBeVisible(
-      { timeout: 30000 },
-    );
-    await expect(page.getByText('Light', { exact: true }).first()).toBeVisible({
-      timeout: 30000,
-    });
-    await expect(page.getByText('Dark', { exact: true }).first()).toBeVisible({
-      timeout: 30000,
-    });
+  test('shows Theme label and options', async ({ settingsPage }) => {
+    await settingsPage.preferences.expectThemeLabel(30000);
+    await settingsPage.preferences.expectThemeOptionVisible('System', 30000);
+    await settingsPage.preferences.expectThemeOptionVisible('Light', 30000);
+    await settingsPage.preferences.expectThemeOptionVisible('Dark', 30000);
   });
 
-  test('shows Animations toggle', async ({ page }) => {
-    await expect(page.getByText('Animations', { exact: true })).toBeVisible();
+  test('shows Animations toggle', async ({ settingsPage }) => {
+    await settingsPage.preferences.expectAnimationsToggleVisible();
   });
 
   test('clicking the Dark theme chip selects it and persists to localStorage', async ({
     page,
+    settingsPage,
   }) => {
-    const darkChip = page.locator('[role="radio"]', { hasText: 'Dark' });
-    await expect(darkChip).toBeVisible({ timeout: 30000 });
-    await darkChip.click();
+    await settingsPage.preferences.expectThemeOptionVisible('Dark', 30000);
+    await settingsPage.preferences.selectTheme('Dark');
 
     // Chip should show as selected
-    await expect(
-      page.locator('[role="radio"][aria-checked="true"]', { hasText: 'Dark' }),
-    ).toBeVisible({ timeout: 10000 });
+    await settingsPage.preferences.expectThemeSelected('Dark', 10000);
 
     // Verify auto-save banner appears
-    await expect(page.getByTestId('prefs-save-banner')).toBeVisible({
-      timeout: 5000,
-    });
+    await settingsPage.preferences.expectSaveBanner(5000);
 
     // Verify preference was actually persisted to localStorage
     const savedTheme = await page.evaluate(() => {
@@ -110,16 +96,13 @@ test.describe('User Preferences – Appearance section @regression', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('User Preferences – toggle interaction @regression', () => {
-  test('Animations toggle is interactive', async ({ page }) => {
-    await page.goto('/preferences');
-    await page.waitForLoadState('load');
+  test('Animations toggle is interactive', async ({ settingsPage }) => {
+    await settingsPage.preferences.goto();
 
-    const toggle = page.locator('[role="switch"][aria-label="Animations"]');
-    await expect(toggle).toBeVisible();
+    await settingsPage.preferences.expectAnimationsToggleVisible();
 
-    const initialState = await toggle.getAttribute('aria-checked');
-    const expectedState = initialState === 'true' ? 'false' : 'true';
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-checked', expectedState);
+    const initialState = await settingsPage.preferences.animationsChecked();
+    await settingsPage.preferences.toggleAnimations();
+    await settingsPage.preferences.expectAnimationsChecked(!initialState);
   });
 });

@@ -10,10 +10,12 @@
  *   - Session/Danger zone: Sign Out button present
  *   - Accessibility: logo alt text, <main> landmark, <nav> landmark (LS-3507)
  *
- * All GraphQL queries are mocked so these tests run without a live backend.
+ * All GraphQL queries are mocked (in-spec `page.route`) so these tests run
+ * without a live backend; all element access goes through the injected
+ * `settingsPage` object (ADR-0015).
  */
 
-import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/pages';
 import {
   isGraphQLEndpoint,
   unmockedGraphQLFallback,
@@ -85,130 +87,113 @@ async function setupProfileGraphQL(page: import('@playwright/test').Page) {
 test.describe('Profile Settings Page @smoke', () => {
   test('should load and display the Profile Settings heading', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
-    await expect(
-      page.getByRole('heading', { name: 'Profile Settings' }),
-    ).toBeVisible();
+    await settingsPage.profile.goto();
+    await settingsPage.profile.expectHeading();
   });
 
   test('should display the Profile section with user information', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    // Profile section heading
-    await expect(
-      page.getByText('Profile', { exact: true }).first(),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Your public identity on Legacy Sports'),
-    ).toBeVisible();
+    await settingsPage.profile.expectProfileSection();
   });
 
-  test('should display username field', async ({ page }) => {
+  test('should display username field', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    const usernameLabel = page.getByText('Username', { exact: true });
-    await expect(usernameLabel).toBeVisible();
+    await settingsPage.profile.expectUsernameField();
   });
 
-  test('should display email field', async ({ page }) => {
+  test('should display email field', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    const emailLabel = page.getByText('Email', { exact: true });
-    await expect(emailLabel).toBeVisible();
+    await settingsPage.profile.expectEmailField();
   });
 
-  test('should display User ID field', async ({ page }) => {
+  test('should display User ID field', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    const userIdLabel = page.getByText('User ID');
-    await expect(userIdLabel).toBeVisible();
+    await settingsPage.profile.expectUserIdField();
   });
 
   test('should display info banner about Google-managed profile', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(
-      page.getByText(
-        /Email and profile photo are managed through your Google account/,
-      ),
-    ).toBeVisible();
+    await settingsPage.profile.expectGoogleManagedBanner();
   });
 
-  test('should display App Avatar section', async ({ page }) => {
+  test('should display App Avatar section', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(page.getByText('App Avatar')).toBeVisible();
-    await expect(
-      page.getByText(/Choose a custom avatar displayed in chat/),
-    ).toBeVisible();
+    await settingsPage.profile.expectAppAvatarSection();
   });
 
-  test('should display Account & Security section', async ({ page }) => {
+  test('should display Account & Security section', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(page.getByText('Account & Security')).toBeVisible();
-    await expect(page.getByText('Sign-in Method')).toBeVisible();
-    await expect(page.getByText('Google OAuth')).toBeVisible();
+    await settingsPage.profile.expectAccountSecuritySection();
   });
 
-  test('should display active session indicator', async ({ page }) => {
+  test('should display active session indicator', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(
-      page.getByText('Session', { exact: true }).first(),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Active', { exact: true }).first(),
-    ).toBeVisible();
+    await settingsPage.profile.expectActiveSession();
   });
 
-  test('should display Sign Out button', async ({ page }) => {
+  test('should display Sign Out button', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    const signOutButton = page.getByRole('button', { name: /sign out/i });
-    await expect(signOutButton).toBeVisible();
+    await settingsPage.profile.expectSignOutButton();
   });
 
-  test('should display sign out description text', async ({ page }) => {
+  test('should display sign out description text', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(
-      page.getByText(
-        /You will be signed out of your Legacy Sports account and redirected to the login page/,
-      ),
-    ).toBeVisible();
+    await settingsPage.profile.expectSignOutDescription();
   });
 
-  test('should display Access Level field', async ({ page }) => {
+  test('should display Access Level field', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(page.getByText('Access Level')).toBeVisible();
+    await settingsPage.profile.expectAccessLevelField();
   });
 
-  test('should display page meta description', async ({ page }) => {
+  test('should display page meta description', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(
-      page.getByText(/Manage your account information and preferences/),
-    ).toBeVisible();
+    await settingsPage.profile.expectMetaDescription();
   });
 });
 
@@ -223,80 +208,71 @@ test.describe('Profile Settings Page @smoke', () => {
 test.describe('Profile Settings Page — appearance @regression', () => {
   test('renders Appearance section with all three theme options', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(page.getByText('Appearance')).toBeVisible();
+    await settingsPage.profile.expectAppearanceSection();
     // The theme options are Tamagui styled `role="radio"` buttons. Tamagui does
     // not forward `data-testid` on these (it does forward role/aria-*), so the
     // accessible name (aria-label="<Label> theme") is the stable locator — the
     // same role-based approach dark-mode.spec.ts uses for the preferences chips.
-    await expect(
-      page.getByRole('radio', { name: 'Light theme' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('radio', { name: 'System theme' }),
-    ).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'Dark theme' })).toBeVisible();
+    await settingsPage.profile.expectThemeOptionVisible('Light');
+    await settingsPage.profile.expectThemeOptionVisible('System');
+    await settingsPage.profile.expectThemeOptionVisible('Dark');
   });
 
   test('theme can be changed on mobile (412x784 viewport)', async ({
     page,
+    settingsPage,
   }) => {
     // Match the reporter's viewport from LS-4912 exactly.
     await page.setViewportSize({ width: 412, height: 784 });
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    const light = page.getByRole('radio', { name: 'Light theme' });
-    const dark = page.getByRole('radio', { name: 'Dark theme' });
+    await settingsPage.profile.expectThemeOptionVisible('Light');
+    await settingsPage.profile.selectTheme('Light');
+    await settingsPage.profile.expectThemeSelected('Light');
 
-    await expect(light).toBeVisible();
-    await light.click();
-    await expect(light).toHaveAttribute('aria-checked', 'true');
-
-    await dark.click();
-    await expect(dark).toHaveAttribute('aria-checked', 'true');
-    await expect(light).toHaveAttribute('aria-checked', 'false');
+    await settingsPage.profile.selectTheme('Dark');
+    await settingsPage.profile.expectThemeSelected('Dark');
+    await settingsPage.profile.expectThemeUnselected('Light');
   });
 
   test('theme radio group follows ARIA roving-tabindex model', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
-
-    const light = page.getByRole('radio', { name: 'Light theme' });
-    const system = page.getByRole('radio', { name: 'System theme' });
-    const dark = page.getByRole('radio', { name: 'Dark theme' });
+    await settingsPage.profile.goto();
 
     // Select Light so we have a known starting point.
-    await light.click();
-    await expect(light).toHaveAttribute('aria-checked', 'true');
+    await settingsPage.profile.selectTheme('Light');
+    await settingsPage.profile.expectThemeSelected('Light');
 
     // Only the checked option is in the tab order.
-    await expect(light).toHaveAttribute('tabindex', '0');
-    await expect(system).toHaveAttribute('tabindex', '-1');
-    await expect(dark).toHaveAttribute('tabindex', '-1');
+    await settingsPage.profile.expectThemeTabindex('Light', '0');
+    await settingsPage.profile.expectThemeTabindex('System', '-1');
+    await settingsPage.profile.expectThemeTabindex('Dark', '-1');
 
     // ArrowRight moves selection (and focus) to System.
-    await light.focus();
-    await page.keyboard.press('ArrowRight');
-    await expect(system).toHaveAttribute('aria-checked', 'true');
-    await expect(system).toHaveAttribute('tabindex', '0');
-    await expect(light).toHaveAttribute('tabindex', '-1');
-    await expect(system).toBeFocused();
+    await settingsPage.profile.pressThemeKey('Light', 'ArrowRight');
+    await settingsPage.profile.expectThemeSelected('System');
+    await settingsPage.profile.expectThemeTabindex('System', '0');
+    await settingsPage.profile.expectThemeTabindex('Light', '-1');
+    await settingsPage.profile.expectThemeFocused('System');
 
     // ArrowLeft wraps back to Light from System.
-    await page.keyboard.press('ArrowLeft');
-    await expect(light).toHaveAttribute('aria-checked', 'true');
-    await expect(light).toBeFocused();
+    await settingsPage.profile.pressThemeKey('System', 'ArrowLeft');
+    await settingsPage.profile.expectThemeSelected('Light');
+    await settingsPage.profile.expectThemeFocused('Light');
 
     // End jumps to the last option (Dark).
-    await page.keyboard.press('End');
-    await expect(dark).toHaveAttribute('aria-checked', 'true');
-    await expect(dark).toBeFocused();
+    await settingsPage.profile.pressThemeKey('Light', 'End');
+    await settingsPage.profile.expectThemeSelected('Dark');
+    await settingsPage.profile.expectThemeFocused('Dark');
   });
 });
 
@@ -399,49 +375,48 @@ async function setupProfileGraphQLWithIdentities(
 }
 
 test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression', () => {
-  test('renders the Linked Identities section', async ({ page }) => {
+  test('renders the Linked Identities section', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQLWithIdentities(page);
-    await page.goto('/profile/settings');
-    await expect(
-      page.getByTestId('profile-linked-identities-section'),
-    ).toBeVisible();
-    await expect(page.getByText('Linked Identities')).toBeVisible();
+    await settingsPage.profile.goto();
+    await settingsPage.profile.expectLinkedIdentitiesSection();
   });
 
   test('shows the canonical identity with a "Primary email" badge', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQLWithIdentities(page);
-    await page.goto('/profile/settings');
-    await expect(page.getByText('Primary email')).toBeVisible();
-    // Scope to the section — bare getByText('Google') also matches the
-    // info banner and the "Google OAuth" sign-in method row.
-    await expect(
-      page
-        .getByTestId('profile-linked-identities-section')
-        .getByText('Google', { exact: true }),
-    ).toBeVisible();
+    await settingsPage.profile.goto();
+    await settingsPage.profile.expectPrimaryEmailBadge();
+    // Scope to the section — bare "Google" also matches the info banner and the
+    // "Google OAuth" sign-in method row.
+    await settingsPage.profile.expectIdentityProviderInSection('Google');
   });
 
   test('shows "Set as primary" button for a verified non-canonical identity', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQLWithIdentities(page, MOCK_IDENTITIES_MULTI);
-    await page.goto('/profile/settings');
-    await expect(page.getByText('Set as primary')).toBeVisible();
+    await settingsPage.profile.goto();
+    await settingsPage.profile.expectSetAsPrimaryVisible();
   });
 
   test('shows "Disconnect" button for non-local providers', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQLWithIdentities(page, MOCK_IDENTITIES_MULTI);
-    await page.goto('/profile/settings');
-    const disconnectButtons = page.getByText('Disconnect');
-    await expect(disconnectButtons.first()).toBeVisible();
+    await settingsPage.profile.goto();
+    await settingsPage.profile.expectDisconnectVisible();
   });
 
   test('clicking "Set as primary" calls SetCanonicalEmail mutation', async ({
     page,
+    settingsPage,
   }) => {
     let mutationCalled = false;
     await page.route(
@@ -497,15 +472,12 @@ test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression
       },
     );
 
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
     // EditButton is a Tamagui styled() component, which does not forward
     // data-testid in the web build — locate by accessible role + name. Only
     // the non-canonical verified identity (discord, id 2) renders the button.
-    const setAsPrimaryBtn = page.getByRole('button', {
-      name: 'Set as primary',
-    });
-    await expect(setAsPrimaryBtn).toBeVisible();
-    await setAsPrimaryBtn.click();
+    await settingsPage.profile.expectSetAsPrimaryButton();
+    await settingsPage.profile.clickSetAsPrimary();
     await expect.poll(() => mutationCalled, { timeout: 5000 }).toBe(true);
   });
 });
@@ -519,34 +491,31 @@ test.describe('Profile Settings Page — Linked Identities (LS-7825) @regression
 // ---------------------------------------------------------------------------
 
 test.describe('Profile Settings Page — accessibility @regression', () => {
-  test('logo image has non-empty alt text', async ({ page }) => {
+  test('logo image has non-empty alt text', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
-    await page.waitForLoadState('load');
+    await settingsPage.profile.goto();
 
-    const logo = page.getByTestId('header-logo');
-    await expect(logo).toBeAttached({ timeout: 15_000 });
-    const alt = await logo.getAttribute('alt');
+    await settingsPage.profile.expectLogoAttached();
+    const alt = await settingsPage.profile.logoAltText();
     expect(alt).toBeTruthy();
     expect((alt ?? '').trim().length).toBeGreaterThan(0);
   });
 
-  test('page has a <main> landmark', async ({ page }) => {
+  test('page has a <main> landmark', async ({ page, settingsPage }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
-    await page.waitForLoadState('load');
+    await settingsPage.profile.goto();
 
-    await expect(page.getByRole('main')).toBeVisible({ timeout: 15_000 });
+    await settingsPage.profile.expectMainLandmark();
   });
 
-  test('page has a primary navigation landmark', async ({ page }) => {
+  test('page has a primary navigation landmark', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
-    await page.goto('/profile/settings');
-    await page.waitForLoadState('load');
+    await settingsPage.profile.goto();
 
-    await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible(
-      { timeout: 15_000 },
-    );
+    await settingsPage.profile.expectPrimaryNavLandmark();
   });
 });
 
@@ -583,32 +552,32 @@ async function setupMfaRoutes(
 }
 
 test.describe('Profile Settings — Two-Factor Authentication @regression', () => {
-  test('shows the Two-Factor Authentication section', async ({ page }) => {
+  test('shows the Two-Factor Authentication section', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
     await setupMfaRoutes(page, { mfaEnabled: false });
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(page.getByText('Two-Factor Authentication')).toBeVisible();
-    await expect(
-      page.getByText('Add an extra layer of security to your account'),
-    ).toBeVisible();
+    await settingsPage.profile.expectTwoFactorSection();
   });
 
-  test('shows Enable 2FA button when MFA is disabled', async ({ page }) => {
+  test('shows Enable 2FA button when MFA is disabled', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
     await setupMfaRoutes(page, { mfaEnabled: false });
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(page.getByRole('button', { name: /Enable 2FA/i })).toBeVisible(
-      { timeout: 10_000 },
-    );
-    await expect(
-      page.getByRole('button', { name: /Disable 2FA/i }),
-    ).not.toBeVisible();
+    await settingsPage.profile.expectEnable2faButton();
+    await settingsPage.profile.expectDisable2faButtonHidden();
   });
 
   test('shows QR code and verification input after clicking Enable 2FA', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
     await setupMfaRoutes(page, { mfaEnabled: false });
@@ -625,21 +594,18 @@ test.describe('Profile Settings — Two-Factor Authentication @regression', () =
       }),
     );
 
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    const enableBtn = page.getByRole('button', { name: /Enable 2FA/i });
-    await expect(enableBtn).toBeVisible({ timeout: 10_000 });
-    await enableBtn.click();
+    await settingsPage.profile.clickEnable2fa();
 
-    await expect(page.getByTestId('2fa-enroll-flow')).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByTestId('2fa-code-input')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Verify/i })).toBeVisible();
+    await settingsPage.profile.expect2faEnrollFlow();
+    await settingsPage.profile.expect2faCodeInput();
+    await settingsPage.profile.expectVerifyButton();
   });
 
   test('shows enrollment error when verify-setup returns invalid code', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
     await setupMfaRoutes(page, { mfaEnabled: false });
@@ -662,31 +628,32 @@ test.describe('Profile Settings — Two-Factor Authentication @regression', () =
       }),
     );
 
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await page.getByRole('button', { name: /Enable 2FA/i }).click();
-    await expect(page.getByTestId('2fa-code-input')).toBeVisible({
-      timeout: 10_000,
-    });
+    await settingsPage.profile.clickEnable2fa();
+    await settingsPage.profile.expect2faCodeInput(10_000);
 
-    await page.getByTestId('2fa-code-input').fill('000000');
-    await page.getByRole('button', { name: /Verify/i }).click();
+    await settingsPage.profile.fill2faCode('000000');
+    await settingsPage.profile.clickVerify();
 
-    await expect(page.getByRole('alert')).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByRole('alert')).toHaveText('Invalid code');
+    await settingsPage.profile.expect2faError('Invalid code');
   });
 
-  test('shows Disable 2FA button when MFA is enabled', async ({ page }) => {
+  test('shows Disable 2FA button when MFA is enabled', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
     await setupMfaRoutes(page, { mfaEnabled: true });
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await expect(
-      page.getByRole('button', { name: /Disable 2FA/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await settingsPage.profile.expectDisable2faButton();
   });
 
-  test('returns to disabled state after disabling 2FA', async ({ page }) => {
+  test('returns to disabled state after disabling 2FA', async ({
+    page,
+    settingsPage,
+  }) => {
     await setupProfileGraphQL(page);
     await setupMfaRoutes(page, { mfaEnabled: true });
 
@@ -698,23 +665,21 @@ test.describe('Profile Settings — Two-Factor Authentication @regression', () =
       }),
     );
 
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    const disableBtn = page.getByRole('button', { name: /Disable 2FA/i });
-    await expect(disableBtn).toBeVisible({ timeout: 10_000 });
+    await settingsPage.profile.expectDisable2faButton();
 
     page.once('dialog', (dialog) => void dialog.accept());
-    await disableBtn.click();
+    await settingsPage.profile.clickDisable2fa();
 
     // useMfa sets mfaEnabled: false directly on success, so the Enable button
     // should appear without a page reload.
-    await expect(page.getByRole('button', { name: /Enable 2FA/i })).toBeVisible(
-      { timeout: 10_000 },
-    );
+    await settingsPage.profile.expectEnable2faButton();
   });
 
   test('flips to Enabled state after successful enrollment with valid code', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
     await setupMfaRoutes(page, { mfaEnabled: false });
@@ -738,27 +703,22 @@ test.describe('Profile Settings — Two-Factor Authentication @regression', () =
       }),
     );
 
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
-    await page.getByRole('button', { name: /Enable 2FA/i }).click();
-    await expect(page.getByTestId('2fa-code-input')).toBeVisible({
-      timeout: 10_000,
-    });
+    await settingsPage.profile.clickEnable2fa();
+    await settingsPage.profile.expect2faCodeInput(10_000);
 
-    await page.getByTestId('2fa-code-input').fill('123456');
-    await page.getByRole('button', { name: /Verify/i }).click();
+    await settingsPage.profile.fill2faCode('123456');
+    await settingsPage.profile.clickVerify();
 
     // useMfa.verifySetup sets mfaEnabled: true on success — Disable button must appear.
-    await expect(
-      page.getByRole('button', { name: /Disable 2FA/i }),
-    ).toBeVisible({ timeout: 10_000 });
-    await expect(
-      page.getByRole('button', { name: /Enable 2FA/i }),
-    ).not.toBeVisible();
+    await settingsPage.profile.expectDisable2faButton();
+    await settingsPage.profile.expectEnable2faButtonHidden();
   });
 
   test('full cycle: enables 2FA then disables it in the same session', async ({
     page,
+    settingsPage,
   }) => {
     await setupProfileGraphQL(page);
     await setupMfaRoutes(page, { mfaEnabled: false });
@@ -789,25 +749,19 @@ test.describe('Profile Settings — Two-Factor Authentication @regression', () =
       }),
     );
 
-    await page.goto('/profile/settings');
+    await settingsPage.profile.goto();
 
     // — Enable phase —
-    await page.getByRole('button', { name: /Enable 2FA/i }).click();
-    await expect(page.getByTestId('2fa-code-input')).toBeVisible({
-      timeout: 10_000,
-    });
-    await page.getByTestId('2fa-code-input').fill('123456');
-    await page.getByRole('button', { name: /Verify/i }).click();
-    await expect(
-      page.getByRole('button', { name: /Disable 2FA/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await settingsPage.profile.clickEnable2fa();
+    await settingsPage.profile.expect2faCodeInput(10_000);
+    await settingsPage.profile.fill2faCode('123456');
+    await settingsPage.profile.clickVerify();
+    await settingsPage.profile.expectDisable2faButton();
 
     // — Disable phase —
     page.once('dialog', (dialog) => void dialog.accept());
-    await page.getByRole('button', { name: /Disable 2FA/i }).click();
-    await expect(page.getByRole('button', { name: /Enable 2FA/i })).toBeVisible(
-      { timeout: 10_000 },
-    );
+    await settingsPage.profile.clickDisable2fa();
+    await settingsPage.profile.expectEnable2faButton();
   });
 });
 
@@ -825,9 +779,8 @@ unauthTest.describe(
   () => {
     unauthTest(
       'stays at /profile/settings and shows login page for unauthenticated user',
-      async ({ page }) => {
-        await page.goto('/profile/settings');
-        await page.waitForLoadState('load');
+      async ({ page, settingsPage }) => {
+        await settingsPage.profile.goto();
 
         // EnhancedAuthGuard renders the login page in-place — no redirect to /.
         await expect(page).toHaveURL('/profile/settings', { timeout: 15_000 });
@@ -836,25 +789,19 @@ unauthTest.describe(
 
     unauthTest(
       'shows sign-in CTA for unauthenticated user at /profile/settings',
-      async ({ page }) => {
-        await page.goto('/profile/settings');
-        await page.waitForLoadState('load');
+      async ({ settingsPage }) => {
+        await settingsPage.profile.goto();
 
-        await expect(
-          page.getByRole('button', { name: /continue with google/i }),
-        ).toBeVisible({ timeout: 15_000 });
+        await settingsPage.profile.expectContinueWithGoogle();
       },
     );
 
     unauthTest(
       'does not show Profile Settings content for unauthenticated user',
-      async ({ page }) => {
-        await page.goto('/profile/settings');
-        await page.waitForLoadState('load');
+      async ({ settingsPage }) => {
+        await settingsPage.profile.goto();
 
-        await expect(
-          page.getByRole('heading', { name: /profile settings/i }),
-        ).not.toBeVisible();
+        await settingsPage.profile.expectHeadingHidden();
       },
     );
   },

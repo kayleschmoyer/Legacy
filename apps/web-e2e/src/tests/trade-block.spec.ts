@@ -19,9 +19,13 @@
  * All GraphQL queries are mocked so these tests run without a live backend.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8456 / ADR-0015/0016): all Trade Block selectors
+// live on `tradesPage` (TradesPage) — specs are selector-free. GraphQL mocking
+// (including the SetTradeBlock variable capture) stays here (ADR-0015 §6).
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -245,139 +249,146 @@ async function setupGraphQL(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe('Trade Block Management @regression', () => {
-  test('should display Trade Block heading', async ({ page }) => {
+  test('should display Trade Block heading', async ({ page, tradesPage }) => {
     await setupGraphQL(page);
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
     // The shared TradingCenter renders LeagueTradeBlock, whose title is a
     // styled Text node (not a semantic heading). Match on the exact text.
-    await expect(page.getByText('Trade Block', { exact: true })).toBeVisible();
+    await tradesPage.expectTradeBlockHeading();
   });
 
   test('should show empty state when no players on trade block', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, { tradeBlock: MOCK_TRADE_BLOCK_EMPTY });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    await expect(page.getByText('No players on the trade block')).toBeVisible();
-    await expect(
-      page.getByText('Use the roster page to list players for trade.'),
-    ).toBeVisible();
+    await tradesPage.expectTradeBlockEmpty();
+    await tradesPage.expectTradeBlockEmptyHelp();
   });
 
-  test('should list players when trade block has entries', async ({ page }) => {
+  test('should list players when trade block has entries', async ({
+    page,
+    tradesPage,
+  }) => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    await expect(page.getByText('Mike Johnson')).toBeVisible();
-    await expect(page.getByText('Chris Davis')).toBeVisible();
-    await expect(page.getByText('Jake Smith')).toBeVisible();
+    await tradesPage.expectPlayerVisible('Mike Johnson');
+    await tradesPage.expectPlayerVisible('Chris Davis');
+    await tradesPage.expectPlayerVisible('Jake Smith');
   });
 
   test('should display count badge with number of available players', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    await expect(page.getByText('3 available')).toBeVisible();
+    await tradesPage.expectAvailableCount(3);
   });
 
   test('should display AVAILABLE badge for other teams players', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    const availableBadges = page.getByText('AVAILABLE');
-    await expect(availableBadges.first()).toBeVisible();
+    await tradesPage.expectAvailableBadge();
   });
 
   test('should display Remove button for user own team players', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
     // Mike Johnson is on teamId=1 (user's team), should have Remove button
-    await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
+    await tradesPage.removeButton.expectVisible();
   });
 
   test('should show Show more button when more than 5 players', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_MANY,
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    await expect(
-      page.getByRole('button', { name: /show.*more/i }),
-    ).toBeVisible();
+    await tradesPage.showMoreButton.expectVisible();
   });
 
-  test('should expand list when Show more is clicked', async ({ page }) => {
+  test('should expand list when Show more is clicked', async ({
+    page,
+    tradesPage,
+  }) => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_MANY,
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
     // 6th player should not be visible before expansion
-    await expect(page.getByText('Ryan Brown')).not.toBeVisible();
+    await tradesPage.expectPlayerHidden('Ryan Brown');
 
     // Click show more
-    await page.getByRole('button', { name: /show.*more/i }).click();
+    await tradesPage.showMoreTradeBlock();
 
     // Now 6th player should be visible
-    await expect(page.getByText('Ryan Brown')).toBeVisible();
+    await tradesPage.expectPlayerVisible('Ryan Brown');
   });
 
-  test('should display asking price when set', async ({ page }) => {
+  test('should display asking price when set', async ({ page, tradesPage }) => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    await expect(page.getByText('Asking: 2nd round pick')).toBeVisible();
-    await expect(page.getByText('Asking: Top 10 pitcher')).toBeVisible();
+    await tradesPage.expectAskingPrice('2nd round pick');
+    await tradesPage.expectAskingPrice('Top 10 pitcher');
   });
 
   test('should show Set Price button for own team players', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, {
       tradeBlock: [makeTradeBlockEntry(1, 1, 'Mike', 'Johnson')],
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    await expect(page.getByRole('button', { name: 'Set Price' })).toBeVisible();
+    await tradesPage.setPriceButton.expectVisible();
   });
 
   test('should show Edit Price button when price is already set', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, {
       tradeBlock: MOCK_TRADE_BLOCK_WITH_PLAYERS,
     });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
     // Mike Johnson (own team) has an asking price, so button should say "Edit Price"
-    await expect(
-      page.getByRole('button', { name: 'Edit Price' }),
-    ).toBeVisible();
+    await tradesPage.editPriceButton.expectVisible();
   });
 
   test('should send askingPrice when user sets a price via Set Price flow', async ({
     page,
+    tradesPage,
   }) => {
     // Start with an own-team player that has no price
     const ownPlayer = makeTradeBlockEntry(1, 1, 'Mike', 'Johnson');
@@ -411,17 +422,12 @@ test.describe('Trade Block Management @regression', () => {
       },
     );
 
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    // Click "Set Price" button
-    await page.getByRole('button', { name: 'Set Price' }).click();
-
-    // Fill in the asking price input
-    const priceInput = page.getByRole('textbox');
-    await priceInput.fill('1st round pick');
-
-    // Click Save
-    await page.getByRole('button', { name: 'Save' }).click();
+    // Open the Set Price editor, fill the asking price, and save.
+    await tradesPage.startSetPrice();
+    await tradesPage.fillAskingPrice('1st round pick');
+    await tradesPage.saveAskingPrice();
 
     // Verify the mutation was called with askingPrice. The SetTradeBlock
     // mutation is dispatched asynchronously and captured by the route
@@ -436,10 +442,13 @@ test.describe('Trade Block Management @regression', () => {
     });
   });
 
-  test('should display error state when query fails', async ({ page }) => {
+  test('should display error state when query fails', async ({
+    page,
+    tradesPage,
+  }) => {
     await setupGraphQL(page, { tradeBlockError: true });
-    await page.goto('/baseball/league/1/trades');
+    await tradesPage.gotoTrades(1);
 
-    await expect(page.getByText('Failed to load trade block.')).toBeVisible();
+    await tradesPage.expectTradeBlockError();
   });
 });

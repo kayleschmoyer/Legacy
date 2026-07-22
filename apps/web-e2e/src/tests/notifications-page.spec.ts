@@ -9,7 +9,7 @@
  * All GraphQL traffic is mocked via route.fulfill — no live backend.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { agoIso } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -127,66 +127,50 @@ async function mockNotifications(
 }
 
 test.describe('Notifications page — /notifications @regression', () => {
-  test('renders populated state with notification cards', async ({ page }) => {
+  test('renders populated state with notification cards', async ({
+    page,
+    notificationsPage,
+  }) => {
     await mockNotifications(page);
-    await page.goto('/notifications');
-    await page.waitForLoadState('load');
+    await notificationsPage.gotoNotifications();
 
-    await expect(
-      page.getByRole('heading', { level: 1, name: 'Notifications' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { level: 3, name: 'Week 5 matchup started' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { level: 3, name: 'Week 4 matchup complete' }),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Your matchup against Beantown Bombers has begun.'),
-    ).toBeVisible();
-
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
+    await notificationsPage.expectPageHeadingVisible();
+    await notificationsPage.expectNotificationCard('Week 5 matchup started');
+    await notificationsPage.expectNotificationCard('Week 4 matchup complete');
+    await notificationsPage.expectNotificationMessage(
+      'Your matchup against Beantown Bombers has begun.',
     );
+
+    await notificationsPage.expectNoAppError();
   });
 
-  test('renders empty state when no notifications', async ({ page }) => {
+  test('renders empty state when no notifications', async ({
+    page,
+    notificationsPage,
+  }) => {
     await mockNotifications(page, { empty: true });
-    await page.goto('/notifications');
-    await page.waitForLoadState('load');
+    await notificationsPage.gotoNotifications();
 
-    await expect(
-      page.getByRole('heading', { level: 2, name: 'No notifications yet' }),
-    ).toBeVisible();
-    await expect(page.locator('body')).toContainText('You’re all caught up');
+    await notificationsPage.expectEmptyState();
 
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await notificationsPage.expectNoAppError();
   });
 
   test('renders error state with retry button when query fails', async ({
     page,
+    notificationsPage,
   }) => {
     await mockNotifications(page, { historyError: true });
-    await page.goto('/notifications');
-    await page.waitForLoadState('load');
+    await notificationsPage.gotoNotifications();
 
-    await expect(
-      page.getByRole('heading', {
-        level: 2,
-        name: 'Unable to load your notifications',
-      }),
-    ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    await notificationsPage.expectErrorState();
 
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await notificationsPage.expectNoAppError();
   });
 
   test('enables Next button when server returns PAGE_SIZE+1 items', async ({
     page,
+    notificationsPage,
   }) => {
     // PAGE_SIZE+1 items means a next page exists.
     const items = makeMockNotifications(PAGE_SIZE + 1);
@@ -211,16 +195,15 @@ test.describe('Notifications page — /notifications @regression', () => {
       await unmockedGraphQLFallback(route);
     });
 
-    await page.goto('/notifications');
-    await page.waitForLoadState('load');
+    await notificationsPage.gotoNotifications();
 
-    const nextBtn = page.getByRole('button', { name: 'Next page' });
-    await expect(nextBtn).toBeVisible();
-    await expect(nextBtn).toBeEnabled();
+    await notificationsPage.nextPageButton.expectVisible();
+    await notificationsPage.nextPageButton.expectEnabled();
   });
 
   test('disables Next button when server returns exactly PAGE_SIZE items (regression LS-4096)', async ({
     page,
+    notificationsPage,
   }) => {
     // Exactly PAGE_SIZE items means we are on the last page. The old code
     // incorrectly inferred hasNextPage=true from notifications.length===PAGE_SIZE.
@@ -246,11 +229,9 @@ test.describe('Notifications page — /notifications @regression', () => {
       await unmockedGraphQLFallback(route);
     });
 
-    await page.goto('/notifications');
-    await page.waitForLoadState('load');
+    await notificationsPage.gotoNotifications();
 
-    const nextBtn = page.getByRole('button', { name: 'Next page' });
-    await expect(nextBtn).toBeVisible();
-    await expect(nextBtn).toBeDisabled();
+    await notificationsPage.nextPageButton.expectVisible();
+    await notificationsPage.nextPageButton.expectDisabled();
   });
 });

@@ -13,114 +13,97 @@
  * Toggle interactions (animations, season totals) and stats-format selection
  * are visibility-only checks — full interaction tests are not yet implemented.
  *
- * Preferences are stored in localStorage (ls_user_preferences).
- * No GraphQL calls are needed for this page.
+ * Preferences are stored in localStorage (ls_user_preferences). No GraphQL
+ * calls are needed for this page, so the localStorage reset stays in the spec;
+ * all element access goes through the injected `settingsPage` object (ADR-0015).
  */
 
-import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
+import { expect, test, unauthTest } from '../fixtures/pages';
 
 const PREFS_KEY = 'ls_user_preferences';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe('Preferences Page @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, settingsPage }) => {
     // Clear preferences so each test starts from defaults
-    await page.goto('/preferences');
-    await page.waitForLoadState('domcontentloaded');
+    await settingsPage.preferences.goto();
     await page.evaluate((key) => localStorage.removeItem(key), PREFS_KEY);
   });
 
-  // Note: data-testid attributes are not yet present on Preferences page
-  // components. Role-based queries are used where possible; getByText with
-  // { exact: true } is used as a fallback for elements without semantic roles.
-
-  test('should load and display the Preferences heading', async ({ page }) => {
-    await page.goto('/preferences');
-    await expect(
-      page.getByRole('heading', { name: 'Preferences' }),
-    ).toBeVisible();
+  test('should load and display the Preferences heading', async ({
+    settingsPage,
+  }) => {
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectHeading();
   });
 
-  test('should display auto-save description text', async ({ page }) => {
-    await page.goto('/preferences');
-    await expect(page.getByText(/save automatically/i)).toBeVisible();
+  test('should display auto-save description text', async ({
+    settingsPage,
+  }) => {
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectAutoSaveSubtitle();
   });
 
-  test('should display Appearance section', async ({ page }) => {
-    await page.goto('/preferences');
-    await expect(page.getByText('Appearance', { exact: true })).toBeVisible();
-    await expect(
-      page.getByText('Theme · Animations', { exact: true }),
-    ).toBeVisible();
+  test('should display Appearance section', async ({ settingsPage }) => {
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectAppearanceSection();
   });
 
   test('should display Theme selector with System, Light, Dark options', async ({
-    page,
+    settingsPage,
   }) => {
-    await page.goto('/preferences');
-    await expect(page.getByText('Theme', { exact: true })).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'System' })).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'Light' })).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'Dark' })).toBeVisible();
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectThemeLabel();
+    await settingsPage.preferences.expectThemeOptionVisible('System');
+    await settingsPage.preferences.expectThemeOptionVisible('Light');
+    await settingsPage.preferences.expectThemeOptionVisible('Dark');
   });
 
-  test('should display Animations toggle', async ({ page }) => {
-    await page.goto('/preferences');
-    await expect(page.getByText('Animations', { exact: true })).toBeVisible();
-    await expect(
-      page.getByText(/Page transitions and micro-motion/),
-    ).toBeVisible();
+  test('should display Animations toggle', async ({ settingsPage }) => {
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectAnimationsRow();
   });
 
-  test('should display Sports & Stats section', async ({ page }) => {
-    await page.goto('/preferences');
-    await expect(
-      page.getByText('Sports & Stats', { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByText('Default sport · Format · Totals', { exact: true }),
-    ).toBeVisible();
+  test('should display Sports & Stats section', async ({ settingsPage }) => {
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectSportsStatsSection();
   });
 
   test('should display Default sport selector with Baseball and Football', async ({
-    page,
+    settingsPage,
   }) => {
-    await page.goto('/preferences');
-    await expect(
-      page.getByText('Default sport', { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'Baseball' })).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'Football' })).toBeVisible();
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectDefaultSportLabel();
+    await settingsPage.preferences.expectSportOptionVisible('Baseball');
+    await settingsPage.preferences.expectSportOptionVisible('Football');
   });
 
   test('should display Stats format selector with Standard and Expanded', async ({
-    page,
+    settingsPage,
   }) => {
-    await page.goto('/preferences');
-    await expect(page.getByText('Stats format', { exact: true })).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'Standard' })).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'Expanded' })).toBeVisible();
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectStatsFormatLabel();
+    await settingsPage.preferences.expectStatsFormatOptionVisible('Standard');
+    await settingsPage.preferences.expectStatsFormatOptionVisible('Expanded');
   });
 
-  test('should display Show season totals toggle', async ({ page }) => {
-    await page.goto('/preferences');
-    await expect(
-      page.getByText('Show season totals', { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByText(/Append running season numbers/)).toBeVisible();
+  test('should display Show season totals toggle', async ({ settingsPage }) => {
+    await settingsPage.preferences.goto();
+    await settingsPage.preferences.expectSeasonTotalsRow();
   });
 
   test('should auto-save preference to localStorage when theme is changed', async ({
     page,
+    settingsPage,
   }) => {
-    await page.goto('/preferences');
+    await settingsPage.preferences.goto();
 
     // Click the "Dark" theme option
-    await page.getByRole('radio', { name: 'Dark' }).click();
+    await settingsPage.preferences.selectTheme('Dark');
 
     // Verify saved banner appears
-    await expect(page.getByTestId('prefs-save-banner')).toBeVisible();
+    await settingsPage.preferences.expectSaveBanner();
 
     // Verify preference was saved to localStorage
     const saved = await page.evaluate(
@@ -132,11 +115,14 @@ test.describe('Preferences Page @smoke', () => {
     expect(prefs.theme).toBe('dark');
   });
 
-  test('should persist preferences across page reload', async ({ page }) => {
-    await page.goto('/preferences');
+  test('should persist preferences across page reload', async ({
+    page,
+    settingsPage,
+  }) => {
+    await settingsPage.preferences.goto();
 
     // Select Football as default sport
-    await page.getByRole('radio', { name: 'Football' }).click();
+    await settingsPage.preferences.selectDefaultSport('Football');
 
     // Reload
     await page.reload();
@@ -153,12 +139,13 @@ test.describe('Preferences Page @smoke', () => {
 
   test('should reset to defaults when localStorage is cleared and page is reloaded', async ({
     page,
+    settingsPage,
   }) => {
-    await page.goto('/preferences');
+    await settingsPage.preferences.goto();
 
     // Select Dark theme first
-    await page.getByRole('radio', { name: 'Dark' }).click();
-    await expect(page.getByTestId('prefs-save-banner')).toBeVisible();
+    await settingsPage.preferences.selectTheme('Dark');
+    await settingsPage.preferences.expectSaveBanner();
 
     // Clear localStorage and reload
     await page.evaluate((key) => localStorage.removeItem(key), PREFS_KEY);
@@ -172,7 +159,7 @@ test.describe('Preferences Page @smoke', () => {
     // No preferences saved = defaults apply
     expect(saved).toBeNull();
     // System chip should be visible (default)
-    await expect(page.getByText('System')).toBeVisible();
+    await settingsPage.preferences.expectThemeOptionVisible('System');
   });
 });
 
@@ -182,50 +169,40 @@ test.describe('Preferences Page @smoke', () => {
 // auth-gate card. Appearance + Sports settings still work (localStorage-only).
 
 unauthTest.describe('Preferences Page — unauthenticated @smoke', () => {
-  unauthTest.beforeEach(async ({ page }) => {
-    await page.goto('/preferences');
-    await page.waitForLoadState('domcontentloaded');
+  unauthTest.beforeEach(async ({ settingsPage }) => {
+    await settingsPage.preferences.goto();
   });
 
   unauthTest(
     'still loads the page heading when signed out',
-    async ({ page }) => {
-      await expect(
-        page.getByRole('heading', { name: 'Preferences' }),
-      ).toBeVisible();
+    async ({ settingsPage }) => {
+      await settingsPage.preferences.expectHeading();
     },
   );
 
   unauthTest(
     'shows the notifications sign-in card instead of toggles',
-    async ({ page }) => {
-      await expect(page.getByText('Sign in to set alerts')).toBeVisible();
-      await expect(
-        page.getByText(
-          /Push, email, and matchup alerts live with your account/,
-        ),
-      ).toBeVisible();
+    async ({ settingsPage }) => {
+      await settingsPage.preferences.expectNotificationsSignInCard();
       // None of the authed notification toggles should be in the DOM.
-      await expect(
-        page.getByText('Push notifications', { exact: true }),
-      ).toHaveCount(0);
+      await settingsPage.preferences.expectPushNotificationsAbsent();
     },
   );
 
   unauthTest(
     'Sign In CTA navigates to the home / auth gate',
-    async ({ page }) => {
-      await page.getByRole('button', { name: /sign in/i }).click();
+    async ({ page, settingsPage }) => {
+      await settingsPage.preferences.clickSignIn();
       await expect(page).toHaveURL(/\/$|\/?\?/);
     },
   );
 
   unauthTest(
     'Appearance section is still usable when signed out',
-    async ({ page }) => {
-      await expect(page.getByText('Appearance', { exact: true })).toBeVisible();
-      await page.getByRole('radio', { name: 'Dark' }).click();
-      await expect(page.getByTestId('prefs-save-banner')).toBeVisible();
+    async ({ settingsPage }) => {
+      await settingsPage.preferences.expectAppearanceHeading();
+      await settingsPage.preferences.selectTheme('Dark');
+      await settingsPage.preferences.expectSaveBanner();
     },
   );
 });

@@ -11,16 +11,21 @@
  * current week (rosterViewWeek === null, which is the default).
  */
 
-import { expect } from '../fixtures/auth-enhanced';
-import { test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8456 / ADR-0015/0016): all locators live on
+// `waiversPage` — this spec is selector-free. The default `test` from
+// `../fixtures/pages` is the auth-enhanced isolated test with page objects
+// injected (identical isolation to the previous `../fixtures/auth-enhanced`
+// import, now with `{ waiversPage, … }`). GraphQL `page.route` mocks stay here.
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const ROSTER_URL = '/baseball/league/1/roster';
+const LEAGUE_ID = 1;
 
 const MOCK_LEAGUE = {
   __typename: 'League',
@@ -327,49 +332,53 @@ async function setupGraphQL(
 test.describe('Pending Waiver Claims — component hidden when empty @regression', () => {
   test('component does not render when teamWaiverClaims returns empty array', async ({
     page,
+    waiversPage,
   }) => {
     await setupGraphQL(page, { claims: [] });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('Pending Waiver Claims')).not.toBeVisible();
+    await waiversPage.header.expectHidden();
   });
 });
 
 test.describe('Pending Waiver Claims — list display @critical', () => {
-  test('header reads "Pending Waiver Claims"', async ({ page }) => {
+  test('header reads "Pending Waiver Claims"', async ({
+    page,
+    waiversPage,
+  }) => {
     await setupGraphQL(page, {
       claims: [mockClaim()],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('Pending Waiver Claims')).toBeVisible();
+    await waiversPage.header.expectVisible();
   });
 
-  test('displays player name for a pending claim', async ({ page }) => {
+  test('displays player name for a pending claim', async ({
+    page,
+    waiversPage,
+  }) => {
     await setupGraphQL(page, {
       claims: [mockClaim({ playerName: 'John Doe' })],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('John Doe')).toBeVisible();
+    await waiversPage.playerName('John Doe').expectVisible();
   });
 
   test('shows fallback "Player #N" when playerName is null', async ({
     page,
+    waiversPage,
   }) => {
     await setupGraphQL(page, {
       claims: [mockClaim({ playerName: null, playerId: 42 })],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('Player #42')).toBeVisible();
+    await waiversPage.playerName('Player #42').expectVisible();
   });
 
-  test('renders multiple claims', async ({ page }) => {
+  test('renders multiple claims', async ({ page, waiversPage }) => {
     await setupGraphQL(page, {
       claims: [
         mockClaim({ id: 1, playerName: 'Player One' }),
@@ -377,30 +386,28 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
         mockClaim({ id: 3, playerName: 'Player Three' }),
       ],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('Player One')).toBeVisible();
-    await expect(page.getByText('Player Two')).toBeVisible();
-    await expect(page.getByText('Player Three')).toBeVisible();
+    await waiversPage.playerName('Player One').expectVisible();
+    await waiversPage.playerName('Player Two').expectVisible();
+    await waiversPage.playerName('Player Three').expectVisible();
   });
 
   test('footer shows singular "1 pending claim — processed hourly"', async ({
     page,
+    waiversPage,
   }) => {
     await setupGraphQL(page, {
       claims: [mockClaim()],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(
-      page.getByText(/1 pending claim — processed hourly/i),
-    ).toBeVisible();
+    await waiversPage.footerSummary(1).expectVisible();
   });
 
   test('footer shows plural "N pending claims — processed hourly"', async ({
     page,
+    waiversPage,
   }) => {
     await setupGraphQL(page, {
       claims: [
@@ -408,34 +415,28 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
         mockClaim({ id: 2, playerName: 'Other Player' }),
       ],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(
-      page.getByText(/2 pending claims — processed hourly/i),
-    ).toBeVisible();
+    await waiversPage.footerSummary(2).expectVisible();
   });
 });
 
 test.describe('Pending Waiver Claims — cancel button @critical', () => {
   test('each claim has a cancel button with correct aria-label', async ({
     page,
+    waiversPage,
   }) => {
     await setupGraphQL(page, {
       claims: [mockClaim({ playerName: 'John Doe' })],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(
-      page.getByRole('button', {
-        name: /cancel waiver claim for John Doe/i,
-      }),
-    ).toBeVisible();
+    await waiversPage.cancelButtonFor('John Doe').expectVisible();
   });
 
   test('clicking cancel triggers CancelWaiverClaim mutation', async ({
     page,
+    waiversPage,
   }) => {
     const cancelledIds: number[] = [];
     await setupGraphQL(page, {
@@ -444,39 +445,43 @@ test.describe('Pending Waiver Claims — cancel button @critical', () => {
         cancelledIds.push(claimId);
       },
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /cancel waiver claim for Jane Smith/i })
-      .click();
+    await waiversPage.cancelClaim('Jane Smith');
 
     await expect.poll(() => cancelledIds, { timeout: 10000 }).toContain(7);
   });
 });
 
 test.describe('Pending Waiver Claims — special claim attributes @regression', () => {
-  test('shows FAAB bid amount when faabBid > 0', async ({ page }) => {
+  test('shows FAAB bid amount when faabBid > 0', async ({
+    page,
+    waiversPage,
+  }) => {
     await setupGraphQL(page, {
       claims: [mockClaim({ playerName: 'Big Spender', faabBid: 25 })],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('$25 FAAB')).toBeVisible();
+    await waiversPage.faabBadge(25).expectVisible();
   });
 
-  test('does not show FAAB label when faabBid is null', async ({ page }) => {
+  test('does not show FAAB label when faabBid is null', async ({
+    page,
+    waiversPage,
+  }) => {
     await setupGraphQL(page, {
       claims: [mockClaim({ playerName: 'Free Claimer', faabBid: null })],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText(/FAAB/)).not.toBeVisible();
+    await waiversPage.faabLabel.expectHidden();
   });
 
-  test('shows drop player name when dropPlayerId is set', async ({ page }) => {
+  test('shows drop player name when dropPlayerId is set', async ({
+    page,
+    waiversPage,
+  }) => {
     await setupGraphQL(page, {
       claims: [
         mockClaim({
@@ -486,25 +491,24 @@ test.describe('Pending Waiver Claims — special claim attributes @regression', 
         }),
       ],
     });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText(/Drop:/i)).toBeVisible();
-    await expect(page.getByText('Old Guy')).toBeVisible();
+    await waiversPage.dropLabel.expectVisible();
+    await waiversPage.playerName('Old Guy').expectVisible();
   });
 });
 
 test.describe('Pending Waiver Claims — error state @regression', () => {
-  test('displays error message when query fails', async ({ page }) => {
+  test('displays error message when query fails', async ({
+    page,
+    waiversPage,
+  }) => {
     await setupGraphQL(page, { errorClaims: true });
-    await page.goto(ROSTER_URL);
-    await page.waitForLoadState('load');
+    await waiversPage.goto(LEAGUE_ID);
 
     // V2 renders the failure message in two places (the alert role for
     // assistive tech, plus the visible error text in the main content
     // region). Target the alert region to avoid the strict-mode collision.
-    await expect(
-      page.getByRole('alert').getByText('Failed to load waiver claims'),
-    ).toBeVisible();
+    await waiversPage.loadError.expectVisible();
   });
 });

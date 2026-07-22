@@ -10,7 +10,7 @@
  * All GraphQL requests are intercepted — no live backend is required.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { agoIso, FIXED_NOW_ISO } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -184,41 +184,38 @@ async function mockNotificationsGraphQL(
 test.describe('Notifications Hub – page loads with mocked data @smoke', () => {
   test('home page loads without errors when notification queries are mocked', async ({
     page,
+    notificationsPage,
   }) => {
     await mockNotificationsGraphQL(page);
     await page.goto('/');
     await page.waitForLoadState('load');
 
     await expect(page).toHaveURL('/');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await notificationsPage.expectNoAppError();
   });
 
   test('home page loads without errors when notification history is empty', async ({
     page,
+    notificationsPage,
   }) => {
     await mockNotificationsGraphQL(page, { empty: true });
     await page.goto('/');
     await page.waitForLoadState('load');
 
     await expect(page).toHaveURL('/');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await notificationsPage.expectNoAppError();
   });
 
   test('home page loads without errors when notification history query fails', async ({
     page,
+    notificationsPage,
   }) => {
     await mockNotificationsGraphQL(page, { historyError: true });
     await page.goto('/');
     await page.waitForLoadState('load');
 
     await expect(page).toHaveURL('/');
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await notificationsPage.expectNoAppError();
   });
 });
 
@@ -255,13 +252,11 @@ test.describe('Notifications Hub – notification list displays items @regressio
   });
 
   test('page does not crash with notification data loaded', async ({
-    page,
+    notificationsPage,
   }) => {
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await notificationsPage.expectNoAppError();
     // The main content area should still render
-    await expect(page.locator('[data-testid="main-content"]')).toBeVisible();
+    await notificationsPage.expectMainContentVisible();
   });
 });
 
@@ -270,15 +265,16 @@ test.describe('Notifications Hub – notification list displays items @regressio
 // ---------------------------------------------------------------------------
 
 test.describe('Notifications Hub – empty state @regression', () => {
-  test('page renders correctly with zero notifications', async ({ page }) => {
+  test('page renders correctly with zero notifications', async ({
+    page,
+    notificationsPage,
+  }) => {
     await mockNotificationsGraphQL(page, { empty: true });
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
-    await expect(page.locator('[data-testid="main-content"]')).toBeVisible();
+    await notificationsPage.expectNoAppError();
+    await notificationsPage.expectMainContentVisible();
   });
 
   test('unread count is zero when no notifications exist', async ({ page }) => {
@@ -409,7 +405,10 @@ test.describe('Notifications Hub – mark as read @regression', () => {
     expect(result.data.markAllNotificationsAsRead).toBe(true);
   });
 
-  test('page remains stable after mark-as-read mutations', async ({ page }) => {
+  test('page remains stable after mark-as-read mutations', async ({
+    page,
+    notificationsPage,
+  }) => {
     await mockNotificationsGraphQL(page);
     await page.goto('/');
     await page.waitForLoadState('load');
@@ -442,9 +441,7 @@ test.describe('Notifications Hub – mark as read @regression', () => {
     });
 
     // Page should not crash
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
-    await expect(page.locator('[data-testid="main-content"]')).toBeVisible();
+    await notificationsPage.expectNoAppError();
+    await notificationsPage.expectMainContentVisible();
   });
 });

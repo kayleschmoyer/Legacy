@@ -10,16 +10,22 @@
  * league detail page (/baseball/league/1/free-agents).
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { extractOperationName } from '../fixtures/shared-mocks';
 import { FIXED_NOW_ISO } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8456 / ADR-0015/0016): all locators live on
+// `freeAgentsPage` — this spec is selector-free. The default `test` from
+// `../fixtures/pages` is the auth-enhanced isolated test with page objects
+// injected (identical isolation to the previous `../fixtures/auth-enhanced`
+// import, now with `{ freeAgentsPage, … }`). GraphQL `page.route` mocks stay here.
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const FREE_AGENTS_URL = '/baseball/league/1/free-agents';
+const LEAGUE_ID = 1;
 
 // ── Mock Player Data ─────────────────────────────────────────────────────────
 
@@ -307,72 +313,81 @@ async function setupGraphQL(
 // ── Tests: Free Agents Page Renders ──────────────────────────────────────────
 
 test.describe('Free Agents — page renders with player list @critical', () => {
-  test('displays player names in the free agents table', async ({ page }) => {
+  test('displays player names in the free agents table', async ({
+    page,
+    freeAgentsPage,
+  }) => {
     await setupGraphQL(page);
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
-    await expect(page.getByText('Lou Gehrig')).toBeVisible();
-    await expect(page.getByText('Ted Williams')).toBeVisible();
+    await freeAgentsPage.playerName('Babe Ruth').expectVisible();
+    await freeAgentsPage.playerName('Lou Gehrig').expectVisible();
+    await freeAgentsPage.playerName('Ted Williams').expectVisible();
   });
 
-  test('shows Hitters and Pitchers toggle buttons', async ({ page }) => {
+  test('shows Hitters and Pitchers toggle buttons', async ({
+    page,
+    freeAgentsPage,
+  }) => {
     await setupGraphQL(page);
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('Hitters')).toBeVisible();
-    await expect(page.getByText('Pitchers')).toBeVisible();
+    await freeAgentsPage.hittersToggle.expectVisible();
+    await freeAgentsPage.pitchersToggle.expectVisible();
   });
 
-  test('shows position filter chips', async ({ page }) => {
+  test('shows position filter chips', async ({ page, freeAgentsPage }) => {
     await setupGraphQL(page);
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
     // The ALL chip and at least one position chip should be visible
-    await expect(page.getByTestId('position-filter-ALL')).toBeVisible();
-    await expect(page.getByTestId('position-filter-C')).toBeVisible();
+    await freeAgentsPage.positionChip('ALL').expectVisible();
+    await freeAgentsPage.positionChip('C').expectVisible();
   });
 
-  test('shows pagination info when players are listed', async ({ page }) => {
+  test('shows pagination info when players are listed', async ({
+    page,
+    freeAgentsPage,
+  }) => {
     await setupGraphQL(page);
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
     // Should show "Showing 1–3" for our 3 mock players
-    await expect(page.getByText(/Showing 1–3/)).toBeVisible();
+    await freeAgentsPage.showingRange(1, 3).expectVisible();
   });
 });
 
 // ── Tests: Search/Filter ─────────────────────────────────────────────────────
 
 test.describe('Free Agents — search and filter @critical', () => {
-  test('search input narrows player results', async ({ page }) => {
+  test('search input narrows player results', async ({
+    page,
+    freeAgentsPage,
+  }) => {
     await setupGraphQL(page);
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
     // All three players should be visible initially
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
-    await expect(page.getByText('Lou Gehrig')).toBeVisible();
-    await expect(page.getByText('Ted Williams')).toBeVisible();
+    await freeAgentsPage.playerName('Babe Ruth').expectVisible();
+    await freeAgentsPage.playerName('Lou Gehrig').expectVisible();
+    await freeAgentsPage.playerName('Ted Williams').expectVisible();
 
     // Type in the search box — the component uses a placeholder "Search players…"
-    const searchInput = page.getByPlaceholder(/Search players/i);
-    await searchInput.fill('Ruth');
+    await freeAgentsPage.search('Ruth');
 
     // After debounce and refetch, only Ruth should appear
     // (server-side search is mocked to filter by firstName/lastName)
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
-    await expect(page.getByText('Lou Gehrig')).not.toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.getByText('Ted Williams')).not.toBeVisible();
+    await freeAgentsPage.playerName('Babe Ruth').expectVisible();
+    await freeAgentsPage
+      .playerName('Lou Gehrig')
+      .expectHidden({ timeout: 5000 });
+    await freeAgentsPage.playerName('Ted Williams').expectHidden();
   });
 
-  test('position filter chip triggers new query', async ({ page }) => {
+  test('position filter chip triggers new query', async ({
+    page,
+    freeAgentsPage,
+  }) => {
     const queryPositions: string[] = [];
 
     await page.route(isGraphQLEndpoint, async (route) => {
@@ -401,14 +416,11 @@ test.describe('Free Agents — search and filter @critical', () => {
       }
     });
 
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
     // Click on the "SS" position filter chip. aria-label is "Filter by position: SS"
     // which avoids ambiguity with Silver Slugger "SS" accolade text in player rows.
-    await page
-      .getByRole('button', { name: 'Filter by position: SS', exact: true })
-      .click();
+    await freeAgentsPage.filterByPosition('SS');
 
     // Wait for the query to fire with the new position filter
     await expect.poll(() => queryPositions, { timeout: 5000 }).toContain('SS');
@@ -418,25 +430,28 @@ test.describe('Free Agents — search and filter @critical', () => {
 // ── Tests: Claim Flow ────────────────────────────────────────────────────────
 
 test.describe('Free Agents — claim button initiates waiver claim flow @critical', () => {
-  test('clicking add button opens the waiver claim modal', async ({ page }) => {
+  test('clicking add button opens the waiver claim modal', async ({
+    page,
+    freeAgentsPage,
+  }) => {
     await setupGraphQL(page);
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
     // Wait for players to render
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
+    await freeAgentsPage.playerName('Babe Ruth').expectVisible();
 
     // Click the claim button for Babe Ruth (aria-label "Add Babe Ruth")
-    await page.getByRole('button', { name: /Add Babe Ruth/i }).click();
+    await freeAgentsPage.openClaimModal('Babe Ruth');
 
     // The WaiverClaimModal should open with "Claim Free Agent" header
-    await expect(page.getByText('Claim Free Agent')).toBeVisible();
+    await freeAgentsPage.claimModalHeader.expectVisible();
     // And it should display the player name
-    await expect(page.getByText('Babe Ruth').last()).toBeVisible();
+    await freeAgentsPage.playerName('Babe Ruth').last().expectVisible();
   });
 
   test('submitting claim triggers ClaimFreeAgent mutation and shows success', async ({
     page,
+    freeAgentsPage,
   }) => {
     const claimedPlayers: number[] = [];
     await setupGraphQL(page, {
@@ -444,48 +459,47 @@ test.describe('Free Agents — claim button initiates waiver claim flow @critica
         claimedPlayers.push(playerId);
       },
     });
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
+    await freeAgentsPage.playerName('Babe Ruth').expectVisible();
 
     // Open the claim modal
-    await page.getByRole('button', { name: /Add Babe Ruth/i }).click();
+    await freeAgentsPage.openClaimModal('Babe Ruth');
 
-    await expect(page.getByText('Claim Free Agent')).toBeVisible();
+    await freeAgentsPage.claimModalHeader.expectVisible();
 
     // Click the submit button in the modal
     // The WaiverClaimModal has a "Submit Claim" button
-    await page.getByRole('button', { name: /Submit Claim/i }).click();
+    await freeAgentsPage.submitClaim();
 
     // Verify the mutation was called with the correct player
     await expect.poll(() => claimedPlayers, { timeout: 10000 }).toContain(101);
 
     // Verify success confirmation UI
-    await expect(page.getByText('Waiver Claim Submitted!')).toBeVisible();
-    await expect(
-      page.getByText(/Your claim for Babe Ruth has been submitted/i),
-    ).toBeVisible();
+    await freeAgentsPage.successHeader.expectVisible();
+    await freeAgentsPage.successMessage('Babe Ruth').expectVisible();
   });
 
-  test('Done button closes the success modal', async ({ page }) => {
+  test('Done button closes the success modal', async ({
+    page,
+    freeAgentsPage,
+  }) => {
     await setupGraphQL(page);
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
+    await freeAgentsPage.playerName('Babe Ruth').expectVisible();
 
     // Open claim modal, submit
-    await page.getByRole('button', { name: /Add Babe Ruth/i }).click();
-    await page.getByRole('button', { name: /Submit Claim/i }).click();
+    await freeAgentsPage.openClaimModal('Babe Ruth');
+    await freeAgentsPage.submitClaim();
 
-    await expect(page.getByText('Waiver Claim Submitted!')).toBeVisible();
+    await freeAgentsPage.successHeader.expectVisible();
 
     // Click Done to close
-    await page.getByRole('button', { name: /Done/i }).click();
+    await freeAgentsPage.closeSuccess();
 
     // Modal should close — "Waiver Claim Submitted!" should no longer be visible
-    await expect(page.getByText('Waiver Claim Submitted!')).not.toBeVisible();
+    await freeAgentsPage.successHeader.expectHidden();
   });
 });
 
@@ -494,24 +508,22 @@ test.describe('Free Agents — claim button initiates waiver claim flow @critica
 test.describe('Free Agents — empty state @regression', () => {
   test('shows "No players found" when query returns empty array', async ({
     page,
+    freeAgentsPage,
   }) => {
     await setupGraphQL(page, { players: [] });
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
-    await expect(page.getByText('No players found')).toBeVisible();
-    await expect(
-      page.getByText(/Try adjusting your search or position filter/i),
-    ).toBeVisible();
+    await freeAgentsPage.emptyStateHeading.expectVisible();
+    await freeAgentsPage.emptyStateHint.expectVisible();
   });
 
-  test('shows error state when query fails', async ({ page }) => {
+  test('shows error state when query fails', async ({
+    page,
+    freeAgentsPage,
+  }) => {
     await setupGraphQL(page, { errorPlayers: true });
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await freeAgentsPage.goto(LEAGUE_ID);
 
-    await expect(
-      page.getByTestId('main-content').getByText('Unable to Load Players'),
-    ).toBeVisible();
+    await freeAgentsPage.loadError.expectVisible();
   });
 });

@@ -18,9 +18,13 @@
  * backend.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8456 / ADR-0015/0016): the multi-step Propose Trade
+// dialog is driven through `tradesPage` (TradesPage) — specs are selector-free.
+// GraphQL mocking stays here (ADR-0015 §6).
 
 // ── Mock Data ────────────────────────────────────────────────────────────────────────────────
 
@@ -331,333 +335,200 @@ async function setupGraphQL(
   );
 }
 
-// ── Helper: full propose-trade flow via Playwright ────────────────────────────────────────────────
-
-/**
- * Click through all four steps of the Propose Trade dialog:
- * Team → Offer players → Request players → Confirm → Send.
- *
- * Assumes the page is already on the Trades tab with the dialog NOT yet open.
- */
-async function completeProposeTradeFlow(
-  page: import('@playwright/test').Page,
-  targetTeamName: string | RegExp,
-): Promise<void> {
-  const dialog = page.getByRole('dialog', { name: /propose trade/i });
-
-  // Open dialog
-  await page
-    .getByRole('button', { name: /propose trade/i })
-    .first()
-    .click();
-  await expect(dialog).toBeVisible({ timeout: 10_000 });
-
-  // Step 1: Select team
-  await expect(
-    page.getByText(/select the team you want to trade with/i),
-  ).toBeVisible({ timeout: 10_000 });
-  await page.getByText(targetTeamName, { exact: false }).first().click();
-
-  // Step 2: Select offering player (first player button in dialog)
-  await expect(page.getByText(/you will give/i).first()).toBeVisible({
-    timeout: 10_000,
-  });
-  const offerButtons = dialog.getByRole('button');
-  await expect
-    .poll(async () => offerButtons.count(), { timeout: 15_000 })
-    .toBeGreaterThan(1);
-
-  const offerCount = await offerButtons.count();
-  let playerSelected = false;
-  for (let i = 0; i < offerCount; i++) {
-    const btn = offerButtons.nth(i);
-    const text = ((await btn.textContent()) ?? '').trim();
-    if (
-      text.length > 3 &&
-      !/^(?:[←→]\s*)?(?:next|back|send|propose|review|cancel|confirm|\d|✓)(?:\s*[←→])?$/i.test(
-        text,
-      )
-    ) {
-      await btn.click();
-      playerSelected = true;
-      break;
-    }
-  }
-  expect(playerSelected).toBe(true);
-
-  // Click "Next — Select Their Players"
-  await page
-    .getByRole('button', { name: /next.*select their players/i })
-    .click();
-
-  // Step 3: Select requesting player
-  await expect(page.getByText(/give you/i).first()).toBeVisible({
-    timeout: 10_000,
-  });
-  const reqButtons = dialog.getByRole('button');
-  await expect
-    .poll(async () => reqButtons.count(), { timeout: 15_000 })
-    .toBeGreaterThan(2);
-
-  const reqCount = await reqButtons.count();
-  let reqPlayerSelected = false;
-  for (let i = 0; i < reqCount; i++) {
-    const btn = reqButtons.nth(i);
-    const text = ((await btn.textContent()) ?? '').trim();
-    if (
-      text.length > 3 &&
-      !/^(?:[←→]\s*)?(?:next|back|send|propose|review|cancel|confirm|\d|✓)(?:\s*[←→])?$/i.test(
-        text,
-      ) &&
-      !/review trade/i.test(text)
-    ) {
-      await btn.click();
-      reqPlayerSelected = true;
-      break;
-    }
-  }
-  expect(reqPlayerSelected).toBe(true);
-
-  // Click "Review Trade"
-  await page.getByRole('button', { name: /review trade/i }).click();
-
-  // Step 4: Confirm — send
-  await expect(
-    page.getByRole('button', { name: /send trade offer/i }),
-  ).toBeVisible({ timeout: 10_000 });
-  await page.getByRole('button', { name: /send trade offer/i }).click();
-}
-
 // ── Tests ─────────────────────────────────────────────────────────────────────────────────
+
+// The default rosters seeded by `setupGraphQL`: pick the first player from each
+// side to drive the full flow (mirrors the previous helper's "first available
+// player" selection — same outcome for these fixtures).
+const OFFER_PLAYER = 'Aaron Judge'; // MY_ROSTER[0]
+const REQUEST_PLAYER = 'Mike Trout'; // THEIR_ROSTER[0]
 
 test.describe('Submit New Trade Offer @regression', () => {
   test('should display the "Propose Trade" button on the Trades tab', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await expect(
-      page.getByRole('button', { name: /propose trade/i }).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await tradesPage.proposeTradeButton.expectVisible({ timeout: 15_000 });
   });
 
   test('should open the Propose Trade dialog when the button is clicked', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /propose trade/i })
-      .first()
-      .click();
+    await tradesPage.openProposeTradeDialog();
 
-    await expect(
-      page.getByRole('dialog', { name: /propose trade/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await tradesPage.proposeTradeDialog.expectVisible({ timeout: 10_000 });
   });
 
   test('should show the team-selection step with other teams listed', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /propose trade/i })
-      .first()
-      .click();
+    await tradesPage.openProposeTradeDialog();
 
-    await expect(
-      page.getByText(/select the team you want to trade with/i),
-    ).toBeVisible({ timeout: 10_000 });
+    await tradesPage.expectTeamSelectionStep();
     // Only "Rival Squad" should appear (not "My Team" which is userTeamId=1)
-    await expect(page.getByText('Rival Squad', { exact: false })).toBeVisible({
-      timeout: 10_000,
-    });
+    await tradesPage.expectTeamListed('Rival Squad');
   });
 
   test('should advance to the offer step after clicking a team', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /propose trade/i })
-      .first()
-      .click();
-    await page.getByText('Rival Squad', { exact: false }).first().click();
+    await tradesPage.openProposeTradeDialog();
+    await tradesPage.selectTradeTeam('Rival Squad');
 
-    await expect(page.getByText(/you will give/i).first()).toBeVisible({
-      timeout: 10_000,
-    });
+    await tradesPage.expectOfferStep();
   });
 
   test('should list user roster players in the offer step', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /propose trade/i })
-      .first()
-      .click();
-    await page.getByText('Rival Squad', { exact: false }).first().click();
+    await tradesPage.openProposeTradeDialog();
+    await tradesPage.selectTradeTeam('Rival Squad');
 
     // Wait for player list to load
-    await expect(page.getByText('Aaron Judge')).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByText('Bryce Harper')).toBeVisible({
-      timeout: 10_000,
-    });
+    await tradesPage.expectPlayerVisible('Aaron Judge');
+    await tradesPage.expectPlayerVisible('Bryce Harper');
   });
 
   test('should show "Next — Select Their Players" button after selecting an offering player', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /propose trade/i })
-      .first()
-      .click();
-    await page.getByText('Rival Squad', { exact: false }).first().click();
-    await page.getByText('Aaron Judge').first().click();
+    await tradesPage.openProposeTradeDialog();
+    await tradesPage.selectTradeTeam('Rival Squad');
+    await tradesPage.selectOfferPlayer('Aaron Judge');
 
-    await expect(
-      page.getByRole('button', { name: /next.*select their players/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await tradesPage.nextSelectTheirPlayersButton.expectVisible({
+      timeout: 10_000,
+    });
   });
 
   test('should advance to the request step and show target team roster', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /propose trade/i })
-      .first()
-      .click();
-    await page.getByText('Rival Squad', { exact: false }).first().click();
-    await page.getByText('Aaron Judge').first().click();
-    await page
-      .getByRole('button', { name: /next.*select their players/i })
-      .click();
+    await tradesPage.openProposeTradeDialog();
+    await tradesPage.selectTradeTeam('Rival Squad');
+    await tradesPage.selectOfferPlayer('Aaron Judge');
+    await tradesPage.goToRequestStep();
 
-    await expect(page.getByText(/give you/i).first()).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByText('Mike Trout')).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByText('Shohei Ohtani')).toBeVisible({
-      timeout: 10_000,
-    });
+    await tradesPage.expectRequestStep();
+    await tradesPage.expectPlayerVisible('Mike Trout');
+    await tradesPage.expectPlayerVisible('Shohei Ohtani');
   });
 
   test('should show "Review Trade" button after selecting a requesting player', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /propose trade/i })
-      .first()
-      .click();
-    await page.getByText('Rival Squad', { exact: false }).first().click();
-    await page.getByText('Aaron Judge').first().click();
-    await page
-      .getByRole('button', { name: /next.*select their players/i })
-      .click();
-    await page.getByText('Mike Trout').first().click();
+    await tradesPage.openProposeTradeDialog();
+    await tradesPage.selectTradeTeam('Rival Squad');
+    await tradesPage.selectOfferPlayer('Aaron Judge');
+    await tradesPage.goToRequestStep();
+    await tradesPage.selectRequestPlayer('Mike Trout');
 
-    await expect(
-      page.getByRole('button', { name: /review trade/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await tradesPage.reviewTradeButton.expectVisible({ timeout: 10_000 });
   });
 
   test('should show the confirm step with "Send Trade Offer" button', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await page
-      .getByRole('button', { name: /propose trade/i })
-      .first()
-      .click();
-    await page.getByText('Rival Squad', { exact: false }).first().click();
-    await page.getByText('Aaron Judge').first().click();
-    await page
-      .getByRole('button', { name: /next.*select their players/i })
-      .click();
-    await page.getByText('Mike Trout').first().click();
-    await page.getByRole('button', { name: /review trade/i }).click();
+    await tradesPage.openProposeTradeDialog();
+    await tradesPage.selectTradeTeam('Rival Squad');
+    await tradesPage.selectOfferPlayer('Aaron Judge');
+    await tradesPage.goToRequestStep();
+    await tradesPage.selectRequestPlayer('Mike Trout');
+    await tradesPage.reviewTrade();
 
-    await expect(
-      page.getByRole('button', { name: /send trade offer/i }),
-    ).toBeVisible({ timeout: 10_000 });
+    await tradesPage.sendTradeOfferButton.expectVisible({ timeout: 10_000 });
   });
 
   test('should close the dialog after successful trade submission', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page);
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await completeProposeTradeFlow(page, 'Rival Squad');
+    await tradesPage.proposeTrade({
+      team: 'Rival Squad',
+      offerPlayer: OFFER_PLAYER,
+      requestPlayer: REQUEST_PLAYER,
+    });
 
-    await expect(
-      page.getByRole('dialog', { name: /propose trade/i }),
-    ).not.toBeVisible({ timeout: 15_000 });
+    await tradesPage.expectProposeDialogClosed();
   });
 
   test('should show the submitted offer in Outgoing Offers after submission', async ({
     page,
+    tradesPage,
   }) => {
     // After mutation succeeds, the cache update writes the offer into the pending list
     await setupGraphQL(page, {
       pendingOffers: [PROPOSED_TRADE_OFFER],
     });
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await expect(
-      page.getByText('To: Rival Squad', { exact: false }),
-    ).toBeVisible({ timeout: 10_000 });
+    await tradesPage.expectOutgoingTo('Rival Squad');
   });
 
   test('should disable "Propose Trade" when the trade deadline has passed', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, {
       league: makeLeague({ tradeDeadlineWeek: 10, currentWeekNumber: 11 }),
     });
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    const proposeBtn = page
-      .getByRole('button', { name: /propose trade/i })
-      .first();
-    await expect(proposeBtn).toBeVisible({ timeout: 15_000 });
-    await expect(proposeBtn).toBeDisabled({ timeout: 10_000 });
+    await tradesPage.proposeTradeButton.expectVisible({ timeout: 15_000 });
+    await tradesPage.proposeTradeButton.expectDisabled({ timeout: 10_000 });
   });
 
   test('should show an error when ProposeTrade returns UNAUTHENTICATED', async ({
     page,
+    tradesPage,
   }) => {
     await setupGraphQL(page, { proposeTradeUnauthenticated: true });
-    await page.goto(`/baseball/league/${LEAGUE_ID}/trades`);
+    await tradesPage.gotoTrades(LEAGUE_ID);
 
-    await completeProposeTradeFlow(page, 'Rival Squad');
-
-    await expect(page.getByText(/UNAUTHENTICATED/i)).toBeVisible({
-      timeout: 10_000,
+    await tradesPage.proposeTrade({
+      team: 'Rival Squad',
+      offerPlayer: OFFER_PLAYER,
+      requestPlayer: REQUEST_PLAYER,
     });
+
+    await tradesPage.expectErrorMessage(/UNAUTHENTICATED/i);
   });
 });

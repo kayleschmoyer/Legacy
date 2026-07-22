@@ -14,14 +14,19 @@ import {
   DraftPage,
   FootballPlayersComparePage,
   ForgotPasswordPage,
+  FreeAgentsPage,
   LeaguePage,
   MatchupPage,
+  NotificationsPage,
   PlayersPage,
   ProfileSettingsScreen,
   RedirectResolverPage,
   ResetPasswordPage,
   RosterPage,
+  SettingsPage,
   StandingsPage,
+  TradesPage,
+  WaiversPage,
 } from '../pages';
 import { NavHeader } from '../components';
 import { PlaywrightWebDriver } from '../driver';
@@ -67,6 +72,16 @@ export interface PageObjectFixtures {
    * Drives /matchup/:id, /standings, and legacy aliases (LS-8464).
    */
   redirectPage: RedirectResolverPage;
+  /** Trades tab (`/:sport/league/:id/trades`) — trading center, propose-trade, trade block. */
+  tradesPage: TradesPage;
+  /** Pending waiver claims (rendered on the roster tab). */
+  waiversPage: WaiversPage;
+  /** Free-agents tab (`/:sport/league/:id/free-agents`). */
+  freeAgentsPage: FreeAgentsPage;
+  /** Notifications route (`/notifications`) + nav-bell dropdown. */
+  notificationsPage: NotificationsPage;
+  /** Preferences (`/preferences`) + profile settings (`/profile/settings`). */
+  settingsPage: SettingsPage;
   /**
    * The persistent header / nav bar. A component (not a page object) composed
    * here scoped to the `banner` landmark — present on every authenticated
@@ -161,6 +176,36 @@ const pageObjects = {
     use: (pageObject: RedirectResolverPage) => Promise<void>,
   ) => {
     await use(new RedirectResolverPage(new PlaywrightWebDriver(page)));
+  },
+  tradesPage: async (
+    { page }: { page: Page },
+    use: (pageObject: TradesPage) => Promise<void>,
+  ) => {
+    await use(new TradesPage(new PlaywrightWebDriver(page)));
+  },
+  waiversPage: async (
+    { page }: { page: Page },
+    use: (pageObject: WaiversPage) => Promise<void>,
+  ) => {
+    await use(new WaiversPage(new PlaywrightWebDriver(page)));
+  },
+  freeAgentsPage: async (
+    { page }: { page: Page },
+    use: (pageObject: FreeAgentsPage) => Promise<void>,
+  ) => {
+    await use(new FreeAgentsPage(new PlaywrightWebDriver(page)));
+  },
+  notificationsPage: async (
+    { page }: { page: Page },
+    use: (pageObject: NotificationsPage) => Promise<void>,
+  ) => {
+    await use(new NotificationsPage(new PlaywrightWebDriver(page)));
+  },
+  settingsPage: async (
+    { page }: { page: Page },
+    use: (pageObject: SettingsPage) => Promise<void>,
+  ) => {
+    await use(new SettingsPage(new PlaywrightWebDriver(page)));
   },
   navHeader: async (
     { page }: { page: Page },

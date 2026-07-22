@@ -11,7 +11,7 @@
  * All GraphQL requests are mocked; no live backend is required.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
@@ -125,26 +125,19 @@ async function mockDropdownNotifications(
 test.describe('NotificationDropdown – click navigation @regression', () => {
   test('clicking a matchup notification navigates to /matchup/:matchupId and closes the dropdown', async ({
     page,
+    notificationsPage,
   }) => {
     await mockDropdownNotifications(page, [MATCHUP_NOTIFICATION]);
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    // The app shell renders NotificationDropdown twice (desktop + mobile nav),
-    // so the testid resolves to two elements; one is hidden by responsive CSS.
-    // Scope to the first (visible at the desktop test viewport) to avoid a
-    // strict-mode violation.
-    const trigger = page.getByTestId('notifications-trigger').first();
-    await trigger.click();
+    await notificationsPage.openBellDropdown();
 
-    const item = page.getByTestId(
-      `notification-item-${MATCHUP_NOTIFICATION.id}`,
-    );
-    await expect(item).toBeVisible();
-    await item.click();
+    await notificationsPage.expectDropdownItem(MATCHUP_NOTIFICATION.id);
+    await notificationsPage.clickDropdownItem(MATCHUP_NOTIFICATION.id);
 
     // Dropdown closes (the item is no longer in the DOM).
-    await expect(item).toBeHidden();
+    await notificationsPage.expectDropdownItemHidden(MATCHUP_NOTIFICATION.id);
 
     // URL navigated to the matchup redirect route.
     await expect(page).toHaveURL(
@@ -154,17 +147,16 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
 
   test('clicking a trade notification navigates to the trade center', async ({
     page,
+    notificationsPage,
   }) => {
     await mockDropdownNotifications(page, [TRADE_NOTIFICATION]);
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    // See note above: dual desktop/mobile render → scope to the visible first.
-    await page.getByTestId('notifications-trigger').first().click();
+    await notificationsPage.openBellDropdown();
 
-    const item = page.getByTestId(`notification-item-${TRADE_NOTIFICATION.id}`);
-    await expect(item).toBeVisible();
-    await item.click();
+    await notificationsPage.expectDropdownItem(TRADE_NOTIFICATION.id);
+    await notificationsPage.clickDropdownItem(TRADE_NOTIFICATION.id);
 
     await expect(page).toHaveURL(
       new RegExp(`/trade-center\\?leagueId=${TRADE_NOTIFICATION.leagueId}$`),
@@ -173,6 +165,7 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
 
   test('clicking a trade notification with a tradeOfferId navigates to the trade center with offerId param', async ({
     page,
+    notificationsPage,
   }) => {
     const tradeNotificationWithOffer: MockNotification = {
       ...TRADE_NOTIFICATION,
@@ -183,13 +176,10 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
     await page.goto('/');
     await page.waitForLoadState('load');
 
-    await page.getByTestId('notifications-trigger').first().click();
+    await notificationsPage.openBellDropdown();
 
-    const item = page.getByTestId(
-      `notification-item-${tradeNotificationWithOffer.id}`,
-    );
-    await expect(item).toBeVisible();
-    await item.click();
+    await notificationsPage.expectDropdownItem(tradeNotificationWithOffer.id);
+    await notificationsPage.clickDropdownItem(tradeNotificationWithOffer.id);
 
     await expect(page).toHaveURL(
       new RegExp(

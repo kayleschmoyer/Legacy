@@ -186,6 +186,7 @@ module.exports = {
       files: [
         'create-league-form-validation.spec.ts',
         'draft-selection-workflow.spec.ts',
+        'free-agents-pickup.spec.ts',
         'join-league.spec.ts',
         'league-creation-advanced.spec.ts',
         'league-creation-football.spec.ts',
@@ -209,6 +210,17 @@ module.exports = {
         'player-stats-mocked.spec.ts',
         'player-stats-search.dual.spec.ts',
         'player-stats.spec.ts',
+        // LS-8456 Phase B — trades / waivers / free-agents / notifications / settings
+        'notification-dropdown-navigation.spec.ts',
+        'notifications-hub.spec.ts',
+        'notifications-page.spec.ts',
+        'preferences.spec.ts',
+        'profile-settings.spec.ts',
+        'submit-new-trade.spec.ts',
+        'trade-block.spec.ts',
+        'trading-center.spec.ts',
+        'user-preferences.spec.ts',
+        'waiver-claims.spec.ts',
       ],
       rules: {
         'no-restricted-syntax': [

@@ -11,9 +11,14 @@
 
 import type { WebSocketRoute } from '@playwright/test';
 import { injectWebSocketUrl } from './helpers/websocket-test-utils';
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+
+// Page-object migration (LS-8456 / ADR-0015/0016): all trades selectors live on
+// `tradesPage` (TradesPage) — specs are selector-free. GraphQL/WebSocket mocking
+// stays here (ADR-0015 §6). The WebSocket real-time refresh flow is web-only
+// pending LS-8448 — see the TradesPage class doc comment.
 
 const MOCK_LEAGUE = {
   __typename: 'League',
@@ -324,205 +329,194 @@ async function mockTradesGraphQL(
 }
 
 test.describe('Trades tab — navigation @smoke', () => {
-  test('navigates to trades tab without errors', async ({ page }) => {
+  test('navigates to trades tab without errors', async ({
+    page,
+    tradesPage,
+  }) => {
     await mockTradesGraphQL(page);
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
 
     await expect(page).toHaveURL(/\/trades/);
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await tradesPage.expectNoAppError();
   });
 });
 
 test.describe('Trades tab — sections @critical', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, tradesPage }) => {
     await mockTradesGraphQL(page, {
       leagueTradeOffers: [MOCK_INCOMING_PENDING],
     });
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
   });
 
-  test('shows "Incoming Offers" section heading', async ({ page }) => {
-    await expect(
-      page.getByText('Incoming Offers', { exact: true }),
-    ).toBeVisible();
+  test('shows "Incoming Offers" section heading', async ({ tradesPage }) => {
+    await tradesPage.expectIncomingOffersSection();
   });
 
-  test('shows "Trade History" section toggle', async ({ page }) => {
-    await expect(
-      page.getByText('Trade History', { exact: true }),
-    ).toBeVisible();
+  test('shows "Trade History" section toggle', async ({ tradesPage }) => {
+    await tradesPage.expectTradeHistorySection();
   });
 });
 
 test.describe('Trades tab — empty state @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, tradesPage }) => {
     await mockTradesGraphQL(page, { leagueTradeOffers: [] });
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
   });
 
   test('shows empty pending message when there are no pending offers', async ({
-    page,
+    tradesPage,
   }) => {
-    await expect(
-      page.getByText('No incoming trade offers', { exact: false }),
-    ).toBeVisible();
+    await tradesPage.expectNoIncomingOffers();
   });
 
   test('shows empty completed message when there are no accepted trades', async ({
-    page,
+    tradesPage,
   }) => {
     // Completed trades live behind the collapsible "Trade History" toggle,
     // which is collapsed by default in the shared TradingCenter. Expand it
     // to reveal the empty-history message.
-    await page.getByRole('button', { name: /Trade History/ }).click();
-    await expect(page.getByText('No trade history yet.')).toBeVisible();
+    await tradesPage.openTradeHistory();
+    await tradesPage.expectNoTradeHistory();
   });
 });
 
 test.describe('Trades tab — incoming pending trade @critical', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, tradesPage }) => {
     await mockTradesGraphQL(page, {
       leagueTradeOffers: [MOCK_INCOMING_PENDING],
     });
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
   });
 
   test('renders the proposing team label on the trade card', async ({
-    page,
+    tradesPage,
   }) => {
-    await expect(page.getByText('From: Beta Force')).toBeVisible();
+    await tradesPage.expectIncomingFrom('Beta Force');
   });
 
   test('shows player offered by the proposing team (Mike Trout)', async ({
-    page,
+    tradesPage,
   }) => {
-    await expect(page.getByText('Mike Trout')).toBeVisible();
+    await tradesPage.expectPlayerVisible('Mike Trout');
   });
 
-  test('shows Accept button for incoming pending trade', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Accept' })).toBeVisible();
+  test('shows Accept button for incoming pending trade', async ({
+    tradesPage,
+  }) => {
+    await tradesPage.acceptButton.expectVisible();
   });
 
-  test('shows Reject button for incoming pending trade', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Reject' })).toBeVisible();
+  test('shows Reject button for incoming pending trade', async ({
+    tradesPage,
+  }) => {
+    await tradesPage.rejectButton.expectVisible();
   });
 
   test('does not show a Withdraw button for incoming trade', async ({
-    page,
+    tradesPage,
   }) => {
-    await expect(
-      page.getByRole('button', { name: 'Withdraw' }),
-    ).not.toBeVisible();
+    await tradesPage.withdrawButton.expectHidden();
   });
 });
 
 test.describe('Trades tab — outgoing pending trade @critical', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, tradesPage }) => {
     await mockTradesGraphQL(page, {
       leagueTradeOffers: [MOCK_OUTGOING_PENDING],
     });
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
   });
 
   test('renders the receiving team label on the trade card', async ({
-    page,
+    tradesPage,
   }) => {
-    await expect(page.getByText('To: Beta Force')).toBeVisible();
+    await tradesPage.expectOutgoingTo('Beta Force');
   });
 
   test('shows player being offered in outgoing trade (Mookie Betts)', async ({
-    page,
+    tradesPage,
   }) => {
-    await expect(page.getByText('Mookie Betts')).toBeVisible();
+    await tradesPage.expectPlayerVisible('Mookie Betts');
   });
 
-  test('shows Cancel button for outgoing pending trade', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+  test('shows Cancel button for outgoing pending trade', async ({
+    tradesPage,
+  }) => {
+    await tradesPage.cancelButton.expectVisible();
   });
 
   test('does not show Accept or Reject for outgoing trade', async ({
-    page,
+    tradesPage,
   }) => {
-    await expect(
-      page.getByRole('button', { name: 'Accept' }),
-    ).not.toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Reject' }),
-    ).not.toBeVisible();
+    await tradesPage.acceptButton.expectHidden();
+    await tradesPage.rejectButton.expectHidden();
   });
 });
 
 test.describe('Trades tab — completed history @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, tradesPage }) => {
     await mockTradesGraphQL(page, {
       leagueTradeOffers: [MOCK_ACCEPTED_TRADE],
     });
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
   });
 
   test('shows accepted trade in the Trade History section', async ({
-    page,
+    tradesPage,
   }) => {
     // Completed (non-pending) trades render under the collapsible "Trade
     // History" toggle. Expanding it fires the GetLeagueTradeOffers query.
-    await page.getByRole('button', { name: /Trade History/ }).click();
-    await expect(page.getByText('Freddie Freeman')).toBeVisible();
+    await tradesPage.openTradeHistory();
+    await tradesPage.expectPlayerVisible('Freddie Freeman');
   });
 });
 
 test.describe('Trades tab — trade block section @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, tradesPage }) => {
     await mockTradesGraphQL(page, { leagueTradeOffers: [] });
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
   });
 
-  test('renders the Trade Block section heading', async ({ page }) => {
+  test('renders the Trade Block section heading', async ({ tradesPage }) => {
     // LeagueTradeBlock renders its title as a styled Text node (not a
     // semantic heading), so match on the exact text.
-    await expect(page.getByText('Trade Block', { exact: true })).toBeVisible();
+    await tradesPage.expectTradeBlockHeading();
   });
 
   test('shows empty state when no players are on the trade block', async ({
-    page,
+    tradesPage,
   }) => {
-    await expect(page.getByText('No players on the trade block')).toBeVisible();
+    await tradesPage.expectTradeBlockEmpty();
   });
 });
 
 test.describe('Trades tab — trade block with players @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, tradesPage }) => {
     await mockTradesGraphQL(page, {
       leagueTradeOffers: [],
       leagueTradeBlock: [MOCK_TRADE_BLOCK_PLAYER, MOCK_OWN_TRADE_BLOCK_PLAYER],
     });
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
   });
 
-  test('lists players on the trade block', async ({ page }) => {
-    await expect(page.getByText('Jake Smith')).toBeVisible();
-    await expect(page.getByText('Mike Johnson')).toBeVisible();
+  test('lists players on the trade block', async ({ tradesPage }) => {
+    await tradesPage.expectPlayerVisible('Jake Smith');
+    await tradesPage.expectPlayerVisible('Mike Johnson');
   });
 
-  test('shows AVAILABLE badge for other teams players', async ({ page }) => {
-    await expect(page.getByText('AVAILABLE').first()).toBeVisible();
+  test('shows AVAILABLE badge for other teams players', async ({
+    tradesPage,
+  }) => {
+    await tradesPage.expectAvailableBadge();
   });
 
-  test('shows Remove button for own team players', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
+  test('shows Remove button for own team players', async ({ tradesPage }) => {
+    await tradesPage.removeButton.expectVisible();
   });
 
-  test('shows asking price when set', async ({ page }) => {
-    await expect(page.getByText('Asking: 2nd round pick')).toBeVisible();
+  test('shows asking price when set', async ({ tradesPage }) => {
+    await tradesPage.expectAskingPrice('2nd round pick');
   });
 });
 
@@ -559,6 +553,7 @@ test.describe('Trades tab — WebSocket real-time refresh @critical', () => {
 
   test('TRADE_OFFER WebSocket event triggers a GetTeamTradeOffers refetch — outgoing pending trade disappears after remote GM accepts', async ({
     page,
+    tradesPage,
   }) => {
     // Stateful call counter: first response = pending, subsequent = empty
     // (simulating the remote GM accepting the outgoing trade).
@@ -588,11 +583,10 @@ test.describe('Trades tab — WebSocket real-time refresh @critical', () => {
 
     const ws = await setupWebSocket(page);
 
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
 
     // Confirm initial state: outgoing pending trade is visible.
-    await expect(page.getByText('Mookie Betts')).toBeVisible();
+    await tradesPage.expectPlayerVisible('Mookie Betts');
 
     // Wait for the WS connection before sending events.
     const route = await ws.waitForConnection();
@@ -627,7 +621,10 @@ test.describe('Trades tab — WebSocket real-time refresh @critical', () => {
 });
 
 test.describe('Trades tab — trade block interactions @regression', () => {
-  test('sets an asking price via the Set Price flow', async ({ page }) => {
+  test('sets an asking price via the Set Price flow', async ({
+    page,
+    tradesPage,
+  }) => {
     const ownPlayerNoPrice = {
       __typename: 'TeamMember',
       id: 2,
@@ -642,17 +639,17 @@ test.describe('Trades tab — trade block interactions @regression', () => {
       leagueTradeOffers: [],
       leagueTradeBlock: [ownPlayerNoPrice],
     });
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
 
-    await page.getByRole('button', { name: 'Set Price' }).click();
-    await page.getByRole('textbox').fill('1st round pick');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await tradesPage.setAskingPrice('1st round pick');
 
-    await expect(page.getByText('Asking: 1st round pick')).toBeVisible();
+    await tradesPage.expectAskingPrice('1st round pick');
   });
 
-  test('removes a player from the trade block', async ({ page }) => {
+  test('removes a player from the trade block', async ({
+    page,
+    tradesPage,
+  }) => {
     const mutationCalls: string[] = [];
 
     await mockTradesGraphQL(page, {
@@ -683,10 +680,9 @@ test.describe('Trades tab — trade block interactions @regression', () => {
       await route.fallback();
     });
 
-    await page.goto('/baseball/league/1/trades');
-    await page.waitForLoadState('load');
+    await tradesPage.gotoTrades(1);
 
-    await page.getByRole('button', { name: 'Remove' }).click();
+    await tradesPage.removeFromTradeBlock();
 
     // The SetTradeBlock mutation is dispatched asynchronously and captured by
     // the route interceptor above, so poll rather than asserting synchronously
