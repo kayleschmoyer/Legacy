@@ -6,7 +6,7 @@
  */
 import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, eq, gte, inArray, ne } from 'drizzle-orm';
+import { and, eq, gte, ilike, inArray, ne } from 'drizzle-orm';
 import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder } from '../builder';
 import { LeagueMember, Team, TeamMember } from '../leagues/types';
@@ -590,6 +590,15 @@ builder.mutationField('renameTeam', (t) =>
 // ── Invite / Remove Assistant Manager ─────────────────────────────────────
 
 /**
+ * Single message returned for every invite failure mode (user not found,
+ * already a league member, already an assistant manager for this team).
+ * Distinct messages per failure previously let a caller enumerate league
+ * membership by comparing error text across probes (BTD-003).
+ */
+const INVITE_FAILURE_MESSAGE =
+  'Could not invite user. Check the username and try again.';
+
+/**
  * Mutation: inviteAssistantManager
  *
  * Allows the General Manager (owner) of a team to invite another user as an
@@ -668,18 +677,18 @@ builder.mutationField('inviteAssistantManager', (t) =>
         );
       }
 
-      // 3. Look up the invitee by username
+      // 3. Look up the invitee by username (case-insensitive — BTD-003)
       const inviteeRows = await db
         .select({
           id: PublicSchema.users.id,
           username: PublicSchema.users.username,
         })
         .from(PublicSchema.users)
-        .where(eq(PublicSchema.users.username, username.trim()))
+        .where(ilike(PublicSchema.users.username, username.trim()))
         .limit(1);
 
       if (inviteeRows.length === 0) {
-        throw new Error(`No user found with username "${username}"`);
+        throw UserInputError(INVITE_FAILURE_MESSAGE);
       }
 
       const inviteeId = Number(inviteeRows[0].id);
@@ -690,11 +699,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
 
       // 4. Check the invitee is not already a member of this league
       const existingMembership = await db
-        .select({
-          leagueId: PublicSchema.leagueMembers.leagueId,
-          teamId: PublicSchema.leagueMembers.teamId,
-          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
-        })
+        .select({ userId: PublicSchema.leagueMembers.userId })
         .from(PublicSchema.leagueMembers)
         .where(
           and(
@@ -705,16 +710,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
         .limit(1);
 
       if (existingMembership.length > 0) {
-        const existing = existingMembership[0];
-        if (
-          existing.teamId === teamId &&
-          existing.permissionLevel === 'assistant_manager'
-        ) {
-          throw new Error(
-            `${username} is already an assistant manager for this team`,
-          );
-        }
-        throw new Error(`${username} is already a member of this league`);
+        throw UserInputError(INVITE_FAILURE_MESSAGE);
       }
 
       // 5. Insert the new league_members row with assistant_manager permission
