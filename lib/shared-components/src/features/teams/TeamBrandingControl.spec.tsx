@@ -16,7 +16,29 @@ jest.mock('@legacy-sports/graphql', () => ({
   useUpdateTeamBrandingMutation: () => [mockUpdateBranding, { loading: false }],
 }));
 
-jest.mock('@tamagui/lucide-icons', () => ({ Shirt: () => null }));
+jest.mock('@tamagui/lucide-icons', () => ({
+  Shirt: () => null,
+  Upload: () => null,
+}));
+
+const mockPickAndUploadLogo = jest.fn();
+let mockUploadState: {
+  uploading: boolean;
+  uploadError: string | null;
+} = { uploading: false, uploadError: null };
+const mockUseTeamLogoUpload = jest.fn(
+  (options: { onUploaded: (url: string) => void }) => ({
+    uploading: mockUploadState.uploading,
+    uploadError: mockUploadState.uploadError,
+    pickAndUploadLogo: (): void => {
+      mockPickAndUploadLogo(options);
+    },
+  }),
+);
+jest.mock('./useTeamLogoUpload', () => ({
+  useTeamLogoUpload: (options: Parameters<typeof mockUseTeamLogoUpload>[0]) =>
+    mockUseTeamLogoUpload(options),
+}));
 
 type Children = { children?: React.ReactNode };
 type ButtonProps = Children & {
@@ -97,6 +119,9 @@ describe('TeamBrandingControl (LS-7809)', () => {
   beforeEach(() => {
     mockRenameTeam.mockClear();
     mockUpdateBranding.mockClear();
+    mockUseTeamLogoUpload.mockClear();
+    mockPickAndUploadLogo.mockClear();
+    mockUploadState = { uploading: false, uploadError: null };
   });
 
   it('disables Save Name until the name is changed', () => {
@@ -186,6 +211,129 @@ describe('TeamBrandingControl (LS-7809)', () => {
     expect(
       screen.queryByRole('button', { name: /^(Save Name|Saving…|Saved)$/ }),
     ).toBeNull();
+  });
+
+  describe('logo upload (LS-7685)', () => {
+    const getUploadButton = () =>
+      screen.getByRole('button', { name: /^(Upload Logo|Uploading…)$/ });
+
+    it('hides the Upload Logo button when canUploadLogo is not set (default, all tiers)', () => {
+      render(<TeamBrandingControl teamId={1} leagueId={2} team={TEAM} />);
+      expect(
+        screen.queryByRole('button', { name: /^(Upload Logo|Uploading…)$/ }),
+      ).toBeNull();
+    });
+
+    it('hides the Upload Logo button when canUploadLogo is false (non-premium)', () => {
+      render(
+        <TeamBrandingControl
+          teamId={1}
+          leagueId={2}
+          team={TEAM}
+          canUploadLogo={false}
+        />,
+      );
+      expect(
+        screen.queryByRole('button', { name: /^(Upload Logo|Uploading…)$/ }),
+      ).toBeNull();
+    });
+
+    it('shows and wires the Upload Logo button when canUploadLogo is true (premium)', () => {
+      render(
+        <TeamBrandingControl
+          teamId={1}
+          leagueId={2}
+          team={TEAM}
+          canUploadLogo
+          imageUploadUrl="https://api.example.com"
+        />,
+      );
+
+      fireEvent.click(getUploadButton());
+      expect(mockPickAndUploadLogo).toHaveBeenCalledTimes(1);
+    });
+
+    it('still hides the pasted-URL path unaffected for all tiers (AC7)', () => {
+      render(
+        <TeamBrandingControl
+          teamId={1}
+          leagueId={2}
+          team={TEAM}
+          canUploadLogo={false}
+        />,
+      );
+      expect(screen.getByTestId('team-logo-input')).not.toBeDisabled();
+    });
+
+    it('shows an inline error when the upload hook reports a failure', () => {
+      mockUploadState = { uploading: false, uploadError: 'Upload failed.' };
+      render(
+        <TeamBrandingControl
+          teamId={1}
+          leagueId={2}
+          team={TEAM}
+          canUploadLogo
+        />,
+      );
+      expect(screen.getByText('Upload failed.')).toBeInTheDocument();
+    });
+
+    it('disables the button and shows "Uploading…" while an upload is in flight', () => {
+      mockUploadState = { uploading: true, uploadError: null };
+      render(
+        <TeamBrandingControl
+          teamId={1}
+          leagueId={2}
+          team={TEAM}
+          canUploadLogo
+        />,
+      );
+      expect(screen.getByRole('button', { name: 'Uploading…' })).toBeDisabled();
+    });
+
+    it('populates logoUrl and flows into saveBranding when the upload succeeds', async () => {
+      mockUseTeamLogoUpload.mockImplementation(({ onUploaded }) => ({
+        uploading: false,
+        uploadError: null,
+        pickAndUploadLogo: () => {
+          onUploaded('https://cdn.example.com/uploaded-logo.png');
+        },
+      }));
+
+      render(
+        <TeamBrandingControl
+          teamId={1}
+          leagueId={2}
+          team={TEAM}
+          canUploadLogo
+          imageUploadUrl="https://api.example.com"
+        />,
+      );
+
+      fireEvent.click(getUploadButton());
+      expect(screen.getByTestId('team-logo-input')).toHaveValue(
+        'https://cdn.example.com/uploaded-logo.png',
+      );
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: /^(Save Branding|Saving…|Saved)$/,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      expect(mockUpdateBranding).toHaveBeenCalledWith({
+        variables: {
+          teamId: 1,
+          leagueId: 2,
+          primaryColor: '#1B3A5C',
+          secondaryColor: '#C5A55A',
+          logoUrl: 'https://cdn.example.com/uploaded-logo.png',
+        },
+      });
+    });
   });
 });
 

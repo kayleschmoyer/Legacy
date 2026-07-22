@@ -11,12 +11,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Shirt } from '@tamagui/lucide-icons';
+import { Shirt, Upload } from '@tamagui/lucide-icons';
 import {
   initialsFromTeamName,
   type TeamBrandingTeam,
   useTeamBranding,
 } from './useTeamBranding';
+import { useTeamLogoUpload } from './useTeamLogoUpload';
 import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -27,6 +28,16 @@ export interface TeamBrandingControlProps {
   team: TeamBrandingTeam | null;
   /** When false, the editor renders read-only (no inputs / save buttons). */
   canEdit?: boolean;
+  /**
+   * Gates the "Upload Logo" picker behind the `logo_upload` entitlement
+   * (LS-7685) — mirrors web's PremiumGate. When falsy (the default), only the
+   * existing pasted-URL input renders, unchanged.
+   */
+  canUploadLogo?: boolean;
+  /** `config.imageUploadUrl` — required for `canUploadLogo` to do anything. */
+  imageUploadUrl?: string | null;
+  /** Resolves the caller's bearer JWT for the upload request. */
+  getAuthToken?: () => Promise<string | null>;
   onSaved?: (kind: 'name' | 'branding') => void;
   onError?: (error: Error) => void;
 }
@@ -38,11 +49,16 @@ export interface TeamBrandingControlProps {
  * colors, logo). Mirrors web's canonical league-detail v2 "Team" tab and shares
  * its save wiring via {@link useTeamBranding} (LS-7809).
  */
+const noAuthToken = (): Promise<string | null> => Promise.resolve(null);
+
 export function TeamBrandingControl({
   teamId,
   leagueId,
   team,
   canEdit = true,
+  canUploadLogo = false,
+  imageUploadUrl,
+  getAuthToken = noAuthToken,
   onSaved,
   onError,
 }: TeamBrandingControlProps): React.JSX.Element {
@@ -66,6 +82,17 @@ export function TeamBrandingControl({
     saveName,
     saveBranding,
   } = useTeamBranding({ teamId, leagueId, team, onSaved, onError });
+
+  const {
+    uploading: logoUploading,
+    uploadError: logoUploadError,
+    pickAndUploadLogo,
+  } = useTeamLogoUpload({
+    teamId,
+    imageUploadUrl,
+    getAuthToken,
+    onUploaded: setLogoUrl,
+  });
 
   const displayName = trimmedName || currentTeamName || 'My Team';
 
@@ -190,6 +217,38 @@ export function TeamBrandingControl({
             <Text fontSize="$2" color="$red9">
               {logoUrlError}
             </Text>
+          )}
+          {canEdit && canUploadLogo && (
+            <YStack gap="$1">
+              {logoUploadError && (
+                <Text fontSize="$2" color="$red9" role="alert">
+                  {logoUploadError}
+                </Text>
+              )}
+              <XStack>
+                <Button
+                  size="$3"
+                  backgroundColor="$brandNavyLight"
+                  color="$textOnAccent"
+                  hoverStyle={{ backgroundColor: '$brandNavy' }}
+                  pressStyle={{ backgroundColor: '$brandNavyDark' }}
+                  disabled={logoUploading}
+                  icon={
+                    logoUploading ? (
+                      <Spinner size="small" />
+                    ) : (
+                      <Upload size={14} />
+                    )
+                  }
+                  onPress={() => void pickAndUploadLogo()}
+                >
+                  {logoUploading ? 'Uploading…' : 'Upload Logo'}
+                </Button>
+              </XStack>
+              <Text fontSize="$1" color="$gray10">
+                PNG, JPEG, or WebP · max 2 MB
+              </Text>
+            </YStack>
           )}
         </YStack>
 

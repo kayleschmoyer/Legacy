@@ -112,11 +112,27 @@ describe('native adapter', () => {
     );
   });
 
+  it('reads imageUploadUrl from EXPO_PUBLIC_IMAGE_UPLOAD_URL (LS-7685)', () => {
+    process.env.EXPO_PUBLIC_IMAGE_UPLOAD_URL = 'https://api.example.com';
+    expect(buildNativeConfig().imageUploadUrl).toBe('https://api.example.com');
+  });
+
+  it('falls back to extra.imageUploadUrl when EXPO_PUBLIC_IMAGE_UPLOAD_URL is absent', () => {
+    mockExtraData = {
+      ...defaultMockExtra,
+      imageUploadUrl: 'https://api-fallback.example.com',
+    };
+    expect(buildNativeConfig().imageUploadUrl).toBe(
+      'https://api-fallback.example.com',
+    );
+  });
+
   it('returns undefined for keys absent from both env and extra', () => {
     const cfg = buildNativeConfig();
     expect(cfg.websocketUrl).toBeUndefined();
     expect(cfg.giphyApiKey).toBeUndefined();
     expect(cfg.appBaseUrl).toBeUndefined();
+    expect(cfg.imageUploadUrl).toBeUndefined();
     expect(cfg.repoUrl).toBeUndefined();
   });
 

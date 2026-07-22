@@ -42,7 +42,9 @@ export function buildNativeConfig(): AppConfig {
     stripeMonthlyPriceId: undefined,
     stripeAnnualPriceId: undefined,
     vapidPublicKey: undefined,
-    imageUploadUrl: undefined,
+    // Native team-logo upload (LS-7685): mirrors repoUrl below.
+    imageUploadUrl:
+      process.env.EXPO_PUBLIC_IMAGE_UPLOAD_URL ?? extra?.['imageUploadUrl'],
     repoUrl: process.env.EXPO_PUBLIC_REPO_URL ?? extra?.['repoUrl'],
   };
 

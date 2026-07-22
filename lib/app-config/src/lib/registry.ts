@@ -138,6 +138,7 @@ export const CONFIG_KEYS = {
   imageUploadUrl: {
     clientSafe: true,
     web: 'VITE_IMAGE_UPLOAD_URL',
+    mobile: 'EXPO_PUBLIC_IMAGE_UPLOAD_URL',
     required: false,
   },
   repoUrl: {

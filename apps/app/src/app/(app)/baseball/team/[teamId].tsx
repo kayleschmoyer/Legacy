@@ -5,10 +5,13 @@ import { useLocalSearchParams } from 'expo-router';
 import { computeAverageScoring, computeScoring } from '@legacy-sports/scoring';
 import {
   BRAND_NAVY_LIGHT,
+  SecureStorageProvider,
   TeamBrandingControl,
   type TeamBrandingTeam,
   UnifiedLoadingPanel,
 } from '@legacy-sports/shared-components';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { config } from '@legacy-sports/app-config/native';
 import {
   AppMatchupFragment,
   AppTeamMemberFragment,
@@ -32,7 +35,11 @@ import { LineupEditor } from '../../../../features/roster/LineupEditor';
 import { PositionSlot } from '../../../../common/models/Models';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
-import { useSubscription } from '../../../../features/subscription/useSubscription';
+import { INTERNAL_JWT_KEY } from '../../../../common/auth/jwtRefresh';
+import {
+  useHasEntitlement,
+  useSubscription,
+} from '../../../../features/subscription/useSubscription';
 
 interface MatchupPlayerStats {
   playerId?: number | null;
@@ -102,6 +109,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
   } = props;
 
   const { isPremium } = useSubscription();
+  const canUploadLogo = useHasEntitlement(ENTITLEMENTS.logo_upload);
 
   const { data: statsData, loading: loadingStats } = useGetMatchupPlayersQuery({
     skip: !matchup?.id,
@@ -283,6 +291,9 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
             teamId={teamId}
             leagueId={leagueId}
             team={brandingTeam}
+            canUploadLogo={canUploadLogo}
+            imageUploadUrl={config.imageUploadUrl}
+            getAuthToken={() => SecureStorageProvider.getItem(INTERNAL_JWT_KEY)}
             onSaved={() =>
               Alert.alert('Saved', 'Team branding updated successfully.')
             }

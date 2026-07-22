@@ -30,12 +30,32 @@ jest.mock('@legacy-sports/scoring', () => ({
 // used here since it pulls in the full barrel (native OAuth deps Jest can't parse).
 const MOCK_BRAND_NAVY_LIGHT = '#2C4A7C';
 
+// Captures the props from the most recent TeamBrandingControl render so
+// LS-7685's canUploadLogo/imageUploadUrl/getAuthToken wiring is verifiable.
+let lastTeamBrandingProps:
+  | {
+      canUploadLogo?: boolean;
+      imageUploadUrl?: string | null;
+      getAuthToken?: () => Promise<string | null>;
+    }
+  | undefined;
+
 jest.mock('@legacy-sports/shared-components', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
     BRAND_NAVY_LIGHT: MOCK_BRAND_NAVY_LIGHT,
     UnifiedLoadingPanel: () => <View testID="loading-panel" />,
-    TeamBrandingControl: () => <View testID="team-branding-control" />,
+    TeamBrandingControl: (props: {
+      canUploadLogo?: boolean;
+      imageUploadUrl?: string | null;
+      getAuthToken?: () => Promise<string | null>;
+    }) => {
+      lastTeamBrandingProps = props;
+      return <View testID="team-branding-control" />;
+    },
+    SecureStorageProvider: {
+      getItem: jest.fn(() => Promise.resolve('mock-jwt')),
+    },
   };
 });
 
@@ -192,9 +212,11 @@ jest.mock('@legacy-sports/graphql', () => ({
 // ── Subscription mock ─────────────────────────────────────────────────────────
 
 const mockUseSubscription = jest.fn(() => ({ isPremium: true }));
+const mockUseHasEntitlement = jest.fn(() => true);
 
 jest.mock('../../../../features/subscription/useSubscription', () => ({
   useSubscription: (...args: unknown[]) => mockUseSubscription(...args),
+  useHasEntitlement: (...args: unknown[]) => mockUseHasEntitlement(...args),
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -348,5 +370,64 @@ describe('BaseballTeam route — team identity header (LS-8313)', () => {
     render(<TeamIdHeader />);
     expect(screen.getByText('Test Team')).toBeTruthy();
     expect(screen.getByTestId('team-avatar-fallback')).toHaveTextContent('T');
+  });
+});
+
+describe('BaseballTeam route — Settings tab logo-upload gating (LS-7685)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    lastTeamBrandingProps = undefined;
+
+    mockUseGetTeamByIdQuery.mockReturnValue({
+      loading: false,
+      data: { team: mockTeam },
+    });
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { userMembership: { permissionLevel: 'owner' } } },
+    });
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: { leagueScoringProfile: { multiplierGroups: [] } },
+    });
+    mockUseGetMatchupPlayersQuery.mockReturnValue({
+      loading: false,
+      data: { getMatchupPlayers: [] },
+    });
+    mockUseGetPositionsForLeagueQuery.mockReturnValue({
+      loading: false,
+      data: { leaguePositions: mockPositions },
+    });
+    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
+    mockUseSubscription.mockReturnValue({ isPremium: true });
+  });
+
+  it('passes canUploadLogo=true to TeamBrandingControl for an entitled (premium) owner', () => {
+    mockUseHasEntitlement.mockReturnValue(true);
+    render(<BaseballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    expect(screen.getByTestId('team-branding-control')).toBeTruthy();
+    expect(lastTeamBrandingProps?.canUploadLogo).toBe(true);
+    expect(mockUseHasEntitlement).toHaveBeenCalledWith('logo_upload');
+  });
+
+  it('passes canUploadLogo=false to TeamBrandingControl for a non-entitled (free) owner', () => {
+    mockUseHasEntitlement.mockReturnValue(false);
+    render(<BaseballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    expect(lastTeamBrandingProps?.canUploadLogo).toBe(false);
+  });
+
+  it('passes a getAuthToken callback that resolves the stored bearer JWT', async () => {
+    mockUseHasEntitlement.mockReturnValue(true);
+    render(<BaseballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    await expect(lastTeamBrandingProps?.getAuthToken?.()).resolves.toBe(
+      'mock-jwt',
+    );
   });
 });
