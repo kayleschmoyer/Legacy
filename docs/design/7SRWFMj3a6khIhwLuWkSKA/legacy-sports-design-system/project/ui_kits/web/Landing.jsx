@@ -39,7 +39,7 @@ const Landing = ({ onEnter }) => (
           [
             'zap',
             'Instant Updates',
-            'Lineup moves, trades, and injuries land the moment they happen.',
+            'Lineup moves and trades land the moment they happen.',
           ],
           [
             'secure',
