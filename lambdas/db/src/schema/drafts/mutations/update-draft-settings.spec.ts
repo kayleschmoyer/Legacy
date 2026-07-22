@@ -104,27 +104,40 @@ function captureResolver() {
     | ((_p: unknown, args: unknown, ctx: unknown) => Promise<unknown>)
     | undefined;
 
+  // Universally callable/chainable no-op: `require('./update-draft-settings')`
+  // below loads the FULL schema graph (drafts/types -> leagues/types -> scoring,
+  // statistics, ...) as a side effect, and every one of those files invokes
+  // arbitrary `builder.*`/`t.*` methods at module-top-level to register their
+  // (unrelated) GraphQL types. Hand-picking a fixed method list here breaks
+  // every time the schema graph grows a call this mock doesn't know about
+  // (LS-8598) — auto-stubbing avoids the whack-a-mole.
+  function autoStub(): unknown {
+    return new Proxy(() => autoStub(), { get: () => autoStub() });
+  }
+
   jest.doMock('../../builder', () => ({
-    builder: {
-      objectRef: jest.fn(() => ({ implement: jest.fn() })),
-      inputType: jest.fn(() => ({ implement: jest.fn() })),
-      objectType: jest.fn(),
-      queryField: jest.fn(),
-      mutationField: jest.fn((_name: string, fn: (t: unknown) => void) => {
-        fn({
-          field: (opts: {
-            resolve: (
-              _p: unknown,
-              args: unknown,
-              ctx: unknown,
-            ) => Promise<unknown>;
-          }) => {
-            capturedFn = opts.resolve;
-          },
-          arg: () => ({}),
-        });
-      }),
-    },
+    builder: new Proxy(
+      {
+        mutationField: jest.fn((_name: string, fn: (t: unknown) => void) => {
+          fn({
+            field: (opts: {
+              resolve: (
+                _p: unknown,
+                args: unknown,
+                ctx: unknown,
+              ) => Promise<unknown>;
+            }) => {
+              capturedFn = opts.resolve;
+            },
+            arg: autoStub(),
+          });
+        }),
+      },
+      {
+        get: (target, prop) =>
+          prop in target ? target[prop as keyof typeof target] : autoStub(),
+      },
+    ),
   }));
 
   jest.doMock('@legacy-sports/utils/node', () => ({
