@@ -98,6 +98,22 @@ export function NotFoundError(message: string): GraphQLError {
 }
 
 /**
+ * Throw when a caller has exceeded a per-user rate limit.
+ *
+ * Maps to Apollo code `RATE_LIMITED` (HTTP 429 equivalent). Intentionally
+ * generic: never include remaining-attempt counts or reset timing in the
+ * message, since either would help an attacker calibrate further probing
+ * (e.g. username enumeration — LS-8587 / BTD-003).
+ */
+export function RateLimitedError(
+  message = 'Too many attempts. Please try again later.',
+): GraphQLError {
+  return new GraphQLError(message, {
+    extensions: { code: 'RATE_LIMITED' },
+  });
+}
+
+/**
  * Throw when a matchup roster edit is rejected because the matchup is no
  * longer in the `scheduled` state (e.g. `in_progress`, `completed`, or
  * `cancelled`).

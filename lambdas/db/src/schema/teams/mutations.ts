@@ -18,8 +18,10 @@ import {
   AuthenticationError,
   ForbiddenError,
   NotFoundError,
+  RateLimitedError,
   UserInputError,
 } from '../graphql-errors';
+import { checkAndIncrementRateLimit } from '../rate-limit';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -609,6 +611,16 @@ const INVITE_FAILURE_MESSAGE =
   'Could not invite user. Check the username and try again.';
 
 /**
+ * Caps invite attempts per calling user to prevent username enumeration via
+ * repeated probing (BTD-003 / LS-8587). LS-6026 already made every failure
+ * mode return the identical message above; this stops volume-based probing
+ * that message uniformity alone cannot.
+ */
+const INVITE_RATE_LIMIT_BUCKET = 'invite_assistant_manager';
+const INVITE_RATE_LIMIT_MAX_ATTEMPTS = 10;
+const INVITE_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+/**
  * Mutation: inviteAssistantManager
  *
  * Allows the General Manager (owner) of a team to invite another user as an
@@ -687,7 +699,21 @@ builder.mutationField('inviteAssistantManager', (t) =>
         );
       }
 
-      // 3. Look up the invitee by username (case-insensitive — BTD-003)
+      // 3. Rate-limit invite attempts per calling user. Gated here (after
+      //    authorization, before the username lookup) so probing only
+      //    consumes budget for callers who could actually reach the
+      //    enumeration surface below (BTD-003 / LS-8587).
+      const rateLimit = await checkAndIncrementRateLimit(db, {
+        bucket: INVITE_RATE_LIMIT_BUCKET,
+        userId,
+        limit: INVITE_RATE_LIMIT_MAX_ATTEMPTS,
+        windowMs: INVITE_RATE_LIMIT_WINDOW_MS,
+      });
+      if (!rateLimit.allowed) {
+        throw RateLimitedError();
+      }
+
+      // 4. Look up the invitee by username (case-insensitive — BTD-003)
       const inviteeRows = await db
         .select({
           id: PublicSchema.users.id,
@@ -707,7 +733,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
         throw new Error('You cannot invite yourself as an assistant manager');
       }
 
-      // 4. Check the invitee is not already a member of this league
+      // 5. Check the invitee is not already a member of this league
       const existingMembership = await db
         .select({ userId: PublicSchema.leagueMembers.userId })
         .from(PublicSchema.leagueMembers)
@@ -723,7 +749,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
         throw UserInputError(INVITE_FAILURE_MESSAGE);
       }
 
-      // 5. Insert the new league_members row with assistant_manager permission
+      // 6. Insert the new league_members row with assistant_manager permission
       const inserted = await db
         .insert(PublicSchema.leagueMembers)
         .values({
@@ -746,7 +772,7 @@ builder.mutationField('inviteAssistantManager', (t) =>
         leagueId,
       });
 
-      // 6. Send a league chat notification
+      // 7. Send a league chat notification
       const senderUsername = context.user.username ?? `user_${userId}`;
       const { notificationService } = context;
       if (notificationService) {

@@ -12,6 +12,7 @@ export * from './models/Matchups';
 export * from './models/Notifications';
 export * from './models/Players';
 export * from './models/Playoffs';
+export * from './models/RateLimits';
 export * from './models/SalaryCap';
 export * from './models/Scoring';
 export * from './models/SeasonDraftGame';
