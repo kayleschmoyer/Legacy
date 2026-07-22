@@ -8,7 +8,7 @@
  *     throwing, when window.gtag is unavailable or the GA measurement ID is
  *     unset.
  */
-import { trackEvent, trackMatchupViewed } from './analytics';
+import { trackEvent, trackMatchupViewed, trackTeamViewed } from './analytics';
 import { getEnvironmentConfig } from '../config/environment';
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -83,5 +83,61 @@ describe('trackEvent no-op behavior (LS-7628)', () => {
     delete (window as { gtag?: unknown }).gtag;
 
     expect(() => trackEvent('matchup_viewed', { matchup_id: 1 })).not.toThrow();
+  });
+});
+
+describe('trackTeamViewed de-dupe (LS-6050)', () => {
+  beforeEach(() => {
+    mockGetEnvironmentConfig.mockReturnValue({
+      googleAnalyticsMeasurementId: 'G-TEST123',
+    } as ReturnType<typeof getEnvironmentConfig>);
+    window.gtag = jest.fn();
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    delete (window as { gtag?: unknown }).gtag;
+    sessionStorage.clear();
+  });
+
+  it('fires once for a repeated (teamId, leagueId) tuple within the window', () => {
+    trackTeamViewed(42, 7);
+    trackTeamViewed(42, 7);
+    trackTeamViewed(42, 7);
+
+    expect(window.gtag).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires again for the same tuple once the 5-minute window has elapsed', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(1_000_000);
+    trackTeamViewed(42, 7);
+
+    nowSpy.mockReturnValue(1_000_000 + 5 * 60 * 1000 + 1);
+    trackTeamViewed(42, 7);
+
+    expect(window.gtag).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not de-dupe across different (teamId, leagueId) tuples', () => {
+    trackTeamViewed(42, 7);
+    trackTeamViewed(43, 7);
+    trackTeamViewed(42, 8);
+
+    expect(window.gtag).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not throw when sessionStorage is unavailable', () => {
+    const getItemSpy = jest
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(() => {
+        throw new Error('SecurityError');
+      });
+
+    expect(() => trackTeamViewed(42, 7)).not.toThrow();
+    expect(window.gtag).toHaveBeenCalledTimes(1);
+
+    getItemSpy.mockRestore();
   });
 });

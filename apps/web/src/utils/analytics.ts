@@ -158,12 +158,45 @@ export function trackPlayerSelected(playerId: number, position: string): void {
   });
 }
 
+const TEAM_VIEWED_DEDUPE_KEY_PREFIX = 'analytics:team_viewed:';
+const TEAM_VIEWED_DEDUPE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
 /**
- * Track team roster view
+ * True when a `team_viewed` event for this (teamId, leagueId) tuple was
+ * already fired within the de-dupe window, and records this firing when it
+ * wasn't. Uses `sessionStorage` so the de-dupe survives unmount/remount from
+ * back-forward navigation, not just re-renders (LS-6050).
+ */
+function isTeamViewedDeduped(teamId: number, leagueId: number): boolean {
+  try {
+    if (typeof sessionStorage === 'undefined') return false;
+    const key = `${TEAM_VIEWED_DEDUPE_KEY_PREFIX}${teamId}:${leagueId}`;
+    const lastTracked = Number(sessionStorage.getItem(key));
+    if (
+      lastTracked &&
+      Date.now() - lastTracked < TEAM_VIEWED_DEDUPE_WINDOW_MS
+    ) {
+      return true;
+    }
+    sessionStorage.setItem(key, String(Date.now()));
+    return false;
+  } catch {
+    // sessionStorage can throw in private-browsing / quota-exceeded modes.
+    // De-duping is best-effort, so fall back to always tracking.
+    return false;
+  }
+}
+
+/**
+ * Track team roster view. De-duped to fire once per (teamId, leagueId) tuple
+ * per 5-minute window, so navigating back and forth between teams doesn't
+ * inflate the view count (LS-6050).
  * @param teamId - The team ID
  * @param leagueId - The league ID
  */
 export function trackTeamViewed(teamId: number, leagueId: number): void {
+  if (isTeamViewedDeduped(teamId, leagueId)) return;
+
   trackEvent('team_viewed', {
     team_id: teamId,
     league_id: leagueId,
