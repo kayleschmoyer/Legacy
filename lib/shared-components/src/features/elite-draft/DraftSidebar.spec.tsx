@@ -52,6 +52,9 @@ jest.mock('@tamagui/lucide-icons', () => ({
   Lock: () => null,
 }));
 jest.mock('../../utils/colors', () => ({
+  ...jest.requireActual<typeof import('../../utils/colors')>(
+    '../../utils/colors',
+  ),
   BRAND_NAVY_LIGHT: '#1A2A4A',
   withAlpha: (color: string, _alpha: number) => color,
 }));

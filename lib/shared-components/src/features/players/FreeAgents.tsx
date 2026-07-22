@@ -10,8 +10,12 @@ import {
   YStack,
 } from 'tamagui';
 import { Animated, Dimensions, FlatList } from '../../platform-components';
-import { Filter, Player, SportPosition, TrendingInfo } from '../../types';
+import { Filter, Player, TrendingInfo } from '../../types';
 import { SPORT_CONFIGS } from '../../config/sports';
+import {
+  getPositionColor as getCanonicalPositionColor,
+  POS_UTILITY,
+} from '../../utils/colors';
 import { PositionBadge } from '../../components/PositionBadge';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,21 +39,14 @@ export interface WaiverClaim {
 }
 
 // Utility functions
-const DEFAULT_POSITION_COLOR = '#6B7280';
-
-const getPositionColor = (position: SportPosition, sport: string): string => {
-  const colors = [
-    '#3B82F6',
-    '#10B981',
-    '#F59E0B',
-    '#EF4444',
-    '#8B5CF6',
-    '#F97316',
-  ];
-  const sportConfig = SPORT_CONFIGS[sport];
-  const index = sportConfig?.positions.indexOf(position) ?? -1;
-  return index >= 0 ? colors[index % colors.length] : DEFAULT_POSITION_COLOR;
-};
+//
+// `sport` is a loosely-typed string prop here (not the canonical `Sport`
+// union) — guard before delegating so an unexpected value falls back to the
+// canonical default instead of throwing.
+const getPositionColor = (position: string, sport: string): string =>
+  sport === 'baseball' || sport === 'football'
+    ? getCanonicalPositionColor(sport, position)
+    : POS_UTILITY;
 
 const getTrendingIcon = (trending: FreeAgentPlayer['trending']): string => {
   switch (trending.direction) {

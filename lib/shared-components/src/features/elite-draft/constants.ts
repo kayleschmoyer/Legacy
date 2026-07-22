@@ -2,43 +2,12 @@
 // Shared constants for EliteDraftBoard
 // ---------------------------------------------------------------------------
 
-import {
-  BRAND_GOLD,
-  BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
-  POS_DEF,
-  POS_FLEX,
-  POS_K,
-  POS_QB,
-  POS_RB,
-  POS_TE,
-  POS_WR,
-  type Sport,
-} from '../../utils/colors';
-
-export const POSITION_COLORS: Record<Sport, Record<string, string>> = {
-  baseball: {
-    C: BRAND_SEAM_RED, // seam red
-    '1B': '#B5651D', // warm amber
-    '2B': BRAND_GOLD, // heritage gold
-    '3B': '#2D6A4F', // forest green
-    SS: BRAND_NAVY_LIGHT, // navy blue
-    OF: '#64748B', // slate — replaces banned purple
-    P: '#4A708B', // steel blue — replaces banned cyan
-    SP: '#4A708B', // steel blue — replaces banned cyan
-    RP: '#2E7D6E', // forest teal
-    DH: '#8B2635', // burgundy
-  },
-  football: {
-    QB: POS_QB,
-    RB: POS_RB,
-    WR: POS_WR,
-    TE: POS_TE,
-    K: POS_K,
-    DEF: POS_DEF,
-    FLEX: POS_FLEX,
-  },
-};
+// LS-8578: POSITION_COLORS is re-exported from the canonical map — this file
+// used to maintain its own divergent copy (baseball colors differed from
+// canonical on every entry; football was missing DST/DL/LB/DB). The
+// canonical map was promoted onto this file's baseball palette, so this is
+// now a single source of truth, not a duplicate.
+export { POSITION_COLORS } from '../../utils/colors';
 
 export const TIMER_RADIUS = 50;
 export const TIMER_CIRCUMFERENCE = 2 * Math.PI * TIMER_RADIUS;

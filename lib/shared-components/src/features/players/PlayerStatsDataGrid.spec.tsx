@@ -1090,7 +1090,7 @@ describe('PlayerStatsDataGrid - Editorial reskin (LS-4615)', () => {
 
     const nameNode = screen.getByText('Player 1486');
     // The player cell wraps the name in a sticky XStack with a 1px left border
-    // colored by the player's position. POS_INFIELD = '#8B6F47' (rgb 139,111,71).
+    // colored by the player's position (1B -> POS_FIRST_BASE in utils/colors.ts).
     const stickyCell = findAncestor(
       nameNode,
       (n) => n.style.position === 'sticky',

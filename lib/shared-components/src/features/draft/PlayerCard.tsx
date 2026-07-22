@@ -1,6 +1,10 @@
 import React, { useCallback, useRef } from 'react';
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { Animated } from '../../platform-components';
+import {
+  getPositionColor as getCanonicalPositionColor,
+  POS_UTILITY,
+} from '../../utils/colors';
 import { PositionBadge } from '../../components/PositionBadge';
 
 // Types
@@ -37,30 +41,14 @@ export interface PlayerCardProps {
   hapticFeedback?: boolean;
 }
 
-// Utility function to get position colors
-const getPositionColor = (position: string, sport: string): string => {
-  const colorMaps: Record<string, Record<string, string>> = {
-    baseball: {
-      C: '#ef4444',
-      '1B': '#f97316',
-      '2B': '#eab308',
-      '3B': '#22c55e',
-      SS: '#06b6d4',
-      OF: '#3b82f6',
-      P: '#8b5cf6',
-    },
-    football: {
-      QB: '#ef4444',
-      RB: '#f97316',
-      WR: '#eab308',
-      TE: '#22c55e',
-      K: '#06b6d4',
-      DEF: '#8b5cf6',
-    },
-  };
-
-  return colorMaps[sport]?.[position] || '#6b7280';
-};
+// Position colors — delegates to the canonical sport+position map
+// (lib/shared-components/src/utils/colors.ts). `sport` also accepts
+// 'basketball' | 'hockey' per PlayerCardProps, which the canonical map
+// doesn't cover; those fall back to the canonical default.
+const getPositionColor = (position: string, sport: string): string =>
+  sport === 'baseball' || sport === 'football'
+    ? getCanonicalPositionColor(sport, position)
+    : POS_UTILITY;
 
 // Injury status colors
 const getInjuryColor = (injury?: string): string => {

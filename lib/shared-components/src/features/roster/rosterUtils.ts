@@ -59,7 +59,17 @@ export function isStatsLoading(status: string | null | undefined): boolean {
   return status === 'loading' || status === 'queued' || status === 'retry';
 }
 
-/** Returns Tamagui color tokens for a position badge. Uses only design-system tokens. */
+/**
+ * Returns Tamagui color tokens for a position badge. Uses only design-system tokens.
+ *
+ * LS-8578: intentionally NOT unified with the hex-based sport+position map in
+ * utils/colors.ts (POSITION_COLORS / getPositionColor). This system is
+ * Tamagui-theme-token based (not hex) and covers roster-specific slot types
+ * (LF/CF/RF/IF/XDH/UT/UTIL) that don't correspond 1:1 with the sport+position
+ * hex map's baseball keys (1B/2B/3B/SS/OF/etc.) — e.g. IF here spans four
+ * distinct hex-mapped positions, and XDH/UT/UTIL have no hex equivalent at
+ * all. Kept as a separate, purpose-built system by design.
+ */
 export function getPositionColors(position: string | null | undefined): {
   bg: string;
   text: string;

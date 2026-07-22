@@ -49,12 +49,24 @@ export const BRAND_GOLD_DARK = '#A68B3E';
  *  introduced by the sport-toggle initiative (ADR 0011). */
 export type Sport = 'baseball' | 'football';
 
-// Baseball position tokens.
-export const POS_PITCHER = '#C41E3A';
-export const POS_CATCHER = '#7C8794';
-export const POS_INFIELD = '#8B6F47';
-export const POS_OUTFIELD = '#2D6A4F';
+// Baseball position tokens (LS-8578: promoted from elite-draft's palette,
+// the authoritative source per product decision — canonical's prior muted
+// palette is retired).
+export const POS_CATCHER = BRAND_SEAM_RED;
+export const POS_FIRST_BASE = '#B5651D'; // warm amber
+export const POS_SECOND_BASE = BRAND_GOLD;
+export const POS_THIRD_BASE = '#2D6A4F'; // forest green
+export const POS_SHORTSTOP = BRAND_NAVY_LIGHT;
+export const POS_OUTFIELD = '#64748B'; // slate
+export const POS_PITCHER = '#4A708B'; // steel blue
+export const POS_STARTING_PITCHER = '#4A708B'; // steel blue
+export const POS_RELIEF_PITCHER = '#2E7D6E'; // forest teal
+export const POS_DESIGNATED_HITTER = '#8B2635'; // burgundy
 export const POS_UTILITY = '#C5A55A';
+/** Generic "infield" category color for position-group filters (e.g. an IF
+ *  filter tab covering 1B/2B/3B/SS) — distinct from the per-position hex
+ *  values in POSITION_COLORS, which now vary per infield position. */
+export const POS_INFIELD = '#8B6F47';
 
 // Football position tokens — mirrors the football theme block in the
 // Draft Board mockup (`draft.html` ~lines 2700–2846, ADR 0011 §3).
@@ -74,12 +86,15 @@ export const POS_DB = '#6B3FA0'; // deep purple (defensive backs)
 export const POSITION_COLORS: Record<Sport, Record<string, string>> = {
   baseball: {
     C: POS_CATCHER,
-    '1B': POS_INFIELD,
-    '2B': POS_INFIELD,
-    '3B': POS_INFIELD,
-    SS: POS_INFIELD,
+    '1B': POS_FIRST_BASE,
+    '2B': POS_SECOND_BASE,
+    '3B': POS_THIRD_BASE,
+    SS: POS_SHORTSTOP,
     OF: POS_OUTFIELD,
     P: POS_PITCHER,
+    SP: POS_STARTING_PITCHER,
+    RP: POS_RELIEF_PITCHER,
+    DH: POS_DESIGNATED_HITTER,
   },
   football: {
     QB: POS_QB,
