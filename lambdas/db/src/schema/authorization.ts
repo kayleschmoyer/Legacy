@@ -31,7 +31,7 @@
  *   - {@link verifyLeagueMembership}   – throws if the user is not a member of the league
  *   - {@link verifyCommissionerAccess} – throws unless the user is a commissioner/GM
  *   - {@link verifyTeamEditAccess}     – team General Manager OR commissioner; use for roster edits
- *   - {@link checkPlayersNotLocked}    – throws if any player has game selections
+ *   - {@link checkPlayersNotLocked}    – throws if the player's matchup has started
  */
 
 import {
@@ -39,7 +39,7 @@ import {
   PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, ne, or } from 'drizzle-orm';
 import type { Context } from './builder';
 import {
   AuthenticationError,
@@ -138,8 +138,8 @@ export interface AuthConfig<TArgs> {
 
   /**
    * When `true` (and `teamMembers` is also provided) the wrapper will call
-   * {@link checkPlayersNotLocked} to ensure none of the players already have
-   * game selections in the current matchup.
+   * {@link checkPlayersNotLocked} to ensure none of the players' teams are in
+   * a matchup that has already started for the current week.
    *
    * @default false
    */
@@ -552,12 +552,21 @@ export async function verifyTeamEditAccess(
 }
 
 /**
- * Checks whether any of the given team members have game selections in the
- * current matchup for their league.  A player with at least one row in
- * `matchup_player_games` for the active matchup week is considered "locked"
- * and must not be moved.
+ * Checks whether any of the given team members' matchup for the current
+ * week has already started. A player is "locked" once their team's matchup
+ * is no longer `scheduled` (i.e. `in_progress` or `completed`) — the same
+ * authoritative start signal `swapMatchupPlayerPositions` /
+ * `updateMatchupPlayerPosition` already enforce, driven by
+ * `autoSelectGames` / `advanceLeagueWeekInternal` flipping matchup status at
+ * game start.
  *
- * @throws Error when one or more players are locked.
+ * Previously this checked for the existence of `matchup_player_games` rows
+ * (stats-existence), which raced with the stats pipeline: a game could have
+ * started with no stats row written yet, letting a manager swap the player
+ * out after lock. Checking matchup status instead closes that window
+ * because the status flip does not depend on stats ingestion (LS-6031).
+ *
+ * @throws Error when one or more players' team is in a started matchup.
  */
 export async function checkPlayersNotLocked(
   db: PublicDb,
@@ -605,48 +614,38 @@ export async function checkPlayersNotLocked(
   );
   if (membersWithTeam.length === 0) return;
 
-  const playerIds = membersWithTeam.map((m) => m.playerId);
+  const teamIds = [...new Set(membersWithTeam.map((m) => m.teamId))];
 
-  const lockedRows = await db
-    .selectDistinct({
-      playerId: PublicSchema.matchupPlayers.playerId,
-      teamId: PublicSchema.matchupPlayers.teamId,
+  const startedMatchups = await db
+    .select({
+      team1Id: PublicSchema.matchups.team1Id,
+      team2Id: PublicSchema.matchups.team2Id,
     })
-    .from(PublicSchema.matchupPlayerGames)
-    .innerJoin(
-      PublicSchema.matchupPlayers,
-      eq(
-        PublicSchema.matchupPlayerGames.matchupPlayerId,
-        PublicSchema.matchupPlayers.id,
-      ),
-    )
-    .innerJoin(
-      PublicSchema.matchups,
-      eq(PublicSchema.matchupPlayers.matchupId, PublicSchema.matchups.id),
-    )
+    .from(PublicSchema.matchups)
     .where(
       and(
-        inArray(PublicSchema.matchupPlayers.playerId, playerIds),
         eq(PublicSchema.matchups.leagueId, leagueId),
         eq(PublicSchema.matchups.weekNumber, weekNumber),
+        ne(PublicSchema.matchups.status, 'scheduled'),
         or(
-          eq(PublicSchema.matchups.team1Id, PublicSchema.matchupPlayers.teamId),
-          eq(PublicSchema.matchups.team2Id, PublicSchema.matchupPlayers.teamId),
+          inArray(PublicSchema.matchups.team1Id, teamIds),
+          inArray(PublicSchema.matchups.team2Id, teamIds),
         ),
       ),
     );
 
-  if (lockedRows.length > 0) {
-    const lockedPairs = new Set(
-      lockedRows.map((r) => `${r.playerId}:${r.teamId}`),
+  if (startedMatchups.length === 0) return;
+
+  const lockedTeamIds = new Set<number>();
+  for (const m of startedMatchups) {
+    if (m.team1Id != null) lockedTeamIds.add(m.team1Id);
+    if (m.team2Id != null) lockedTeamIds.add(m.team2Id);
+  }
+
+  if (membersWithTeam.some((m) => lockedTeamIds.has(m.teamId))) {
+    throw UserInputError(
+      'Player is locked — the matchup for the current week has already started',
     );
-    if (
-      membersWithTeam.some((m) => lockedPairs.has(`${m.playerId}:${m.teamId}`))
-    ) {
-      throw UserInputError(
-        'Player is locked — game selections have already been made for the current matchup',
-      );
-    }
   }
 }
 
