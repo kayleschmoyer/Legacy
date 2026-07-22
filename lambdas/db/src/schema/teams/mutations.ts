@@ -1065,11 +1065,10 @@ builder.mutationField('updateTeamBranding', (t) =>
       const { permissionLevel, teamId: memberTeamId } = membership[0];
 
       const isCommissioner = permissionLevel === 'commissioner';
-      const isOwner = memberTeamId === teamId;
-      const isGM =
-        isOwner &&
-        (permissionLevel === 'general_manager' ||
-          permissionLevel === 'assistant_manager');
+      const isGM = isTeamGeneralManager(
+        { leagueId, userId, teamId: memberTeamId, permissionLevel },
+        teamId,
+      );
 
       if (!isCommissioner && !isGM) {
         throw new Error(

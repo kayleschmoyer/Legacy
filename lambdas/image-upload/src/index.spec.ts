@@ -441,7 +441,7 @@ describe('handler — team ownership authorization', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it('allows upload for assistant_manager permission', async () => {
+  it('returns 403 for assistant_manager permission (LS-6041: branding is GM-only)', async () => {
     mockRunWithPublicClient.mockImplementation(async (_opts, fn) => {
       const fakeDrizzle = {
         select: () => fakeDrizzle,
@@ -449,6 +449,22 @@ describe('handler — team ownership authorization', () => {
         innerJoin: () => fakeDrizzle,
         where: () => fakeDrizzle,
         limit: () => [{ teamId: 1, permissionLevel: 'assistant_manager' }],
+      };
+      return fn(fakeDrizzle as never);
+    });
+
+    const res = await handler(makeEvent(), MOCK_CONTEXT);
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('allows upload for general_manager permission', async () => {
+    mockRunWithPublicClient.mockImplementation(async (_opts, fn) => {
+      const fakeDrizzle = {
+        select: () => fakeDrizzle,
+        from: () => fakeDrizzle,
+        innerJoin: () => fakeDrizzle,
+        where: () => fakeDrizzle,
+        limit: () => [{ teamId: 1, permissionLevel: 'general_manager' }],
       };
       return fn(fakeDrizzle as never);
     });

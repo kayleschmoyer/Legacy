@@ -55,7 +55,8 @@ function jsonResponse(
 /**
  * Verify that the given user is authorized to upload images for the given team.
  * The user must be a league member whose assigned teamId matches AND whose
- * permission level is general_manager, assistant_manager, or commissioner.
+ * permission level is general_manager or commissioner. Team branding is
+ * GM/commissioner-only — assistant_manager is intentionally excluded (LS-6041).
  *
  * Throws if the user is not authorized.
  */
@@ -89,9 +90,7 @@ async function verifyTeamOwnership(
 
   const { permissionLevel } = rows[0];
   const isCommissioner = permissionLevel === 'commissioner';
-  const isGM =
-    permissionLevel === 'general_manager' ||
-    permissionLevel === 'assistant_manager';
+  const isGM = permissionLevel === 'general_manager';
 
   if (!isCommissioner && !isGM) {
     throw new Error(
