@@ -258,7 +258,7 @@ Prefer `make_run` MCP tool over running `make <target>` via Bash. The MCP tool e
 | `make lint-touch-map`                                                         | `make_run({ target: "lint-touch-map" })`                                                                                                                                                                                                                                                                                                                                                           |
 | `db_migration_status` → `db_migrate` → `make_run({ target: "pc" })` (3 steps) | `validate_pr({ worktreePath?, sanctionedChunks?, runPcInBackground?, startAtChunk? })` — semantic one-shot; checks migration status, applies if needed, then runs pc. Use `sanctionedChunks: true` in cloud sessions; each call is budgeted to ~45s and may return `{ pc: { status: "in_progress" } }` with resume instructions (`startAtChunk`, or `make_run_wait` on a still-running chunk job). |
 
-**Heavy targets are transport-safe by default (LS-8558).** Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every tool call. `make_run` (and the job-backed nx tools `nx_run`, `nx_run_affected`, `nx_run_e2e_specs`, `nx_install_package`) now always run the underlying process as a background job with a ~45s bounded wait: fast targets return their result in one call, and anything slower returns `{ status: "running", jobId }` instead of blocking into the transport timeout. Never re-invoke the tool while its job runs — poll instead:
+**Heavy targets are transport-safe by default (LS-8558, LS-8559).** Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every tool call. `make_run` (and the job-backed nx tools `nx_run`, `nx_run_affected`, `nx_run_e2e_specs`, `nx_install_package`), plus `worktree_run` / `worktree_run_all` on the worktree server, now always run the underlying process as a background job with a ~45s bounded wait: fast targets return their result in one call, and anything slower returns `{ status: "running", jobId }` instead of blocking into the transport timeout. Never re-invoke the tool while its job runs — poll instead:
 
 ```
 make_run({ target: "build-all" })   // fast → full result; slow → { jobId, status: "running" }
@@ -266,6 +266,9 @@ make_run_wait({ jobId })            // blocks ≤55s; re-call if it returns stat
 make_run_status({ jobId })          // non-blocking snapshot (status + log tail)
 // nx tools poll with nx_job_wait({ jobId }) / nx_job_status({ jobId }) instead
 // git-heavy github tools poll with github_job_wait({ jobId }) / github_job_status({ jobId }) instead
+// worktree tools poll with worktree_job_wait({ jobId }) / worktree_job_status({ jobId });
+// worktree_job_list recovers job handles after a server restart. worktree_run keeps its
+// 120s process cap — long-running work still belongs in nx_run_pc_chunk / make_run / nx_run.
 ```
 
 `make_run_wait` returns the full structured result (with `steps[]` for multi-step targets like `pre-commit`/`full-check`) once the job reaches `done`/`failed`; `nx_job_wait` likewise returns the originating tool's structured result (e.g. the playwright report for `nx_run_e2e_specs`). `runInBackground: true` still exists to skip the initial bounded wait and return the jobId immediately. (Validation routing is unchanged — see [Validation Routing](#validation-routing).)

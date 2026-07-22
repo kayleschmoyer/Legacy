@@ -33,6 +33,15 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import { scanStagedForConflictMarkers } from './conflict-markers';
 import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
+import {
+  type JobSnapshot,
+  listJobs,
+  MAX_WAIT_MS,
+  runJobWithBudget,
+  snapshotJob,
+  startJob,
+  waitForJob,
+} from './jobs';
 import { rebaseOntoMain } from './rebase-onto-main';
 import {
   type BranchEntry,
@@ -881,6 +890,179 @@ function applyTailLines(output: string, tailLines?: number): string {
   return `[... ${omitted} line${omitted === 1 ? '' : 's'} omitted — use tailLines=0 or omit to see full output ...]\n${tail}`;
 }
 
+// ---------------------------------------------------------------------------
+// Background-job result formatting (LS-8559)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sync budget for job-backed tools (worktree_run, worktree_run_all): work
+ * finishing within the budget returns its result inline; slower work returns
+ * { status: "running", jobId } to poll via worktree_job_wait, keeping every
+ * tool call well under the ~60s cloud MCP transport timeout (LS-8559).
+ */
+const JOB_SYNC_BUDGET_MS = 45_000;
+
+/** Process-level cap for worktree_run commands (pre-existing 120s ceiling). */
+const WORKTREE_RUN_TIMEOUT_MS = 120_000;
+
+type ToolResult = {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+};
+
+/** Cap generic job output at a sane size for transport. */
+function truncateChars(s: string, max = 10_000): string {
+  return s.length > max ? `…(truncated)\n${s.slice(-max)}` : s;
+}
+
+/**
+ * Rebuild the worktree_run result from a job snapshot — used both inline
+ * (within the sync budget) and when completion is observed later via
+ * worktree_job_wait / worktree_job_status, so both paths return the same
+ * shape the synchronous implementation used to produce.
+ */
+function formatWorktreeRunSnapshot(snapshot: JobSnapshot): ToolResult {
+  const meta = snapshot.meta ?? {};
+  const command =
+    typeof meta['command'] === 'string' ? meta['command'] : snapshot.label;
+  const tailLines =
+    typeof meta['tailLines'] === 'number' ? meta['tailLines'] : undefined;
+  const cwd = snapshot.cwd;
+
+  if (snapshot.status === 'done') {
+    const displayOutput = applyTailLines(snapshot.log ?? '', tailLines);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `[cwd: ${cwd}]\n$ ${command}\n\n${displayOutput}`,
+        },
+      ],
+    };
+  }
+
+  if (snapshot.status === 'failed') {
+    const rawOutput = snapshot.log ?? '';
+    // Surface a clear remediation hint when node_modules is missing/broken,
+    // instead of the confusing ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL cascade.
+    if (
+      rawOutput.includes('ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL') ||
+      rawOutput.includes('Command "nx" not found') ||
+      rawOutput.includes('Command "tsx" not found')
+    ) {
+      const nmExists = existsSync(join(cwd, 'node_modules'));
+      if (!nmExists) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                `[cwd: ${cwd}]\n$ ${command}\n\n` +
+                `node_modules is missing or broken in ${cwd}.\n` +
+                'Run `node scripts/modules-pool/link.mjs` from the worktree root to repair it, then retry.',
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    const output = applyTailLines(
+      rawOutput || (snapshot.error ?? ''),
+      tailLines,
+    );
+    const errorLine =
+      snapshot.exitCode === null && snapshot.error
+        ? `Error: ${snapshot.error}`
+        : `Error code/signal: ${snapshot.exitCode ?? 'unknown'}`;
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `[cwd: ${cwd}]\n$ ${command}\n\n${errorLine}\n${output}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // running / orphaned — structured snapshot with a re-arm hint.
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            jobId: snapshot.jobId,
+            status: snapshot.status,
+            command,
+            cwd,
+            elapsedSec: snapshot.elapsedSec,
+            logTail: truncateChars(snapshot.logTail ?? ''),
+            ...(snapshot.hint ? { hint: snapshot.hint } : {}),
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
+}
+
+/**
+ * Generic snapshot result for worktree_job_status / worktree_job_wait.
+ * worktree_run jobs are rebuilt via their dedicated formatter so deferred
+ * completion returns the same shape as the inline path.
+ */
+function formatJobSnapshotResult(snapshot: JobSnapshot): ToolResult {
+  if (
+    snapshot.meta?.['kind'] === 'worktree_run' &&
+    (snapshot.status === 'done' || snapshot.status === 'failed')
+  ) {
+    return formatWorktreeRunSnapshot(snapshot);
+  }
+
+  const body: Record<string, unknown> = {
+    jobId: snapshot.jobId,
+    status: snapshot.status,
+    label: snapshot.label,
+    cwd: snapshot.cwd,
+    elapsedSec: snapshot.elapsedSec,
+  };
+  if (snapshot.status === 'done' || snapshot.status === 'failed') {
+    body['passed'] = snapshot.status === 'done';
+    if (snapshot.error) body['error'] = snapshot.error;
+    body['output'] = truncateChars(snapshot.log ?? '');
+  } else {
+    body['logTail'] = truncateChars(snapshot.logTail ?? '');
+    if (snapshot.hint) body['hint'] = snapshot.hint;
+  }
+  return {
+    content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
+    ...(snapshot.status === 'failed' ? { isError: true } : {}),
+  };
+}
+
+function jobNotFound(jobId: string): ToolResult {
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            ok: false,
+            error: `Job "${jobId}" not found in the registry or on disk.`,
+            hint: 'Call worktree_job_list to see recent jobs, including jobs started by a previous server process.',
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+    isError: true,
+  };
+}
+
 /** Read ~/.netrc (or ~/_netrc on Windows) and check for a machine entry. */
 function checkNetrc(machine: string): boolean {
   const netrcName = process.platform === 'win32' ? '_netrc' : '.netrc';
@@ -1333,7 +1515,12 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         'worktree_is_tracked (git ls-files), worktree_check_ignore (git check-ignore), ' +
         'worktree_commit (git add + commit), worktree_push (git push), ' +
         'worktree_status (git status), worktree_diff (git diff), ' +
-        'worktree_reset (git reset), worktree_reflog (git reflog).',
+        'worktree_reset (git reset), worktree_reflog (git reflog). ' +
+        'Fast commands return their output in one call. A command still running after ~45s ' +
+        'returns { status: "running", jobId } instead of blocking into the ~60s MCP transport ' +
+        'timeout — call worktree_job_wait({ jobId }) to continue waiting; do NOT re-run the ' +
+        'command (LS-8559). A 120s process-level cap still applies — prefer nx_run_pc_chunk / ' +
+        'make_run / nx_run for long-running work (make pc, builds, installs).',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1348,9 +1535,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'integer',
             minimum: 0,
             description:
-              'Cap output to the last N lines. Use 0 for no truncation. A header showing the omitted line count is prepended. ' +
-              'NOTE: worktree_run executes synchronously with a 120s cap — do NOT route long-running work (make pc, builds, installs) through it; ' +
-              'use nx_run_pc_chunk / make_run / nx_run, which background slow work and return a pollable jobId (LS-8558).',
+              'Cap output to the last N lines. Use 0 for no truncation. A header showing the omitted line count is prepended.',
           },
         },
         required: ['command'],
@@ -1733,7 +1918,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       name: 'worktree_run_all',
       description:
         'Run a make target across all active worktrees and report pass/fail per worktree. ' +
-        'Useful for batch validation (e.g. format:write, lint, typecheck, pc) across all in-flight branches.',
+        'Useful for batch validation (e.g. format:write, lint, typecheck, pc) across all in-flight branches. ' +
+        'Each worktree runs as a background job: a batch finishing within ~45s returns the full ' +
+        'summary in one call; a longer batch returns { status: "running" } with per-worktree ' +
+        'jobIds — poll with worktree_job_wait({ jobId }) / worktree_job_status while the batch ' +
+        'continues in the background; do NOT re-run worktree_run_all (LS-8559).',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1763,6 +1952,58 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
         },
         required: ['command'],
+      },
+    },
+    {
+      name: 'worktree_job_status',
+      description:
+        'Cheap, instant snapshot of a background job started by worktree_run or ' +
+        'worktree_run_all. Returns { status, elapsedSec, logTail } while running (never an ' +
+        'error), or the final output once done. Use worktree_job_wait to block until completion.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          jobId: {
+            type: 'string',
+            description: 'Job ID returned by a { status: "running" } result',
+          },
+        },
+        required: ['jobId'],
+      },
+    },
+    {
+      name: 'worktree_job_wait',
+      description:
+        'Wait for a background job to finish, bounded at 55s per call (stays under the MCP ' +
+        'transport timeout). If the job is still running when the wait expires, returns a ' +
+        '{ status: "running" } snapshot with logTail — re-invoke to continue waiting. ' +
+        'Never re-run the underlying command while a job is in progress.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          jobId: {
+            type: 'string',
+            description: 'Job ID returned by a { status: "running" } result',
+          },
+          maxWaitMs: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 55_000,
+            description: 'Max wait per call in ms (default and cap: 55000)',
+          },
+        },
+        required: ['jobId'],
+      },
+    },
+    {
+      name: 'worktree_job_list',
+      description:
+        'List recent background jobs (newest first), including jobs started by a previous ' +
+        'MCP server process. Use after a session resume or lost tool result to recover a ' +
+        'job handle instead of re-running the command.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {},
       },
     },
     {
@@ -5598,99 +5839,40 @@ const handleCallTool = async (
         }
       }
 
-      try {
-        const shell =
-          process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
-        const isCmdShell =
-          process.platform === 'win32' &&
-          shell.toLowerCase().endsWith('cmd.exe');
-        const output = await new Promise<string>((resolve, reject) => {
-          const cb = (error: Error | null, stdout: string, stderr: string) => {
-            if (error) {
-              const e = error as Error & {
-                stdout?: string;
-                stderr?: string;
-              };
-              e.stdout = stdout;
-              e.stderr = stderr;
-              reject(e);
-            } else {
-              resolve(stdout);
-            }
-          };
-          const opts = {
-            cwd: targetDir,
-            encoding: 'utf-8' as const,
-            timeout: 120_000,
-            maxBuffer: 10 * 1024 * 1024,
-            // Suppress the console window the cmd.exe/bash shell would otherwise
-            // flash on Windows (this server runs as a hidden stdio MCP child).
-            windowsHide: true,
-          };
-          if (isCmdShell) {
-            // Use execFile with explicit /d /s /c args so cmd.exe handling is
-            // consistent with the git-bash branch — no implicit shell wrapping.
-            execFile(shell, ['/d', '/s', '/c', command], opts, cb);
-          } else {
-            execFile(shell, ['-c', command], opts, cb);
-          }
-        });
+      // Run through the background-job registry with a bounded sync budget:
+      // fast commands return their full result inline exactly as before; a
+      // command still running after JOB_SYNC_BUDGET_MS returns
+      // { status: "running", jobId } to poll via worktree_job_wait instead of
+      // blocking into the ~60s cloud MCP transport timeout (LS-8559). The
+      // pre-existing 120s process-level cap still applies to the command.
+      const shell =
+        process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
+      const isCmdShell =
+        process.platform === 'win32' && shell.toLowerCase().endsWith('cmd.exe');
+      // cmd.exe gets explicit /d /s /c args so its handling is consistent with
+      // the git-bash branch — no implicit shell wrapping. stdout/stderr are
+      // merged into the job log (the log keeps growing even if this MCP server
+      // restarts while the command runs).
+      const shellArgs = isCmdShell
+        ? ['/d', '/s', '/c', command]
+        : ['-c', command];
 
-        const displayOutput = applyTailLines(output, tailLines);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `[cwd: ${targetDir}]\n$ ${command}\n\n${displayOutput}`,
-            },
-          ],
-        };
-      } catch (err: unknown) {
-        const e = err as {
-          stdout?: string;
-          stderr?: string;
-          code?: number | string | null;
-          signal?: string | null;
-        };
-        const rawOutput =
-          [e.stdout, e.stderr].filter(Boolean).join('\n') ||
-          (err instanceof Error ? err.message : String(err));
-
-        // Surface a clear remediation hint when node_modules is missing/broken,
-        // instead of the confusing ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL cascade.
-        if (
-          rawOutput.includes('ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL') ||
-          rawOutput.includes('Command "nx" not found') ||
-          rawOutput.includes('Command "tsx" not found')
-        ) {
-          const nmExists = existsSync(join(targetDir, 'node_modules'));
-          if (!nmExists) {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text:
-                    `[cwd: ${targetDir}]\n$ ${command}\n\n` +
-                    `node_modules is missing or broken in ${targetDir}.\n` +
-                    'Run `node scripts/modules-pool/link.mjs` from the worktree root to repair it, then retry.',
-                },
-              ],
-              isError: true,
-            };
-          }
-        }
-
-        const output = applyTailLines(rawOutput, tailLines);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `[cwd: ${targetDir}]\n$ ${command}\n\nError code/signal: ${e.code ?? 'unknown'}${e.signal ? ` (signal: ${e.signal})` : ''}\n${output}`,
-            },
-          ],
-          isError: true,
-        };
-      }
+      const snapshot = await runJobWithBudget(
+        {
+          command: shell,
+          args: shellArgs,
+          cwd: targetDir,
+          label: command.length > 80 ? `${command.slice(0, 77)}...` : command,
+          timeoutMs: WORKTREE_RUN_TIMEOUT_MS,
+          meta: {
+            kind: 'worktree_run',
+            command,
+            ...(tailLines !== undefined ? { tailLines } : {}),
+          },
+        },
+        JOB_SYNC_BUDGET_MS,
+      );
+      return formatWorktreeRunSnapshot(snapshot);
     }
 
     // -----------------------------------------------------------------------
@@ -8091,103 +8273,144 @@ const handleCallTool = async (
           TARGET_TIMEOUT_DEFAULTS[command] ??
           DEFAULT_TIMEOUT_S) * 1000;
 
-      interface RunResult {
-        key: string;
-        path: string;
-        branch: string | null;
-        passed: boolean;
-        stdout: string;
-        stderr: string;
-        durationMs: number;
+      // Each per-worktree `make <target>` runs as a background job (LS-8559):
+      // the batch gets a bounded sync budget, and if it is still going when
+      // the budget expires the tool returns per-worktree jobIds to poll via
+      // worktree_job_wait / worktree_job_status instead of blocking into the
+      // ~60s cloud MCP transport timeout. The in-process orchestrator keeps
+      // launching queued worktrees as slots free up.
+      // Defense-in-depth: the ALLOWED_TARGETS check above already constrains
+      // the target, but the Windows branch below interpolates it into a
+      // PowerShell command string — re-assert at the spawn site that it can
+      // never carry shell metacharacters, so the whitelist and this guard
+      // must BOTH be broken before interpolation becomes reachable.
+      if (!/^[a-z][a-z0-9:_-]*$/i.test(command)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Refused: target "${command}" contains unsupported characters.`,
+            },
+          ],
+          isError: true,
+        };
       }
 
-      const runInWorktree = (wt: WorktreeInfo): Promise<RunResult> => {
-        const start = Date.now();
-        return new Promise<RunResult>((res) => {
-          execFile(
-            'make',
-            [command],
-            {
-              cwd: wt.path,
-              encoding: 'utf-8',
-              timeout: resolvedTimeoutMs,
-              maxBuffer: 10 * 1024 * 1024,
-              env: { ...process.env },
-              shell:
-                process.platform === 'win32' ? 'powershell.exe' : undefined,
-              // Hide the powershell.exe console window on Windows (hidden stdio
-              // MCP child — without this each `make` run flashes a window).
-              windowsHide: true,
-            },
-            (error, stdout, stderr) => {
-              const durationMs = Date.now() - start;
-              const MAX_OUTPUT = 2000;
-              const trimOutput = (s: string): string =>
-                s.length > MAX_OUTPUT
-                  ? `…(truncated)\n${s.slice(-MAX_OUTPUT)}`
-                  : s;
-
-              // Append ExecException details when the process fails
-              let stderrOut = stderr ?? '';
-              if (error) {
-                const details: string[] = [];
-                if (error.message) details.push(`message: ${error.message}`);
-                if (error.code !== undefined)
-                  details.push(`code: ${String(error.code)}`);
-                if (error.signal) details.push(`signal: ${error.signal}`);
-                if (details.length > 0) {
-                  stderrOut += `\n[ExecException] ${details.join(', ')}`;
-                }
-              }
-
-              res({
-                key: wt.key,
-                path: wt.path,
-                branch: wt.branch,
-                passed: error === null,
-                stdout: trimOutput(stdout ?? ''),
-                stderr: trimOutput(stderrOut),
-                durationMs,
-              });
-            },
-          );
+      const startJobFor = (wt: WorktreeInfo): string => {
+        // Preserve the pre-jobs execution shape: Windows ran `make <target>`
+        // through powershell.exe (exec's custom-shell path built
+        // `powershell.exe -c "make <target>"`); POSIX ran make directly.
+        const isWin = process.platform === 'win32';
+        const { jobId } = startJob({
+          command: isWin ? 'powershell.exe' : 'make',
+          args: isWin ? ['-c', `make ${command}`] : [command],
+          cwd: wt.path,
+          label: `${wt.key}: make ${command}`,
+          timeoutMs: resolvedTimeoutMs,
+          meta: { kind: 'worktree_run_all', key: wt.key, target: command },
         });
+        return jobId;
       };
 
-      let results: RunResult[];
-      if (parallel) {
-        // Semaphore-based concurrency limiter
-        const limit = Math.max(1, maxConcurrency);
+      interface BatchEntry {
+        key: string;
+        branch: string | null;
+        jobId: string | null;
+      }
+      const entries: BatchEntry[] = worktrees.map((wt) => ({
+        key: wt.key,
+        branch: wt.branch,
+        jobId: null,
+      }));
+
+      // Semaphore-based launcher: sequential mode is concurrency 1. Runs to
+      // completion in this server process even after the tool call returns.
+      const limit = parallel ? Math.max(1, maxConcurrency) : 1;
+      const waitTerminal = async (jobId: string): Promise<void> => {
+        for (;;) {
+          const snap = await waitForJob(jobId);
+          if (!snap || snap.status !== 'running') return;
+        }
+      };
+      const allDone = new Promise<void>((resolveAll) => {
         let active = 0;
         let idx = 0;
-        results = new Array<RunResult>(worktrees.length);
-        await new Promise<void>((resolveAll) => {
-          const next = (): void => {
-            if (idx >= worktrees.length && active === 0) {
-              resolveAll();
-              return;
+        const next = (): void => {
+          if (idx >= entries.length && active === 0) {
+            resolveAll();
+            return;
+          }
+          while (active < limit && idx < entries.length) {
+            const i = idx++;
+            active++;
+            entries[i].jobId = startJobFor(worktrees[i]);
+            void waitTerminal(entries[i].jobId).then(() => {
+              active--;
+              next();
+            });
+          }
+        };
+        next();
+      });
+
+      const finishedInBudget = await Promise.race([
+        allDone.then(() => true),
+        new Promise<boolean>((r) =>
+          setTimeout(() => r(false), JOB_SYNC_BUDGET_MS),
+        ),
+      ]);
+
+      if (!finishedInBudget) {
+        // Batch continues in the background — hand back pollable jobIds.
+        const running = {
+          status: 'running',
+          command: `make ${command}`,
+          mode: parallel ? 'parallel' : 'sequential',
+          total: entries.length,
+          results: entries.map((e) => {
+            if (!e.jobId) {
+              return { key: e.key, branch: e.branch, status: 'queued' };
             }
-            while (active < limit && idx < worktrees.length) {
-              const i = idx++;
-              active++;
-              void runInWorktree(worktrees[i]).then((result) => {
-                results[i] = result;
-                active--;
-                next();
-              });
-            }
-          };
-          next();
-        });
-      } else {
-        results = [];
-        for (const wt of worktrees) {
-          results.push(await runInWorktree(wt));
-        }
+            const snap = snapshotJob(e.jobId);
+            return {
+              key: e.key,
+              branch: e.branch,
+              jobId: e.jobId,
+              status: snap?.status ?? 'running',
+            };
+          }),
+          hint:
+            'The batch keeps running in this MCP server process. Poll running jobs with ' +
+            'worktree_job_wait({ jobId }) (bounded at 55s per call) or worktree_job_status; ' +
+            'queued worktrees start automatically as slots free up (find their jobIds via ' +
+            'worktree_job_list). Do NOT re-run worktree_run_all while the batch is in ' +
+            'progress. If this MCP server restarts, queued (not yet started) worktrees are ' +
+            'abandoned — re-run with a filter for the missing worktrees.',
+        };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(running, null, 2) }],
+        };
       }
 
+      const MAX_OUTPUT = 2000;
+      const trimOutput = (s: string): string =>
+        s.length > MAX_OUTPUT ? `…(truncated)\n${s.slice(-MAX_OUTPUT)}` : s;
+
+      const results = entries.map((e) => {
+        const snap = e.jobId ? snapshotJob(e.jobId) : null;
+        return {
+          key: e.key,
+          branch: e.branch,
+          jobId: e.jobId,
+          passed: snap?.status === 'done',
+          elapsedSec: snap?.elapsedSec ?? 0,
+          ...(snap?.error ? { error: snap.error } : {}),
+          output: trimOutput(snap?.log ?? ''),
+        };
+      });
+
       const passed = results.filter((r) => r.passed).length;
-      const failed = results.filter((r) => !r.passed).length;
+      const failed = results.length - passed;
 
       const summary = {
         command: `make ${command}`,
@@ -8195,19 +8418,72 @@ const handleCallTool = async (
         total: results.length,
         passed,
         failed,
-        results: results.map((r) => ({
-          key: r.key,
-          branch: r.branch,
-          passed: r.passed,
-          durationMs: r.durationMs,
-          stdout: r.stdout,
-          stderr: r.stderr,
-        })),
+        results,
       };
 
       return {
         content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
         isError: failed > 0,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_job_status
+    // -----------------------------------------------------------------------
+    case 'worktree_job_status': {
+      const { jobId } = args as { jobId?: string };
+      if (!jobId || typeof jobId !== 'string') {
+        return {
+          content: [{ type: 'text', text: 'jobId is required' }],
+          isError: true,
+        };
+      }
+      const snapshot = snapshotJob(jobId);
+      if (!snapshot) return jobNotFound(jobId);
+      return formatJobSnapshotResult(snapshot);
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_job_wait
+    // -----------------------------------------------------------------------
+    case 'worktree_job_wait': {
+      const { jobId, maxWaitMs } = args as {
+        jobId?: string;
+        maxWaitMs?: number;
+      };
+      if (!jobId || typeof jobId !== 'string') {
+        return {
+          content: [{ type: 'text', text: 'jobId is required' }],
+          isError: true,
+        };
+      }
+      if (
+        maxWaitMs !== undefined &&
+        (!Number.isInteger(maxWaitMs) || maxWaitMs <= 0)
+      ) {
+        return {
+          content: [
+            { type: 'text', text: 'maxWaitMs must be a positive integer' },
+          ],
+          isError: true,
+        };
+      }
+      const snapshot = await waitForJob(jobId, maxWaitMs ?? MAX_WAIT_MS);
+      if (!snapshot) return jobNotFound(jobId);
+      return formatJobSnapshotResult(snapshot);
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_job_list
+    // -----------------------------------------------------------------------
+    case 'worktree_job_list': {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ jobs: listJobs() }, null, 2),
+          },
+        ],
       };
     }
 
