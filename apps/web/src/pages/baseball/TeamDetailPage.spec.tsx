@@ -30,6 +30,11 @@ jest.mock('../../lib/csrf', () => ({
   getCsrfToken: jest.fn(() => 'test-token'),
 }));
 
+let mockIsPremium = false;
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremium: () => mockIsPremium,
+}));
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 jest.mock('../../components/PageMeta', () => ({
@@ -160,8 +165,12 @@ jest.mock('tamagui', () => {
     Separator: () => <hr />,
     Spinner: () => <span data-testid="spinner" />,
     Text: ({ children }: any) => <span>{children}</span>,
-    XStack: ({ children }: any) => <div>{children}</div>,
-    YStack: ({ children }: any) => <div>{children}</div>,
+    XStack: ({ children, testID }: any) => (
+      <div {...(testID ? { 'data-testid': testID } : {})}>{children}</div>
+    ),
+    YStack: ({ children, testID }: any) => (
+      <div {...(testID ? { 'data-testid': testID } : {})}>{children}</div>
+    ),
   };
 });
 
@@ -174,6 +183,7 @@ jest.mock('@tamagui/lucide-icons', () => ({
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 jest.mock('../../constants/colors', () => ({
+  BRAND_GOLD: '#C5A55A',
   BRAND_GOLD_LIGHT: '#C5A55A',
   BRAND_NAVY: '#0A0F1A',
   BRAND_NAVY_DARK: '#0D1526',
@@ -189,6 +199,7 @@ describe('TeamDetailPage – clear branding confirmation (LS-4063)', () => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
     mockRefetchTeams.mockResolvedValue({});
+    mockIsPremium = false;
   });
 
   // ── Logo ──────────────────────────────────────────────────────────────────
@@ -316,5 +327,60 @@ describe('TeamDetailPage – lineup editor (LS-5360)', () => {
 
     const board = screen.getByTestId('roster-board');
     expect(board).toHaveAttribute('data-read-only', 'true');
+  });
+});
+
+// ── Premium badge (LS-6054) ──────────────────────────────────────────────────
+
+describe('TeamDetailPage – Premium badge (LS-6054)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+    mockIsPremium = false;
+
+    // A prior describe block may have overridden this mock's return value
+    // (jest.clearAllMocks() clears calls but not mockReturnValue overrides).
+    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetUserTeamIdQuery.mockReturnValue({
+      data: { userTeamId: 1 },
+      loading: false,
+      error: undefined,
+    });
+  });
+
+  it('shows a Premium badge for a premium GM viewing their own team', () => {
+    mockIsPremium = true;
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByTestId('team-premium-badge')).toBeInTheDocument();
+    expect(screen.getByText('Premium')).toBeInTheDocument();
+  });
+
+  it('hides the Premium badge for a non-premium GM', () => {
+    mockIsPremium = false;
+
+    render(<TeamDetailPage />);
+
+    expect(screen.queryByTestId('team-premium-badge')).not.toBeInTheDocument();
+  });
+
+  it("hides the Premium badge for a premium visitor viewing another GM's team", () => {
+    mockIsPremium = true;
+    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetUserTeamIdQuery.mockReturnValue({
+      data: { userTeamId: 999 },
+      loading: false,
+      error: undefined,
+    });
+
+    render(<TeamDetailPage />);
+
+    expect(screen.queryByTestId('team-premium-badge')).not.toBeInTheDocument();
   });
 });

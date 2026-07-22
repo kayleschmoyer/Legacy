@@ -30,6 +30,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { PageMeta } from '../../components/PageMeta';
 import { TeamAssistantManagerSettings } from '../../features/baseball/TeamAssistantManagerSettings';
 import {
+  BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_DARK,
@@ -40,6 +41,7 @@ import {
 import { getCsrfToken } from '../../lib/csrf';
 import { trackTeamViewed } from '../../utils/analytics';
 import { env } from '../../config/environment';
+import { useIsPremium } from '../../hooks/useIsPremium';
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -222,6 +224,8 @@ export function TeamDetailPage() {
     isOwner &&
     (userPermissionLevel === 'owner' ||
       userPermissionLevel === 'general_manager');
+
+  const isPremium = useIsPremium();
 
   const loading =
     membersLoading ||
@@ -553,9 +557,32 @@ export function TeamDetailPage() {
 
         {/* Name + visitor note */}
         <YStack gap="$1" flex={1}>
-          <Text fontSize="$8" fontWeight="bold" $sm={{ fontSize: '$6' }}>
-            {team?.name || 'Team'}
-          </Text>
+          <XStack gap="$2" alignItems="center" flexWrap="wrap">
+            <Text fontSize="$8" fontWeight="bold" $sm={{ fontSize: '$6' }}>
+              {team?.name || 'Team'}
+            </Text>
+            {isOwner && isPremium && (
+              <XStack
+                testID="team-premium-badge"
+                backgroundColor={withAlpha(BRAND_GOLD, 0.16)}
+                borderWidth={1}
+                borderColor={withAlpha(BRAND_GOLD, 0.4)}
+                borderRadius={9999}
+                paddingVertical={2}
+                paddingHorizontal={8}
+              >
+                <Text
+                  fontWeight="700"
+                  fontSize={10}
+                  letterSpacing={1.4}
+                  textTransform="uppercase"
+                  color={BRAND_GOLD_LIGHT}
+                >
+                  Premium
+                </Text>
+              </XStack>
+            )}
+          </XStack>
           {leagueId && (
             <Text fontSize="$3" color="$gray11">
               League ID: {leagueId}
