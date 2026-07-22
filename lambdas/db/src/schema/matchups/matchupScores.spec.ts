@@ -18,6 +18,9 @@ jest.mock('../builder', () => ({
     })),
     unionType: jest.fn(),
     queryField: jest.fn(),
+    // football.ts registers SosTierEnum at module load (LS-8044); this spec
+    // pulls it in transitively via matchupScores.ts, so the mock needs it too.
+    enumType: jest.fn(),
   },
 }));
 

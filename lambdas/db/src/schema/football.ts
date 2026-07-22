@@ -1919,189 +1919,218 @@ function isStatCategory(c: string): c is FootballStatCategory {
   return (FOOTBALL_STAT_CATEGORIES as readonly string[]).includes(c);
 }
 
-const CATEGORY_TABLES = {
-  passing: PublicSchema.careerFootballPassing,
-  rushing: PublicSchema.careerFootballRushing,
-  receiving: PublicSchema.careerFootballReceiving,
-  kicking: PublicSchema.careerFootballKicking,
-  idp: PublicSchema.careerFootballDefenseIdp,
-  defense: PublicSchema.careerFootballDefense,
-} as const;
+// Lazily built (LS-8588): these dereference PublicSchema.careerFootball*
+// columns, which throws if evaluated eagerly against a test's partial
+// `jest.doMock('@legacy-sports/db-client', ...)` PublicSchema stub. Deferring
+// construction to first resolver use means only specs that actually exercise
+// the footballPlayers category/sort args need a complete PublicSchema mock.
+function buildCategoryTables() {
+  return {
+    passing: PublicSchema.careerFootballPassing,
+    rushing: PublicSchema.careerFootballRushing,
+    receiving: PublicSchema.careerFootballReceiving,
+    kicking: PublicSchema.careerFootballKicking,
+    idp: PublicSchema.careerFootballDefenseIdp,
+    defense: PublicSchema.careerFootballDefense,
+  } as const;
+}
+let categoryTablesCache: ReturnType<typeof buildCategoryTables> | null = null;
+function getCategoryTables() {
+  categoryTablesCache ??= buildCategoryTables();
+  return categoryTablesCache;
+}
 
 // Namespaced stat sort keys (`<category>.<field>`) → the sortable expression on
 // the joined career table. A stat sort is only valid alongside its matching
 // `category` arg, so the expression's table is always joined. `kicking.fgPct`
 // is computed in SQL (ratio, order-equivalent to the rounded percentage the
 // FootballCareerKicking.fgPct field exposes — LS-6244).
-const FOOTBALL_STAT_SORTS: Record<
+function buildFootballStatSorts(): Record<
   string,
   { category: FootballStatCategory; expr: SQL | AnyPgColumn }
-> = {
-  'passing.g': {
-    category: 'passing',
-    expr: PublicSchema.careerFootballPassing.g,
-  },
-  'passing.cmp': {
-    category: 'passing',
-    expr: PublicSchema.careerFootballPassing.cmp,
-  },
-  'passing.att': {
-    category: 'passing',
-    expr: PublicSchema.careerFootballPassing.att,
-  },
-  'passing.yds': {
-    category: 'passing',
-    expr: PublicSchema.careerFootballPassing.yds,
-  },
-  'passing.td': {
-    category: 'passing',
-    expr: PublicSchema.careerFootballPassing.td,
-  },
-  'passing.int': {
-    category: 'passing',
-    expr: PublicSchema.careerFootballPassing.int,
-  },
-  'passing.rating': {
-    category: 'passing',
-    expr: PublicSchema.careerFootballPassing.rating,
-  },
-  'rushing.g': {
-    category: 'rushing',
-    expr: PublicSchema.careerFootballRushing.g,
-  },
-  'rushing.att': {
-    category: 'rushing',
-    expr: PublicSchema.careerFootballRushing.att,
-  },
-  'rushing.yds': {
-    category: 'rushing',
-    expr: PublicSchema.careerFootballRushing.yds,
-  },
-  'rushing.td': {
-    category: 'rushing',
-    expr: PublicSchema.careerFootballRushing.td,
-  },
-  'rushing.lng': {
-    category: 'rushing',
-    expr: PublicSchema.careerFootballRushing.lng,
-  },
-  'rushing.fumbles': {
-    category: 'rushing',
-    expr: PublicSchema.careerFootballRushing.fumbles,
-  },
-  'receiving.g': {
-    category: 'receiving',
-    expr: PublicSchema.careerFootballReceiving.g,
-  },
-  'receiving.rec': {
-    category: 'receiving',
-    expr: PublicSchema.careerFootballReceiving.rec,
-  },
-  'receiving.tgt': {
-    category: 'receiving',
-    expr: PublicSchema.careerFootballReceiving.tgt,
-  },
-  'receiving.yds': {
-    category: 'receiving',
-    expr: PublicSchema.careerFootballReceiving.yds,
-  },
-  'receiving.td': {
-    category: 'receiving',
-    expr: PublicSchema.careerFootballReceiving.td,
-  },
-  'receiving.lng': {
-    category: 'receiving',
-    expr: PublicSchema.careerFootballReceiving.lng,
-  },
-  'kicking.g': {
-    category: 'kicking',
-    expr: PublicSchema.careerFootballKicking.g,
-  },
-  'kicking.fgm': {
-    category: 'kicking',
-    expr: PublicSchema.careerFootballKicking.fgm,
-  },
-  'kicking.fga': {
-    category: 'kicking',
-    expr: PublicSchema.careerFootballKicking.fga,
-  },
-  'kicking.fgPct': {
-    category: 'kicking',
-    expr: sql`(${PublicSchema.careerFootballKicking.fgm}::float / NULLIF(${PublicSchema.careerFootballKicking.fga}, 0))`,
-  },
-  'kicking.xpm': {
-    category: 'kicking',
-    expr: PublicSchema.careerFootballKicking.xpm,
-  },
-  'kicking.xpa': {
-    category: 'kicking',
-    expr: PublicSchema.careerFootballKicking.xpa,
-  },
-  'kicking.lng': {
-    category: 'kicking',
-    expr: PublicSchema.careerFootballKicking.lng,
-  },
-  'idp.g': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.g },
-  'idp.soloTkl': {
-    category: 'idp',
-    expr: PublicSchema.careerFootballDefenseIdp.soloTkl,
-  },
-  'idp.astTkl': {
-    category: 'idp',
-    expr: PublicSchema.careerFootballDefenseIdp.astTkl,
-  },
-  'idp.totalTkl': {
-    category: 'idp',
-    expr: PublicSchema.careerFootballDefenseIdp.totalTkl,
-  },
-  'idp.sacks': {
-    category: 'idp',
-    expr: PublicSchema.careerFootballDefenseIdp.sacks,
-  },
-  'idp.int': {
-    category: 'idp',
-    expr: PublicSchema.careerFootballDefenseIdp.int,
-  },
-  'idp.pd': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.pd },
-  'idp.ff': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.ff },
-  'idp.fr': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.fr },
-  'idp.defTd': {
-    category: 'idp',
-    expr: PublicSchema.careerFootballDefenseIdp.defTd,
-  },
-  'defense.g': {
-    category: 'defense',
-    expr: PublicSchema.careerFootballDefense.g,
-  },
-  'defense.sacks': {
-    category: 'defense',
-    expr: PublicSchema.careerFootballDefense.sacks,
-  },
-  'defense.int': {
-    category: 'defense',
-    expr: PublicSchema.careerFootballDefense.int,
-  },
-  'defense.fumRec': {
-    category: 'defense',
-    expr: PublicSchema.careerFootballDefense.fumRec,
-  },
-  'defense.defTd': {
-    category: 'defense',
-    expr: PublicSchema.careerFootballDefense.defTd,
-  },
-  'defense.safeties': {
-    category: 'defense',
-    expr: PublicSchema.careerFootballDefense.safeties,
-  },
-  'defense.ptsAllowedPerG': {
-    category: 'defense',
-    expr: PublicSchema.careerFootballDefense.ptsAllowedPerG,
-  },
-  'defense.ydsAllowedPerG': {
-    category: 'defense',
-    expr: PublicSchema.careerFootballDefense.ydsAllowedPerG,
-  },
-};
+> {
+  return {
+    'passing.g': {
+      category: 'passing',
+      expr: PublicSchema.careerFootballPassing.g,
+    },
+    'passing.cmp': {
+      category: 'passing',
+      expr: PublicSchema.careerFootballPassing.cmp,
+    },
+    'passing.att': {
+      category: 'passing',
+      expr: PublicSchema.careerFootballPassing.att,
+    },
+    'passing.yds': {
+      category: 'passing',
+      expr: PublicSchema.careerFootballPassing.yds,
+    },
+    'passing.td': {
+      category: 'passing',
+      expr: PublicSchema.careerFootballPassing.td,
+    },
+    'passing.int': {
+      category: 'passing',
+      expr: PublicSchema.careerFootballPassing.int,
+    },
+    'passing.rating': {
+      category: 'passing',
+      expr: PublicSchema.careerFootballPassing.rating,
+    },
+    'rushing.g': {
+      category: 'rushing',
+      expr: PublicSchema.careerFootballRushing.g,
+    },
+    'rushing.att': {
+      category: 'rushing',
+      expr: PublicSchema.careerFootballRushing.att,
+    },
+    'rushing.yds': {
+      category: 'rushing',
+      expr: PublicSchema.careerFootballRushing.yds,
+    },
+    'rushing.td': {
+      category: 'rushing',
+      expr: PublicSchema.careerFootballRushing.td,
+    },
+    'rushing.lng': {
+      category: 'rushing',
+      expr: PublicSchema.careerFootballRushing.lng,
+    },
+    'rushing.fumbles': {
+      category: 'rushing',
+      expr: PublicSchema.careerFootballRushing.fumbles,
+    },
+    'receiving.g': {
+      category: 'receiving',
+      expr: PublicSchema.careerFootballReceiving.g,
+    },
+    'receiving.rec': {
+      category: 'receiving',
+      expr: PublicSchema.careerFootballReceiving.rec,
+    },
+    'receiving.tgt': {
+      category: 'receiving',
+      expr: PublicSchema.careerFootballReceiving.tgt,
+    },
+    'receiving.yds': {
+      category: 'receiving',
+      expr: PublicSchema.careerFootballReceiving.yds,
+    },
+    'receiving.td': {
+      category: 'receiving',
+      expr: PublicSchema.careerFootballReceiving.td,
+    },
+    'receiving.lng': {
+      category: 'receiving',
+      expr: PublicSchema.careerFootballReceiving.lng,
+    },
+    'kicking.g': {
+      category: 'kicking',
+      expr: PublicSchema.careerFootballKicking.g,
+    },
+    'kicking.fgm': {
+      category: 'kicking',
+      expr: PublicSchema.careerFootballKicking.fgm,
+    },
+    'kicking.fga': {
+      category: 'kicking',
+      expr: PublicSchema.careerFootballKicking.fga,
+    },
+    'kicking.fgPct': {
+      category: 'kicking',
+      expr: sql`(${PublicSchema.careerFootballKicking.fgm}::float / NULLIF(${PublicSchema.careerFootballKicking.fga}, 0))`,
+    },
+    'kicking.xpm': {
+      category: 'kicking',
+      expr: PublicSchema.careerFootballKicking.xpm,
+    },
+    'kicking.xpa': {
+      category: 'kicking',
+      expr: PublicSchema.careerFootballKicking.xpa,
+    },
+    'kicking.lng': {
+      category: 'kicking',
+      expr: PublicSchema.careerFootballKicking.lng,
+    },
+    'idp.g': { category: 'idp', expr: PublicSchema.careerFootballDefenseIdp.g },
+    'idp.soloTkl': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.soloTkl,
+    },
+    'idp.astTkl': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.astTkl,
+    },
+    'idp.totalTkl': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.totalTkl,
+    },
+    'idp.sacks': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.sacks,
+    },
+    'idp.int': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.int,
+    },
+    'idp.pd': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.pd,
+    },
+    'idp.ff': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.ff,
+    },
+    'idp.fr': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.fr,
+    },
+    'idp.defTd': {
+      category: 'idp',
+      expr: PublicSchema.careerFootballDefenseIdp.defTd,
+    },
+    'defense.g': {
+      category: 'defense',
+      expr: PublicSchema.careerFootballDefense.g,
+    },
+    'defense.sacks': {
+      category: 'defense',
+      expr: PublicSchema.careerFootballDefense.sacks,
+    },
+    'defense.int': {
+      category: 'defense',
+      expr: PublicSchema.careerFootballDefense.int,
+    },
+    'defense.fumRec': {
+      category: 'defense',
+      expr: PublicSchema.careerFootballDefense.fumRec,
+    },
+    'defense.defTd': {
+      category: 'defense',
+      expr: PublicSchema.careerFootballDefense.defTd,
+    },
+    'defense.safeties': {
+      category: 'defense',
+      expr: PublicSchema.careerFootballDefense.safeties,
+    },
+    'defense.ptsAllowedPerG': {
+      category: 'defense',
+      expr: PublicSchema.careerFootballDefense.ptsAllowedPerG,
+    },
+    'defense.ydsAllowedPerG': {
+      category: 'defense',
+      expr: PublicSchema.careerFootballDefense.ydsAllowedPerG,
+    },
+  };
+}
+let footballStatSortsCache: ReturnType<typeof buildFootballStatSorts> | null =
+  null;
+function getFootballStatSorts() {
+  footballStatSortsCache ??= buildFootballStatSorts();
+  return footballStatSortsCache;
+}
 
 builder.queryField('footballPlayers', (t) =>
   t.field({
@@ -2186,7 +2215,7 @@ builder.queryField('footballPlayers', (t) =>
       } | null = null;
       if (args.sortBy != null) {
         if (!isPlayerColumnSort(args.sortBy)) {
-          const candidate = FOOTBALL_STAT_SORTS[args.sortBy];
+          const candidate = getFootballStatSorts()[args.sortBy];
           if (!candidate) {
             throw UserInputError(`Invalid sortBy: ${args.sortBy}`);
           }
@@ -2366,7 +2395,8 @@ builder.queryField('footballPlayers', (t) =>
       // Dynamic mode so the category join can be applied conditionally. The
       // join is PK-to-PK (career_*.player_id is the primary key) and doubles
       // as the category filter — see the category arg description.
-      const categoryTable = category != null ? CATEGORY_TABLES[category] : null;
+      const categoryTable =
+        category != null ? getCategoryTables()[category] : null;
       let query = db
         .select({
           id: PublicSchema.players.id,
