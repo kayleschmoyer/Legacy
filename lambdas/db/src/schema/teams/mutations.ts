@@ -6,6 +6,10 @@
  */
 import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  containsHtmlLikeMarkup,
+  sanitizeDisplayName,
+} from '@legacy-sports/utils';
 import { and, eq, gte, ilike, inArray, ne } from 'drizzle-orm';
 import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder } from '../builder';
@@ -449,12 +453,18 @@ builder.mutationField('renameTeam', (t) =>
         throw AuthenticationError();
       }
 
-      const name = args.newName.trim();
+      // Server-side sanitization — the client only trims before submit, so the
+      // resolver cannot trust that control chars, zero-width chars, or bidi
+      // overrides have already been stripped (LS-6039, mirrors LS-6056).
+      const name = sanitizeDisplayName(args.newName);
       if (name.length === 0) {
         throw UserInputError('Team name cannot be empty');
       }
       if (name.length > 40) {
         throw UserInputError('Team name cannot exceed 40 characters');
+      }
+      if (containsHtmlLikeMarkup(name)) {
+        throw UserInputError('Team name cannot contain HTML tags');
       }
 
       const { teamId, leagueId } = args;
