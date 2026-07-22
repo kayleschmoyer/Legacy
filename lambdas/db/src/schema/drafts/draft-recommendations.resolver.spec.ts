@@ -179,3 +179,5 @@ describe('getDraftRecommendations resolver — entitlement gate', () => {
     expect(db.select).toHaveBeenCalled();
   });
 });
+
+export {};

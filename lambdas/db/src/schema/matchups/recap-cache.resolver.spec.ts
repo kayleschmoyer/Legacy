@@ -273,3 +273,5 @@ describe('Matchup.recap field — persisted cache', () => {
     ).resolves.toEqual(GENERATED_RECAP);
   });
 });
+
+export {};

@@ -345,3 +345,5 @@ describe('Premium authorization helpers', () => {
     });
   });
 });
+
+export {};

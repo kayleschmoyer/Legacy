@@ -152,3 +152,5 @@ describe('Matchup.recap field — entitlement gate', () => {
     expect(teamsLoad).toHaveBeenCalled();
   });
 });
+
+export {};

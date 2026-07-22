@@ -416,3 +416,5 @@ describe('Discord Score Alerts (LS-1678)', () => {
     });
   });
 });
+
+export {};

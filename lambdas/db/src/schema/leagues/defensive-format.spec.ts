@@ -122,3 +122,5 @@ describe('sport field passthrough (league / userLeagues queries)', () => {
     expect(passthroughSport({ sport: null })).toBeNull();
   });
 });
+
+export {};

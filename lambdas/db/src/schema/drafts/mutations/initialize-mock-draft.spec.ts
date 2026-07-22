@@ -241,3 +241,5 @@ describe('initializeMockDraft transaction behavior', () => {
     ).rejects.toThrow('connection lost');
   });
 });
+
+export {};

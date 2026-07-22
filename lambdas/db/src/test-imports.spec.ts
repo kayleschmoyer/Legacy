@@ -10,3 +10,5 @@ describe('DB Lambda Tests', () => {
     expect(true).toBe(true);
   });
 });
+
+export {};

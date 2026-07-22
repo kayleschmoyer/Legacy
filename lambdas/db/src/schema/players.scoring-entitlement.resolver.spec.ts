@@ -180,3 +180,5 @@ describe('Player.scoring field — entitlement gate (PCM-022)', () => {
     await expect(resolve(playerWithoutScoring, {}, ctx)).resolves.toBeNull();
   });
 });
+
+export {};

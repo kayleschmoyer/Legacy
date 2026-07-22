@@ -168,3 +168,5 @@ describe('pauseDraft resolver', () => {
     });
   });
 });
+
+export {};

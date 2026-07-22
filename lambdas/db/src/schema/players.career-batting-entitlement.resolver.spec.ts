@@ -134,3 +134,5 @@ describe('Player.careerBatting field — entitlement gate (LS-7004)', () => {
     expect(careerBattingLoad).toHaveBeenCalledWith(42);
   });
 });
+
+export {};

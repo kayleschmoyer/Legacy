@@ -308,3 +308,5 @@ describe('updateDraftSettings — draft-status guard', () => {
     ).rejects.toThrow(/cannot be changed after/i);
   });
 });
+
+export {};

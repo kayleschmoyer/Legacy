@@ -3,3 +3,5 @@ describe('Live Test', () => {
     expect(true).toBe(true);
   });
 });
+
+export {};

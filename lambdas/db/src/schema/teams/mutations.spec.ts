@@ -225,3 +225,5 @@ describe('renameTeam mutation — server-side name sanitization (LS-6039)', () =
     );
   });
 });
+
+export {};

@@ -622,3 +622,5 @@ describe('makeDraftPick — draft row lock-wait retry (LS-8476 / LS-8475)', () =
     expect(mockCommitDraftPick).not.toHaveBeenCalled();
   });
 });
+
+export {};
