@@ -1,8 +1,9 @@
-import { spawn } from 'node:child_process';
-import { createWriteStream, readFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import {
+  MAX_WAIT_MS,
+  createJobRunner,
+  type JobSnapshot,
+} from '@legacy-sports/mcp-jobs';
 import type { ToolResult } from '../types.js';
 import {
   MAX_OUTPUT_CHARS,
@@ -13,18 +14,23 @@ import {
   buildCompactOutput,
 } from './run-target-utils.js';
 
-export interface JobRecord {
-  jobId: string;
-  pid: number;
-  logPath: string;
-  startTime: number;
-  target: string;
-  workDir: string;
-  exitCode: number | null;
-  done: boolean;
-  error: string | null;
-  verbose: boolean;
-}
+export type { JobSnapshot } from '@legacy-sports/mcp-jobs';
+
+/**
+ * make-server's binding of the shared background-job runner
+ * (`@legacy-sports/mcp-jobs`, LS-8564). Replaces the old in-memory registry:
+ * jobs now survive a server restart via disk-persisted metadata, and the
+ * internal timeout kills the whole process tree instead of only the direct
+ * `make` child (which left nx/node grandchildren running).
+ */
+const runner = createJobRunner({
+  idPrefix: 'make',
+  dirName: 'make-run-jobs',
+  waitHint: (jobId) =>
+    `Job still running. Re-invoke make_run_wait({ jobId: "${jobId}" }) to continue waiting ` +
+    `(each call waits up to ${MAX_WAIT_MS / 1000}s and returns a status snapshot — never an error ` +
+    'while the job is in progress). Do NOT re-run the target.',
+});
 
 /**
  * Single-call sync budget for job-backed tools — stays safely under the ~60s
@@ -34,25 +40,20 @@ export interface JobRecord {
  */
 export const SYNC_BUDGET_MS = 45_000;
 
-// In-memory registry — lives for the lifetime of the MCP server process.
-const jobRegistry = new Map<string, JobRecord>();
-
-function newJobId(): string {
-  return `make-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+/** Per-job metadata persisted with the runner so restarts keep formatting context. */
+interface MakeJobMeta {
+  target: string;
+  workDir: string;
+  verbose: boolean;
 }
 
-function ensureLogDir(): string {
-  const dir = join(tmpdir(), 'make-run-jobs');
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function readLog(logPath: string): string {
-  try {
-    return readFileSync(logPath, 'utf-8');
-  } catch {
-    return '';
-  }
+function metaOf(snapshot: JobSnapshot): MakeJobMeta {
+  const meta = (snapshot.meta ?? {}) as Partial<MakeJobMeta>;
+  return {
+    target: typeof meta.target === 'string' ? meta.target : snapshot.label,
+    workDir: typeof meta.workDir === 'string' ? meta.workDir : snapshot.cwd,
+    verbose: meta.verbose === true,
+  };
 }
 
 /**
@@ -66,123 +67,100 @@ export function startMakeInBackground(
   timeoutMs: number,
   verbose = false,
 ): { jobId: string; logPath: string } {
-  const jobId = newJobId();
-  const logPath = join(ensureLogDir(), `${jobId}.log`);
-  const logStream = createWriteStream(logPath);
-
-  const child = spawn('make', args, {
+  const { jobId, logPath } = runner.startJob({
+    command: 'make',
+    args,
     cwd: workDir,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
+    label: `make ${target}`,
+    timeoutMs,
+    meta: { target, workDir, verbose },
   });
-
-  const record: JobRecord = {
-    jobId,
-    pid: child.pid ?? 0,
-    logPath,
-    startTime: Date.now(),
-    target,
-    workDir,
-    exitCode: null,
-    done: false,
-    error: null,
-    verbose,
-  };
-  jobRegistry.set(jobId, record);
-
-  // end: false on both pipes — stdout and stderr share one destination, and the
-  // default end-on-source-end would close the stream when the first source
-  // finishes while the other may still write ("write after end"). The stream is
-  // ended explicitly in the 'close' handler / timeout path instead.
-  child.stdout?.pipe(logStream, { end: false });
-  child.stderr?.pipe(logStream, { end: false });
-  // Late writes after an explicit end() (e.g. a killed child flushing) must not
-  // crash the server process via an unhandled 'error' event.
-  logStream.on('error', () => {});
-
-  // Enforce a process-level timeout independent of the MCP client transport.
-  const timer = setTimeout(() => {
-    child.kill();
-    record.done = true;
-    record.error = `Process killed after ${timeoutMs}ms (internal timeout)`;
-    logStream.end();
-  }, timeoutMs);
-
-  child.on('close', (code) => {
-    clearTimeout(timer);
-    record.exitCode = code;
-    record.done = true;
-    if (code !== 0 && !record.error) {
-      record.error = `make ${target} exited with code ${code}`;
-    }
-    logStream.end();
-  });
-
   return { jobId, logPath };
 }
 
 export function buildStatusResult(
-  record: JobRecord,
+  snapshot: JobSnapshot,
   full: boolean,
   extras: Record<string, unknown> = {},
 ): ToolResult {
-  const log = readLog(record.logPath);
-  const elapsedSec = Math.round((Date.now() - record.startTime) / 1000);
+  const { target, workDir, verbose } = metaOf(snapshot);
+  const elapsedSec = snapshot.elapsedSec;
 
-  if (!record.done) {
-    const logTail = log.slice(-5000);
+  if (snapshot.status === 'running') {
     return {
       content: [
         {
           type: 'text',
           text: minifiedJson({
             status: 'running',
-            jobId: record.jobId,
-            target: record.target,
+            jobId: snapshot.jobId,
+            target,
             elapsedSec,
             ...extras,
-            logTail,
-            hint:
-              `Job still running. Re-invoke make_run_wait({ jobId: "${record.jobId}" }) to continue waiting ` +
-              '(each call waits up to 55s and returns a status snapshot — never an error ' +
-              'while the job is in progress). Do NOT re-run the target.',
+            logTail: snapshot.logTail ?? '',
+            hint: snapshot.hint,
           }),
         },
       ],
     };
   }
 
+  // A job recovered from a previous server process whose result was never
+  // recorded — surface the runner's orphan hint instead of a bogus pass/fail.
+  if (snapshot.status === 'orphaned') {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            status: 'orphaned',
+            success: false,
+            jobId: snapshot.jobId,
+            target,
+            worktreePath: workDir,
+            elapsedSec,
+            ...extras,
+            logTail: snapshot.logTail ?? '',
+            hint: snapshot.hint,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const log = snapshot.log ?? '';
   const output = full ? log : log.slice(-5000);
 
-  if (STRUCTURED_TARGETS.has(record.target)) {
+  if (STRUCTURED_TARGETS.has(target)) {
     const steps = parseSteps(log);
     const hasPassedMarker = /All pre-commit checks passed/i.test(log);
     const failedCount = steps.filter((s) => s.status === 'failed').length;
     const anyStepFailed = failedCount > 0;
     const success =
-      record.exitCode === 0 &&
-      !record.error &&
+      snapshot.exitCode === 0 &&
+      !snapshot.error &&
       !anyStepFailed &&
       (hasPassedMarker || steps.length === 0);
 
     const result: Record<string, unknown> = {
-      status: record.done ? (success ? 'done' : 'failed') : 'running',
+      status: success ? 'done' : 'failed',
       success,
-      jobId: record.jobId,
-      target: record.target,
-      worktreePath: record.workDir,
+      jobId: snapshot.jobId,
+      target,
+      worktreePath: workDir,
       elapsedSec,
       ...extras,
       summary: success
-        ? `${record.target} passed${steps.length > 0 ? ` (${steps.length} steps)` : ''}`
-        : `${record.target} failed${failedCount > 0 ? ` (${failedCount} step${failedCount === 1 ? '' : 's'} failed)` : ''}`,
+        ? `${target} passed${steps.length > 0 ? ` (${steps.length} steps)` : ''}`
+        : `${target} failed${failedCount > 0 ? ` (${failedCount} step${failedCount === 1 ? '' : 's'} failed)` : ''}`,
     };
     if (steps.length > 0) result.steps = steps;
     if (!success) {
       const errors = extractErrors(log);
       if (errors.length > 0) result.errors = errors;
     }
-    result.output = record.verbose
+    result.output = verbose
       ? truncateOutput(output, MAX_OUTPUT_CHARS)
       : buildCompactOutput(output, MAX_OUTPUT_CHARS);
 
@@ -192,21 +170,21 @@ export function buildStatusResult(
     };
   }
 
-  const success = record.exitCode === 0 && !record.error;
+  const success = snapshot.exitCode === 0 && !snapshot.error;
   return {
     content: [
       {
         type: 'text',
         text: minifiedJson({
-          status: record.done ? (success ? 'done' : 'failed') : 'running',
+          status: success ? 'done' : 'failed',
           success,
-          jobId: record.jobId,
-          target: record.target,
-          worktreePath: record.workDir,
+          jobId: snapshot.jobId,
+          target,
+          worktreePath: workDir,
           elapsedSec,
           ...extras,
-          ...(record.error ? { error: record.error } : {}),
-          output: record.verbose
+          ...(snapshot.error ? { error: snapshot.error } : {}),
+          output: verbose
             ? truncateOutput(output, MAX_OUTPUT_CHARS)
             : buildCompactOutput(output, MAX_OUTPUT_CHARS),
         }),
@@ -217,32 +195,36 @@ export function buildStatusResult(
 }
 
 /**
- * Internal helper for other tools (e.g. validate_pr): wait for a job to
- * complete, bounded by maxWaitMs, and return its raw record (which may still
- * be running when the budget expires). Returns null for an unknown jobId.
+ * Internal helper for other tools (e.g. validate_pr): wait for a job to reach
+ * a terminal state, bounded by maxWaitMs (capped at MAX_WAIT_MS by the shared
+ * runner), and return its snapshot (which may still be status:"running" when
+ * the budget expires). Returns null for an unknown jobId.
  */
 export async function waitForJobDone(
   jobId: string,
   maxWaitMs: number,
-): Promise<JobRecord | null> {
-  const POLL_INTERVAL_MS = 1_000;
-  const record = jobRegistry.get(jobId);
-  if (!record) return null;
-  const deadline = Date.now() + maxWaitMs;
-  while (!record.done && Date.now() < deadline) {
-    await new Promise<void>((r) =>
-      setTimeout(
-        r,
-        Math.min(POLL_INTERVAL_MS, Math.max(deadline - Date.now(), 1)),
-      ),
-    );
-  }
-  return record;
+): Promise<JobSnapshot | null> {
+  return runner.waitForJob(jobId, maxWaitMs);
 }
 
-/** Read the full log for a job record. Exported for internal tool reuse. */
-export function readJobLog(record: JobRecord): string {
-  return readLog(record.logPath);
+/** Read the full log for a job snapshot. Exported for internal tool reuse. */
+export function readJobLog(snapshot: JobSnapshot): string {
+  return snapshot.log ?? snapshot.logTail ?? '';
+}
+
+function unknownJobResult(jobId: string): ToolResult {
+  return {
+    content: [
+      {
+        type: 'text',
+        text: minifiedJson({
+          ok: false,
+          error: `Job "${jobId}" not found.`,
+        }),
+      },
+    ],
+    isError: true,
+  };
 }
 
 // ---- make_run_status ----
@@ -252,22 +234,11 @@ export interface MakeRunStatusParams {
 }
 
 export function makeRunStatus(params: MakeRunStatusParams): ToolResult {
-  const record = jobRegistry.get(params.jobId);
-  if (!record) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: minifiedJson({
-            ok: false,
-            error: `Job "${params.jobId}" not found. Job records exist only for the lifetime of this MCP server process.`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+  const snapshot = runner.snapshotJob(params.jobId);
+  if (!snapshot) {
+    return unknownJobResult(params.jobId);
   }
-  return buildStatusResult(record, true);
+  return buildStatusResult(snapshot, true);
 }
 
 // ---- make_run_wait ----
@@ -278,7 +249,7 @@ export interface MakeRunWaitParams {
 }
 
 /**
- * Block until the job completes or maxWaitMs elapses (default 50 000ms).
+ * Block until the job completes or maxWaitMs elapses (default 55 000ms).
  * Capped at 55 000ms to stay under the MCP transport timeout of ~60s in cloud sessions.
  * If still running when the wait expires, returns a status: "running" snapshot so
  * the caller can re-invoke make_run_wait to continue waiting.
@@ -286,38 +257,12 @@ export interface MakeRunWaitParams {
 export async function makeRunWait(
   params: MakeRunWaitParams,
 ): Promise<ToolResult> {
-  const POLL_INTERVAL_MS = 1_000;
-  // Cap at 55s to stay safely under the ~60s MCP transport timeout in cloud sessions.
-  const MAX_SAFE_WAIT_MS = 55_000;
-  const maxWaitMs = Math.min(
-    params.maxWaitMs ?? MAX_SAFE_WAIT_MS,
-    MAX_SAFE_WAIT_MS,
+  const snapshot = await runner.waitForJob(
+    params.jobId,
+    params.maxWaitMs ?? MAX_WAIT_MS,
   );
-
-  const record = jobRegistry.get(params.jobId);
-  if (!record) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: minifiedJson({
-            ok: false,
-            error: `Job "${params.jobId}" not found. Job records exist only for the lifetime of this MCP server process.`,
-          }),
-        },
-      ],
-      isError: true,
-    };
+  if (!snapshot) {
+    return unknownJobResult(params.jobId);
   }
-
-  const waitStart = Date.now();
-  while (!record.done) {
-    if (Date.now() - waitStart >= maxWaitMs) {
-      // Return a running snapshot — caller should re-invoke make_run_wait.
-      return buildStatusResult(record, false);
-    }
-    await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
-  }
-
-  return buildStatusResult(record, true);
+  return buildStatusResult(snapshot, snapshot.status !== 'running');
 }

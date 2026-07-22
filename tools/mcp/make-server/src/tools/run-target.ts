@@ -18,7 +18,7 @@ import {
   startMakeInBackground,
   waitForJobDone,
 } from './make-run-bg.js';
-import type { JobRecord } from './make-run-bg.js';
+import type { JobSnapshot } from './make-run-bg.js';
 
 /**
  * Parse the list of files rewritten by the formatter from a make pc error message.
@@ -265,7 +265,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       isError: true,
     };
   }
-  if (!record.done) {
+  if (record.status === 'running') {
     return buildStatusResult(record, false);
   }
 
@@ -289,9 +289,9 @@ interface RunContext {
   verbose: boolean;
 }
 
-/** Format a terminal job record, applying formatter auto-recovery for structured targets. */
+/** Format a terminal job snapshot, applying formatter auto-recovery for structured targets. */
 async function finishCompletedRun(
-  record: JobRecord,
+  record: JobSnapshot,
   ctx: RunContext,
 ): Promise<ToolResult> {
   const timedOut =
@@ -437,7 +437,7 @@ async function autoCommitFormatterAndRetry(
       isError: true,
     };
   }
-  return buildStatusResult(retryRecord, retryRecord.done, {
+  return buildStatusResult(retryRecord, retryRecord.status !== 'running', {
     autoFormatterCommit: true,
   });
 }

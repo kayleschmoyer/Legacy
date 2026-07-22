@@ -1,7 +1,6 @@
-import { spawn } from 'node:child_process';
-import { createWriteStream, readFileSync, mkdirSync } from 'node:fs';
-import { join, dirname, isAbsolute, resolve } from 'node:path';
+import { join, isAbsolute, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createJobRunner, type JobSnapshot } from '@legacy-sports/mcp-jobs';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -18,26 +17,37 @@ const DURATION_PATTERN =
 const MAX_WAIT_SECONDS = 55;
 // Default initial wait for packer_build before returning a running snapshot.
 const DEFAULT_SYNC_WAIT_SECONDS = 45;
-const RECORD_POLL_MS = 1000;
 // Backstop: kill a background build that outlives the ceiling the old
-// synchronous mode enforced.
+// synchronous mode enforced (30 min build + 2 min `packer init` plugin
+// downloads — init runs inside the same job, see startJob below).
 const BUILD_BACKSTOP_MS = 30 * 60_000;
 const INIT_TIMEOUT_MS = 120_000;
 
-interface BuildRecord {
-  pid: number;
-  logPath: string;
-  startTime: number;
-  exitCode: number | null;
-  done: boolean;
-  error: string | null;
+export function packerWaitHint(buildId: string): string {
+  return (
+    `Build is still running. Call packer_build_wait({ buildId: "${buildId}" }) to continue waiting ` +
+    `(each call waits up to ${MAX_WAIT_SECONDS}s and returns a status snapshot — never an error ` +
+    'while the build is in progress). Do NOT re-run packer_build.'
+  );
 }
 
-// In-memory registry — lives for the lifetime of the MCP server process.
-const buildRegistry = new Map<string, BuildRecord>();
+/**
+ * Background builds run on the shared job runner (`@legacy-sports/mcp-jobs`,
+ * LS-8564): build metadata persists to disk so a restarted MCP server can
+ * still report on in-flight AMI bakes, and the job timeout kills the whole
+ * packer process tree instead of only the direct child. The transport-safe
+ * call contract (45s initial wait, ≤55s per wait call, running snapshots with
+ * re-arm hints — LS-8560) is unchanged.
+ */
+const runner = createJobRunner({
+  idPrefix: 'packer',
+  dirName: 'packer-builds',
+  waitHint: packerWaitHint,
+});
 
-function newBuildId(): string {
-  return `packer-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+/** The runner's deterministic log location for a background build. */
+function bgLogPathFor(buildId: string): string {
+  return join(tmpdir(), 'packer-builds', `${buildId}.log`);
 }
 
 function parseAmiId(log: string): string | null {
@@ -83,119 +93,115 @@ async function fetchImageMeta(cwd: string, amiId: string): Promise<ImageMeta> {
   }
 }
 
-function ensureLogDir(): string {
-  const dir = join(tmpdir(), 'packer-builds');
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-export function packerWaitHint(buildId: string): string {
-  return (
-    `Build is still running. Call packer_build_wait({ buildId: "${buildId}" }) to continue waiting ` +
-    `(each call waits up to ${MAX_WAIT_SECONDS}s and returns a status snapshot — never an error ` +
-    'while the build is in progress). Do NOT re-run packer_build.'
-  );
-}
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Spawns `packer init` + `packer build` as a detached background job, teeing
- * output to a log file and tracking completion in the registry. Nothing on the
- * tool-call path may block past the sync budget, so even `packer init` (up to
- * 120s of plugin downloads) runs inside the job.
- */
-function startBackgroundBuild(
-  cwd: string,
-  resolvedHcl: string,
-  buildArgs: string[],
-): { buildId: string; record: BuildRecord } {
-  const buildId = newBuildId();
-  const logPath = join(ensureLogDir(), `${buildId}.log`);
-  const logStream = createWriteStream(logPath);
-  const record: BuildRecord = {
-    pid: 0,
-    logPath,
-    startTime: Date.now(),
-    exitCode: null,
-    done: false,
-    error: null,
-  };
-  buildRegistry.set(buildId, record);
-
-  void (async () => {
-    try {
-      const initOut = await runCommand(
-        'packer',
-        ['init', resolvedHcl],
-        dirname(resolvedHcl),
-        {},
-        INIT_TIMEOUT_MS,
-      );
-      if (initOut) logStream.write(`${initOut}\n`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      record.exitCode = -1;
-      record.done = true;
-      record.error = `packer init failed: ${msg}`;
-      logStream.end(`packer init failed: ${msg}\n`);
-      return;
-    }
-
-    const child = spawn('packer', buildArgs, {
-      cwd,
-      shell: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    record.pid = child.pid ?? 0;
-    child.stdout?.pipe(logStream);
-    child.stderr?.pipe(logStream);
-
-    let killedByBackstop = false;
-    const backstop = setTimeout(() => {
-      killedByBackstop = true;
-      child.kill();
-    }, BUILD_BACKSTOP_MS);
-    // The backstop must not keep the server process (or a test runner) alive.
-    backstop.unref();
-
-    child.on('close', (code) => {
-      clearTimeout(backstop);
-      record.exitCode = code;
-      record.done = true;
-      record.error = killedByBackstop
-        ? `Packer build timed out after ${Math.round(BUILD_BACKSTOP_MS / 60_000)} minutes and was killed`
-        : code !== 0
-          ? `Packer exited with code ${code}`
-          : null;
-      logStream.end();
-    });
-  })();
-
-  return { buildId, record };
-}
-
-async function waitForRecord(
-  record: BuildRecord,
-  budgetMs: number,
-): Promise<boolean> {
-  const deadline = Date.now() + budgetMs;
-  while (!record.done && Date.now() < deadline) {
-    await sleep(Math.min(RECORD_POLL_MS, Math.max(deadline - Date.now(), 1)));
-  }
-  return record.done;
-}
-
 /** In-progress snapshot with a re-arm hint — never an error while running. */
-function runningSnapshot(buildId: string, record: BuildRecord): ToolResult {
-  let logTail = '';
-  try {
-    logTail = readFileSync(record.logPath, 'utf-8').slice(-2000);
-  } catch {
-    logTail = '(log not yet readable)';
+function runningSnapshot(snapshot: JobSnapshot): ToolResult {
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify({
+          ok: true,
+          buildId: snapshot.jobId,
+          status: 'running',
+          elapsedSec: snapshot.elapsedSec,
+          logPath: bgLogPathFor(snapshot.jobId),
+          logTail: snapshot.logTail || '(log not yet readable)',
+          hint: snapshot.hint ?? packerWaitHint(snapshot.jobId),
+        }),
+      },
+    ],
+  };
+}
+
+function notFoundResult(buildId: string): ToolResult {
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify({
+          ok: false,
+          error: `Build "${buildId}" not found.`,
+        }),
+      },
+    ],
+    isError: true,
+  };
+}
+
+/** Format a terminal (or orphaned) snapshot as the packer_build result. */
+async function finishedResult(snapshot: JobSnapshot): Promise<ToolResult> {
+  const buildId = snapshot.jobId;
+  const logPath = bgLogPathFor(buildId);
+
+  // A job recovered from a previous server process whose result was never
+  // recorded — surface the runner's orphan hint instead of a bogus pass/fail.
+  if (snapshot.status === 'orphaned') {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            buildId,
+            status: 'orphaned',
+            elapsedSec: snapshot.elapsedSec,
+            logPath,
+            logTail: snapshot.logTail || '(log not yet readable)',
+            ...(snapshot.hint ? { hint: snapshot.hint } : {}),
+          }),
+        },
+      ],
+      isError: true,
+    };
   }
+
+  const fullLog = snapshot.log ?? '';
+  const logTail = fullLog.slice(-3000);
+
+  if (snapshot.status === 'failed') {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            buildId,
+            status: 'failed',
+            error: snapshot.error,
+            exitCode: snapshot.exitCode,
+            logPath,
+            logTail,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const amiId = parseAmiId(fullLog);
+  const durationSec = parseDurationSec(fullLog) ?? snapshot.elapsedSec;
+
+  if (!amiId) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            buildId,
+            status: 'failed',
+            error: 'Build completed but no AMI ID was found in Packer output.',
+            logPath,
+            logTail,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  const meta = await fetchImageMeta(getRepoRoot(), amiId);
+
   return {
     content: [
       {
@@ -203,11 +209,13 @@ function runningSnapshot(buildId: string, record: BuildRecord): ToolResult {
         text: JSON.stringify({
           ok: true,
           buildId,
-          status: 'running',
-          elapsedSec: Math.round((Date.now() - record.startTime) / 1000),
-          logPath: record.logPath,
-          logTail,
-          hint: packerWaitHint(buildId),
+          status: 'done',
+          amiId,
+          name: meta.name,
+          durationSec,
+          snapshotId: meta.snapshotId,
+          tags: meta.tags,
+          logPath,
         }),
       },
     ],
@@ -225,14 +233,16 @@ export interface PackerBuildParams {
 }
 
 // Validate inputs at the interpolation boundary: hclPath and vars reach the
-// `packer init` / `packer build` argv, and both runCommand and spawn execute
-// with shell: true, so shell metacharacters would be interpreted. hclPath is
+// `packer init` / `packer build` argv, and the job is spawned with
+// shell: true, so shell metacharacters would be interpreted. hclPath is
 // restricted to path characters (backslash + drive colon allowed for Windows);
 // var names to identifier characters; var values reject the same metacharacter
-// class aws_ssm_run_command blocks.
+// class aws_ssm_run_command blocks. Spaces are covered by both checks —
+// shell:true joins args with spaces, so a space would split the argument and
+// allow smuggling extra flags into packer.
 const HCL_PATH_RE = /^[A-Za-z0-9._/\\:-]+\.pkr\.hcl$/;
 const VAR_NAME_RE = /^[A-Za-z0-9_-]+$/;
-const VAR_VALUE_METACHAR_RE = /[\n\r"'`$;&|<>(){}\\]/;
+const VAR_VALUE_METACHAR_RE = /[\s"'`$;&|<>(){}\\]/;
 
 function invalidInput(error: string): ToolResult {
   return {
@@ -259,7 +269,7 @@ export async function packerBuild(
     }
     if (VAR_VALUE_METACHAR_RE.test(v)) {
       return invalidInput(
-        `Var ${JSON.stringify(k)} contains disallowed characters: ${JSON.stringify(v)}. Values must not contain quotes, backticks, backslashes, newlines, or shell operators.`,
+        `Var ${JSON.stringify(k)} contains disallowed characters: ${JSON.stringify(v)}. Values must not contain whitespace, quotes, backticks, backslashes, or shell operators.`,
       );
     }
   }
@@ -275,7 +285,20 @@ export async function packerBuild(
   }
   buildArgs.push(resolvedHcl);
 
-  const { buildId, record } = startBackgroundBuild(cwd, resolvedHcl, buildArgs);
+  // `packer init` (up to ~2 min of plugin downloads) must not block the tool
+  // call, so it runs inside the job as a shell composite with the build. All
+  // interpolated inputs were validated above, so joining through the shell is
+  // safe. `packer init` resolves the config by absolute path, so running it
+  // from `cwd` (instead of the config's directory) is equivalent.
+  const { jobId: buildId } = runner.startJob({
+    command: 'packer',
+    args: ['init', resolvedHcl, '&&', 'packer', ...buildArgs],
+    cwd,
+    shell: true,
+    label: `packer build ${hclPath}`,
+    timeoutMs: INIT_TIMEOUT_MS + BUILD_BACKSTOP_MS,
+    meta: { hclPath: resolvedHcl },
+  });
 
   if (runInBackground) {
     return {
@@ -285,7 +308,7 @@ export async function packerBuild(
           text: JSON.stringify({
             ok: true,
             buildId,
-            logPath: record.logPath,
+            logPath: bgLogPathFor(buildId),
             message:
               'Packer build started in background. Use packer_build_status to poll progress or packer_build_wait for a bounded wait.',
           }),
@@ -298,9 +321,11 @@ export async function packerBuild(
     params.maxWaitSeconds ?? DEFAULT_SYNC_WAIT_SECONDS,
     MAX_WAIT_SECONDS,
   );
-  const done = await waitForRecord(record, budgetSec * 1000);
-  if (!done) return runningSnapshot(buildId, record);
-  return packerBuildStatus({ buildId });
+  const snapshot = await runner.waitForJob(buildId, budgetSec * 1000);
+  // The job was just started, so the registry lookup cannot miss.
+  if (!snapshot) return notFoundResult(buildId);
+  if (snapshot.status === 'running') return runningSnapshot(snapshot);
+  return finishedResult(snapshot);
 }
 
 // ---- packer_build_status ----
@@ -312,120 +337,10 @@ export interface PackerBuildStatusParams {
 export async function packerBuildStatus(
   params: PackerBuildStatusParams,
 ): Promise<ToolResult> {
-  const { buildId } = params;
-  const record = buildRegistry.get(buildId);
-
-  if (!record) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Build "${buildId}" not found. Records are kept only for the lifetime of this MCP server process.`,
-          }),
-        },
-      ],
-      isError: true,
-    };
-  }
-
-  let logTail = '';
-  try {
-    logTail = readFileSync(record.logPath, 'utf-8').slice(-3000);
-  } catch {
-    logTail = '(log not yet readable)';
-  }
-
-  if (!record.done) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: true,
-            buildId,
-            status: 'running',
-            elapsedSec: Math.round((Date.now() - record.startTime) / 1000),
-            logPath: record.logPath,
-            logTail,
-          }),
-        },
-      ],
-    };
-  }
-
-  if (record.error) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            buildId,
-            status: 'failed',
-            error: record.error,
-            exitCode: record.exitCode,
-            logPath: record.logPath,
-            logTail,
-          }),
-        },
-      ],
-      isError: true,
-    };
-  }
-
-  let fullLog = '';
-  try {
-    fullLog = readFileSync(record.logPath, 'utf-8');
-  } catch {
-    // ignore
-  }
-
-  const amiId = parseAmiId(fullLog);
-  const durationSec =
-    parseDurationSec(fullLog) ??
-    Math.round((Date.now() - record.startTime) / 1000);
-
-  if (!amiId) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            buildId,
-            status: 'failed',
-            error: 'Build completed but no AMI ID was found in Packer output.',
-            logPath: record.logPath,
-            logTail,
-          }),
-        },
-      ],
-      isError: true,
-    };
-  }
-
-  const meta = await fetchImageMeta(getRepoRoot(), amiId);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          ok: true,
-          buildId,
-          status: 'done',
-          amiId,
-          name: meta.name,
-          durationSec,
-          snapshotId: meta.snapshotId,
-          tags: meta.tags,
-          logPath: record.logPath,
-        }),
-      },
-    ],
-  };
+  const snapshot = runner.snapshotJob(params.buildId);
+  if (!snapshot) return notFoundResult(params.buildId);
+  if (snapshot.status === 'running') return runningSnapshot(snapshot);
+  return finishedResult(snapshot);
 }
 
 // ---- packer_build_wait ----
@@ -442,39 +357,18 @@ export interface PackerBuildWaitParams {
  * { status: "running" } snapshot (not an error) if the build has not finished,
  * so the caller re-arms with another call instead of losing an in-flight
  * long-poll to the MCP transport timeout. Mirrors ci_wait_run.
+ * (pollIntervalSec is accepted for compatibility; the shared runner polls
+ * internally at a fixed 1s cadence.)
  */
 export async function packerBuildWait(
   params: PackerBuildWaitParams,
 ): Promise<ToolResult> {
-  const { buildId } = params;
-  const record = buildRegistry.get(buildId);
-
-  if (!record) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: `Build "${buildId}" not found. Records are kept only for the lifetime of this MCP server process.`,
-          }),
-        },
-      ],
-      isError: true,
-    };
-  }
-
   const waitSec = Math.min(
     params.timeoutSec ?? MAX_WAIT_SECONDS,
     MAX_WAIT_SECONDS,
   );
-  const pollMs = Math.max(1_000, (params.pollIntervalSec ?? 5) * 1000);
-  const deadline = Date.now() + waitSec * 1000;
-
-  while (!record.done && Date.now() < deadline) {
-    await sleep(Math.min(pollMs, Math.max(deadline - Date.now(), 1)));
-  }
-
-  if (!record.done) return runningSnapshot(buildId, record);
-  return packerBuildStatus({ buildId });
+  const snapshot = await runner.waitForJob(params.buildId, waitSec * 1000);
+  if (!snapshot) return notFoundResult(params.buildId);
+  if (snapshot.status === 'running') return runningSnapshot(snapshot);
+  return finishedResult(snapshot);
 }

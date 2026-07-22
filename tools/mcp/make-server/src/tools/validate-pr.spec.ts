@@ -50,18 +50,18 @@ const {
   waitForJobDone: jest.Mock<any>;
 };
 
-/** A completed job record as returned by waitForJobDone. */
+/** A terminal job snapshot as returned by waitForJobDone. */
 function doneRecord(exitCode = 0, error: string | null = null) {
   return {
-    pid: 1234,
-    logPath: '/tmp/job.log',
-    startTime: Date.now(),
-    target: 'chunk',
-    workDir: '/tmp/test-repo-root',
+    jobId: 'job-123',
+    status: exitCode === 0 && error === null ? 'done' : 'failed',
+    label: 'make chunk',
+    cwd: '/tmp/test-repo-root',
+    elapsedSec: 1,
     exitCode,
-    done: true,
     error,
-    verbose: false,
+    log: 'chunk output',
+    meta: { target: 'chunk', workDir: '/tmp/test-repo-root', verbose: false },
   };
 }
 
@@ -153,8 +153,10 @@ describe('validatePR', () => {
     it('returns pc.status running with a jobId when pc outlives the sync budget', async () => {
       mockWaitForJobDone.mockResolvedValueOnce({
         ...doneRecord(),
-        done: false,
+        status: 'running',
         exitCode: null,
+        log: undefined,
+        logTail: 'chunk output',
       });
       const result = await validatePR({});
       expect(result.isError).toBeFalsy();
@@ -205,8 +207,10 @@ describe('validatePR', () => {
     it('returns in_progress with the jobId when a chunk outlives the budget', async () => {
       mockWaitForJobDone.mockResolvedValueOnce({
         ...doneRecord(),
-        done: false,
+        status: 'running',
         exitCode: null,
+        log: undefined,
+        logTail: 'chunk output',
       });
       const result = await validatePR({ sanctionedChunks: true });
       expect(result.isError).toBeFalsy();

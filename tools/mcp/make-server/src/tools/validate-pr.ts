@@ -313,7 +313,7 @@ export async function validatePR(
         Math.max(budgetDeadline - Date.now(), 1_000),
       );
 
-      if (record && !record.done) {
+      if (record && record.status === 'running') {
         // Budget expired mid-chunk — the chunk keeps running in the background.
         return inProgress({
           currentChunk: chunk,
@@ -393,7 +393,7 @@ export async function validatePR(
   );
   const record = await waitForJobDone(jobId, CHUNK_SYNC_BUDGET_MS);
 
-  if (record && !record.done) {
+  if (record && record.status === 'running') {
     return {
       content: [
         {

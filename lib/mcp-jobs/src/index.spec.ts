@@ -9,19 +9,23 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  listJobs,
-  runJobWithBudget,
-  snapshotJob,
-  startJob,
-  waitForJob,
-} from './jobs.js';
+import { createJobRunner } from './index';
+
+const TEST_DIR_NAME = 'mcp-jobs-test';
+
+const runner = createJobRunner({
+  idPrefix: 'test',
+  dirName: TEST_DIR_NAME,
+  waitHint: (jobId) => `Call test_job_wait({ jobId: "${jobId}" }) to wait.`,
+});
+const { listJobs, runJobWithBudget, snapshotJob, startJob, waitForJob } =
+  runner;
 
 describe('background job registry', () => {
   let workDir: string;
 
   beforeAll(() => {
-    workDir = mkdtempSync(join(tmpdir(), 'nx-jobs-test-'));
+    workDir = mkdtempSync(join(tmpdir(), 'mcp-jobs-spec-'));
     // Makefile recipes require a leading TAB. Use `echo`/`node` (not `true`):
     // when these tests run as a descendant of `make pc` on Windows, the child
     // make finds no sh.exe in PATH and execs simple commands directly via
@@ -55,6 +59,7 @@ describe('background job registry', () => {
       timeoutMs: 30_000,
     });
     expect(existing).toBe(false);
+    expect(jobId).toMatch(/^test-/);
 
     const snapshot = await waitForJob(jobId, 20_000);
     expect(snapshot?.status).toBe('done');
@@ -75,7 +80,7 @@ describe('background job registry', () => {
     expect(snapshot?.error).toContain('exited with code');
   }, 25_000);
 
-  it('runJobWithBudget returns a running snapshot with a hint when the budget expires', async () => {
+  it('runJobWithBudget returns a running snapshot with the configured hint when the budget expires', async () => {
     const snapshot = await runJobWithBudget(
       {
         command: 'make',
@@ -87,7 +92,7 @@ describe('background job registry', () => {
       1_500,
     );
     expect(snapshot.status).toBe('running');
-    expect(snapshot.hint).toContain('nx_job_wait');
+    expect(snapshot.hint).toContain('test_job_wait');
 
     // The handle stays valid: a follow-up wait reaches the terminal state.
     const final = await waitForJob(snapshot.jobId, 20_000);
@@ -132,12 +137,12 @@ describe('background job registry', () => {
   }, 30_000);
 
   it('persists meta and echoes it on snapshots; env vars reach the child', async () => {
-    // `make noop-env` echoes $NX_JOBS_TEST_VAR (recipe added per-test below).
+    // `make noop-env` echoes $MCP_JOBS_TEST_VAR (recipe added per-test below).
     writeFileSync(
       join(workDir, 'Makefile'),
       'noop:\n\t@echo ok\n' +
         'slow:\n\t@node -e "setTimeout(function () {}, 5000)"\n' +
-        'noop-env:\n\t@node -e "console.log(process.env.NX_JOBS_TEST_VAR)"\n',
+        'noop-env:\n\t@node -e "process.stdout.write(String(process.env.MCP_JOBS_TEST_VAR))"\n',
     );
     const { jobId } = startJob({
       command: 'make',
@@ -145,7 +150,7 @@ describe('background job registry', () => {
       cwd: workDir,
       label: 'noop-env',
       timeoutMs: 30_000,
-      env: { NX_JOBS_TEST_VAR: 'hello-from-env' },
+      env: { MCP_JOBS_TEST_VAR: 'hello-from-env' },
       meta: { kind: 'test-kind', extra: 42 },
     });
     const snapshot = await waitForJob(jobId, 20_000);
@@ -170,8 +175,8 @@ describe('background job registry', () => {
   it('reports a disk-recovered job past its deadline as orphaned even if the pid is alive', () => {
     // Simulate a job persisted by a dead server process: not in this process's
     // registry, done:false, a live pid (this test process), expired deadline.
-    const jobId = `nx-test-orphan-${process.pid}`;
-    const jobsDir = join(tmpdir(), 'nx-mcp-jobs');
+    const jobId = `test-orphan-${process.pid}`;
+    const jobsDir = join(tmpdir(), TEST_DIR_NAME);
     mkdirSync(jobsDir, { recursive: true });
     const metaPath = join(jobsDir, `${jobId}.json`);
     writeFileSync(
@@ -198,6 +203,23 @@ describe('background job registry', () => {
       unlinkSync(metaPath);
     }
   });
+
+  it("runners with different dirNames do not see each other's jobs", async () => {
+    const other = createJobRunner({
+      idPrefix: 'other',
+      dirName: 'mcp-jobs-test-other',
+      waitHint: (jobId) => jobId,
+    });
+    const { jobId } = startJob({
+      command: 'make',
+      args: ['noop'],
+      cwd: workDir,
+      label: 'noop-isolated',
+      timeoutMs: 30_000,
+    });
+    await waitForJob(jobId, 20_000);
+    expect(other.snapshotJob(jobId)).toBeNull();
+  }, 25_000);
 
   it('listJobs returns recent jobs newest-first with status', async () => {
     const { jobId } = startJob({

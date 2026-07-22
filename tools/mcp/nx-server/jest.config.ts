@@ -13,6 +13,7 @@ const config: Config = {
     // Resolve the shared format helper path alias to source for ts-jest.
     '^@legacy-sports/mcp-format$':
       '<rootDir>/../../../lib/mcp-format/src/index.ts',
+    '^@legacy-sports/mcp-jobs$': '<rootDir>/../../../lib/mcp-jobs/src/index.ts',
   },
   coverageDirectory: '../../../coverage/tools/mcp/nx-server',
 };

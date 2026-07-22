@@ -1673,6 +1673,8 @@ importers:
 
   lib/mcp-format: {}
 
+  lib/mcp-jobs: {}
+
   lib/mlb-client:
     dependencies:
       tslib:

@@ -10,7 +10,8 @@
     "declaration": true,
     "baseUrl": ".",
     "paths": {
-      "@legacy-sports/mcp-format": ["../../../lib/mcp-format/src/index.ts"]
+      "@legacy-sports/mcp-format": ["../../../lib/mcp-format/src/index.ts"],
+      "@legacy-sports/mcp-jobs": ["../../../lib/mcp-jobs/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"],

@@ -129,9 +129,10 @@ describe('runTarget — default path (budgeted background job)', () => {
   });
 
   afterAll(async () => {
-    // The killed job's node grandchild survives child.kill() (make-only kill —
-    // the tree-kill gap tracked in LS-8564) and holds workDir open on Windows.
-    // Outwait it, then retry the removal to absorb any EBUSY tail.
+    // The job runner's tree-kill (taskkill /T on Windows) is fired
+    // asynchronously, so the node grandchild can briefly outlive the job and
+    // hold workDir open. Outwait it, then retry the removal to absorb any
+    // EBUSY tail.
     await new Promise((r) => setTimeout(r, 2_000));
     rmSync(workDir, {
       recursive: true,
