@@ -1078,9 +1078,11 @@ interface FootballPlayerShape {
 
 /**
  * Career-stat categories the ingestion pipeline can write for a player at a
- * given position. The `careerStats` resolver issues one DB read per category,
- * so skipping the categories a position can never accumulate avoids wasted
- * round trips on every player-detail load (LS-6245).
+ * given position. The `careerStats` resolver loads one DataLoader batch per
+ * category (LS-8567), so skipping the categories a position can never
+ * accumulate avoids wasted keys in every batch — a QB never touches the
+ * defense/idp loaders, a DST/IDP player never touches the offensive ones
+ * (LS-6245).
  *
  * This mirrors the position routing in
  * `lib/data-loaders/src/lib/load-football-career-stats.ts`:
@@ -1479,87 +1481,38 @@ FootballPlayerRef.implement({
             'Authentication required to query football career stats',
           );
         }
-        const db = context.db;
         const playerId = parent.id;
 
-        // Only read the career tables the ingestion path can populate for this
-        // player's position — a QB never has IDP rows, a kicker never has
-        // passing rows, etc. Skipping guaranteed-empty reads turns the fixed
-        // six round trips per detail load into 1 (DST/IDP) or 4 (offensive)
-        // (LS-6245).
+        // Only load the career categories the ingestion path can populate for
+        // this player's position — a QB never has IDP rows, a kicker never
+        // has passing rows, etc. Skipping guaranteed-empty keys keeps each
+        // player's request out of loaders it will never need. Every touched
+        // category loader batches across the whole page into one query per
+        // category, not one query per row (LS-8567, building on LS-6245).
         const categories = careerStatCategoriesForPlayer(parent);
-        const skip = Promise.resolve([] as never[]);
+        const loaders = context.loaders;
+        const skip = Promise.resolve(null);
 
-        const [
-          passingRows,
-          rushingRows,
-          receivingRows,
-          kickingRows,
-          defenseRows,
-          idpRows,
-        ] = await Promise.all([
+        const [p, ru, re, k, d, idp] = await Promise.all([
           categories.has('passing')
-            ? db
-                .select()
-                .from(PublicSchema.careerFootballPassing)
-                .where(
-                  eq(PublicSchema.careerFootballPassing.playerId, playerId),
-                )
-                .limit(1)
+            ? loaders.careerFootballPassing.load(playerId)
             : skip,
           categories.has('rushing')
-            ? db
-                .select()
-                .from(PublicSchema.careerFootballRushing)
-                .where(
-                  eq(PublicSchema.careerFootballRushing.playerId, playerId),
-                )
-                .limit(1)
+            ? loaders.careerFootballRushing.load(playerId)
             : skip,
           categories.has('receiving')
-            ? db
-                .select()
-                .from(PublicSchema.careerFootballReceiving)
-                .where(
-                  eq(PublicSchema.careerFootballReceiving.playerId, playerId),
-                )
-                .limit(1)
+            ? loaders.careerFootballReceiving.load(playerId)
             : skip,
           categories.has('kicking')
-            ? db
-                .select()
-                .from(PublicSchema.careerFootballKicking)
-                .where(
-                  eq(PublicSchema.careerFootballKicking.playerId, playerId),
-                )
-                .limit(1)
+            ? loaders.careerFootballKicking.load(playerId)
             : skip,
           categories.has('defense')
-            ? db
-                .select()
-                .from(PublicSchema.careerFootballDefense)
-                .where(
-                  eq(PublicSchema.careerFootballDefense.playerId, playerId),
-                )
-                .limit(1)
+            ? loaders.careerFootballDefense.load(playerId)
             : skip,
           categories.has('idp')
-            ? db
-                .select()
-                .from(PublicSchema.careerFootballDefenseIdp)
-                .where(
-                  eq(PublicSchema.careerFootballDefenseIdp.playerId, playerId),
-                )
-                .limit(1)
+            ? loaders.careerFootballDefenseIdp.load(playerId)
             : skip,
         ]);
-
-        const p = passingRows[0] ?? null;
-        const ru = rushingRows[0] ?? null;
-        const re = receivingRows[0] ?? null;
-        const k = kickingRows[0] ?? null;
-        const d = defenseRows[0] ?? null;
-        const idp = idpRows[0] ?? null;
 
         return {
           playerId,

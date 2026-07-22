@@ -139,6 +139,144 @@ export const createCareerFieldingLoader = (
     return keys.map((key) => cfMap.get(key) ?? null);
   });
 
+// ── Football Career Loaders (LS-8567) ───────────────────────────────────────
+//
+// FootballPlayer.careerStats reads 1-4 career_football_* category tables per
+// row (see careerStatCategoriesForPlayer in schema/football.ts). At pageSize
+// 100 that was up to ~400 point reads per request. These loaders key on
+// playerId so every row's request for a given category coalesces into one
+// query per category per GraphQL response, mirroring the MLB career loaders
+// above.
+
+/**
+ * DataLoader for career football passing stats
+ * Key: playerId (number)
+ */
+export const createCareerFootballPassingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.careerFootballPassing.$inferSelect | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.careerFootballPassing)
+      .where(inArray(PublicSchema.careerFootballPassing.playerId, ids));
+    const map = new Map(rows.map((r) => [r.playerId, r]));
+    return keys.map((key) => map.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for career football rushing stats
+ * Key: playerId (number)
+ */
+export const createCareerFootballRushingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.careerFootballRushing.$inferSelect | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.careerFootballRushing)
+      .where(inArray(PublicSchema.careerFootballRushing.playerId, ids));
+    const map = new Map(rows.map((r) => [r.playerId, r]));
+    return keys.map((key) => map.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for career football receiving stats
+ * Key: playerId (number)
+ */
+export const createCareerFootballReceivingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.careerFootballReceiving.$inferSelect | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.careerFootballReceiving)
+      .where(inArray(PublicSchema.careerFootballReceiving.playerId, ids));
+    const map = new Map(rows.map((r) => [r.playerId, r]));
+    return keys.map((key) => map.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for career football kicking stats
+ * Key: playerId (number)
+ */
+export const createCareerFootballKickingLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.careerFootballKicking.$inferSelect | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.careerFootballKicking)
+      .where(inArray(PublicSchema.careerFootballKicking.playerId, ids));
+    const map = new Map(rows.map((r) => [r.playerId, r]));
+    return keys.map((key) => map.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for career football (team) defense stats
+ * Key: playerId (number) — synthetic DST "player" id
+ */
+export const createCareerFootballDefenseLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.careerFootballDefense.$inferSelect | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.careerFootballDefense)
+      .where(inArray(PublicSchema.careerFootballDefense.playerId, ids));
+    const map = new Map(rows.map((r) => [r.playerId, r]));
+    return keys.map((key) => map.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for career football IDP (individual defender) stats.
+ * Backed by the `career_football_defense_idp` view (SUM of
+ * football_season_defense_idp grouped by player_id).
+ * Key: playerId (number)
+ */
+export const createCareerFootballDefenseIdpLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<
+    number,
+    typeof PublicSchema.careerFootballDefenseIdp.$inferSelect | null
+  >(async (keys) => {
+    const ids = [...new Set(keys)] as number[];
+    const rows = await db
+      .select()
+      .from(PublicSchema.careerFootballDefenseIdp)
+      .where(inArray(PublicSchema.careerFootballDefenseIdp.playerId, ids));
+
+    const map = new Map<
+      number,
+      typeof PublicSchema.careerFootballDefenseIdp.$inferSelect
+    >();
+    for (const row of rows) {
+      if (row.playerId !== null) map.set(row.playerId, row);
+    }
+    return keys.map((key) => map.get(key) ?? null);
+  });
+
 // ── Season Loaders ───────────────────────────────────────────────────────────
 
 /**

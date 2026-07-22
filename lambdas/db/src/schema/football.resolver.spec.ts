@@ -44,9 +44,18 @@ describe('football resolvers', () => {
     offset: jest.Mock;
     then: jest.Mock;
   };
+  let mockCareerFootballLoaders: {
+    careerFootballPassing: { load: jest.Mock };
+    careerFootballRushing: { load: jest.Mock };
+    careerFootballReceiving: { load: jest.Mock };
+    careerFootballKicking: { load: jest.Mock };
+    careerFootballDefense: { load: jest.Mock };
+    careerFootballDefenseIdp: { load: jest.Mock };
+  };
   let mockContext: {
     user: { id: number; isAdmin: boolean } | null;
     db: typeof mockDb;
+    loaders: typeof mockCareerFootballLoaders;
   };
 
   beforeEach(() => {
@@ -302,9 +311,19 @@ describe('football resolvers', () => {
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
+    mockCareerFootballLoaders = {
+      careerFootballPassing: { load: jest.fn().mockResolvedValue(null) },
+      careerFootballRushing: { load: jest.fn().mockResolvedValue(null) },
+      careerFootballReceiving: { load: jest.fn().mockResolvedValue(null) },
+      careerFootballKicking: { load: jest.fn().mockResolvedValue(null) },
+      careerFootballDefense: { load: jest.fn().mockResolvedValue(null) },
+      careerFootballDefenseIdp: { load: jest.fn().mockResolvedValue(null) },
+    };
+
     mockContext = {
       user: { id: 1, isAdmin: false },
       db: mockDb,
+      loaders: mockCareerFootballLoaders,
     };
   });
 
@@ -1637,10 +1656,18 @@ describe('football resolvers', () => {
       position: 'QB',
     };
 
-    // The IDP career table is the only mocked career table with a distinct
-    // shape; the four offensive tables and the team-defense table share the
-    // `{ playerId }` mock, so we assert on `from` call counts for those.
-    const idpTableMatcher = expect.objectContaining({ soloTkl: 'soloTkl' });
+    // LS-8567: the resolver now reads through per-category DataLoaders keyed
+    // by playerId instead of issuing its own db.select() per row, so these
+    // assertions check which loaders were `.load()`-ed for a given position
+    // rather than counting raw `mockDb.from` calls.
+    function loaderCallCounts() {
+      return Object.fromEntries(
+        Object.entries(mockCareerFootballLoaders).map(([name, loader]) => [
+          name,
+          loader.load.mock.calls.length,
+        ]),
+      );
+    }
 
     it('throws UNAUTHENTICATED when no user in context', async () => {
       mockContext.user = null;
@@ -1650,7 +1677,7 @@ describe('football resolvers', () => {
       ).rejects.toMatchObject({ extensions: { code: 'UNAUTHENTICATED' } });
     });
 
-    it('reads only the four offensive/kicking tables for a QB', async () => {
+    it('loads only the four offensive/kicking loaders for a QB', async () => {
       await getResolver()(
         { ...basePlayer, position: 'QB' },
         {},
@@ -1658,11 +1685,20 @@ describe('football resolvers', () => {
         undefined as never,
       );
 
-      expect(mockDb.from).toHaveBeenCalledTimes(4);
-      expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
+      expect(loaderCallCounts()).toEqual({
+        careerFootballPassing: 1,
+        careerFootballRushing: 1,
+        careerFootballReceiving: 1,
+        careerFootballKicking: 1,
+        careerFootballDefense: 0,
+        careerFootballDefenseIdp: 0,
+      });
+      expect(
+        mockCareerFootballLoaders.careerFootballPassing.load,
+      ).toHaveBeenCalledWith(basePlayer.id);
     });
 
-    it('reads only the four offensive/kicking tables for a kicker', async () => {
+    it('loads only the four offensive/kicking loaders for a kicker', async () => {
       await getResolver()(
         { ...basePlayer, position: 'K' },
         {},
@@ -1670,11 +1706,17 @@ describe('football resolvers', () => {
         undefined as never,
       );
 
-      expect(mockDb.from).toHaveBeenCalledTimes(4);
-      expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
+      expect(loaderCallCounts()).toEqual({
+        careerFootballPassing: 1,
+        careerFootballRushing: 1,
+        careerFootballReceiving: 1,
+        careerFootballKicking: 1,
+        careerFootballDefense: 0,
+        careerFootballDefenseIdp: 0,
+      });
     });
 
-    it('reads only the team-defense table for a DST', async () => {
+    it('loads only the team-defense loader for a DST', async () => {
       await getResolver()(
         { ...basePlayer, isDst: true, position: 'DST' },
         {},
@@ -1682,11 +1724,17 @@ describe('football resolvers', () => {
         undefined as never,
       );
 
-      expect(mockDb.from).toHaveBeenCalledTimes(1);
-      expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
+      expect(loaderCallCounts()).toEqual({
+        careerFootballPassing: 0,
+        careerFootballRushing: 0,
+        careerFootballReceiving: 0,
+        careerFootballKicking: 0,
+        careerFootballDefense: 1,
+        careerFootballDefenseIdp: 0,
+      });
     });
 
-    it('reads only the IDP table for an individual defender', async () => {
+    it('loads only the IDP loader for an individual defender', async () => {
       await getResolver()(
         { ...basePlayer, position: 'DL' },
         {},
@@ -1694,11 +1742,17 @@ describe('football resolvers', () => {
         undefined as never,
       );
 
-      expect(mockDb.from).toHaveBeenCalledTimes(1);
-      expect(mockDb.from).toHaveBeenCalledWith(idpTableMatcher);
+      expect(loaderCallCounts()).toEqual({
+        careerFootballPassing: 0,
+        careerFootballRushing: 0,
+        careerFootballReceiving: 0,
+        careerFootballKicking: 0,
+        careerFootballDefense: 0,
+        careerFootballDefenseIdp: 1,
+      });
     });
 
-    it('falls back to the offensive/kicking tables when position is null', async () => {
+    it('falls back to the offensive/kicking loaders when position is null', async () => {
       await getResolver()(
         { ...basePlayer, position: null },
         {},
@@ -1706,8 +1760,26 @@ describe('football resolvers', () => {
         undefined as never,
       );
 
-      expect(mockDb.from).toHaveBeenCalledTimes(4);
-      expect(mockDb.from).not.toHaveBeenCalledWith(idpTableMatcher);
+      expect(loaderCallCounts()).toEqual({
+        careerFootballPassing: 1,
+        careerFootballRushing: 1,
+        careerFootballReceiving: 1,
+        careerFootballKicking: 1,
+        careerFootballDefense: 0,
+        careerFootballDefenseIdp: 0,
+      });
+    });
+
+    it('does not touch context.db directly — reads go through loaders only', async () => {
+      await getResolver()(
+        { ...basePlayer, position: 'QB' },
+        {},
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.select).not.toHaveBeenCalled();
+      expect(mockDb.from).not.toHaveBeenCalled();
     });
   });
 
