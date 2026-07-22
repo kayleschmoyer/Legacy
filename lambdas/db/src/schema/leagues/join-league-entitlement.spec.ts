@@ -98,6 +98,16 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
         leaguePosition: sentinelTable('leaguePosition'),
         teamMembers: sentinelTable('teamMembers'),
         leagueMessages: sentinelTable('leagueMessages'),
+        // Referenced at module scope by football.ts's FOOTBALL_STAT_SORTS /
+        // CATEGORY_TABLES (LS-8566/LS-8567) — the full `../../schema` import
+        // below pulls football.ts in transitively, so these keys must exist
+        // even though this suite never queries them.
+        careerFootballPassing: sentinelTable('careerFootballPassing'),
+        careerFootballRushing: sentinelTable('careerFootballRushing'),
+        careerFootballReceiving: sentinelTable('careerFootballReceiving'),
+        careerFootballKicking: sentinelTable('careerFootballKicking'),
+        careerFootballDefense: sentinelTable('careerFootballDefense'),
+        careerFootballDefenseIdp: sentinelTable('careerFootballDefenseIdp'),
       },
       InternalSchema: {
         usersInAppInternal: sentinelTable('usersInAppInternal'),
@@ -252,7 +262,8 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
         [{ id: 7, name: 'Test League', owner: 99, faabBudgetDefault: 100 }],
         [], // not already a member
         [{ tier: 'free' }],
-        [{ leagueCount: 2 }], // 1 created + 1 joined
+        [{ leagueCount: 2 }], // pre-check (requireJoinLeagueCapacity)
+        [{ leagueCount: 2 }], // in-transaction re-check (claimUnassignedTeamForUser)
       ];
       const db = makeChainableDb(readQueue);
       const resolve = resolverFor('joinLeagueByCode');
