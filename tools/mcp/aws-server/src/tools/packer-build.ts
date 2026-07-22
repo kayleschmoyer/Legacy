@@ -3,7 +3,6 @@ import { createWriteStream, readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getRepoRoot, runCommand } from '../run-command.js';
-import { errorResult } from '../aws-error.js';
 import type { ToolResult } from '../types.js';
 
 // Parses: "==> amazon-ebs.runner: AMI: ami-0abc1234def56789a"
@@ -12,6 +11,18 @@ const AMI_PATTERN = /AMI: (ami-[0-9a-f]+)/;
 // Parses: "Build 'amazon-ebs.runner' finished after 10 minutes 15 seconds."
 const DURATION_PATTERN =
   /finished after\s+(?:(\d+)\s+minutes?)?\s*(?:(\d+)\s+seconds?)?/;
+
+// Hard per-call ceiling: cloud sessions kill any MCP call at ~60s (transport
+// timeout). Longer waits are re-armed by the caller re-invoking
+// packer_build_wait (mirrors ci_wait_run in tools/mcp/ci-server).
+const MAX_WAIT_SECONDS = 55;
+// Default initial wait for packer_build before returning a running snapshot.
+const DEFAULT_SYNC_WAIT_SECONDS = 45;
+const RECORD_POLL_MS = 1000;
+// Backstop: kill a background build that outlives the ceiling the old
+// synchronous mode enforced.
+const BUILD_BACKSTOP_MS = 30 * 60_000;
+const INIT_TIMEOUT_MS = 120_000;
 
 interface BuildRecord {
   pid: number;
@@ -78,61 +89,129 @@ function ensureLogDir(): string {
   return dir;
 }
 
+export function packerWaitHint(buildId: string): string {
+  return (
+    `Build is still running. Call packer_build_wait({ buildId: "${buildId}" }) to continue waiting ` +
+    `(each call waits up to ${MAX_WAIT_SECONDS}s and returns a status snapshot — never an error ` +
+    'while the build is in progress). Do NOT re-run packer_build.'
+  );
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
- * Spawns a process, tees stdout+stderr to `logStream`, and resolves with the
- * combined output string. Rejects on non-zero exit or timeout.
+ * Spawns `packer init` + `packer build` as a detached background job, teeing
+ * output to a log file and tracking completion in the registry. Nothing on the
+ * tool-call path may block past the sync budget, so even `packer init` (up to
+ * 120s of plugin downloads) runs inside the job.
  */
-function spawnCapture(
-  cmd: string,
-  args: string[],
+function startBackgroundBuild(
   cwd: string,
-  logStream: ReturnType<typeof createWriteStream>,
-  timeoutMs: number,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, {
+  resolvedHcl: string,
+  buildArgs: string[],
+): { buildId: string; record: BuildRecord } {
+  const buildId = newBuildId();
+  const logPath = join(ensureLogDir(), `${buildId}.log`);
+  const logStream = createWriteStream(logPath);
+  const record: BuildRecord = {
+    pid: 0,
+    logPath,
+    startTime: Date.now(),
+    exitCode: null,
+    done: false,
+    error: null,
+  };
+  buildRegistry.set(buildId, record);
+
+  void (async () => {
+    try {
+      const initOut = await runCommand(
+        'packer',
+        ['init', resolvedHcl],
+        dirname(resolvedHcl),
+        {},
+        INIT_TIMEOUT_MS,
+      );
+      if (initOut) logStream.write(`${initOut}\n`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      record.exitCode = -1;
+      record.done = true;
+      record.error = `packer init failed: ${msg}`;
+      logStream.end(`packer init failed: ${msg}\n`);
+      return;
+    }
+
+    const child = spawn('packer', buildArgs, {
       cwd,
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    record.pid = child.pid ?? 0;
+    child.stdout?.pipe(logStream);
+    child.stderr?.pipe(logStream);
 
-    const chunks: string[] = [];
-    let settled = false;
-
-    const onData = (buf: Buffer) => {
-      chunks.push(buf.toString());
-      logStream.write(buf);
-    };
-
-    child.stdout?.on('data', onData);
-    child.stderr?.on('data', onData);
-
-    const timer = setTimeout(() => {
-      settled = true;
+    let killedByBackstop = false;
+    const backstop = setTimeout(() => {
+      killedByBackstop = true;
       child.kill();
-      logStream.end();
-      reject(
-        new Error(
-          `Packer timed out after ${Math.round(timeoutMs / 60_000)} minutes`,
-        ),
-      );
-    }, timeoutMs);
+    }, BUILD_BACKSTOP_MS);
+    // The backstop must not keep the server process (or a test runner) alive.
+    backstop.unref();
 
     child.on('close', (code) => {
-      clearTimeout(timer);
-      if (settled) return;
-      settled = true;
+      clearTimeout(backstop);
+      record.exitCode = code;
+      record.done = true;
+      record.error = killedByBackstop
+        ? `Packer build timed out after ${Math.round(BUILD_BACKSTOP_MS / 60_000)} minutes and was killed`
+        : code !== 0
+          ? `Packer exited with code ${code}`
+          : null;
       logStream.end();
-      const log = chunks.join('');
-      if (code === 0) {
-        resolve(log);
-      } else {
-        reject(
-          new Error(`Packer exited with code ${code}:\n${log.slice(-3000)}`),
-        );
-      }
     });
-  });
+  })();
+
+  return { buildId, record };
+}
+
+async function waitForRecord(
+  record: BuildRecord,
+  budgetMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + budgetMs;
+  while (!record.done && Date.now() < deadline) {
+    await sleep(Math.min(RECORD_POLL_MS, Math.max(deadline - Date.now(), 1)));
+  }
+  return record.done;
+}
+
+/** In-progress snapshot with a re-arm hint — never an error while running. */
+function runningSnapshot(buildId: string, record: BuildRecord): ToolResult {
+  let logTail = '';
+  try {
+    logTail = readFileSync(record.logPath, 'utf-8').slice(-2000);
+  } catch {
+    logTail = '(log not yet readable)';
+  }
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify({
+          ok: true,
+          buildId,
+          status: 'running',
+          elapsedSec: Math.round((Date.now() - record.startTime) / 1000),
+          logPath: record.logPath,
+          logTail,
+          hint: packerWaitHint(buildId),
+        }),
+      },
+    ],
+  };
 }
 
 // ---- packer_build ----
@@ -142,30 +221,53 @@ export interface PackerBuildParams {
   vars?: Record<string, string>;
   worktreePath?: string;
   runInBackground?: boolean;
+  maxWaitSeconds?: number;
+}
+
+// Validate inputs at the interpolation boundary: hclPath and vars reach the
+// `packer init` / `packer build` argv, and both runCommand and spawn execute
+// with shell: true, so shell metacharacters would be interpreted. hclPath is
+// restricted to path characters (backslash + drive colon allowed for Windows);
+// var names to identifier characters; var values reject the same metacharacter
+// class aws_ssm_run_command blocks.
+const HCL_PATH_RE = /^[A-Za-z0-9._/\\:-]+\.pkr\.hcl$/;
+const VAR_NAME_RE = /^[A-Za-z0-9_-]+$/;
+const VAR_VALUE_METACHAR_RE = /[\n\r"'`$;&|<>(){}\\]/;
+
+function invalidInput(error: string): ToolResult {
+  return {
+    content: [{ type: 'text', text: JSON.stringify({ ok: false, error }) }],
+    isError: true,
+  };
 }
 
 export async function packerBuild(
   params: PackerBuildParams,
 ): Promise<ToolResult> {
   const { hclPath, vars = {}, runInBackground = false } = params;
+
+  if (!HCL_PATH_RE.test(hclPath)) {
+    return invalidInput(
+      `Invalid hclPath ${JSON.stringify(hclPath)}: must be a plain path to a .pkr.hcl file with no spaces, quotes, or shell metacharacters.`,
+    );
+  }
+  for (const [k, v] of Object.entries(vars)) {
+    if (!VAR_NAME_RE.test(k)) {
+      return invalidInput(
+        `Invalid var name ${JSON.stringify(k)}: must match [A-Za-z0-9_-]+.`,
+      );
+    }
+    if (VAR_VALUE_METACHAR_RE.test(v)) {
+      return invalidInput(
+        `Var ${JSON.stringify(k)} contains disallowed characters: ${JSON.stringify(v)}. Values must not contain quotes, backticks, backslashes, newlines, or shell operators.`,
+      );
+    }
+  }
+
   const cwd = params.worktreePath
     ? resolve(params.worktreePath)
     : getRepoRoot();
   const resolvedHcl = isAbsolute(hclPath) ? hclPath : join(cwd, hclPath);
-
-  // Ensure required Packer plugins are installed before building.
-  try {
-    await runCommand(
-      'packer',
-      ['init', resolvedHcl],
-      dirname(resolvedHcl),
-      {},
-      120_000,
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return errorResult('packer init', msg);
-  }
 
   const buildArgs = ['build'];
   for (const [k, v] of Object.entries(vars)) {
@@ -173,36 +275,9 @@ export async function packerBuild(
   }
   buildArgs.push(resolvedHcl);
 
+  const { buildId, record } = startBackgroundBuild(cwd, resolvedHcl, buildArgs);
+
   if (runInBackground) {
-    const buildId = newBuildId();
-    const bgLogPath = join(ensureLogDir(), `${buildId}.log`);
-    const logStream = createWriteStream(bgLogPath);
-
-    const child = spawn('packer', buildArgs, {
-      cwd,
-      shell: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    const record: BuildRecord = {
-      pid: child.pid ?? 0,
-      logPath: bgLogPath,
-      startTime: Date.now(),
-      exitCode: null,
-      done: false,
-      error: null,
-    };
-    buildRegistry.set(buildId, record);
-
-    child.stdout?.pipe(logStream);
-    child.stderr?.pipe(logStream);
-    child.on('close', (code) => {
-      record.exitCode = code;
-      record.done = true;
-      record.error = code !== 0 ? `Packer exited with code ${code}` : null;
-      logStream.end();
-    });
-
     return {
       content: [
         {
@@ -210,85 +285,22 @@ export async function packerBuild(
           text: JSON.stringify({
             ok: true,
             buildId,
-            logPath: bgLogPath,
+            logPath: record.logPath,
             message:
-              'Packer build started in background. Use packer_build_status to poll progress or packer_build_wait to block until complete.',
+              'Packer build started in background. Use packer_build_status to poll progress or packer_build_wait for a bounded wait.',
           }),
         },
       ],
     };
   }
 
-  // Synchronous mode: run packer and wait up to 30 minutes.
-  const syncLogPath = join(ensureLogDir(), `${newBuildId()}.log`);
-  const logStream = createWriteStream(syncLogPath);
-  const startTime = Date.now();
-
-  let fullLog: string;
-  try {
-    fullLog = await spawnCapture(
-      'packer',
-      buildArgs,
-      cwd,
-      logStream,
-      30 * 60_000,
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error: msg,
-            fullLogPath: syncLogPath,
-          }),
-        },
-      ],
-      isError: true,
-    };
-  }
-
-  const durationSec =
-    parseDurationSec(fullLog) ?? Math.round((Date.now() - startTime) / 1000);
-  const amiId = parseAmiId(fullLog);
-
-  if (!amiId) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ok: false,
-            error:
-              'Build succeeded but no AMI ID was found in Packer output. Check the log.',
-            fullLogPath: syncLogPath,
-          }),
-        },
-      ],
-      isError: true,
-    };
-  }
-
-  const meta = await fetchImageMeta(cwd, amiId);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          ok: true,
-          amiId,
-          name: meta.name,
-          durationSec,
-          snapshotId: meta.snapshotId,
-          tags: meta.tags,
-          fullLogPath: syncLogPath,
-        }),
-      },
-    ],
-  };
+  const budgetSec = Math.min(
+    params.maxWaitSeconds ?? DEFAULT_SYNC_WAIT_SECONDS,
+    MAX_WAIT_SECONDS,
+  );
+  const done = await waitForRecord(record, budgetSec * 1000);
+  if (!done) return runningSnapshot(buildId, record);
+  return packerBuildStatus({ buildId });
 }
 
 // ---- packer_build_status ----
@@ -424,10 +436,17 @@ export interface PackerBuildWaitParams {
   timeoutSec?: number;
 }
 
+/**
+ * Bounded wait for a background Packer build. Transport-safe replacement for
+ * a single long-poll: each call blocks at most MAX_WAIT_SECONDS and returns a
+ * { status: "running" } snapshot (not an error) if the build has not finished,
+ * so the caller re-arms with another call instead of losing an in-flight
+ * long-poll to the MCP transport timeout. Mirrors ci_wait_run.
+ */
 export async function packerBuildWait(
   params: PackerBuildWaitParams,
 ): Promise<ToolResult> {
-  const { buildId, pollIntervalSec = 30, timeoutSec = 1800 } = params;
+  const { buildId } = params;
   const record = buildRegistry.get(buildId);
 
   if (!record) {
@@ -445,29 +464,17 @@ export async function packerBuildWait(
     };
   }
 
-  const maxMs = timeoutSec * 1000;
-  const pollMs = Math.max(5_000, pollIntervalSec * 1000);
-  const waitStart = Date.now();
+  const waitSec = Math.min(
+    params.timeoutSec ?? MAX_WAIT_SECONDS,
+    MAX_WAIT_SECONDS,
+  );
+  const pollMs = Math.max(1_000, (params.pollIntervalSec ?? 5) * 1000);
+  const deadline = Date.now() + waitSec * 1000;
 
-  while (!record.done) {
-    if (Date.now() - waitStart > maxMs) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              ok: false,
-              buildId,
-              error: `Wait timed out after ${timeoutSec}s. Build is still running.`,
-              logPath: record.logPath,
-            }),
-          },
-        ],
-        isError: true,
-      };
-    }
-    await new Promise<void>((r) => setTimeout(r, pollMs));
+  while (!record.done && Date.now() < deadline) {
+    await sleep(Math.min(pollMs, Math.max(deadline - Date.now(), 1)));
   }
 
+  if (!record.done) return runningSnapshot(buildId, record);
   return packerBuildStatus({ buildId });
 }

@@ -252,7 +252,7 @@ server.tool(
 // --- aws_ssm_run_command ---
 server.tool(
   'aws_ssm_run_command',
-  'Run ad-hoc shell commands on an EC2 instance via AWS SSM (no SSH needed). Requires the instance to have the SSM agent running and the IAM role to have AmazonSSMManagedInstanceCore. Polls until completion and returns stdout/stderr. Use for debugging runner state (e.g. inspecting /opt/playwright-browsers).',
+  'Run ad-hoc shell commands on an EC2 instance via AWS SSM (no SSH needed). Requires the instance to have the SSM agent running and the IAM role to have AmazonSSMManagedInstanceCore. Polls up to 55s per call and returns stdout/stderr when done; a still-running command returns an in-progress snapshot with a re-arm hint — call again with the returned commandId to continue waiting. Use for debugging runner state (e.g. inspecting /opt/playwright-browsers).',
   {
     instanceId: z
       .string()
@@ -263,8 +263,15 @@ server.tool(
       .array(z.string())
       .min(1)
       .max(20)
+      .optional()
       .describe(
-        "Simple commands with arguments only. Each command is validated and must not contain: pipes (|), redirects (>, <), semicolons (;), ampersands (&), dollar signs ($), quotes (\" or '), backticks (`), parentheses, braces, backslashes, or newlines. Example: ['ls -la', 'cat /etc/hostname']",
+        "Simple commands with arguments only. Required unless commandId is provided. Each command is validated and must not contain: pipes (|), redirects (>, <), semicolons (;), ampersands (&), dollar signs ($), quotes (\" or '), backticks (`), parentheses, braces, backslashes, or newlines. Example: ['ls -la', 'cat /etc/hostname']",
+      ),
+    commandId: z
+      .string()
+      .optional()
+      .describe(
+        'Re-attach to a command a previous aws_ssm_run_command call returned an in-progress snapshot for. When provided, commands is ignored and this call only polls for completion.',
       ),
     timeout: z.coerce
       .number()
@@ -272,7 +279,18 @@ server.tool(
       .min(10)
       .max(3600)
       .default(60)
-      .describe('Command timeout in seconds (min: 10, default: 60, max: 3600)'),
+      .describe(
+        'Server-side SSM command timeout in seconds (min: 10, default: 60, max: 3600). Not the per-call poll budget — see maxWaitSeconds.',
+      ),
+    maxWaitSeconds: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(55)
+      .default(55)
+      .describe(
+        'Max seconds this call polls before returning an in-progress snapshot with a re-arm hint (default and cap: 55).',
+      ),
   },
   async (params) => ssmRunCommand(params),
 );
@@ -631,18 +649,18 @@ server.tool(
 // --- packer_build ---
 server.tool(
   'packer_build',
-  'Run `packer build` against an HCL template and return structured output: amiId, name, durationSec, snapshotId, tags, fullLogPath. Runs `packer init` first to install required plugins. Pass runInBackground=true to start the build asynchronously and get back a buildId — use packer_build_status to poll or packer_build_wait to block until done.',
+  'Run `packer build` against an HCL template. The build (including `packer init`) always runs in the background; by default this call waits up to 45s and returns either the finished structured result (amiId, name, durationSec, snapshotId, tags, logPath) or a running snapshot with a buildId + re-arm hint. Use packer_build_status to poll or packer_build_wait for a bounded wait. Pass runInBackground=true to return immediately with the buildId.',
   {
     hclPath: z
       .string()
       .describe(
-        'Path to the Packer HCL template file, relative to the repo root (or worktreePath if provided). Example: "terraform/runners/packer/runner-ami.pkr.hcl".',
+        'Path to the Packer HCL template file (.pkr.hcl), relative to the repo root (or worktreePath if provided). Path characters only — no spaces, quotes, or shell metacharacters. Example: "terraform/runners/packer/runner-ami.pkr.hcl".',
       ),
     vars: z
       .record(z.string(), z.string())
       .optional()
       .describe(
-        'Packer variable overrides passed as `-var key=value`. Example: { vpc_id: "vpc-0abc123", subnet_id: "subnet-0abc123", playwright_version: "1.50.0" }.',
+        'Packer variable overrides passed as `-var key=value`. Names must match [A-Za-z0-9_-]+; values must not contain quotes, backticks, backslashes, newlines, or shell operators. Example: { vpc_id: "vpc-0abc123", subnet_id: "subnet-0abc123", playwright_version: "1.50.0" }.',
       ),
     worktreePath: z
       .string()
@@ -654,7 +672,16 @@ server.tool(
       .boolean()
       .default(false)
       .describe(
-        'When true, spawn the build in the background and return immediately with a buildId. Use packer_build_status or packer_build_wait to track completion. Default: false (block until done).',
+        'When true, skip the initial wait and return immediately with a buildId. The build always runs in the background either way. Default: false (wait up to maxWaitSeconds, then return a running snapshot if not finished).',
+      ),
+    maxWaitSeconds: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(55)
+      .default(45)
+      .describe(
+        'Max seconds to wait for completion before returning a running snapshot (default: 45, cap: 55). Ignored when runInBackground=true.',
       ),
   },
   async (params) => packerBuild(params),
@@ -663,13 +690,11 @@ server.tool(
 // --- packer_build_status ---
 server.tool(
   'packer_build_status',
-  'Check the status of a background Packer build started with packer_build(runInBackground=true). Returns status ("running" | "done" | "failed"), elapsed time, and a tail of the build log. When done, returns the same structured output as a synchronous packer_build call.',
+  'Check the status of a background Packer build. Returns status ("running" | "done" | "failed"), elapsed time, and a tail of the build log. When done, returns the same structured output as a completed packer_build call.',
   {
     buildId: z
       .string()
-      .describe(
-        'The buildId returned by packer_build when runInBackground=true.',
-      ),
+      .describe('The buildId returned by a previous packer_build call.'),
   },
   async (params) => packerBuildStatus(params),
 );
@@ -677,30 +702,28 @@ server.tool(
 // --- packer_build_wait ---
 server.tool(
   'packer_build_wait',
-  'Block until a background Packer build completes, then return the same structured output as a synchronous packer_build call. Use after packer_build(runInBackground=true) when you want to wait for the result in a later turn.',
+  'Bounded wait for a background Packer build: each call waits up to 55s and returns the finished structured result, or a status snapshot with a re-arm hint if the build is still running — never an error while in progress. Re-invoke to continue waiting. Do NOT re-run packer_build.',
   {
     buildId: z
       .string()
-      .describe(
-        'The buildId returned by packer_build when runInBackground=true.',
-      ),
+      .describe('The buildId returned by a previous packer_build call.'),
     pollIntervalSec: z.coerce
       .number()
       .int()
-      .min(5)
-      .max(300)
-      .default(30)
+      .min(1)
+      .max(55)
+      .default(5)
       .describe(
-        'How often to poll for completion in seconds (min: 5, default: 30, max: 300).',
+        'How often to poll for completion in seconds (min: 1, default: 5, max: 55).',
       ),
     timeoutSec: z.coerce
       .number()
       .int()
-      .min(60)
-      .max(3600)
-      .default(1800)
+      .min(5)
+      .max(55)
+      .default(55)
       .describe(
-        'Maximum time to wait before returning a timeout error, in seconds (default: 1800 = 30 min).',
+        'Max seconds this call waits before returning an in-progress snapshot with a re-arm hint (default and cap: 55).',
       ),
   },
   async (params) => packerBuildWait(params),
