@@ -26,56 +26,85 @@ export interface HandleLoadFootballCareerArgs {
 
 const CACHE_CLEAR_INTERVAL = 50;
 
-// Number of consecutive 403s (expired PFR_CF_CLEARANCE cookie) that trigger
-// an early abort instead of grinding through the rest of the player list.
-const AUTH_FAILURE_STREAK_THRESHOLD = 4;
+// Number of consecutive player failures that trigger an early abort instead of
+// grinding through the rest of the list. A run of back-to-back failures is
+// almost always one systemic cause (expired PFR_CF_CLEARANCE, DB connection
+// dropped, PFR down) rather than N independent per-player problems, and every
+// further attempt just burns time producing the same error.
+const FAILURE_STREAK_THRESHOLD = 4;
 
 const AUTH_EXPIRED_MESSAGE =
   'PFR auth appears to have expired — refresh PFR_CF_CLEARANCE and re-run.';
 
-/**
- * Tracks consecutive 403 (auth-looking) failures across a loop of
- * `loadSinglePlayer` calls. A single non-auth failure or a success resets the
- * streak, so only a genuine run of auth failures — not scattered per-player
- * errors — triggers an abort. Also tracks whether *any* auth failure was seen
- * across the whole run (independent of streaks resetting), so callers can
- * raise one actionable alert even when auth failures never chain into a
- * streak (e.g. a small --limit run, or 403s interleaved with successes).
- */
-class AuthFailureStreakTracker {
-  private consecutiveAuthFailures = 0;
-  private sawAuthFailure = false;
-
-  /** Records a result; returns true once the abort threshold is reached. */
-  record(result: { isAuthError?: boolean }): boolean {
-    if (result.isAuthError) {
-      this.consecutiveAuthFailures++;
-      this.sawAuthFailure = true;
-    } else {
-      this.consecutiveAuthFailures = 0;
-    }
-    return this.consecutiveAuthFailures >= AUTH_FAILURE_STREAK_THRESHOLD;
-  }
-
-  get hasAuthFailures(): boolean {
-    return this.sawAuthFailure;
-  }
+interface PlayerLoadResult {
+  success: boolean;
+  error?: string;
+  /**
+   * The thrown Error itself, kept so the run summary can forward it to Rollbar
+   * as a first-class argument (stack trace intact) rather than only its
+   * flattened message string.
+   */
+  errorInstance?: Error;
+  isAuthError?: boolean;
 }
 
 /**
- * Emits the actionable auth-expiry alert exactly once per run. Individual
- * per-player 403s are logged at `warn` (see loadSinglePlayer) so a run of
- * many auth failures doesn't flood Rollbar with duplicate `error`-level
- * occurrences for what is really one root cause — this is the single
- * `error`-level signal that reaches Rollbar. Skipped when the streak abort
- * already logged AUTH_EXPIRED_MESSAGE, so a run never double-alerts.
+ * Tracks consecutive failures across a loop of `loadSinglePlayer` calls so a
+ * systemic outage aborts the run instead of repeating per player. A success
+ * resets the streak, so scattered per-player errors never trigger an abort.
+ *
+ * The streak is deliberately failure-class agnostic (LS-8431): an earlier fix
+ * only counted 403s, which left a dropped DB connection to fail every
+ * remaining player — 20+ identical errors in a single second, one Rollbar
+ * occurrence each, until Rollbar's per-minute cap started dropping *real*
+ * errors (LS-8571). Auth is still tracked separately, but only to pick a more
+ * actionable operator message.
  */
-function logAuthFailureSummaryIfNeeded(
-  authTracker: AuthFailureStreakTracker,
-  alreadyAborted: boolean,
-): void {
-  if (!alreadyAborted && authTracker.hasAuthFailures) {
-    LOGGER.error(AUTH_EXPIRED_MESSAGE);
+class FailureStreakTracker {
+  private consecutiveFailures = 0;
+  private failureCount = 0;
+  private sawAuthFailure = false;
+  private firstError: string | undefined;
+  private firstErrorInstance: Error | undefined;
+
+  /** Records a result; returns true once the abort threshold is reached. */
+  record(result: PlayerLoadResult): boolean {
+    if (result.success) {
+      this.consecutiveFailures = 0;
+      return false;
+    }
+    this.consecutiveFailures++;
+    this.failureCount++;
+    this.sawAuthFailure ||= result.isAuthError === true;
+    this.firstError ??= result.error;
+    this.firstErrorInstance ??= result.errorInstance;
+    return this.consecutiveFailures >= FAILURE_STREAK_THRESHOLD;
+  }
+
+  get hasFailures(): boolean {
+    return this.failureCount > 0;
+  }
+
+  /**
+   * The single operator-facing line describing what went wrong this run.
+   * Auth expiry gets its own message because the remedy is specific; anything
+   * else reports the count plus the first error as a representative sample.
+   */
+  get summaryMessage(): string {
+    if (this.sawAuthFailure) return AUTH_EXPIRED_MESSAGE;
+    return (
+      `${this.failureCount} player(s) failed — first error: ` +
+      `${this.firstError ?? 'unknown'}`
+    );
+  }
+
+  /**
+   * The first failing Error, forwarded alongside {@link summaryMessage} so
+   * Rollbar receives a real stack trace (RollbarOutputDestination picks the
+   * first Error argument), not just the flattened message text.
+   */
+  get representativeError(): Error | undefined {
+    return this.firstErrorInstance;
   }
 }
 
@@ -110,7 +139,7 @@ async function loadSinglePlayer(
   db: PublicDb,
   playerId: number,
   startSeason?: number,
-): Promise<{ success: boolean; error?: string; isAuthError?: boolean }> {
+): Promise<PlayerLoadResult> {
   try {
     const result = await loadFootballCareerStats(db, playerId, startSeason);
     LOGGER.info(
@@ -121,24 +150,100 @@ async function loadSinglePlayer(
     );
     return { success: true };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const isAuthError = isPfrForbiddenError(err);
-    // Auth failures are a single known root cause (expired cf_clearance)
-    // repeated per-player, not independent errors — log at `warn` so a run
-    // of many 403s doesn't flood Rollbar with duplicate occurrences. The
-    // caller raises one `error`-level alert for the whole run instead (see
-    // logAuthFailureSummaryIfNeeded).
-    if (isAuthError) {
-      LOGGER.warn(`Player ${playerId} failed: ${message}`);
-    } else {
-      LOGGER.error(`Player ${playerId} failed: ${message}`);
-    }
+    const errorInstance = err instanceof Error ? err : new Error(String(err));
+    const message = errorInstance.message;
+    // Per-player failures are logged at `warn`, never `error`: a batch run
+    // fails player-by-player from one systemic cause, and `error` is the level
+    // forwarded to Rollbar (RollbarOutputDestination.shouldLog), so logging
+    // each one at `error` turns a single outage into N Rollbar occurrences.
+    // That flood is what tripped Rollbar's per-minute item cap and caused real
+    // errors to be dropped (LS-8431 / LS-8571). The caller emits exactly one
+    // `error`-level summary per run instead — see runPlayerBatch.
+    LOGGER.warn(`Player ${playerId} failed: ${message}`);
     return {
       success: false,
       error: message,
-      isAuthError,
+      errorInstance,
+      isAuthError: isPfrForbiddenError(err),
     };
   }
+}
+
+interface BatchPlayer {
+  id: number;
+  pfrId: string | null;
+}
+
+interface BatchOutcome {
+  attempted: number;
+  failed: number;
+  /** True when the loop stopped early on a consecutive-failure streak. */
+  aborted: boolean;
+}
+
+/**
+ * Runs `loadSinglePlayer` over `players`, aborting on a consecutive-failure
+ * streak and emitting exactly one `error`-level line for the whole run.
+ *
+ * Shared by every batch mode (--batch, --limit, --all) so the fail-fast and
+ * Rollbar-noise behaviour can't drift between them — before LS-8431 the loop
+ * was copy-pasted three times.
+ *
+ * `skipWithoutPfrId` mirrors --all mode, which iterates every football player
+ * including those that have no PFR id to fetch.
+ */
+async function runPlayerBatch(
+  db: PublicDb,
+  players: BatchPlayer[],
+  startSeason: number | undefined,
+  { skipWithoutPfrId = false }: { skipWithoutPfrId?: boolean } = {},
+): Promise<BatchOutcome> {
+  const tracker = new FailureStreakTracker();
+  let attempted = 0;
+  let failed = 0;
+  let aborted = false;
+
+  for (const [index, player] of players.entries()) {
+    LOGGER.info(
+      `[${index + 1}/${players.length}] Player ${player.id}` +
+        (player.pfrId ? ` (${player.pfrId})` : ''),
+    );
+
+    if (skipWithoutPfrId && !player.pfrId) {
+      LOGGER.warn(`Skipping player ${player.id} — no pfrId`);
+      continue;
+    }
+
+    attempted++;
+    const result = await loadSinglePlayer(db, player.id, startSeason);
+    if (!result.success) failed++;
+
+    if (tracker.record(result)) {
+      aborted = true;
+      LOGGER.error(
+        `Aborting after ${FAILURE_STREAK_THRESHOLD} consecutive failures. ` +
+          tracker.summaryMessage,
+        ...(tracker.representativeError ? [tracker.representativeError] : []),
+      );
+      break;
+    }
+
+    if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
+      clearCache();
+    }
+  }
+
+  // One `error`-level line per run — the only signal that reaches Rollbar.
+  // Skipped when the abort above already logged it, so a run never
+  // double-alerts.
+  if (!aborted && tracker.hasFailures) {
+    LOGGER.error(
+      tracker.summaryMessage,
+      ...(tracker.representativeError ? [tracker.representativeError] : []),
+    );
+  }
+
+  return { attempted, failed, aborted };
 }
 
 export async function handleLoadFootballCareer(
@@ -199,37 +304,16 @@ export async function handleLoadFootballCareer(
       LOGGER.info(
         `Loading football career stats for ${playerIds.length} players from ${batch}`,
       );
-      const errors: Array<{ playerId: number; error: string }> = [];
-      const authTracker = new AuthFailureStreakTracker();
-      let authExpired = false;
-
-      for (const [index, pid] of playerIds.entries()) {
-        LOGGER.info(`[${index + 1}/${playerIds.length}] Player ${pid}`);
-        const result = await loadSinglePlayer(db, pid, startSeason);
-        if (!result.success) {
-          errors.push({ playerId: pid, error: result.error ?? 'unknown' });
-        }
-        if (authTracker.record(result)) {
-          authExpired = true;
-          LOGGER.error(AUTH_EXPIRED_MESSAGE);
-          break;
-        }
-        if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
-          clearCache();
-        }
-      }
-
-      logAuthFailureSummaryIfNeeded(authTracker, authExpired);
-      LOGGER.info(
-        `Batch complete: ${playerIds.length - errors.length}/${playerIds.length} succeeded`,
+      const outcome = await runPlayerBatch(
+        db,
+        playerIds.map((id) => ({ id, pfrId: null })),
+        startSeason,
       );
-      if (errors.length > 0) {
-        LOGGER.error(
-          `${errors.length} player(s) failed:`,
-          JSON.stringify(errors),
-        );
-      }
-      if (authExpired) {
+
+      LOGGER.info(
+        `Batch complete: ${outcome.attempted - outcome.failed}/${playerIds.length} succeeded`,
+      );
+      if (outcome.aborted) {
         process.exit(1);
       }
       return;
@@ -246,44 +330,17 @@ export async function handleLoadFootballCareer(
         `Loading next ${batchPlayers.length} football player(s) ` +
           '(never-fetched first, then oldest)',
       );
-      const errors: Array<{ playerId: number; error: string }> = [];
-      const authTracker = new AuthFailureStreakTracker();
-      let authExpired = false;
+      const outcome = await runPlayerBatch(db, batchPlayers, startSeason);
 
-      for (const [index, p] of batchPlayers.entries()) {
-        LOGGER.info(
-          `[${index + 1}/${batchPlayers.length}] Player ${p.id} (${p.pfrId ?? 'no pfrId'})`,
-        );
-        const result = await loadSinglePlayer(db, p.id, startSeason);
-        if (!result.success) {
-          errors.push({ playerId: p.id, error: result.error ?? 'unknown' });
-        }
-        if (authTracker.record(result)) {
-          authExpired = true;
-          LOGGER.error(AUTH_EXPIRED_MESSAGE);
-          break;
-        }
-        if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
-          clearCache();
-        }
-      }
-
-      logAuthFailureSummaryIfNeeded(authTracker, authExpired);
       LOGGER.info(
-        `Batch complete: ${batchPlayers.length - errors.length}/${batchPlayers.length} succeeded — run again to continue.`,
+        `Batch complete: ${outcome.attempted - outcome.failed}/${batchPlayers.length} succeeded — run again to continue.`,
       );
-      if (errors.length > 0) {
-        LOGGER.error(
-          `${errors.length} player(s) failed:`,
-          JSON.stringify(errors),
-        );
-      }
       // Exit non-zero when the entire batch failed (e.g. cookie/tunnel down)
-      // or the loop aborted early on an auth-expiry streak — either way
-      // callers/CI must see the failure. Partial failures with no abort are
-      // expected for a resumable loader — failed players stay un-stamped and
-      // retry next run.
-      if (errors.length === batchPlayers.length || authExpired) {
+      // or the loop aborted early on a failure streak — either way callers/CI
+      // must see the failure. Partial failures with no abort are expected for
+      // a resumable loader — failed players stay un-stamped and retry next
+      // run.
+      if (outcome.failed === batchPlayers.length || outcome.aborted) {
         process.exit(1);
       }
       return;
@@ -294,46 +351,14 @@ export async function handleLoadFootballCareer(
     LOGGER.info(
       `Loading football career stats for all ${players.length} football players`,
     );
-    const errors: Array<{ playerId: number; error: string }> = [];
-    const authTracker = new AuthFailureStreakTracker();
-    let authExpired = false;
+    const outcome = await runPlayerBatch(db, players, startSeason, {
+      skipWithoutPfrId: true,
+    });
 
-    for (const [index, p] of players.entries()) {
-      LOGGER.info(
-        `[${index + 1}/${players.length}] Player ${p.id} (${p.pfrId ?? 'no pfrId'})`,
-      );
-
-      if (!p.pfrId) {
-        LOGGER.warn(`Skipping player ${p.id} — no pfrId`);
-        continue;
-      }
-
-      const result = await loadSinglePlayer(db, p.id, startSeason);
-      if (!result.success) {
-        errors.push({ playerId: p.id, error: result.error ?? 'unknown' });
-      }
-      if (authTracker.record(result)) {
-        authExpired = true;
-        LOGGER.error(AUTH_EXPIRED_MESSAGE);
-        break;
-      }
-
-      if ((index + 1) % CACHE_CLEAR_INTERVAL === 0) {
-        clearCache();
-      }
-    }
-
-    logAuthFailureSummaryIfNeeded(authTracker, authExpired);
     LOGGER.info(
-      `All-players load complete: ${players.length - errors.length}/${players.length} succeeded`,
+      `All-players load complete: ${outcome.attempted - outcome.failed}/${outcome.attempted} succeeded`,
     );
-    if (errors.length > 0) {
-      LOGGER.error(
-        `${errors.length} player(s) failed:`,
-        JSON.stringify(errors),
-      );
-    }
-    if (authExpired) {
+    if (outcome.aborted) {
       process.exit(1);
     }
   });

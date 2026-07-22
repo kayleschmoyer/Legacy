@@ -93,7 +93,7 @@ function makePlayers(count: number): FakePlayer[] {
   }));
 }
 
-describe('handleLoadFootballCareer — consecutive-403 streak detection', () => {
+describe('handleLoadFootballCareer — consecutive-failure streak detection', () => {
   let exitSpy: jest.SpyInstance;
   const loadStats = loadFootballCareerStats as jest.Mock;
 
@@ -144,17 +144,40 @@ describe('handleLoadFootballCareer — consecutive-403 streak detection', () => 
       expect(exitSpy).not.toHaveBeenCalled();
     });
 
-    it('does not abort on scattered non-auth failures below the streak threshold', async () => {
+    // LS-8431: a dropped DB connection failed every remaining player in the
+    // same second. The abort must not be auth-specific — any consecutive-
+    // failure run is systemic and has to stop the loop.
+    it('aborts early on a streak of non-auth failures (e.g. a DB outage)', async () => {
+      const players = makePlayers(20);
+      currentFakeDb = makeFakeDb(players);
+      loadStats.mockRejectedValue(
+        new Error('Failed query: select "id", "first_name" from players'),
+      );
+
+      await handleLoadFootballCareer({ limit: 20 });
+
+      expect(loadStats).toHaveBeenCalledTimes(4);
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('does not abort when non-auth failures are interrupted by successes', async () => {
       const players = makePlayers(5);
       currentFakeDb = makeFakeDb(players);
-      loadStats.mockRejectedValue(new Error('Player not found'));
+      loadStats
+        .mockRejectedValueOnce(new Error('Player not found'))
+        .mockRejectedValueOnce(new Error('Player not found'))
+        .mockResolvedValueOnce({
+          playerId: 3,
+          pfrId: 'Player300',
+          groupsUpserted: ['passing'],
+        })
+        .mockRejectedValueOnce(new Error('Player not found'))
+        .mockRejectedValueOnce(new Error('Player not found'));
 
       await handleLoadFootballCareer({ limit: 5 });
 
       expect(loadStats).toHaveBeenCalledTimes(5);
-      // Every player failed, so the existing "whole batch failed" exit path
-      // still fires — just not via the auth-streak path.
-      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(exitSpy).not.toHaveBeenCalled();
     });
 
     it('exits non-zero when the streak aborts mid-batch, even though not every player was attempted', async () => {
@@ -243,13 +266,25 @@ describe('handleLoadFootballCareer — consecutive-403 streak detection', () => 
   });
 });
 
-describe('handleLoadFootballCareer — auth-failure Rollbar noise reduction', () => {
+describe('handleLoadFootballCareer — Rollbar noise reduction', () => {
   const AUTH_EXPIRED_MESSAGE =
     'PFR auth appears to have expired — refresh PFR_CF_CLEARANCE and re-run.';
   let exitSpy: jest.SpyInstance;
   const loadStats = loadFootballCareerStats as jest.Mock;
   const { LOGGER }: { LOGGER: { warn: jest.Mock; error: jest.Mock } } =
     jest.requireMock('@legacy-sports/logging');
+
+  /**
+   * Only `error`/`fatal` entries reach Rollbar
+   * (RollbarOutputDestination.shouldLog), so the count of LOGGER.error calls
+   * is the count of Rollbar occurrences a run produces.
+   */
+  const rollbarOccurrences = (): number => LOGGER.error.mock.calls.length;
+
+  const authAlerts = (): unknown[] =>
+    LOGGER.error.mock.calls.filter((call: unknown[]) =>
+      String(call[0]).includes(AUTH_EXPIRED_MESSAGE),
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -277,16 +312,64 @@ describe('handleLoadFootballCareer — auth-failure Rollbar noise reduction', ()
     );
   });
 
-  it('still logs non-auth failures at error so they remain individually actionable', async () => {
-    const players = makePlayers(1);
+  // LS-8431 regression: non-auth per-player failures used to be logged at
+  // `error`, so a DB outage mid-run produced one Rollbar occurrence per
+  // player — 20+ in one second — which tripped Rollbar's per-minute item cap
+  // and caused genuine errors to be dropped (LS-8571).
+  it('logs non-auth per-player failures at warn, not error', async () => {
+    const players = makePlayers(3);
     currentFakeDb = makeFakeDb(players);
-    loadStats.mockRejectedValue(new Error('Player not found'));
+    loadStats.mockRejectedValue(new Error('Failed query: select "id"'));
 
-    await handleLoadFootballCareer({ limit: 1 });
+    await handleLoadFootballCareer({ limit: 3 });
 
-    expect(LOGGER.error).toHaveBeenCalledWith(
+    expect(LOGGER.warn).toHaveBeenCalledWith(
       expect.stringContaining('Player 1 failed'),
     );
+    expect(LOGGER.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('Player 1 failed'),
+    );
+  });
+
+  it('emits at most one Rollbar-bound error for a run where every player fails', async () => {
+    const players = makePlayers(50);
+    currentFakeDb = makeFakeDb(players);
+    loadStats.mockRejectedValue(new Error('Failed query: select "id"'));
+
+    await handleLoadFootballCareer({ limit: 50 });
+
+    expect(rollbarOccurrences()).toBe(1);
+  });
+
+  it('includes the first error in the single summary so the cause stays diagnosable', async () => {
+    const players = makePlayers(6);
+    currentFakeDb = makeFakeDb(players);
+    loadStats.mockRejectedValue(new Error('Failed query: select "id"'));
+
+    await handleLoadFootballCareer({ limit: 6 });
+
+    expect(LOGGER.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed query: select "id"'),
+      expect.anything(),
+    );
+  });
+
+  // The reviewer flagged (correctly) that interpolating only the message
+  // string denies Rollbar a stack trace — RollbarOutputDestination forwards
+  // the first Error argument, so the summary must pass the Error instance
+  // itself, not just its text.
+  it('forwards the first Error instance to Rollbar for the stack trace', async () => {
+    const players = makePlayers(6);
+    currentFakeDb = makeFakeDb(players);
+    const dbError = new Error('Failed query: select "id"');
+    loadStats.mockRejectedValue(dbError);
+
+    await handleLoadFootballCareer({ limit: 6 });
+
+    const forwardedError = LOGGER.error.mock.calls
+      .flat()
+      .find((arg: unknown) => arg instanceof Error);
+    expect(forwardedError).toBe(dbError);
   });
 
   it('raises exactly one actionable alert when auth failures never form a streak', async () => {
@@ -308,10 +391,7 @@ describe('handleLoadFootballCareer — auth-failure Rollbar noise reduction', ()
 
     await handleLoadFootballCareer({ limit: 4 });
 
-    const authAlertCalls = LOGGER.error.mock.calls.filter(
-      (call: unknown[]) => call[0] === AUTH_EXPIRED_MESSAGE,
-    );
-    expect(authAlertCalls).toHaveLength(1);
+    expect(authAlerts()).toHaveLength(1);
   });
 
   it('does not double-alert when the streak abort already raised the summary', async () => {
@@ -321,10 +401,7 @@ describe('handleLoadFootballCareer — auth-failure Rollbar noise reduction', ()
 
     await handleLoadFootballCareer({ limit: 6 });
 
-    const authAlertCalls = LOGGER.error.mock.calls.filter(
-      (call: unknown[]) => call[0] === AUTH_EXPIRED_MESSAGE,
-    );
-    expect(authAlertCalls).toHaveLength(1);
+    expect(authAlerts()).toHaveLength(1);
   });
 
   it('does not raise the auth alert when no auth failures occurred', async () => {
@@ -334,9 +411,6 @@ describe('handleLoadFootballCareer — auth-failure Rollbar noise reduction', ()
 
     await handleLoadFootballCareer({ limit: 2 });
 
-    const authAlertCalls = LOGGER.error.mock.calls.filter(
-      (call: unknown[]) => call[0] === AUTH_EXPIRED_MESSAGE,
-    );
-    expect(authAlertCalls).toHaveLength(0);
+    expect(authAlerts()).toHaveLength(0);
   });
 });
