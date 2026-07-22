@@ -792,6 +792,15 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     );
 
     if (existingComment) {
+      // Carry the Discord-ping dedup marker forward across status rewrites
+      // (e.g. codeowner-blocked → waiting-on-checks → codeowner-blocked), so an
+      // intermediate state doesn't re-arm the ping for the same head SHA.
+      const pingMarker = existingComment.body.match(
+        /<!-- CODEOWNER-PING:[^>]* -->/,
+      );
+      if (pingMarker && !commentBody.includes('<!-- CODEOWNER-PING:')) {
+        commentBody += '\n' + pingMarker[0];
+      }
       console.log(
         `🔄 Updating existing merge queue comment #${existingComment.id}`,
       );
@@ -801,7 +810,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         comment_id: existingComment.id,
         body: commentBody,
       });
-      return existingComment.id;
+      return { id: existingComment.id, previousBody: existingComment.body };
     } else {
       console.log(`✨ Creating new merge queue comment`);
       const newComment = await github.rest.issues.createComment({
@@ -810,7 +819,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         issue_number: pr.number,
         body: commentBody,
       });
-      return newComment.data.id;
+      return { id: newComment.data.id, previousBody: null };
     }
   }
 
@@ -1077,9 +1086,21 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       '\n\nThe merge queue will automatically retry once the issues are resolved.\n\n' +
       '---\n*Automated message from merge queue system*';
 
-    await findOrCreateComment(pr, comment);
+    // The queue re-evaluates on every CI completion / review / label event, so
+    // this path re-runs many times while a PR sits blocked. Ping Discord at most
+    // once per head SHA: a hidden marker persisted in the status comment (and
+    // carried forward across rewrites by findOrCreateComment) records that the
+    // ping was sent. A new push gets a fresh ping — the push dismisses the stale
+    // approval, so the codeowner genuinely needs to be re-summoned.
+    const isCodeownerBlocked = validation.reason.includes('CODEOWNER approval');
+    const pingMarker = `<!-- CODEOWNER-PING:${pr.head.sha} -->`;
+    if (isCodeownerBlocked) {
+      comment += '\n' + pingMarker;
+    }
 
-    if (validation.reason.includes('CODEOWNER approval')) {
+    const { previousBody } = await findOrCreateComment(pr, comment);
+
+    if (isCodeownerBlocked && !(previousBody || '').includes(pingMarker)) {
       await notifyDiscordCodeownerRequired(pr);
     }
   }

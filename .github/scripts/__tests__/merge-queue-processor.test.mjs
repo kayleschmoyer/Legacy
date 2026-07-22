@@ -866,6 +866,180 @@ describe('merge-queue-processor — Discord CODEOWNER notification (LS-4185)', (
   });
 });
 
+// ── LS-8603 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — Discord CODEOWNER ping dedup (LS-8603)', () => {
+  const STATUS_MARKER = '<!-- MERGE-QUEUE-STATUS -->';
+  const pingMarkerFor = (sha) => `<!-- CODEOWNER-PING:${sha} -->`;
+
+  function mockDiscord() {
+    const https = require('https');
+    const requestCalls = [];
+    const originalRequest = https.request;
+    https.request = (opts, cb) => {
+      requestCalls.push(opts);
+      const res = { statusCode: 204, resume: () => {}, on: () => res };
+      if (cb) cb(res);
+      return { on: () => {}, write: () => {}, end: () => {} };
+    };
+    return { requestCalls, restore: () => (https.request = originalRequest) };
+  }
+
+  function withExistingComment(github, body, updates) {
+    github.rest.issues.listComments = async () => ({
+      data: [{ id: 42, body }],
+    });
+    github.rest.issues.updateComment = async (args) => {
+      updates.push(args);
+    };
+  }
+
+  it('records a ping marker for the head SHA in the status comment on first ping', async () => {
+    process.env.ESCALATION_WEBHOOK_URL =
+      'https://discord.com/api/webhooks/test/token';
+    const { github, calls } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+    const discord = mockDiscord();
+
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      discord.restore();
+      delete process.env.ESCALATION_WEBHOOK_URL;
+    }
+
+    assert.strictEqual(discord.requestCalls.length, 1, 'should ping once');
+    assert.ok(
+      calls.comments.some((c) => c.body?.includes(pingMarkerFor(HEAD_SHA))),
+      'status comment should persist the ping marker for the head SHA',
+    );
+  });
+
+  it('does not re-ping when the status comment already has the marker for the same SHA', async () => {
+    process.env.ESCALATION_WEBHOOK_URL =
+      'https://discord.com/api/webhooks/test/token';
+    const { github } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+    const updates = [];
+    withExistingComment(
+      github,
+      `${STATUS_MARKER}\n## 🚫 Merge Queue: Cannot Merge\n${pingMarkerFor(HEAD_SHA)}`,
+      updates,
+    );
+    const discord = mockDiscord();
+
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      discord.restore();
+      delete process.env.ESCALATION_WEBHOOK_URL;
+    }
+
+    assert.strictEqual(
+      discord.requestCalls.length,
+      0,
+      'should not re-ping while blocked on the same head SHA',
+    );
+    assert.ok(
+      updates.some((u) => u.body?.includes(pingMarkerFor(HEAD_SHA))),
+      'updated status comment should keep the ping marker',
+    );
+  });
+
+  it('re-pings once when the head SHA has changed since the last ping', async () => {
+    process.env.ESCALATION_WEBHOOK_URL =
+      'https://discord.com/api/webhooks/test/token';
+    const { github } = makeGithub({ reviewDecision: 'REVIEW_REQUIRED' });
+    const updates = [];
+    withExistingComment(
+      github,
+      `${STATUS_MARKER}\n## 🚫 Merge Queue: Cannot Merge\n${pingMarkerFor('oldsha000')}`,
+      updates,
+    );
+    const discord = mockDiscord();
+
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      discord.restore();
+      delete process.env.ESCALATION_WEBHOOK_URL;
+    }
+
+    assert.strictEqual(
+      discord.requestCalls.length,
+      1,
+      'should ping again for a new head SHA',
+    );
+    assert.ok(
+      updates.some(
+        (u) =>
+          u.body?.includes(pingMarkerFor(HEAD_SHA)) &&
+          !u.body?.includes(pingMarkerFor('oldsha000')),
+      ),
+      'marker should be replaced with the new head SHA',
+    );
+  });
+
+  it('carries the ping marker forward across a non-codeowner status rewrite', async () => {
+    process.env.ESCALATION_WEBHOOK_URL =
+      'https://discord.com/api/webhooks/test/token';
+    // Blocked on merge conflicts this cycle — the status comment is rewritten
+    // with a different reason, and must not drop the dedup marker.
+    const conflictPR = makePR({ mergeable: false });
+    const { github } = makeGithub({ pr: conflictPR });
+    const updates = [];
+    withExistingComment(
+      github,
+      `${STATUS_MARKER}\n## 🚫 Merge Queue: Cannot Merge\n${pingMarkerFor(HEAD_SHA)}`,
+      updates,
+    );
+    const discord = mockDiscord();
+
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun: false,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      discord.restore();
+      delete process.env.ESCALATION_WEBHOOK_URL;
+    }
+
+    assert.strictEqual(
+      discord.requestCalls.length,
+      0,
+      'conflict blocker should not ping Discord',
+    );
+    assert.ok(
+      updates.some(
+        (u) =>
+          u.body?.includes('merge conflicts') &&
+          u.body?.includes(pingMarkerFor(HEAD_SHA)),
+      ),
+      'rewritten status comment should carry the ping marker forward',
+    );
+  });
+});
+
 // ── LS-7963 ──────────────────────────────────────────────────────────────────
 
 describe('merge-queue-processor — config-tracked required checks gate (LS-7963)', () => {
