@@ -111,6 +111,67 @@ describe('Playoff Resolver', () => {
         },
         teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
         leagues: { id: 'id', name: 'name' },
+        users: {
+          id: 'users.id',
+          accessLevel: 'users.access_level',
+        },
+        // Referenced at module scope by football.ts's FOOTBALL_STAT_SORTS
+        // (LS-8566), which this spec pulls in transitively via `../schema`.
+        careerFootballPassing: {
+          g: 'g',
+          cmp: 'cmp',
+          att: 'att',
+          yds: 'yds',
+          td: 'td',
+          int: 'int',
+          rating: 'rating',
+        },
+        careerFootballRushing: {
+          g: 'g',
+          att: 'att',
+          yds: 'yds',
+          td: 'td',
+          lng: 'lng',
+          fumbles: 'fumbles',
+        },
+        careerFootballReceiving: {
+          g: 'g',
+          rec: 'rec',
+          tgt: 'tgt',
+          yds: 'yds',
+          td: 'td',
+          lng: 'lng',
+        },
+        careerFootballKicking: {
+          g: 'g',
+          fgm: 'fgm',
+          fga: 'fga',
+          xpm: 'xpm',
+          xpa: 'xpa',
+          lng: 'lng',
+        },
+        careerFootballDefenseIdp: {
+          g: 'g',
+          soloTkl: 'soloTkl',
+          astTkl: 'astTkl',
+          totalTkl: 'totalTkl',
+          sacks: 'sacks',
+          int: 'int',
+          pd: 'pd',
+          ff: 'ff',
+          fr: 'fr',
+          defTd: 'defTd',
+        },
+        careerFootballDefense: {
+          g: 'g',
+          sacks: 'sacks',
+          int: 'int',
+          fumRec: 'fumRec',
+          defTd: 'defTd',
+          safeties: 'safeties',
+          ptsAllowedPerG: 'ptsAllowedPerG',
+          ydsAllowedPerG: 'ydsAllowedPerG',
+        },
         leagueMembers: {
           leagueId: 'leagueId',
           userId: 'userId',
@@ -397,6 +458,9 @@ describe('Playoff Resolver', () => {
         updatedAt: new Date().toISOString(),
       };
       mockPlayoffService.createBracket.mockResolvedValueOnce(mockBracket);
+      // checkAdminInDb: confirm admin access so the commissioner-access
+      // fallback (which needs its own league-membership mocks) is skipped.
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
 
       const resolver = getMutation('createPlayoffBracket');
       const result = await resolver(
@@ -442,6 +506,9 @@ describe('Playoff Resolver', () => {
         updatedAt: new Date().toISOString(),
       };
       mockPlayoffService.advanceBracket.mockResolvedValueOnce(mockBracket);
+      // checkAdminInDb: confirm admin access so the commissioner-access
+      // fallback (which needs its own bracket-lookup mocks) is skipped.
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
 
       const resolver = getMutation('advancePlayoffBracket');
       const result = await resolver(
@@ -487,6 +554,9 @@ describe('Playoff Resolver', () => {
         isMultiWeek: false,
       };
 
+      // checkAdminInDb: confirm admin access so the commissioner-access
+      // fallback (which needs its own matchup/bracket-lookup mocks) is skipped.
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
       // limit() called when determining winner: returns matchup
       mockDb.limit.mockResolvedValueOnce([mockMatchup]);
       // returning() called for the update
@@ -538,6 +608,9 @@ describe('Playoff Resolver', () => {
         updatedAt: now,
       };
       mockPlayoffService.awardChampionship.mockResolvedValueOnce(mockTrophy);
+      // checkAdminInDb: confirm admin access so the commissioner-access
+      // fallback (which needs its own bracket-lookup mocks) is skipped.
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
       // badge award: leagueMembers lookup
       mockDb.limit.mockResolvedValueOnce([{ userId: 5 }]);
 
