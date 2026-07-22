@@ -22,8 +22,9 @@ jest.mock('react-router-dom', () => ({
 
 // ── Analytics / CSRF ─────────────────────────────────────────────────────────
 
+const mockTrackTeamViewed = jest.fn();
 jest.mock('../../utils/analytics', () => ({
-  trackTeamViewed: jest.fn(),
+  trackTeamViewed: (...args: unknown[]) => mockTrackTeamViewed(...args),
 }));
 
 jest.mock('../../lib/csrf', () => ({
@@ -617,5 +618,83 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
       screen.getByTestId('assistant-manager-settings'),
     ).toBeInTheDocument();
     expect(screen.queryByTestId('settings-skeleton')).not.toBeInTheDocument();
+  });
+});
+
+// ── Analytics tracking (LS-7686 / LS-8581) ───────────────────────────────────
+
+describe('TeamDetailPage – analytics tracking (LS-7686)', () => {
+  const graphql = jest.requireMock<{ useGetTeamMembersQuery: jest.Mock }>(
+    '@legacy-sports/graphql',
+  );
+
+  const teamMembersWithLeagueId = (leagueId: number | null) => ({
+    data: {
+      teamMembers: [
+        {
+          id: 10,
+          leagueId,
+          player: { firstName: 'Test', lastName: 'Player' },
+          positionId: null,
+        },
+      ],
+    },
+    loading: false,
+    error: undefined,
+    refetch: mockRefetchMembers,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+    graphql.useGetTeamMembersQuery.mockReturnValue(
+      teamMembersWithLeagueId(100),
+    );
+  });
+
+  it('calls trackTeamViewed with the resolved teamId and leagueId once both are available', () => {
+    render(<TeamDetailPage />);
+
+    expect(mockTrackTeamViewed).toHaveBeenCalledTimes(1);
+    expect(mockTrackTeamViewed).toHaveBeenCalledWith(1, 100);
+  });
+
+  it('does not call trackTeamViewed before leagueId resolves', () => {
+    graphql.useGetTeamMembersQuery.mockReturnValue(
+      teamMembersWithLeagueId(null),
+    );
+
+    render(<TeamDetailPage />);
+
+    expect(mockTrackTeamViewed).not.toHaveBeenCalled();
+  });
+
+  it('fires again when leagueId changes between renders for the same team — documents that no dedupe ref exists today (unlike MatchupDetailPage)', () => {
+    const { rerender } = render(<TeamDetailPage />);
+    expect(mockTrackTeamViewed).toHaveBeenCalledTimes(1);
+    expect(mockTrackTeamViewed).toHaveBeenLastCalledWith(1, 100);
+
+    // Simulates the leagueId source transition the ticket describes
+    // (membersData vs. teamById resolving to different values at different
+    // times). TeamDetailPage has no lastTrackedTeamViewKeyRef-style guard, so
+    // this fires a second time — this is documenting current behavior, not
+    // asserting it as desired.
+    graphql.useGetTeamMembersQuery.mockReturnValue(
+      teamMembersWithLeagueId(200),
+    );
+    rerender(<TeamDetailPage />);
+
+    expect(mockTrackTeamViewed).toHaveBeenCalledTimes(2);
+    expect(mockTrackTeamViewed).toHaveBeenLastCalledWith(1, 200);
+  });
+
+  it('does not fire again on a re-render with an unchanged teamId/leagueId (React dependency-array diffing, not an explicit dedupe ref)', () => {
+    const { rerender } = render(<TeamDetailPage />);
+    expect(mockTrackTeamViewed).toHaveBeenCalledTimes(1);
+
+    rerender(<TeamDetailPage />);
+
+    expect(mockTrackTeamViewed).toHaveBeenCalledTimes(1);
   });
 });
