@@ -10,7 +10,7 @@
 1. Back button → `navigate(-1)`
 2. Banner image (conditional — full-width, 160px desktop / 100px mobile)
 3. Team identity section (avatar, name, league ID, visitor note)
-4. Roster section
+4. Roster / Lineup Editor section
 5. Team Settings section _(GM/Commissioner only)_
 6. Assistant Manager Settings component
 
@@ -27,17 +27,21 @@
 
 ---
 
-## Roster Section
+## Roster / Lineup Editor Section
 
 **Heading**: "Roster"
 
-Per player card:
+Renders the shared `RosterBoard` component (`@legacy-sports/shared-components/roster`, LS-5360) — the same lineup-slot editor used by the mobile `Lineup` tab (`apps/app/.../baseball/team/[teamId].tsx`). Web and mobile no longer have a platform parity gap here (closes LS-6032 / BTD-009): there is no separate "Set Lineup" CTA or link out to the league `#my-team` tab because the editor is embedded inline in this section.
 
-| Field      | Source                                                                        |
-| ---------- | ----------------------------------------------------------------------------- |
-| First name | `member.firstName`                                                            |
-| Last name  | `member.lastName`                                                             |
-| Position   | `positionMap[member.positionId]` — e.g., C, 1B, 2B, 3B, SS, OF, P, Unassigned |
+| Element        | Behavior                                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Position slots | One row per league position (`leaguePositions`), showing the assigned player's name + eligible positions, or "Open slot"                                           |
+| Bench rows     | Unassigned team members rendered as bench rows                                                                                                                     |
+| Assign         | Select a bench player, then select an eligible open slot → `updateTeamMemberPositionMutation({ teamMemberId, positionId })`                                        |
+| Remove         | Select an occupied slot's occupant → moves to bench via `updateTeamMemberPositionMutation({ teamMemberId, positionId: null })`                                     |
+| Swap           | Select a player, then select another eligible occupied slot → `swapTeamMemberPositionsMutation({ teamMemberIdA, positionIdA, teamMemberIdB, positionIdB })`        |
+| Locked slots   | Read-only with a lock icon when the underlying slot is locked (matchup started)                                                                                    |
+| Edit access    | `readOnly={!isGM}` — only the team's GM (owner with `owner`/`general_manager` permission) can assign/remove/swap; commissioners and visitors see a read-only board |
 
 ---
 
@@ -99,25 +103,28 @@ Per player card:
 
 ## GraphQL Mutations
 
-| Hook                                | Action                                                                                        |
-| ----------------------------------- | --------------------------------------------------------------------------------------------- |
-| `useUpdateTeamBrandingMutation`     | Update avatarUrl and/or bannerUrl — variables: `{ teamId, leagueId, avatarUrl?, bannerUrl? }` |
-| `useInviteAssistantManagerMutation` | Invite user by username — variables: `{ teamId, username }`                                   |
-| `useRemoveAssistantManagerMutation` | Remove assistant — variables: `{ teamId, userId }`                                            |
+| Hook                                  | Action                                                                                                        |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `useUpdateTeamBrandingMutation`       | Update avatarUrl and/or bannerUrl — variables: `{ teamId, leagueId, avatarUrl?, bannerUrl? }`                 |
+| `useUpdateTeamMemberPositionMutation` | Assign/remove a lineup slot — variables: `{ teamMemberId, positionId }` (`positionId: null` removes)          |
+| `useSwapTeamMemberPositionsMutation`  | Swap two team members' lineup slots — variables: `{ teamMemberIdA, positionIdA, teamMemberIdB, positionIdB }` |
+| `useInviteAssistantManagerMutation`   | Invite user by username — variables: `{ teamId, username }`                                                   |
+| `useRemoveAssistantManagerMutation`   | Remove assistant — variables: `{ teamId, userId }`                                                            |
 
 ---
 
 ## Conditional Rendering
 
-| Section                      | Condition                                                   |
-| ---------------------------- | ----------------------------------------------------------- |
-| Team Settings                | `isOwner \|\| isCommissioner`                               |
-| Visitor note                 | `!isOwner && !isCommissioner`                               |
-| Banner image                 | `currentBannerUrl && !bannerImgError`                       |
-| Avatar image                 | `currentAvatarUrl && !avatarImgError` (else show initials)  |
-| Current URL + Clear button   | URL is already set                                          |
-| Save Branding button enabled | `avatarInput \|\| bannerInput` (at least one change)        |
-| Inputs disabled              | `brandingLoading \|\| avatarUploading \|\| bannerUploading` |
+| Section                      | Condition                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| Roster board editable        | `isGM` (owner + `owner`/`general_manager` permission); otherwise `readOnly` |
+| Team Settings                | `isOwner \|\| isCommissioner`                                               |
+| Visitor note                 | `!isOwner && !isCommissioner`                                               |
+| Banner image                 | `currentBannerUrl && !bannerImgError`                                       |
+| Avatar image                 | `currentAvatarUrl && !avatarImgError` (else show initials)                  |
+| Current URL + Clear button   | URL is already set                                                          |
+| Save Branding button enabled | `avatarInput \|\| bannerInput` (at least one change)                        |
+| Inputs disabled              | `brandingLoading \|\| avatarUploading \|\| bannerUploading`                 |
 
 ---
 
