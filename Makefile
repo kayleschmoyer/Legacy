@@ -758,7 +758,7 @@ endif
 sync-jira: ## Sync Jira ticket statuses with Git branches (DRY_RUN=1 AUTO_UPDATE=1 SHOW_ALL=1 RECHECK=1 ROLLUP_SCOPE=None|Touched|AllOpen)
 	@$(call echo_blue,Syncing Jira ticket statuses...)
 ifeq ($(DETECTED_OS),Windows)
-	powershell -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-jira-status.ps1 $(if $(DRY_RUN),-DryRun) $(if $(AUTO_UPDATE),-AutoUpdate) $(if $(SHOW_ALL),-ShowAll) $(if $(RECHECK),-Recheck) $(if $(ROLLUP_SCOPE),-RollupScope $(ROLLUP_SCOPE))
+	pwsh -NoProfile -ExecutionPolicy Bypass -File scripts$(PATH_SEP)sync-jira-status.ps1 $(if $(DRY_RUN),-DryRun) $(if $(AUTO_UPDATE),-AutoUpdate) $(if $(SHOW_ALL),-ShowAll) $(if $(RECHECK),-Recheck) $(if $(ROLLUP_SCOPE),-RollupScope $(ROLLUP_SCOPE))
 else
 	@echo "sync-jira is Windows-only (PowerShell required)"
 endif

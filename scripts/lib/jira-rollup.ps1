@@ -11,6 +11,49 @@
 
 $JiraWorkflowOrder = @('To Do', 'In Progress', 'In Review', 'Done')
 
+# Terminal non-Done statuses: the ticket is closed but no work was delivered.
+# The leaf pass never transitions these; the rollup treats them as resolved
+# (a "Won't Do" child must not hold its parent in In Progress forever).
+$JiraTerminalStatuses = @("Won't Do", 'Cancelled', 'Rejected', 'Duplicate')
+
+function ConvertFrom-JsonArray {
+    <#
+    .SYNOPSIS
+        Parse JSON text (a string or an array of lines) and always return an
+        array, identically under Windows PowerShell 5.1 and pwsh 7.
+    .DESCRIPTION
+        Native-command output is captured as a string[] of lines, and the two
+        PowerShell generations disagree about JSON arrays: 5.1's
+        ConvertFrom-Json emits the whole array as ONE object while pwsh 7
+        enumerates its elements. Wrapping the *pipeline* in @() therefore
+        yields a one-element wrapper under 5.1 — `@($json | ConvertFrom-Json)`
+        silently collapsed every multi-item result to Count=1 (LS-8582: this
+        killed PR detection, the child-truncation guard, and AllOpen rollup
+        discovery). This helper joins the lines, parses once via -InputObject
+        (no pipeline enumeration), and @()-wraps the resulting *variable*,
+        which is stable across versions.
+
+        Returns @() for empty/whitespace input or a parse failure; a JSON
+        object (non-array) comes back as a one-element array.
+    #>
+    param([object]$Json)
+
+    $text = if ($Json -is [array]) { $Json -join "`n" } else { [string]$Json }
+    if (-not $text -or -not $text.Trim()) { return , @() }
+
+    try {
+        $parsed = ConvertFrom-Json -InputObject $text
+    } catch {
+        return , @()
+    }
+
+    # Drop JSON nulls (a literal `null` document or null array elements) so the
+    # contract is "array of real items" -- a $null element would otherwise flow
+    # into hashtable-key positions downstream and throw (LS-8582 smoke run).
+    # Comma operator keeps the array shape through the function-return unwrap.
+    return , @($parsed | Where-Object { $null -ne $_ })
+}
+
 function Test-JiraKey {
     <#
     .SYNOPSIS
@@ -46,11 +89,14 @@ function Get-RolledUpStatus {
     .DESCRIPTION
         Applied identically at every level of the hierarchy
         (Task -> Story -> Epic -> Initiative):
-          - no children            -> $null  (caller skips; not a parent)
-          - all children Done      -> 'Done'
-          - any child started      -> 'In Progress'
-            (In Progress / In Review / Done), but not all Done
-          - all children To Do     -> 'To Do'
+          - no children                     -> $null  (caller skips; not a parent)
+          - all children resolved, any Done -> 'Done'
+            (resolved = Done or a terminal status: Won't Do / Cancelled / ...)
+          - all children terminal (no Done) -> $null  (all cancelled; nothing
+            meaningful to derive -- caller leaves the parent as-is)
+          - any child started               -> 'In Progress'
+            (In Progress / In Review / Done), but not all resolved
+          - otherwise (To Do / terminal mix)-> 'To Do'
     .PARAMETER ChildStatuses
         The status names of the parent's direct children.
     #>
@@ -61,15 +107,20 @@ function Get-RolledUpStatus {
     }
 
     $startedStatuses = @('In Progress', 'In Review', 'Done')
-    $allDone = $true
+    $allResolved = $true
+    $anyDone = $false
     $anyStarted = $false
 
     foreach ($status in $ChildStatuses) {
-        if ($status -ne 'Done') { $allDone = $false }
+        if ($status -eq 'Done') { $anyDone = $true }
+        elseif ($JiraTerminalStatuses -notcontains $status) { $allResolved = $false }
         if ($startedStatuses -contains $status) { $anyStarted = $true }
     }
 
-    if ($allDone) { return 'Done' }
+    if ($allResolved) {
+        if ($anyDone) { return 'Done' }
+        return $null
+    }
     if ($anyStarted) { return 'In Progress' }
     return 'To Do'
 }

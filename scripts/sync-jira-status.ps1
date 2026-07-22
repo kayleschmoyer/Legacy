@@ -5,7 +5,12 @@
 .DESCRIPTION
     This script examines all Git branches, extracts Jira ticket keys,
     and reports on ticket statuses. It can optionally update Jira statuses
-    based on branch state (e.g., merged branches → Done).
+    based on branch/PR state (e.g., merged PR → Done, open PR → In Review).
+    Only a merged PR is Done evidence; a branch that is merely an ancestor of
+    main is reported for manual review (in a squash-merge repo that shape is
+    almost always a zero-commit leftover, not merged work). Tickets that have
+    children are never transitioned here — the rollup pass derives their
+    status from their children.
 .PARAMETER DryRun
     Show what would be done without making any changes
 .PARAMETER AutoUpdate
@@ -35,8 +40,9 @@
     or PR; a parent (Story, Epic, Initiative, ...) has no branch of its own, so
     its status is reconciled from its children instead.
       None    - skip the rollup pass entirely (legacy behavior).
-      Touched - (default) reconcile the full ancestor chain of every ticket this
-                run visited. Cheap; no extra discovery query.
+      Touched - (default) reconcile every visited ticket that is itself a
+                parent, plus the full ancestor chain of every ticket this run
+                visited. Cheap; no extra discovery query.
       AllOpen - reconcile every parent in the hierarchy, regardless of whether
                 any descendant had an active branch this run.
 .EXAMPLE
@@ -178,9 +184,110 @@ function Get-PRStatus {
     return @{ Exists = $false; State = "none"; Merged = $false }
 }
 
+# ----------------------------------------------------------------------------
+# Jira issue lookup helpers (shared by the leaf pass and the rollup pass).
+# Defined before the leaf loop because the leaf pass consults Get-IssueChildren
+# to refuse branch-driven transitions on parent tickets (LS-8582).
+# ----------------------------------------------------------------------------
+
+$script:issueInfoCache = @{}
+$script:childrenCache = @{}
+# Parents whose children search hit the acli --limit ceiling. acli has no cursor
+# pagination, so a capped result is a partial set; we record the key here and skip
+# deriving a rollup status from it rather than acting on incomplete data.
+$script:childrenTruncated = @{}
+# Tickets the leaf pass visited that turned out to be parents; the rollup pass
+# reconciles them from their children (the leaf pass never transitions them).
+$script:touchedParents = @{}
+
+function Get-IssueRollupInfo {
+    # One acli JSON view -> @{ Key; Status; Type; ParentKey; Labels }, or $null on failure.
+    param([string]$Key)
+    if ($script:issueInfoCache.ContainsKey($Key)) { return $script:issueInfoCache[$Key] }
+
+    # Injection guard: never pass an unvalidated key to acli.
+    if (-not (Test-JiraKey $Key)) {
+        $script:issueInfoCache[$Key] = $null
+        return $null
+    }
+
+    $json = acli jira workitem view $Key --fields "key,status,parent,issuetype,labels" --json 2>$null
+    $info = $null
+    if ($LASTEXITCODE -eq 0 -and $json) {
+        # ConvertFrom-JsonArray for uniform, version-stable parsing; a view
+        # returns one object, so take the first (and only) element.
+        $obj = (ConvertFrom-JsonArray $json) | Select-Object -First 1
+        if ($obj -and $obj.fields) {
+            $info = @{
+                Key       = $Key
+                Status    = $obj.fields.status.name
+                Type      = $obj.fields.issuetype.name
+                ParentKey = if ($obj.fields.parent) { $obj.fields.parent.key } else { $null }
+                Labels    = @($obj.fields.labels)
+            }
+        }
+    }
+    $script:issueInfoCache[$Key] = $info
+    return $info
+}
+
+function Get-IssueChildren {
+    # Direct children of $Key as @( @{ Key; Status }, ... ). Empty if none/leaf.
+    #
+    # Return convention: plain `return $children` (NO comma wrap). Every caller
+    # wraps the call in @(...), and @(f) around a comma-wrapped return yields a
+    # ONE-element array nesting the real array — for a childless ticket that is
+    # @( @() ), whose .Key member-enumerates to $null and crashed the rollup
+    # ordering pass / made every Done leaf look like a parent (LS-8582).
+    # Plain return + @(caller) gives the correct per-item array in all cases.
+    param([string]$Key)
+    if ($script:childrenCache.ContainsKey($Key)) { return @($script:childrenCache[$Key]) }
+
+    # Injection guard: $Key is interpolated into the JQL string below.
+    if (-not (Test-JiraKey $Key)) {
+        $script:childrenCache[$Key] = @()
+        return @()
+    }
+
+    # acli search exposes only --limit (no cursor/offset), so a parent with more
+    # children than $childLimit is capped. When that happens we flag the parent as
+    # truncated and the rollup caller skips deriving a status from the partial set
+    # (see Invoke-ParentRollup) rather than risk a wrong derivation. The limit is
+    # set well above realistic parents (QA page epics have tens of children).
+    $childLimit = 500
+    $json = acli jira workitem search --jql "parent = $Key" --fields "key,status,issuetype" --limit $childLimit --json 2>$null
+    $children = @()
+    if ($LASTEXITCODE -eq 0 -and $json) {
+        # ConvertFrom-JsonArray: version-stable array parsing -- the previous
+        # @($json | ConvertFrom-Json) collapsed to Count=1 under PS 5.1, which
+        # disabled the truncation guard and broke per-child keys (LS-8582).
+        $items = ConvertFrom-JsonArray $json
+        if ($items.Count -ge $childLimit) {
+            $script:childrenTruncated[$Key] = $true
+            Write-Warning "Parent $Key has >= $childLimit children -- acli search has no cursor pagination, so the result is capped. Its rollup will be skipped to avoid deriving a status from a partial set."
+        }
+        foreach ($item in $items) {
+            if ($item -and $item.key) {
+                $children += @{ Key = $item.key; Status = $item.fields.status.name }
+            }
+        }
+        # A transient acli failure (rate limit, malformed page) can yield items
+        # that aren't issues. Surface it: a silent drop here once let a junk
+        # entry masquerade as a child and crash the rollup ordering pass.
+        if ($items.Count -ne $children.Count) {
+            Write-Warning "Get-IssueChildren($Key): dropped $($items.Count - $children.Count) non-issue item(s) from the children search result."
+        }
+    }
+    $script:childrenCache[$Key] = $children
+    return $children
+}
+
 # Get all branches
 Write-Header "Fetching branches..."
-$branches = git branch -a | ForEach-Object { $_.Trim() -replace '^\*\s*', '' -replace '^remotes/origin/', '' } | Where-Object { $_ -notmatch '^HEAD' } | Select-Object -Unique
+# '^[*+]\s*': git prefixes the current branch with '*' and branches checked
+# out in linked worktrees with '+'. Both must be stripped or the dirty name
+# ("+ claude/x") misses every PR-map lookup and duplicates its clean twin.
+$branches = git branch -a | ForEach-Object { $_.Trim() -replace '^[*+]\s*', '' -replace '^remotes/origin/', '' } | Where-Object { $_ -notmatch '^HEAD' } | Select-Object -Unique
 
 Write-Info "Found $($branches.Count) unique branches"
 
@@ -198,7 +305,11 @@ if ($ghAvailable) {
     $allPrsJson = gh pr list --state all --json headRefName,title,body,number,state,mergedAt --limit $prFetchLimit 2>$null
 
     if ($allPrsJson) {
-        $allPrs = @($allPrsJson | ConvertFrom-Json)
+        # ConvertFrom-JsonArray, not @($x | ConvertFrom-Json): under Windows
+        # PowerShell 5.1 the latter collapses the whole PR array into a single
+        # element, leaving prMap with one garbage Object[]-keyed entry and
+        # every branch lookup false (LS-8582).
+        $allPrs = ConvertFrom-JsonArray $allPrsJson
         if ($allPrs.Count -ge $prFetchLimit) {
             Write-Warning "Hit the PR fetch cap ($prFetchLimit) -- older PRs may be missing from the map; affected branches fall back to the git-merge check. Raise `$prFetchLimit if your repo has more PRs."
         }
@@ -331,7 +442,9 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
     # Get ticket info from Jira (JSON avoids false-positive regex matches against
     # description/comment text that may contain "Status: <some text>").
     try {
-        $ticketJson = acli jira workitem view $ticketKey --fields "key,status" --json 2>&1 | Out-String
+        # 2>$null, not 2>&1: an acli warning on stderr would corrupt the JSON
+        # and silently degrade the status to UNKNOWN.
+        $ticketJson = acli jira workitem view $ticketKey --fields "key,status" --json 2>$null | Out-String
 
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "Could not fetch ticket $ticketKey (may be deleted or inaccessible)"
@@ -346,13 +459,11 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             continue
         }
 
-        try {
-            $ticketObj = $ticketJson | ConvertFrom-Json
-            $status = $ticketObj.fields.status.name
-            if (-not $status) { $status = "UNKNOWN" }
-        } catch {
-            $status = "UNKNOWN"
-        }
+        # ConvertFrom-JsonArray for uniform, version-stable parsing (returns @()
+        # on malformed output, so a null-safe chain degrades to UNKNOWN).
+        $ticketObj = (ConvertFrom-JsonArray $ticketJson) | Select-Object -First 1
+        $status = $ticketObj.fields.status.name
+        if (-not $status) { $status = "UNKNOWN" }
         
         # Check if branches are merged and PR status
         $mergedBranches = @()
@@ -420,8 +531,9 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
 
         # Terminal non-Done statuses cannot be transitioned via the normal workflow.
         # Leave them as-is and report in sync so they don't appear as "needs attention".
-        $terminalStatuses = @("Won't Do", "Cancelled", "Rejected", "Duplicate")
-        if ($status -in $terminalStatuses) {
+        # ($JiraTerminalStatuses comes from scripts/lib/jira-rollup.ps1, shared with
+        # the rollup derivation so both passes agree on what "terminal" means.)
+        if ($status -in $JiraTerminalStatuses) {
             $recommendation = "[OK] $status - skipping transition"
             $effectiveStatus[$ticketKey] = $status
             Write-Success $recommendation
@@ -442,11 +554,14 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             $shouldUpdate = $true
             $targetStatus = "Done"
         }
-        # Priority 2: Branch merged to main → Done
+        # Priority 2: branch is an ancestor of main but there is no merged PR.
+        # NOT Done evidence in a squash-merge repo: a really-merged PR's branch
+        # tip never becomes an ancestor of main (the squash commit is a new
+        # SHA) -- the branches that DO show up in `git branch --merged main`
+        # are typically zero-commit worktree leftovers, which walked three
+        # epics to Done on 2026-07-22 (LS-8582). Report for manual review only.
         elseif ($mergedBranches.Count -gt 0 -and $status -ne "Done") {
-            $recommendation = "Branch merged but ticket not Done"
-            $shouldUpdate = $true
-            $targetStatus = "Done"
+            $recommendation = "Branch is ancestor of main but no merged PR found - verify manually (not auto-transitioned)"
         }
         # Priority 3: PR open → In Review
         elseif ($prInfo -and $prInfo.Exists -and $prInfo.State -eq "OPEN" -and $status -ne "In Review" -and $status -ne "Done") {
@@ -481,6 +596,23 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
             $recommendation = "[OK] In sync"
         }
         
+        # Parent guard (LS-8582): a ticket with children is never transitioned
+        # from branch/PR evidence -- its status is derived from its children in
+        # the rollup pass. Only pay the children lookup when it matters: a
+        # transition is pending, or a Done status is about to enter the ledger.
+        $isParent = $false
+        if ($shouldUpdate -or $status -eq "Done") {
+            $isParent = (@(Get-IssueChildren -Key $ticketKey)).Count -gt 0
+        }
+        if ($isParent) {
+            $script:touchedParents[$ticketKey] = $true
+            if ($shouldUpdate) {
+                $recommendation = "Parent ticket - branch/PR evidence ignored; status derives from children (rollup pass)"
+                $shouldUpdate = $false
+                $targetStatus = ""
+            }
+        }
+
         # Auto-update if enabled
         $transitionOk = $false
         if ($AutoUpdate -and $shouldUpdate -and $targetStatus) {
@@ -510,9 +642,11 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
 
         # Record terminal (Done) tickets in the ledger so future runs skip them.
         # A ticket counts as Done if it was already Done, or we just transitioned
-        # it to Done. Never record during a dry run (no real state changed).
+        # it to Done. Never record during a dry run (no real state changed), and
+        # never record a parent: its status is children-derived and can regress
+        # when a child reopens, so it must stay visible to future runs.
         $reachedDone = ($status -eq "Done") -or ($targetStatus -eq "Done" -and $transitionOk)
-        if ($reachedDone -and -not $DryRun -and -not $doneCache.ContainsKey($ticketKey)) {
+        if ($reachedDone -and -not $isParent -and -not $DryRun -and -not $doneCache.ContainsKey($ticketKey)) {
             $doneCache[$ticketKey] = (Get-Date -Format "o")
             $cacheDirty = $true
         }
@@ -548,78 +682,7 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
 # (Task -> Story -> Epic -> Initiative). Reconciliation is bidirectional: a parent
 # advances when a child starts and regresses when a child reopens.
 
-$script:issueInfoCache = @{}
-$script:childrenCache = @{}
-# Parents whose children search hit the acli --limit ceiling. acli has no cursor
-# pagination, so a capped result is a partial set; we record the key here and skip
-# deriving a rollup status from it rather than acting on incomplete data.
-$script:childrenTruncated = @{}
 $script:rollupResults = @()
-
-function Get-IssueRollupInfo {
-    # One acli JSON view -> @{ Key; Status; Type; ParentKey }, or $null on failure.
-    param([string]$Key)
-    if ($script:issueInfoCache.ContainsKey($Key)) { return $script:issueInfoCache[$Key] }
-
-    # Injection guard: never pass an unvalidated key to acli.
-    if (-not (Test-JiraKey $Key)) {
-        $script:issueInfoCache[$Key] = $null
-        return $null
-    }
-
-    $json = acli jira workitem view $Key --fields "key,status,parent,issuetype" --json 2>$null
-    $info = $null
-    if ($LASTEXITCODE -eq 0 -and $json) {
-        try {
-            $obj = $json | ConvertFrom-Json
-            $info = @{
-                Key       = $Key
-                Status    = $obj.fields.status.name
-                Type      = $obj.fields.issuetype.name
-                ParentKey = if ($obj.fields.parent) { $obj.fields.parent.key } else { $null }
-            }
-        } catch {
-            $info = $null
-        }
-    }
-    $script:issueInfoCache[$Key] = $info
-    return $info
-}
-
-function Get-IssueChildren {
-    # Direct children of $Key as @( @{ Key; Status }, ... ). Empty if none/leaf.
-    param([string]$Key)
-    if ($script:childrenCache.ContainsKey($Key)) { return , @($script:childrenCache[$Key]) }
-
-    # Injection guard: $Key is interpolated into the JQL string below.
-    if (-not (Test-JiraKey $Key)) {
-        $script:childrenCache[$Key] = @()
-        return , @()
-    }
-
-    # acli search exposes only --limit (no cursor/offset), so a parent with more
-    # children than $childLimit is capped. When that happens we flag the parent as
-    # truncated and the rollup caller skips deriving a status from the partial set
-    # (see Invoke-ParentRollup) rather than risk a wrong derivation. The limit is
-    # set well above realistic parents (QA page epics have tens of children).
-    $childLimit = 500
-    $json = acli jira workitem search --jql "parent = $Key" --fields "key,status,issuetype" --limit $childLimit --json 2>$null
-    $children = @()
-    if ($LASTEXITCODE -eq 0 -and $json) {
-        try {
-            $items = @($json | ConvertFrom-Json)
-            if ($items.Count -ge $childLimit) {
-                $script:childrenTruncated[$Key] = $true
-                Write-Warning "Parent $Key has >= $childLimit children -- acli search has no cursor pagination, so the result is capped. Its rollup will be skipped to avoid deriving a status from a partial set."
-            }
-            foreach ($item in $items) {
-                $children += @{ Key = $item.key; Status = $item.fields.status.name }
-            }
-        } catch { }
-    }
-    $script:childrenCache[$Key] = $children
-    return , $children
-}
 
 function Invoke-ParentRollup {
     # Reconcile one parent from its children and record its effective status so
@@ -627,8 +690,10 @@ function Invoke-ParentRollup {
     param([string]$ParentKey, $Children)
 
     # Guard against PowerShell unwrapping a single-element array to a scalar
-    # (a bare hashtable's .Count is its key count, which would corrupt the rollup).
-    $Children = @($Children)
+    # (a bare hashtable's .Count is its key count, which would corrupt the
+    # rollup), and drop null entries so an empty pipeline result ($null) can't
+    # masquerade as one child.
+    $Children = @($Children | Where-Object { $_ })
 
     # If the children search was capped at the acli --limit ceiling, the set is
     # partial and deriving a rollup from it could produce a wrong status. Skip the
@@ -658,6 +723,12 @@ function Invoke-ParentRollup {
 
     $childStatuses = @()
     foreach ($child in $Children) {
+        # Defensive: a malformed child (null entry or missing Key) must not
+        # feed the derivation or throw on hashtable lookup.
+        if (-not $child -or -not $child.Key) {
+            Write-Warning "Rollup: malformed child entry under $ParentKey -- skipping it."
+            continue
+        }
         if ($effectiveStatus.ContainsKey($child.Key)) {
             $childStatuses += $effectiveStatus[$child.Key]
         } else {
@@ -671,6 +742,22 @@ function Invoke-ParentRollup {
     $info = Get-IssueRollupInfo -Key $ParentKey
     $current = if ($info) { $info.Status } else { "UNKNOWN" }
     $type = if ($info) { $info.Type } else { "?" }
+
+    # pinned-status: manual pin honored by jira-branch-sync; honor it here too
+    # so the nightly reconciliation doesn't fight a deliberate override.
+    if ($info -and @($info.Labels) -contains 'pinned-status') {
+        $effectiveStatus[$ParentKey] = $current
+        Write-Host "[ROLLUP] $ParentKey ($type): $current (pinned-status - skipping auto-sync)" -ForegroundColor DarkGray
+        $script:rollupResults += [PSCustomObject]@{
+            Ticket         = $ParentKey
+            Branches       = "(parent: $type)"
+            JiraStatus     = $current
+            PRStatus       = "Rollup"
+            Merged         = "N/A"
+            Recommendation = "[OK] pinned-status - not auto-synced"
+        }
+        return
+    }
 
     # Default the propagated status to reality; only override to $desired when we
     # actually apply (or simulate under -DryRun), mirroring the leaf pass.
@@ -711,6 +798,14 @@ if ($RollupScope -ne "None") {
     $parentSet = @{}
 
     if ($RollupScope -eq "Touched") {
+        # Tickets the leaf pass visited that are themselves parents (e.g. an
+        # epic with its own worktree branch) are reconciled too -- previously
+        # only their ANCESTORS entered the set, so nothing ever corrected a
+        # parent the leaf pass had touched (LS-8582).
+        foreach ($k in @($script:touchedParents.Keys)) {
+            $parentSet[$k] = $true
+        }
+
         # Walk the ancestor chain of every ticket the per-ticket pass evaluated.
         foreach ($leafKey in @($effectiveStatus.Keys)) {
             $cursor = $leafKey
@@ -737,7 +832,10 @@ if ($RollupScope -ne "None") {
             $allChildrenJson = acli jira workitem search --jql "project = $proj AND parent is not EMPTY" --fields "key,status,parent" --limit $discoveryLimit --json 2>$null
             if ($LASTEXITCODE -eq 0 -and $allChildrenJson) {
                 try {
-                    $allChildren = @($allChildrenJson | ConvertFrom-Json)
+                    # Version-stable array parsing (see ConvertFrom-JsonArray):
+                    # under PS 5.1 the old pattern collapsed the discovery
+                    # result to one element, reducing AllOpen to a no-op.
+                    $allChildren = ConvertFrom-JsonArray $allChildrenJson
                     $discoveryTruncated = $allChildren.Count -ge $discoveryLimit
                     if ($discoveryTruncated) {
                         Write-Warning "AllOpen rollup hit the discovery cap ($discoveryLimit) -- acli search has no cursor pagination, so the child set is partial. Affected parents' rollups will be skipped to avoid deriving a status from incomplete data."
@@ -781,6 +879,10 @@ if ($RollupScope -ne "None") {
             $children = @(Get-IssueChildren -Key $parentKey)
             $blocked = $false
             foreach ($child in $children) {
+                # Defensive: skip malformed entries -- ContainsKey($null) throws
+                # under $ErrorActionPreference = "Stop" (seen in the LS-8582
+                # smoke run when a transient search result produced junk).
+                if (-not $child -or -not $child.Key) { continue }
                 if ($parentSet.ContainsKey($child.Key) -and -not $effectiveStatus.ContainsKey($child.Key)) {
                     $blocked = $true
                     break
@@ -798,7 +900,7 @@ if ($RollupScope -ne "None") {
             # No tree should cycle; if we stall, reconcile the rest with whatever
             # child statuses we have rather than loop forever.
             foreach ($parentKey in $remaining) {
-                Invoke-ParentRollup -ParentKey $parentKey -Children (Get-IssueChildren -Key $parentKey)
+                Invoke-ParentRollup -ParentKey $parentKey -Children @(Get-IssueChildren -Key $parentKey)
             }
             break
         }

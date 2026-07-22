@@ -41,6 +41,39 @@ Assert-Equal (Get-RolledUpStatus @("To Do", "Done")) "In Progress" "mixed todo+d
 Assert-Equal (Get-RolledUpStatus @("In Review")) "In Progress" "in-review child -> In Progress"
 Assert-Equal (Get-RolledUpStatus @("To Do", "To Do")) "To Do" "all todo -> To Do"
 
+# --- Get-RolledUpStatus: terminal statuses count as resolved (LS-8582) ---
+Assert-Equal (Get-RolledUpStatus @("Done", "Won't Do")) "Done" "done + won't-do -> Done (terminal is resolved)"
+Assert-Equal (Get-RolledUpStatus @("Done", "Cancelled", "Duplicate")) "Done" "done + terminals -> Done"
+Assert-Equal (Get-RolledUpStatus @("Won't Do", "Cancelled")) $null "all terminal, no done -> null (leave parent alone)"
+Assert-Equal (Get-RolledUpStatus @("To Do", "Won't Do")) "To Do" "todo + terminal -> To Do (terminal is not 'started')"
+Assert-Equal (Get-RolledUpStatus @("In Progress", "Won't Do")) "In Progress" "in-progress + terminal -> In Progress"
+Assert-Equal (Get-RolledUpStatus @("Done", "To Do", "Won't Do")) "In Progress" "done + todo + terminal -> In Progress (not all resolved)"
+
+# --- ConvertFrom-JsonArray: version-stable array parsing (LS-8582) ---
+# Under Windows PowerShell 5.1, @($x | ConvertFrom-Json) collapses a JSON array
+# to a single element; this helper must return per-item arrays on BOTH 5.1 and 7.
+$multi = ConvertFrom-JsonArray '[{"key":"LS-1","fields":{"status":{"name":"Done"}}},{"key":"LS-2","fields":{"status":{"name":"To Do"}}}]'
+Assert-Equal $multi.Count 2 "json array -> per-item array"
+Assert-Equal $multi[0].key "LS-1" "json array -> first item addressable"
+Assert-Equal $multi[1].fields.status.name "To Do" "json array -> nested fields addressable"
+
+# Native-command output arrives as a string[] of lines (pretty-printed JSON).
+$lines = @('[', '  {"key":"LS-3"},', '  {"key":"LS-4"}', ']')
+$fromLines = ConvertFrom-JsonArray $lines
+Assert-Equal $fromLines.Count 2 "line-array input -> per-item array"
+Assert-Equal $fromLines[1].key "LS-4" "line-array input -> items parsed"
+
+$single = ConvertFrom-JsonArray '{"key":"LS-5"}'
+Assert-Equal $single.Count 1 "json object -> one-element array"
+Assert-Equal $single[0].key "LS-5" "json object -> element addressable"
+
+Assert-Equal (ConvertFrom-JsonArray '[]').Count 0 "empty json array -> empty"
+Assert-Equal (ConvertFrom-JsonArray 'null').Count 0 "json null document -> empty"
+Assert-Equal (ConvertFrom-JsonArray '[null, {"key":"LS-6"}, null]').Count 1 "null array elements dropped"
+Assert-Equal (ConvertFrom-JsonArray '').Count 0 "empty string -> empty"
+Assert-Equal (ConvertFrom-JsonArray $null).Count 0 "null input -> empty"
+Assert-Equal (ConvertFrom-JsonArray 'not json {{{').Count 0 "invalid json -> empty (no throw)"
+
 # --- Get-TransitionPath: bidirectional stepper ---
 Assert-Equal (Get-TransitionPath "To Do" "In Progress") @("In Progress") "todo -> in progress"
 Assert-Equal (Get-TransitionPath "To Do" "Done") @("In Progress", "In Review", "Done") "todo -> done (forward)"
@@ -75,10 +108,10 @@ Assert-Equal (Get-RolledUpStatus @("In Progress")) "In Progress" "dry-run effect
 
 # --- Parent-with-own-PR: children-derived rollup overrides branch-driven status ---
 # When a ticket is both a parent (has children) and has its own PR/branch, the per-ticket
-# pass may move it to Done (merged PR). Invoke-ParentRollup then runs Get-RolledUpStatus
-# against the children and overwrites the effective status with the children-derived result.
-# This verifies the derivation function produces the correct override target.
-$parentBranchDrivenStatus = "Done"   # per-ticket pass moved this to Done (merged PR)
+# pass refuses to transition it (LS-8582 parent guard) and defers to the rollup pass,
+# which runs Get-RolledUpStatus against the children. This verifies the derivation
+# function produces the correct children-derived target where branch evidence said Done.
+$parentBranchDrivenStatus = "Done"   # what branch/PR evidence alone would have implied
 $rollupDerived = Get-RolledUpStatus @("In Progress", "To Do")
 Assert-Equal $rollupDerived "In Progress" "parent-with-own-PR: children-derived In Progress overrides branch-driven Done"
 Assert-Equal ($parentBranchDrivenStatus -ne $rollupDerived) $true "parent-with-own-PR: rollup status differs from branch-driven status"
