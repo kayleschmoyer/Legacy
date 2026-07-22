@@ -103,7 +103,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
 // ── GraphQL ───────────────────────────────────────────────────────────────────
 
 const mockUpdateBranding = jest.fn();
-const mockRefetchTeams = jest.fn();
+const mockRefetchTeamById = jest.fn();
 const mockRefetchMembers = jest.fn();
 const mockUpdateTeamMemberPosition = jest.fn();
 const mockSwapTeamMemberPositions = jest.fn();
@@ -133,33 +133,29 @@ jest.mock('@legacy-sports/graphql', () => ({
     { loading: false },
   ]),
   useGetTeamByIdQuery: jest.fn(() => ({
-    data: { teamById: { id: 1, leagueId: 100 } },
-    loading: false,
-  })),
-  useGetLeagueTeamsQuery: jest.fn(() => ({
     data: {
-      leagueTeams: [
-        {
-          id: 1,
-          name: 'Test Team',
-          avatarUrl: 'https://example.com/logo.png',
-          bannerUrl: 'https://example.com/banner.jpg',
-          primaryColor: '#123ABC',
-          secondaryColor: '#ABC123',
-        },
-      ],
+      team: {
+        id: 1,
+        leagueId: 100,
+        name: 'Test Team',
+        avatarUrl: 'https://example.com/logo.png',
+        bannerUrl: 'https://example.com/banner.jpg',
+        primaryColor: '#123ABC',
+        secondaryColor: '#ABC123',
+      },
+    },
+    loading: false,
+    refetch: mockRefetchTeamById,
+  })),
+  useGetViewerMembershipQuery: jest.fn(() => ({
+    data: {
+      viewerMembership: { teamId: 1, permissionLevel: 'general_manager' },
     },
     loading: false,
     error: undefined,
-    refetch: mockRefetchTeams,
   })),
-  useGetLeagueByIdQuery: jest.fn(() => ({
-    data: {
-      league: {
-        id: 100,
-        userMembership: { teamId: 1, permissionLevel: 'general_manager' },
-      },
-    },
+  useGetLeagueNameQuery: jest.fn(() => ({
+    data: { leagueName: 'Test League' },
     loading: false,
     error: undefined,
   })),
@@ -248,7 +244,7 @@ describe('TeamDetailPage – clear branding confirmation (LS-4063)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     mockIsPremium = false;
   });
 
@@ -402,7 +398,7 @@ describe('TeamDetailPage – branding save toast accessibility (LS-6045)', () =>
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
   });
 
   it('announces a successful save via a role="status" aria-live="polite" region', async () => {
@@ -440,7 +436,7 @@ describe('TeamDetailPage – team colors (LS-6046)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
   });
 
   it('AC1: renders primary/secondary color pickers seeded from the team', () => {
@@ -458,25 +454,23 @@ describe('TeamDetailPage – team colors (LS-6046)', () => {
   });
 
   it('AC1: seeds from the shared preset defaults when the team has no saved colors', () => {
-    const graphql = jest.requireMock<{ useGetLeagueTeamsQuery: jest.Mock }>(
+    const graphql = jest.requireMock<{ useGetTeamByIdQuery: jest.Mock }>(
       '@legacy-sports/graphql',
     );
-    graphql.useGetLeagueTeamsQuery.mockReturnValueOnce({
+    graphql.useGetTeamByIdQuery.mockReturnValueOnce({
       data: {
-        leagueTeams: [
-          {
-            id: 1,
-            name: 'Test Team',
-            avatarUrl: 'https://example.com/logo.png',
-            bannerUrl: 'https://example.com/banner.jpg',
-            primaryColor: null,
-            secondaryColor: null,
-          },
-        ],
+        team: {
+          id: 1,
+          leagueId: 100,
+          name: 'Test Team',
+          avatarUrl: 'https://example.com/logo.png',
+          bannerUrl: 'https://example.com/banner.jpg',
+          primaryColor: null,
+          secondaryColor: null,
+        },
       },
       loading: false,
-      error: undefined,
-      refetch: mockRefetchTeams,
+      refetch: mockRefetchTeamById,
     });
 
     render(<TeamDetailPage />);
@@ -572,7 +566,7 @@ describe('TeamDetailPage – image upload CSRF token (LS-6040)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     getCsrfToken.mockReturnValue('test-token');
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -618,7 +612,7 @@ describe('TeamDetailPage – lineup editor (LS-5360)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     mockRefetchMembers.mockResolvedValue({});
     mockUpdateTeamMemberPosition.mockResolvedValue({});
     mockSwapTeamMemberPositions.mockResolvedValue({});
@@ -633,15 +627,12 @@ describe('TeamDetailPage – lineup editor (LS-5360)', () => {
   });
 
   it('renders the RosterBoard as read-only for a visitor', () => {
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: { teamId: 999, permissionLevel: 'general_manager' },
-        },
+        viewerMembership: { teamId: 999, permissionLevel: 'general_manager' },
       },
       loading: false,
       error: undefined,
@@ -679,20 +670,17 @@ describe('TeamDetailPage – Premium badge (LS-6054)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     mockIsPremium = false;
 
     // A prior describe block may have overridden this mock's return value
     // (jest.clearAllMocks() clears calls but not mockReturnValue overrides).
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: { teamId: 1, permissionLevel: 'general_manager' },
-        },
+        viewerMembership: { teamId: 1, permissionLevel: 'general_manager' },
       },
       loading: false,
       error: undefined,
@@ -718,15 +706,12 @@ describe('TeamDetailPage – Premium badge (LS-6054)', () => {
 
   it("hides the Premium badge for a premium visitor viewing another GM's team", () => {
     mockIsPremium = true;
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: { teamId: 999, permissionLevel: 'general_manager' },
-        },
+        viewerMembership: { teamId: 999, permissionLevel: 'general_manager' },
       },
       loading: false,
       error: undefined,
@@ -747,7 +732,7 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     mockRefetchMembers.mockResolvedValue({});
 
     const graphql = jest.requireMock<Record<string, jest.Mock>>(
@@ -769,30 +754,21 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
       refetch: mockRefetchMembers,
     });
     graphql.useGetTeamByIdQuery.mockReturnValue({
-      data: { teamById: { id: 1, leagueId: 100 } },
-      loading: false,
-    });
-    graphql.useGetLeagueTeamsQuery.mockReturnValue({
       data: {
-        leagueTeams: [
-          {
-            id: 1,
-            name: 'Test Team',
-            avatarUrl: 'https://example.com/logo.png',
-            bannerUrl: 'https://example.com/banner.jpg',
-          },
-        ],
+        team: {
+          id: 1,
+          leagueId: 100,
+          name: 'Test Team',
+          avatarUrl: 'https://example.com/logo.png',
+          bannerUrl: 'https://example.com/banner.jpg',
+        },
       },
       loading: false,
-      error: undefined,
-      refetch: mockRefetchTeams,
+      refetch: mockRefetchTeamById,
     });
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: { teamId: 1, permissionLevel: 'general_manager' },
-        },
+        viewerMembership: { teamId: 1, permissionLevel: 'general_manager' },
       },
       loading: false,
       error: undefined,
@@ -804,10 +780,10 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
   });
 
   it('renders team identity and roster while the permission query is still loading, instead of a full-page spinner', () => {
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: undefined,
       loading: true,
       error: undefined,
@@ -855,16 +831,13 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders commissioner settings as soon as league data resolves', () => {
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+  it('renders commissioner settings as soon as permission data resolves', () => {
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: { permissionLevel: 'commissioner' },
-        },
+        viewerMembership: { teamId: null, permissionLevel: 'commissioner' },
       },
       loading: false,
       error: undefined,
@@ -882,9 +855,10 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
 // ── Analytics tracking (LS-7686 / LS-8581) ───────────────────────────────────
 
 describe('TeamDetailPage – analytics tracking (LS-7686)', () => {
-  const graphql = jest.requireMock<{ useGetTeamMembersQuery: jest.Mock }>(
-    '@legacy-sports/graphql',
-  );
+  const graphql = jest.requireMock<{
+    useGetTeamMembersQuery: jest.Mock;
+    useGetTeamByIdQuery: jest.Mock;
+  }>('@legacy-sports/graphql');
 
   const teamMembersWithLeagueId = (leagueId: number | null) => ({
     data: {
@@ -905,7 +879,7 @@ describe('TeamDetailPage – analytics tracking (LS-7686)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     graphql.useGetTeamMembersQuery.mockReturnValue(
       teamMembersWithLeagueId(100),
     );
@@ -922,6 +896,13 @@ describe('TeamDetailPage – analytics tracking (LS-7686)', () => {
     graphql.useGetTeamMembersQuery.mockReturnValue(
       teamMembersWithLeagueId(null),
     );
+    // teamById's leagueId fallback must also be unresolved — otherwise it
+    // supplies leagueId regardless of the members-side value.
+    graphql.useGetTeamByIdQuery.mockReturnValue({
+      data: { team: { id: 1, leagueId: null } },
+      loading: false,
+      refetch: mockRefetchTeamById,
+    });
 
     render(<TeamDetailPage />);
 
@@ -963,7 +944,7 @@ describe('TeamDetailPage – league identity link (LS-6052)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     mockRefetchMembers.mockResolvedValue({});
   });
 
@@ -974,17 +955,11 @@ describe('TeamDetailPage – league identity link (LS-6052)', () => {
   });
 
   it('renders "Part of <League Name>" and navigates to the league detail page on click', () => {
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
+    const graphql = jest.requireMock<{ useGetLeagueNameQuery: jest.Mock }>(
       '@legacy-sports/graphql',
     );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
-      data: {
-        league: {
-          id: 100,
-          name: 'The Dynasty League',
-          userMembership: { permissionLevel: 'general_manager' },
-        },
-      },
+    graphql.useGetLeagueNameQuery.mockReturnValue({
+      data: { leagueName: 'The Dynasty League' },
       loading: false,
       error: undefined,
     });
@@ -1038,7 +1013,7 @@ describe('TeamDetailPage – lineup editor lock-window enforcement (LS-6035)', (
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     mockRefetchMembers.mockResolvedValue({});
     mockUpdateTeamMemberPosition.mockResolvedValue({});
     mockSwapTeamMemberPositions.mockResolvedValue({});
@@ -1046,15 +1021,12 @@ describe('TeamDetailPage – lineup editor lock-window enforcement (LS-6035)', (
     // Reset to the GM baseline regardless of mock state left behind by
     // preceding describe blocks (e.g. the visitor/premium/loading overrides
     // above).
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: { teamId: 1, permissionLevel: 'general_manager' },
-        },
+        viewerMembership: { teamId: 1, permissionLevel: 'general_manager' },
       },
       loading: false,
       error: undefined,
@@ -1091,15 +1063,12 @@ describe('TeamDetailPage – lineup editor lock-window enforcement (LS-6035)', (
 
   it('preserves per-player lock state independent of the read-only (visitor) gate', () => {
     mockTeamMembers([{ id: 10, positionId: 1, isLocked: true }]);
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: { teamId: 999, permissionLevel: 'general_manager' },
-        },
+        viewerMembership: { teamId: 999, permissionLevel: 'general_manager' },
       },
       loading: false,
       error: undefined,
@@ -1119,7 +1088,7 @@ describe('TeamDetailPage – assistant manager permissions (LS-6051)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateBranding.mockResolvedValue({});
-    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
     mockRefetchMembers.mockResolvedValue({});
     mockUpdateTeamMemberPosition.mockResolvedValue({});
     mockSwapTeamMemberPositions.mockResolvedValue({});
@@ -1127,15 +1096,12 @@ describe('TeamDetailPage – assistant manager permissions (LS-6051)', () => {
     // `mockReturnValue` persists across tests (clearAllMocks resets calls,
     // not implementations) — reset to the default GM membership so each
     // test's role is explicit rather than inherited from a prior test.
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: { teamId: 1, permissionLevel: 'general_manager' },
-        },
+        viewerMembership: { teamId: 1, permissionLevel: 'general_manager' },
       },
       loading: false,
       error: undefined,
@@ -1143,17 +1109,14 @@ describe('TeamDetailPage – assistant manager permissions (LS-6051)', () => {
   });
 
   function mockAsAssistantManager() {
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: {
-            teamId: 1,
-            permissionLevel: 'assistant_manager',
-          },
+        viewerMembership: {
+          teamId: 1,
+          permissionLevel: 'assistant_manager',
         },
       },
       loading: false,
@@ -1199,17 +1162,14 @@ describe('TeamDetailPage – assistant manager permissions (LS-6051)', () => {
   });
 
   it('still shows the visitor note for an assistant_manager of a different team', () => {
-    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
-      '@legacy-sports/graphql',
-    );
-    graphql.useGetLeagueByIdQuery.mockReturnValue({
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
       data: {
-        league: {
-          id: 100,
-          userMembership: {
-            teamId: 999,
-            permissionLevel: 'assistant_manager',
-          },
+        viewerMembership: {
+          teamId: 999,
+          permissionLevel: 'assistant_manager',
         },
       },
       loading: false,

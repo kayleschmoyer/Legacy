@@ -19,11 +19,11 @@ import { Skeleton } from '@legacy-sports/shared-components';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
-  useGetLeagueByIdQuery,
-  useGetLeagueTeamsQuery,
+  useGetLeagueNameQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
   useGetTeamMembersQuery,
+  useGetViewerMembershipQuery,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
@@ -219,8 +219,14 @@ export function TeamDetailPage() {
     skip: !isValidTeamId,
   });
 
-  // Fetch team row directly — provides leagueId for empty-roster teams (LS-1330)
-  const { data: teamByIdData, loading: teamByIdLoading } = useGetTeamByIdQuery({
+  // Fetch team row directly — provides leagueId for empty-roster teams (LS-1330),
+  // and is the sole source of team data (LS-6036 — the legacy leagueTeams-find
+  // fallback fetched every team's full row in the league just to locate this one).
+  const {
+    data: teamByIdData,
+    loading: teamByIdLoading,
+    refetch: refetchTeamById,
+  } = useGetTeamByIdQuery({
     variables: { teamId: teamIdNum },
     skip: !isValidTeamId,
   });
@@ -228,23 +234,20 @@ export function TeamDetailPage() {
   // leagueId: prefer from members (populated after draft), fall back to teamById
   const leagueId =
     membersData?.teamMembers?.[0]?.leagueId ?? teamByIdData?.team?.leagueId;
-  const {
-    data: teamsData,
-    loading: teamsLoading,
-    error: teamsError,
-    refetch: refetchTeams,
-  } = useGetLeagueTeamsQuery({
-    variables: { leagueId: leagueId || 0 },
-    skip: !leagueId,
-  });
 
-  // Get league details including the user's permission level
+  // Get the viewer's membership row (teamId + permissionLevel) for this
+  // league in one lightweight fetch (LS-6036 — replaces a full
+  // useGetLeagueByIdQuery fetch that pulled ~40 league fields, and the
+  // separate userTeamId "best team across the league" query). Scoped to a
+  // single membership row rather than the highest-priority role across all
+  // of the viewer's memberships, so an assistant manager on this team still
+  // resolves correctly even if they GM a different team (BTD-028/LS-6051).
   const {
-    data: leagueData,
-    loading: leagueLoading,
-    error: leagueError,
-  } = useGetLeagueByIdQuery({
-    variables: { id: leagueId || 0 },
+    data: viewerMembershipData,
+    loading: viewerMembershipLoading,
+    error: viewerMembershipError,
+  } = useGetViewerMembershipQuery({
+    variables: { leagueId: leagueId || 0 },
     skip: !leagueId,
   });
 
@@ -258,6 +261,13 @@ export function TeamDetailPage() {
     skip: !leagueId,
   });
 
+  // Get the league's display name for the "Part of <league>" link (LS-6052)
+  // without the full league object.
+  const { data: leagueNameData } = useGetLeagueNameQuery({
+    variables: { leagueId: leagueId || 0 },
+    skip: !leagueId,
+  });
+
   const leaguePositions = useMemo<readonly LeaguePositionFragment[]>(
     () =>
       (positionsData?.leaguePositions ?? []).filter(
@@ -266,11 +276,7 @@ export function TeamDetailPage() {
     [positionsData],
   );
 
-  // Find the team from leagueTeams, falling back to teamById for empty-roster teams
-  const team =
-    teamsData?.leagueTeams?.find(
-      (t: { id?: number | null }) => t?.id === teamIdNum,
-    ) ?? teamByIdData?.team;
+  const team = teamByIdData?.team;
   const seedTeamId = team?.id;
   const teamPrimaryColor = team?.primaryColor;
   const teamSecondaryColor = team?.secondaryColor;
@@ -363,8 +369,8 @@ export function TeamDetailPage() {
   };
 
   const userPermissionLevel =
-    leagueData?.league?.userMembership?.permissionLevel;
-  const userMembershipTeamId = leagueData?.league?.userMembership?.teamId;
+    viewerMembershipData?.viewerMembership?.permissionLevel;
+  const userMembershipTeamId = viewerMembershipData?.viewerMembership?.teamId;
 
   // isOwner must be scoped to THIS team's membership row, not the user's
   // "best" team across the league (BTD-028): a user who is a GM of a
@@ -386,15 +392,14 @@ export function TeamDetailPage() {
   const isPremium = useIsPremium();
 
   // Gates team identity + roster — the data those sections need to render.
-  const identityLoading =
-    membersLoading || teamByIdLoading || teamsLoading || positionsLoading;
+  const identityLoading = membersLoading || teamByIdLoading || positionsLoading;
 
   // Gates only the GM/Commissioner settings section. Identity and roster
   // render as soon as their own data is available instead of waiting on
   // permission data too (LS-6048). Ownership and permission level both come
-  // from `leagueData` (LS-6051), so `leagueLoading` alone is sufficient —
-  // there is no longer a separate ownership query to wait on.
-  const permissionLoading = leagueLoading;
+  // from the single viewerMembership fetch (LS-6051 + LS-6036), so its
+  // loading flag alone is sufficient — there is no separate ownership query.
+  const permissionLoading = viewerMembershipLoading;
 
   if (!isValidTeamId) {
     return (
@@ -455,17 +460,11 @@ export function TeamDetailPage() {
     );
   };
 
-  const teamsErrorState = renderQueryErrorState(
-    teamsError,
-    'Failed to load league teams',
+  const viewerMembershipErrorState = renderQueryErrorState(
+    viewerMembershipError,
+    'Failed to load viewer league membership',
   );
-  if (teamsErrorState) return teamsErrorState;
-
-  const leagueErrorState = renderQueryErrorState(
-    leagueError,
-    'Failed to load league details',
-  );
-  if (leagueErrorState) return leagueErrorState;
+  if (viewerMembershipErrorState) return viewerMembershipErrorState;
 
   const teamMembers = membersData.teamMembers;
 
@@ -508,7 +507,7 @@ export function TeamDetailPage() {
           ...(trimmedBanner ? { bannerUrl: trimmedBanner } : {}),
         },
       });
-      await refetchTeams();
+      await refetchTeamById();
       setAvatarInput('');
       setBannerInput('');
       setAvatarImgError(false);
@@ -550,7 +549,7 @@ export function TeamDetailPage() {
           secondaryColor,
         },
       });
-      await refetchTeams();
+      await refetchTeamById();
       setBrandingSuccess(true);
       setTimeout(() => setBrandingSuccess(false), 3000);
     } catch (err: unknown) {
@@ -577,7 +576,7 @@ export function TeamDetailPage() {
           avatarUrl: '',
         },
       });
-      await refetchTeams();
+      await refetchTeamById();
       setAvatarImgError(false);
       setBrandingSuccess(true);
       setTimeout(() => setBrandingSuccess(false), 3000);
@@ -600,7 +599,7 @@ export function TeamDetailPage() {
           bannerUrl: '',
         },
       });
-      await refetchTeams();
+      await refetchTeamById();
       setBannerImgError(false);
       setBrandingSuccess(true);
       setTimeout(() => setBrandingSuccess(false), 3000);
@@ -683,7 +682,7 @@ export function TeamDetailPage() {
         },
       });
 
-      await refetchTeams();
+      await refetchTeamById();
       if (imageType === 'avatar') setAvatarImgError(false);
       else setBannerImgError(false);
       setBrandingSuccess(true);
@@ -804,7 +803,7 @@ export function TeamDetailPage() {
               </XStack>
             )}
           </XStack>
-          {leagueId && leagueData?.league?.name && (
+          {leagueId && leagueNameData?.leagueName && (
             <Button
               unstyled
               size="$1"
@@ -820,7 +819,7 @@ export function TeamDetailPage() {
                 color="$gray11"
                 textDecorationLine="underline"
               >
-                Part of {leagueData.league.name}
+                Part of {leagueNameData.leagueName}
               </Text>
             </Button>
           )}

@@ -2,11 +2,13 @@ import type { Page, Route } from '@playwright/test';
 
 import {
   leagueByIdResponse,
+  leagueNameResponse,
   leaguePositionsResponse,
   leagueScoringProfileResponse,
   leagueTeamsResponse,
   matchupsForLeagueResponse,
   userTeamIdResponse,
+  viewerMembershipResponse,
 } from '../mocks/graphql';
 import { mockDraft } from '../mocks/graphql/draft.mocks';
 import {
@@ -153,6 +155,8 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   getleagueteams: leagueTeamsResponse(),
   getpositionsforleague: leaguePositionsResponse(),
   getuserteamid: userTeamIdResponse(),
+  getviewermembership: viewerMembershipResponse(),
+  getleaguename: leagueNameResponse(),
   getteammembers: { data: { teamMembers: [] } },
   getcurrentweekforleague: { data: { getCurrentWeekForLeague: null } },
   getmatchupsforleague: matchupsForLeagueResponse(),
@@ -226,7 +230,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
 
   // ── Team / league members ─────────────────────────────────────────
   getteamleaguemembers: { data: { teamLeagueMembers: [] } },
-  getteambyid: { data: { teamById: null } },
+  getteambyid: { data: { team: null } },
 
   // ── Matchups (week-based) ─────────────────────────────────────────
   getmatchupsbyweek: { data: { getMatchupsByWeek: [] } },

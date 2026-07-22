@@ -18,6 +18,7 @@ export {
   mockLeagueAtWeek,
   mockLeagueInPlayoffs,
   leagueByIdResponse,
+  leagueNameResponse,
   leagueAtWeekResponse,
   leagueInPlayoffsResponse,
   userLeaguesResponse,
@@ -25,6 +26,7 @@ export {
   leagueTeamsResponse,
   leaguePositionsResponse,
   userTeamIdResponse,
+  viewerMembershipResponse,
   leagueScoringProfileResponse,
   createLeagueResponse,
 } from './league.mocks';

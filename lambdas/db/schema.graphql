@@ -3398,6 +3398,7 @@ type Query {
   Get payment status for all league members. Requires league membership.
   """
   leagueDuesStatus(leagueId: Int!): [LeagueMemberPaymentStatus!]
+  leagueName(leagueId: Int!): String
   leaguePositions(leagueId: Int!): [LeaguePosition!]
   leagueScoringProfile(leagueId: Int!): ScoringConfig
 
@@ -3732,6 +3733,7 @@ type Query {
   Get version and deployment information for the GraphQL API
   """
   version: VersionInfo
+  viewerMembership(leagueId: Int!): LeagueMember
 }
 
 input RecalculateMatchupScoresInput {

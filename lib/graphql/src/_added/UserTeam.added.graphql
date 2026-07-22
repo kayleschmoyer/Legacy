@@ -1,3 +1,16 @@
 query GetUserTeamId($leagueId: Int!) {
   userTeamId(leagueId: $leagueId)
 }
+
+query GetViewerMembership($leagueId: Int!) {
+  viewerMembership(leagueId: $leagueId) {
+    leagueId
+    userId
+    teamId
+    permissionLevel
+  }
+}
+
+query GetLeagueName($leagueId: Int!) {
+  leagueName(leagueId: $leagueId)
+}

@@ -153,6 +153,24 @@ async function setupGraphQL(page: import('@playwright/test').Page) {
         });
         return;
       }
+      if (op === 'GetViewerMembership') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              viewerMembership: {
+                __typename: 'LeagueMember',
+                leagueId: LEAGUE_ID,
+                userId: 1,
+                teamId: TEAM_ID + 999,
+                permissionLevel: 'member',
+              },
+            },
+          }),
+        });
+        return;
+      }
       if (op === 'GetPositionsForLeague') {
         await route.fulfill({
           status: 200,

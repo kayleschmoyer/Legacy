@@ -3045,6 +3045,7 @@ export type Query = {
   leagueDuesSettings?: Maybe<LeagueDuesSettings>;
   /** Get payment status for all league members. Requires league membership. */
   leagueDuesStatus?: Maybe<Array<LeagueMemberPaymentStatus>>;
+  leagueName?: Maybe<Scalars['String']['output']>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   /** Return all season awards for a league, optionally filtered by season */
@@ -3144,6 +3145,7 @@ export type Query = {
   validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
+  viewerMembership?: Maybe<LeagueMember>;
 };
 
 export type QueryAchievementRestrictionsArgs = {
@@ -3483,6 +3485,10 @@ export type QueryLeagueDuesStatusArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type QueryLeagueNameArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type QueryLeaguePositionsArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -3780,6 +3786,10 @@ export type QueryUsersCountArgs = {
 
 export type QueryValidateInviteCodeArgs = {
   code: Scalars['String']['input'];
+};
+
+export type QueryViewerMembershipArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type RecalculateMatchupScoresInput = {
@@ -8063,6 +8073,30 @@ export type GetUserTeamIdQueryVariables = Exact<{
 export type GetUserTeamIdQuery = {
   __typename?: 'Query';
   userTeamId?: number | null;
+};
+
+export type GetViewerMembershipQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetViewerMembershipQuery = {
+  __typename?: 'Query';
+  viewerMembership?: {
+    __typename?: 'LeagueMember';
+    leagueId?: number | null;
+    userId?: number | null;
+    teamId?: number | null;
+    permissionLevel?: string | null;
+  } | null;
+};
+
+export type GetLeagueNameQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeagueNameQuery = {
+  __typename?: 'Query';
+  leagueName?: string | null;
 };
 
 export type UserFragment = {
@@ -20862,6 +20896,187 @@ export type GetUserTeamIdSuspenseQueryHookResult = ReturnType<
 export type GetUserTeamIdQueryResult = Apollo.QueryResult<
   GetUserTeamIdQuery,
   GetUserTeamIdQueryVariables
+>;
+export const GetViewerMembership = gql`
+  query GetViewerMembership($leagueId: Int!) {
+    viewerMembership(leagueId: $leagueId) {
+      leagueId
+      userId
+      teamId
+      permissionLevel
+    }
+  }
+`;
+
+/**
+ * __useGetViewerMembershipQuery__
+ *
+ * To run a query within a React component, call `useGetViewerMembershipQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetViewerMembershipQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetViewerMembershipQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetViewerMembershipQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetViewerMembershipQuery,
+    GetViewerMembershipQueryVariables
+  > &
+    (
+      | { variables: GetViewerMembershipQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetViewerMembershipQuery,
+    GetViewerMembershipQueryVariables
+  >(GetViewerMembership, options);
+}
+export function useGetViewerMembershipLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetViewerMembershipQuery,
+    GetViewerMembershipQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetViewerMembershipQuery,
+    GetViewerMembershipQueryVariables
+  >(GetViewerMembership, options);
+}
+export function useGetViewerMembershipSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetViewerMembershipQuery,
+        GetViewerMembershipQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetViewerMembershipQuery,
+    GetViewerMembershipQueryVariables
+  >(
+    GetViewerMembership,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetViewerMembershipQuery,
+          GetViewerMembershipQueryVariables
+        >,
+  );
+}
+export type GetViewerMembershipQueryHookResult = ReturnType<
+  typeof useGetViewerMembershipQuery
+>;
+export type GetViewerMembershipLazyQueryHookResult = ReturnType<
+  typeof useGetViewerMembershipLazyQuery
+>;
+export type GetViewerMembershipSuspenseQueryHookResult = ReturnType<
+  typeof useGetViewerMembershipSuspenseQuery
+>;
+export type GetViewerMembershipQueryResult = Apollo.QueryResult<
+  GetViewerMembershipQuery,
+  GetViewerMembershipQueryVariables
+>;
+export const GetLeagueName = gql`
+  query GetLeagueName($leagueId: Int!) {
+    leagueName(leagueId: $leagueId)
+  }
+`;
+
+/**
+ * __useGetLeagueNameQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueNameQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueNameQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueNameQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueNameQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueNameQuery,
+    GetLeagueNameQueryVariables
+  > &
+    (
+      | { variables: GetLeagueNameQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetLeagueNameQuery, GetLeagueNameQueryVariables>(
+    GetLeagueName,
+    options,
+  );
+}
+export function useGetLeagueNameLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueNameQuery,
+    GetLeagueNameQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<GetLeagueNameQuery, GetLeagueNameQueryVariables>(
+    GetLeagueName,
+    options,
+  );
+}
+export function useGetLeagueNameSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueNameQuery,
+        GetLeagueNameQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueNameQuery,
+    GetLeagueNameQueryVariables
+  >(
+    GetLeagueName,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueNameQuery,
+          GetLeagueNameQueryVariables
+        >,
+  );
+}
+export type GetLeagueNameQueryHookResult = ReturnType<
+  typeof useGetLeagueNameQuery
+>;
+export type GetLeagueNameLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueNameLazyQuery
+>;
+export type GetLeagueNameSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueNameSuspenseQuery
+>;
+export type GetLeagueNameQueryResult = Apollo.QueryResult<
+  GetLeagueNameQuery,
+  GetLeagueNameQueryVariables
 >;
 export const GetMyIdentities = gql`
   query GetMyIdentities {

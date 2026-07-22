@@ -2,11 +2,12 @@
  * League domain — Query resolvers
  *
  * Queries: league, userLeagues, myLeagues, leaguePositions, leagueTeams,
- *          userTeamId, validateInviteCode, teamLeagueMembers,
- *          publicLeagues
+ *          userTeamId, viewerMembership, leagueName, validateInviteCode,
+ *          teamLeagueMembers, publicLeagues
  */
 import {
   buildEligibilityConditions,
+  type GenericDatabase,
   type LeagueEligibilitySettings,
   PublicSchema,
 } from '@legacy-sports/db-client';
@@ -586,6 +587,47 @@ builder.queryField('teamMembers', (t) =>
   }),
 );
 
+const LEAGUE_ROLE_PRIORITY: Record<string, number> = {
+  general_manager: 0,
+  commissioner: 1,
+  assistant_manager: 2,
+};
+
+/**
+ * Fetch all of this user's memberships in a league (any role) and return the
+ * highest-priority one. Multiple rows can exist when a user holds different
+ * roles across teams (e.g. GM on one team + commissioner on another); we
+ * prioritise by role so the user's own team/role is always returned:
+ * GM > commissioner > assistant. Shared by userTeamId and userPermissionLevel
+ * so the two stay in lockstep — same DB round trip, same role tie-breaking.
+ */
+export async function getBestLeagueMembership(
+  db: GenericDatabase<typeof PublicSchema>,
+  leagueId: number,
+  userId: number,
+): Promise<{ teamId: number | null; permissionLevel: string } | null> {
+  const memberships = await db
+    .select({
+      teamId: PublicSchema.leagueMembers.teamId,
+      permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+    })
+    .from(PublicSchema.leagueMembers)
+    .where(
+      and(
+        eq(PublicSchema.leagueMembers.leagueId, leagueId),
+        eq(PublicSchema.leagueMembers.userId, userId),
+      ),
+    );
+
+  if (memberships.length === 0) return null;
+
+  return memberships.sort(
+    (a, b) =>
+      (LEAGUE_ROLE_PRIORITY[a.permissionLevel] ?? 99) -
+      (LEAGUE_ROLE_PRIORITY[b.permissionLevel] ?? 99),
+  )[0];
+}
+
 // Query field to get user's team ID for a specific league
 builder.queryField('userTeamId', (t) =>
   t.field({
@@ -606,12 +648,57 @@ builder.queryField('userTeamId', (t) =>
       const userId = context.user.id;
 
       try {
-        // Fetch all of this user's memberships in the league (any role).
-        // Multiple rows can exist when a user holds different roles across teams
-        // (e.g. GM on one team + commissioner on another). We prioritise by role
-        // so the user's own team is always returned: GM > commissioner > assistant.
-        const memberships = await context.db
+        const best = await getBestLeagueMembership(
+          context.db,
+          leagueId,
+          userId,
+        );
+        return best?.teamId ?? null;
+      } catch (error) {
+        LOGGER.error(
+          'Error fetching user team ID',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId, userId },
+        );
+        throw new Error('Failed to fetch user team ID');
+      }
+    },
+  }),
+);
+
+// Query field to get the viewer's own membership row (teamId +
+// permissionLevel) for a league, without the full League object (LS-6036 —
+// avoids the ~40-field League over-fetch when a caller only needs to check
+// the viewer's role/team for a specific league).
+//
+// Deliberately NOT role-priority-sorted like userTeamId/getBestLeagueMembership:
+// this must return the SAME row `league`'s `userMembership` field resolves
+// (BTD-028/LS-6051) so a viewer who is e.g. general_manager of a different
+// team but assistant_manager of the team being viewed resolves consistently
+// with the rest of the page, rather than always preferring their
+// highest-priority role across every team they belong to.
+builder.queryField('viewerMembership', (t) =>
+  t.field({
+    type: LeagueMember,
+    nullable: true,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to fetch league membership',
+        );
+      }
+
+      const { leagueId } = args;
+      const userId = context.user.id;
+
+      try {
+        const rows = await context.db
           .select({
+            leagueId: PublicSchema.leagueMembers.leagueId,
+            userId: PublicSchema.leagueMembers.userId,
             teamId: PublicSchema.leagueMembers.teamId,
             permissionLevel: PublicSchema.leagueMembers.permissionLevel,
           })
@@ -621,30 +708,56 @@ builder.queryField('userTeamId', (t) =>
               eq(PublicSchema.leagueMembers.leagueId, leagueId),
               eq(PublicSchema.leagueMembers.userId, userId),
             ),
-          );
+          )
+          .limit(1);
 
-        if (memberships.length === 0) return null;
-
-        const rolePriority: Record<string, number> = {
-          general_manager: 0,
-          commissioner: 1,
-          assistant_manager: 2,
-        };
-
-        const best = memberships.sort(
-          (a, b) =>
-            (rolePriority[a.permissionLevel] ?? 99) -
-            (rolePriority[b.permissionLevel] ?? 99),
-        )[0];
-
-        return best.teamId;
+        return rows[0] ?? null;
       } catch (error) {
-        LOGGER.error('Error fetching user team ID', {
-          leagueId,
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        throw new Error('Failed to fetch user team ID');
+        LOGGER.error(
+          'Error fetching viewer league membership',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId, userId },
+        );
+        throw new Error('Failed to fetch viewer league membership');
+      }
+    },
+  }),
+);
+
+// Query field to get just a league's display name, without the full league
+// object (LS-6036/LS-6052 — a display-only "Part of <league>" link needs the
+// name, not the ~40-field League fetch).
+builder.queryField('leagueName', (t) =>
+  t.field({
+    type: 'String',
+    nullable: true,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to fetch league name',
+        );
+      }
+
+      const { leagueId } = args;
+
+      try {
+        const rows = await context.db
+          .select({ name: PublicSchema.leagues.name })
+          .from(PublicSchema.leagues)
+          .where(eq(PublicSchema.leagues.id, leagueId))
+          .limit(1);
+
+        return rows[0]?.name ?? null;
+      } catch (error) {
+        LOGGER.error(
+          'Error fetching league name',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId },
+        );
+        throw new Error('Failed to fetch league name');
       }
     },
   }),

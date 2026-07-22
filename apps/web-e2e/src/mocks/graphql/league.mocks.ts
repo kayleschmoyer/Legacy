@@ -200,6 +200,10 @@ export function leagueByIdResponse(league?: Partial<MockLeague>) {
   return { data: { league: mockLeague(league) } };
 }
 
+export function leagueNameResponse(name: string | null = 'Test League') {
+  return { data: { leagueName: name } };
+}
+
 export function userLeaguesResponse(leagues?: Partial<MockLeague>[]) {
   return {
     data: {
@@ -236,6 +240,27 @@ export function leaguePositionsResponse(positions?: MockPosition[]) {
 export function userTeamIdResponse(teamId = 1) {
   return {
     data: { userTeamId: { __typename: 'UserTeamId' as const, teamId } },
+  };
+}
+
+export function viewerMembershipResponse(
+  membership: Partial<MockLeagueMember> | null = {
+    teamId: 1,
+    permissionLevel: 'general_manager',
+  },
+) {
+  return {
+    data: {
+      viewerMembership: membership && {
+        __typename: 'LeagueMember' as const,
+        leagueId: 1,
+        userId: 1,
+        teamId: 1,
+        permissionLevel: 'general_manager',
+        username: 'testuser',
+        ...membership,
+      },
+    },
   };
 }
 

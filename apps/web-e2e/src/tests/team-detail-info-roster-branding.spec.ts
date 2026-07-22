@@ -201,7 +201,7 @@ async function setupGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: { teamById: { ...team, managerId: team.owner } },
+          data: { team: { ...team, managerId: team.owner } },
         }),
       });
     } else if (postData.includes('getleagueteams')) {
@@ -224,6 +224,28 @@ async function setupGraphQL(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league } }),
+      });
+    } else if (operationName === 'getviewermembership') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            viewerMembership: {
+              __typename: 'LeagueMember',
+              leagueId: league.userMembership.leagueId,
+              userId: league.userMembership.userId,
+              teamId: league.userMembership.teamId,
+              permissionLevel: league.userMembership.permissionLevel,
+            },
+          },
+        }),
+      });
+    } else if (operationName === 'getleaguename') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { leagueName: league.name } }),
       });
     } else if (postData.includes('getpositionsforleague')) {
       await route.fulfill({

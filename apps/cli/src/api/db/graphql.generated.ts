@@ -3039,6 +3039,7 @@ export type Query = {
   leagueDuesSettings?: Maybe<LeagueDuesSettings>;
   /** Get payment status for all league members. Requires league membership. */
   leagueDuesStatus?: Maybe<Array<LeagueMemberPaymentStatus>>;
+  leagueName?: Maybe<Scalars['String']['output']>;
   leaguePositions?: Maybe<Array<LeaguePosition>>;
   leagueScoringProfile?: Maybe<ScoringConfig>;
   /** Return all season awards for a league, optionally filtered by season */
@@ -3138,6 +3139,7 @@ export type Query = {
   validateInviteCode?: Maybe<InviteCodeInfo>;
   /** Get version and deployment information for the GraphQL API */
   version?: Maybe<VersionInfo>;
+  viewerMembership?: Maybe<LeagueMember>;
 };
 
 export type QueryAchievementRestrictionsArgs = {
@@ -3477,6 +3479,10 @@ export type QueryLeagueDuesStatusArgs = {
   leagueId: Scalars['Int']['input'];
 };
 
+export type QueryLeagueNameArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
 export type QueryLeaguePositionsArgs = {
   leagueId: Scalars['Int']['input'];
 };
@@ -3774,6 +3780,10 @@ export type QueryUsersCountArgs = {
 
 export type QueryValidateInviteCodeArgs = {
   code: Scalars['String']['input'];
+};
+
+export type QueryViewerMembershipArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type RecalculateMatchupScoresInput = {
