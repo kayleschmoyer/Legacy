@@ -153,16 +153,11 @@ jest.mock('@legacy-sports/graphql', () => ({
     error: undefined,
     refetch: mockRefetchTeams,
   })),
-  useGetUserTeamIdQuery: jest.fn(() => ({
-    data: { userTeamId: 1 },
-    loading: false,
-    error: undefined,
-  })),
   useGetLeagueByIdQuery: jest.fn(() => ({
     data: {
       league: {
         id: 100,
-        userMembership: { permissionLevel: 'general_manager' },
+        userMembership: { teamId: 1, permissionLevel: 'general_manager' },
       },
     },
     loading: false,
@@ -638,11 +633,16 @@ describe('TeamDetailPage – lineup editor (LS-5360)', () => {
   });
 
   it('renders the RosterBoard as read-only for a visitor', () => {
-    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
       '@legacy-sports/graphql',
     );
-    graphql.useGetUserTeamIdQuery.mockReturnValue({
-      data: { userTeamId: 999 },
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: { teamId: 999, permissionLevel: 'general_manager' },
+        },
+      },
       loading: false,
       error: undefined,
     });
@@ -684,11 +684,16 @@ describe('TeamDetailPage – Premium badge (LS-6054)', () => {
 
     // A prior describe block may have overridden this mock's return value
     // (jest.clearAllMocks() clears calls but not mockReturnValue overrides).
-    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
       '@legacy-sports/graphql',
     );
-    graphql.useGetUserTeamIdQuery.mockReturnValue({
-      data: { userTeamId: 1 },
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: { teamId: 1, permissionLevel: 'general_manager' },
+        },
+      },
       loading: false,
       error: undefined,
     });
@@ -713,11 +718,16 @@ describe('TeamDetailPage – Premium badge (LS-6054)', () => {
 
   it("hides the Premium badge for a premium visitor viewing another GM's team", () => {
     mockIsPremium = true;
-    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
       '@legacy-sports/graphql',
     );
-    graphql.useGetUserTeamIdQuery.mockReturnValue({
-      data: { userTeamId: 999 },
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: { teamId: 999, permissionLevel: 'general_manager' },
+        },
+      },
       loading: false,
       error: undefined,
     });
@@ -777,16 +787,11 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
       error: undefined,
       refetch: mockRefetchTeams,
     });
-    graphql.useGetUserTeamIdQuery.mockReturnValue({
-      data: { userTeamId: 1 },
-      loading: false,
-      error: undefined,
-    });
     graphql.useGetLeagueByIdQuery.mockReturnValue({
       data: {
         league: {
           id: 100,
-          userMembership: { permissionLevel: 'general_manager' },
+          userMembership: { teamId: 1, permissionLevel: 'general_manager' },
         },
       },
       loading: false,
@@ -798,16 +803,10 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
     });
   });
 
-  it('renders team identity and roster while ownership/permission queries are still loading, instead of a full-page spinner', () => {
-    const graphql = jest.requireMock<{
-      useGetUserTeamIdQuery: jest.Mock;
-      useGetLeagueByIdQuery: jest.Mock;
-    }>('@legacy-sports/graphql');
-    graphql.useGetUserTeamIdQuery.mockReturnValue({
-      data: undefined,
-      loading: true,
-      error: undefined,
-    });
+  it('renders team identity and roster while the permission query is still loading, instead of a full-page spinner', () => {
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
     graphql.useGetLeagueByIdQuery.mockReturnValue({
       data: undefined,
       loading: true,
@@ -856,18 +855,10 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders commissioner settings as soon as league data resolves, without waiting on the still-loading ownership query', () => {
-    const graphql = jest.requireMock<{
-      useGetUserTeamIdQuery: jest.Mock;
-      useGetLeagueByIdQuery: jest.Mock;
-    }>('@legacy-sports/graphql');
-    // Commissioner status derives entirely from league data — the ownership
-    // (userTeam) query is still loading and irrelevant to that determination.
-    graphql.useGetUserTeamIdQuery.mockReturnValue({
-      data: undefined,
-      loading: true,
-      error: undefined,
-    });
+  it('renders commissioner settings as soon as league data resolves', () => {
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
     graphql.useGetLeagueByIdQuery.mockReturnValue({
       data: {
         league: {
@@ -1055,11 +1046,16 @@ describe('TeamDetailPage – lineup editor lock-window enforcement (LS-6035)', (
     // Reset to the GM baseline regardless of mock state left behind by
     // preceding describe blocks (e.g. the visitor/premium/loading overrides
     // above).
-    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
       '@legacy-sports/graphql',
     );
-    graphql.useGetUserTeamIdQuery.mockReturnValue({
-      data: { userTeamId: 1 },
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: { teamId: 1, permissionLevel: 'general_manager' },
+        },
+      },
       loading: false,
       error: undefined,
     });
@@ -1095,11 +1091,16 @@ describe('TeamDetailPage – lineup editor lock-window enforcement (LS-6035)', (
 
   it('preserves per-player lock state independent of the read-only (visitor) gate', () => {
     mockTeamMembers([{ id: 10, positionId: 1, isLocked: true }]);
-    const graphql = jest.requireMock<{ useGetUserTeamIdQuery: jest.Mock }>(
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
       '@legacy-sports/graphql',
     );
-    graphql.useGetUserTeamIdQuery.mockReturnValue({
-      data: { userTeamId: 999 },
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: { teamId: 999, permissionLevel: 'general_manager' },
+        },
+      },
       loading: false,
       error: undefined,
     });
@@ -1109,5 +1110,116 @@ describe('TeamDetailPage – lineup editor lock-window enforcement (LS-6035)', (
     const board = screen.getByTestId('roster-board');
     expect(board).toHaveAttribute('data-read-only', 'true');
     expect(board).toHaveAttribute('data-locked-ids', '10');
+  });
+});
+
+// ── Assistant manager UX matches backend permission (LS-6051 / BTD-028) ────
+
+describe('TeamDetailPage – assistant manager permissions (LS-6051)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchMembers.mockResolvedValue({});
+    mockUpdateTeamMemberPosition.mockResolvedValue({});
+    mockSwapTeamMemberPositions.mockResolvedValue({});
+
+    // `mockReturnValue` persists across tests (clearAllMocks resets calls,
+    // not implementations) — reset to the default GM membership so each
+    // test's role is explicit rather than inherited from a prior test.
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: { teamId: 1, permissionLevel: 'general_manager' },
+        },
+      },
+      loading: false,
+      error: undefined,
+    });
+  });
+
+  function mockAsAssistantManager() {
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: {
+            teamId: 1,
+            permissionLevel: 'assistant_manager',
+          },
+        },
+      },
+      loading: false,
+      error: undefined,
+    });
+  }
+
+  it('does not show the visitor note for an assistant_manager of this team', () => {
+    mockAsAssistantManager();
+
+    render(<TeamDetailPage />);
+
+    expect(
+      screen.queryByText(/viewing this team as a visitor/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the RosterBoard as editable for an assistant_manager of this team', () => {
+    mockAsAssistantManager();
+
+    render(<TeamDetailPage />);
+
+    const board = screen.getByTestId('roster-board');
+    expect(board).toHaveAttribute('data-read-only', 'false');
+  });
+
+  it('shows Team Settings (branding) for an assistant_manager of this team', () => {
+    mockAsAssistantManager();
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByText('Team Settings')).toBeInTheDocument();
+  });
+
+  it('hides Assistant Manager Settings (invite/remove) for an assistant_manager', () => {
+    mockAsAssistantManager();
+
+    render(<TeamDetailPage />);
+
+    expect(
+      screen.queryByTestId('assistant-manager-settings'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('still shows the visitor note for an assistant_manager of a different team', () => {
+    const graphql = jest.requireMock<{ useGetLeagueByIdQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: {
+            teamId: 999,
+            permissionLevel: 'assistant_manager',
+          },
+        },
+      },
+      loading: false,
+      error: undefined,
+    });
+
+    render(<TeamDetailPage />);
+
+    expect(
+      screen.getByText(/viewing this team as a visitor/i),
+    ).toBeInTheDocument();
   });
 });

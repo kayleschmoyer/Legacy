@@ -49,7 +49,7 @@ const MOCK_LEAGUE = {
   inviteCode: 'TEST1234',
   userMembership: {
     teamId: 1,
-    permissionLevel: 'owner',
+    permissionLevel: 'general_manager',
   },
   minCareerGames: 50,
   minCareerSeasons: 3,
@@ -344,7 +344,7 @@ test.describe('Team Detail Page — GM settings @regression', () => {
       userTeamId: 1,
       league: {
         ...MOCK_LEAGUE,
-        userMembership: { teamId: 1, permissionLevel: 'owner' },
+        userMembership: { teamId: 1, permissionLevel: 'general_manager' },
       },
     });
     await page.goto(TEAM_URL);
@@ -362,8 +362,14 @@ test.describe('Team Detail Page — GM settings @regression', () => {
   });
 
   test('visitor does not see Team Settings section', async ({ page }) => {
-    // user owns team 2, not team 1
-    await setupGraphQL(page, { userTeamId: 2 });
+    // user's membership is for team 2, not team 1
+    await setupGraphQL(page, {
+      userTeamId: 2,
+      league: {
+        ...MOCK_LEAGUE,
+        userMembership: { teamId: 2, permissionLevel: 'general_manager' },
+      },
+    });
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
@@ -371,7 +377,13 @@ test.describe('Team Detail Page — GM settings @regression', () => {
   });
 
   test('visitor sees "viewing as a visitor" note', async ({ page }) => {
-    await setupGraphQL(page, { userTeamId: 2 });
+    await setupGraphQL(page, {
+      userTeamId: 2,
+      league: {
+        ...MOCK_LEAGUE,
+        userMembership: { teamId: 2, permissionLevel: 'general_manager' },
+      },
+    });
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 

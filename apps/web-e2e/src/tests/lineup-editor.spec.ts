@@ -50,7 +50,7 @@ const MOCK_LEAGUE = {
     leagueId: 1,
     userId: 1,
     teamId: 1,
-    permissionLevel: 'owner',
+    permissionLevel: 'general_manager',
     username: 'testuser',
   },
   minCareerGames: 50,
@@ -107,13 +107,18 @@ function mockMember(overrides: Record<string, unknown> = {}) {
 interface SetupOptions {
   teamMembers?: ReturnType<typeof mockMember>[];
   userTeamId?: number;
+  league?: typeof MOCK_LEAGUE;
 }
 
 async function setupGraphQL(
   page: import('@playwright/test').Page,
   opts: SetupOptions = {},
 ) {
-  const { teamMembers = [mockMember()], userTeamId = 1 } = opts;
+  const {
+    teamMembers = [mockMember()],
+    userTeamId = 1,
+    league = MOCK_LEAGUE,
+  } = opts;
 
   // Mutable so a mocked mutation response can update what subsequent
   // getTeamMembers refetches return, mirroring the real server round-trip.
@@ -155,7 +160,7 @@ async function setupGraphQL(
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
+        body: JSON.stringify({ data: { league } }),
       });
     } else if (operationName === 'getpositionsforleague') {
       await route.fulfill({
@@ -283,6 +288,13 @@ test.describe('Lineup Editor — visitor sees a read-only board @regression', ()
     await setupGraphQL(page, {
       teamMembers: [mockMember({ positionId: 2 })],
       userTeamId: 2,
+      league: {
+        ...MOCK_LEAGUE,
+        userMembership: {
+          ...MOCK_LEAGUE.userMembership,
+          teamId: 2,
+        },
+      },
     });
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');

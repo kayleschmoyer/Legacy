@@ -23,7 +23,6 @@ import {
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
   useGetTeamMembersQuery,
-  useGetUserTeamIdQuery,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
@@ -238,16 +237,6 @@ export function TeamDetailPage() {
     skip: !leagueId,
   });
 
-  // Get user's team in this league to check ownership
-  const {
-    data: userTeamData,
-    loading: userTeamLoading,
-    error: userTeamError,
-  } = useGetUserTeamIdQuery({
-    variables: { leagueId: leagueId || 0 },
-    skip: !leagueId,
-  });
-
   // Get league details including the user's permission level
   const {
     data: leagueData,
@@ -374,14 +363,24 @@ export function TeamDetailPage() {
 
   const userPermissionLevel =
     leagueData?.league?.userMembership?.permissionLevel;
+  const userMembershipTeamId = leagueData?.league?.userMembership?.teamId;
 
-  // A user is the GM if their teamId matches AND they have owner/general_manager permission
-  const isOwner = userTeamData?.userTeamId === teamIdNum;
+  // isOwner must be scoped to THIS team's membership row, not the user's
+  // "best" team across the league (BTD-028): a user who is a GM of a
+  // different team and an assistant_manager of this one still needs edit
+  // access here. isGM mirrors the backend's own check in
+  // verifyTeamEditAccess/updateTeamBranding (LS-6024) — assistant_manager
+  // is a valid edit-access permission level, not just owner/GM.
+  const isOwner = userMembershipTeamId === teamIdNum;
   const isCommissioner = userPermissionLevel === 'commissioner';
   const isGM =
     isOwner &&
-    (userPermissionLevel === 'owner' ||
-      userPermissionLevel === 'general_manager');
+    (userPermissionLevel === 'general_manager' ||
+      userPermissionLevel === 'assistant_manager');
+  // Inviting/removing assistant managers stays GM/commissioner-only — the
+  // backend explicitly excludes assistant_manager from these mutations.
+  const canManageAssistantManagers =
+    isCommissioner || (isOwner && userPermissionLevel === 'general_manager');
 
   const isPremium = useIsPremium();
 
@@ -391,11 +390,10 @@ export function TeamDetailPage() {
 
   // Gates only the GM/Commissioner settings section. Identity and roster
   // render as soon as their own data is available instead of waiting on
-  // ownership/permission queries too (LS-6048). Commissioner status comes
-  // entirely from `leagueData`, so once that resolves a commissioner
-  // doesn't need to wait on the ownership (userTeam) query too.
-  const permissionLoading =
-    leagueLoading || (userTeamLoading && !isCommissioner);
+  // permission data too (LS-6048). Ownership and permission level both come
+  // from `leagueData` (LS-6051), so `leagueLoading` alone is sufficient —
+  // there is no longer a separate ownership query to wait on.
+  const permissionLoading = leagueLoading;
 
   if (!isValidTeamId) {
     return (
@@ -442,8 +440,6 @@ export function TeamDetailPage() {
   }
   if (teamsError)
     return <Text>Error loading league teams: {teamsError.message}</Text>;
-  if (userTeamError)
-    return <Text>Error loading team ownership: {userTeamError.message}</Text>;
   if (leagueError)
     return <Text>Error loading league details: {leagueError.message}</Text>;
 
@@ -1123,11 +1119,14 @@ export function TeamDetailPage() {
               </XStack>
             </YStack>
 
-            {/* Assistant Manager Settings */}
-            <TeamAssistantManagerSettings
-              teamId={teamIdNum}
-              leagueId={leagueId}
-            />
+            {/* Assistant Manager Settings — GM/commissioner only; the backend
+                restricts invite/remove to those roles (BTD-001 / LS-6024) */}
+            {canManageAssistantManagers && (
+              <TeamAssistantManagerSettings
+                teamId={teamIdNum}
+                leagueId={leagueId}
+              />
+            )}
           </YStack>
         </>
       )}
