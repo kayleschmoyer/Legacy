@@ -63,6 +63,10 @@ jest.mock('@legacy-sports/shared-components/roster', () => ({
   ),
 }));
 
+jest.mock('@legacy-sports/shared-components', () => ({
+  Skeleton: () => <div data-testid="settings-skeleton" />,
+}));
+
 // ── GraphQL ───────────────────────────────────────────────────────────────────
 
 const mockUpdateBranding = jest.fn();
@@ -453,5 +457,165 @@ describe('TeamDetailPage – Premium badge (LS-6054)', () => {
     render(<TeamDetailPage />);
 
     expect(screen.queryByTestId('team-premium-badge')).not.toBeInTheDocument();
+  });
+});
+
+// ── Decoupled loading states (LS-6048) ─────────────────────────────────────
+
+describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
+  // `mockReturnValue` overrides persist across tests/describes (clearAllMocks
+  // only clears call history, not implementations) — re-assert every hook's
+  // resolved-state default here so this suite is isolated from ordering.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+    mockRefetchMembers.mockResolvedValue({});
+
+    const graphql = jest.requireMock<Record<string, jest.Mock>>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetTeamMembersQuery.mockReturnValue({
+      data: {
+        teamMembers: [
+          {
+            id: 10,
+            leagueId: 100,
+            player: { firstName: 'Test', lastName: 'Player' },
+            positionId: null,
+          },
+        ],
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetchMembers,
+    });
+    graphql.useGetTeamByIdQuery.mockReturnValue({
+      data: { teamById: { id: 1, leagueId: 100 } },
+      loading: false,
+    });
+    graphql.useGetLeagueTeamsQuery.mockReturnValue({
+      data: {
+        leagueTeams: [
+          {
+            id: 1,
+            name: 'Test Team',
+            avatarUrl: 'https://example.com/logo.png',
+            bannerUrl: 'https://example.com/banner.jpg',
+          },
+        ],
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetchTeams,
+    });
+    graphql.useGetUserTeamIdQuery.mockReturnValue({
+      data: { userTeamId: 1 },
+      loading: false,
+      error: undefined,
+    });
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: { permissionLevel: 'general_manager' },
+        },
+      },
+      loading: false,
+      error: undefined,
+    });
+    graphql.useGetPositionsForLeagueQuery.mockReturnValue({
+      data: { leaguePositions: [] },
+      loading: false,
+    });
+  });
+
+  it('renders team identity and roster while ownership/permission queries are still loading, instead of a full-page spinner', () => {
+    const graphql = jest.requireMock<{
+      useGetUserTeamIdQuery: jest.Mock;
+      useGetLeagueByIdQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetUserTeamIdQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+      error: undefined,
+    });
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+      error: undefined,
+    });
+
+    render(<TeamDetailPage />);
+
+    // Identity + roster render even though permission data hasn't resolved.
+    expect(screen.getByTestId('roster-board')).toBeInTheDocument();
+    expect(screen.getByText('Test Team')).toBeInTheDocument();
+    expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+
+    // The GM/Commissioner settings section (which depends on permission
+    // data) does not render yet — it's replaced by an inline skeleton.
+    expect(
+      screen.queryByTestId('assistant-manager-settings'),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('settings-skeleton').length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it('renders the full-page spinner while identity-blocking queries (e.g. team members) are loading', () => {
+    const graphql = jest.requireMock<{ useGetTeamMembersQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetTeamMembersQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+      error: undefined,
+      refetch: mockRefetchMembers,
+    });
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByTestId('spinner')).toBeInTheDocument();
+    expect(screen.queryByTestId('roster-board')).not.toBeInTheDocument();
+  });
+
+  it('renders GM settings once permission data resolves', () => {
+    render(<TeamDetailPage />);
+
+    expect(
+      screen.getByTestId('assistant-manager-settings'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders commissioner settings as soon as league data resolves, without waiting on the still-loading ownership query', () => {
+    const graphql = jest.requireMock<{
+      useGetUserTeamIdQuery: jest.Mock;
+      useGetLeagueByIdQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    // Commissioner status derives entirely from league data — the ownership
+    // (userTeam) query is still loading and irrelevant to that determination.
+    graphql.useGetUserTeamIdQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+      error: undefined,
+    });
+    graphql.useGetLeagueByIdQuery.mockReturnValue({
+      data: {
+        league: {
+          id: 100,
+          userMembership: { permissionLevel: 'commissioner' },
+        },
+      },
+      loading: false,
+      error: undefined,
+    });
+
+    render(<TeamDetailPage />);
+
+    expect(
+      screen.getByTestId('assistant-manager-settings'),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-skeleton')).not.toBeInTheDocument();
   });
 });

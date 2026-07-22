@@ -13,6 +13,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { Skeleton } from '@legacy-sports/shared-components';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
@@ -231,13 +232,17 @@ export function TeamDetailPage() {
 
   const isPremium = useIsPremium();
 
-  const loading =
-    membersLoading ||
-    teamByIdLoading ||
-    teamsLoading ||
-    userTeamLoading ||
-    leagueLoading ||
-    positionsLoading;
+  // Gates team identity + roster — the data those sections need to render.
+  const identityLoading =
+    membersLoading || teamByIdLoading || teamsLoading || positionsLoading;
+
+  // Gates only the GM/Commissioner settings section. Identity and roster
+  // render as soon as their own data is available instead of waiting on
+  // ownership/permission queries too (LS-6048). Commissioner status comes
+  // entirely from `leagueData`, so once that resolves a commissioner
+  // doesn't need to wait on the ownership (userTeam) query too.
+  const permissionLoading =
+    leagueLoading || (userTeamLoading && !isCommissioner);
 
   if (!isValidTeamId) {
     return (
@@ -251,7 +256,7 @@ export function TeamDetailPage() {
     );
   }
 
-  if (loading) return <Spinner />;
+  if (identityLoading) return <Spinner />;
 
   if (membersError) {
     const graphQLErrors = CombinedGraphQLErrors.is(membersError)
@@ -588,7 +593,7 @@ export function TeamDetailPage() {
               League ID: {leagueId}
             </Text>
           )}
-          {!isOwner && !isCommissioner && (
+          {!permissionLoading && !isOwner && !isCommissioner && (
             <Text fontSize="$3" color="$gray11" fontStyle="italic">
               You are viewing this team as a visitor. Only the General Manager
               can make changes.
@@ -621,8 +626,19 @@ export function TeamDetailPage() {
         />
       </YStack>
 
-      {/* ── GM / Commissioner Settings ── */}
-      {(isGM || isCommissioner) && leagueId && (
+      {/* ── GM / Commissioner Settings — inline skeleton while permission
+           data resolves, so identity/roster above don't wait on it ── */}
+      {permissionLoading && leagueId && (
+        <>
+          <Separator />
+          <YStack gap="$4" aria-label="Loading team settings">
+            <Skeleton width={160} height={24} />
+            <Skeleton width="100%" height={140} radius={8} />
+          </YStack>
+        </>
+      )}
+
+      {!permissionLoading && (isGM || isCommissioner) && leagueId && (
         <>
           <Separator />
           <YStack gap="$4">
