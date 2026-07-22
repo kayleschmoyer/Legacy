@@ -233,11 +233,10 @@ export const DISCORD_BLURPLE = '#5865F2';
 /** Discord brand hover color (darker Blurple). */
 export const DISCORD_BLURPLE_DARK = '#4752C4';
 
-// ─── Injury / Status Border Colors ────────────────────────
+// ─── Status Colors ─────────────────────────────────────────
 
-export const INJURY_HEALTHY = '#22C55E';
-export const INJURY_QUESTIONABLE = '#FBBF24';
-export const INJURY_OUT = '#EF4444';
+/** Danger/destructive accent — decline/cancel actions, error surfaces. */
+export const STATUS_DANGER = '#EF4444';
 
 // ─── Extended Surface & Border Tokens ──────────────────────
 

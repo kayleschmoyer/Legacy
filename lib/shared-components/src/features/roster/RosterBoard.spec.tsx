@@ -19,12 +19,11 @@ const mk = (
   eligible: string[],
   positionId: number | null,
   isLocked?: boolean,
-  injuryStatus?: string | null,
 ): RosterBoardPlayer => ({
   id,
   positionId,
   isLocked,
-  player: { firstName, lastName, eligiblePositions: eligible, injuryStatus },
+  player: { firstName, lastName, eligiblePositions: eligible },
 });
 
 const PLAYERS: RosterBoardPlayer[] = [
@@ -208,42 +207,5 @@ describe('RosterBoard', () => {
       screen.getByRole('button', { name: /Mike Johnson at C — locked/ }),
     );
     expect(onPlayerSwap).not.toHaveBeenCalled();
-  });
-
-  it('shows an injury badge for an injured starter and does not for a healthy one', () => {
-    const playersWithInjury: RosterBoardPlayer[] = [
-      mk(101, 'Mike', 'Johnson', ['C'], 1, false, 'IL-10'),
-      mk(102, 'Wade', 'Boggs', ['1B'], null),
-      mk(103, 'Nolan', 'Ryan', ['SP'], null),
-    ];
-    render(
-      <RosterBoard
-        positions={POSITIONS}
-        teamPlayers={playersWithInjury}
-        onPlayerAssign={noop}
-        onPlayerRemove={noop}
-      />,
-    );
-    expect(screen.getByLabelText('Injury status: IL-10')).toBeTruthy();
-    expect(screen.getByText('Mike Johnson')).toBeTruthy();
-    expect(screen.getByText('Wade Boggs')).toBeTruthy();
-    expect(screen.queryByLabelText(/Injury status: (?!IL-10)/)).toBeNull();
-  });
-
-  it('shows an injury badge for an injured bench player', () => {
-    const playersWithInjury: RosterBoardPlayer[] = [
-      mk(101, 'Mike', 'Johnson', ['C'], 1),
-      mk(102, 'Wade', 'Boggs', ['1B'], null, false, 'DTD'),
-      mk(103, 'Nolan', 'Ryan', ['SP'], null),
-    ];
-    render(
-      <RosterBoard
-        positions={POSITIONS}
-        teamPlayers={playersWithInjury}
-        onPlayerAssign={noop}
-        onPlayerRemove={noop}
-      />,
-    );
-    expect(screen.getByLabelText('Injury status: DTD')).toBeTruthy();
   });
 });

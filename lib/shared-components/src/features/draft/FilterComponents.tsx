@@ -9,7 +9,6 @@ export interface Filter {
   team?: string;
   availability?: string;
   trending?: string;
-  injury?: string;
   ownership?: string;
   sort?: string;
   [key: string]: string | undefined;

@@ -74,7 +74,6 @@ const baseballPlayer: Player = {
   rank: 1,
   ownership: 98.5,
   trending: 'stable',
-  injury: 'healthy',
   stats: {
     avg: '.283',
     hr: 40,
@@ -93,32 +92,12 @@ const footballPlayer: Player = {
   rank: 2,
   ownership: 89.2,
   trending: 'up',
-  injury: 'healthy',
   stats: {
     passingYds: 4306,
     passingTds: 29,
     rushingYds: 523,
     rushingTds: 15,
   },
-};
-
-const injuredPlayer: Player = {
-  id: '3',
-  name: 'Ronald Acuña Jr.',
-  position: 'OF',
-  team: 'ATL',
-  adp: 125.4,
-  rank: 45,
-  ownership: 12.8,
-  trending: 'down',
-  injury: 'out',
-  stats: {
-    avg: '.337',
-    hr: 8,
-    rbi: 15,
-    sb: 3,
-  },
-  isWatched: true,
 };
 
 const rookiePlayer: Player = {
@@ -130,7 +109,6 @@ const rookiePlayer: Player = {
   rank: 15,
   ownership: 76.3,
   trending: 'up',
-  injury: 'healthy',
   stats: {
     avg: '.285',
     hr: 25,
@@ -158,18 +136,6 @@ export const FootballPlayer: Story = {
     onSelect: fn(),
     onWatch: fn(),
     sport: 'football',
-    variant: 'draft',
-    showStats: true,
-    showOwnership: true,
-  },
-};
-
-export const InjuredPlayer: Story = {
-  args: {
-    player: injuredPlayer,
-    onSelect: fn(),
-    onWatch: fn(),
-    sport: 'baseball',
     variant: 'draft',
     showStats: true,
     showOwnership: true,
@@ -325,41 +291,6 @@ export const SportsComparison: Story = {
         variant="draft"
         showStats={true}
         showOwnership={true}
-      />
-    </div>
-  ),
-  parameters: {
-    layout: 'padded',
-  },
-};
-
-// Injury status showcase
-export const InjuryStatuses: Story = {
-  render: () => (
-    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-      <PlayerCard
-        player={{ ...baseballPlayer, injury: 'healthy' }}
-        onSelect={fn()}
-        sport="baseball"
-        variant="draft"
-      />
-      <PlayerCard
-        player={{ ...baseballPlayer, injury: 'questionable' }}
-        onSelect={fn()}
-        sport="baseball"
-        variant="draft"
-      />
-      <PlayerCard
-        player={{ ...baseballPlayer, injury: 'doubtful' }}
-        onSelect={fn()}
-        sport="baseball"
-        variant="draft"
-      />
-      <PlayerCard
-        player={{ ...baseballPlayer, injury: 'out' }}
-        onSelect={fn()}
-        sport="baseball"
-        variant="draft"
       />
     </div>
   ),

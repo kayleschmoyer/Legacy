@@ -418,7 +418,7 @@ export const MixedDataTypes: Story = {
         id: 'jacob-degrom',
         player: 'Jacob deGrom',
         age: 35,
-        status: 'Injured',
+        status: 'Retired',
         salary: 37000000,
         draft_year: 2010,
       },

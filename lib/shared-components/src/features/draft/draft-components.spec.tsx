@@ -46,7 +46,6 @@ const mockPlayer = {
   rank: 1,
   ownership: 95,
   trending: 'up' as const,
-  injury: 'healthy' as const,
   stats: { AVG: 0.283, HR: 40, RBI: 104 },
   faabValue: 50,
   isWatched: false,

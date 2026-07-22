@@ -70,7 +70,6 @@ const sampleFilters: Filter = {
   team: '',
   availability: 'available',
   trending: '',
-  injury: 'healthy',
 };
 
 const footballFilterSections: FilterSection[] = [
@@ -106,17 +105,6 @@ const footballFilterSections: FilterSection[] = [
       { label: 'Down', value: 'down' },
       { label: 'Hot', value: 'hot' },
       { label: 'Cold', value: 'cold' },
-    ],
-    allowMultiple: false,
-  },
-  {
-    key: 'injury',
-    title: 'Health',
-    options: [
-      { label: 'Healthy', value: 'healthy' },
-      { label: 'Questionable', value: 'questionable' },
-      { label: 'Doubtful', value: 'doubtful' },
-      { label: 'Out', value: 'out' },
     ],
     allowMultiple: false,
   },

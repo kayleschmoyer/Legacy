@@ -518,7 +518,6 @@
   text-decoration: none;
 }
 
-/* Name + injury badge (LS-5905) */
 .mrc-pname-row {
   display: flex;
   align-items: center;
@@ -528,32 +527,6 @@
 .mrc-cell.mrc-t1 .mrc-pname-row {
   flex-direction: row-reverse;
   justify-content: flex-end;
-}
-.mrc-injury-badge {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 9px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  border-radius: var(--radius-2);
-  padding: 2px 6px;
-  flex-shrink: 0;
-}
-.mrc-injury-badge.mrc-injury-danger {
-  background: var(--danger-soft);
-  color: var(--danger-fg);
-}
-.mrc-injury-badge.mrc-injury-warning {
-  background: var(--warning-soft);
-  color: var(--warning-fg);
-}
-.mrc-injury-badge.mrc-injury-neutral {
-  background: var(--surface-raised);
-  color: var(--fg3);
-}
-/* Dims a player's projected-score figure when they're injured (LS-5905) */
-.mrc-sc.mrc-dimmed {
-  opacity: 0.5;
 }
 .mrc-pmeta {
   font-family: var(--font-body);

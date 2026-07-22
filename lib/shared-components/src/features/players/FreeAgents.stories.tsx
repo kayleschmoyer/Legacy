@@ -37,7 +37,6 @@ function makeFreeAgent(
     obp: 0.33,
     ownership: 15,
     trending: { direction: 'stable' },
-    injury: 'healthy',
     projections: { pts: rank * 0.8 },
     isWatched: false,
     faabValue: Math.max(1, 50 - rank),
@@ -61,7 +60,6 @@ const mockPlayers: FreeAgentPlayer[] = [
     ownership: 8,
     trending: { direction: 'down' },
     faabValue: 5,
-    injury: 'questionable',
   }),
   makeFreeAgent('fa4', 'Andrew', 'Heaney', 'P', 'TEX', 4, {
     ownership: 22,
@@ -72,7 +70,6 @@ const mockPlayers: FreeAgentPlayer[] = [
     ownership: 12,
     trending: { direction: 'down' },
     faabValue: 8,
-    injury: 'doubtful',
   }),
   makeFreeAgent('fa6', 'Nick', 'Lodolo', 'P', 'CIN', 6, {
     ownership: 30,
@@ -94,7 +91,6 @@ const mockPlayers: FreeAgentPlayer[] = [
     ownership: 10,
     trending: { direction: 'down' },
     faabValue: 6,
-    injury: 'out',
   }),
   makeFreeAgent('fa10', 'Willy', 'Adames', 'SS', 'SF', 10, {
     ownership: 60,
@@ -158,7 +154,7 @@ const meta: Meta<typeof FreeAgents> = {
     docs: {
       description: {
         component:
-          'Full-featured free agent browser with search, position/trending filters, sort controls, player cards with ownership and injury data, and waiver claim modal.',
+          'Full-featured free agent browser with search, position/trending filters, sort controls, player cards with ownership data, and waiver claim modal.',
       },
     },
   },
@@ -203,28 +199,6 @@ export const EmptyList: Story = {
     docs: {
       description: {
         story: 'No free agents available -- shows empty list with controls.',
-      },
-    },
-  },
-};
-
-export const InjuryHeavy: Story = {
-  args: {
-    sport: 'baseball',
-    players: mockPlayers.map((p, i) => ({
-      ...p,
-      injury: (['healthy', 'questionable', 'doubtful', 'out'] as const)[i % 4],
-    })),
-    onPlayerClaim: fn(),
-    onPlayerWatch: fn(),
-    maxFaab: 100,
-    rosterPlayers,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story:
-          'Mix of all injury statuses to verify color coding and badge display.',
       },
     },
   },

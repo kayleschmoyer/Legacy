@@ -263,7 +263,7 @@ export const LongName: Story = {
 export const ZeroStats: Story = {
   args: {
     player: {
-      player: 'Injured Player',
+      player: 'Slumping Player',
       pos: 'DH',
       team: 'TBD',
       hr: 0,

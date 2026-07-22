@@ -14,10 +14,10 @@ import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   GREEN,
-  INJURY_OUT,
   ORANGE,
   PURPLE,
   SLATE_400,
+  STATUS_DANGER,
   withAlpha,
 } from '../../constants/colors';
 
@@ -68,11 +68,11 @@ function getTradeConfig(action: TradeAction) {
     case 'rejected':
       return {
         icon: <XCircle size={16} color="var(--red10)" />,
-        accent: withAlpha(INJURY_OUT, 0.1),
-        border: withAlpha(INJURY_OUT, 0.25),
+        accent: withAlpha(STATUS_DANGER, 0.1),
+        border: withAlpha(STATUS_DANGER, 0.25),
         badge: {
           label: 'Rejected',
-          bg: withAlpha(INJURY_OUT, 0.15),
+          bg: withAlpha(STATUS_DANGER, 0.15),
           color: 'var(--red10)',
         },
       };

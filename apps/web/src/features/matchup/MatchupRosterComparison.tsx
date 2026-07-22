@@ -43,33 +43,6 @@ function getPositionGroup(position: string | null | undefined): PositionGroup {
   return 'utility';
 }
 
-// ── Injury badge (LS-5905) ──────────────────────────────────────────────
-
-/** Maps an injury status string to one of the badge color variants. */
-function injuryBadgeClass(status: string): string {
-  const normalized = status.toUpperCase();
-  if (
-    normalized.startsWith('IL') ||
-    normalized === 'OUT' ||
-    normalized === 'SUSPENDED'
-  ) {
-    return 'mrc-injury-danger';
-  }
-  if (normalized === 'DTD' || normalized === 'DAY-TO-DAY') {
-    return 'mrc-injury-warning';
-  }
-  return 'mrc-injury-neutral';
-}
-
-/** Compact badge showing a player's injury status (e.g. "IL-10", "DTD") (LS-5905). */
-function InjuryBadge({ status }: { status: string }) {
-  return (
-    <span className={`mrc-injury-badge ${injuryBadgeClass(status)}`}>
-      {status}
-    </span>
-  );
-}
-
 // ── Skeleton loading ─────────────────────────────────────────────────────
 
 function SkeletonSlotRow() {
@@ -878,9 +851,6 @@ export function MatchupRosterComparison({
     const group = getPositionGroup(slotType ?? posLabel);
     const statLine = formatAccumulatedStats(player);
     const lead = isLead ? ' mrc-lead' : '';
-    // Injured players still play out their slot but are visually
-    // de-emphasized so a roster comparison doesn't read them as active (LS-5905).
-    const injuryStatus = player.player?.injuryStatus ?? null;
 
     return (
       <div className={`mrc-cell ${cls}${mine}${lead}`}>
@@ -898,7 +868,6 @@ export function MatchupRosterComparison({
             >
               {player.player?.firstName} {player.player?.lastName}
             </button>
-            {injuryStatus && <InjuryBadge status={injuryStatus} />}
           </div>
           <div className="mrc-pmeta">
             Season {player.season} •{' '}
@@ -913,9 +882,7 @@ export function MatchupRosterComparison({
           {statLine && <div className="mrc-pstat">{statLine}</div>}
         </div>
         <div className="mrc-pscore">
-          <div
-            className={`mrc-sc mrc-proj${injuryStatus ? ' mrc-dimmed' : ''}`}
-          >
+          <div className="mrc-sc mrc-proj">
             <span className="mrc-lab">Proj</span>
             <span className="mrc-num">{proj.toFixed(1)}</span>
           </div>

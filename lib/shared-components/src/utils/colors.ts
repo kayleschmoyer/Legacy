@@ -218,11 +218,10 @@ export const OVERLAY_BLACK_40 = 'rgba(0, 0, 0, 0.4)';
 export const OVERLAY_WHITE_05 = 'rgba(255, 255, 255, 0.05)';
 export const OVERLAY_WHITE_10 = 'rgba(255, 255, 255, 0.1)';
 
-// -- Injury / Status Border Colors ------------------------------------
+// -- Status Colors ----------------------------------------------------
 
-export const INJURY_HEALTHY = '#22C55E';
-export const INJURY_QUESTIONABLE = '#FBBF24';
-export const INJURY_OUT = '#EF4444';
+/** Danger/destructive accent — decline/cancel actions, error surfaces. */
+export const STATUS_DANGER = '#EF4444';
 
 // -- Stats Page Brand Tokens (LS-4612) --------------------------------
 // Design source: docs/design/qtqqKYxMFf1A8GY5NL9GNQ/legacy-sports-stats-page/

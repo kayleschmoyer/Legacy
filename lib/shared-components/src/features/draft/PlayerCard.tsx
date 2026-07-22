@@ -17,7 +17,6 @@ export interface Player {
   rank?: number;
   ownership?: number;
   trending?: 'up' | 'down' | 'stable';
-  injury?: 'healthy' | 'questionable' | 'doubtful' | 'out';
   stats?: Record<string, unknown>;
   faabValue?: number;
   isWatched?: boolean;
@@ -49,20 +48,6 @@ const getPositionColor = (position: string, sport: string): string =>
   sport === 'baseball' || sport === 'football'
     ? getCanonicalPositionColor(sport, position)
     : POS_UTILITY;
-
-// Injury status colors
-const getInjuryColor = (injury?: string): string => {
-  switch (injury) {
-    case 'out':
-      return '#ef4444';
-    case 'doubtful':
-      return '#f97316';
-    case 'questionable':
-      return '#eab308';
-    default:
-      return '#22c55e';
-  }
-};
 
 // Trending indicator
 const TrendingIndicator: React.FC<{ trending?: string }> = ({ trending }) => {
@@ -185,22 +170,6 @@ function PlayerCard({
               fontSize="$1"
               fontWeight="bold"
             />
-
-            {player.injury && player.injury !== 'healthy' && (
-              <YStack
-                backgroundColor={getInjuryColor(player.injury)}
-                borderRadius="$2"
-                paddingHorizontal="$2"
-                paddingVertical="$1"
-                alignItems="center"
-                justifyContent="center"
-                marginLeft="$1"
-              >
-                <Text fontSize="$1" fontWeight="bold" color="white">
-                  {player.injury.charAt(0).toUpperCase()}
-                </Text>
-              </YStack>
-            )}
           </XStack>
         </XStack>
 

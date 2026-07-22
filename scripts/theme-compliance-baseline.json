@@ -1,6 +1,6 @@
 {
   "apps/web": {
-    "rawHex": 206,
+    "rawHex": 204,
     "rawRgba": 102,
     "blueToken": 0,
     "themeBlue": 0
@@ -12,7 +12,7 @@
     "themeBlue": 0
   },
   "lib/shared-components": {
-    "rawHex": 471,
+    "rawHex": 460,
     "rawRgba": 442,
     "blueToken": 0,
     "themeBlue": 0

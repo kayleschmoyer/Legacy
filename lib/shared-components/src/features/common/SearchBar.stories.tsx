@@ -81,7 +81,6 @@ export const CustomFilterOptions: Story = {
         options: [
           { label: 'All', value: null },
           { label: 'Active', value: 'active' },
-          { label: 'Injured', value: 'injured' },
           { label: 'Free Agent', value: 'free-agent' },
         ],
       },

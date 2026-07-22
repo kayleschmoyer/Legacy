@@ -26,8 +26,8 @@ import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   GREEN,
-  INJURY_OUT,
   PURPLE,
+  STATUS_DANGER,
   WHITE,
   withAlpha,
 } from '../../utils/colors';
@@ -251,7 +251,7 @@ export function PendingTradeOffers({
               <Button
                 size="$2"
                 flex={1}
-                backgroundColor={withAlpha(INJURY_OUT, 0.12)}
+                backgroundColor={withAlpha(STATUS_DANGER, 0.12)}
                 borderColor="$red7"
                 borderWidth={1}
                 borderRadius="$3"
@@ -274,7 +274,7 @@ export function PendingTradeOffers({
           {variant === 'outgoing' && (
             <Button
               size="$2"
-              backgroundColor={withAlpha(INJURY_OUT, 0.12)}
+              backgroundColor={withAlpha(STATUS_DANGER, 0.12)}
               borderColor="$red7"
               borderWidth={1}
               borderRadius="$3"

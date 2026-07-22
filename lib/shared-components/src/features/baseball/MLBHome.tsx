@@ -25,8 +25,8 @@ import {
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
   GREEN,
-  INJURY_OUT,
   SLATE_400,
+  STATUS_DANGER,
   withAlpha,
   YELLOW,
 } from '../../utils/colors';
@@ -1101,8 +1101,8 @@ export function MLBHome({
                         </XStack>
                       ) : league.weekAdvanceStatus === 'failed' ? (
                         <XStack
-                          backgroundColor={withAlpha(INJURY_OUT, 0.12)}
-                          borderColor={withAlpha(INJURY_OUT, 0.35)}
+                          backgroundColor={withAlpha(STATUS_DANGER, 0.12)}
+                          borderColor={withAlpha(STATUS_DANGER, 0.35)}
                           borderWidth={1}
                           borderRadius="$5"
                           paddingHorizontal="$3"

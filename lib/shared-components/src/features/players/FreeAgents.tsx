@@ -25,7 +25,6 @@ const IS_TABLET = SCREEN_WIDTH > 768;
 export interface FreeAgentPlayer extends Player {
   ownership: number;
   trending: TrendingInfo;
-  injury: 'healthy' | 'questionable' | 'doubtful' | 'out';
   projections: Record<string, number>;
   isWatched: boolean;
   faabValue: number;
@@ -56,21 +55,6 @@ const getTrendingIcon = (trending: FreeAgentPlayer['trending']): string => {
       return '📉';
     default:
       return '➡️';
-  }
-};
-
-const getInjuryColor = (injury: FreeAgentPlayer['injury']): string => {
-  switch (injury) {
-    case 'healthy':
-      return '#22c55e';
-    case 'questionable':
-      return '#f59e0b';
-    case 'doubtful':
-      return '#f97316';
-    case 'out':
-      return '#ef4444';
-    default:
-      return '#6b7280';
   }
 };
 
@@ -161,17 +145,6 @@ const FreeAgentCard: React.FC<FreeAgentCardProps> = ({
                 fontSize="$1"
                 fontWeight="bold"
               />
-              <YStack
-                backgroundColor={getInjuryColor(player.injury)}
-                borderRadius="$2"
-                paddingHorizontal="$2"
-                paddingVertical="$1"
-                alignItems="center"
-              >
-                <Text fontSize="$1" fontWeight="bold" color="white">
-                  {player.injury.toUpperCase()}
-                </Text>
-              </YStack>
             </XStack>
           </YStack>
           <XStack alignItems="center" space="$2">

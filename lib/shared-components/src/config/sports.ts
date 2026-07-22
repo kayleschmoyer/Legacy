@@ -342,12 +342,10 @@ export const sportsConfig = SPORT_CONFIGS;
  * Describes a complete lineup/roster template for a league.
  * `starters` is an ordered list of position slots (repeats allowed, e.g. two 'RB' entries).
  * `bench` is the number of generic bench spots.
- * `ir` is the number of injured-reserve spots.
  */
 export interface LineupTemplate {
   readonly starters: readonly string[];
   readonly bench: number;
-  readonly ir: number;
 }
 
 /**
@@ -365,14 +363,12 @@ export const DEFAULT_LINEUP_BY_SPORT = {
     dst: {
       starters: DEFAULT_BASEBALL_ROSTER_POSITIONS,
       bench: 5,
-      ir: 0,
     } satisfies LineupTemplate,
   },
   football: {
     dst: {
       starters: DEFAULT_FOOTBALL_ROSTER_POSITIONS,
       bench: 6,
-      ir: 1,
     } satisfies LineupTemplate,
     idp: {
       starters: [
@@ -393,7 +389,6 @@ export const DEFAULT_LINEUP_BY_SPORT = {
         'DP',
       ],
       bench: 6,
-      ir: 1,
     } satisfies LineupTemplate,
   },
 } as const;
@@ -401,7 +396,7 @@ export const DEFAULT_LINEUP_BY_SPORT = {
 /**
  * Default maximum roster size per sport applied when the commissioner does not
  * override during league creation.  Football's tighter cap (16) reflects the
- * standard 9-starter + 6-bench + 1-IR configuration; baseball's larger pool (25)
- * accommodates the deeper pitching staff.
+ * standard 9-starter + 6-bench configuration with headroom; baseball's larger
+ * pool (25) accommodates the deeper pitching staff.
  */
 export { DEFAULT_ROSTER_SIZE_BY_SPORT } from '@legacy-sports/utils';
