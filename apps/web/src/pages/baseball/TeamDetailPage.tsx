@@ -510,6 +510,9 @@ export function TeamDetailPage() {
             alt={`${team?.name ?? 'Team'} banner`}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             onError={() => setBannerImgError(true)}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
           />
         </YStack>
       )}
@@ -541,6 +544,9 @@ export function TeamDetailPage() {
                 objectFit: 'cover',
               }}
               onError={() => setAvatarImgError(true)}
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              decoding="async"
             />
           ) : (
             <Text fontSize="$8" fontWeight="bold" color="white">
