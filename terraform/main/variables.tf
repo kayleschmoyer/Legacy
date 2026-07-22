@@ -68,6 +68,12 @@ variable "lambda_stats_timeout" {
   default     = 300
 }
 
+variable "lambda_mcp_db_timeout" {
+  description = "MCP DB Lambda timeout in seconds. Sized for the async db_migrate worker (LS-8563): heavy DDL runs in a self-invoked background branch of the same function, so it needs the ~15-min ceiling. Safe for the HTTP path — API Gateway cuts sync callers at ~29s regardless."
+  type        = number
+  default     = 900
+}
+
 variable "google_oauth_client_id" {
   description = "Google OAuth Client ID"
   type        = string

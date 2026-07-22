@@ -2,9 +2,21 @@ import {
   transpileMigrationSource,
   buildMigrationPayload,
   buildToolCallBody,
+  buildStatusCallBody,
+  parseToolResultPayload,
+  pollMigrateJob,
   postMigrations,
   type LocalMigration,
 } from './migrate-client';
+
+/** Wrap a tool payload in the MCP JSON-RPC response envelope the server sends. */
+function rpcResponse(payload: unknown): string {
+  return JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    result: { content: [{ type: 'text', text: JSON.stringify(payload) }] },
+  });
+}
 
 describe('transpileMigrationSource', () => {
   it('strips type-only imports and emits CJS exports.up', () => {
@@ -128,5 +140,118 @@ describe('postMigrations', () => {
     await expect(postMigrations('https://srv/mcp', 'tok', [])).rejects.toThrow(
       /HTTP 403/,
     );
+  });
+});
+
+describe('buildStatusCallBody', () => {
+  it('builds a tools/call request for db_migration_status with the jobId', () => {
+    const body = JSON.parse(buildStatusCallBody('job-1'));
+
+    expect(body.method).toBe('tools/call');
+    expect(body.params.name).toBe('db_migration_status');
+    expect(body.params.arguments.jobId).toBe('job-1');
+  });
+});
+
+describe('parseToolResultPayload', () => {
+  it('extracts the JSON payload from the text content', () => {
+    const payload = parseToolResultPayload(
+      rpcResponse({ jobId: 'j', status: 'running' }),
+    );
+    expect(payload).toEqual({ jobId: 'j', status: 'running' });
+  });
+
+  it('throws on a JSON-RPC error member', () => {
+    const body = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      error: { code: -32000, message: 'boom' },
+    });
+    expect(() => parseToolResultPayload(body)).toThrow(/boom/);
+  });
+
+  it('throws when there is no text content', () => {
+    const body = JSON.stringify({ jsonrpc: '2.0', id: 1, result: {} });
+    expect(() => parseToolResultPayload(body)).toThrow(/no text content/);
+  });
+});
+
+describe('pollMigrateJob (LS-8563)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('polls until the job leaves running and returns the terminal payload', async () => {
+    const responses = [
+      rpcResponse({ jobId: 'j', status: 'running', terminal: false }),
+      rpcResponse({ jobId: 'j', status: 'running', terminal: false }),
+      rpcResponse({
+        jobId: 'j',
+        status: 'done',
+        terminal: true,
+        applied: 1,
+        success: true,
+      }),
+    ];
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(
+        async () => new Response(responses.shift() ?? '{}', { status: 200 }),
+      );
+
+    const terminal = await pollMigrateJob({
+      serverUrl: 'https://srv/mcp',
+      bearer: 'tok',
+      jobId: 'j',
+      intervalMs: 0,
+      sleep: async () => undefined,
+    });
+
+    expect(terminal.status).toBe('done');
+    expect(terminal.applied).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // Every poll is a db_migration_status call carrying the jobId.
+    expect(String(fetchMock.mock.calls[0][1]?.body)).toContain(
+      'db_migration_status',
+    );
+  });
+
+  it('returns an orphaned payload as terminal', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          rpcResponse({ jobId: 'j', status: 'orphaned', terminal: true }),
+          { status: 200 },
+        ),
+      );
+
+    const terminal = await pollMigrateJob({
+      serverUrl: 'https://srv/mcp',
+      bearer: 'tok',
+      jobId: 'j',
+      sleep: async () => undefined,
+    });
+
+    expect(terminal.status).toBe('orphaned');
+  });
+
+  it('throws once the deadline passes with the job still running', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          rpcResponse({ jobId: 'j', status: 'running', terminal: false }),
+          { status: 200 },
+        ),
+      );
+
+    await expect(
+      pollMigrateJob({
+        serverUrl: 'https://srv/mcp',
+        bearer: 'tok',
+        jobId: 'j',
+        timeoutMs: 0,
+        sleep: async () => undefined,
+      }),
+    ).rejects.toThrow(/still running/);
   });
 });

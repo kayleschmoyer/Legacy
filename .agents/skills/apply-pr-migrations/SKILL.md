@@ -15,7 +15,7 @@ The migration files live on each PR's branch, not on `main`. The flow is: discov
 
 - **Before trusting a `CI: Migration` label, confirm the branch actually adds a migration.** The label goes stale when a PR falls behind `main`. Diff the migrations directory against the merge-base (step 2). An empty diff means skip-and-report, not apply.
 - **`CI: Migration` ≠ `CI: Migration Immutability`.** `CI: Migration Immutability` is an _edited committed migration_ violation — a different problem handled by the immutability soft-reset recipe, not this skill. Only act on `CI: Migration`.
-- **No SSM tunnel needed.** The hosted `legacy-sports-db-admin` MCP server runs inside the VPC and reaches RDS directly. The old `db_migrate_tunnel` flow is gone — use the hosted `db_migrate` MCP tool, which transpiles each local migration `.ts` to CJS, POSTs them to the in-VPC Lambda, and applies them transactionally as `migration_user`.
+- **No SSM tunnel needed.** The hosted `legacy-sports-db-admin` MCP server runs inside the VPC and reaches RDS directly. The old `db_migrate_tunnel` flow is gone — use the hosted `db_migrate` MCP tool, which transpiles each local migration `.ts` to CJS and POSTs them to the in-VPC Lambda; an async worker applies them as `migration_user` (LS-8563).
 
 ## Workflow
 
@@ -38,7 +38,7 @@ Transcribe these into TaskCreate entries at the start so each gates the next:
    git checkout origin/<branch> -- <migration path>
    ```
    Prefer `git checkout origin/<ref> -- <path>`; do **not** use `git show <ref>:<path>` (the colon separator breaks under Git Bash on Windows).
-5. **Apply via the hosted db-admin server** — call `db_migrate` (hosted MCP tool from `legacy-sports-db-admin`). The client transpiles each pending `.ts` migration to CJS and POSTs them in timestamp order; the server applies them transactionally and skips already-applied entries. Confirm `success: true` and that each target filename appears in `appliedNames`. The runner applies all pending migrations (it will also catch up any backlog the dev RDS is behind on — that is expected and safe).
+5. **Apply via the hosted db-admin server** — call `db_migrate` (hosted MCP tool from `legacy-sports-db-admin`). The client transpiles each pending `.ts` migration to CJS and POSTs them in timestamp order; the call is **async** (LS-8563): it returns `{ jobId, status: "running" }` immediately (or joins an already-running job). Poll `db_migration_status({ jobId })` every ~5s until `terminal: true`, then confirm `success: true` and that each target filename appears in `appliedNames` (already-applied entries land in `skipped`). An `orphaned` status means the worker died — re-submit; already-applied migrations are skipped. The runner applies all pending migrations (it will also catch up any backlog the dev RDS is behind on — that is expected and safe).
 6. **Clean the worktree** — the staged files belong to other PRs and must not land on the operator's branch. Remove them so the worktree ends clean:
    ```bash
    git rm --cached <paths> && rm -f <paths>

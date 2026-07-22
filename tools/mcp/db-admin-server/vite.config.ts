@@ -38,6 +38,7 @@ export default defineConfig({
         'querystring',
         'zlib',
         '@aws-sdk/client-secrets-manager',
+        '@aws-sdk/client-lambda',
       ],
     },
     target: 'node20',

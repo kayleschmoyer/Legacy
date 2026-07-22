@@ -1,4 +1,5 @@
 import {
+  applyMigrationBatch,
   migrate,
   migrationRequire,
   evalMigrationModule,
@@ -6,9 +7,19 @@ import {
 } from './migrate';
 import { getMigrationSql } from '../db.js';
 import { applyMigrationModule } from '@legacy-sports/db-client/src/scripts/migration-runner.js';
+import {
+  ensureJobsTable,
+  findRunningJob,
+  finishJob,
+  insertJob,
+  reapStaleJobs,
+} from '../jobs.js';
+import { invokeWorkerAsync } from '../invoke-worker.js';
 import type { McpCaller } from '../audit.js';
 
 jest.mock('../db.js');
+jest.mock('../jobs.js');
+jest.mock('../invoke-worker.js');
 // Replace the migration-runner with a factory so the real module never runs
 // under ts-jest; we only need to observe applyMigrationModule's calls.
 jest.mock('@legacy-sports/db-client/src/scripts/migration-runner.js', () => ({
@@ -25,6 +36,20 @@ const mockGetMigrationSql = getMigrationSql as jest.MockedFunction<
 >;
 const mockApply = applyMigrationModule as jest.MockedFunction<
   typeof applyMigrationModule
+>;
+const mockEnsureJobsTable = ensureJobsTable as jest.MockedFunction<
+  typeof ensureJobsTable
+>;
+const mockReapStaleJobs = reapStaleJobs as jest.MockedFunction<
+  typeof reapStaleJobs
+>;
+const mockFindRunningJob = findRunningJob as jest.MockedFunction<
+  typeof findRunningJob
+>;
+const mockInsertJob = insertJob as jest.MockedFunction<typeof insertJob>;
+const mockFinishJob = finishJob as jest.MockedFunction<typeof finishJob>;
+const mockInvokeWorker = invokeWorkerAsync as jest.MockedFunction<
+  typeof invokeWorkerAsync
 >;
 
 const CALLER: McpCaller = { clientId: 'client-abc', sub: 'sub-123' };
@@ -97,13 +122,87 @@ describe('evalMigrationModule', () => {
   });
 });
 
-describe('db_migrate', () => {
+describe('applyMigrationBatch (worker apply loop)', () => {
+  beforeEach(() => {
+    mockApply.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  it('applies pending migrations in order and skips already-applied ones', async () => {
+    const result = await applyMigrationBatch(
+      makeSql(['20260616_120000_a.ts']),
+      [
+        item('20260616_130000_c.ts'),
+        item('20260616_120000_a.ts'),
+        item('20260616_125000_b.ts'),
+      ],
+      'principal-x',
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.applied).toBe(2);
+    expect(result.appliedNames).toEqual([
+      '20260616_125000_b.ts',
+      '20260616_130000_c.ts',
+    ]);
+    expect(result.skipped).toEqual(['20260616_120000_a.ts']);
+
+    // applyMigrationModule called once per applied migration, with (sql, hash, module).
+    expect(mockApply).toHaveBeenCalledTimes(2);
+    expect(mockApply.mock.calls[0][1]).toBe('20260616_125000_b.ts');
+  });
+
+  it('stops on the first failure and reports the failed migration', async () => {
+    mockApply
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('syntax error at or near "CRATE"'));
+
+    const result = await applyMigrationBatch(
+      makeSql([]),
+      [
+        item('20260616_120000_a.ts'),
+        item('20260616_130000_b.ts'),
+        item('20260616_140000_c.ts'),
+      ],
+      'principal-x',
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.applied).toBe(1);
+    expect(result.appliedNames).toEqual(['20260616_120000_a.ts']);
+    expect(result.failed).toBe('20260616_130000_b.ts');
+    expect(String(result.error)).toContain('CRATE');
+    // The third migration is never attempted.
+    expect(mockApply).toHaveBeenCalledTimes(2);
+  });
+
+  it('awaits the progress heartbeat after every processed migration', async () => {
+    const onProgress = jest.fn(async () => undefined);
+
+    await applyMigrationBatch(
+      makeSql(['20260616_120000_a.ts']),
+      [item('20260616_120000_a.ts'), item('20260616_125000_b.ts')],
+      'principal-x',
+      onProgress,
+    );
+
+    // Once for the skip, once for the applied migration.
+    expect(onProgress).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('db_migrate (async submit)', () => {
   const originalEnv = process.env['NODE_ENV'];
 
   beforeEach(() => {
     process.env['NODE_ENV'] = 'dev';
     mockGetMigrationSql.mockResolvedValue(makeSql([]));
-    mockApply.mockResolvedValue(undefined);
+    mockEnsureJobsTable.mockResolvedValue(undefined);
+    mockReapStaleJobs.mockResolvedValue([]);
+    mockFindRunningJob.mockResolvedValue(null);
+    mockInsertJob.mockResolvedValue('job-1');
+    mockInvokeWorker.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -123,7 +222,7 @@ describe('db_migrate', () => {
     const payload = parse(result.content[0].text);
     expect(payload.success).toBe(false);
     expect(String(payload.error)).toContain('disabled outside dev');
-    expect(mockApply).not.toHaveBeenCalled();
+    expect(mockInsertJob).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid migration name', async () => {
@@ -135,7 +234,7 @@ describe('db_migrate', () => {
     expect(result.isError).toBe(true);
     const payload = parse(result.content[0].text);
     expect(String(payload.error)).toContain('Invalid migration name');
-    expect(mockApply).not.toHaveBeenCalled();
+    expect(mockInsertJob).not.toHaveBeenCalled();
   });
 
   it('rejects an over-large migration count', async () => {
@@ -150,15 +249,12 @@ describe('db_migrate', () => {
     expect(String(payload.error)).toContain('Too many migrations');
   });
 
-  it('applies pending migrations in order and skips already-applied ones', async () => {
-    mockGetMigrationSql.mockResolvedValue(makeSql(['20260616_120000_a.ts']));
-
+  it('persists the job in apply order and returns { jobId, status: running }', async () => {
     const result = await migrate(
       {
         migrations: [
           item('20260616_130000_c.ts'),
           item('20260616_120000_a.ts'),
-          item('20260616_125000_b.ts'),
         ],
       },
       CALLER,
@@ -166,43 +262,86 @@ describe('db_migrate', () => {
 
     expect(result.isError).toBeUndefined();
     const payload = parse(result.content[0].text);
-    expect(payload.success).toBe(true);
-    expect(payload.applied).toBe(2);
-    expect(payload.appliedNames).toEqual([
-      '20260616_125000_b.ts',
+    expect(payload.jobId).toBe('job-1');
+    expect(payload.status).toBe('running');
+    expect(payload.joined).toBe(false);
+    expect(payload.submitted).toBe(2);
+
+    // Table ensured + stale rows reaped before submitting.
+    expect(mockEnsureJobsTable).toHaveBeenCalled();
+    expect(mockReapStaleJobs).toHaveBeenCalled();
+
+    // Payload persisted ordered by timestamp, names alongside.
+    const inserted = mockInsertJob.mock.calls[0][1];
+    expect(inserted.migrationNames).toEqual([
+      '20260616_120000_a.ts',
       '20260616_130000_c.ts',
     ]);
-    expect(payload.skipped).toEqual(['20260616_120000_a.ts']);
+    const persisted = JSON.parse(inserted.payload) as {
+      migrations: MigrationPayloadItem[];
+    };
+    expect(persisted.migrations.map((m) => m.name)).toEqual([
+      '20260616_120000_a.ts',
+      '20260616_130000_c.ts',
+    ]);
+    // Audit principal rides on the row so the worker keys its log lines to it.
+    expect(inserted.principal).toContain('client-abc');
 
-    // applyMigrationModule called once per applied migration, with (sql, hash, module).
-    expect(mockApply).toHaveBeenCalledTimes(2);
-    expect(mockApply.mock.calls[0][1]).toBe('20260616_125000_b.ts');
+    // The async worker is invoked with the new job id — nothing is applied inline.
+    expect(mockInvokeWorker).toHaveBeenCalledWith('job-1');
+    expect(mockApply).not.toHaveBeenCalled();
   });
 
-  it('stops on the first failure and reports the failed migration', async () => {
-    mockApply
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('syntax error at or near "CRATE"'));
+  it('joins an already-running job instead of starting a second worker', async () => {
+    mockFindRunningJob.mockResolvedValue('job-9');
 
     const result = await migrate(
-      {
-        migrations: [
-          item('20260616_120000_a.ts'),
-          item('20260616_130000_b.ts'),
-          item('20260616_140000_c.ts'),
-        ],
-      },
+      { migrations: [item('20260616_120000_a.ts')] },
+      CALLER,
+    );
+
+    const payload = parse(result.content[0].text);
+    expect(payload.jobId).toBe('job-9');
+    expect(payload.joined).toBe(true);
+    expect(mockInsertJob).not.toHaveBeenCalled();
+    expect(mockInvokeWorker).not.toHaveBeenCalled();
+  });
+
+  it('joins the winner when a concurrent submit wins the insert race', async () => {
+    mockInsertJob.mockResolvedValue(null);
+    mockFindRunningJob
+      .mockResolvedValueOnce(null) // pre-insert check
+      .mockResolvedValueOnce('job-2'); // post-conflict lookup
+
+    const result = await migrate(
+      { migrations: [item('20260616_120000_a.ts')] },
+      CALLER,
+    );
+
+    const payload = parse(result.content[0].text);
+    expect(payload.jobId).toBe('job-2');
+    expect(payload.joined).toBe(true);
+    expect(mockInvokeWorker).not.toHaveBeenCalled();
+  });
+
+  it('fails the job and reports the error when the worker invoke fails', async () => {
+    mockInvokeWorker.mockRejectedValue(new Error('AccessDenied'));
+
+    const result = await migrate(
+      { migrations: [item('20260616_120000_a.ts')] },
       CALLER,
     );
 
     expect(result.isError).toBe(true);
     const payload = parse(result.content[0].text);
     expect(payload.success).toBe(false);
-    expect(payload.applied).toBe(1);
-    expect(payload.appliedNames).toEqual(['20260616_120000_a.ts']);
-    expect(payload.failed).toBe('20260616_130000_b.ts');
-    expect(String(payload.error)).toContain('CRATE');
-    // The third migration is never attempted.
-    expect(mockApply).toHaveBeenCalledTimes(2);
+    expect(String(payload.error)).toContain('AccessDenied');
+    // The job row is transitioned to failed so pollers see a terminal state.
+    expect(mockFinishJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'job-1',
+      'failed',
+      expect.stringContaining('AccessDenied'),
+    );
   });
 });

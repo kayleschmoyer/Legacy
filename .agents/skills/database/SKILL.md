@@ -25,7 +25,7 @@ The hosted DB MCP server is the only DB MCP server. It reaches the dev RDS over 
 | Ad-hoc SQL (read-only)         | `db_query` (hosted MCP; connector prefix `mcp__legacy-sports-db__db_query`)                     |
 | Check pending migrations       | `pnpm --prefix lib/db-client run db:status`                                                     |
 | Apply pending migrations       | `pnpm --prefix lib/db-client run db:up`                                                         |
-| Apply migrations to dev RDS    | `db_migrate` (hosted MCP, transpiles local `.ts` and POSTs to the server — no tunnel)           |
+| Apply migrations to dev RDS    | `db_migrate` (hosted MCP, async — returns `jobId`; poll `db_migration_status({ jobId })`)       |
 | Migration applied/pending diff | `db_migration_status` (hosted MCP; pass local migration filenames)                              |
 | Regenerate `schema.graphql`    | `pnpm exec nx run db:print-schema`                                                              |
 | GraphQL codegen after schema   | `make codegen`                                                                                  |

@@ -11,6 +11,14 @@ import {
 import { getMigrationSql } from '../db.js';
 import { errorMessage, jsonResult, type ToolResult } from '../types.js';
 import type { McpCaller } from '../audit.js';
+import {
+  ensureJobsTable,
+  findRunningJob,
+  insertJob,
+  finishJob,
+  reapStaleJobs,
+} from '../jobs.js';
+import { invokeWorkerAsync } from '../invoke-worker.js';
 
 /**
  * `db_migrate` — apply UNMERGED local-branch migrations to the dev database
@@ -19,15 +27,22 @@ import type { McpCaller } from '../audit.js';
  * The hosted Lambda cannot see a developer's local migrations directory, so the
  * client transpiles each pending migration `.ts` to CJS JavaScript (see
  * `src/client/transpile.ts`) and POSTs `{ migrations: [{ name, hash, jsSource }] }`.
- * This tool evaluates each `jsSource` in a constrained sandbox and applies it
- * through the exact same code path as the local runner (`applyMigrationModule`,
- * extracted in LS-8118; migrations run with autocommit semantics since LS-8254).
+ * The migration batch is applied by an async worker (LS-8563): this tool
+ * validates the payload, persists it to a job row, fires an async self-invoke,
+ * and returns `{ jobId, status: "running" }` well inside the API Gateway's ~29s
+ * window; callers poll `db_migration_status({ jobId })` to the terminal result.
+ * The worker (`src/worker.ts`) evaluates each `jsSource` in a constrained
+ * sandbox and applies it through the exact same code path as the local runner
+ * (`applyMigrationModule`, extracted in LS-8118; migrations run with autocommit
+ * semantics since LS-8254).
  *
  * Security posture — this is effectively a remote DDL endpoint. It is defended
  * in depth: the `mcp/db` Cognito scope (enforced in `lambda.ts`), a dev-only
  * environment guard, payload/count caps, a strict migration-name allowlist
  * regex, a `require` shim that resolves ONLY `postgres` / `drizzle-orm[/*]`, and
- * a full audit log of every migration keyed to the calling principal.
+ * a full audit log of every migration keyed to the calling principal — the
+ * principal is persisted on the job row so the worker's per-migration audit
+ * lines stay keyed to the original caller across the async boundary.
  */
 
 /** One transpiled migration as sent by the client, ordered by timestamp. */
@@ -45,7 +60,7 @@ export interface MigrateParams {
 }
 
 /** parseUpOutput-compatible result, plus the `skipped` (already-applied) set. */
-interface MigrateResult {
+export interface MigrateResult {
   applied: number;
   appliedNames: string[];
   skipped: string[];
@@ -221,10 +236,107 @@ async function getAppliedHashes(sqlClient: postgres.Sql): Promise<Set<string>> {
 }
 
 /**
- * Apply the provided migrations, skipping any already recorded as applied, and
- * stopping on the first failure. Each migration's `up()` runs with autocommit
- * semantics and its hash is recorded only on success, by `applyMigrationModule`
- * (LS-8254).
+ * Apply a validated, ordered migration batch: skip any migration already
+ * recorded as applied, stop on the first failure. Each migration's `up()` runs
+ * with autocommit semantics and its hash is recorded only on success, by
+ * `applyMigrationModule` (LS-8254) — which is what makes re-submitting after a
+ * mid-batch failure resume-safe.
+ *
+ * Runs inside the async worker (LS-8563). `principal` is the audit identity
+ * persisted on the job row at submit time, so every per-migration audit line
+ * stays keyed to the original caller across the async boundary. `onProgress`
+ * is awaited after each processed migration — the worker uses it to heartbeat
+ * the job row so pollers can distinguish a slow batch from a dead worker.
+ */
+export async function applyMigrationBatch(
+  sql: postgres.Sql,
+  migrations: MigrationPayloadItem[],
+  principal: string,
+  onProgress?: () => Promise<void>,
+): Promise<MigrateResult> {
+  // Migrations must be applied in timestamp order; submitters persist them
+  // ordered, but sort defensively on the filename (timestamp-prefixed) so order
+  // never depends on upstream behavior.
+  const ordered = [...migrations].sort((a, b) => a.name.localeCompare(b.name));
+
+  const appliedAlready = await getAppliedHashes(sql);
+
+  LOGGER.info(
+    `[db_migrate] start (${principal}): ${ordered.length} migration(s) submitted`,
+  );
+
+  const appliedNames: string[] = [];
+  const skipped: string[] = [];
+
+  for (const m of ordered) {
+    if (appliedAlready.has(m.hash)) {
+      skipped.push(m.name);
+      LOGGER.info(
+        `[db_migrate] skip already-applied migration=${m.name} hash=${m.hash} (${principal})`,
+      );
+      await onProgress?.();
+      continue;
+    }
+
+    try {
+      const moduleToApply = evalMigrationModule(m.jsSource);
+      await applyMigrationModule(sql, m.hash, moduleToApply);
+      appliedNames.push(m.name);
+      LOGGER.info(
+        `[db_migrate] applied migration=${m.name} hash=${m.hash} (${principal})`,
+      );
+    } catch (error) {
+      const message = errorMessage(error);
+      LOGGER.error(
+        `[db_migrate] FAILED migration=${m.name} hash=${m.hash} (${principal}): ${message}`,
+      );
+      return {
+        applied: appliedNames.length,
+        appliedNames,
+        skipped,
+        success: false,
+        failed: m.name,
+        error: message,
+      };
+    }
+    await onProgress?.();
+  }
+
+  LOGGER.info(
+    `[db_migrate] done (${principal}): applied=${appliedNames.length} skipped=${skipped.length}`,
+  );
+
+  return {
+    applied: appliedNames.length,
+    appliedNames,
+    skipped,
+    success: true,
+  };
+}
+
+/** Shape returned by `migrate` — the submit acknowledgement, not the result. */
+export interface MigrateSubmitResult {
+  jobId: string;
+  status: 'running';
+  /** True when an already-running job was joined instead of starting a new one. */
+  joined: boolean;
+  submitted: number;
+  hint: string;
+}
+
+const POLL_HINT =
+  'Poll db_migration_status({ jobId }) every ~5s until status is done/failed/orphaned; ' +
+  'the terminal payload has the same shape db_migrate used to return synchronously.';
+
+/**
+ * Submit a migration batch as an async job (LS-8563): validate, persist the
+ * payload to a job row, fire the async self-invoke, and return
+ * `{ jobId, status: "running" }` — always well inside the API Gateway window.
+ *
+ * If a job is already running, the call JOINS it (returns the existing jobId,
+ * AC4) instead of starting a concurrent worker; the single-`running` partial
+ * unique index makes this race-safe. Stale `running` rows (dead worker) are
+ * reaped to `failed` first so they can never block new submissions.
  */
 export async function migrate(
   params: MigrateParams,
@@ -251,9 +363,8 @@ export async function migrate(
     );
   }
 
-  // Migrations must be applied in timestamp order; the client sends them
-  // ordered, but sort defensively on the filename (timestamp-prefixed) so order
-  // never depends on client behavior.
+  // Persist in apply order so the worker (and the audit trail) see the same
+  // ordering the sync loop used to enforce.
   const ordered = [...params.migrations].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
@@ -277,57 +388,104 @@ export async function migrate(
     );
   }
 
-  const appliedAlready = await getAppliedHashes(sql);
+  try {
+    await ensureJobsTable(sql);
+    await reapStaleJobs(sql);
 
-  LOGGER.info(
-    `[db_migrate] start (${principal}): ${ordered.length} migration(s) submitted`,
-  );
-
-  const appliedNames: string[] = [];
-  const skipped: string[] = [];
-
-  for (const m of ordered) {
-    if (appliedAlready.has(m.hash)) {
-      skipped.push(m.name);
+    const running = await findRunningJob(sql);
+    if (running) {
       LOGGER.info(
-        `[db_migrate] skip already-applied migration=${m.name} hash=${m.hash} (${principal})`,
+        `[db_migrate] joined running job=${running} (${principal}): ${ordered.length} migration(s) submitted`,
       );
-      continue;
+      const joined: MigrateSubmitResult = {
+        jobId: running,
+        status: 'running',
+        joined: true,
+        submitted: ordered.length,
+        hint: POLL_HINT,
+      };
+      return jsonResult(joined);
+    }
+
+    const jobId = await insertJob(sql, {
+      principal,
+      migrationNames: ordered.map((m) => m.name),
+      payload: JSON.stringify({ migrations: ordered }),
+    });
+    if (!jobId) {
+      // A concurrent submit won the single-running-index race — join it.
+      const winner = await findRunningJob(sql);
+      if (winner) {
+        LOGGER.info(
+          `[db_migrate] joined running job=${winner} after insert race (${principal})`,
+        );
+        const joined: MigrateSubmitResult = {
+          jobId: winner,
+          status: 'running',
+          joined: true,
+          submitted: ordered.length,
+          hint: POLL_HINT,
+        };
+        return jsonResult(joined);
+      }
+      throw new Error('Failed to create a migration job (insert conflict).');
     }
 
     try {
-      const moduleToApply = evalMigrationModule(m.jsSource);
-      await applyMigrationModule(sql, m.hash, moduleToApply);
-      appliedNames.push(m.name);
-      LOGGER.info(
-        `[db_migrate] applied migration=${m.name} hash=${m.hash} (${principal})`,
-      );
+      await invokeWorkerAsync(jobId);
     } catch (error) {
-      const message = errorMessage(error);
-      LOGGER.error(
-        `[db_migrate] FAILED migration=${m.name} hash=${m.hash} (${principal}): ${message}`,
+      // The worker will never run — fail the job so pollers see a terminal
+      // state instead of waiting for the stale reaper.
+      const message = `Failed to invoke the migration worker: ${errorMessage(error)}`;
+      LOGGER.error(`[db_migrate] job=${jobId} (${principal}): ${message}`);
+      await finishJob(
+        sql,
+        jobId,
+        'failed',
+        JSON.stringify({
+          applied: 0,
+          appliedNames: [],
+          skipped: [],
+          success: false,
+          error: message,
+        }),
       );
-      const result: MigrateResult = {
-        applied: appliedNames.length,
-        appliedNames,
-        skipped,
-        success: false,
-        failed: m.name,
-        error: message,
-      };
-      return jsonResult(result, true);
+      return jsonResult(
+        {
+          applied: 0,
+          appliedNames: [],
+          skipped: [],
+          success: false,
+          error: message,
+        },
+        true,
+      );
     }
+
+    LOGGER.info(
+      `[db_migrate] submitted job=${jobId} (${principal}): ${ordered.length} migration(s)`,
+    );
+    const submitted: MigrateSubmitResult = {
+      jobId,
+      status: 'running',
+      joined: false,
+      submitted: ordered.length,
+      hint: POLL_HINT,
+    };
+    return jsonResult(submitted);
+  } catch (error) {
+    LOGGER.error(
+      `[db_migrate] submit failed (${principal}): ${errorMessage(error)}`,
+    );
+    return jsonResult(
+      {
+        applied: 0,
+        appliedNames: [],
+        skipped: [],
+        success: false,
+        error: errorMessage(error),
+      },
+      true,
+    );
   }
-
-  LOGGER.info(
-    `[db_migrate] done (${principal}): applied=${appliedNames.length} skipped=${skipped.length}`,
-  );
-
-  const result: MigrateResult = {
-    applied: appliedNames.length,
-    appliedNames,
-    skipped,
-    success: true,
-  };
-  return jsonResult(result);
 }

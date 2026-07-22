@@ -121,15 +121,25 @@ let migrationSql: postgres.Sql | null = null;
  * `max: 1` + `prepare: false` mirrors the local migration runner
  * (`lib/db-client/src/scripts/rollback-migrations.ts`): a single connection for
  * ordered migrations, and no prepared statements because DDL referencing
- * user-defined functions does not work with them. There is intentionally NO
- * `statement_timeout` here — schema changes (e.g. `CREATE INDEX`, backfills)
- * can legitimately run longer than the read-query timeout.
+ * user-defined functions does not work with them.
+ *
+ * The `statement_timeout` (default 840s, `DB_MIGRATION_STATEMENT_TIMEOUT_MS`
+ * to override — Terraform wires it to the worker Lambda timeout minus a 60s
+ * buffer) sits just below the async worker's ~900s function timeout (LS-8563):
+ * schema changes (e.g. `CREATE INDEX`, backfills) may legitimately run for
+ * minutes, but a statement that outlives the worker would freeze mid-run with
+ * no terminal write — the timeout makes runaway DDL fail cleanly inside the
+ * worker's lifetime instead.
  */
 export async function getMigrationSql(): Promise<postgres.Sql> {
   if (migrationSql) return migrationSql;
 
   const creds = await readRoleSecret(requireEnv('DB_SECRET_NAME'));
   const { host, port } = resolveHostPort();
+  const statementTimeoutMs = parseInt(
+    process.env['DB_MIGRATION_STATEMENT_TIMEOUT_MS'] ?? '840000',
+    10,
+  );
 
   migrationSql = postgres({
     host,
@@ -142,6 +152,9 @@ export async function getMigrationSql(): Promise<postgres.Sql> {
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false,
+    connection: {
+      statement_timeout: statementTimeoutMs,
+    },
   });
 
   return migrationSql;

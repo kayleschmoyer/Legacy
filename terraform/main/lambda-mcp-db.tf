@@ -70,6 +70,35 @@ resource "aws_iam_role_policy_attachment" "mcp_db_lambda_secrets" {
   role       = aws_iam_role.mcp_db_lambda.name
 }
 
+# Self-invoke permission for the async db_migrate worker (LS-8563): the submit
+# path fires an InvocationType=Event invoke of this same function carrying only
+# { dbMigrateJobId }; the worker branch applies the migration batch with the
+# full function timeout. The ARN is constructed (not referenced from
+# aws_lambda_function.mcp_db) so this policy has no dependency on the function
+# resource.
+resource "aws_iam_policy" "mcp_db_lambda_self_invoke" {
+  name        = "${local.name_prefix}-mcp-db-lambda-self-invoke"
+  description = "Allows the MCP DB Lambda to async-invoke itself to run the db_migrate worker"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"]
+        Resource = ["arn:aws:lambda:${local.region}:${local.account_id}:function:${local.name_prefix}-mcp-db"]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "mcp_db_lambda_self_invoke" {
+  policy_arn = aws_iam_policy.mcp_db_lambda_self_invoke.arn
+  role       = aws_iam_role.mcp_db_lambda.name
+}
+
 # ── CloudWatch Log Group ──────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "mcp_db_lambda" {
@@ -94,8 +123,10 @@ resource "aws_lambda_function" "mcp_db" {
   role          = aws_iam_role.mcp_db_lambda.arn
   handler       = "index.handler"
   runtime       = "nodejs20.x"
-  timeout       = var.lambda_timeout
-  memory_size   = 256
+  # Dedicated ~15-min timeout for the async db_migrate worker branch (LS-8563).
+  # The HTTP path is unaffected: API Gateway cuts sync callers at ~29s.
+  timeout     = var.lambda_mcp_db_timeout
+  memory_size = 256
 
   source_code_hash = data.aws_ssm_parameter.mcp_db_lambda_version.value
   # Deployed version marker read by the drift-check auditor (LS-8434)
@@ -116,6 +147,10 @@ resource "aws_lambda_function" "mcp_db" {
       DB_SECRET_NAME           = aws_secretsmanager_secret.database_credentials.name
       MCP_READONLY_SECRET_NAME = aws_secretsmanager_secret.mcp_readonly_db_credentials.name
 
+      # Worker DDL statement_timeout: just below the function timeout so
+      # runaway DDL fails cleanly inside the worker's lifetime (LS-8563).
+      DB_MIGRATION_STATEMENT_TIMEOUT_MS = tostring((var.lambda_mcp_db_timeout - 60) * 1000)
+
       NODE_ENV                            = var.environment
       LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"
@@ -135,6 +170,7 @@ resource "aws_lambda_function" "mcp_db" {
     aws_iam_role_policy_attachment.mcp_db_lambda_basic,
     aws_iam_role_policy_attachment.mcp_db_lambda_vpc,
     aws_iam_role_policy_attachment.mcp_db_lambda_secrets,
+    aws_iam_role_policy_attachment.mcp_db_lambda_self_invoke,
     aws_cloudwatch_log_group.mcp_db_lambda,
   ]
 

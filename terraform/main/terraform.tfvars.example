@@ -15,6 +15,8 @@ db_allocated_storage = 20
 
 # Lambda Configuration
 lambda_timeout = 30
+# MCP DB Lambda: ~15-min ceiling for the async db_migrate worker (LS-8563)
+lambda_mcp_db_timeout = 900
 
 # Google OAuth Configuration - REPLACE WITH YOUR ACTUAL CLIENT ID
 google_oauth_client_id = "your-google-client-id.apps.googleusercontent.com"

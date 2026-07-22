@@ -28,7 +28,7 @@ pnpm --prefix lib/db-client run db:up
 
 Confirm the output reports `Applied N new migrations` or `No new migrations to apply`. Any other result is a failure — do not proceed to `make pc`.
 
-To apply against the dev RDS without an SSM tunnel, use the hosted `db_migrate` MCP tool (`mcp__legacy-sports-db-admin__db_migrate`) — it transpiles local migrations and POSTs them to the in-VPC server.
+To apply against the dev RDS without an SSM tunnel, use the hosted `db_migrate` MCP tool (`mcp__legacy-sports-db-admin__db_migrate`) — it transpiles local migrations and POSTs them to the in-VPC server. The call is async (LS-8563): it returns `{ jobId, status: "running" }`; poll `db_migration_status({ jobId })` every ~5s until `terminal: true` for the applied/skipped result.
 
 ### 3. Verify (spot-check)
 

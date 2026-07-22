@@ -38,34 +38,56 @@ via `@legacy-sports/mcp-bearer-auth`. Clients mint the bearer per-connect with
 
 ## Tools
 
-| Tool                  | Description                                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `db_query`            | Read-only SQL. Connects as the SELECT-only `mcp_readonly` role inside a `READ ONLY` txn.                      |
-| `db_migration_status` | Applied vs pending diff. Pass local migration filenames; applied are keyed by filename.                       |
-| `db_migrate`          | Apply UNMERGED local migrations by sending client-transpiled module source; runs as migration_user. Dev-only. |
+| Tool                  | Description                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `db_query`            | Read-only SQL. Connects as the SELECT-only `mcp_readonly` role inside a `READ ONLY` txn.                          |
+| `db_migration_status` | Applied vs pending diff (pass local filenames), or async job polling (pass `jobId`).                              |
+| `db_migrate`          | Submit UNMERGED local migrations as an async job; poll `db_migration_status({ jobId })` for the result. Dev-only. |
 
 ### `db_migrate` (remote DDL — handle with care)
 
 `db_migrate` is effectively a remote DDL endpoint. The hosted Lambda cannot see
 a developer's local migrations directory, so the **client** transpiles each
 pending migration `.ts` to CommonJS with esbuild and POSTs
-`{ migrations: [{ name, hash, jsSource }] }` (ordered by timestamp). The server
-evaluates each `jsSource` in a constrained `vm` sandbox — a `require` shim
-resolving **only** `postgres` and `drizzle-orm[/*]` to the Lambda's bundled
-instances — and applies it via `applyMigrationModule`
+`{ migrations: [{ name, hash, jsSource }] } ` (ordered by timestamp).
+
+**Async job contract (LS-8563).** The tool validates the payload, persists it
+to a job row (`drizzle.__db_migrate_jobs`, created on demand), fires an async
+self-invoke of the same Lambda, and returns `{ jobId, status: "running" }`
+well inside the API Gateway's ~29s window — heavy DDL (`CREATE INDEX`,
+backfills) runs in the worker branch with the function's full ~15-min timeout.
+Poll `db_migration_status({ jobId })` (~5s cadence) until `terminal: true`; the
+terminal payload carries the same result shape the tool used to return
+synchronously (`applied`, `appliedNames`, `skipped`, `success`, `failed?`,
+`error?`). A `db_migrate` call while a job is running **joins** it (returns the
+existing `jobId`) — a partial unique index allows at most one `running` row. A
+worker that dies without a terminal write is reported as `orphaned` once its
+`updated_at` heartbeat exceeds the stale cutoff (`DB_MIGRATE_JOB_STALE_MS`,
+default 960s) and is reaped to `failed` by the next submit.
+
+The worker evaluates each `jsSource` in a constrained `vm` sandbox — a
+`require` shim resolving **only** `postgres` and `drizzle-orm[/*]` to the
+Lambda's bundled instances — and applies it via `applyMigrationModule`
 (`lib/db-client`, the same code path as the local runner; migrations run with
-autocommit semantics since LS-8254). Already-applied
-migrations are skipped; the run stops on the first failure.
+autocommit semantics since LS-8254). Already-applied migrations are skipped;
+the run stops on the first failure, so re-submitting after a mid-batch failure
+is resume-safe. The worker's migration connection sets a `statement_timeout`
+just below the worker timeout (`DB_MIGRATION_STATEMENT_TIMEOUT_MS`, default
+840s) so runaway DDL fails cleanly instead of freezing mid-statement.
 
 It is defended in depth: the **`mcp/db`** scope, a **dev-only** `NODE_ENV` guard,
 payload size/count caps, a strict migration-name regex, the `require` allowlist,
 and a `LOGGER` audit of every migration keyed to the calling Cognito principal
 (`client_id` / `sub`). The threat model is _developer-authored_ migrations
-transported over the wire, not arbitrary third-party code.
+transported over the wire, not arbitrary third-party code. The principal is
+persisted on the job row, so the worker's per-migration audit lines stay keyed
+to the original caller across the async boundary.
 
 Client helper: `src/client/migrate-cli.ts` (run via `tsx`). It reads
-`MCP_DB_ADMIN_URL` + `MCP_DB_ADMIN_BEARER` from the environment. The pure
-transpile/payload logic lives in `src/client/migrate-client.ts`.
+`MCP_DB_ADMIN_URL` + `MCP_DB_ADMIN_BEARER` from the environment, submits the
+batch, and polls the job to its terminal state so callers still see one
+logical operation. The pure transpile/payload/poll logic lives in
+`src/client/migrate-client.ts`.
 
 ## Environment (set by Terraform — see `terraform/main/lambda-mcp-db.tf`)
 
@@ -74,6 +96,9 @@ transpile/payload logic lives in `src/client/migrate-client.ts`.
 - `DB_HOST` (RDS instance endpoint `host:5432`), `DB_PORT`, `DB_NAME`
 - `DB_SECRET_NAME` — migration_user creds (used by `db_migrate`)
 - `NODE_ENV` — environment name; `db_migrate` refuses to run unless this is `dev`/`development`
+- `DB_MIGRATION_STATEMENT_TIMEOUT_MS` — worker DDL statement_timeout (default 840000; Terraform wires it to the function timeout minus 60s)
+- `DB_MIGRATE_JOB_STALE_MS` — heartbeat age past which a `running` job is treated as dead (default 960000)
+- `AWS_LAMBDA_FUNCTION_NAME` — runtime-provided; used for the async self-invoke
 
 ## Build
 

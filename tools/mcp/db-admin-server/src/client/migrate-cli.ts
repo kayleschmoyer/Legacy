@@ -2,7 +2,8 @@
 /**
  * Runnable entry for the `db_migrate` client helper (LS-8119, AC1).
  *
- * Transpiles all local migrations and POSTs them to the hosted db-admin server.
+ * Transpiles all local migrations, POSTs them to the hosted db-admin server,
+ * and polls the resulting async job to its terminal state (LS-8563).
  * Kept separate from `migrate-client.ts` (the pure, unit-tested library) so the
  * direct-run wiring — which uses `import.meta.url`, an ESM-only construct —
  * never reaches the CommonJS ts-jest test runner.
