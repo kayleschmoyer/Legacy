@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
-import { FOOTBALL_PLAYER_DETAIL_POLL_MS } from '@legacy-sports/shared-components/football';
 import FootballPlayerDetailScreen from './[playerId]';
 
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
@@ -33,9 +32,6 @@ let capturedDetailProps: Record<string, unknown> | null = null;
 jest.mock('@legacy-sports/shared-components/football', () => {
   const { View, Text } = jest.requireActual<RNComponents>('react-native');
   return {
-    // Sentinel value so the wiring test proves the screen forwards the shared
-    // constant rather than a hard-coded literal.
-    FOOTBALL_PLAYER_DETAIL_POLL_MS: 54321,
     FootballPlayerDetail: (props: {
       player?: { firstName?: string | null } | null;
       loading?: boolean;
@@ -125,14 +121,6 @@ describe('FootballPlayerDetailScreen', () => {
     });
     render(<FootballPlayerDetailScreen />);
     expect(screen.getByText('error')).toBeTruthy();
-  });
-
-  it('polls the query so injury-status changes auto-refresh (LS-6252)', () => {
-    render(<FootballPlayerDetailScreen />);
-    const call = mockUseFootballPlayerQuery.mock.calls[0] as [
-      { pollInterval?: number },
-    ];
-    expect(call[0].pollInterval).toBe(FOOTBALL_PLAYER_DETAIL_POLL_MS);
   });
 
   it('passes isPremium=false to FootballPlayerDetail for free-tier users (LS-5011)', () => {

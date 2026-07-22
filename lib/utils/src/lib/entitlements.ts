@@ -119,7 +119,7 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   trade_analyzer: 'Trade analyzer',
   football_projections: 'Fantasy scoring projections (football)',
   advanced_search_filters:
-    'Advanced search filters (projected fantasy points, ADP rank, injury status)',
+    'Advanced search filters (projected fantasy points, ADP rank)',
   advanced_pitching_stats: 'Advanced pitching analytics (FIP, WHIP, K/9, BB/9)',
   defensive_sabermetrics: 'Advanced defensive sabermetrics (DRS, UZR, OAA)',
   advanced_batting_stats: 'Advanced batting sabermetrics (OPS, OPS+, BABIP)',

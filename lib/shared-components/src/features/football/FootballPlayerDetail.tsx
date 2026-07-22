@@ -1,19 +1,15 @@
 import React, { useState } from 'react';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ArrowLeft, Lock } from '@tamagui/lucide-icons';
-import { formatInjuryFreshness } from './injuryFreshness';
 import { FootballPlayerHeader } from './FootballPlayerHeader';
 import { GameLogsTable } from '../stats/GameLogsTable';
 import { Select } from '../../components/Select';
 import {
-  AMBER,
-  AMBER_LIGHT,
   BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_SEAM_RED_LIGHT,
-  ORANGE,
   OUTLINE_SUBTLE,
   SURFACE_CARD,
   TEXT_MUTED,
@@ -165,13 +161,6 @@ export interface FootballPlayerDetailPlayer {
   careerStats?: FootballPlayerDetailStats | null;
   seasonStats?: FootballPlayerDetailSeasonStats | null;
   previousTeams: string[];
-  /**
-   * ISO-8601 timestamp injury data was last refreshed, or null when never
-   * synced. Drives the freshness badge (LS-6251 / FPD-027).
-   */
-  injuriesLastSyncedAt?: string | null;
-  injuryStatus?: string | null;
-  injuryDesignation?: string | null;
   news?: string | null;
 }
 
@@ -237,110 +226,6 @@ function StatGroup({
         {children}
       </XStack>
     </YStack>
-  );
-}
-
-/**
- * Relative-freshness badge for injury data (LS-6251 / FPD-027). Renders nothing
- * when there is no last-synced timestamp, a muted "Last updated: …" label when
- * fresh, and a red "Stale (…)" label when the data is older than the staleness
- * threshold so a user is never misled by silently stale injury status.
- */
-function InjuryFreshnessBadge({
-  syncedAtIso,
-}: {
-  syncedAtIso: string | null | undefined;
-}) {
-  const freshness = formatInjuryFreshness(syncedAtIso);
-  if (!freshness) return null;
-
-  const color = freshness.isStale ? BRAND_SEAM_RED_LIGHT : TEXT_MUTED;
-  return (
-    <XStack
-      alignItems="center"
-      gap={6}
-      accessibilityLabel={`Injury data freshness: ${freshness.label}`}
-    >
-      <YStack
-        width={6}
-        height={6}
-        borderRadius={3}
-        backgroundColor={color}
-        opacity={freshness.isStale ? 1 : 0.7}
-      />
-      <Text
-        fontSize={12}
-        color={color}
-        fontFamily={FONT_BODY}
-        fontWeight={freshness.isStale ? '700' : '400'}
-      >
-        {freshness.label}
-      </Text>
-    </XStack>
-  );
-}
-
-const INJURY_COLORS: Record<string, { bg: string; text: string }> = {
-  out: {
-    bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15),
-    text: BRAND_SEAM_RED_LIGHT,
-  },
-  ir: { bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15), text: BRAND_SEAM_RED_LIGHT },
-  pup: {
-    bg: withAlpha(BRAND_SEAM_RED_LIGHT, 0.15),
-    text: BRAND_SEAM_RED_LIGHT,
-  },
-  doubtful: { bg: withAlpha(ORANGE, 0.15), text: ORANGE },
-  questionable: { bg: withAlpha(AMBER_LIGHT, 0.15), text: AMBER },
-  'day-to-day': { bg: withAlpha(AMBER_LIGHT, 0.15), text: AMBER },
-};
-
-function injuryColors(status: string): { bg: string; text: string } {
-  return (
-    INJURY_COLORS[status.toLowerCase()] ?? {
-      bg: withAlpha(TEXT_MUTED, 0.12),
-      text: TEXT_MUTED,
-    }
-  );
-}
-
-function InjuryBanner({
-  injuryStatus,
-  injuryDesignation,
-}: {
-  injuryStatus: string;
-  injuryDesignation?: string | null;
-}) {
-  const colors = injuryColors(injuryStatus);
-  return (
-    <XStack
-      backgroundColor={colors.bg}
-      borderWidth={1}
-      borderColor={withAlpha(colors.text, 0.3)}
-      borderRadius={8}
-      paddingHorizontal={12}
-      paddingVertical={8}
-      gap={8}
-      alignItems="center"
-      flexWrap="wrap"
-      data-testid="injury-banner"
-    >
-      <Text
-        fontSize={13}
-        fontWeight="700"
-        fontFamily={FONT_DISPLAY}
-        color={colors.text}
-        textTransform="uppercase"
-        letterSpacing={0.6}
-      >
-        {injuryStatus}
-      </Text>
-      {injuryDesignation ? (
-        <Text fontSize={13} color={colors.text} fontFamily={FONT_BODY}>
-          {injuryDesignation}
-        </Text>
-      ) : null}
-    </XStack>
   );
 }
 
@@ -1180,17 +1065,6 @@ export function FootballPlayerDetail({
       {player && (
         <YStack padding={24} gap={20} maxWidth={640} width="100%">
           <FootballPlayerHeader player={player} />
-
-          {/* Injury-data freshness (LS-6251 / FPD-027) — hidden until synced */}
-          <InjuryFreshnessBadge syncedAtIso={player.injuriesLastSyncedAt} />
-
-          {/* Injury status */}
-          {player.injuryStatus ? (
-            <InjuryBanner
-              injuryStatus={player.injuryStatus}
-              injuryDesignation={player.injuryDesignation}
-            />
-          ) : null}
 
           {/* Player news */}
           {player.news ? <NewsCard news={player.news} /> : null}

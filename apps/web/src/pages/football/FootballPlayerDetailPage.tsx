@@ -3,7 +3,6 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { YStack } from 'tamagui';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import {
-  FOOTBALL_PLAYER_DETAIL_POLL_MS,
   FootballPlayerDetail,
   resolveFootballPlayerTab,
 } from '@legacy-sports/shared-components/football';
@@ -36,10 +35,6 @@ export function FootballPlayerDetailPage() {
   const { data, loading, error } = useFootballPlayerQuery({
     variables: { id: playerId },
     skip: !isValidId,
-    // Auto-refresh so injury-status changes surface without a manual reload
-    // (LS-6252). Apollo pauses polling while the tab is hidden and stops it on
-    // unmount; a skipped query (invalid id) does not poll.
-    pollInterval: FOOTBALL_PLAYER_DETAIL_POLL_MS,
   });
 
   function handleUpgrade() {

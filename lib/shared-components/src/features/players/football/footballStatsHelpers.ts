@@ -33,22 +33,6 @@ export function parseFootballPositions(raw: string | null): FootballPosition[] {
     .filter((s): s is FootballPosition => s !== '' && VALID_POSITIONS.has(s));
 }
 
-/**
- * Premium advanced-search injury options (LS-6489 / FPL-008). `null` = "Any"
- * (no injury filter). Non-null values match the `injury_status` strings the
- * injury pipeline writes to the players table.
- */
-export const INJURY_STATUS_OPTIONS: {
-  label: string;
-  value: string | null;
-}[] = [
-  { label: 'Any', value: null },
-  { label: 'Questionable', value: 'Questionable' },
-  { label: 'Doubtful', value: 'Doubtful' },
-  { label: 'Out', value: 'Out' },
-  { label: 'IR', value: 'IR' },
-];
-
 /** Team-filter option values that are not concrete NFL team abbreviations. */
 export const TEAM_ALL = 'All';
 export const TEAM_FREE_AGENT = 'FREE_AGENT';
@@ -256,7 +240,6 @@ export interface FootballStatsFilters {
   searchTerm?: string;
   sortField?: FootballSortField;
   sortDir?: 'asc' | 'desc';
-  injuryStatus?: string | null;
   minProjectedPoints?: number;
   maxAdpRank?: number;
   availabilityFilter?: FootballAvailability;
@@ -335,7 +318,6 @@ export interface FootballQueryVars {
   conference?: string;
   freeAgent?: boolean;
   search?: string;
-  injuryStatus?: string;
   minProjectedPoints?: number;
   maxAdpRank?: number;
   sortBy?: string;
@@ -350,7 +332,6 @@ export interface FootballFilterState {
   search: string;
   sortField?: FootballSortField;
   sortDir: 'asc' | 'desc';
-  injuryStatus: string | null;
   minProjectedPoints?: number;
   maxAdpRank?: number;
 }
@@ -379,9 +360,9 @@ export function resolveSortForView(
  * Map committed filter state into the `FootballPlayerStatsGrid` GraphQL
  * variables, mirroring the monolith's queryVars derivation: conference vs
  * concrete team vs free-agent are mutually exclusive; search is gated on a
- * 2-char minimum; the premium injury/projected/ADP args are already
- * premium-gated by the caller. The view maps to the server `category` arg
- * (overview → none) and pins the sort to a field valid for that category.
+ * 2-char minimum; the premium projected/ADP args are already premium-gated by
+ * the caller. The view maps to the server `category` arg (overview → none)
+ * and pins the sort to a field valid for that category.
  */
 export function buildFootballQueryVars(
   state: FootballFilterState,
@@ -402,7 +383,6 @@ export function buildFootballQueryVars(
     conference: isConference ? state.team : undefined,
     freeAgent: state.team === TEAM_FREE_AGENT ? true : undefined,
     search: search.length >= FOOTBALL_SEARCH_MIN_LENGTH ? search : undefined,
-    injuryStatus: state.injuryStatus ?? undefined,
     minProjectedPoints: state.minProjectedPoints,
     maxAdpRank: state.maxAdpRank,
     sortBy: sortField,
@@ -423,7 +403,6 @@ export function buildFootballStatsQuery(state: {
   pageSize: number;
   sortField?: FootballSortField;
   sortDir: 'asc' | 'desc';
-  injuryStatus: string | null;
   minProjectedPoints?: number;
   maxAdpRank?: number;
 }): string {
@@ -445,9 +424,6 @@ export function buildFootballStatsQuery(state: {
   if (state.sortField) {
     params.push(`sortBy=${state.sortField}`);
     params.push(`sortDir=${state.sortDir}`);
-  }
-  if (state.injuryStatus) {
-    params.push(`injuryStatus=${encodeURIComponent(state.injuryStatus)}`);
   }
   if (state.minProjectedPoints != null) {
     params.push(`minProjectedPoints=${state.minProjectedPoints}`);

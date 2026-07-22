@@ -9,7 +9,6 @@
  *   4. Back press with in-app history → navigate(-1).
  *   5. Back press on cold-start deep link (empty history) → navigate('/football/players').
  * LS-6249 — Projections premium upsell wiring.
- * LS-6252 — injury-status auto-refresh via Apollo pollInterval.
  *
  * LS-6226 — Cold-load deep link to a non-numeric id silently skips the query:
  *   AC1: /football/players/abc  → query not fired, notFound=true.
@@ -23,10 +22,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
-import {
-  FOOTBALL_PLAYER_DETAIL_POLL_MS,
-  FootballPlayerDetail,
-} from '@legacy-sports/shared-components/football';
+import { FootballPlayerDetail } from '@legacy-sports/shared-components/football';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useFootballPlayerQuery } from '@legacy-sports/graphql';
 import { FootballPlayerDetailPage } from './FootballPlayerDetailPage';
@@ -46,9 +42,6 @@ jest.mock('react-router-dom', () => ({
 }));
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('@legacy-sports/shared-components/football', () => ({
-  // Sentinel so the wiring test proves the container forwards the shared
-  // constant rather than a hard-coded literal.
-  FOOTBALL_PLAYER_DETAIL_POLL_MS: 54321,
   FootballPlayerDetail: jest.fn(),
   resolveFootballPlayerTab: (raw: string | null | undefined) =>
     raw === 'overview' || raw === 'advanced' || raw === 'news'
@@ -272,19 +265,6 @@ describe('FootballPlayerDetailPage — auth error handling (LS-6227)', () => {
       expect(screen.queryByText('teaser-upgrade')).toBeNull();
       expect(screen.queryByText('upgrade-modal-open')).toBeNull();
     });
-  });
-
-  it('polls the query so injury-status changes auto-refresh (LS-6252)', () => {
-    mockUseFootballPlayerQuery.mockReturnValue({
-      data: undefined,
-      loading: true,
-      error: undefined,
-    } as ReturnType<typeof useFootballPlayerQuery>);
-
-    render(<FootballPlayerDetailPage />);
-
-    const options = mockUseFootballPlayerQuery.mock.calls[0][0];
-    expect(options?.pollInterval).toBe(FOOTBALL_PLAYER_DETAIL_POLL_MS);
   });
 });
 

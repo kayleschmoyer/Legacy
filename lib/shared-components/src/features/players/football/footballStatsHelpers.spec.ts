@@ -124,7 +124,6 @@ describe('buildFootballQueryVars (view/category)', () => {
     team: TEAM_ALL,
     search: '',
     sortDir: 'asc' as const,
-    injuryStatus: null,
   };
 
   it('omits category on the overview and applies its default sort', () => {
@@ -175,7 +174,6 @@ describe('buildFootballStatsQuery', () => {
       search: '',
       pageSize: 25,
       sortDir: 'asc',
-      injuryStatus: null,
     });
     expect(url).toBe('/players/stats?sport=nfl&view=receiving&pageSize=25');
   });
@@ -189,7 +187,6 @@ describe('buildFootballStatsQuery', () => {
       pageSize: 50,
       sortField: 'passing.td',
       sortDir: 'desc',
-      injuryStatus: null,
     });
     expect(url).toContain('view=passing');
     expect(url).toContain('position=QB');

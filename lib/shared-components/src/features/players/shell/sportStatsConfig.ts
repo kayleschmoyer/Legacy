@@ -55,7 +55,7 @@ export interface SportStatsController {
   onAvailabilityChange: (v: AvailabilityValue) => void;
 
   // ── Advanced filters panel ──────────────────────────────────────────
-  /** The full advanced panel (sliders vs injury/projected/ADP), or null. */
+  /** The full advanced panel (sliders vs projected/ADP), or null. */
   renderAdvancedPanel: () => React.ReactNode;
 
   // ── Content ─────────────────────────────────────────────────────────

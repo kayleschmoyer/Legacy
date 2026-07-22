@@ -24,7 +24,7 @@ export interface AdvancedFilterPanelProps {
 /**
  * Collapsible advanced-filters panel frame: a titled card with an optional
  * "Reset" link and a slot for the sport's controls. Baseball fills it with stat
- * sliders; football with injury / projected-points / ADP inputs. Sport-neutral.
+ * sliders; football with projected-points / ADP inputs. Sport-neutral.
  */
 export function AdvancedFilterPanel({
   title,

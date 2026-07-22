@@ -924,74 +924,7 @@ describe('FootballPlayerDetail', () => {
     expect(screen.queryByText('FA')).toBeNull();
   });
 
-  describe('LS-6251 / FPD-027 — injury-data freshness badge', () => {
-    it('renders a fresh "Last updated" badge when synced recently', () => {
-      const player: FootballPlayerDetailPlayer = {
-        ...QB_PLAYER,
-        injuriesLastSyncedAt: new Date(
-          Date.now() - 6 * 60 * 1000,
-        ).toISOString(),
-      };
-      render(<FootballPlayerDetail player={player} />);
-      expect(screen.getByText('Last updated: 6 min ago')).toBeTruthy();
-    });
-
-    it('renders a "Stale" badge when synced over an hour ago', () => {
-      const player: FootballPlayerDetailPlayer = {
-        ...QB_PLAYER,
-        injuriesLastSyncedAt: new Date(
-          Date.now() - 12 * 60 * 60 * 1000,
-        ).toISOString(),
-      };
-      render(<FootballPlayerDetail player={player} />);
-      expect(screen.getByText('Stale (12 hours old)')).toBeTruthy();
-    });
-
-    it('renders no freshness badge when injuriesLastSyncedAt is absent', () => {
-      render(<FootballPlayerDetail player={QB_PLAYER} />);
-      expect(screen.queryByText(/Last updated:|Stale \(/)).toBeNull();
-    });
-
-    it('renders no freshness badge when injuriesLastSyncedAt is null', () => {
-      const player: FootballPlayerDetailPlayer = {
-        ...QB_PLAYER,
-        injuriesLastSyncedAt: null,
-      };
-      render(<FootballPlayerDetail player={player} />);
-      expect(screen.queryByText(/Last updated:|Stale \(/)).toBeNull();
-    });
-  });
-
-  describe('injury status and news (LS-5436)', () => {
-    it('shows the injury banner when injuryStatus is provided', () => {
-      render(
-        <FootballPlayerDetail
-          player={{ ...QB_PLAYER, injuryStatus: 'Questionable' }}
-        />,
-      );
-      expect(screen.getByTestId('injury-banner')).toBeTruthy();
-      expect(screen.getByText('Questionable')).toBeTruthy();
-    });
-
-    it('shows injury designation alongside the status', () => {
-      render(
-        <FootballPlayerDetail
-          player={{
-            ...QB_PLAYER,
-            injuryStatus: 'Doubtful',
-            injuryDesignation: 'Right Knee',
-          }}
-        />,
-      );
-      expect(screen.getByText('Doubtful')).toBeTruthy();
-      expect(screen.getByText('Right Knee')).toBeTruthy();
-    });
-
-    it('does not render the injury banner when injuryStatus is absent', () => {
-      render(<FootballPlayerDetail player={QB_PLAYER} />);
-      expect(screen.queryByTestId('injury-banner')).toBeNull();
-    });
-
+  describe('news (LS-5436)', () => {
     it('shows the news card when news is provided', () => {
       render(
         <FootballPlayerDetail
@@ -1013,21 +946,6 @@ describe('FootballPlayerDetail', () => {
     it('does not render the news card when news is absent', () => {
       render(<FootballPlayerDetail player={QB_PLAYER} />);
       expect(screen.queryByTestId('news-card')).toBeNull();
-    });
-
-    it('shows both injury banner and news card together', () => {
-      render(
-        <FootballPlayerDetail
-          player={{
-            ...QB_PLAYER,
-            injuryStatus: 'Out',
-            injuryDesignation: 'Ankle',
-            news: 'Ruled out for Sunday.',
-          }}
-        />,
-      );
-      expect(screen.getByTestId('injury-banner')).toBeTruthy();
-      expect(screen.getByTestId('news-card')).toBeTruthy();
     });
   });
 });

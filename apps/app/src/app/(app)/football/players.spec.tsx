@@ -769,68 +769,6 @@ describe('FootballPlayers', () => {
     });
   });
 
-  describe('injury badge (LS-6250)', () => {
-    it('renders injury status text when injuryStatus is present', () => {
-      mockUseFootballPlayersQuery.mockReturnValue({
-        ...defaultQueryResult,
-        data: {
-          footballPlayers: {
-            nodes: [{ ...QB_PLAYER, injuryStatus: 'Questionable' }],
-            pageInfo: { hasNextPage: false, endCursor: null },
-          },
-        },
-      });
-      render(<FootballPlayers />);
-      expect(screen.getByText('Questionable')).toBeTruthy();
-    });
-
-    it('does not render an injury badge when injuryStatus is null', () => {
-      mockUseFootballPlayersQuery.mockReturnValue({
-        ...defaultQueryResult,
-        data: {
-          footballPlayers: {
-            nodes: [{ ...QB_PLAYER, injuryStatus: null }],
-            pageInfo: { hasNextPage: false, endCursor: null },
-          },
-        },
-      });
-      render(<FootballPlayers />);
-      expect(screen.queryByText('Out')).toBeNull();
-      expect(screen.queryByText('Questionable')).toBeNull();
-    });
-
-    it.each(['Out', 'IR', 'Doubtful', 'Questionable', 'Day-to-Day', 'PUP'])(
-      'renders injury badge for status "%s"',
-      (status) => {
-        mockUseFootballPlayersQuery.mockReturnValue({
-          ...defaultQueryResult,
-          data: {
-            footballPlayers: {
-              nodes: [{ ...QB_PLAYER, injuryStatus: status }],
-              pageInfo: { hasNextPage: false, endCursor: null },
-            },
-          },
-        });
-        render(<FootballPlayers />);
-        expect(screen.getByText(status)).toBeTruthy();
-      },
-    );
-
-    it('renders an injury badge for an unrecognised status', () => {
-      mockUseFootballPlayersQuery.mockReturnValue({
-        ...defaultQueryResult,
-        data: {
-          footballPlayers: {
-            nodes: [{ ...QB_PLAYER, injuryStatus: 'Game-Time Decision' }],
-            pageInfo: { hasNextPage: false, endCursor: null },
-          },
-        },
-      });
-      render(<FootballPlayers />);
-      expect(screen.getByText('Game-Time Decision')).toBeTruthy();
-    });
-  });
-
   describe('fresh-mount default state (LS-7065 — sport-switch reset)', () => {
     it('starts with all filters cleared on mount, as after a sport switch', () => {
       // When the parent switches sports, FootballPlayers is remounted with a new key.

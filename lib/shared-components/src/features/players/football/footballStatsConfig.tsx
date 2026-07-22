@@ -17,7 +17,6 @@ import {
   type FootballSortField,
   type FootballStatsFilters,
   type FootballStatsView,
-  INJURY_STATUS_OPTIONS,
   isFootballSortField,
   normalizeFootballView,
   resolveSortForView,
@@ -60,8 +59,8 @@ export interface FootballStatsPageProps {
   showActions?: boolean;
   /**
    * Whether the viewer holds the advanced-search-filters entitlement. Gates the
-   * premium advanced-filters panel (injury / projected points / ADP). When
-   * false the panel renders an upsell and the premium args are never sent.
+   * premium advanced-filters panel (projected points / ADP). When false the
+   * panel renders an upsell and the premium args are never sent.
    */
   isPremium?: boolean;
   initialFilters?: Partial<FootballStatsFilters>;
@@ -153,8 +152,8 @@ function useDebounce<T>(value: T, delay: number): T {
 
 /**
  * Football player-stats controller. Owns the live-filter model (multi-select
- * positions, team/conference/FA, debounced search, premium injury /
- * projected-points / ADP, availability), the stats-grid view tabs (Overview +
+ * positions, team/conference/FA, debounced search, premium projected-points /
+ * ADP, availability), the stats-grid view tabs (Overview +
  * six category leader boards, LS-8566), the server-side sort, and the paged
  * {@link FootballStatsDataGrid}, exposed as the sport-neutral
  * {@link SportStatsController} the shared shell renders (LS-8442). Unlike
@@ -207,9 +206,6 @@ export function useFootballController(
     useState<FootballAvailability>(initialFilters.availabilityFilter ?? 'all');
 
   // Premium advanced filters.
-  const [injuryStatus, setInjuryStatus] = useState<string | null>(
-    initialFilters.injuryStatus ?? null,
-  );
   const [minProjectedInput, setMinProjectedInput] = useState<string>(
     initialFilters.minProjectedPoints != null
       ? String(initialFilters.minProjectedPoints)
@@ -227,7 +223,6 @@ export function useFootballController(
   const debouncedMaxAdp = useDebounce(maxAdpInput, FOOTBALL_SEARCH_DEBOUNCE_MS);
 
   // Premium args only apply for premium users; empty/invalid input → undefined.
-  const injuryStatusArg = isPremium && injuryStatus ? injuryStatus : undefined;
   const parsedMinProjected =
     isPremium && debouncedMinProjected.trim() !== ''
       ? Number(debouncedMinProjected)
@@ -254,7 +249,6 @@ export function useFootballController(
         search: debouncedSearch,
         sortField,
         sortDir,
-        injuryStatus: injuryStatusArg ?? null,
         minProjectedPoints: minProjectedArg,
         maxAdpRank: maxAdpArg,
       }),
@@ -265,7 +259,6 @@ export function useFootballController(
       debouncedSearch,
       sortField,
       sortDir,
-      injuryStatusArg,
       minProjectedArg,
       maxAdpArg,
     ],
@@ -289,7 +282,6 @@ export function useFootballController(
       filters.sortField = sortField;
       filters.sortDir = sortDir;
     }
-    if (injuryStatusArg) filters.injuryStatus = injuryStatusArg;
     if (minProjectedArg != null) filters.minProjectedPoints = minProjectedArg;
     if (maxAdpArg != null) filters.maxAdpRank = maxAdpArg;
     onFiltersChange({ view, pageSize, filters });
@@ -301,7 +293,6 @@ export function useFootballController(
     debouncedSearch,
     sortField,
     sortDir,
-    injuryStatusArg,
     minProjectedArg,
     maxAdpArg,
     pageSize,
@@ -342,7 +333,6 @@ export function useFootballController(
         pageSize,
         sortField,
         sortDir,
-        injuryStatus: injuryStatusArg ?? null,
         minProjectedPoints: minProjectedArg,
         maxAdpRank: maxAdpArg,
       }),
@@ -356,7 +346,6 @@ export function useFootballController(
     pageSize,
     sortField,
     sortDir,
-    injuryStatusArg,
     minProjectedArg,
     maxAdpArg,
   ]);
@@ -371,7 +360,6 @@ export function useFootballController(
         pageSize,
         sortField,
         sortDir,
-        injuryStatus: injuryStatusArg ?? null,
         minProjectedPoints: minProjectedArg,
         maxAdpRank: maxAdpArg,
       }),
@@ -383,7 +371,6 @@ export function useFootballController(
       pageSize,
       sortField,
       sortDir,
-      injuryStatusArg,
       minProjectedArg,
       maxAdpArg,
     ],
@@ -402,7 +389,6 @@ export function useFootballController(
     setSearchInput('');
     setSortField(undefined);
     setSortDir('asc');
-    setInjuryStatus(null);
     setMinProjectedInput('');
     setMaxAdpInput('');
     onClearFilters?.();
@@ -645,8 +631,8 @@ export function useFootballController(
               lineHeight: Platform.OS === 'web' ? (1.5 as never) : 21,
             })}
           >
-            Filter players by projected fantasy points, ADP rank, and injury
-            status with Premium.
+            Filter players by projected fantasy points and ADP rank with
+            Premium.
           </Text>
         </AdvancedFilterPanel>
       );
@@ -657,52 +643,11 @@ export function useFootballController(
         resetLabel="Reset"
         grid={false}
         onReset={() => {
-          setInjuryStatus(null);
           setMinProjectedInput('');
           setMaxAdpInput('');
         }}
       >
         <YStack gap={14}>
-          {/* Injury status */}
-          <YStack gap={6}>
-            <Text style={selectLabelStyle}>Injury Status</Text>
-            {Platform.OS === 'web' ? (
-              <YStack style={csp({ ...selectFieldStyle, maxWidth: 220 })}>
-                <select
-                  className="ps-select-native"
-                  aria-label="Injury status"
-                  value={injuryStatus ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setInjuryStatus(v === '' ? null : v);
-                  }}
-                >
-                  {INJURY_STATUS_OPTIONS.map((opt) => (
-                    <option key={opt.label} value={opt.value ?? ''}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <Text style={chevronStyle}>▾</Text>
-              </YStack>
-            ) : (
-              <NativeSelect
-                label="Injury Status"
-                value={
-                  INJURY_STATUS_OPTIONS.find((o) => o.value === injuryStatus)
-                    ?.label ?? 'Any'
-                }
-                options={INJURY_STATUS_OPTIONS.map((o) => o.label)}
-                onChange={(label) => {
-                  const match = INJURY_STATUS_OPTIONS.find(
-                    (o) => o.label === label,
-                  );
-                  setInjuryStatus(match?.value ?? null);
-                }}
-              />
-            )}
-          </YStack>
-
           {/* Numeric thresholds */}
           <XStack gap={16} flexWrap="wrap">
             <YStack gap={6}>
@@ -737,7 +682,7 @@ export function useFootballController(
         </YStack>
       </AdvancedFilterPanel>
     );
-  }, [isPremium, injuryStatus, minProjectedInput, maxAdpInput]);
+  }, [isPremium, minProjectedInput, maxAdpInput]);
 
   // ── Render: projections upsell + data grid ─────────────────────────
   const renderContent = useCallback((): React.ReactNode => {

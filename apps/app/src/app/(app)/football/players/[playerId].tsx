@@ -1,8 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  FOOTBALL_PLAYER_DETAIL_POLL_MS,
-  FootballPlayerDetail,
-} from '@legacy-sports/shared-components/football';
+import { FootballPlayerDetail } from '@legacy-sports/shared-components/football';
 import { useFootballPlayerQuery } from '@legacy-sports/graphql';
 import { SafeScreen } from '../../../../components/SafeScreen';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
@@ -17,10 +14,6 @@ export default function FootballPlayerDetailScreen(): React.JSX.Element {
   const { data, loading, error } = useFootballPlayerQuery({
     skip: playerId === null,
     variables: { id: playerId ?? 0 },
-    // Auto-refresh so injury-status changes surface without a manual reload
-    // (LS-6252). Polling stops on unmount; a skipped query (no playerId) does
-    // not poll.
-    pollInterval: FOOTBALL_PLAYER_DETAIL_POLL_MS,
   });
 
   return (

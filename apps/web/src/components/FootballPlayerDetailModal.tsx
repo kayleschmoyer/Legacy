@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, Text, XStack } from 'tamagui';
 import { ExternalLink } from '@tamagui/lucide-icons';
-import {
-  FOOTBALL_PLAYER_DETAIL_POLL_MS,
-  FootballPlayerDetail,
-} from '@legacy-sports/shared-components/football';
+import { FootballPlayerDetail } from '@legacy-sports/shared-components/football';
 import { config } from '@legacy-sports/app-config/web';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useFootballPlayerQuery } from '@legacy-sports/graphql';
@@ -45,11 +42,10 @@ export interface FootballPlayerDetailModalProps {
  * place over the unified stats list when `?playerId=X` is present (LS-8442).
  *
  * Mirrors {@link PlayerDetailModal} (MLB): a {@link BaseModal} wrapping the
- * shared {@link FootballPlayerDetail}, driven by the `FootballPlayer` query with
- * the same injury-status polling as the standalone detail page. The whole
- * surface renders for all viewers — projections are the premium teaser (via
- * {@link UpgradeModal}) — matching FootballPlayerDetailPage rather than gating
- * the entire modal like the MLB path.
+ * shared {@link FootballPlayerDetail}, driven by the `FootballPlayer` query.
+ * The whole surface renders for all viewers — projections are the premium
+ * teaser (via {@link UpgradeModal}) — matching FootballPlayerDetailPage rather
+ * than gating the entire modal like the MLB path.
  */
 export function FootballPlayerDetailModal({
   playerId,
@@ -63,10 +59,6 @@ export function FootballPlayerDetailModal({
   const { data, loading, error } = useFootballPlayerQuery({
     variables: { id: playerId ?? 0 },
     skip: !playerId || !open,
-    // Auto-refresh so injury-status changes surface without a manual reload
-    // (LS-6252). Apollo pauses polling while the tab is hidden and stops it on
-    // unmount; a skipped query does not poll.
-    pollInterval: FOOTBALL_PLAYER_DETAIL_POLL_MS,
   });
 
   const player = data?.footballPlayer;

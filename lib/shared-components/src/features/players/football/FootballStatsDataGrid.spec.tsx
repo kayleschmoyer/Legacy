@@ -33,7 +33,6 @@ function makePlayer(
     position: 'QB',
     isDst: false,
     nflTeam: 'KC',
-    injuryStatus: null,
     careerStats: {
       fantasyPoints: 100 + id,
       passing: {

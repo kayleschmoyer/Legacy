@@ -1569,7 +1569,6 @@ export function PlayerStatsRoute() {
         params.set('sortBy', f.sortField);
         params.set('sortDir', f.sortDir ?? 'asc');
       }
-      if (f.injuryStatus) params.set('injuryStatus', f.injuryStatus);
       if (f.minProjectedPoints != null) {
         params.set('minProjectedPoints', String(f.minProjectedPoints));
       }
@@ -1634,8 +1633,6 @@ export function PlayerStatsRoute() {
       nflInitialFilters.sortDir =
         searchParams.get('sortDir') === 'desc' ? 'desc' : 'asc';
     }
-    const injuryParam = sanitizeSearchParam(searchParams.get('injuryStatus'));
-    if (injuryParam) nflInitialFilters.injuryStatus = injuryParam;
     const minProjParam = searchParams.get('minProjectedPoints');
     if (minProjParam && Number.isFinite(Number(minProjParam))) {
       nflInitialFilters.minProjectedPoints = Number(minProjParam);
@@ -1847,7 +1844,7 @@ export function PlayerStatsRoute() {
       <PremiumGate
         isPremium={isPremium}
         featureName="Player Statistics & Projections"
-        featureDescription="Unlock advanced player statistics, projected fantasy points, ADP rankings, and injury-status filters with Premium."
+        featureDescription="Unlock advanced player statistics, projected fantasy points, and ADP rankings with Premium."
       >
         <PlayerStatsPage
           title="MLB Player Statistics"
