@@ -36,6 +36,10 @@ jest.mock('../../hooks/useIsPremium', () => ({
   useIsPremium: () => mockIsPremium,
 }));
 
+jest.mock('../../config/environment', () => ({
+  env: { imageUploadUrl: 'https://upload.example.com' },
+}));
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 jest.mock('../../components/PageMeta', () => ({
@@ -542,6 +546,65 @@ describe('TeamDetailPage – team colors (LS-6046)', () => {
     expect(screen.queryByText(/premium/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Primary Color hex')).toBeInTheDocument();
     expect(screen.getByLabelText('Secondary Color hex')).toBeInTheDocument();
+  });
+});
+
+// ── Image upload CSRF token (LS-6040) ───────────────────────────────────────
+
+describe('TeamDetailPage – image upload CSRF token (LS-6040)', () => {
+  const { getCsrfToken } = jest.requireMock<{ getCsrfToken: jest.Mock }>(
+    '../../lib/csrf',
+  );
+
+  const uploadFile = (container: HTMLElement) => {
+    const fileInput = container.querySelector('input[type="file"]');
+    if (!fileInput) throw new Error('avatar file input not found');
+    const file = new File(['fake-image-bytes'], 'logo.png', {
+      type: 'image/png',
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeams.mockResolvedValue({});
+    getCsrfToken.mockReturnValue('test-token');
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ url: 'https://cdn.example.com/logo.png' }),
+    });
+  });
+
+  it('always sends the X-CSRF-Token header when a token is available', async () => {
+    const { container } = render(<TeamDetailPage />);
+
+    uploadFile(container);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/images/upload'),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'X-CSRF-Token': 'test-token' }),
+        }),
+      );
+    });
+  });
+
+  it('throws and never fires the upload request when no CSRF token is available', async () => {
+    getCsrfToken.mockReturnValue('');
+    const { container } = render(<TeamDetailPage />);
+
+    uploadFile(container);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/unable to verify your session/i),
+      ).toBeInTheDocument();
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(mockUpdateBranding).not.toHaveBeenCalled();
   });
 });
 

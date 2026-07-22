@@ -628,11 +628,16 @@ export function TeamDetailPage() {
       }
       const uploadUrl = `${env.imageUploadUrl}/images/upload?teamId=${teamIdNum}&imageType=${imageType}`;
       const csrfToken = getCsrfToken();
+      if (!csrfToken) {
+        throw new Error(
+          'Unable to verify your session. Please refresh the page and try again.',
+        );
+      }
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
           'Content-Type': file.type,
-          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+          'X-CSRF-Token': csrfToken,
         },
         body: file,
         credentials: 'include',
