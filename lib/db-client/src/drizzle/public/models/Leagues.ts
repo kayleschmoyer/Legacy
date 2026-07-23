@@ -27,7 +27,6 @@ import {
   leaguePermissionLevel,
   positionSlot,
   rosterLockTiming,
-  emergencySubRule,
   schedulingStrategy,
   waiverClaimStatus,
   waiverType,
@@ -609,12 +608,6 @@ export const rosterLockRules = pgTable(
   {
     id: serial('id').primaryKey().notNull(),
     leagueId: integer('league_id').notNull(),
-    allowEmergencySubs: boolean('allow_emergency_subs')
-      .notNull()
-      .default(false),
-    emergencySubRule: emergencySubRule('emergency_sub_rule')
-      .notNull()
-      .default('none'),
     customLockTime: timestamp('custom_lock_time', { mode: 'string' }),
     lockHoursBeforeMatchup: integer('lock_hours_before_matchup').default(0),
     commissionerCanOverride: boolean('commissioner_can_override')

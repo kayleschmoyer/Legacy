@@ -164,13 +164,6 @@ export const scoringChangeAction = pgEnum('scoring_change_action', [
   'disabled',
 ]);
 
-export const emergencySubRule = pgEnum('emergency_sub_rule', [
-  'none',
-  'injury_only',
-  'injury_or_rest',
-  'commissioner_approval',
-]);
-
 export const rosterLockTiming = pgEnum('roster_lock_timing', [
   'matchup_start',
   'day_before',

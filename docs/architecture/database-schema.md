@@ -651,25 +651,18 @@ Methods: `highest_category`, `total_season_points`, `head_to_head_record`,
 
 **Purpose**: Configurable rules for when and how rosters can be modified
 
-| Column                      | Type               | Description                                                  |
-| --------------------------- | ------------------ | ------------------------------------------------------------ |
-| `id`                        | SERIAL (PK)        | Rule ID                                                      |
-| `league_id`                 | INTEGER (FK)       | References `leagues.id`                                      |
-| `allow_emergency_subs`      | BOOLEAN            | Whether emergency substitutions are allowed (default: false) |
-| `emergency_sub_rule`        | emergency_sub_rule | Conditions for emergency subs (default: 'none')              |
-| `custom_lock_time`          | TIMESTAMP          | Custom lock time if using custom timing                      |
-| `lock_hours_before_matchup` | INTEGER            | Hours before matchup start to lock (default: 0)              |
-| `commissioner_can_override` | BOOLEAN            | Whether commissioners can bypass locks (default: true)       |
-
-**Emergency Sub Rule Enum**: `none`, `injury_only`, `injury_or_rest`, `commissioner_approval`
-
-> ⚠️ **Pending change (LS-8609):** the injury-based values `injury_only` and `injury_or_rest` are slated for removal under the platform-wide injury-feature removal (epic LS-8604 — historical-data platform, no injury concept). They still exist in the database enum today; LS-8609 owns the product decision on their replacement and the data migration for leagues currently using them.
+| Column                      | Type         | Description                                            |
+| --------------------------- | ------------ | ------------------------------------------------------ |
+| `id`                        | SERIAL (PK)  | Rule ID                                                |
+| `league_id`                 | INTEGER (FK) | References `leagues.id`                                |
+| `custom_lock_time`          | TIMESTAMP    | Custom lock time if using custom timing                |
+| `lock_hours_before_matchup` | INTEGER      | Hours before matchup start to lock (default: 0)        |
+| `commissioner_can_override` | BOOLEAN      | Whether commissioners can bypass locks (default: true) |
 
 **Key Features**:
 
 - Unique constraint: `league_id` ensures one rule set per league
 - Foreign key: `league_id` → `leagues.id` (CASCADE DELETE via league cascade)
-- Flexible emergency substitution policies
 - Commissioner override capability
 
 ---

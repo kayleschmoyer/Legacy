@@ -994,14 +994,13 @@ export async function isRosterLocked(
 }
 
 /**
- * Check if a roster move is allowed (considering locks and emergency subs)
+ * Check if a roster move is allowed (considering locks)
  */
 export async function canMakeRosterMove(
   db: PublicDb,
   leagueId: number,
   weekNumber: number,
   userId: number,
-  isEmergencySubstitution = false,
 ): Promise<{
   allowed: boolean;
   reason?: string;
@@ -1037,13 +1036,6 @@ export async function canMakeRosterMove(
     }
   }
 
-  // Emergency substitution rules
-  if (isEmergencySubstitution && lockRules?.allowEmergencySubs) {
-    if (lockRules.emergencySubRule !== 'none') {
-      return { allowed: true };
-    }
-  }
-
   return {
     allowed: false,
     reason: lockStatus.reason || 'Roster is locked',
@@ -1057,12 +1049,6 @@ export async function upsertRosterLockRules(
   db: PublicDb,
   leagueId: number,
   rules: {
-    allowEmergencySubs?: boolean;
-    emergencySubRule?:
-      | 'none'
-      | 'injury_only'
-      | 'injury_or_rest'
-      | 'commissioner_approval';
     customLockTime?: string;
     lockHoursBeforeMatchup?: number;
     commissionerCanOverride?: boolean;
