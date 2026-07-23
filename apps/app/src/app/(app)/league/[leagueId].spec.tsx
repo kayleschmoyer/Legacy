@@ -12,6 +12,8 @@ type RNComponents = {
   ActivityIndicator: React.ComponentType<{ testID?: string }>;
 };
 
+type TabDef = { id: string; commishOnly?: boolean; memberOnly?: boolean };
+
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 jest.mock('expo-router', () => ({
@@ -92,13 +94,45 @@ jest.mock('tamagui', () => {
   };
 });
 
-jest.mock('@legacy-sports/shared-components', () => ({
-  LeagueTradeBlock: () => null,
-  PendingTradeOffers: () => null,
-  PendingWaiverClaims: () => null,
-  StandingsTable: () => null,
-  useWebSocket: () => ({ connected: false }),
-}));
+jest.mock('@legacy-sports/shared-components', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories can't reference hoisted top-level imports
+  const { View } = require('react-native') as RNComponents;
+  const LeagueTabBar = ({
+    tabs,
+    onTabChange,
+    isMember,
+    isCommissioner,
+  }: {
+    tabs: readonly TabDef[];
+    activeTab: string;
+    onTabChange: (id: string) => void;
+    isMember: boolean;
+    isCommissioner: boolean;
+  }) => (
+    <View testID="tabs-list">
+      {tabs
+        .filter(
+          (t) =>
+            (!t.memberOnly || isMember) && (!t.commishOnly || isCommissioner),
+        )
+        .map((t) => (
+          <View
+            key={t.id}
+            testID={`tab-${t.id}`}
+            onTouchEnd={() => onTabChange(t.id)}
+          />
+        ))}
+    </View>
+  );
+  return {
+    LeagueTabBar,
+    LeagueTradeBlock: () => null,
+    PendingTradeOffers: () => null,
+    PendingWaiverClaims: () => null,
+    StandingsTable: () => null,
+    useWebSocket: () => ({ connected: false }),
+  };
+});
 
 // Feature components
 jest.mock('../../../features/roster/LeagueRosterManagement', () => ({

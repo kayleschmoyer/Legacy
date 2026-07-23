@@ -10,6 +10,8 @@ import { Tabs } from '@tamagui/tabs';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
+  LeagueTabBar,
+  type LeagueTabDef,
   LeagueTradeBlock,
   PendingTradeOffers,
   PendingWaiverClaims,
@@ -39,6 +41,22 @@ import { toIntId } from '../../../common/utilities/RouteUtils';
 import { setLastVisitedLeague } from '../../../common/utilities/lastVisitedLeague';
 import { useStandings } from '../../../features/matchup/hooks/useStandings';
 import { LeagueFreeAgents } from '../FreeAgents';
+
+// This screen predates the sport-aware baseball/football league-detail routes
+// and hand-rolled its own tab bar, which wrapped labels across 3 lines at
+// default device width (LS-8623). Reusing the shared LeagueTabBar — the same
+// horizontally-scrolling component the sport-aware screens use — fixes the
+// wrap without duplicating that layout logic here.
+const LEAGUE_TABS: readonly LeagueTabDef[] = [
+  { id: 'matchup', label: 'Matchup' },
+  { id: 'roster', label: 'My Team' },
+  { id: 'players', label: 'Players' },
+  { id: 'freeagents', label: 'Free Agents' },
+  { id: 'trades', label: 'Trades' },
+  { id: 'standings', label: 'Standings' },
+  { id: 'chat', label: 'Chat' },
+  { id: 'manage', label: 'Manage', commishOnly: true },
+];
 
 function LeagueTeamsTab({
   leagueId,
@@ -206,6 +224,7 @@ export default function LeagueContext(): React.JSX.Element {
     if (!leagueData?.league || !userInfo) return false;
     return leagueData.league.owner === userInfo.id || userInfo.isAdmin;
   }, [leagueData?.league, userInfo]);
+  const isMember = isCommissioner || userTeamId != null;
 
   const league = leagueData?.league;
 
@@ -317,38 +336,13 @@ export default function LeagueContext(): React.JSX.Element {
         flexDirection="column"
         flex={1}
       >
-        <Tabs.List
-          backgroundColor="$background"
-          paddingHorizontal="$2"
-          flexWrap="wrap"
-        >
-          <Tabs.Tab value="matchup" flex={1}>
-            <Text fontSize="$2">Matchup</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="roster" flex={1}>
-            <Text fontSize="$2">My Team</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="players" flex={1}>
-            <Text fontSize="$2">Players</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="freeagents" flex={1}>
-            <Text fontSize="$2">Free Agents</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="trades" flex={1}>
-            <Text fontSize="$2">Trades</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="standings" flex={1}>
-            <Text fontSize="$2">Standings</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="chat" flex={1}>
-            <Text fontSize="$2">Chat</Text>
-          </Tabs.Tab>
-          {isCommissioner && (
-            <Tabs.Tab value="manage" flex={1}>
-              <Text fontSize="$2">Manage</Text>
-            </Tabs.Tab>
-          )}
-        </Tabs.List>
+        <LeagueTabBar
+          tabs={LEAGUE_TABS}
+          activeTab={selectedTab}
+          onTabChange={setSelectedTab}
+          isMember={isMember}
+          isCommissioner={isCommissioner}
+        />
 
         <Tabs.Content value="matchup" flex={1}>
           <MatchupList
