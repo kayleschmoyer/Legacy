@@ -28,9 +28,20 @@ jest.mock('expo-router', () => ({
 // Mock the premium gate so the screen's subscription dependency graph
 // (PremiumGate → utils/analytics → @react-native-firebase, useSubscription →
 // websocket-client/rollbar) is not pulled into this unit test. The gate is
-// rendered transparently; gating behavior is covered by its own tests.
+// rendered transparently; gating behavior is covered by its own tests. Props
+// are captured so the screen's fill wiring (LS-8636) stays asserted here.
+const capturedGateProps: Array<Record<string, unknown>> = [];
 jest.mock('../../features/subscription/PremiumGate', () => ({
-  PremiumGate: ({ children }: { children: React.ReactNode }) => children,
+  PremiumGate: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => {
+    capturedGateProps.push(props);
+    return children;
+  },
 }));
 
 jest.mock('../../features/subscription/useSubscription', () => ({
@@ -124,6 +135,7 @@ describe('PlayerStatsScreen', () => {
     capturedInitialViewMode = undefined;
     capturedInitialFilters = undefined;
     capturedInitialPageSize = undefined;
+    capturedGateProps.length = 0;
   });
 
   it('renders without crashing', () => {
@@ -131,6 +143,18 @@ describe('PlayerStatsScreen', () => {
     expect(
       screen.getByTestId('player-stats-page-header-actions-standard'),
     ).toBeTruthy();
+  });
+
+  it('renders the premium gate in fill mode (LS-8636)', () => {
+    // PlayerStatsPage sizes itself with flex; without fill the free-tier
+    // overlay collapses to zero height and free users see a blank screen.
+    render(<PlayerStatsScreen />);
+
+    expect(capturedGateProps).toHaveLength(1);
+    expect(capturedGateProps[0]).toMatchObject({
+      fill: true,
+      featureName: 'Player Statistics',
+    });
   });
 
   it('drives statsFormat from the saved preference instead of hardcoding it (LS-7106)', () => {

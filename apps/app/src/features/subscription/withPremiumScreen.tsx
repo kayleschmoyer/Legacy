@@ -54,10 +54,14 @@ export function withPremiumScreen<P extends object>(
     }
 
     return (
+      // Screen-level gates always fill the viewport (matching the flex-filled
+      // loading state above): wrapped screens size themselves with flex, and
+      // without `fill` the free-tier overlay collapses to zero height (LS-8636).
       <PremiumGate
         isPremium={isPremium}
         featureName={options.featureName}
         featureDescription={options.featureDescription}
+        fill
       >
         <WrappedComponent {...props} isPremium={isPremium} />
       </PremiumGate>

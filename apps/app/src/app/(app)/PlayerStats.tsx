@@ -309,7 +309,10 @@ export default function PlayerStatsScreen() {
   );
 
   return (
-    <PremiumGate isPremium={isPremium} featureName="Player Statistics">
+    // `fill` is required: PlayerStatsPage sizes itself with flex, so without
+    // it the free-tier overlay collapses to zero height and renders a blank
+    // screen (LS-8636).
+    <PremiumGate isPremium={isPremium} featureName="Player Statistics" fill>
       <PlayerStatsPage
         initialViewMode={initialState.viewMode}
         initialFilters={initialState.filters}

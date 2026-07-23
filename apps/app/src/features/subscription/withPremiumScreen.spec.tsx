@@ -11,12 +11,24 @@ jest.mock('tamagui', () => {
     jest.requireActual<typeof import('react-native')>('react-native');
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
+    // Forward testID + flex so tests can assert the screen gate fills the
+    // viewport (LS-8636) — without flex: 1 the overlay collapses to zero
+    // height for flex-sized screens and free users see a blank screen.
     YStack: ({
       children,
+      testID,
+      flex,
     }: {
       children?: React.ReactNode;
+      testID?: string;
+      flex?: number;
       [key: string]: unknown;
-    }) => ReactActual.createElement(View, null, children),
+    }) =>
+      ReactActual.createElement(
+        View,
+        { testID, style: flex !== undefined ? { flex } : undefined },
+        children,
+      ),
     Text: ({
       children,
     }: {
@@ -104,6 +116,21 @@ describe('withPremiumScreen', () => {
     expect(screen.getByText('From $6.67/mo')).toBeTruthy();
     // Screen content is still rendered (dimmed behind overlay)
     expect(screen.getByTestId('screen-content')).toBeTruthy();
+  });
+
+  it('renders the gate in fill mode so flex-sized screens do not collapse', () => {
+    // Regression (LS-8636): screen-level gates wrap flex-sized screens; without
+    // fill the free-tier overlay collapsed to zero height (blank screen).
+    mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
+
+    render(<GatedScreen />);
+
+    expect(screen.getByTestId('premium-gate-overlay')).toHaveStyle({
+      flex: 1,
+    });
+    expect(screen.getByTestId('premium-gate-content')).toHaveStyle({
+      flex: 1,
+    });
   });
 
   it('injects isPremium=false into the wrapped component for free users', () => {

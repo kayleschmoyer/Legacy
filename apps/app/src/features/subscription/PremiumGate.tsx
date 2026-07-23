@@ -20,6 +20,16 @@ export interface PremiumGateProps {
   featureName: string;
   /** Optional description displayed in the upgrade overlay. */
   featureDescription?: string;
+  /**
+   * Stretch the free-tier overlay to fill its parent (`flex: 1`). Required when
+   * `children` size themselves with flex (full-screen pages like
+   * PlayerStatsPage): the overlay container is otherwise auto-height and the
+   * lock card is absolutely positioned (contributing no height), so a
+   * flex-sized child collapses the whole gate to zero height and free users see
+   * a blank screen (LS-8636). Leave unset for intrinsic-height content (cards,
+   * panels) so the gate keeps hugging its content.
+   */
+  fill?: boolean;
   /** Content to tease (dimmed) for free users or render normally for premium. */
   children: React.ReactNode;
 }
@@ -45,6 +55,7 @@ export function PremiumGate({
   isUserLoaded = true,
   featureName,
   featureDescription,
+  fill = false,
   children,
 }: PremiumGateProps) {
   useEffect(() => {
@@ -61,6 +72,7 @@ export function PremiumGate({
     <PremiumGateOverlay
       featureName={featureName}
       featureDescription={featureDescription}
+      fill={fill}
     >
       {children}
     </PremiumGateOverlay>
@@ -72,6 +84,8 @@ interface PremiumGateOverlayProps {
   featureName: string;
   /** Optional description displayed in the upgrade overlay. */
   featureDescription?: string;
+  /** Stretch the overlay to fill its parent — see {@link PremiumGateProps.fill}. */
+  fill?: boolean;
   /** Content to tease (dimmed) behind the lock card. */
   children: React.ReactNode;
 }
@@ -84,6 +98,7 @@ interface PremiumGateOverlayProps {
 function PremiumGateOverlay({
   featureName,
   featureDescription,
+  fill = false,
   children,
 }: PremiumGateOverlayProps) {
   const router = useRouter();
@@ -98,9 +113,22 @@ function PremiumGateOverlay({
   };
 
   return (
-    <YStack position="relative" overflow="hidden" borderRadius="$4">
-      {/* Dimmed preview of locked content */}
-      <YStack pointerEvents="none" opacity={0.3}>
+    <YStack
+      testID="premium-gate-overlay"
+      position="relative"
+      overflow="hidden"
+      borderRadius="$4"
+      flex={fill ? 1 : undefined}
+    >
+      {/* Dimmed preview of locked content. The wrapper must mirror `fill` —
+          without flex here a flex-sized child still resolves to zero height
+          even when the outer container fills the parent. */}
+      <YStack
+        testID="premium-gate-content"
+        pointerEvents="none"
+        opacity={0.3}
+        flex={fill ? 1 : undefined}
+      >
         {children}
       </YStack>
 

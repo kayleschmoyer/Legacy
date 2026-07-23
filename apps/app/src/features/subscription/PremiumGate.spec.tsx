@@ -16,12 +16,23 @@ jest.mock('tamagui', () => {
     jest.requireActual<typeof import('react-native')>('react-native');
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
+    // Forward testID + flex so tests can assert the fill-mode layout fix
+    // (LS-8636) — a flex-sized child collapses the gate without flex: 1 here.
     YStack: ({
       children,
+      testID,
+      flex,
     }: {
       children?: React.ReactNode;
+      testID?: string;
+      flex?: number;
       [key: string]: unknown;
-    }) => ReactActual.createElement(View, null, children),
+    }) =>
+      ReactActual.createElement(
+        View,
+        { testID, style: flex !== undefined ? { flex } : undefined },
+        children,
+      ),
     Text: ({
       children,
     }: {
@@ -153,6 +164,39 @@ describe('PremiumGate', () => {
     expect(trackPremiumFeatureBlocked).toHaveBeenCalledWith(
       'Player Comparison',
     );
+  });
+
+  it('applies flex: 1 to the overlay container and content wrapper when fill is set', () => {
+    // Regression (LS-8636): PlayerStatsPage sizes itself with flex, so without
+    // fill the overlay collapsed to zero height — free users saw a blank
+    // screen instead of the upgrade card.
+    render(
+      <PremiumGate isPremium={false} featureName="Player Statistics" fill>
+        <RNText>locked content</RNText>
+      </PremiumGate>,
+    );
+
+    expect(screen.getByTestId('premium-gate-overlay')).toHaveStyle({
+      flex: 1,
+    });
+    expect(screen.getByTestId('premium-gate-content')).toHaveStyle({
+      flex: 1,
+    });
+  });
+
+  it('does not apply flex sizing by default (intrinsic-height card usages)', () => {
+    render(
+      <PremiumGate isPremium={false} featureName="Matchup Projections">
+        <RNText>locked content</RNText>
+      </PremiumGate>,
+    );
+
+    expect(screen.getByTestId('premium-gate-overlay')).not.toHaveStyle({
+      flex: 1,
+    });
+    expect(screen.getByTestId('premium-gate-content')).not.toHaveStyle({
+      flex: 1,
+    });
   });
 
   it('does not fire trackPremiumFeatureBlocked when isPremium resolves true after loading', () => {
