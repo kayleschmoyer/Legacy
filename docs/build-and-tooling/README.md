@@ -11,7 +11,6 @@ This directory contains documentation for build systems, development tools, and 
 - **[Nx Cloud Workflow Migration](nx-cloud-workflow-migration.md)** - Migration guide
 - **[Nx Cloud Conditional Usage](nx-cloud-conditional-usage.md)** - Smart cloud usage
 - **[Nx Cloud Quota Fix](nx-cloud-quota-fix.md)** - Managing cloud quotas
-- **[Nx DTE Badge Implementation](nx-dte-badge-implementation.md)** - Distributed task execution badges
 - **[Nx Background Tasks](nx-background-tasks.md)** - Background process management
 - **[Nx Best Practices](nx-best-practices-assessment.md)** - Best practices guide
 - **[Nx Migration Summary](nx-migration-summary.md)** - Migration history
@@ -33,7 +32,6 @@ This directory contains documentation for build systems, development tools, and 
 
 1. Start with [Nx Cloud Optimization Strategy](nx-cloud-optimization-strategy.md)
 2. Configure [Nx Cloud CI Strategy](nx-cloud-ci-strategy.md) for pipelines
-3. Implement [Nx DTE Badge Implementation](nx-dte-badge-implementation.md)
 
 ### Setting Up Testing
 
@@ -59,8 +57,7 @@ This directory contains documentation for build systems, development tools, and 
 
 1. Check [Nx Cloud Optimization Strategy](nx-cloud-optimization-strategy.md)
 2. Verify cache configuration
-3. Review [Nx DTE Badge Implementation](nx-dte-badge-implementation.md) status
-4. Check [Nx Cloud Quota Fix](nx-cloud-quota-fix.md) for quota issues
+3. Check [Nx Cloud Quota Fix](nx-cloud-quota-fix.md) for quota issues
 
 ### Nx Cloud Not Working
 

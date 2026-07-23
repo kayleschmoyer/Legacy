@@ -28,11 +28,6 @@ on:
         required: false
         default: false
         type: boolean
-      suppress-notifications:
-        description: "Suppress per-lambda deployment badge updates (umbrella deploy aggregates these)"
-        required: false
-        default: false
-        type: boolean
   workflow_dispatch:
     inputs:
       lambda:
@@ -69,11 +64,6 @@ on:
         type: boolean
       skip-ci-check:
         description: "Skip CI status verification (emergency deploys only)"
-        required: false
-        default: false
-        type: boolean
-      suppress-notifications:
-        description: "Suppress per-lambda deployment badge updates"
         required: false
         default: false
         type: boolean
@@ -602,14 +592,3 @@ jobs:
           echo "::notice::✅ ${{ matrix.lambda.badgeName }} uploaded successfully"
           echo "::notice::Version: ${VERSION}"
           echo "::notice::Waiting for Terraform workflow to apply infrastructure..."
-
-      - name: Update Deployment Badge
-        if: always() && inputs['suppress-notifications'] != true
-        uses: ./.github/actions/update-deployment-badge
-        with:
-          github-token: ${{ secrets.GIST_TOKEN }}
-          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
-          deployment-name: ${{ matrix.lambda.badgeName }}
-          deployment-status: ${{ job.status }}
-          workflow-run-id: ${{ github.run_id }}
-          branch: ${{ github.ref_name }}

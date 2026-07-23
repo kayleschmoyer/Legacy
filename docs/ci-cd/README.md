@@ -24,7 +24,6 @@ This directory contains documentation for the Legacy Sports CI/CD system. The cu
 
 - **[nx-remote-caching-implementation.md](nx-remote-caching-implementation.md)** — GitHub Actions-based Nx caching (still relevant)
 - **[CI_BADGES_SETUP.md](CI_BADGES_SETUP.md)** — Status badge configuration
-- **[badge-logging-improvements.md](badge-logging-improvements.md)** — Badge logging enhancements
 
 ## Agent References
 

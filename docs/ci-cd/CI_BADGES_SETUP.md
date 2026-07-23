@@ -1,6 +1,8 @@
 # CI Badges Setup Guide
 
-This guide will help you set up the CI badges system for the Legacy Sports project.
+This guide covers the status badge system for the Legacy Sports project: deployment and health badges served from a GitHub Gist via [shields.io endpoint badges](https://shields.io/badges/endpoint-badge).
+
+> **History**: the CI pipeline previously wrote per-stage badges (Lint, Format, Test, etc.) via a `.github/actions/update-badges` action. That machinery was removed (LS-8619) — the CI pipeline is `workflow_call`-only and never runs on `refs/heads/main`, so those badges could never update. Remaining badges are deployment badges (written by `.github/actions/update-deployment-badge`) and lambda health badges (written by `.github/actions/update-health-badge`).
 
 ## 📋 Prerequisites
 
@@ -20,214 +22,35 @@ This guide will help you set up the CI badges system for the Legacy Sports proje
    # Legacy Sports CI Badges
 
    This gist stores the badge JSON files for the Legacy Sports CI pipeline.
-   Updated automatically by GitHub Actions on main branch builds.
+   Updated automatically by GitHub Actions.
    ```
 
 4. Create the gist and copy the **Gist ID** from the URL (e.g., `c0b25f4a406c1216b17211cc13a9c1af`)
 
 ### Step 2: Add Repository Secrets
 
-Add these secrets to your GitHub repository:
+Add these secrets to your GitHub repository (Settings → Secrets and variables → Actions):
 
-1. Go to your repository → Settings → Secrets and variables → Actions
-2. Add the following repository secrets:
-   - **Name**: `CI_BADGES_GIST_ID`  
-     **Value**: Your gist ID from Step 1
+- **`CI_BADGES_GIST_ID`** — the gist ID from Step 1
+- **`GIST_TOKEN`** — a personal access token with `gist` scope (the default `GITHUB_TOKEN` cannot write gists)
 
-   > Note: `GITHUB_TOKEN` is automatically available and doesn't need to be added
+### Step 3: Badge Files
 
-### Step 3: Initialize Badge Files (Optional)
+Badge JSON files are created automatically in the gist on the first run of each writing workflow:
 
-You can manually create initial badge files in your gist, or let the workflow create them automatically on the first run.
+| Writer action                             | Workflows                                                           | Gist files                                               |
+| ----------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------- |
+| `.github/actions/update-deployment-badge` | `deploy.yml`, `build-android-app.yml`, `lambda-terraform-apply.yml` | `<Deployment-Name>.json` (e.g. `Build-Android-APK.json`) |
+| `.github/actions/update-health-badge`     | `lambda-health-checks.yml`, `lambda-terraform-apply.yml`            | `Health-<Lambda-Name>.json`                              |
 
-To create them manually:
-
-1. Edit your gist
-2. Add these files with the initial content:
-
-#### `CI Pipeline.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "CI Pipeline",
-  "message": "pending",
-  "color": "yellow",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `DTE Detection.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "DTE Detection",
-  "message": "pending",
-  "color": "yellow",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `Change Detection.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "Change Detection",
-  "message": "pending",
-  "color": "yellow",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `Execution Plan.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "Execution Plan",
-  "message": "pending",
-  "color": "yellow",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `Quality Gates.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "Quality Gates",
-  "message": "pending",
-  "color": "yellow",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `Build Validation.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "Build Validation",
-  "message": "pending",
-  "color": "yellow",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `E2E Testing.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "E2E Testing",
-  "message": "pending",
-  "color": "yellow",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `Deployment Gate.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "Deployment Gate",
-  "message": "pending",
-  "color": "yellow",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `Branch.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "Branch",
-  "message": "main",
-  "color": "brightgreen",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `Nx DTE Status.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "Nx DTE Status",
-  "message": "disabled",
-  "color": "orange",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-#### `Last Updated.json`
-
-```json
-{
-  "schemaVersion": 1,
-  "label": "Last Updated",
-  "message": "never",
-  "color": "lightgrey",
-  "namedLogo": "github",
-  "logoColor": "white",
-  "style": "flat",
-  "cacheSeconds": 300
-}
-```
-
-### Step 4: Update README
-
-Replace `YOUR_GIST_ID` in the README.md with your actual gist ID:
+### Step 4: Reference Badges in the README
 
 ```markdown
-[![CI Pipeline](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/CI%20Pipeline.json)](https://github.com/bkrupa/legacy-sports/actions)
+[![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/YOUR_GIST_ID/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
 ```
-
-### Step 5: Test the Setup
-
-1. Push a commit to the `main` branch
-2. Wait for the integration build to complete
-3. Check your gist - it should be updated with the latest badge statuses
-4. Check your README - the badges should show current status
 
 ## 🎯 Badge Behavior
 
-- **Updates**: Badges are updated only on `main` branch integration builds
 - **Status Colors**:
   - 🟢 `brightgreen` - Success/Passing
   - 🔴 `red` - Failure/Failing
@@ -236,29 +59,8 @@ Replace `YOUR_GIST_ID` in the README.md with your actual gist ID:
   - 🔵 `blue` - Info (timestamps, branch names)
 - **Cache**: Badges cache for 5 minutes (300 seconds)
 
-## 🔧 Maintenance
+## 🔧 Troubleshooting
 
-### Updating Badge Structure
-
-If you add new CI steps:
-
-1. Update the badge generation logic in `.github/actions/update-badges/action.yml`
-2. Add the new badge URLs to README.md
-3. The gist will automatically create the new badge files on the next run
-
-### Troubleshooting
-
-- **Badges not updating**: Check that `CI_BADGES_GIST_ID` secret is set correctly
-- **Permission errors**: Ensure the gist is public and the GitHub token has gist scope
-- **Wrong status**: Check the step IDs match between the workflow and badge generation
-
-## 📊 Result
-
-Once set up, you'll have:
-
-- ✅ Real-time CI status badges in your README
-- 🔄 Automatic updates on every main branch build
-- 🎯 Individual badges for each CI step
-- 📈 Professional project presentation
-
-Your badges will show the current status of each CI component, giving visitors immediate insight into your project's health and quality!
+- **Badges not updating**: Check that `CI_BADGES_GIST_ID` and `GIST_TOKEN` secrets are set correctly
+- **Permission errors**: Ensure the gist is public and `GIST_TOKEN` has `gist` scope
+- **Badge shows "invalid"**: The gist file doesn't exist yet — run the writing workflow once, or verify the filename in the README URL matches the gist file exactly

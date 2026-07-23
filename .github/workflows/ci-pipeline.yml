@@ -1113,29 +1113,6 @@ jobs:
             }
           project-failures: "{}"
 
-      - name: "Update CI Status Badges"
-        if: github.ref == 'refs/heads/main'
-        continue-on-error: true
-        uses: ./.github/actions/update-badges
-        with:
-          github-token: ${{ secrets.GIST_TOKEN }}
-          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
-          workflow-status: ${{ steps.collect-results.outputs.overall-status }}
-          step-results: |
-            {
-              "Change Detection": "${{ needs.detect-changes.result }}",
-              "Lint":             "${{ needs.lint.result }}",
-              "Format":           "${{ needs.format.result }}",
-              "Test":             "${{ needs.test.result }}",
-              "Custom Checks":    "${{ needs.custom-checks.result }}",
-              "Build Validation": "${{ needs.build.result }}",
-              "Lockfile Check":   "${{ needs.lockfile-check.result }}",
-              "E2E Testing":      "${{ needs.e2e.result }}"
-            }
-          workflow-run-id: ${{ github.run_id }}
-          branch: ${{ github.ref_name }}
-          commit-sha: ${{ github.sha }}
-
       - name: "Label PR on Failure"
         if: always() && github.event.pull_request.number
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9

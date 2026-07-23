@@ -50,7 +50,7 @@ lint format test build custom- lockfile-   (6 granular jobs, PARALLEL)
        |
      e2e              (sharded matrix; gated on the six above)
        |
-   summarize          (always() && !cancelled() — PR comment, labels, badges,
+   summarize          (always() && !cancelled() — PR comment, labels,
                        posts the `CI Gate` commit status)
 ```
 
@@ -96,7 +96,6 @@ Reports are published to `playwright-report/manual-<run_number>/` on GitHub Page
 - Collects results from all stages
 - **Posts the `CI Gate` aggregate commit status** for the PR head SHA (`.github/scripts/ci-gate.js`) — the required CI context post-LS-8014; folded-job list, pass semantics, and the cancelled-exclusion rule (LS-8219) live in [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md#ci-gate)
 - Posts PR comment with status table
-- Updates CI status badges (on main)
 - Labels PR with failure reasons
 - Discord notification on main branch failures
 

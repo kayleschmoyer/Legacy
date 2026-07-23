@@ -93,4 +93,4 @@ The CI pipeline uses local GitHub Actions caching for Nx outputs (`NX_NO_CLOUD=t
 
 ## CI Badge Configuration
 
-See [CI_BADGES_SETUP.md](CI_BADGES_SETUP.md) and [badge-logging-improvements.md](badge-logging-improvements.md).
+See [CI_BADGES_SETUP.md](CI_BADGES_SETUP.md).

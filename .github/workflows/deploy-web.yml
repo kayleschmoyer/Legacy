@@ -262,17 +262,6 @@ jobs:
           environment: production
           description: "Web app deployment failed"
 
-      - name: Update Deployment Badge
-        if: always() && inputs['suppress-notifications'] != true
-        uses: ./.github/actions/update-deployment-badge
-        with:
-          github-token: ${{ secrets.GIST_TOKEN }}
-          gist-id: ${{ secrets.CI_BADGES_GIST_ID }}
-          deployment-name: "Web"
-          deployment-status: ${{ job.status }}
-          workflow-run-id: ${{ github.run_id }}
-          branch: ${{ github.ref_name }}
-
   create-release:
     name: Create GitHub Release
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}

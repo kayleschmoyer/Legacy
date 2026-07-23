@@ -155,8 +155,6 @@ jobs:
       pull-requests: read # required by the reusable workflow and cannot be elevated by the callee
     uses: ./.github/workflows/upload-lambdas.yml
     secrets: inherit
-    with:
-      suppress-notifications: true
 
   # ---------------------------------------------------------------------------
   # Child: Deploy Web

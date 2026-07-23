@@ -48,7 +48,6 @@ Preview deployments are kicked off by the deploy workflow after successful PR CI
 5. Upload sourcemaps to Rollbar
 6. Create GitHub Release (`web-v{version}-{build_number}`) and force-push the stable `web-latest` pointer tag
 7. Discord notifications (deploy + release)
-8. Update deployment badge
 
 ## Cleanup
 
