@@ -2,45 +2,25 @@
 
 A modern sports data management platform built with React Native CLI, Next.js web, and AWS serverless backend.
 
-> 🤖 **AI Agents**: Start here → [agents.md](agents.md) for complete contribution workflow and documentation index
+> 🤖 **AI Agents**: Start here → [AGENTS.md](AGENTS.md) for complete contribution workflow and documentation index
 
-## 🚀 CI Status
+## 📊 Status
 
-[![CI Pipeline](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml/badge.svg?branch=main)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Branch](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Branch.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Last Updated](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Last-Updated.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+CI runs per-PR via the [CI Orchestrator](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-orchestrator.yml) and every merge is gated by the merge queue — there is no standalone CI run on `main`, so the merge queue is the "is main healthy" signal.
 
-Pipeline stages:
-[![Change Detection](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Change-Detection.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Lint](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Lint.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Format](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Format.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Test](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Test.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Custom Checks](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Custom-Checks.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Build Validation](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Validation.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![Lockfile Check](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Lockfile-Check.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
-[![E2E Testing](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/E2E-Testing.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-pipeline.yml)
+| Area                                                                           | Status                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Merge queue** — CI gate for `main`                                           | [![Merge Queue](https://github.com/bkrupa/legacy-sports/actions/workflows/merge-queue.yml/badge.svg?branch=main)](https://github.com/bkrupa/legacy-sports/actions/workflows/merge-queue.yml)                                                                                |
+| **Deploy** — umbrella deploy on every push to `main` (lambdas, web, Storybook) | [![Deploy](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Deploy.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy.yml)                                                           |
+| **Lambda infrastructure** — Terraform apply after deploys                      | [![Apply Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Apply-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml) |
+| **Android APK** — auto-built on app changes                                    | [![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)                          |
+| **DB migrations** — total count · date of latest migration on `main`           | [![DB Migrations](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/DB-Migrations.json)](https://github.com/bkrupa/legacy-sports/tree/main/lib/db-client/migrations)                                       |
 
+Run `pnpm run db:migrate` from the root to apply any pending migrations to your local database.
+
+**Reports:**
 [![Playwright Report](https://img.shields.io/badge/Playwright-Test%20Report-blue?logo=playwright)](https://bkrupa.github.io/legacy-sports-deploys/playwright-report/)
 [![Storybook](https://img.shields.io/badge/Storybook-Component%20Library-ff4785?logo=storybook&logoColor=white)](https://bkrupa.github.io/legacy-sports-deploys/storybook/)
-
-## 🚢 Deployment Status
-
-[![Deploy](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/bkrupa/legacy-sports/actions/workflows/deploy.yml)
-[![Apply Lambda Infrastructure](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Apply-Lambda-Infrastructure.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-terraform-apply.yml)
-[![Build Android APK](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Build-Android-APK.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/build-android-app.yml)
-
-Lambda uploads:
-[![Upload Stats Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Stats-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
-[![Upload Game Selection Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Game-Selection-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
-[![Upload OAuth Proxy Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-OAuth-Proxy-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
-[![Upload GraphQL Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-GraphQL-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
-[![Upload Draft Processor Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Upload-Draft-Processor-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/upload-lambdas.yml)
-
-## 🗄️ Database
-
-[![DB Migrations](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/DB-Migrations.json)](https://github.com/bkrupa/legacy-sports/tree/main/lib/db-client/migrations)
-
-Badge updates automatically whenever a migration is committed to `main`. It shows the total count and the date of the latest migration file in the repo. Run `pnpm run db:migrate` from the root to apply any pending migrations to your local database.
 
 ## 🏥 Lambda Health Status
 
@@ -54,7 +34,7 @@ HTTP lambdas serve their own live badge — shields.io fetches directly from the
 [![Draft Processor Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Health-Draft-Processor-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-health-checks.yml)
 [![WebSocket Lambda](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bkrupa/c0b25f4a406c1216b17211cc13a9c1af/raw/Health-WebSocket-Lambda.json)](https://github.com/bkrupa/legacy-sports/actions/workflows/lambda-health-checks.yml)
 
-## �🌐 Live Web App
+## 🌐 Live Web App
 
 [![Launch Web App](https://img.shields.io/badge/Launch-Web%20App-blue?style=for-the-badge&logo=vercel)](https://bkrupa.github.io/legacy-sports/)
 
@@ -97,13 +77,11 @@ These are published automatically by CI workflows — no manual steps required.
 
 ## 🔒 Security
 
-[![CI Orchestrator (includes security scanning)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-orchestrator.yml/badge.svg)](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-orchestrator.yml)
-
-Security scanning is invoked by `ci-orchestrator.yml`, which runs on pull requests, merge groups, pushes to `develop`, manual dispatch, and on a scheduled basis; based on changed paths, the orchestrator selects dependency scanning for dependency-related changes or secrets-only scanning otherwise. Run `pnpm audit` locally to check for vulnerabilities.
+Security scanning is invoked by the [CI Orchestrator](https://github.com/bkrupa/legacy-sports/actions/workflows/ci-orchestrator.yml), which runs on pull requests, review approvals, merge groups, and manual dispatch; based on changed paths, the orchestrator selects dependency scanning for dependency-related changes or secrets-only scanning otherwise. Run `pnpm audit` locally to check for vulnerabilities.
 
 For complete security details, see: **[Security Audit Status](docs/security/security-audit-status.md)**
 
-## �🚀 Quick Start
+## 🚀 Quick Start
 
 ### 📚 Documentation Hub
 
@@ -445,7 +423,3 @@ The Legacy Sports backend runs on AWS serverless infrastructure managed with Ter
 ---
 
 Built with ❤️ using modern development tools and practices.
-
-```
-
-```
