@@ -101,6 +101,7 @@ const mockUseGetUserLeaguesQuery = jest.fn(() => ({
 }));
 
 jest.mock('@legacy-sports/graphql', () => ({
+  Sport: { Baseball: 'baseball', Football: 'football' },
   useGetUserLeaguesQuery: (...args: unknown[]) =>
     mockUseGetUserLeaguesQuery(...args),
 }));
@@ -241,7 +242,7 @@ describe('LeaguesTab', () => {
   });
 
   describe('league row navigation', () => {
-    it('pushes to the league context screen when a row is pressed', () => {
+    it('pushes to the sport-aware baseball league-detail route when a baseball row is pressed', () => {
       mockUseGetUserLeaguesQuery.mockReturnValue({
         data: {
           userLeagues: [{ id: 7, name: 'My League', sport: 'baseball' }],
@@ -251,8 +252,25 @@ describe('LeaguesTab', () => {
       render(<LeaguesTab />);
       fireEvent(screen.getByTestId('league-row-7'), 'touchEnd');
       expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/league/[leagueId]',
+        pathname: '/baseball/league/[leagueId]',
         params: { leagueId: '7' },
+      });
+    });
+
+    it('pushes to the sport-aware football league-detail route when a football row is pressed', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            { id: 9, name: 'My Football League', sport: 'football' },
+          ],
+        },
+        loading: false,
+      });
+      render(<LeaguesTab />);
+      fireEvent(screen.getByTestId('league-row-9'), 'touchEnd');
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/football/league/[leagueId]',
+        params: { leagueId: '9' },
       });
     });
   });

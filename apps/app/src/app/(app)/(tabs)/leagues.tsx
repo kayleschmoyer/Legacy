@@ -4,7 +4,7 @@ import { Alert, FlatList } from 'react-native';
 import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ChevronRight, Plus, Trophy } from '@tamagui/lucide-icons';
 
-import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
+import { Sport, useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 
 function sportBadge(sport: string | null | undefined): string {
@@ -126,6 +126,20 @@ export default function LeaguesTab() {
           renderItem={({ item }) => {
             if (item.id == null) return null;
             const leagueId = item.id;
+            const viewLeague = () => {
+              const params = { leagueId: String(leagueId) };
+              if (item.sport === Sport.Football) {
+                router.push({
+                  pathname: '/football/league/[leagueId]',
+                  params,
+                });
+              } else {
+                router.push({
+                  pathname: '/baseball/league/[leagueId]',
+                  params,
+                });
+              }
+            };
             return (
               <Card
                 testID={`league-row-${leagueId}`}
@@ -134,19 +148,11 @@ export default function LeaguesTab() {
                 padding="$4"
                 marginBottom="$3"
                 pressStyle={{ opacity: 0.7, scale: 0.99 }}
-                onPress={() =>
-                  router.push({
-                    pathname: '/league/[leagueId]',
-                    params: { leagueId: String(leagueId) },
-                  })
-                }
+                onPress={viewLeague}
                 tabIndex={0}
                 onKeyDown={(e: React.KeyboardEvent) => {
                   if (e.key === 'Enter' || e.key === ' ') {
-                    router.push({
-                      pathname: '/league/[leagueId]',
-                      params: { leagueId: String(leagueId) },
-                    });
+                    viewLeague();
                   }
                 }}
                 accessibilityRole="button"
