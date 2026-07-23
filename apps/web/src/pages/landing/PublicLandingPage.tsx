@@ -16,6 +16,7 @@ import { env } from '../../config/environment';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import { storeDiscordSessionPreCache } from '../../lib/session-precache';
+import { fullPageRedirect } from '../../lib/full-page-redirect';
 
 /* ─── Styled Components ─── */
 
@@ -404,7 +405,7 @@ export function PublicLandingPage(): React.JSX.Element {
 
         // Navigate to home; AuthProvider will restore the session from cache
         // and the HttpOnly JWT cookie will authenticate API requests.
-        window.location.replace(env.baseUrl);
+        fullPageRedirect(env.baseUrl);
       } catch (err) {
         LOGGER.error('Discord callback exchange failed:', String(err));
         setErrorMessage(

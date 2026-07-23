@@ -21,6 +21,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { storeCsrfToken } from '../../lib/csrf';
 import { storeDiscordSessionPreCache } from '../../lib/session-precache';
 import { getSafeRedirectTarget } from '../../lib/safe-redirect';
+import { fullPageRedirect } from '../../lib/full-page-redirect';
 import { consumeCameFrom, storeCameFrom } from '../../lib/came-from';
 import { getLastVisitedLeague } from '../../lib/last-visited-league';
 import { env } from '../../config/environment';
@@ -359,7 +360,7 @@ export function LoginPage(): React.JSX.Element {
           // and re-verified by the background JWT refresh.  See
           // lib/session-precache.ts.
           storeDiscordSessionPreCache(result.jwt);
-          window.location.replace(safeTarget);
+          fullPageRedirect(safeTarget);
         }
       } catch (err) {
         LOGGER.error(

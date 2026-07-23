@@ -57,24 +57,23 @@ const DESKTOP_USER_AGENT = DESKTOP_FIREFOX_USER_AGENT;
 
 describe('WebOAuthProvider', () => {
   const originalUserAgent = navigator.userAgent;
-  const originalLocation = window.location;
   let provider: WebOAuthProvider;
+  // jsdom 26 / jest-environment-jsdom 30 made `window.location` fully
+  // unforgeable, so neither Object.defineProperty nor jest.spyOn can stub it
+  // anymore (upstream: jestjs/jest#15674). WebOAuthProvider takes an
+  // injectable hostname source for exactly this reason — tests vary the
+  // effective hostname via this mutable variable instead of touching the
+  // jsdom global.
+  let currentHostname = 'legacy-fantasy.com';
 
   function setLocation(hostname: string) {
-    // JSDOM does not allow cross-origin pushState, so we replace
-    // window.location with a minimal stub that satisfies the implementation's
-    // `window.location.hostname` check.
-    Object.defineProperty(window, 'location', {
-      value: { ...originalLocation, hostname },
-      writable: true,
-      configurable: true,
-    });
+    currentHostname = hostname;
   }
 
   beforeEach(() => {
     capturedGsiConfig = undefined;
     promptCallback = undefined;
-    provider = new WebOAuthProvider();
+    provider = new WebOAuthProvider(() => currentHostname);
 
     // Set up window.google mock
     const mock = createMockGoogleAccounts();
@@ -91,11 +90,6 @@ describe('WebOAuthProvider', () => {
   afterEach(() => {
     Object.defineProperty(navigator, 'userAgent', {
       value: originalUserAgent,
-      writable: true,
-      configurable: true,
-    });
-    Object.defineProperty(window, 'location', {
-      value: originalLocation,
       writable: true,
       configurable: true,
     });

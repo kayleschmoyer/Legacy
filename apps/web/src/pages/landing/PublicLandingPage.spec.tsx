@@ -9,6 +9,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { PublicLandingPage } from './PublicLandingPage';
+import { fullPageRedirect } from '../../lib/full-page-redirect';
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -56,6 +57,9 @@ jest.mock('../../lib/csrf', () => ({ storeCsrfToken: jest.fn() }));
 jest.mock('../../lib/session-precache', () => ({
   storeDiscordSessionPreCache: jest.fn(),
 }));
+jest.mock('../../lib/full-page-redirect', () => ({
+  fullPageRedirect: jest.fn(),
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,6 +72,8 @@ function renderPage() {
     </MemoryRouter>,
   );
 }
+
+const mockedFullPageRedirect = jest.mocked(fullPageRedirect);
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -145,38 +151,16 @@ describe('PublicLandingPage Discord callback — oauthProxyUrl guard (LS-7782)',
       oauthProxyUrl: 'https://proxy.example.com',
     };
 
-    // jsdom does not implement navigation; stub window.location so the
-    // success-path redirect does not emit a "Not implemented" error.
-    const replaceSpy = jest.fn();
-    const originalLocation = window.location;
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      writable: true,
-      value: {
-        pathname: '/auth/discord/callback',
-        search: '?code=abc&state=xyz',
-        replace: replaceSpy,
-      },
+    renderPage();
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://proxy.example.com/discord',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
-
-    try {
-      renderPage();
-
-      await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledWith(
-          'https://proxy.example.com/discord',
-          expect.objectContaining({ method: 'POST' }),
-        );
-      });
-      await waitFor(() => {
-        expect(replaceSpy).toHaveBeenCalled();
-      });
-    } finally {
-      Object.defineProperty(window, 'location', {
-        configurable: true,
-        writable: true,
-        value: originalLocation,
-      });
-    }
+    await waitFor(() => {
+      expect(mockedFullPageRedirect).toHaveBeenCalled();
+    });
   });
 });

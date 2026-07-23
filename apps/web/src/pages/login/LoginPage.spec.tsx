@@ -17,6 +17,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { OAuthProvider } from '@legacy-sports/shared-components/ui';
 import { LoginPage } from './LoginPage';
 import { storeDiscordSessionPreCache } from '../../lib/session-precache';
+import { fullPageRedirect } from '../../lib/full-page-redirect';
 
 // Shared handle so individual tests can control hydrateSession's return value.
 const mockHydrateSession = jest.fn();
@@ -71,6 +72,9 @@ jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('../../lib/csrf', () => ({ storeCsrfToken: jest.fn() }));
 jest.mock('../../lib/session-precache', () => ({
   storeDiscordSessionPreCache: jest.fn(),
+}));
+jest.mock('../../lib/full-page-redirect', () => ({
+  fullPageRedirect: jest.fn(),
 }));
 jest.mock('../../config/environment', () => ({
   env: {
@@ -509,6 +513,7 @@ describe('LoginPage handleSignIn re-entrancy guard (LS-6685)', () => {
 describe('LoginPage Discord callback redirect (LS-6693)', () => {
   const originalFetch = global.fetch;
   const mockedStorePreCache = jest.mocked(storeDiscordSessionPreCache);
+  const mockedFullPageRedirect = jest.mocked(fullPageRedirect);
 
   beforeEach(() => {
     mockHydrateSession.mockReset();
@@ -619,18 +624,6 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
   });
 
   it('falls back to pre-cache + full reload when the JWT cannot be hydrated', async () => {
-    const replaceLocationSpy = jest.fn();
-    const originalLocation = window.location;
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      writable: true,
-      value: {
-        pathname: '/auth/discord/callback',
-        search: '?code=abc&state=xyz',
-        replace: replaceLocationSpy,
-      },
-    });
-
     global.fetch = jest.fn(() =>
       Promise.resolve({
         ok: true,
@@ -645,13 +638,7 @@ describe('LoginPage Discord callback redirect (LS-6693)', () => {
     await waitFor(() => {
       expect(mockedStorePreCache).toHaveBeenCalledWith('bad.jwt');
     });
-    expect(replaceLocationSpy).toHaveBeenCalledWith('/');
-
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      writable: true,
-      value: originalLocation,
-    });
+    expect(mockedFullPageRedirect).toHaveBeenCalledWith('/');
   });
 });
 

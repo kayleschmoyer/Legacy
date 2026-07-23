@@ -228,20 +228,17 @@ describe('useIsPremiumStatus', () => {
   });
 
   describe('checkout redirect refetch', () => {
+    // jsdom's window.history.pushState updates window.location.search for the
+    // same-origin test document, so the hook's `new
+    // URLSearchParams(window.location.search)` read reflects it without ever
+    // touching the (as of jsdom 26 / jest-environment-jsdom 30) unforgeable
+    // `window.location` global — see jestjs/jest#15674.
     function setLocationSearch(search: string) {
-      Object.defineProperty(window, 'location', {
-        value: { search },
-        writable: true,
-        configurable: true,
-      });
+      window.history.pushState({}, '', `/${search}`);
     }
 
     afterEach(() => {
-      Object.defineProperty(window, 'location', {
-        value: { search: '' },
-        writable: true,
-        configurable: true,
-      });
+      window.history.pushState({}, '', '/');
     });
 
     it('refetches on mount when ?checkout=success is in the URL', () => {

@@ -158,6 +158,17 @@ export class WebOAuthProvider implements OAuthProvider {
   private oneTapInitialized = false;
   private fedcmFailed = false;
 
+  /**
+   * @param getHostname Source of the current hostname, used for the FedCM
+   *   localhost check in `initializeOneTap`. Defaults to reading
+   *   `window.location.hostname`; injectable so tests can vary it without
+   *   touching the (as of jsdom 26 / jest-environment-jsdom 30) unforgeable
+   *   `window.location` global — see jestjs/jest#15674.
+   */
+  constructor(
+    private readonly getHostname: () => string = () => window.location.hostname,
+  ) {}
+
   async configure(config: OAuthConfig): Promise<void> {
     this.config = config;
 
@@ -248,8 +259,7 @@ export class WebOAuthProvider implements OAuthProvider {
     // FedCM for One Tap — the legacy iframe-based prompt is not available in these
     // environments. Always enable FedCM for them to prevent silent failures.
     const isLocalhost =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1';
+      this.getHostname() === 'localhost' || this.getHostname() === '127.0.0.1';
     const isFedCmOnly = isFedCmOnlyBrowser();
     const enableFedCm = isFedCmOnly
       ? true
