@@ -55,6 +55,7 @@ Standards derived from analysis of Copilot code review across recent merged PRs.
 | **Tamagui**   | Numeric `lineHeight` in `style` prop → `1px`; pass as `('1' as unknown as number)` string    | 3     |
 | **Tamagui**   | H1/Paragraph UA margins leak through Tamagui prop overrides; use `style={{ margin: 0 }}`     | 2     |
 | **Tamagui**   | `position: fixed/sticky` elements need a same-height `aria-hidden` spacer sibling            | 2     |
+| **Tamagui**   | String `letterSpacing`/`lineHeight` (`'0.1em'`) crashes native `RCTText`; use a number       | —     |
 
 ### Validation Before Push
 
@@ -66,6 +67,7 @@ All code must pass `make pc` before being pushed. This runs formatting, linting,
 
 > Full catalog with code examples: [standards-catalog.md](standards-catalog.md)
 > Tamagui web pitfalls (overlapping content, lineHeight, UA margin leaks): [tamagui-web-pitfalls.md](tamagui-web-pitfalls.md)
+> Tamagui native-only pitfalls (string `letterSpacing`/`lineHeight` crashes `RCTText`): [tamagui-native-pitfalls.md](tamagui-native-pitfalls.md)
 
 ### Security & Input Validation
 
