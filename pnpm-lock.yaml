@@ -785,6 +785,9 @@ importers:
       '@legacy-sports/app-config':
         specifier: workspace:*
         version: link:../../lib/app-config
+      '@legacy-sports/design-tokens':
+        specifier: workspace:*
+        version: link:../../lib/design-tokens
       '@legacy-sports/env-utilities':
         specifier: workspace:*
         version: link:../../lib/env-utilities
