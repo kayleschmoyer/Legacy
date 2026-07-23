@@ -94,21 +94,40 @@ high-risk on `Text`:
    <Text style={{ letterSpacing: 1 }}>…</Text>
    ```
 
-2. **`csp()` — the cross-platform style normalizer**
+2. **`csp()` — the cross-platform style normalizer, as a safety net only**
    (`lib/shared-components/src/features/players/crossPlatformStyle.ts`). On web it is the
-   identity; on native it drops values RN can't represent (em/ch/clamp lengths, `transform`
+   identity; on native it **drops** values RN can't represent (em/ch/clamp lengths, `transform`
    strings, box-shorthands). `letterSpacing` is in its `LENGTH_KEYS`, so a `'0.1em'` string is
-   **dropped** on native — no crash. **Caveat:** dropping means the letter-spacing is _silently
-   lost_ on native, so prefer numeric when the tracking is part of the design.
+   dropped on native — no crash. **But drop ≠ align:** the tracking is _silently lost_ on native
+   while web still shows it, so `csp()` trades a crash for a **fidelity gap**. Use it as a catch-all
+   guard, not as the primary way to style a value that has a native equivalent.
 
    ```tsx
-   <Text style={csp({ letterSpacing: '0.1em' })}>…</Text> // no crash; tracking lost on native
+   <Text style={csp({ letterSpacing: '0.1em' })}>…</Text> // no crash; tracking lost on native ≠ web
    ```
 
 3. **Explicit `Platform.OS` branch** when web genuinely needs the string form.
    ```tsx
    letterSpacing: Platform.OS === 'web' ? ('0.1em' as unknown as number) : 1;
    ```
+
+### Alignment vs removal: `csp()` drops, it does not convert
+
+`csp()`'s strategy is _removal_ — anything native can't parse is stripped. That prevents the crash
+but means **native and web render differently** for every dropped value. Three tiers:
+
+- **Convertible → align, don't drop.** `letterSpacing`/`lineHeight` em→px is exact
+  (`value × fontSize`, e.g. `0.1em` at `fontSize 11` = `1.1`). Author it **numeric** so both
+  platforms match — this is the fix, not `csp()`-drop. (Tracked in **LS-8630**.)
+- **Web-only, no native equivalent → divergence is inherent.** `cursor`, `whiteSpace`,
+  gradients, `backdropFilter` on old RN — dropping is the only option; the gap is acceptable.
+- **Convertible but currently dropped → latent divergence.** `transform: 'translateY(-50%)'`
+  could become RN's array form `[{ translateY: '-50%' }]`; `boxShadow`/`filter` are supported on
+  RN 0.76+. `csp()` drops these today. Evolving `csp()` from _drop_ → _convert_ here would make it
+  an alignment layer, not a removal one. (Tracked in **LS-8631**.)
+
+Rule of thumb: if the value **has** a native equivalent, convert it (numeric/array) so the two
+platforms agree; reserve `csp()`-drop for values that are genuinely web-only.
 
 ### Detection
 
