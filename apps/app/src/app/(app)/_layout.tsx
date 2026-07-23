@@ -1,6 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BrandedSplash } from '@legacy-sports/shared-components';
+import { colors } from '@legacy-sports/design-tokens';
 
 import { LeagueIdHeader } from './baseball/league/[leagueId]';
 import { FootballLeagueIdHeader } from './football/league/[leagueId]';
@@ -29,6 +30,13 @@ export const unstable_settings = {
 export default function Layout() {
   const { data: currentUser, loading } = useCurrentUserInfo();
   const { resolvedTheme } = useThemeContext();
+  // React Navigation paints the scene (content) background itself and defaults
+  // it to white regardless of the active theme, so pushed screens that don't
+  // paint their own full-bleed background (e.g. the league-detail shell, which
+  // gets its page background from web-only `.ls-root` CSS that native ignores)
+  // render dark cards on a white scene in dark mode. Theme the content
+  // background from the same design-token palette the tab bar reads.
+  const palette = colors[resolvedTheme];
 
   usePushNotifications(currentUser?.id ?? null);
 
@@ -47,6 +55,9 @@ export default function Layout() {
           screenOptions={{
             headerStyle: {
               backgroundColor: HEADER_BG[resolvedTheme],
+            },
+            contentStyle: {
+              backgroundColor: palette.surface.bg,
             },
           }}
         >
