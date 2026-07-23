@@ -48,7 +48,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsx --test apps/web-e2e/src/**/*.test.ts"
+        "command": "node apps/web-e2e/scripts/run-unit-tests.mjs"
       },
       "configurations": {
         "full": {
