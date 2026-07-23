@@ -952,7 +952,38 @@ importers:
         specifier: ^9.26.1
         version: 9.27.0(bufferutil@4.1.0)(puppeteer-core@24.43.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(utf-8-validate@6.0.6)
 
-  apps/cli: {}
+  apps/cli:
+    dependencies:
+      '@legacy-sports/bref-client':
+        specifier: workspace:*
+        version: link:../../lib/bref-client
+      '@legacy-sports/data-loaders':
+        specifier: workspace:*
+        version: link:../../lib/data-loaders
+      '@legacy-sports/db-client':
+        specifier: workspace:*
+        version: link:../../lib/db-client
+      '@legacy-sports/env-utilities':
+        specifier: workspace:*
+        version: link:../../lib/env-utilities
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../../lib/logging
+      '@legacy-sports/pfr-client':
+        specifier: workspace:*
+        version: link:../../lib/pfr-client
+      '@legacy-sports/rollbar':
+        specifier: workspace:*
+        version: link:../../lib/rollbar
+      '@legacy-sports/scoring':
+        specifier: workspace:*
+        version: link:../../lib/scoring
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../../lib/utils
+      '@legacy-sports/websocket-client':
+        specifier: workspace:*
+        version: link:../../lib/websocket-client
 
   apps/video:
     dependencies:
@@ -982,7 +1013,41 @@ importers:
         specifier: '*'
         version: 5.9.3
 
-  apps/web: {}
+  apps/web:
+    dependencies:
+      '@legacy-sports/analytics':
+        specifier: workspace:*
+        version: link:../../lib/analytics
+      '@legacy-sports/app-config':
+        specifier: workspace:*
+        version: link:../../lib/app-config
+      '@legacy-sports/graphql':
+        specifier: workspace:*
+        version: link:../../lib/graphql
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../../lib/logging
+      '@legacy-sports/rollbar':
+        specifier: workspace:*
+        version: link:../../lib/rollbar
+      '@legacy-sports/scoring':
+        specifier: workspace:*
+        version: link:../../lib/scoring
+      '@legacy-sports/shared-components':
+        specifier: workspace:*
+        version: link:../../lib/shared-components
+      '@legacy-sports/tamagui-config':
+        specifier: workspace:*
+        version: link:../../lib/tamagui-config
+      '@legacy-sports/ui-abstractions':
+        specifier: workspace:*
+        version: link:../../lib/ui-abstractions
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../../lib/utils
+      '@legacy-sports/websocket-client':
+        specifier: workspace:*
+        version: link:../../lib/websocket-client
 
   lambdas/apple-iap:
     dependencies:
@@ -1639,20 +1704,57 @@ importers:
       '@aws-sdk/client-dynamodb':
         specifier: '*'
         version: 3.1025.0
+      '@legacy-sports/env-utilities':
+        specifier: workspace:*
+        version: link:../env-utilities
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../utils
 
   lib/bref-client:
     dependencies:
+      '@legacy-sports/db-client':
+        specifier: workspace:*
+        version: link:../db-client
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
       tslib:
         specifier: '*'
         version: 2.8.1
 
-  lib/data-loaders: {}
+  lib/data-loaders:
+    dependencies:
+      '@legacy-sports/bref-client':
+        specifier: workspace:*
+        version: link:../bref-client
+      '@legacy-sports/db-client':
+        specifier: workspace:*
+        version: link:../db-client
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
+      '@legacy-sports/pfr-client':
+        specifier: workspace:*
+        version: link:../pfr-client
+      '@legacy-sports/rollbar':
+        specifier: workspace:*
+        version: link:../rollbar
 
   lib/db-client:
     dependencies:
       '@drepkovsky/drizzle-migrations':
         specifier: ^0.6.0
         version: 0.6.0(drizzle-kit@0.31.10)(drizzle-orm@0.44.7(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.8.0)(pg@8.20.0)(postgres@3.4.9))
+      '@legacy-sports/aws-utils':
+        specifier: workspace:*
+        version: link:../aws-utils
+      '@legacy-sports/env-utilities':
+        specifier: workspace:*
+        version: link:../env-utilities
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../logging
@@ -1676,7 +1778,11 @@ importers:
 
   lib/graphql: {}
 
-  lib/logging: {}
+  lib/logging:
+    dependencies:
+      '@legacy-sports/env-utilities':
+        specifier: workspace:*
+        version: link:../env-utilities
 
   lib/mcp-bearer-auth: {}
 
@@ -1686,6 +1792,9 @@ importers:
 
   lib/mlb-client:
     dependencies:
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
       tslib:
         specifier: '*'
         version: 2.8.1
@@ -1694,6 +1803,9 @@ importers:
 
   lib/pfr-client:
     dependencies:
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
       tslib:
         specifier: '*'
         version: 2.8.1
@@ -1716,7 +1828,14 @@ importers:
         specifier: '*'
         version: 2.8.1
 
-  lib/scoring: {}
+  lib/scoring:
+    dependencies:
+      '@legacy-sports/db-client':
+        specifier: workspace:*
+        version: link:../db-client
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../utils
 
   lib/shared-components:
     dependencies:
@@ -1735,6 +1854,9 @@ importers:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../logging
+      '@legacy-sports/scoring':
+        specifier: workspace:*
+        version: link:../scoring
       '@legacy-sports/tamagui-config':
         specifier: workspace:*
         version: link:../tamagui-config
@@ -1789,13 +1911,23 @@ importers:
         specifier: '*'
         version: 2.8.1
 
-  lib/utils: {}
+  lib/utils:
+    dependencies:
+      '@legacy-sports/env-utilities':
+        specifier: workspace:*
+        version: link:../env-utilities
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
 
   lib/websocket-client:
     dependencies:
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../logging
+      '@legacy-sports/utils':
+        specifier: workspace:*
+        version: link:../utils
       ws:
         specifier: '*'
         version: 8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)

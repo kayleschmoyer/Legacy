@@ -8,5 +8,11 @@
     "codegen:db": "graphql-codegen --require tsconfig-paths/register --config codegen.ts",
     "codegen": "pnpm run codegen:db"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@legacy-sports/bref-client": "workspace:*",
+    "@legacy-sports/db-client": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/pfr-client": "workspace:*",
+    "@legacy-sports/rollbar": "workspace:*"
+  }
 }

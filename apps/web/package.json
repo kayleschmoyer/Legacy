@@ -1,5 +1,18 @@
 {
   "name": "@legacy-sports/web",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@legacy-sports/analytics": "workspace:*",
+    "@legacy-sports/app-config": "workspace:*",
+    "@legacy-sports/graphql": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/rollbar": "workspace:*",
+    "@legacy-sports/scoring": "workspace:*",
+    "@legacy-sports/shared-components": "workspace:*",
+    "@legacy-sports/tamagui-config": "workspace:*",
+    "@legacy-sports/ui-abstractions": "workspace:*",
+    "@legacy-sports/utils": "workspace:*",
+    "@legacy-sports/websocket-client": "workspace:*"
+  }
 }

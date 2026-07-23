@@ -1,6 +1,6 @@
 {
   "extends": ["../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", "jest.config.ts", "dist"],
+  "ignorePatterns": ["!**/*", "node_modules", "jest.config.ts", "dist"],
   "overrides": [
     {
       "files": ["*.ts", "*.tsx"],

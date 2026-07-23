@@ -10,6 +10,8 @@
     "codegen": "pnpm run codegen:db"
   },
   "dependencies": {
+    "@legacy-sports/db-client": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
     "tslib": "*"
   }
 }

@@ -7,6 +7,9 @@
   "description": "AWS-specific utilities for server-side operations",
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "*",
-    "@aws-sdk/client-dynamodb": "*"
+    "@aws-sdk/client-dynamodb": "*",
+    "@legacy-sports/env-utilities": "workspace:*",
+    "@legacy-sports/logging": "workspace:*",
+    "@legacy-sports/utils": "workspace:*"
   }
 }

@@ -1,6 +1,6 @@
 ﻿{
   "extends": ["../../.eslintrc.json", "../../.eslintrc.hermes.json"],
-  "ignorePatterns": ["!**/*", "jest.config.ts", "**/*.d.ts"],
+  "ignorePatterns": ["!**/*", "node_modules", "jest.config.ts", "**/*.d.ts"],
   "overrides": [
     {
       "files": ["*.ts", "*.tsx"],

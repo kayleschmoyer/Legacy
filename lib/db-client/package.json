@@ -34,6 +34,8 @@
   },
   "dependencies": {
     "@drepkovsky/drizzle-migrations": "^0.6.0",
+    "@legacy-sports/aws-utils": "workspace:*",
+    "@legacy-sports/env-utilities": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/utils": "workspace:*",
     "dotenv": "*",

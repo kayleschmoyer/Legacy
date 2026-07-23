@@ -4,5 +4,9 @@
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "react-native": "./src/mobile.ts"
+  "react-native": "./src/mobile.ts",
+  "dependencies": {
+    "@legacy-sports/env-utilities": "workspace:*",
+    "@legacy-sports/logging": "workspace:*"
+  }
 }
