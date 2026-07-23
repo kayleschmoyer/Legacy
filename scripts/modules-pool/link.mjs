@@ -228,6 +228,20 @@ function linkWorktreeToSlot(target) {
       if (cur && normalize(cur) === normalize(target)) return;
     }
     removeNodeModulesEntry(nmPath);
+    // removeNodeModulesEntry is best-effort (e.g. a locked file inside a stale
+    // real directory can make rmSync throw silently) — verify it actually
+    // cleared the path. Otherwise mklink/symlinkSync below fails with a raw
+    // "already exists" error that gives no hint the removal itself failed
+    // (LS-8649).
+    if (lstatExists(nmPath)) {
+      fail(
+        `node_modules already exists and could not be removed automatically:\n  ${nmPath}\n\n` +
+          'It may be a stale real directory left over from a prior install, or a ' +
+          'file inside it may be locked by a running process (nx daemon, editor, ' +
+          'antivirus scan). Close anything that might be holding it open and ' +
+          `remove it manually, then re-run this script:\n  rm -rf "${nmPath}"`,
+      );
+    }
   }
 
   if (process.platform === 'win32') {

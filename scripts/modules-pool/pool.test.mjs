@@ -26,6 +26,8 @@ import {
   chmodSync,
   copyFileSync,
   symlinkSync,
+  openSync,
+  closeSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, delimiter } from 'node:path';
@@ -202,6 +204,94 @@ test(
       runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
       assert.equal(realpathSync(nm), realpathSync(slotNm));
     } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'pool hit self-heals a stale real (non-symlink) node_modules directory (LS-8649)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'wt1');
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+      const slotNm = join(root, '.modules-pool', hash, 'node_modules');
+      makeHealthyNodeModules(slotNm);
+
+      // Simulate the LS-8649 repro: node_modules already exists in the
+      // worktree as a real directory with real package contents, not a
+      // symlink — mklink /D refuses to overwrite this on Windows.
+      const nm = join(wt, 'node_modules');
+      mkdirSync(join(nm, '@ardatan'), { recursive: true });
+      writeFileSync(join(nm, '@ardatan', 'pkg.json'), '{}');
+
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+
+      assert.ok(
+        lstatSync(nm).isSymbolicLink(),
+        'stale real node_modules must be replaced by a symlink',
+      );
+      assert.equal(
+        realpathSync(nm),
+        realpathSync(slotNm),
+        'symlink should target the slot',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'pool hit fails actionably (not a raw mklink error) when a stale node_modules cannot be removed',
+  {
+    skip:
+      process.platform === 'win32'
+        ? false
+        : 'requires Windows file-lock semantics to force a removal failure',
+  },
+  () => {
+    const root = freshMainRepo();
+    let fd;
+    try {
+      const wt = makeWorktree(root, 'wt1');
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+      const slotNm = join(root, '.modules-pool', hash, 'node_modules');
+      makeHealthyNodeModules(slotNm);
+
+      // A file held open without FILE_SHARE_DELETE blocks Windows from deleting
+      // it (and its parent dir), reproducing the LS-8649 repro: rmSync throws,
+      // removeNodeModulesEntry swallows it silently, and mklink then fails with
+      // a raw "already exists" error unless the caller re-checks removal.
+      const nm = join(wt, 'node_modules');
+      mkdirSync(nm, { recursive: true });
+      const lockedFile = join(nm, 'locked.txt');
+      writeFileSync(lockedFile, 'x');
+      fd = openSync(lockedFile, 'r+');
+
+      const { status, output } = runLinkExpectFail([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+      ]);
+      assert.equal(status, 1, 'link.mjs must exit non-zero');
+      assert.match(
+        output,
+        /could not be removed automatically/,
+        'must surface an actionable message instead of the raw mklink error',
+      );
+      assert.match(output, /rm -rf/);
+    } finally {
+      if (fd !== undefined) closeSync(fd);
       rmSync(root, { recursive: true, force: true });
     }
   },
