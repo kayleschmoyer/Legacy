@@ -2409,7 +2409,31 @@
       "apps/web/src/config/environment.ts",
       "apps/web/src/types/e2e-globals.d.ts",
       "apps/web-e2e/src/e2e-globals.d.ts",
-      "lib/app-config/src/lib/**"
+      "lib/app-config/src/lib/**",
+      "apps/web/src/components/**",
+      "apps/web/src/components/icons/**",
+      "apps/web/src/components/scoreboard/**",
+      "apps/web/src/constants/**",
+      "apps/web/src/features/matchup/**",
+      "apps/web/src/hooks/**",
+      "apps/web/src/pages/login/**",
+      "apps/web/src/store/**",
+      "apps/web/src/utils/**",
+      "lib/design-tokens/src/lib/**",
+      "lib/env-utilities/src/lib/**",
+      "lib/graphql/src/**",
+      "lib/logging/src/**",
+      "lib/logging/src/lib/**",
+      "lib/logging/src/lib/destinations/**",
+      "lib/rollbar/src/**",
+      "lib/rollbar/src/lib/**",
+      "lib/scoring/src/**",
+      "lib/scoring/src/baseball/**",
+      "lib/scoring/src/football/**",
+      "lib/tamagui-config/src/lib/**",
+      "lib/test-fixtures/src/lib/**",
+      "lib/utils/src/lib/**",
+      "lib/websocket-client/src/**"
     ],
     "apps/web-e2e/src/tests/matchup-detail.spec.ts": [
       "apps/web/src/pages/matchup/**",
@@ -3004,7 +3028,12 @@
       "lib/rollbar/src/lib/**",
       "lib/tamagui-config/src/lib/**",
       "lib/test-fixtures/src/lib/**",
-      "lib/utils/src/lib/**"
+      "lib/utils/src/lib/**",
+      "apps/web/src/pages/login/**",
+      "lib/scoring/src/**",
+      "lib/scoring/src/baseball/**",
+      "lib/scoring/src/football/**",
+      "lib/websocket-client/src/**"
     ],
     "apps/web-e2e/src/tests/player-brefid-route.spec.ts": [
       "apps/web/src/pages/players/**",
@@ -4420,7 +4449,28 @@
       "apps/web/src/config/**",
       "apps/web/src/utils/**",
       "apps/web/src/lib/csrf.ts",
-      "lib/graphql/src/**"
+      "lib/graphql/src/**",
+      "apps/web/src/components/**",
+      "apps/web/src/components/icons/**",
+      "apps/web/src/components/scoreboard/**",
+      "apps/web/src/hooks/**",
+      "apps/web/src/pages/login/**",
+      "apps/web/src/store/**",
+      "lib/app-config/src/lib/**",
+      "lib/design-tokens/src/lib/**",
+      "lib/env-utilities/src/lib/**",
+      "lib/logging/src/**",
+      "lib/logging/src/lib/**",
+      "lib/logging/src/lib/destinations/**",
+      "lib/rollbar/src/**",
+      "lib/rollbar/src/lib/**",
+      "lib/scoring/src/**",
+      "lib/scoring/src/baseball/**",
+      "lib/scoring/src/football/**",
+      "lib/tamagui-config/src/lib/**",
+      "lib/test-fixtures/src/lib/**",
+      "lib/utils/src/lib/**",
+      "lib/websocket-client/src/**"
     ],
     "apps/web-e2e/src/tests/scoreboard.spec.ts": [
       "apps/web/src/pages/scoreboard/**",
@@ -5296,7 +5346,10 @@
       "lib/tamagui-config/src/lib/**",
       "lib/test-fixtures/src/lib/**",
       "lib/utils/src/lib/**",
-      "lib/websocket-client/src/**"
+      "lib/websocket-client/src/**",
+      "lib/scoring/src/**",
+      "lib/scoring/src/baseball/**",
+      "lib/scoring/src/football/**"
     ],
     "apps/web-e2e/src/tests/trading-center.spec.ts": [
       "apps/web/src/pages/baseball/**",
@@ -5684,7 +5737,18 @@
       "lib/graphql/src/**",
       "lib/tamagui-config/src/lib/**",
       "lib/test-fixtures/src/lib/**",
-      "lib/utils/src/lib/**"
+      "lib/utils/src/lib/**",
+      "apps/web/src/pages/login/**",
+      "lib/env-utilities/src/lib/**",
+      "lib/logging/src/**",
+      "lib/logging/src/lib/**",
+      "lib/logging/src/lib/destinations/**",
+      "lib/rollbar/src/**",
+      "lib/rollbar/src/lib/**",
+      "lib/scoring/src/**",
+      "lib/scoring/src/baseball/**",
+      "lib/scoring/src/football/**",
+      "lib/websocket-client/src/**"
     ]
   }
 }
