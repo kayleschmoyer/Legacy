@@ -4,6 +4,13 @@
  * Verifies that auction_draft and historical_era_filters entitlements are
  * enforced before any DB writes — mirroring the identical gate in
  * createLeagueAndTeams (LS-5159).
+ *
+ * Draft settings became a blanket premium-only feature in LS-5014, checked
+ * after the ownership/draft-status guards but before the granular
+ * auction/era-filter entitlement checks above. A free-tier caller therefore
+ * never reaches those granular checks — the "free era filter" cases below
+ * run as a premium user to isolate what they actually verify: that a
+ * free-tier-safe era value doesn't spuriously trip requireEntitlement.
  */
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -34,10 +41,17 @@ function makeCtx({
     customEraEndYear: null,
   };
 
-  const selectMock = jest.fn().mockReturnValue({
+  const leagueSelectMock = jest.fn().mockReturnValue({
     from: jest.fn().mockReturnValue({
       where: jest.fn().mockReturnValue({
         limit: jest.fn().mockResolvedValue([league]),
+      }),
+    }),
+  });
+  const tierSelectMock = jest.fn().mockReturnValue({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue([{ tier }]),
       }),
     }),
   });
@@ -49,12 +63,15 @@ function makeCtx({
     }),
   });
 
-  // First select call is the league; second is the draft record
-  let selectCallCount = 0;
+  // The resolver issues several differently-shaped `db.select(columns)` calls
+  // (league lookup, subscription-tier lookup(s), draft-record lookup) whose
+  // relative order shifts with guard ordering and which fields are set on
+  // the input — route by the requested column shape instead of call count.
   const db = {
-    select: jest.fn(() => {
-      selectCallCount += 1;
-      return selectCallCount === 1 ? selectMock() : draftSelectMock();
+    select: jest.fn((columns?: Record<string, unknown>) => {
+      if (columns && 'tier' in columns) return tierSelectMock();
+      if (columns && 'owner' in columns) return leagueSelectMock();
+      return draftSelectMock();
     }),
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
@@ -80,20 +97,9 @@ function makeCtx({
     }),
   };
 
-  const usersDb = {
-    select: jest.fn().mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue([{ subscriptionTier: tier }]),
-        }),
-      }),
-    }),
-  };
-
   return {
     user: { id: userId, username: 'testuser' },
     db,
-    internalDb: usersDb,
     notificationService: null,
   };
 }
@@ -206,9 +212,13 @@ describe('updateDraftSettings — entitlement gates (LS-5017)', () => {
     ).rejects.toThrow(/premium/i);
   });
 
-  it('allows a free-tier user to keep the free era filter (all)', async () => {
+  // Draft settings are blanket premium-gated (LS-5014), so a free-tier caller
+  // never reaches the era-filter entitlement check at all — these run as a
+  // premium user to isolate what they actually verify: a free-tier-safe era
+  // value doesn't spuriously trip requireEntitlement(historical_era_filters).
+  it('does not require the era-filter entitlement for the free era filter (all)', async () => {
     const resolve = captureResolver();
-    const ctx = makeCtx({ tier: 'free' });
+    const ctx = makeCtx({ tier: 'premium' });
 
     await expect(
       resolve(
@@ -224,9 +234,9 @@ describe('updateDraftSettings — entitlement gates (LS-5017)', () => {
     ).resolves.toBeDefined();
   });
 
-  it('allows a free-tier user to keep the free era filter (modern)', async () => {
+  it('does not require the era-filter entitlement for the free era filter (modern)', async () => {
     const resolve = captureResolver();
-    const ctx = makeCtx({ tier: 'free' });
+    const ctx = makeCtx({ tier: 'premium' });
 
     await expect(
       resolve(
@@ -299,7 +309,6 @@ describe('updateDraftSettings — draft-status guard', () => {
     const ctx = {
       user: { id: 1, username: 'owner' },
       db: { select: selectMock },
-      internalDb: makeCtx().internalDb,
       notificationService: null,
     };
 
