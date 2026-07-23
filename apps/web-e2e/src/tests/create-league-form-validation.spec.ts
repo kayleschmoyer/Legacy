@@ -36,16 +36,16 @@ test.describe('Create League (Baseball) — Form Validation @regression', () => 
     );
   });
 
-  test('shows a validation error when the league name is over 50 characters', async ({
+  test('hard-caps the league name input at 50 characters (LS-6055)', async ({
     leaguePage,
   }) => {
+    // The input's maxLength attribute prevents both typing and fill() from
+    // ever producing a value over the limit, so the "must be less than 50
+    // characters" validation-message branch is covered at the unit level
+    // instead (LeagueCreatePage.spec.tsx › validateFormFull — league name
+    // length), where it's exercised directly against the pure validator.
     await leaguePage.gotoCreate();
-    await leaguePage.fillLeagueName('A'.repeat(51));
-    await leaguePage.submitCreate();
-
-    await leaguePage.alert.expectContainsText(
-      'League name must be less than 50 characters',
-    );
+    await leaguePage.leagueNameInput.expectAttribute('maxlength', '50');
   });
 
   test('accepts a league name within the 3–50 character range', async ({

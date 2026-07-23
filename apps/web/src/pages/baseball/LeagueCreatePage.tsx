@@ -2364,7 +2364,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                         backgroundColor="$color1"
                         disabled={isFormDisabled}
                         aria-required="true"
-                        maxLength={MAX_LEAGUE_NAME_LENGTH + 5}
+                        maxLength={MAX_LEAGUE_NAME_LENGTH}
                       />
                     </FieldRow>
                   </div>

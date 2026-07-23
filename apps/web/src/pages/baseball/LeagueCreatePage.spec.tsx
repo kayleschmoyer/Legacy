@@ -38,6 +38,7 @@ import {
   VALIDATION_ERROR_SECTION,
 } from './LeagueCreatePage';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
+import { MAX_LEAGUE_NAME_LENGTH } from '../../constants/league';
 
 // jsdom does not implement scrollIntoView; the submit error banner auto-scroll
 // (LS-6066) calls it on every submitError transition, so stub it globally
@@ -1375,6 +1376,56 @@ describe('validateFormFull — gamesPerMatchup (LS-6102)', () => {
   it('rejects a NaN gamesPerMatchup value instead of silently passing', () => {
     const errs = validateFormFull({ ...baseFormData, gamesPerMatchup: NaN });
     expect(errs.gamesPerMatchup).toBeDefined();
+  });
+});
+
+describe('validateFormFull — league name length (LS-6055)', () => {
+  const baseFormData: CreateLeagueFormData = {
+    sport: 'baseball',
+    leagueName: 'Test League',
+    numberOfTeams: 8,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'standard',
+    draftOrder: 'snake',
+    maxRosterSize: 26,
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
+    isPublic: false,
+    gamesPerMatchup: 5,
+    baseballEraFilter: 'all',
+    baseballHofOnly: false,
+    salaryCapEnabled: false,
+    auctionBudget: 200,
+    auctionMinBid: 1,
+    pickTimeLimitSeconds: 120,
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
+  };
+
+  // The rendered Input hard-caps at maxLength={MAX_LEAGUE_NAME_LENGTH}, so a
+  // name longer than the limit can no longer be produced through the UI —
+  // covering the "too long" branch here, against the pure validator, rather
+  // than through an E2E fill() that the native maxlength attribute now
+  // truncates before submission ever sees an over-limit value.
+  it('rejects a league name over the max length', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      leagueName: 'A'.repeat(MAX_LEAGUE_NAME_LENGTH + 1),
+    });
+    expect(errs.leagueName).toBe(
+      `League name must be less than ${MAX_LEAGUE_NAME_LENGTH} characters`,
+    );
+  });
+
+  it('accepts a league name exactly at the max length', () => {
+    const errs = validateFormFull({
+      ...baseFormData,
+      leagueName: 'A'.repeat(MAX_LEAGUE_NAME_LENGTH),
+    });
+    expect(errs.leagueName).toBeUndefined();
   });
 });
 
