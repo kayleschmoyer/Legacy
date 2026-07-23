@@ -50,7 +50,7 @@ export function AdvancedFilterPanel({
             fontFamily: FONT_DISPLAY,
             fontWeight: '700',
             fontSize: 11,
-            letterSpacing: '0.16em',
+            letterSpacing: 1.76,
             textTransform: 'uppercase',
             color: BRAND_GOLD_LIGHT,
           })}

@@ -66,7 +66,7 @@ export function StatsPageHeader({
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 11,
-              letterSpacing: '0.16em',
+              letterSpacing: 1.76,
               textTransform: 'uppercase',
               color: BRAND_GOLD_LIGHT,
             })}
@@ -87,7 +87,11 @@ export function StatsPageHeader({
               // See .agents/skills/standards/references/tamagui-web-pitfalls.md
               lineHeight:
                 Platform.OS === 'web' ? ('1' as unknown as number) : 48,
-              letterSpacing: '-0.02em',
+              // em is fluid on web's clamp() fontSize; native uses the 48px branch → -0.02 × 48.
+              letterSpacing:
+                Platform.OS === 'web'
+                  ? ('-0.02em' as unknown as number)
+                  : -0.96,
               color: WHITE,
               margin: 0,
             })}
@@ -126,7 +130,7 @@ export function StatsPageHeader({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 10,
-                letterSpacing: '0.14em',
+                letterSpacing: 1.4,
                 textTransform: 'uppercase',
                 color: FG4,
                 flexShrink: 0,

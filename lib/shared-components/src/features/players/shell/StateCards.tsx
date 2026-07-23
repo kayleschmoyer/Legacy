@@ -63,7 +63,7 @@ export function LoadingSkeleton({ columnCount }: LoadingSkeletonProps) {
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 11,
-              letterSpacing: '0.16em',
+              letterSpacing: 1.76,
               textTransform: 'uppercase',
               color: BRAND_GOLD_LIGHT,
             })}
@@ -204,7 +204,7 @@ export function ErrorCard({ onRetry }: ErrorCardProps) {
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 12,
-              letterSpacing: '0.08em',
+              letterSpacing: 0.96,
               textTransform: 'uppercase',
               color: WHITE,
             })}
@@ -303,7 +303,7 @@ export function EmptyCard({ onClear }: EmptyCardProps) {
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 12,
-              letterSpacing: '0.08em',
+              letterSpacing: 0.96,
               textTransform: 'uppercase',
               color: WHITE,
             })}

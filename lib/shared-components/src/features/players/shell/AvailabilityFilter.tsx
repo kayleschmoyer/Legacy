@@ -46,7 +46,7 @@ export function AvailabilityFilter({
           fontFamily: FONT_DISPLAY,
           fontWeight: '700',
           fontSize: 11,
-          letterSpacing: '0.1em',
+          letterSpacing: 1.1,
           textTransform: 'uppercase',
           color: FG3,
           whiteSpace: 'nowrap',

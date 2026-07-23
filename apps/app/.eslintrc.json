@@ -44,8 +44,34 @@
           {
             "selector": "Property[key.name='theme'] Literal[value='blue']",
             "message": "theme: \"blue\" is banned (generic Tailwind blue). Use a brand token from .agents/skills/ui/references/brand-colors.md instead."
+          },
+          {
+            "selector": "JSXAttribute[name.name=/^(letterSpacing|lineHeight)$/] > Literal[raw=/^['\"](?!\\$)/]",
+            "message": "String letterSpacing/lineHeight (em/px/unit-less strings) hard-crashes native RCTText: ClassCastException String→Double, the app closes with no JS error (LS-8624/LS-8630). Use a number (points = em × fontSize), a Tamagui $token, or a `Platform.OS === 'web' ? ('…' as unknown as number) : <number>` branch. See .agents/skills/standards/references/tamagui-native-pitfalls.md."
+          },
+          {
+            "selector": "JSXAttribute[name.name=/^(letterSpacing|lineHeight)$/] > JSXExpressionContainer > Literal[raw=/^['\"](?!\\$)/]",
+            "message": "String letterSpacing/lineHeight (em/px/unit-less strings) hard-crashes native RCTText: ClassCastException String→Double, the app closes with no JS error (LS-8624/LS-8630). Use a number (points = em × fontSize), a Tamagui $token, or a `Platform.OS === 'web' ? ('…' as unknown as number) : <number>` branch. See .agents/skills/standards/references/tamagui-native-pitfalls.md."
+          },
+          {
+            "selector": "JSXAttribute[name.name=/^(letterSpacing|lineHeight)$/] > JSXExpressionContainer > TemplateLiteral",
+            "message": "Template-literal letterSpacing/lineHeight resolves to a string and hard-crashes native RCTText: ClassCastException String→Double, the app closes with no JS error (LS-8624/LS-8630). Use a number (points = em × fontSize). See .agents/skills/standards/references/tamagui-native-pitfalls.md."
+          },
+          {
+            "selector": "Property[key.name=/^(letterSpacing|lineHeight)$/] > Literal[raw=/^['\"](?!\\$)/]",
+            "message": "String letterSpacing/lineHeight (em/px/unit-less strings) hard-crashes native RCTText: ClassCastException String→Double, the app closes with no JS error (LS-8624/LS-8630). Use a number (points = em × fontSize), a Tamagui $token, or a `Platform.OS === 'web' ? ('…' as unknown as number) : <number>` branch. See .agents/skills/standards/references/tamagui-native-pitfalls.md."
+          },
+          {
+            "selector": "Property[key.name=/^(letterSpacing|lineHeight)$/] > TemplateLiteral",
+            "message": "Template-literal letterSpacing/lineHeight resolves to a string and hard-crashes native RCTText: ClassCastException String→Double, the app closes with no JS error (LS-8624/LS-8630). Use a number (points = em × fontSize). See .agents/skills/standards/references/tamagui-native-pitfalls.md."
           }
         ]
+      }
+    },
+    {
+      "files": ["*.spec.ts", "*.spec.tsx", "*.test.ts", "*.test.tsx"],
+      "rules": {
+        "no-restricted-syntax": "off"
       }
     },
     {

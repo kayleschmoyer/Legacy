@@ -717,7 +717,7 @@ function PlayersScreen({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 11,
-                letterSpacing: '0.16em',
+                letterSpacing: 1.76,
                 textTransform: 'uppercase',
                 color: BRAND_GOLD_LIGHT,
               }}
@@ -736,7 +736,11 @@ function PlayersScreen({
                     : 48,
                 lineHeight:
                   Platform.OS === 'web' ? ('0.95' as unknown as number) : 48,
-                letterSpacing: '-0.02em',
+                // em is fluid on web's clamp() fontSize; native uses the 48px branch → -0.02 × 48.
+                letterSpacing:
+                  Platform.OS === 'web'
+                    ? ('-0.02em' as unknown as number)
+                    : -0.96,
                 color: TEXT_PRIMARY,
                 margin: 0,
               }}
@@ -784,7 +788,7 @@ function PlayersScreen({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 13,
-                letterSpacing: '0.1em',
+                letterSpacing: 1.3,
                 textTransform: 'uppercase',
                 color: TEXT_NEUTRAL_FG3,
               }}
@@ -1052,7 +1056,7 @@ function FilterRail({
                     fontFamily: FONT_DISPLAY,
                     fontWeight: '700',
                     fontSize: 10,
-                    letterSpacing: '0.14em',
+                    letterSpacing: 1.4,
                     textTransform: 'uppercase',
                     color: TEXT_MUTED,
                     marginRight: 4,
@@ -1099,7 +1103,7 @@ function RailGroup({ label, children }: RailGroupProps) {
           fontFamily: FONT_DISPLAY,
           fontWeight: '700',
           fontSize: 10,
-          letterSpacing: '0.14em',
+          letterSpacing: 1.4,
           textTransform: 'uppercase',
           color: TEXT_MUTED,
           marginRight: 4,
@@ -1306,7 +1310,7 @@ function ViewToggleButton({
           fontFamily: FONT_DISPLAY,
           fontWeight: '700',
           fontSize: 11,
-          letterSpacing: '0.1em',
+          letterSpacing: 1.1,
           textTransform: 'uppercase',
           color: labelColor,
         }}
@@ -1391,7 +1395,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
             fontWeight: '800',
             fontSize: 32,
             color: TEXT_PRIMARY,
-            letterSpacing: '0.02em',
+            letterSpacing: 0.64,
           }}
         >
           {initialsOf(player)}
@@ -1405,7 +1409,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
             fontFamily: FONT_DISPLAY,
             fontWeight: '700',
             fontSize: 11,
-            letterSpacing: '0.18em',
+            letterSpacing: 1.98,
             textTransform: 'uppercase',
             color: BRAND_GOLD_LIGHT,
           }}
@@ -1420,7 +1424,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
             fontWeight: '800',
             fontSize: 38,
             lineHeight: Platform.OS === 'web' ? ('1' as unknown as number) : 40,
-            letterSpacing: '-0.01em',
+            letterSpacing: -0.38,
             color: TEXT_PRIMARY,
             margin: 0,
           }}
@@ -1462,7 +1466,7 @@ function FeaturedSpotlight({ player }: FeaturedSpotlightProps) {
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 10,
-                letterSpacing: '0.14em',
+                letterSpacing: 1.4,
                 textTransform: 'uppercase',
                 color: TEXT_MUTED,
               }}
@@ -1736,7 +1740,7 @@ function ErrorState({ onRetry }: ErrorStateProps) {
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 12,
-              letterSpacing: '0.08em',
+              letterSpacing: 0.96,
               textTransform: 'uppercase',
               color: WHITE,
             }}
@@ -1835,7 +1839,7 @@ function EmptyState({ onClear }: EmptyStateProps) {
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 12,
-              letterSpacing: '0.08em',
+              letterSpacing: 0.96,
               textTransform: 'uppercase',
               color: WHITE,
             }}

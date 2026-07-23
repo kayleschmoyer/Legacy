@@ -531,7 +531,7 @@ export function DraftPlayerBoard({
                             color: posColor,
                             background: `${posColor}26`,
                             fontFamily: "'Big Shoulders Display', sans-serif",
-                            letterSpacing: '0.06em',
+                            letterSpacing: 0.6,
                           }}
                         >
                           {player.position ?? '?'}

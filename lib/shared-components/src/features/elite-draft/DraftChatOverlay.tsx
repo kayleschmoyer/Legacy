@@ -44,7 +44,7 @@ export function DraftChatOverlay({
           style={{
             fontSize: 13,
             fontWeight: 700,
-            letterSpacing: '0.08em',
+            letterSpacing: 1.04,
             color: 'var(--d-accent)',
             textTransform: 'uppercase',
           }}

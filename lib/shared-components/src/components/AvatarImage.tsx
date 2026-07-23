@@ -95,7 +95,7 @@ export function AvatarImage({
           fontSize={dims.font}
           fontWeight="800"
           fontFamily={FONT_DISPLAY}
-          lineHeight={`${dims.px}px`}
+          lineHeight={dims.px}
           textAlign="center"
         >
           {initials}

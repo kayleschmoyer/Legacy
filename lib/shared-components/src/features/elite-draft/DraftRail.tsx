@@ -164,7 +164,7 @@ export function DraftRail({
                 style={{
                   marginLeft: 6,
                   fontSize: 9,
-                  letterSpacing: '0.14em',
+                  letterSpacing: 1.26,
                   color: 'var(--d-accent)',
                   fontWeight: 700,
                 }}
@@ -336,7 +336,7 @@ export function DraftRail({
                           background: pill.bg,
                           whiteSpace: 'nowrap',
                           fontFamily: "'Big Shoulders Display', sans-serif",
-                          letterSpacing: '0.06em',
+                          letterSpacing: 0.54,
                           flexShrink: 0,
                         }}
                       >

@@ -84,14 +84,14 @@ export const TYPE_DISPLAY = {
     fontWeight: 800,
     fontSize: TYPE_SCALE['4xl'],
     lineHeight: 1,
-    letterSpacing: '-0.02em',
+    letterSpacing: -0.96,
   },
   h2: {
     fontFamily: FONT_DISPLAY,
     fontWeight: 800,
     fontSize: TYPE_SCALE['3xl'],
     lineHeight: LINE_HEIGHT.tight,
-    letterSpacing: '-0.01em',
+    letterSpacing: -0.36,
   },
   h3: {
     fontFamily: FONT_DISPLAY,
@@ -133,7 +133,7 @@ export const TYPE_BODY = {
     fontWeight: 700,
     fontSize: TYPE_SCALE.xs,
     lineHeight: 1,
-    letterSpacing: '0.12em',
+    letterSpacing: 1.44,
     textTransform: 'uppercase',
   },
 } as const;
@@ -168,7 +168,7 @@ export const TYPE_SCORE = {
     fontWeight: 700,
     fontSize: TYPE_SCALE.xl,
     lineHeight: 1,
-    letterSpacing: '0.04em',
+    letterSpacing: 0.88,
   },
 } as const;
 

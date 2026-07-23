@@ -1267,7 +1267,7 @@ export function PlayerStatsDataGrid({
               fontFamily: FONT_DISPLAY,
               fontWeight: '700',
               fontSize: 11,
-              letterSpacing: '0.16em',
+              letterSpacing: 1.76,
               textTransform: 'uppercase',
               color: BRAND_GOLD_LIGHT,
             }}
@@ -1279,7 +1279,7 @@ export function PlayerStatsDataGrid({
               fontFamily: FONT_DISPLAY,
               fontWeight: '800',
               fontSize: 22,
-              letterSpacing: '-0.01em',
+              letterSpacing: -0.22,
               color: TEXT_HIGH_CONTRAST,
             }}
           >
@@ -1325,7 +1325,7 @@ export function PlayerStatsDataGrid({
               fontSize: 18,
               color: '#E63950',
               textTransform: 'uppercase',
-              letterSpacing: '0.04em',
+              letterSpacing: 0.72,
             }}
           >
             Error Loading Statistics

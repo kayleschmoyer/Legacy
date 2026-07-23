@@ -165,7 +165,7 @@ const selectLabelStyle = csp({
   fontFamily: FONT_DISPLAY,
   fontWeight: '700' as const,
   fontSize: 10,
-  letterSpacing: '0.14em',
+  letterSpacing: 1.4,
   textTransform: 'uppercase' as const,
   color: FG3,
 });

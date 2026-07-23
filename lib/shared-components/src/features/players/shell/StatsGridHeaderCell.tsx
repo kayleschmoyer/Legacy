@@ -138,7 +138,7 @@ export function StatsGridHeaderCell({
             fontFamily: FONT_DISPLAY,
             fontWeight: '700',
             fontSize: 11,
-            letterSpacing: '0.1em',
+            letterSpacing: 1.1,
             textTransform: 'uppercase',
             color: isActive ? BRAND_GOLD_LIGHT : TEXT_MUTED,
             transition: 'color 0.15s ease',

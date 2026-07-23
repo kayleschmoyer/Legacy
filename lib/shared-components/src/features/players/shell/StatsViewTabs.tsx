@@ -70,7 +70,7 @@ export function StatsViewTabs({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 12,
-                letterSpacing: '0.06em',
+                letterSpacing: 0.72,
                 textTransform: 'uppercase',
                 color: selected ? WHITE : FG3,
               })}

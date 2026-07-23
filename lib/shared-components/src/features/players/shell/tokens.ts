@@ -56,6 +56,6 @@ export const GOLD_ACCENT_BUTTON_LABEL_STYLE = csp({
   fontSize: 12,
   fontFamily: FONT_DISPLAY,
   fontWeight: '700' as const,
-  letterSpacing: '0.08em',
+  letterSpacing: 0.96,
   textTransform: 'uppercase' as const,
 });

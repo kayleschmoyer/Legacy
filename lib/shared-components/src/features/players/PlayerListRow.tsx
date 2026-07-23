@@ -182,7 +182,7 @@ export function PlayerListRow({
                 fontFamily: FONT_DISPLAY,
                 fontWeight: '700',
                 fontSize: 9,
-                letterSpacing: '0.12em',
+                letterSpacing: 1.08,
                 textTransform: 'uppercase',
                 color: TEXT_MUTED,
               }}

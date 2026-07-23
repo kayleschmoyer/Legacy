@@ -46,7 +46,7 @@ const EYEBROW_STYLE: React.CSSProperties = {
   fontFamily: 'var(--font-display, "Big Shoulders Display", sans-serif)',
   fontWeight: 700,
   fontSize: 12,
-  letterSpacing: '0.14em',
+  letterSpacing: 1.68,
   textTransform: 'uppercase',
 };
 
@@ -400,7 +400,7 @@ const GameCard: React.FC<{
                 'var(--font-display, "Big Shoulders Display", sans-serif)',
               fontWeight: 700,
               fontSize: isNarrow ? 11.5 : 10.5,
-              letterSpacing: '0.12em',
+              letterSpacing: isNarrow ? 1.38 : 1.26,
               textTransform: 'uppercase',
               color: isNarrow ? '#B8C5DC' : '#9CAAC5',
               padding: '6px 11px',
@@ -421,7 +421,7 @@ const GameCard: React.FC<{
             fontWeight: 800,
             fontSize: isNarrow ? 34 : 44,
             lineHeight: 1,
-            letterSpacing: '-0.02em',
+            letterSpacing: isNarrow ? -0.68 : -0.88,
             color: '#F8FAFC',
           }}
         >
@@ -511,7 +511,7 @@ const GameCard: React.FC<{
                   'var(--font-display, "Big Shoulders Display", sans-serif)',
                 fontWeight: 700,
                 fontSize: isNarrow ? 11 : 10,
-                letterSpacing: '0.14em',
+                letterSpacing: isNarrow ? 1.54 : 1.4,
                 textTransform: 'uppercase',
                 color: isNarrow ? '#9AABCB' : '#7A8BAA',
                 marginTop: 4,
@@ -529,7 +529,7 @@ const GameCard: React.FC<{
                 'var(--font-display, "Big Shoulders Display", sans-serif)',
               fontWeight: 800,
               fontSize: isNarrow ? 14 : 13,
-              letterSpacing: '0.1em',
+              letterSpacing: isNarrow ? 1.4 : 1.3,
               textTransform: 'uppercase',
               color: BRAND_GOLD_LIGHT,
               padding: isNarrow ? '12px 18px' : '10px 16px',
@@ -695,7 +695,8 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({
                 ? 'clamp(30px, 8vw, 38px)'
                 : 'clamp(38px, 6vw, 64px)',
               lineHeight: 0.98,
-              letterSpacing: '-0.025em',
+              // Web-only hero div (fluid clamp() fontSize) — ≈ -0.025em across the rendered range.
+              letterSpacing: isNarrow ? -0.85 : -1.25,
               color: '#F8FAFC',
               margin: '16px 0 18px',
               maxWidth: '18ch',
@@ -709,7 +710,8 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({
                 fontStyle: 'italic',
                 fontFamily: 'Literata, serif',
                 fontWeight: 400,
-                letterSpacing: '-0.01em',
+                // Web-only accent inheriting the hero's fluid fontSize — ≈ -0.01em.
+                letterSpacing: isNarrow ? -0.34 : -0.5,
               }}
             >
               when the season does.
@@ -774,7 +776,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({
                         'var(--font-display, "Big Shoulders Display", sans-serif)',
                       fontWeight: 700,
                       fontSize: isNarrow ? 11 : 10.5,
-                      letterSpacing: '0.14em',
+                      letterSpacing: isNarrow ? 1.54 : 1.47,
                       textTransform: 'uppercase',
                       color: isNarrow ? '#9AABCB' : '#7A8BAA',
                       marginTop: 6,
@@ -840,7 +842,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({
                 'var(--font-display, "Big Shoulders Display", sans-serif)',
               fontWeight: 700,
               fontSize: 12,
-              letterSpacing: '0.14em',
+              letterSpacing: 1.68,
               textTransform: 'uppercase',
               color: '#7A8BAA',
             }}
@@ -855,7 +857,7 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({
               fontSize: 16,
               color: '#9CAAC5',
               marginTop: 4,
-              letterSpacing: '0.01em',
+              letterSpacing: 0.16,
             }}
           >
             Trade Deadline · Pennant Picks · Box Score Quiz
