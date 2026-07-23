@@ -73,6 +73,13 @@ describe('PositionBadge', () => {
     },
   );
 
+  it('accepts a numeric letterSpacing without throwing (strings are rejected at the type level — LS-8624)', () => {
+    const { getByText } = render(
+      <PositionBadge position="QB" sport="football" letterSpacing={0.8} />,
+    );
+    expect(getByText('QB')).toBeTruthy();
+  });
+
   it('showBorder does not affect the rendered label', () => {
     const { getByText } = render(
       <PositionBadge position="QB" sport="football" showBorder />,

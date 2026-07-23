@@ -55,7 +55,12 @@ export interface PositionBadgeProps {
   fontSize?: number | string;
   fontWeight?: string;
   fontFamily?: string;
-  letterSpacing?: number | string;
+  /**
+   * Numeric points only — forwarded to the native text style, where React
+   * Native requires a number; a CSS unit string like `'0.08em'` hard-crashes
+   * Android (LS-8624). Tamagui renders the number as `px` on web.
+   */
+  letterSpacing?: number;
   /** Opacity of the whole badge, e.g. to dim it while a related item is drafted/disabled. */
   opacity?: number;
   /** Overrides the default label `Text` — e.g. a loading `Spinner` in the same color. */

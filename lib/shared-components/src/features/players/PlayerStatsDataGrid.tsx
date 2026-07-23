@@ -1203,7 +1203,7 @@ export function PlayerStatsDataGrid({
                           fontSize={10}
                           fontWeight="800"
                           fontFamily={FONT_DISPLAY}
-                          letterSpacing="0.08em"
+                          letterSpacing={0.8}
                         />
                       ) : null}
                       <Text
