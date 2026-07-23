@@ -63,16 +63,21 @@ jest.mock('tamagui', () => {
 // Capture the onViewSport callback so tests can invoke sport selection
 let capturedOnViewSport: ((sport: 'baseball' | 'football') => void) | null =
   null;
+// Capture topInset so tests can assert it's forwarded from useSafeAreaInsets (LS-8625)
+let capturedTopInset: number | undefined;
 
 jest.mock('@legacy-sports/shared-components', () => ({
   HomeScreen: ({
     onViewSport,
     testID,
+    topInset,
   }: {
     onViewSport: (sport: 'baseball' | 'football') => void;
     testID?: string;
+    topInset?: number;
   }) => {
     capturedOnViewSport = onViewSport;
+    capturedTopInset = topInset;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
     return <View testID={testID ?? 'home-screen'} />;
@@ -140,6 +145,7 @@ describe('HomeTab sport switching (LS-5814)', () => {
     jest.clearAllMocks();
     backHandlerHandlers.length = 0;
     capturedOnViewSport = null;
+    capturedTopInset = undefined;
     mockGetUserLeagueSummaries.mockReturnValue({
       data: { getUserLeagueSummaries: [] },
       loading: false,
@@ -168,6 +174,11 @@ describe('HomeTab sport switching (LS-5814)', () => {
   it('renders the HomeScreen dashboard by default', () => {
     render(<HomeTab />);
     expect(screen.getByTestId('home-screen')).toBeTruthy();
+  });
+
+  it('forwards the top safe-area inset to HomeScreen (LS-8625)', () => {
+    render(<HomeTab />);
+    expect(capturedTopInset).toBe(44);
   });
 
   it('does not mount sport screens until the user selects a sport', () => {

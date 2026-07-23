@@ -108,6 +108,8 @@ export interface HomeScreenProps {
   isLight?: boolean;
   /** Whether the current user has an active premium subscription. Controls premium-only CTAs in the empty state. */
   isPremium?: boolean;
+  /** Top safe-area inset (e.g. from `useSafeAreaInsets().top`), applied as top padding so content never renders under the status bar. Defaults to 0 for platforms without a safe-area concept (web). */
+  topInset?: number;
 
   loading?: boolean;
   error?: boolean;
@@ -1134,6 +1136,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     defaultSport = 'baseball',
     isLight = false,
     isPremium = false,
+    topInset = 0,
     loading = false,
     error = false,
     showArchived = false,
@@ -1191,7 +1194,11 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   /* ── Loading ── */
   if (loading) {
     return (
-      <ScrollView testID="home-screen" backgroundColor="$background">
+      <ScrollView
+        testID="home-screen"
+        backgroundColor="$background"
+        paddingTop={topInset}
+      >
         <YStack
           flex={1}
           minHeight={400}
@@ -1212,7 +1219,11 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   /* ── Error ── */
   if (error) {
     return (
-      <ScrollView testID="home-screen" backgroundColor="$background">
+      <ScrollView
+        testID="home-screen"
+        backgroundColor="$background"
+        paddingTop={topInset}
+      >
         <YStack
           maxWidth={1280}
           width="100%"
@@ -1274,7 +1285,11 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     const secondaryLeagues = sortedSummaries.slice(1);
 
     return (
-      <ScrollView testID="home-screen" backgroundColor="$background">
+      <ScrollView
+        testID="home-screen"
+        backgroundColor="$background"
+        paddingTop={topInset}
+      >
         <YStack
           testID="home-content"
           maxWidth={1280}
@@ -1477,7 +1492,11 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
 
   /* ── New-user getting-started view ── */
   return (
-    <ScrollView testID="home-screen" backgroundColor="$background">
+    <ScrollView
+      testID="home-screen"
+      backgroundColor="$background"
+      paddingTop={topInset}
+    >
       <YStack
         testID="home-content"
         maxWidth={1280}

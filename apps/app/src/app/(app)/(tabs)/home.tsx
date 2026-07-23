@@ -204,6 +204,7 @@ export default function HomeTab() {
         <HomeScreen
           userName={userName}
           isLight={resolvedTheme === 'light'}
+          topInset={topInset}
           leagues={leagues}
           archivedLeagues={archivedLeagues}
           archivedCount={archivedCount}

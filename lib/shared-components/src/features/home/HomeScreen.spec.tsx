@@ -201,4 +201,26 @@ describe('HomeScreen', () => {
       expect(onRetry).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('top safe-area inset (LS-8625)', () => {
+    // The global `tamagui` jest mock strips layout props (including
+    // paddingTop) before they reach the DOM, so this only asserts that
+    // passing topInset through every render branch doesn't throw. The
+    // paddingTop wiring itself is covered by reading HomeScreen.tsx's four
+    // ScrollView returns and by home.spec.tsx (HomeTab forwards topInset).
+    it('accepts topInset on every render branch without throwing', () => {
+      expect(() =>
+        render(<HomeScreen {...baseProps} topInset={44} />),
+      ).not.toThrow();
+      expect(() =>
+        render(<HomeScreen {...baseProps} leagues={[league]} topInset={44} />),
+      ).not.toThrow();
+      expect(() =>
+        render(<HomeScreen {...baseProps} loading topInset={44} />),
+      ).not.toThrow();
+      expect(() =>
+        render(<HomeScreen {...baseProps} error topInset={44} />),
+      ).not.toThrow();
+    });
+  });
 });
