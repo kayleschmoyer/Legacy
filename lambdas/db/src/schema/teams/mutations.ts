@@ -11,6 +11,7 @@ import {
   sanitizeDisplayName,
 } from '@legacy-sports/utils';
 import { and, eq, gte, ilike, inArray, ne } from 'drizzle-orm';
+import { validateBrandingUrl } from './validate-branding-url';
 import { authorized, isTeamGeneralManager } from '../authorization';
 import { builder } from '../builder';
 import { LeagueMember, Team, TeamMember } from '../leagues/types';
@@ -1010,70 +1011,9 @@ builder.mutationField('updateTeamBranding', (t) =>
       }
 
       // ── Validate URL fields ────────────────────────────────────────────────
-      const validateUrl = (
-        raw: string | null | undefined,
-        fieldName: string,
-      ): string | null => {
-        if (raw === undefined) return undefined as unknown as null; // sentinel: skip this field
-        if (raw === null || raw.trim() === '') return null; // clear the field
-        const trimmed = raw.trim();
-        if (trimmed.length > 2048) {
-          throw new Error(`${fieldName} URL is too long (max 2048 chars)`);
-        }
-
-        // Parse and validate as a proper URL (catches malformed inputs).
-        let parsed: URL;
-        try {
-          parsed = new URL(trimmed);
-        } catch {
-          throw new Error(`${fieldName} must be a valid URL`);
-        }
-
-        // Only allow HTTPS — no http, data:, javascript:, etc.
-        if (parsed.protocol !== 'https:') {
-          throw new Error(`${fieldName} must use HTTPS`);
-        }
-
-        // Reject embedded credentials (user:pass@host) — phishing/confusion vector.
-        if (parsed.username || parsed.password) {
-          throw new Error(`${fieldName} must not contain credentials`);
-        }
-
-        const hostname = parsed.hostname.toLowerCase();
-
-        // Block hostnames that resolve to private/loopback networks (SSRF
-        // prevention). These addresses are unreachable from end-user browsers
-        // and serve no purpose for image hosting.
-        const blockedPatterns = [
-          /^localhost$/,
-          /^127\./,
-          /^10\./,
-          /^172\.(1[6-9]|2\d|3[01])\./,
-          /^192\.168\./,
-          /^169\.254\./, // AWS instance metadata service
-          /^\[?::1\]?$/, // IPv6 loopback
-          /^\[?fc[0-9a-f]{2}:/i, // IPv6 ULA
-          /^\[?fe[89ab][0-9a-f]:/i, // IPv6 link-local
-        ];
-        for (const pattern of blockedPatterns) {
-          if (pattern.test(hostname)) {
-            throw new Error(`${fieldName} must be a public URL`);
-          }
-        }
-
-        // Block bare IPv4 addresses (no legitimate image CDN uses a raw IP).
-        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
-          throw new Error(
-            `${fieldName} must use a domain name, not an IP address`,
-          );
-        }
-
-        return trimmed;
-      };
-
-      const newLogoUrl = validateUrl(args.logoUrl, 'logoUrl');
-      const newAvatarUrl = validateUrl(args.avatarUrl, 'avatarUrl');
-      const newBannerUrl = validateUrl(args.bannerUrl, 'bannerUrl');
+      const newLogoUrl = validateBrandingUrl(args.logoUrl, 'logoUrl');
+      const newAvatarUrl = validateBrandingUrl(args.avatarUrl, 'avatarUrl');
+      const newBannerUrl = validateBrandingUrl(args.bannerUrl, 'bannerUrl');
 
       // ── Verify GM / commissioner ownership ────────────────────────────────
       const membership = await db

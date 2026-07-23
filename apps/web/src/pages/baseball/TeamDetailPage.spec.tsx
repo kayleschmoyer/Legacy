@@ -424,8 +424,11 @@ describe('TeamDetailPage – branding save toast accessibility (LS-6045)', () =>
     );
     fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
 
+    // LS-6043: client validation now mirrors server semantics (new URL()
+    // parse) instead of a loose regex, so a malformed (non-parseable) URL
+    // gets a "must be a valid URL" reason rather than the old generic text.
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Avatar URL must start with https://');
+    expect(alert).toHaveTextContent('Avatar URL must be a valid URL');
     expect(mockUpdateBranding).not.toHaveBeenCalled();
   });
 });
@@ -603,6 +606,53 @@ describe('TeamDetailPage – image upload CSRF token (LS-6040)', () => {
     });
     expect(global.fetch).not.toHaveBeenCalled();
     expect(mockUpdateBranding).not.toHaveBeenCalled();
+  });
+});
+
+// ── Save branding validation (LS-6043) ──────────────────────────────────────
+
+describe('TeamDetailPage – save branding URL validation (LS-6043)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
+  });
+
+  it('blocks a URL with embedded credentials before calling the mutation, showing the specific reason', async () => {
+    render(<TeamDetailPage />);
+
+    fireEvent.change(
+      screen.getByPlaceholderText('https://example.com/my-logo.png'),
+      { target: { value: 'https://attacker.com:80@evil.com/path' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Avatar URL must not contain credentials'),
+      ).toBeInTheDocument();
+    });
+    expect(mockUpdateBranding).not.toHaveBeenCalled();
+  });
+
+  it('saves successfully for a valid HTTPS URL', async () => {
+    render(<TeamDetailPage />);
+
+    fireEvent.change(
+      screen.getByPlaceholderText('https://example.com/my-logo.png'),
+      { target: { value: 'https://example.com/my-logo.png' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^save branding$/i }));
+
+    await waitFor(() => {
+      expect(mockUpdateBranding).toHaveBeenCalledWith({
+        variables: {
+          teamId: 1,
+          leagueId: 100,
+          avatarUrl: 'https://example.com/my-logo.png',
+        },
+      });
+    });
   });
 });
 

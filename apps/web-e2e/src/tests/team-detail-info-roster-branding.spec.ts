@@ -627,9 +627,11 @@ test.describe('Team Detail – branding actions (GM) @regression', () => {
       .fill('http://insecure.example.com/logo.png');
     await page.getByRole('button', { name: /save branding/i }).click();
 
-    await expect(
-      page.getByText('Avatar URL must start with https://'),
-    ).toBeVisible();
+    // LS-6043: client validation now mirrors the server's stricter rules
+    // (new URL() + protocol check) instead of a loose regex, so the
+    // rejection message is now specific rather than the old generic
+    // "must start with https://" string.
+    await expect(page.getByText('Avatar URL must use HTTPS')).toBeVisible();
     await expect(page.getByText('Branding saved!')).not.toBeVisible();
   });
 

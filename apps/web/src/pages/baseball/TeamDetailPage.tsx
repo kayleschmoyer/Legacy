@@ -34,6 +34,7 @@ import {
   TEAM_BRANDING_PRESET_COLORS,
 } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
+import { validateBrandingUrl } from './validate-branding-url';
 import { PageMeta } from '../../components/PageMeta';
 import { TeamAssistantManagerSettings } from '../../features/baseball/TeamAssistantManagerSettings';
 import {
@@ -482,13 +483,19 @@ export function TeamDetailPage() {
     const trimmedAvatar = avatarInput.trim();
     const trimmedBanner = bannerInput.trim();
 
-    if (trimmedAvatar && !/^https:\/\//i.test(trimmedAvatar)) {
-      setBrandingError('Avatar URL must start with https://');
-      return;
+    if (trimmedAvatar) {
+      const avatarError = validateBrandingUrl(trimmedAvatar, 'Avatar');
+      if (avatarError) {
+        setBrandingError(avatarError);
+        return;
+      }
     }
-    if (trimmedBanner && !/^https:\/\//i.test(trimmedBanner)) {
-      setBrandingError('Banner URL must start with https://');
-      return;
+    if (trimmedBanner) {
+      const bannerError = validateBrandingUrl(trimmedBanner, 'Banner');
+      if (bannerError) {
+        setBrandingError(bannerError);
+        return;
+      }
     }
 
     // If both are empty, nothing to save
