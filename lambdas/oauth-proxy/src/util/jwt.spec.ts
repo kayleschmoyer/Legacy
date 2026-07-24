@@ -40,6 +40,21 @@ describe('createJwt — algorithm pinning (LS-2544)', () => {
     expect(payload['subscriptionTier']).toBe('free');
   });
 
+  it('embeds hasPassword=false for OAuth-only accounts (no password hash)', async () => {
+    const token = await createJwt(user);
+    const payload = decode(token) as Record<string, unknown>;
+    expect(payload['hasPassword']).toBe(false);
+  });
+
+  it('embeds hasPassword=true when the user has a stored password hash', async () => {
+    const token = await createJwt({
+      ...user,
+      passwordHash: 'hashed-password',
+    });
+    const payload = decode(token) as Record<string, unknown>;
+    expect(payload['hasPassword']).toBe(true);
+  });
+
   it('signs tokens with the HS256 algorithm', async () => {
     const token = await createJwt(user);
     const header = decode(token, { complete: true })?.header;

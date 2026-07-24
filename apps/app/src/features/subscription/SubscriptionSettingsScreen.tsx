@@ -352,6 +352,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
           onSuccess={onStepUpVerified}
           onDismiss={onStepUpDismiss}
           mfaEnabled={currentUser?.mfaEnabled ?? false}
+          hasPassword={currentUser?.hasPassword ?? true}
         />
       )}
       <ScrollView>

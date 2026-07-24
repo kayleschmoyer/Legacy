@@ -53,6 +53,12 @@ export interface LegacySportsJwt {
   isAdmin: boolean;
   about: string | null | undefined;
   mfaEnabled?: boolean;
+  /**
+   * Whether the account has a local password. OAuth-only accounts
+   * (Google/Discord) have none, so a password re-entry challenge (step-up)
+   * cannot be presented to them.
+   */
+  hasPassword?: boolean;
   subscriptionTier?: 'free' | 'premium';
 }
 

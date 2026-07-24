@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Input, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { AlertTriangle, Shield } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   AMBER,
+  BG_DARK,
   BRAND_GOLD,
   BRAND_NAVY,
   BRAND_NAVY_DARK,
@@ -17,6 +18,17 @@ export interface StepUpModalProps {
   /** Called when the user dismisses the modal without verifying. */
   onDismiss: () => void;
 }
+
+/**
+ * Step-up challenge mode.
+ * - `totp`     — prompt for a TOTP code (MFA-enrolled users).
+ * - `password` — prompt for the account password.
+ * - `checking` — no local credential is known (OAuth-only account): silently
+ *   confirm the active session with the server, which grants step-up when there
+ *   is genuinely no second factor to challenge and otherwise tells us which
+ *   credential to prompt for.
+ */
+type StepUpMode = 'totp' | 'password' | 'checking';
 
 function getCsrfToken(): string {
   try {
@@ -34,19 +46,85 @@ function getCsrfToken(): string {
  * Step-up re-authentication challenge modal (LGN-022 / LS-7834).
  *
  * Shown before billing and commissioner actions that require proof of a fresh
- * user credential. Displays a TOTP input for MFA-enrolled users and a
- * password input for everyone else, with a toggle between the two modes.
+ * user credential. Displays a TOTP input for MFA-enrolled users and a password
+ * input for password accounts, with a toggle between the two modes.
+ *
+ * OAuth-only accounts (Google/Discord) have neither a password nor MFA, so there
+ * is no credential to re-enter. For those users the modal confirms the active
+ * session with the server instead of dead-ending on a password prompt they can
+ * never satisfy.
  */
 export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
   const { config, user } = useAuth();
   const oauthProxyUrl = config.oauthProxyUrl;
 
-  const [mode, setMode] = useState<'totp' | 'password'>(
-    user?.mfaEnabled ? 'totp' : 'password',
+  const [mode, setMode] = useState<StepUpMode>(
+    user?.mfaEnabled ? 'totp' : user?.hasPassword ? 'password' : 'checking',
   );
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const postVerify = useCallback(
+    (body: Record<string, unknown>): Promise<Response> => {
+      const csrf = getCsrfToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      return fetch(`${oauthProxyUrl}/step-up/verify`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+    },
+    [oauthProxyUrl],
+  );
+
+  // Session-only confirmation for accounts with no local credential. The server
+  // grants step-up when the user has neither a password nor MFA; if it turns out
+  // a credential does exist (e.g. a stale token), it tells us which one to
+  // prompt for and we switch modes instead of leaving the user stuck.
+  const runSessionProbe = useCallback(async () => {
+    if (!oauthProxyUrl) {
+      setError(
+        'Authentication service is not configured. Please contact support.',
+      );
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await postVerify({});
+      if (response.ok) {
+        const data = (await response.json()) as { validUntil: number };
+        onSuccess(data.validUntil);
+        return;
+      }
+      const data = (await response.json()) as { error?: string };
+      if (data.error === 'mfa_required') {
+        setMode('totp');
+      } else {
+        // password_required, or an unexpected error — fall back to a password
+        // prompt so the user still has a way forward.
+        setMode('password');
+      }
+    } catch (err) {
+      LOGGER.error(
+        'StepUpModal: session probe error',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+      setError('Connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [oauthProxyUrl, postVerify, onSuccess]);
+
+  useEffect(() => {
+    if (mode === 'checking') void runSessionProbe();
+    // Only re-run when entering `checking`; runSessionProbe is stable.
+  }, [mode, runSessionProbe]);
 
   const handleSubmit = async () => {
     const trimmed = value.trim();
@@ -60,24 +138,10 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
     setLoading(true);
     setError(null);
 
-    const csrf = getCsrfToken();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (csrf) headers['X-CSRF-Token'] = csrf;
-
-    const body =
-      mode === 'totp'
-        ? JSON.stringify({ code: trimmed })
-        : JSON.stringify({ password: trimmed });
-
     try {
-      const response = await fetch(`${oauthProxyUrl}/step-up/verify`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body,
-      });
+      const response = await postVerify(
+        mode === 'totp' ? { code: trimmed } : { password: trimmed },
+      );
 
       if (!response.ok) {
         const data = (await response.json()) as { error?: string };
@@ -85,6 +149,11 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
           setMode('password');
           setValue('');
           setError('Authenticator not set up. Please use your password.');
+        } else if (data.error === 'no_password' && mode === 'password') {
+          // The account has no password after all (e.g. a stale token) — confirm
+          // the session instead of prompting for a credential that doesn't exist.
+          setValue('');
+          setMode('checking');
         } else {
           setError('Incorrect credential. Please try again.');
         }
@@ -103,6 +172,8 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
       setLoading(false);
     }
   };
+
+  const isChecking = mode === 'checking';
 
   return (
     <YStack
@@ -150,25 +221,38 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
         {/* Body */}
         <YStack padding="$5" gap="$4" backgroundColor="$background">
           <Paragraph size="$3" color="$colorPress">
-            {mode === 'totp'
-              ? 'Enter the 6-digit code from your authenticator app.'
-              : 'Enter your password to continue.'}
+            {isChecking
+              ? 'Confirming your identity…'
+              : mode === 'totp'
+                ? 'Enter the 6-digit code from your authenticator app.'
+                : 'Enter your password to continue.'}
           </Paragraph>
 
-          <Input
-            value={value}
-            onChangeText={setValue}
-            placeholder={mode === 'totp' ? '6-digit code' : 'Password'}
-            secureTextEntry={mode === 'password'}
-            keyboardType={mode === 'totp' ? 'numeric' : 'default'}
-            maxLength={mode === 'totp' ? 6 : undefined}
-            autoFocus
-            onSubmitEditing={() => void handleSubmit()}
-            accessible
-            accessibilityLabel={
-              mode === 'totp' ? 'Authenticator code' : 'Password'
-            }
-          />
+          {isChecking ? (
+            !error && (
+              <XStack gap="$3" alignItems="center" paddingVertical="$2">
+                <Spinner size="small" color={BRAND_GOLD} />
+                <Paragraph size="$3" color="$colorPress">
+                  Please wait…
+                </Paragraph>
+              </XStack>
+            )
+          ) : (
+            <Input
+              value={value}
+              onChangeText={setValue}
+              placeholder={mode === 'totp' ? '6-digit code' : 'Password'}
+              secureTextEntry={mode === 'password'}
+              keyboardType={mode === 'totp' ? 'numeric' : 'default'}
+              maxLength={mode === 'totp' ? 6 : undefined}
+              autoFocus
+              onSubmitEditing={() => void handleSubmit()}
+              accessible
+              accessibilityLabel={
+                mode === 'totp' ? 'Authenticator code' : 'Password'
+              }
+            />
+          )}
 
           {error && (
             <XStack
@@ -197,23 +281,27 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
           )}
 
           <XStack gap="$3" justifyContent="space-between" alignItems="center">
-            {/* Mode toggle */}
-            <Button
-              size="$2"
-              chromeless
-              onPress={() => {
-                setMode((m) => (m === 'totp' ? 'password' : 'totp'));
-                setValue('');
-                setError(null);
-              }}
-              style={{ color: BRAND_GOLD }}
-            >
-              {mode === 'totp'
-                ? 'Use password instead'
-                : user?.mfaEnabled
-                  ? 'Use authenticator instead'
-                  : null}
-            </Button>
+            {/* Mode toggle — hidden while confirming the session. */}
+            {isChecking ? (
+              <YStack flex={1} />
+            ) : (
+              <Button
+                size="$2"
+                chromeless
+                onPress={() => {
+                  setMode((m) => (m === 'totp' ? 'password' : 'totp'));
+                  setValue('');
+                  setError(null);
+                }}
+                style={{ color: BRAND_GOLD }}
+              >
+                {mode === 'totp'
+                  ? 'Use password instead'
+                  : user?.mfaEnabled
+                    ? 'Use authenticator instead'
+                    : null}
+              </Button>
+            )}
 
             <XStack gap="$2">
               <Button
@@ -225,19 +313,39 @@ export function StepUpModal({ onSuccess, onDismiss }: StepUpModalProps) {
               >
                 Cancel
               </Button>
-              <Button
-                size="$3"
-                onPress={() => void handleSubmit()}
-                disabled={loading || !value.trim()}
-                icon={loading ? <Spinner size="small" /> : undefined}
-                style={{
-                  background: `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_GOLD}cc 100%)`,
-                  color: '#0A0F1A',
-                  fontWeight: '700',
-                }}
-              >
-                {loading ? 'Verifying…' : 'Verify'}
-              </Button>
+              {isChecking ? (
+                // Only offer a manual retry if the session probe failed; a
+                // successful probe resolves without any button press.
+                error ? (
+                  <Button
+                    size="$3"
+                    onPress={() => void runSessionProbe()}
+                    disabled={loading}
+                    icon={loading ? <Spinner size="small" /> : undefined}
+                    style={{
+                      background: `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_GOLD}cc 100%)`,
+                      color: BG_DARK,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {loading ? 'Verifying…' : 'Try again'}
+                  </Button>
+                ) : null
+              ) : (
+                <Button
+                  size="$3"
+                  onPress={() => void handleSubmit()}
+                  disabled={loading || !value.trim()}
+                  icon={loading ? <Spinner size="small" /> : undefined}
+                  style={{
+                    background: `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_GOLD}cc 100%)`,
+                    color: BG_DARK,
+                    fontWeight: '700',
+                  }}
+                >
+                  {loading ? 'Verifying…' : 'Verify'}
+                </Button>
+              )}
             </XStack>
           </XStack>
         </YStack>

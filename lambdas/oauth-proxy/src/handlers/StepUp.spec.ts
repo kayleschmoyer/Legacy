@@ -84,12 +84,62 @@ describe('handleStepUpVerify', () => {
     expect(result.statusCode).toBe(401);
   });
 
-  it('returns 400 when neither code nor password is provided', async () => {
-    const result = await handleStepUpVerify(makeEvent({}));
+  describe('session-only probe (no credential submitted)', () => {
+    it('grants step-up when the user has neither a password nor MFA (OAuth-only)', async () => {
+      mockGetUserById.mockResolvedValue({
+        ...mockUser,
+        passwordHash: null,
+      } as never);
+      mockGetUserMfa.mockResolvedValue({ mfaEnabled: false, totpSecret: null });
 
-    expect(result.statusCode).toBe(400);
-    expect(JSON.parse(result.body)).toMatchObject({
-      error: 'code or password required',
+      const before = Math.floor(Date.now() / 1000);
+      const result = await handleStepUpVerify(makeEvent({}));
+      const after = Math.floor(Date.now() / 1000);
+
+      expect(result.statusCode).toBe(200);
+      const body = JSON.parse(result.body) as {
+        success: boolean;
+        validUntil: number;
+      };
+      expect(body.success).toBe(true);
+      expect(body.validUntil).toBeGreaterThanOrEqual(before + 15 * 60);
+      expect(body.validUntil).toBeLessThanOrEqual(after + 15 * 60);
+      expect(mockTestPassword).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 password_required when the user has a password', async () => {
+      mockGetUserMfa.mockResolvedValue({ mfaEnabled: false, totpSecret: null });
+
+      const result = await handleStepUpVerify(makeEvent({}));
+
+      expect(result.statusCode).toBe(400);
+      expect(JSON.parse(result.body)).toMatchObject({
+        error: 'password_required',
+      });
+    });
+
+    it('returns 400 mfa_required when the user has MFA enrolled', async () => {
+      mockGetUserById.mockResolvedValue({
+        ...mockUser,
+        passwordHash: null,
+      } as never);
+      mockGetUserMfa.mockResolvedValue({
+        mfaEnabled: true,
+        totpSecret: 'SECRET123',
+      });
+
+      const result = await handleStepUpVerify(makeEvent({}));
+
+      expect(result.statusCode).toBe(400);
+      expect(JSON.parse(result.body)).toMatchObject({ error: 'mfa_required' });
+    });
+
+    it('returns 401 when the user is not found', async () => {
+      mockGetUserById.mockResolvedValue(null);
+
+      const result = await handleStepUpVerify(makeEvent({}));
+
+      expect(result.statusCode).toBe(401);
     });
   });
 

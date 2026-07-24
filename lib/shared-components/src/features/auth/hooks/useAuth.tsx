@@ -27,6 +27,12 @@ interface User {
   picture?: string;
   accessLevel: 'none' | 'admin';
   mfaEnabled?: boolean;
+  /**
+   * Whether the account has a local password. OAuth-only accounts
+   * (Google/Discord) have none, so a password re-entry challenge (step-up)
+   * cannot be presented to them.
+   */
+  hasPassword?: boolean;
   // Legacy compatibility
   isAdmin?: boolean;
   /** Set when this session was started via admin impersonation. */
@@ -41,6 +47,7 @@ interface JwtPayload {
   picture?: string;
   accessLevel?: 'none' | 'admin';
   mfaEnabled?: boolean;
+  hasPassword?: boolean;
   impersonatedBy?: ImpersonatedBy;
   [key: string]: unknown;
 }
@@ -292,6 +299,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         picture: payload.picture,
         accessLevel: payload.accessLevel || ('none' as const),
         mfaEnabled: payload.mfaEnabled,
+        hasPassword: payload.hasPassword,
         impersonatedBy: payload.impersonatedBy,
       };
     } catch {

@@ -28,6 +28,11 @@ export async function createJwt(
   const jwt = {
     accessLevel: user.accessLevel,
     email: user.canonicalEmail,
+    // Whether this user has a local password set. OAuth-only accounts
+    // (Google/Discord) have no password, so the client must not present a
+    // password re-entry challenge to them (step-up, LS-7834). Derived here so
+    // the raw hash never leaves the server.
+    hasPassword: !!user.passwordHash,
     id: user.id,
     mfaEnabled: user.mfaEnabled,
     subscriptionTier: user.subscriptionTier,
