@@ -5,7 +5,8 @@
  *   /baseball/league/:id/commissioner
  *
  *   - "League Settings" heading renders
- *   - Games Per Matchup section and options visible
+ *   - Games Per Matchup section and input visible (LS-8660: bounded numeric
+ *     input, not a per-value button grid)
  *   - SP Starts Per Matchup section visible
  *   - Minimum Career Games section visible
  *   - Save Settings button present
@@ -232,15 +233,17 @@ test.describe('Commissioner League Settings @critical', () => {
     ).toBeVisible();
   });
 
-  test('should display game count options 1 through 7', async ({ page }) => {
+  test('should display Games Per Matchup input with the current value', async ({
+    page,
+  }) => {
     await setupGraphQL(page);
     await page.goto('/baseball/league/1/commissioner');
     await expandLeagueSettings(page);
 
-    for (const n of [1, 2, 3, 4, 5, 6, 7]) {
-      const label = `Games per matchup: ${n} game${n > 1 ? 's' : ''}`;
-      await expect(page.getByRole('button', { name: label })).toBeVisible();
-    }
+    // LS-8660: replaced the per-value button grid (which rendered one button
+    // per integer up to the sport's max — 162 for baseball — and crashed the
+    // tab) with a single bounded numeric input.
+    await expect(page.getByLabel('Games per matchup')).toHaveValue('5');
   });
 
   test('should display SP Starts Per Matchup section', async ({ page }) => {
@@ -319,9 +322,7 @@ test.describe('Commissioner League Settings @critical', () => {
     await expandLeagueSettings(page);
 
     // Change a setting to enable the save button (games per matchup)
-    await page
-      .getByRole('button', { name: /Games per matchup: 7 games/ })
-      .click();
+    await page.getByLabel('Games per matchup').fill('7');
     await page.getByRole('button', { name: 'Save Settings' }).click();
 
     await expect.poll(() => mutationCalled, { timeout: 5000 }).toBe(true);
@@ -337,9 +338,7 @@ test.describe('Commissioner League Settings @critical', () => {
     await expandLeagueSettings(page);
 
     // Change a setting and save
-    await page
-      .getByRole('button', { name: /Games per matchup: 7 games/ })
-      .click();
+    await page.getByLabel('Games per matchup').fill('7');
     await page.getByRole('button', { name: 'Save Settings' }).click();
 
     // Wait for the success banner to appear on the commissioner tab

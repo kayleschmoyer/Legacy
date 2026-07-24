@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { LeagueSettingsControl } from './LeagueSettingsControl';
-import { render, screen } from '../../test-utils';
+import { fireEvent, render, screen } from '../../test-utils';
 
 jest.mock('@legacy-sports/graphql', () => ({
   useUpdateLeagueSettingsMutation: () => [jest.fn(), { loading: false }],
@@ -22,6 +22,13 @@ type ButtonProps = Children & {
   'aria-label'?: string;
   'aria-pressed'?: boolean;
   'data-testid'?: string;
+};
+type InputProps = {
+  value?: string;
+  onChangeText?: (text: string) => void;
+  disabled?: boolean;
+  'aria-label'?: string;
+  placeholder?: string;
 };
 
 jest.mock('tamagui', () => {
@@ -38,11 +45,20 @@ jest.mock('tamagui', () => {
       {children}
     </button>
   );
+  const Input = ({ value, onChangeText, disabled, ...rest }: InputProps) => (
+    <input
+      value={value}
+      onChange={(e) => onChangeText?.(e.target.value)}
+      disabled={!!disabled}
+      aria-label={rest['aria-label']}
+      placeholder={rest.placeholder}
+    />
+  );
   return {
     Button,
     Card: PassThrough,
     H4: PassThrough,
-    Input: PassThrough,
+    Input,
     Separator: () => null,
     Spinner: () => <span>spinner</span>,
     Text: PassThrough,
@@ -142,5 +158,80 @@ describe('LeagueSettingsControl — advanced playoff format gating (LS-5912)', (
     expect(
       screen.getByRole('button', { name: 'Playoff format: 4-team' }),
     ).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+/**
+ * Regression guard for LS-8660: the Settings tab crashed for every freshly
+ * created baseball league. Root cause — Games Per Matchup / SP Starts Per
+ * Matchup rendered one Button per integer up to the sport's max
+ * (GAMES_PER_MATCHUP_BY_SPORT.baseball.max === 162), a data-independent
+ * render blowup introduced by LS-4762. Both fields are now bounded numeric
+ * Inputs instead of per-value button grids.
+ */
+describe('LeagueSettingsControl — bounded numeric inputs (LS-8660)', () => {
+  it('renders without throwing for a freshly created baseball league (162-game max)', () => {
+    expect(() =>
+      render(
+        <LeagueSettingsControl
+          {...defaultProps}
+          sport="baseball"
+          currentGamesPerMatchup={5}
+          currentSpStartsPerMatchup={1}
+        />,
+      ),
+    ).not.toThrow();
+
+    expect(screen.getByLabelText('Games per matchup')).toHaveValue('5');
+    expect(screen.getByLabelText('SP starts per matchup')).toHaveValue('1');
+
+    // The old per-value button grid must be gone — no more "Games per
+    // matchup: N games" buttons regardless of the sport's max.
+    expect(
+      screen.queryByRole('button', { name: /Games per matchup: /i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /SP starts per matchup: /i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a validation error and disables Save when games per matchup is out of bounds', () => {
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        sport="baseball"
+        currentGamesPerMatchup={5}
+        currentSpStartsPerMatchup={1}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Games per matchup'), {
+      target: { value: '9999' },
+    });
+
+    expect(
+      screen.getByText('Games per matchup must be between 1 and 162'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Save Settings' }),
+    ).toBeDisabled();
+  });
+
+  it('allows clearing and retyping the games per matchup input', () => {
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        sport="baseball"
+        currentGamesPerMatchup={5}
+        currentSpStartsPerMatchup={1}
+      />,
+    );
+
+    const input = screen.getByLabelText('Games per matchup');
+    fireEvent.change(input, { target: { value: '' } });
+    expect(input).toHaveValue('');
+
+    fireEvent.change(input, { target: { value: '10' } });
+    expect(input).toHaveValue('10');
   });
 });

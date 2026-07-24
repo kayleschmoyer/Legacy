@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Button,
   Card,
@@ -38,15 +38,6 @@ export interface LeagueSettingsControlProps {
   onUpgrade?: () => void;
   onSuccess?: (message: string) => void;
   onError?: (error: Error) => void;
-}
-
-function buildGamesPerMatchupOptions(
-  max: number,
-): ReadonlyArray<{ label: string; value: number }> {
-  return Array.from({ length: max }, (_, i) => ({
-    label: i === 0 ? '1 game' : `${i + 1} games`,
-    value: i + 1,
-  }));
 }
 
 const MIN_CAREER_GAMES_OPTIONS = [
@@ -115,6 +106,17 @@ export function LeagueSettingsControl({
     currentGamesPerMatchup,
   );
   const [spStarts, setSpStarts] = useState(currentSpStartsPerMatchup);
+  // Text buffers for the numeric inputs below, decoupled from the numeric
+  // state so the field can be freely cleared/edited (see the analogous
+  // salaryCap pattern further down). Synced from the numeric state whenever
+  // it changes from any source (typing a valid value, the SP-starts clamp,
+  // or Reset).
+  const [gamesPerMatchupText, setGamesPerMatchupText] = useState(
+    String(currentGamesPerMatchup),
+  );
+  const [spStartsText, setSpStartsText] = useState(
+    String(currentSpStartsPerMatchup),
+  );
   const [minCareerGames, setMinCareerGames] = useState(currentMinCareerGames);
   const [minCareerSeasons, setMinCareerSeasons] = useState(
     currentMinCareerSeasons,
@@ -141,7 +143,14 @@ export function LeagueSettingsControl({
   const sportBounds =
     GAMES_PER_MATCHUP_BY_SPORT[resolvedSport] ??
     GAMES_PER_MATCHUP_BY_SPORT.baseball;
-  const gamesPerMatchupOptions = buildGamesPerMatchupOptions(sportBounds.max);
+
+  useEffect(() => {
+    setGamesPerMatchupText(String(gamesPerMatchup));
+  }, [gamesPerMatchup]);
+
+  useEffect(() => {
+    setSpStartsText(String(spStarts));
+  }, [spStarts]);
 
   const isLocked = draftStatus === 'completed';
   const [updateLeagueSettings, { loading: saving }] =
@@ -401,9 +410,13 @@ export function LeagueSettingsControl({
   );
 
   const validationError =
-    spStarts > gamesPerMatchup
-      ? `SP starts (${spStarts}) cannot exceed games per matchup (${gamesPerMatchup})`
-      : null;
+    gamesPerMatchup < sportBounds.min || gamesPerMatchup > sportBounds.max
+      ? `Games per matchup must be between ${sportBounds.min} and ${sportBounds.max}`
+      : spStarts < 1
+        ? 'SP starts must be at least 1'
+        : spStarts > gamesPerMatchup
+          ? `SP starts (${spStarts}) cannot exceed games per matchup (${gamesPerMatchup})`
+          : null;
 
   const handleSave = async () => {
     if (validationError) return;
@@ -505,52 +518,25 @@ export function LeagueSettingsControl({
                 Games Per Matchup
               </Text>
               <Text fontSize="$2" color="$gray10">
-                Total number of games in each matchup week. All non-pitcher and
-                RP players play every game. Changes apply to scheduled matchups
-                only.
+                Total number of games in each matchup week ({sportBounds.min}–
+                {sportBounds.max}). All non-pitcher and RP players play every
+                game. Changes apply to scheduled matchups only.
               </Text>
             </YStack>
-            <XStack gap="$2" flexWrap="wrap">
-              {gamesPerMatchupOptions.map((option) => {
-                const isSelected = gamesPerMatchup === option.value;
-                return (
-                  <Button
-                    key={option.value}
-                    size="$3"
-                    theme={isSelected ? 'active' : 'alt2'}
-                    backgroundColor={
-                      isSelected ? withAlpha(BRAND_NAVY_LIGHT, 0.35) : '$gray3'
-                    }
-                    borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                    borderWidth={1}
-                    borderRadius="$3"
-                    onPress={() => handleGamesChange(option.value)}
-                    disabled={saving}
-                    opacity={saving ? 0.5 : 1}
-                    icon={isSelected ? <Check size={14} /> : undefined}
-                    aria-pressed={isSelected}
-                    aria-label={`Games per matchup: ${option.label}`}
-                    hoverStyle={
-                      saving
-                        ? undefined
-                        : {
-                            backgroundColor: isSelected
-                              ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                              : '$gray4',
-                          }
-                    }
-                  >
-                    <Text
-                      fontSize="$2"
-                      fontWeight={isSelected ? '700' : '400'}
-                      color={isSelected ? 'white' : '$color'}
-                    >
-                      {option.label}
-                    </Text>
-                  </Button>
-                );
-              })}
-            </XStack>
+            <Input
+              value={gamesPerMatchupText}
+              onChangeText={(text: string) => {
+                setGamesPerMatchupText(text);
+                const parsed = parseInt(text, 10);
+                if (!isNaN(parsed)) {
+                  handleGamesChange(parsed);
+                }
+              }}
+              placeholder={`e.g. ${sportBounds.default}`}
+              keyboardType="numeric"
+              disabled={saving}
+              aria-label="Games per matchup"
+            />
           </YStack>
 
           <Separator />
@@ -567,51 +553,20 @@ export function LeagueSettingsControl({
                 game.
               </Text>
             </YStack>
-            <XStack gap="$2" flexWrap="wrap">
-              {gamesPerMatchupOptions
-                .filter((o) => o.value <= gamesPerMatchup)
-                .map((option) => {
-                  const isSelected = spStarts === option.value;
-                  return (
-                    <Button
-                      key={option.value}
-                      size="$3"
-                      theme={isSelected ? 'active' : 'alt2'}
-                      backgroundColor={
-                        isSelected
-                          ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
-                          : '$gray3'
-                      }
-                      borderColor={isSelected ? BRAND_NAVY_LIGHT : '$gray6'}
-                      borderWidth={1}
-                      borderRadius="$3"
-                      onPress={() => handleSpStartsChange(option.value)}
-                      disabled={saving}
-                      opacity={saving ? 0.5 : 1}
-                      icon={isSelected ? <Check size={14} /> : undefined}
-                      aria-pressed={isSelected}
-                      aria-label={`SP starts per matchup: ${option.label}`}
-                      hoverStyle={
-                        saving
-                          ? undefined
-                          : {
-                              backgroundColor: isSelected
-                                ? withAlpha(BRAND_NAVY_LIGHT, 0.5)
-                                : '$gray4',
-                            }
-                      }
-                    >
-                      <Text
-                        fontSize="$2"
-                        fontWeight={isSelected ? '700' : '400'}
-                        color={isSelected ? 'white' : '$color'}
-                      >
-                        {option.label}
-                      </Text>
-                    </Button>
-                  );
-                })}
-            </XStack>
+            <Input
+              value={spStartsText}
+              onChangeText={(text: string) => {
+                setSpStartsText(text);
+                const parsed = parseInt(text, 10);
+                if (!isNaN(parsed)) {
+                  handleSpStartsChange(parsed);
+                }
+              }}
+              placeholder="e.g. 1"
+              keyboardType="numeric"
+              disabled={saving}
+              aria-label="SP starts per matchup"
+            />
           </YStack>
 
           <Separator />
