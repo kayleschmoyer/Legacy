@@ -201,6 +201,18 @@ export function LeagueDetailHero({
   const sportIcon: BrandIconName =
     sport === 'football' ? 'football' : 'baseball';
 
+  // Responsive tiers (desktop-first, matching this file's existing convention
+  // where the un-mediated base = desktop). Design breakpoints ~380/600/780 map
+  // to the nearest Tamagui max-width tokens: base = desktop, `$sm` = ≤800
+  // (compact tablet/large phone), `$xs` = ≤660 (small phone — crest, invite,
+  // and era are dropped here). The crest icon `size` is a component prop (not a
+  // style), so it can't take media props — resolve it via useMedia instead.
+  // Bind useMedia through an explicit signature so the call/result stay
+  // type-safe under this project's typed ESLint rules (same pattern as the tab
+  // bar below and useThemeColors in utils/themeColors.ts).
+  const readMedia = useMedia as () => { sm?: boolean };
+  const crestIconSize = readMedia().sm ? 26 : 48;
+
   return (
     <YStack
       backgroundColor="$surfaceCard"
@@ -209,12 +221,20 @@ export function LeagueDetailHero({
       borderRadius={20}
       paddingVertical={28}
       paddingHorizontal={32}
+      $sm={{ paddingVertical: 14, paddingHorizontal: 16 }}
       overflow="hidden"
       // Web-only rich gradient layer; native falls back to the solid card bg.
       style={{ backgroundImage: HERO_GRADIENT }}
     >
       {/* Top row — back link · sport eyebrow · commissioner chip */}
-      <XStack alignItems="center" gap={10} marginBottom={14} flexWrap="wrap">
+      <XStack
+        alignItems="center"
+        gap={10}
+        marginBottom={14}
+        $sm={{ marginBottom: 10 }}
+        $xs={{ gap: 6, marginBottom: 8 }}
+        flexWrap="wrap"
+      >
         <XStack
           tag="button"
           role="button"
@@ -275,11 +295,21 @@ export function LeagueDetailHero({
       </XStack>
 
       {/* Main row — crest · body · actions */}
-      <XStack gap={24} alignItems="flex-start" flexWrap="wrap">
+      <XStack
+        gap={24}
+        $sm={{ gap: 14 }}
+        $xs={{ gap: 12 }}
+        alignItems="flex-start"
+        flexWrap="wrap"
+      >
+        {/* Crest scales down on compact widths and is hidden entirely on small
+            phones (≤$xs) to reclaim vertical space. */}
         <YStack
           width={92}
           height={92}
           borderRadius={16}
+          $sm={{ width: 48, height: 48, borderRadius: 12 }}
+          $xs={{ display: 'none' }}
           backgroundColor={BRAND_NAVY}
           borderWidth={1}
           borderColor={withAlpha(BRAND_GOLD, 0.45)}
@@ -290,13 +320,13 @@ export function LeagueDetailHero({
         >
           <BrandIcon
             name={sportIcon}
-            size={48}
+            size={crestIconSize}
             color={BRAND_GOLD_LIGHT}
             accentColor={BRAND_SEAM_RED_LIGHT}
           />
         </YStack>
 
-        <YStack flex={1} minWidth={280} gap={10}>
+        <YStack flex={1} minWidth={280} gap={10} $sm={{ minWidth: 0, gap: 8 }}>
           <Text
             // Render as an <h1> on web: preserves the page's single
             // heading-level-1 (a11y heading hierarchy + e2e selectors). `tag`
@@ -308,6 +338,8 @@ export function LeagueDetailHero({
             fontSize={40}
             lineHeight={40}
             letterSpacing={-0.8}
+            $sm={{ fontSize: 24, lineHeight: 28, letterSpacing: -0.4 }}
+            $xs={{ fontSize: 22, lineHeight: 26 }}
             margin={0}
             color="$color"
           >
@@ -316,12 +348,25 @@ export function LeagueDetailHero({
           <XStack gap={8} flexWrap="wrap" alignItems="center">
             <LeagueDraftStatusChip status={league.draftStatus} />
             {league.era ? (
-              <Text fontFamily="$body" fontSize={13} color="$textMuted">
+              // Era eyebrow is dropped on small phones (≤$xs) per the design
+              // declutter; it stays visible from the compact tier up.
+              <Text
+                fontFamily="$body"
+                fontSize={13}
+                color="$textMuted"
+                $xs={{ display: 'none' }}
+              >
                 {league.era}
               </Text>
             ) : null}
           </XStack>
-          <XStack gap={20} marginTop={4} flexWrap="wrap">
+          <XStack
+            gap={20}
+            marginTop={4}
+            $sm={{ gap: 12 }}
+            $xs={{ marginTop: 2 }}
+            flexWrap="wrap"
+          >
             {league.currentWeek != null ? (
               <HeroMetaItem label="Week">
                 {String(league.currentWeek)}
@@ -346,7 +391,14 @@ export function LeagueDetailHero({
         </YStack>
 
         {onInvite ? (
-          <XStack flexShrink={0}>
+          // Invite action spans full width on the compact tier, then is hidden
+          // entirely on small phones (≤$xs) per the design declutter; native
+          // retains its in-page invite/share entry point.
+          <XStack
+            flexShrink={0}
+            $sm={{ width: '100%' }}
+            $xs={{ display: 'none' }}
+          >
             <XStack
               tag="button"
               role="button"
@@ -387,6 +439,14 @@ export function LeagueDetailHero({
   );
 }
 
+// Meta items flow as an intrinsic-width row on desktop/compact widths, then
+// pack into a 2-column grid on small phones (≤$xs) where each takes ~half the
+// row and wraps. Shared by HeroMetaItem and InviteCodeMetaItem so both align.
+const HERO_META_ITEM_LAYOUT = {
+  gap: 2,
+  $xs: { gap: 1, flexBasis: '42%', flexGrow: 1 },
+} as const;
+
 function HeroMetaItem({
   label,
   children,
@@ -397,11 +457,12 @@ function HeroMetaItem({
   valueColor?: string;
 }): React.JSX.Element {
   return (
-    <YStack gap={2}>
+    <YStack {...HERO_META_ITEM_LAYOUT}>
       <Text
         fontFamily="$heading"
         fontWeight="700"
         fontSize={10}
+        $xs={{ fontSize: 9 }}
         letterSpacing={1.4}
         textTransform="uppercase"
         color="$color10"
@@ -412,6 +473,8 @@ function HeroMetaItem({
         fontFamily="$heading"
         fontWeight="700"
         fontSize={16}
+        $sm={{ fontSize: 14 }}
+        $xs={{ fontSize: 13 }}
         letterSpacing={0.32}
         color={valueColor}
       >
@@ -459,11 +522,12 @@ function InviteCodeMetaItem({
   }, [inviteCode]);
 
   return (
-    <YStack gap={2}>
+    <YStack {...HERO_META_ITEM_LAYOUT}>
       <Text
         fontFamily="$heading"
         fontWeight="700"
         fontSize={10}
+        $xs={{ fontSize: 9 }}
         letterSpacing={1.4}
         textTransform="uppercase"
         color="$color10"
@@ -490,6 +554,8 @@ function InviteCodeMetaItem({
           fontFamily="$heading"
           fontWeight="700"
           fontSize={16}
+          $sm={{ fontSize: 14 }}
+          $xs={{ fontSize: 13 }}
           letterSpacing={0.32}
           color={BRAND_GOLD_LIGHT}
         >

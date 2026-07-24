@@ -2600,3 +2600,12 @@
     margin-bottom: 0;
   }
 }
+
+/* Smallest phones — tighten the page gutters so content isn't crushed against
+   the edges once the hero (rendered by the shared Tamagui shell) has collapsed
+   its crest/actions. The snapshot bar is already 2-up from the 780px tier. */
+@media (max-width: 380px) {
+  .ls-page {
+    padding: 12px 10px 48px;
+  }
+}
