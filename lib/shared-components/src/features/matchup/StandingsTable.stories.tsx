@@ -269,3 +269,12 @@ export const TiebreakerScenario: Story = {
     standings: tiebreakerStandings,
   },
 };
+
+export const CurrentUserLongTeamName: Story = {
+  args: {
+    standings: mockStandings.map((s) =>
+      s.teamId === '2' ? { ...s, teamName: "legacyplaywright's Team" } : s,
+    ),
+    currentUserTeamId: 2,
+  },
+};

@@ -224,6 +224,9 @@ function StandingsRow({
                   },
                 } as Record<string, unknown>)
               : {})}
+            flex={1}
+            minWidth={0}
+            numberOfLines={1}
             fontSize="$3"
             fontWeight="600"
             color={isCurrentUser ? BRAND_GOLD_LIGHT : undefined}
@@ -233,6 +236,7 @@ function StandingsRow({
           </Text>
           {isCurrentUser ? (
             <Text
+              flexShrink={0}
               fontSize="$1"
               fontWeight="700"
               color={BRAND_GOLD_LIGHT}
