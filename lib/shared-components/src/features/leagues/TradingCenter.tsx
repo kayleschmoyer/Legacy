@@ -1657,8 +1657,15 @@ export function TradingCenter({
       aria-labelledby="tab-trades"
       gap="$4"
     >
-      {/* Page header */}
-      <XStack alignItems="center" justifyContent="space-between">
+      {/* Page header — flexWrap lets "Propose Trade" drop to its own line on
+          narrow Android viewports instead of overflowing the screen edge (LS-8662) */}
+      <XStack
+        data-testid="trade-center-header"
+        alignItems="center"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        gap="$2"
+      >
         <XStack alignItems="center" gap="$2">
           <ArrowLeftRight size={22} color={BRAND_GOLD_LIGHT} />
           <YStack>
