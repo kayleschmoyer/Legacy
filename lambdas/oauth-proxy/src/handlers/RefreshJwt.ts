@@ -3,8 +3,10 @@ import { sign, verify } from 'jsonwebtoken';
 import { LOGGER } from '@legacy-sports/logging';
 import { readSecret } from '@legacy-sports/aws-utils';
 import { getUserById } from '@legacy-sports/db-client';
+import type { EntitlementKey } from '@legacy-sports/utils';
 import { Secret, SECRET_CONFIG } from '../util';
 import { createJwt, generateJti, JWT_AUDIENCE, JWT_ISSUER } from '../util/jwt';
+import { isEntitlementKey } from '../util/entitlements';
 import {
   buildAuthCookies,
   buildImpersonationCookie,
@@ -23,12 +25,29 @@ interface RefreshJwtPayload {
   picture?: string;
   exp?: number;
   iat?: number;
+  /** Entitlement lookup_keys minted by LS-8644; carried forward on refresh. */
+  entitlements?: unknown;
   impersonatedBy?: {
     id: number;
     email: string;
     username: string;
   };
   [key: string]: unknown;
+}
+
+/**
+ * Narrow an arbitrary prior-token `entitlements` claim to the code catalog.
+ *
+ * Returns `undefined` when the claim is absent (e.g. a token minted before
+ * LS-8644) so the re-mint fails closed on a persistent Stripe failure; returns
+ * the filtered lookup_keys (possibly empty) when a claim was present so those
+ * are carried forward. Any value that is not a valid catalog key is dropped.
+ */
+function parsePriorEntitlements(
+  claim: unknown,
+): readonly EntitlementKey[] | undefined {
+  if (!Array.isArray(claim)) return undefined;
+  return claim.filter(isEntitlementKey);
 }
 
 /** Impersonation tokens expire after 2 hours. */
@@ -179,9 +198,14 @@ export const handleRefreshJwt = async (
       };
     }
 
-    // Issue a fresh JWT (same fields, new expiry)
+    // Issue a fresh JWT (same fields, new expiry). `sign()` stamps a fresh iat
+    // by default, so a refreshed token passes downstream staleness checks
+    // (LS-8643). Re-mint the entitlements claim from live Stripe, carrying the
+    // prior token's claim forward if Stripe is persistently unreachable
+    // (LS-8644 / LS-8638 Resolved Decisions #1).
     const newJwt = await createJwt(user, {
       picture: payload.picture,
+      fallbackEntitlements: parsePriorEntitlements(payload.entitlements),
     });
 
     LOGGER.info('handleRefreshJwt: issued fresh JWT', { userId: user.id });

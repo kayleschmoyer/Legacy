@@ -1,6 +1,7 @@
 import { verify } from 'jsonwebtoken';
 import { LOGGER } from '@legacy-sports/logging';
 import { retrieveSecretParameterValue } from '@legacy-sports/aws-utils';
+import { type EntitlementKey, ENTITLEMENTS } from '@legacy-sports/utils';
 import type { APIGatewayProxyEvent } from 'aws-lambda';
 
 export interface ImpersonatedBy {
@@ -16,6 +17,12 @@ export interface JWTPayload {
   accessLevel?: string;
   isAdmin?: boolean;
   subscriptionTier?: string;
+  /**
+   * Live Stripe entitlement lookup_keys minted into the token at login/refresh
+   * (LS-8644). A plain array of catalog keys. Not yet enforced here —
+   * enforcement is LS-8643.
+   */
+  entitlements?: unknown;
   impersonatedBy?: ImpersonatedBy;
   [key: string]: unknown; // For other JWT standard fields
 }
@@ -26,8 +33,33 @@ export interface User {
   username: string;
   isAdmin: boolean;
   subscriptionTier?: 'free' | 'premium';
+  /**
+   * Entitlement lookup_keys carried by the token (LS-8644). Always populated by
+   * {@link parseUserFromJwtPayload} (empty for free users / users with no Stripe
+   * customer); optional on the type so existing hand-built User fixtures need no
+   * change. Consumed for gating by LS-8643.
+   */
+  entitlements?: EntitlementKey[];
   /** Present when this session was created by an admin via impersonation. */
   impersonatedBy?: ImpersonatedBy;
+}
+
+/** Known entitlement lookup_keys, for narrowing the untrusted token claim. */
+const ENTITLEMENT_KEY_SET: ReadonlySet<string> = new Set<string>(
+  Object.values(ENTITLEMENTS),
+);
+
+/**
+ * Narrow an untrusted `entitlements` claim from a JWT payload to the code
+ * catalog. Non-array claims and unknown keys are dropped, so a tampered or
+ * stale-shaped token yields an empty (fail-closed) entitlement set.
+ */
+function parseEntitlementsClaim(claim: unknown): EntitlementKey[] {
+  if (!Array.isArray(claim)) return [];
+  return claim.filter(
+    (key): key is EntitlementKey =>
+      typeof key === 'string' && ENTITLEMENT_KEY_SET.has(key),
+  );
 }
 
 const JWT_SECRET_NAME = process.env['JWT_SECRET_NAME'] || '';
@@ -127,6 +159,7 @@ export function parseUserFromJwtPayload(payload: JWTPayload): User {
     username: payload.username,
     isAdmin: payload.isAdmin === true || accessLevel === 'admin',
     subscriptionTier,
+    entitlements: parseEntitlementsClaim(payload.entitlements),
     impersonatedBy,
   };
 }
