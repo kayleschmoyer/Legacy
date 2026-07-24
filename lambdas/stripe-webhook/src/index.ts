@@ -225,10 +225,18 @@ async function upsertSubscription(
         ),
       });
 
-    // Denormalize tier onto users table for fast resolver lookups
+    // Denormalize tier onto users table for fast resolver lookups.
+    // Bump entitlements_updated_at alongside the tier write so already-issued
+    // JWTs minted before this change are force-expired on their next request
+    // (LS-8642). The bump rides the existing tier-denorm UPDATE, so it is
+    // atomic with the tier change and adds no independent failure surface.
     await db
       .update(InternalSchema.usersInAppInternal)
-      .set({ subscriptionTier: newTier, updatedAt: new Date() })
+      .set({
+        subscriptionTier: newTier,
+        entitlementsUpdatedAt: new Date(),
+        updatedAt: new Date(),
+      })
       .where(eq(InternalSchema.usersInAppInternal.id, userId));
   });
 
@@ -304,10 +312,15 @@ async function updateSubscriptionStatus(
       return null;
     }
 
-    // Denormalize tier onto users table
+    // Denormalize tier onto users table + bump the entitlements invalidation
+    // marker so stale JWTs are force-expired on their next request (LS-8642).
     await db
       .update(InternalSchema.usersInAppInternal)
-      .set({ subscriptionTier: newTier, updatedAt: new Date() })
+      .set({
+        subscriptionTier: newTier,
+        entitlementsUpdatedAt: new Date(),
+        updatedAt: new Date(),
+      })
       .where(eq(InternalSchema.usersInAppInternal.id, userId));
 
     return { userId, previousTier: previousTier as 'free' | 'premium' };
@@ -685,9 +698,16 @@ async function handlePaymentFailed(
         ),
       );
 
+    // Bump the entitlements invalidation marker on payment failure too, so the
+    // client re-mints against Stripe's current state (epic Resolved Decisions
+    // #3 — grace defers to Stripe as-is). Rides the tier-denorm write (LS-8642).
     await db
       .update(InternalSchema.usersInAppInternal)
-      .set({ subscriptionTier: tier, updatedAt: now })
+      .set({
+        subscriptionTier: tier,
+        entitlementsUpdatedAt: now,
+        updatedAt: now,
+      })
       .where(eq(InternalSchema.usersInAppInternal.id, record.userId));
 
     if (withinGracePeriod) {
@@ -762,9 +782,15 @@ async function handlePaymentSucceeded(
         ),
       );
 
+    // Bump the entitlements invalidation marker alongside the tier restore so
+    // stale JWTs are force-expired on their next request (LS-8642).
     await db
       .update(InternalSchema.usersInAppInternal)
-      .set({ subscriptionTier: 'premium', updatedAt: now })
+      .set({
+        subscriptionTier: 'premium',
+        entitlementsUpdatedAt: now,
+        updatedAt: now,
+      })
       .where(eq(InternalSchema.usersInAppInternal.id, userId));
 
     LOGGER.info('Payment succeeded — subscription restored to active', {
@@ -973,9 +999,17 @@ async function handleChargeRefunded(
         );
 
       if (isFullRefund) {
+        // Full refund revokes premium — bump the entitlements marker with the
+        // tier write so stale JWTs are force-expired (LS-8642). Partial refunds
+        // leave the tier (and entitlements) untouched, so they intentionally do
+        // not bump.
         await db
           .update(InternalSchema.usersInAppInternal)
-          .set({ subscriptionTier: 'free', updatedAt: now })
+          .set({
+            subscriptionTier: 'free',
+            entitlementsUpdatedAt: now,
+            updatedAt: now,
+          })
           .where(eq(InternalSchema.usersInAppInternal.id, userId));
       }
 
@@ -1077,9 +1111,16 @@ async function handleChargeDisputeCreated(
           eq(InternalSchema.subscriptions.stripeCustomerId, stripeCustomerId),
         );
 
+      // Chargeback revokes premium — bump the entitlements marker with the
+      // tier write so stale JWTs are force-expired on their next request
+      // (LS-8642).
       await db
         .update(InternalSchema.usersInAppInternal)
-        .set({ subscriptionTier: 'free', updatedAt: now })
+        .set({
+          subscriptionTier: 'free',
+          entitlementsUpdatedAt: now,
+          updatedAt: now,
+        })
         .where(eq(InternalSchema.usersInAppInternal.id, userId));
 
       return prior;

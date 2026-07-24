@@ -1590,4 +1590,348 @@ describe('stripe-webhook event handlers', () => {
       );
     });
   });
+
+  // ── entitlements_updated_at invalidation bump (LS-8642) ───────────────────
+  //
+  // Every entitlement/tier change must stamp app_internal.users.
+  // entitlements_updated_at = now() alongside the existing subscription_tier
+  // denormalization write, so already-issued JWTs are force-expired on their
+  // next request. The bump rides the same users UPDATE, so we assert it by
+  // capturing the payloads passed to `.update(usersInAppInternal).set(...)`.
+  describe('entitlements_updated_at bump', () => {
+    let capturedSets: Record<string, unknown>[];
+
+    beforeEach(() => {
+      capturedSets = [];
+    });
+
+    /** Records every `.set()` payload so tests can assert the marker bump. */
+    function capturingUpdate() {
+      return jest.fn(() => ({
+        set: jest.fn((payload: Record<string, unknown>) => {
+          capturedSets.push(payload);
+          return {
+            where: jest.fn(() => ({
+              returning: jest.fn(() => Promise.resolve([{ userId: 42 }])),
+              then: (resolve: (v: unknown) => unknown) => resolve(undefined),
+            })),
+          };
+        }),
+      }));
+    }
+
+    /** insert + onConflict* + capturing update (upsertSubscription call 2). */
+    function capturingInsertUpdateDb() {
+      return {
+        insert: jest.fn(() => ({
+          values: jest.fn(() => ({
+            onConflictDoUpdate: jest.fn(() => Promise.resolve()),
+            onConflictDoNothing: jest.fn(() => Promise.resolve()),
+          })),
+        })),
+        update: capturingUpdate(),
+      };
+    }
+
+    /** select-then-capturing-update (updateSubscriptionStatus / refund / dispute). */
+    function capturingSelectThenUpdateDb(rows: unknown[]) {
+      return {
+        select: jest.fn(() => ({
+          from: jest.fn(() => ({
+            where: jest.fn(() => ({
+              limit: jest.fn(() => Promise.resolve(rows)),
+            })),
+          })),
+        })),
+        update: capturingUpdate(),
+      };
+    }
+
+    const bumped = () => capturedSets.some((s) => 'entitlementsUpdatedAt' in s);
+
+    it('bumps on customer.subscription.created (upsert path)', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'customer.subscription.created',
+          data: {
+            object: {
+              id: 'sub_123',
+              customer: 'cus_123',
+              status: 'active',
+              cancel_at_period_end: false,
+              trial_end: null,
+              metadata: { userId: '42' },
+              items: { data: [{ current_period_end: 1700000000 }] },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) => cb(makeSelectDb([])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(capturingInsertUpdateDb()),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(true);
+    });
+
+    it('bumps on customer.subscription.deleted (updateSubscriptionStatus path)', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'customer.subscription.deleted',
+          data: { object: { id: 'sub_123' } },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(capturingSelectThenUpdateDb([{ userId: 42, tier: 'premium' }])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'canceled' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(true);
+    });
+
+    it('bumps on invoice.payment_succeeded', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'invoice.payment_succeeded',
+          data: {
+            object: {
+              parent: { subscription_details: { subscription: 'sub_123' } },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(capturingSelectThenUpdateDb([{ userId: 42 }])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(true);
+    });
+
+    it('bumps on invoice.payment_failed (grace-period path re-mints against Stripe)', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'invoice.payment_failed',
+          data: {
+            object: {
+              parent: { subscription_details: { subscription: 'sub_123' } },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(
+            capturingSelectThenUpdateDb([
+              { userId: 42, gracePeriodEndsAt: null },
+            ]),
+          ),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'past_due' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(true);
+    });
+
+    it('bumps on charge.refunded when the refund is full', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'charge.refunded',
+          data: {
+            object: {
+              id: 'ch_123',
+              customer: 'cus_123',
+              payment_intent: 'pi_123',
+              amount: 1999,
+              amount_refunded: 1999,
+              currency: 'usd',
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // findSubscriptionByCustomer
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ userId: 42, stripeSubscriptionId: 'sub_123' }])),
+      );
+      // prior tier read + subscription update + users update (full refund)
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(capturingSelectThenUpdateDb([{ tier: 'premium' }])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'refunded' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(true);
+    });
+
+    it('does NOT bump on a partial charge.refunded (tier/entitlements unchanged)', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'charge.refunded',
+          data: {
+            object: {
+              id: 'ch_part',
+              customer: 'cus_123',
+              payment_intent: 'pi_part',
+              amount: 1999,
+              amount_refunded: 500,
+              currency: 'usd',
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ userId: 42, stripeSubscriptionId: 'sub_123' }])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(capturingSelectThenUpdateDb([{ tier: 'premium' }])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(false);
+    });
+
+    it('bumps on charge.dispute.created', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'charge.dispute.created',
+          data: {
+            object: {
+              id: 'dp_123',
+              charge: 'ch_disputed',
+              status: 'warning_needs_response',
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ userId: 42, stripeSubscriptionId: 'sub_123' }])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(capturingSelectThenUpdateDb([{ tier: 'premium' }])),
+      );
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', status: 'disputed' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(true);
+    });
+
+    it('does NOT bump on customer.subscription.trial_will_end', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'customer.subscription.trial_will_end',
+          data: {
+            object: {
+              id: 'sub_123',
+              trial_end: 1700000000,
+              metadata: { userId: '42' },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(false);
+    });
+
+    it('does NOT bump on a stale (out-of-order) subscription.updated', async () => {
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'customer.subscription.updated',
+          created: 100,
+          data: {
+            object: {
+              id: 'sub_123',
+              customer: 'cus_123',
+              status: 'active',
+              cancel_at_period_end: false,
+              trial_end: null,
+              metadata: { userId: '42' },
+              items: { data: [{ current_period_end: 1700000000 }] },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // Existing row carries a newer lastEventTimestamp → event is stale.
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', lastEventTimestamp: 200 }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      expect(bumped()).toBe(false);
+    });
+  });
 });
