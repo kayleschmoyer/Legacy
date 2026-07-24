@@ -1503,6 +1503,9 @@ importers:
       otplib:
         specifier: '*'
         version: 12.0.1
+      stripe:
+        specifier: '*'
+        version: 20.4.1(@types/node@24.10.0)
       zod:
         specifier: ^4.0.0
         version: 4.3.6

@@ -30,6 +30,7 @@
     "jwt-decode": "*",
     "memoize-one": "*",
     "otplib": "*",
+    "stripe": "*",
     "zod": "^4.0.0"
   },
   "devDependencies": {

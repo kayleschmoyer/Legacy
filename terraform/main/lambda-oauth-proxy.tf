@@ -56,6 +56,8 @@ resource "aws_iam_policy" "oauth_proxy_lambda_secrets" {
             aws_secretsmanager_secret.discord_user_signup_webhook_url.arn,
             # Rollbar access token for error tracking
             aws_secretsmanager_secret.rollbar_access_token.arn,
+            # Stripe secret key — mint live entitlements into the JWT (LS-8647/LS-8644)
+            aws_secretsmanager_secret.stripe_secret_key.arn,
           ],
           # Discord OAuth secret (only when configured)
           var.discord_client_secret != "" ? [aws_secretsmanager_secret.discord_client_secret[0].arn] : []
@@ -256,6 +258,13 @@ resource "aws_lambda_function" "oauth_proxy" {
 
       # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
       ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
+
+      # Stripe secret key name — read at cold start to mint live entitlements
+      # into the JWT (LS-8647 reachability; consumed by LS-8644). The lambda
+      # already runs in the same private subnets + security group as the
+      # stripe-webhook lambda, so it shares the existing NAT egress path to the
+      # Stripe API — no additional networking is required.
+      STRIPE_SECRET_KEY_SECRET_NAME = aws_secretsmanager_secret.stripe_secret_key.name
 
       # CORS — comma-separated origins allowed to make credentialed requests.
       # The Lambda code defaults to https://legacy-fantasy.com when not set,
