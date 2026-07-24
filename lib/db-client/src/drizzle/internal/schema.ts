@@ -69,6 +69,16 @@ export const usersInAppInternal = appInternal.table(
     subscriptionTier: subscriptionTierInAppInternal('subscription_tier')
       .notNull()
       .default('free'),
+    // Invalidation marker: records WHEN this user's Stripe entitlements last
+    // changed. Enforcement (LS-8643) compares token `iat` against this to
+    // force-expire stale JWTs. Not an entitlement cache — entitlements live in
+    // the JWT claim. NOT NULL DEFAULT now() (see the add_entitlements_updated_at
+    // migration).
+    entitlementsUpdatedAt: timestamp('entitlements_updated_at', {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
     themePreference: varchar('theme_preference', { length: 10 }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     mfaEnabled: boolean('mfa_enabled').notNull().default(false),

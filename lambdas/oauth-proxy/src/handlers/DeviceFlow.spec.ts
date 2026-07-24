@@ -69,6 +69,7 @@ function makeUser(overrides: Partial<InternalUser> = {}): InternalUser {
     avatarUrl: null,
     privacyPolicyAcceptedAt: null,
     subscriptionTier: 'free',
+    entitlementsUpdatedAt: new Date(),
     themePreference: null,
     lastLoginAt: null,
     mfaEnabled: false,

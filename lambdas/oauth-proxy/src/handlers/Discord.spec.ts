@@ -134,6 +134,7 @@ const mockUser = {
   avatarUrl: null,
   privacyPolicyAcceptedAt: null,
   subscriptionTier: 'free' as const,
+  entitlementsUpdatedAt: new Date(),
   themePreference: null,
   lastLoginAt: null,
   mfaEnabled: false,
