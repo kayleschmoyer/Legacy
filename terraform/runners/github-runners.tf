@@ -18,7 +18,9 @@ locals {
 #   Runner boots once, processes jobs from queue, scale-down Lambda terminates after idle timeout
 #
 # Cost: ~$175-215/month (pre-optimization; target ~$140-180/month after LS-3572) (scale-to-zero, spot instances) vs ~$1,370/month on
-#        GitHub-hosted runners (~96% savings).
+#        GitHub-hosted runners (~96% savings). LS-8693 moved the fleet from
+#        8 GB c-family to 16 GB m-family xlarge (same 4 vCPU): ~15-25% higher
+#        spot rate, required to stop kernel OOM kills of the test job.
 # =============================================================================
 
 module "github_runners" {

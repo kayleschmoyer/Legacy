@@ -79,9 +79,18 @@ variable "github_app_webhook_secret" {
 # ── Runner fleet sizing ───────────────────────────────────────────────────────
 
 variable "github_runners_instance_types" {
-  description = "EC2 instance types for runners, in priority order (spot fleet diversification)"
+  # LS-8693: all types must be ≥16 GB RAM. The previous compute-optimized mix
+  # (c7a/c6a/c7i.xlarge, 8 GB) deterministically OOM-killed the CI Pipeline
+  # test job — kernel oom-killer killed a ~2-3 GB node process inside the
+  # runner service cgroup, systemd tore the unit down ('Failed with result
+  # oom-kill'), and the job died with "The runner has received a shutdown
+  # signal" (9 fleet-wide node OOM kills on 2026-07-26 alone; also the
+  # android-build OOM in build-android-app.yml and the LS-8550 e2e shard-2
+  # flake hypothesis). Types stay at 4 vCPU so jest/nx don't spawn more
+  # workers — same worker count, double the headroom.
+  description = "EC2 instance types for runners, in priority order (spot fleet diversification). Keep every entry at ≥16 GB RAM / 4 vCPU (LS-8693: 8 GB types OOM-kill the test job)."
   type        = list(string)
-  default     = ["c7a.xlarge", "c6a.xlarge", "c7i.xlarge", "m7a.xlarge"]
+  default     = ["m7a.xlarge", "m6a.xlarge", "m7i.xlarge", "m6i.xlarge"]
 }
 
 variable "github_runners_max_count" {

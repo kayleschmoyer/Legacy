@@ -113,12 +113,13 @@ runs:
     # LS-8550: Shard 2/3 has failed intermittently across unrelated specs since
     # LS-8517 (whose code-level route-race fix did not resolve it), with the
     # leading hypothesis being self-hosted spot-runner resource variance —
-    # instance_types in terraform/runners/variables.tf mixes compute-optimized
-    # (c7a/c6a/c7i.xlarge, ~8GB RAM) and general-purpose (m7a.xlarge, ~16GB RAM)
-    # spot capacity, so which one a given shard lands on is non-deterministic.
-    # That hypothesis has never been checked against real data because no
-    # per-shard resource snapshot existed. This step is diagnostic only — it
-    # never fails the job — so the next flaky occurrence has instance-type/
+    # instance_types in terraform/runners/variables.tf used to mix
+    # compute-optimized (c7a/c6a/c7i.xlarge, ~8GB RAM) and general-purpose
+    # (m7a.xlarge, ~16GB RAM) spot capacity, so which one a shard landed on was
+    # non-deterministic. LS-8693 made the fleet uniformly 16 GB after
+    # confirming kernel OOM kills on the 8 GB types; keep this snapshot to
+    # verify the flake disappears with the variance. This step is diagnostic
+    # only — it never fails the job — so any recurrence has instance-type/
     # CPU/memory/load evidence to compare across shards instead of guessing.
     - name: "📈 Runner resource snapshot (pre-test)"
       if: inputs.should-run-e2e == 'true'
