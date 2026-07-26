@@ -139,3 +139,41 @@ describe('githubGraphQL secondary rate limit handling', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('githubGraphQL 504 timeout handling', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('retries a 504 with backoff and succeeds', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(504, 'Gateway Timeout'))
+      .mockResolvedValueOnce(makeResponse(200, { data: { ok: true } }));
+
+    const promise = githubGraphQL<{ ok: boolean }>('query {}', {});
+    await jest.advanceTimersByTimeAsync(2_000);
+
+    const result = await promise;
+    expect(result.data).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after the max number of 504 retries and reports the timeout', async () => {
+    mockFetch.mockImplementation(async () =>
+      makeResponse(504, 'Gateway Timeout'),
+    );
+
+    const promise = githubGraphQL('query {}', {});
+    const assertion = expect(promise).rejects.toThrow(/failed \(504\)/);
+    await jest.advanceTimersByTimeAsync(2_000);
+    await jest.advanceTimersByTimeAsync(4_000);
+    await assertion;
+
+    // initial attempt + 2 retries
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+});

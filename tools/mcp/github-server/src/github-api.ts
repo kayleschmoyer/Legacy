@@ -53,6 +53,20 @@ const PATH_PERMISSION_TABLE: Array<[RegExp, string]> = [
 const MAX_SECONDARY_RATE_LIMIT_RETRIES = 3;
 
 /**
+ * Max attempts to retry a GraphQL request that GitHub timed out (504). Unlike
+ * 502/503 (transient outages, one retry after a flat 1s), a 504 signals the
+ * query itself was too heavy/slow to compute in time — so it gets its own
+ * small retry budget with a longer backoff, bounded so a genuinely stuck
+ * query doesn't hang the caller. See LS-7857.
+ */
+const MAX_GRAPHQL_TIMEOUT_RETRIES = 2;
+
+/** Backoff for a GraphQL-timeout (504) retry: 2s, then 4s. */
+function graphqlTimeoutBackoffMs(attempt: number): number {
+  return Math.min(2_000 * 2 ** attempt, 8_000);
+}
+
+/**
  * Decide whether a non-OK response is a *secondary* rate limit (retryable),
  * as opposed to the primary quota (handled separately via
  * `x-ratelimit-remaining=0`). GitHub returns 403 or 429 with a `Retry-After`
@@ -319,7 +333,7 @@ export async function githubGraphQL<T>(
   query: string,
   variables: Record<string, unknown>,
 ): Promise<GraphQLResult<T>> {
-  return doGraphQL<T>(query, variables, true, 0);
+  return doGraphQL<T>(query, variables, true, 0, 0);
 }
 
 async function doGraphQL<T>(
@@ -327,6 +341,7 @@ async function doGraphQL<T>(
   variables: Record<string, unknown>,
   canRetry: boolean,
   secondaryRetries: number,
+  timeoutRetries: number,
 ): Promise<GraphQLResult<T>> {
   const headers = await buildHeaders();
 
@@ -338,13 +353,41 @@ async function doGraphQL<T>(
 
   if (response.status === 401 && canRetry) {
     await invalidateToken();
-    return doGraphQL<T>(query, variables, false, secondaryRetries);
+    return doGraphQL<T>(
+      query,
+      variables,
+      false,
+      secondaryRetries,
+      timeoutRetries,
+    );
   }
 
   // 502/503 — transient, retry once after 1s
   if ((response.status === 502 || response.status === 503) && canRetry) {
     await new Promise((r) => setTimeout(r, 1_000));
-    return doGraphQL<T>(query, variables, false, secondaryRetries);
+    return doGraphQL<T>(
+      query,
+      variables,
+      false,
+      secondaryRetries,
+      timeoutRetries,
+    );
+  }
+
+  // 504 — the query timed out server-side, often because it's heavy/slow
+  // rather than a transient outage (e.g. a large fan-out query). Retry with
+  // backoff up to MAX_GRAPHQL_TIMEOUT_RETRIES before giving up.
+  if (response.status === 504 && timeoutRetries < MAX_GRAPHQL_TIMEOUT_RETRIES) {
+    await new Promise((r) =>
+      setTimeout(r, graphqlTimeoutBackoffMs(timeoutRetries)),
+    );
+    return doGraphQL<T>(
+      query,
+      variables,
+      canRetry,
+      secondaryRetries,
+      timeoutRetries + 1,
+    );
   }
 
   if (!response.ok) {
@@ -359,7 +402,13 @@ async function doGraphQL<T>(
         'POST /graphql',
       )
     ) {
-      return doGraphQL<T>(query, variables, canRetry, secondaryRetries + 1);
+      return doGraphQL<T>(
+        query,
+        variables,
+        canRetry,
+        secondaryRetries + 1,
+        timeoutRetries,
+      );
     }
 
     throw new Error(

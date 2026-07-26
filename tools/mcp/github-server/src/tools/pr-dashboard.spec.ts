@@ -8,8 +8,8 @@ jest.mock('../github-api', () => ({
   githubRest: jest.fn(),
 }));
 
-import { githubGraphQL } from '../github-api';
 import { getRepoOwnerName } from '../auth';
+import { githubGraphQL } from '../github-api';
 import {
   prDashboard,
   renderDashboardMarkdown,
@@ -442,5 +442,93 @@ describe('prDashboard fetch loop (LS-8196)', () => {
 
     expect(payload.prs.map((p) => p.number)).toEqual([11, 12]);
     expect(payload.truncated).toBe(true);
+  });
+});
+
+// ── prDashboard() fetch pagination (LS-7857) ────────────────────────────────
+// Reuses the prNode()/repoPage()/jsonPayload() helpers from the LS-8196 block
+// above. `../auth` and `../github-api` are already fully mocked, so calling
+// prDashboard() directly works — evaluatePRChecks (imported from
+// `../required-checks`, which itself imports the same mocked `githubRest`)
+// fails harmlessly per-PR and is swallowed by prDashboard's own try/catch,
+// leaving `ciStatus: 'none'` on every row, which these tests don't assert on.
+// Likewise the review-thread-count batch query (also routed through the
+// shared `githubGraphQL` mock) falls through to an unmocked call after the
+// queued page responses are exhausted, which fetchReviewThreadCounts's own
+// per-batch try/catch swallows — harmless for tests that only assert on
+// `prs`/`truncated`/error text.
+describe('prDashboard fetch pagination', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedRepo.mockResolvedValue({ owner: 'o', name: 'r' });
+  });
+
+  it('chunks the main pullRequests query into <=30-PR pages and merges results in order', async () => {
+    const page1Nodes = Array.from({ length: 30 }, (_, i) =>
+      prNode({ number: i + 1 }),
+    );
+    const page2Nodes = Array.from({ length: 10 }, (_, i) =>
+      prNode({ number: i + 31 }),
+    );
+    mockedGraphQL
+      .mockResolvedValueOnce(repoPage(page1Nodes, true, 'cursor-1') as never)
+      .mockResolvedValueOnce(repoPage(page2Nodes, false) as never);
+
+    const result = await prDashboard({
+      state: 'all',
+      limit: 40,
+      format: 'json',
+    });
+    const payload = await jsonPayload(result);
+
+    // Two chunked calls for the main query (first:30/after:null, then
+    // first:10/after:'cursor-1'), each ≤ PAGE_SIZE (30).
+    const mainQueryCalls = mockedGraphQL.mock.calls.filter(([q]) =>
+      q.includes('pullRequests('),
+    );
+    expect(mainQueryCalls).toHaveLength(2);
+    expect(mainQueryCalls[0][1]).toMatchObject({ first: 30, after: null });
+    expect(mainQueryCalls[1][1]).toMatchObject({
+      first: 10,
+      after: 'cursor-1',
+    });
+
+    expect(payload.prs).toHaveLength(40);
+    expect(payload.prs[0].number).toBe(1);
+    expect(payload.prs[39].number).toBe(40);
+  });
+
+  it('issues a single main-query call for a limit within one page (no regression)', async () => {
+    const nodes = Array.from({ length: 5 }, (_, i) =>
+      prNode({ number: i + 1 }),
+    );
+    mockedGraphQL.mockResolvedValueOnce(repoPage(nodes, false) as never);
+
+    const result = await prDashboard({ format: 'json' });
+    const payload = await jsonPayload(result);
+
+    const mainQueryCalls = mockedGraphQL.mock.calls.filter(([q]) =>
+      q.includes('pullRequests('),
+    );
+    expect(mainQueryCalls).toHaveLength(1);
+    expect(mainQueryCalls[0][1]).toMatchObject({ first: 30, after: null });
+    expect(payload.prs).toHaveLength(5);
+  });
+
+  it('returns a structured, actionable error when 504 retries are exhausted', async () => {
+    mockedGraphQL.mockRejectedValueOnce(
+      new Error(
+        "GitHub GraphQL failed (504): We couldn't respond to your request in time.",
+      ),
+    );
+
+    const result = await prDashboard({ state: 'all', limit: 60 });
+
+    expect(result.isError).toBe(true);
+    const text = result.content[0].text as string;
+    expect(text).toContain('github_list_prs');
+    expect(text).not.toBe(
+      "Failed to build PR dashboard: GitHub GraphQL failed (504): We couldn't respond to your request in time.",
+    );
   });
 });
