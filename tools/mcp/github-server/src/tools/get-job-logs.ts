@@ -11,6 +11,7 @@ export interface GetJobLogsParams {
   tailLines?: number;
   maxChars?: number;
   errorSummary?: boolean;
+  truncateLineLength?: number;
 }
 
 /** Default hard cap on output characters to prevent context window overflow. */
@@ -195,21 +196,26 @@ function extractErrorSummary(allLines: string[]): string[] {
 }
 
 /**
- * Apply tail-lines and maxChars limits to a set of log lines.
+ * Apply tail-lines, per-line, and maxChars limits to a set of log lines.
  * Returns the processed text and whether truncation occurred.
  */
 function applyLimits(
   lines: string[],
   tailLines: number,
   maxChars: number,
+  truncateLineLength?: number,
 ): { text: string; truncated: boolean; totalBytes: number } {
   const totalBytes = lines.reduce((n, l) => n + l.length + 1, 0);
   const tailed = lines.length > tailLines ? lines.slice(-tailLines) : lines;
 
   let budget = maxChars;
   const out: string[] = [];
-  for (const line of tailed) {
+  for (const rawLine of tailed) {
     if (budget <= 0) break;
+    const line =
+      truncateLineLength !== undefined && rawLine.length > truncateLineLength
+        ? `${rawLine.slice(0, truncateLineLength)}...[line truncated]`
+        : rawLine;
     if (line.length > budget) {
       out.push(line.slice(0, budget));
       budget = 0;
@@ -292,6 +298,7 @@ export async function getJobLogs(
         errorLines,
         tailLines,
         maxChars,
+        params.truncateLineLength,
       );
       return {
         content: [
@@ -319,6 +326,7 @@ export async function getJobLogs(
       allLines,
       tailLines,
       maxChars,
+      params.truncateLineLength,
     );
 
     return {

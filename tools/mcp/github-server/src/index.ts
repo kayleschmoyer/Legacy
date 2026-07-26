@@ -1935,7 +1935,7 @@ export function createServer(): McpServer {
 
   server.tool(
     'get_job_logs',
-    'Fetch GitHub Actions job logs with server-side truncation. Returns the last tail_lines lines (default 200) and caps output at max_chars (default 10 000) with a truncation indicator. Use error_summary to extract only error/failure lines for faster CI triage. Provide job_id for a single job or run_id (with optional failed_only) to fetch logs for all jobs in a run.',
+    'Fetch GitHub Actions job logs with server-side truncation. Returns the last tail_lines lines (default 200) and caps output at max_chars (default 10 000) with a truncation indicator. Use truncate_line_length to cap individual lines so one pathologically long line cannot consume the whole max_chars budget by itself. Use error_summary to extract only error/failure lines for faster CI triage. Provide job_id for a single job or run_id (with optional failed_only) to fetch logs for all jobs in a run.',
     {
       job_id: z.coerce
         .number()
@@ -1979,6 +1979,14 @@ export function createServer(): McpServer {
         .describe(
           'When true, extract only lines matching error/failure patterns (error, FAIL, failed, exit code, etc.) plus 2 lines of context. Dramatically reduces token usage for CI-diagnosis tasks.',
         ),
+      truncate_line_length: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Truncate individual lines longer than this many characters (e.g. 500). Useful when a log line is pathologically long (e.g. a single line of embedded ANSI or minified output), so it cannot alone consume the entire max_chars budget. Truncated lines are suffixed with ...[line truncated].',
+        ),
     },
     async (params) =>
       getJobLogs({
@@ -1988,6 +1996,7 @@ export function createServer(): McpServer {
         tailLines: params.tail_lines,
         maxChars: params.max_chars,
         errorSummary: params.error_summary,
+        truncateLineLength: params.truncate_line_length,
       }),
   );
 

@@ -118,6 +118,101 @@ describe('getJobLogs', () => {
     });
   });
 
+  describe('truncateLineLength (AC1 + AC2 + AC4)', () => {
+    it('truncates a line longer than truncate_line_length with the indicator', async () => {
+      const longLine = 'x'.repeat(1000);
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(longLine));
+
+      const result = await getJobLogs({
+        jobId: 1,
+        tailLines: 1000,
+        maxChars: 1_000_000,
+        truncateLineLength: 50,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      const logsStr = payload.logs as string;
+      expect(logsStr).toContain('...[line truncated]');
+      for (const line of logsStr.split('\n')) {
+        expect(line.length).toBeLessThanOrEqual(
+          50 + '...[line truncated]'.length,
+        );
+      }
+    });
+
+    it('truncates multiple long lines independently so more lines survive the same maxChars budget', async () => {
+      const longLine = 'y'.repeat(500);
+      const lines = Array.from({ length: 10 }, () => longLine);
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(lines.join('\n')));
+
+      const withoutTruncation = await getJobLogs({
+        jobId: 1,
+        tailLines: 1000,
+        maxChars: 1200,
+      });
+      const withTruncation = await getJobLogs({
+        jobId: 1,
+        tailLines: 1000,
+        maxChars: 1200,
+        truncateLineLength: 50,
+      });
+
+      const countFullLines = (text: string) =>
+        text.split('\n').filter((l) => l === longLine).length;
+      const countTruncatedLines = (text: string) =>
+        text
+          .split('\n')
+          .filter((l) => l.startsWith('y'.repeat(50)) && l !== longLine).length;
+
+      const linesWithout = countFullLines(
+        parse(withoutTruncation.content[0].text).logs as string,
+      );
+      const linesWith = countTruncatedLines(
+        parse(withTruncation.content[0].text).logs as string,
+      );
+
+      expect(linesWith).toBeGreaterThan(linesWithout);
+    });
+
+    it('applies truncate_line_length in errorSummary mode too', async () => {
+      const longErrorLine = `error: ${'z'.repeat(1000)}`;
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(longErrorLine));
+
+      const result = await getJobLogs({
+        jobId: 1,
+        errorSummary: true,
+        truncateLineLength: 50,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      const logsStr = payload.logs as string;
+      expect(logsStr).toContain('...[line truncated]');
+      for (const line of logsStr.split('\n')) {
+        expect(line.length).toBeLessThanOrEqual(
+          50 + '...[line truncated]'.length,
+        );
+      }
+    });
+
+    it('leaves behavior unchanged when truncate_line_length is omitted', async () => {
+      const longLine = 'x'.repeat(1000);
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(longLine));
+
+      const result = await getJobLogs({
+        jobId: 1,
+        tailLines: 1000,
+        maxChars: 1_000_000,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.logs as string).toBe(longLine);
+      expect(payload.logs as string).not.toContain('[line truncated]');
+    });
+  });
+
   describe('errorSummary mode', () => {
     it('extracts only error lines and includes totalLogLines', async () => {
       const lines = [
