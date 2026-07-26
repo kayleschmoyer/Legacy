@@ -21,7 +21,11 @@ Follow the full [worktree-workflow skill](../../worktree-workflow/SKILL.md):
       ```
       It links `node_modules` to the content-addressable pool slot for the worktree's lockfile (and symlinks `.env`/`.env.local` from main). Idempotent, no escaping needed. Requires Windows Developer Mode — there is no independent-install fallback. After it, `pnpm exec nx`, `make typecheck`, `make pc` all work. Do NOT call `make_wt_setup` — it's sibling-only.
     - **Sibling flow**: `make_wt_setup(worktreePath: "$wt")`. Shell fallback: `make wt-setup WT=$wt`.
-    - **Pre-populate task list (both flows)** — create a `TodoWrite` checklist covering every remaining workflow step before writing any code. Agents with an explicit pending list are far less likely to stop at intermediate checkpoints (self-review, `make pc`, mark-ready). **The order below is the [ticket-to-merge spine](../../workflow-overview/references/ticket-to-merge-spine.md)'s (spine step in each item) — the draft PR opens _before_ validation** (the spine's draft-PR-before-validation gate; commit → push → draft PR is the durable checkpoint that survives a container kill mid-validation). Do not reorder; if the order here ever disagrees with the spine, the spine wins:
+    - **Pre-populate task list (both flows)** — create a checklist covering every remaining workflow step before writing any code. Agents with an explicit pending list are far less likely to stop at intermediate checkpoints (self-review, `make pc`, mark-ready). **The order below is the [ticket-to-merge spine](../../workflow-overview/references/ticket-to-merge-spine.md)'s (spine step in each item) — the draft PR opens _before_ validation** (the spine's draft-PR-before-validation gate; commit → push → draft PR is the durable checkpoint that survives a container kill mid-validation). Do not reorder; if the order here ever disagrees with the spine, the spine wins.
+
+      > **Environment note**: the example below uses `TodoWrite(todos: [...])`, a single bulk-array call. **Claude Code Remote (cloud) sessions do not have this tool** — they expose `TaskCreate` (one task per call; `subject`/`description`/`activeForm` params, no array) and `TaskUpdate` (status transitions, `addBlockedBy`/`addBlocks`) instead. Calling `TodoWrite([...])` in a cloud session fails immediately with `InputValidationError: ... An unexpected parameter 'tasks' was provided`. If unsure which tool your session has, check the available-tools listing, or `ToolSearch("select:TodoWrite,TaskCreate")`, before emitting either form.
+
+      **Local / TodoWrite sessions:**
 
       ```
       TodoWrite([
@@ -46,6 +50,33 @@ Follow the full [worktree-workflow skill](../../worktree-workflow/SKILL.md):
         { id: "gap-audit",      content: "MCP gap audit: Skill(skill: 'mcp-gap-audit') (spine 16)",                                       status: "pending" },
         { id: "tracking-tasks", content: "Complete tracking tasks: TaskUpdate(taskId: <id>, status: 'completed')",                        status: "pending" },
       ])
+      ```
+
+      **Claude Code Remote (cloud) sessions:** call `TaskCreate` once per item (all tasks are created `pending`), then immediately `TaskUpdate` the first one to `in_progress` since implementation begins right away:
+
+      ```
+      TaskCreate({ subject: "Implement code + tests",         description: "Spine 6 — implement code + tests for this ticket", activeForm: "Implementing code + tests" })
+      TaskCreate({ subject: "Write implementation notes",     description: "Post an Implementation Notes comment to Jira via jira_add_comment" })
+      TaskCreate({ subject: "Commit",                         description: "worktree_commit — ticket key in message (spine 7)" })
+      TaskCreate({ subject: "First push",                     description: "worktree_push({ setUpstream: true }) (spine 8)" })
+      TaskCreate({ subject: "Open draft PR",                  description: "github_create_pr(draft: true) + agent-in-progress label + continuation checkpoint (spine 9 — BEFORE validation)" })
+      TaskCreate({ subject: "Migrations",                     description: "db:status + db:up (spine 11)" })
+      TaskCreate({ subject: "Validate",                       description: "make_run(target: 'pc') — must pass (spine 12)" })
+      TaskCreate({ subject: "Self-review",                    description: "AC verification + Skill(skill: 'review') — fix all issues (spine 13)" })
+      // Add this task if ANY of the following are true: the ticket description contains a "failing test"
+      // section, a "run the spec locally" requirement, or a "DO NOT SUBMIT" block; the ticket names a
+      // specific spec as a verification gate; or you modified any .integration.spec.ts file.
+      // When in doubt, add it — skipping is worse than a false positive.
+      // TaskCreate({ subject: "Local spec gate", description: "Verify playwright installed, run failing spec against live backend, confirm it passes" })
+      TaskCreate({ subject: "Mark PR ready",                  description: "github_mark_pr_ready (spine 14)" })
+      TaskCreate({ subject: "Transition Jira to In Review",   description: "jira_transition" })
+      TaskCreate({ subject: "Watch PR to merge",              description: "Handle CI failures and review threads until checks pass (spine 15)" })
+      TaskCreate({ subject: "Merge PR",                       description: "review_approved + all checks passing" })
+      TaskCreate({ subject: "MCP gap audit",                  description: "Skill(skill: 'mcp-gap-audit') (spine 16)" })
+      TaskCreate({ subject: "Complete tracking tasks",        description: "TaskUpdate(taskId: <id>, status: 'completed') for every task above" })
+
+      // implementation begins immediately after the list is created
+      TaskUpdate({ taskId: "<implement-task-id>", status: "in_progress" })
       ```
 
       Mark each item `in_progress` when you start it and `completed` when done. **The workflow is not complete until every item is `completed`.** Arriving at `validate` or `self-review` with pending items still in the list is NOT the finish line — keep going.
