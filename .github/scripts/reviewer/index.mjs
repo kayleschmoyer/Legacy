@@ -49,8 +49,9 @@ import {
   filterFindingsCycle3,
   buildAuthorResponsesSection,
   buildAuthorResolvedTitles,
-  hasCannotComplyResponse,
   collectCannotComplyResponses,
+  withCannotComplyTitles,
+  unresolvedCannotComplyEntries,
   getMalformedInlineReplies,
 } from './lib/cycle-protocol.mjs';
 import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
@@ -538,6 +539,12 @@ async function main() {
   let authorFormatErrors = 0;
   let resolvedTitles = new Set();
   let justifiedTitles = new Set();
+  let cannotComplyTitles = new Set();
+  let cannotComplyReasons = new Map();
+  // Title-augmented CANNOT-COMPLY entries, checked against the Cycle 3
+  // post-LLM validator output below (LS-8337) — populated here so the bot
+  // gets a chance to accept or refute-with-reason before any escalation.
+  let cannotComplyEntries = [];
   if (cycle >= 2 && lastBotReview) {
     try {
       const authorResponses = buildAuthorResponsesSection(
@@ -549,7 +556,8 @@ async function main() {
       authorResponsesSection = authorResponses.section;
       authorFormatErrors = authorResponses.formatErrors;
 
-      // Build sets of FIX'd/JUSTIFY'd finding titles for post-LLM validators.
+      // Build sets of FIX'd/JUSTIFY'd/CANNOT-COMPLY'd finding titles for
+      // post-LLM validators and prompt guidance.
       // FIX: replies with a valid PR SHA are treated as resolved even if the LLM
       // re-raises the finding — the author's commit is stronger evidence than the LLM.
       const resolved = buildAuthorResolvedTitles(
@@ -558,6 +566,8 @@ async function main() {
       );
       resolvedTitles = resolved.resolvedTitles;
       justifiedTitles = resolved.justifiedTitles;
+      cannotComplyTitles = resolved.cannotComplyTitles;
+      cannotComplyReasons = resolved.cannotComplyReasons;
       if (resolvedTitles.size > 0) {
         process.stdout.write(
           `[reviewer] Cycle ${cycle}: ${resolvedTitles.size} finding(s) resolved via FIX: reply — will suppress if re-raised\n`,
@@ -566,6 +576,11 @@ async function main() {
       if (justifiedTitles.size > 0) {
         process.stdout.write(
           `[reviewer] Cycle ${cycle}: ${justifiedTitles.size} finding(s) with JUSTIFY: reply — will suppress if re-raised\n`,
+        );
+      }
+      if (cannotComplyTitles.size > 0) {
+        process.stdout.write(
+          `[reviewer] Cycle ${cycle}: ${cannotComplyTitles.size} finding(s) with CANNOT-COMPLY: reply — bot will accept or refute-with-reason\n`,
         );
       }
       if (authorResponsesSection) {
@@ -597,39 +612,24 @@ async function main() {
         }
       }
 
-      // Cycle 3+: CANNOT-COMPLY short-circuit — escalate before calling the LLM.
-      // The LLM's VERIFY-mode prompt focuses on code state and silently ignores
-      // compliance claims, so escalation must happen here rather than in the prompt.
-      if (
-        cycle >= 3 &&
-        hasCannotComplyResponse(
+      // Collect CANNOT-COMPLY entries (title-augmented) for the Cycle 3
+      // post-validator escalation check below. Unlike the prior behavior,
+      // this no longer short-circuits before the LLM runs — the bot is given
+      // accept/refute-with-reason guidance via buildCycleRoleSection and only
+      // escalates if a claim is still unresolved after its Cycle 3
+      // verification pass (LS-8337).
+      if (cycle >= 3) {
+        cannotComplyEntries = withCannotComplyTitles(
+          collectCannotComplyResponses(
+            prReviewComments,
+            prIssueComments,
+            lastBotReview.submittedAt,
+            REVIEWER_BOT_LOGINS,
+            authorLogin,
+          ),
           prReviewComments,
-          prIssueComments,
-          lastBotReview.submittedAt,
           REVIEWER_BOT_LOGINS,
-          authorLogin,
-        )
-      ) {
-        const cannotComplyEntries = collectCannotComplyResponses(
-          prReviewComments,
-          prIssueComments,
-          lastBotReview.submittedAt,
-          REVIEWER_BOT_LOGINS,
-          authorLogin,
         );
-        await escalateToHumanArbitration(
-          prNumber,
-          sha,
-          `Cycle ${cycle}: CANNOT-COMPLY detected — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting`,
-          {
-            body: buildCannotComplyArbitrationComment(
-              prNumber,
-              cycle,
-              cannotComplyEntries,
-            ),
-          },
-        );
-        return;
       }
     } catch (err) {
       process.stderr.write(
@@ -759,6 +759,8 @@ async function main() {
       postReviewCommitShas,
       resolvedTitles,
       justifiedTitles,
+      cannotComplyTitles,
+      cannotComplyReasons,
     );
     systemPrompt = buildSystemPrompt(cycleRoleSection);
     userPrompt = buildUserPrompt(
@@ -1079,6 +1081,7 @@ async function main() {
       filteredFindings,
       priorTitles,
       resolvedTitles,
+      justifiedTitles,
     );
     if (stripped.length > 0) {
       process.stdout.write(
@@ -1087,6 +1090,36 @@ async function main() {
     }
     filteredFindings = kept;
     strippedFindings = [...strippedFindings, ...stripped];
+
+    // CANNOT-COMPLY: escalate only if a claim is still unresolved after the
+    // bot's Cycle 3 verification pass — not merely because a CANNOT-COMPLY
+    // token was posted (LS-8337 AC4). Cycle 3 is the final review cycle, so
+    // a still-unresolved claim here is a genuine standoff worth a human
+    // decision rather than waiting for the generic MAX_CYCLE overflow.
+    if (cannotComplyEntries.length > 0) {
+      const unresolved = unresolvedCannotComplyEntries(
+        cannotComplyEntries,
+        filteredFindings,
+      );
+      if (unresolved.length > 0) {
+        await escalateToHumanArbitration(
+          prNumber,
+          sha,
+          `Cycle ${cycle}: CANNOT-COMPLY claim(s) still unresolved after bot verification — applying '${NEEDS_HUMAN_ARBITRATION_LABEL}' label and exiting`,
+          {
+            body: buildCannotComplyArbitrationComment(
+              prNumber,
+              cycle,
+              unresolved,
+            ),
+          },
+        );
+        return;
+      }
+      process.stdout.write(
+        `[reviewer] Cycle ${cycle}: all ${cannotComplyEntries.length} CANNOT-COMPLY claim(s) resolved by the bot (accepted or refuted) — no escalation\n`,
+      );
+    }
   }
 
   const gated = gateFindingsBySeverity(filteredFindings);
@@ -1369,10 +1402,13 @@ function buildCycleLimitArbitrationComment(cycle, lastBotReview) {
 }
 
 /**
- * Build the issue-level comment posted when the author submits a
- * CANNOT-COMPLY reply. Lists every CANNOT-COMPLY entry with its issue-id,
- * the author's reason, and a link to the originating comment so a maintainer
- * can jump straight to the disputed thread.
+ * Build the issue-level comment posted when a CANNOT-COMPLY claim is still
+ * unresolved after the bot's Cycle 3 verification pass. Lists every
+ * still-unresolved entry with its issue-id, the author's reason, and a link
+ * to the originating comment so a maintainer can jump straight to the
+ * disputed thread. The bot has already had a chance to accept or
+ * refute-with-reason each claim (LS-8337) — reaching this comment means it
+ * could not resolve at least one of them on its own.
  *
  * @param {number} prNumber
  * @param {number} cycle
@@ -1382,9 +1418,9 @@ function buildCycleLimitArbitrationComment(cycle, lastBotReview) {
 function buildCannotComplyArbitrationComment(prNumber, cycle, entries) {
   const lines = [
     '> [!IMPORTANT]',
-    `> **Human arbitration needed — author posted \`CANNOT-COMPLY\` (cycle ${cycle}).**`,
+    `> **Human arbitration needed — \`CANNOT-COMPLY\` claim still unresolved (cycle ${cycle}).**`,
     '',
-    'The author has declared one or more findings impossible to fix. A human reviewer is needed to adjudicate each claim.',
+    'The author declared one or more findings impossible to fix. The bot evaluated each claim and could not resolve it (accept or refute-with-reason) on its own — a human reviewer is needed to adjudicate.',
     '',
   ];
   if (entries.length === 0) {

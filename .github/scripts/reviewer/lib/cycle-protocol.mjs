@@ -177,19 +177,29 @@ export function filterFindingsCycle2(
  * This prevents the bot from re-flagging issues the author has already addressed
  * when the LLM fails to recognize the fix in the diff.
  *
+ * Also strips a mandate re-raised despite a `JUSTIFY: <rationale>` reply
+ * (`justifiedTitles`), mirroring `filterFindingsCycle2`'s existing backstop —
+ * a JUSTIFY posted against a Cycle-2 mandate previously had prompt-only
+ * enforcement at Cycle 3 (no post-LLM validator), so an LLM that re-raised
+ * the mandate unchanged despite the "do not repeat verbatim" instruction let
+ * the finding survive into escalation (LS-8337 AC1).
+ *
  * Stripped findings are annotated with a `strip_reason` field:
  *   - `'author_fixed'`              — author posted FIX: with a valid PR SHA
+ *   - `'author_justified'`          — author posted JUSTIFY: rationale
  *   - `'not_in_c2_mandate_list'`    — finding not in the C2 mandate list
  *
  * @param {import('./findings.mjs').Finding[]} findings
  * @param {string[]} mandateTitles    Titles from Cycle 2's review body
  * @param {Set<string>} [resolvedTitles] Lowercase titles where author FIX'd with a valid SHA
+ * @param {Set<string>} [justifiedTitles] Lowercase titles where author posted JUSTIFY:
  * @returns {{ kept: import('./findings.mjs').Finding[], stripped: StrippedFinding[] }}
  */
 export function filterFindingsCycle3(
   findings,
   mandateTitles,
   resolvedTitles = new Set(),
+  justifiedTitles = new Set(),
 ) {
   const mandateSet = new Set(mandateTitles.map((t) => t.toLowerCase()));
 
@@ -203,6 +213,14 @@ export function filterFindingsCycle3(
     // Suppress even if the LLM re-raised it — trust the explicit FIX reply.
     if (resolvedTitles.has(titleLower)) {
       stripped.push({ ...f, strip_reason: 'author_fixed' });
+      continue;
+    }
+
+    // Author provided a JUSTIFY rationale against this mandate. Suppress if
+    // the LLM re-raises despite having the rationale in the prompt, mirroring
+    // filterFindingsCycle2's identical backstop.
+    if (justifiedTitles.has(titleLower)) {
+      stripped.push({ ...f, strip_reason: 'author_justified' });
       continue;
     }
 
@@ -226,6 +244,13 @@ export function filterFindingsCycle3(
  * @param {Set<string>} [justifiedTitles] Lowercase titles the author posted a JUSTIFY: reply for (C2/C3).
  *   These are excluded from the "re-evaluate"/"verify" lists and explicitly marked do-not-re-raise so a
  *   sound justification does not get re-raised and burn a review cycle toward the arbitration limit (LS-7768).
+ * @param {Set<string>} [cannotComplyTitles] Lowercase titles the author posted a CANNOT-COMPLY: reply for (C2/C3).
+ *   Unlike `justifiedTitles`, these are NOT unconditionally suppressed by the post-LLM validator — the bot
+ *   must explicitly accept (omit) or refute-with-reason (re-raise addressing the claimed impossibility) so a
+ *   genuine refutation survives as a normal mandate instead of only ever silently dropping or escalating
+ *   unconditionally (LS-8337).
+ * @param {Map<string, string>} [cannotComplyReasons] Lowercase title -> the author's stated CANNOT-COMPLY reason,
+ *   echoed in the prompt so the LLM can quote the specific claim it is accepting or refuting.
  * @returns {string}
  */
 export function buildCycleRoleSection(
@@ -234,6 +259,8 @@ export function buildCycleRoleSection(
   postC1CommitShas = [],
   resolvedTitles = new Set(),
   justifiedTitles = new Set(),
+  cannotComplyTitles = new Set(),
+  cannotComplyReasons = new Map(),
 ) {
   if (cycle === 1) {
     return `\
@@ -246,13 +273,14 @@ restrictions on what you may raise in this cycle.`;
 
   if (cycle === 2) {
     // Build sorted list of C1 titles that have NOT been verified as fixed and
-    // were NOT justified by the author, so the LLM only re-adjudicates titles
-    // that still genuinely need it. Justified titles are handled by their own
-    // do-not-re-raise block below (LS-7768).
+    // were NOT justified/CANNOT-COMPLY'd by the author, so the LLM only
+    // re-adjudicates titles that still genuinely need it. Justified and
+    // CANNOT-COMPLY titles are handled by their own dedicated blocks below.
     const pendingTitles = priorTitles.filter(
       (t) =>
         !resolvedTitles.has(t.toLowerCase()) &&
-        !justifiedTitles.has(t.toLowerCase()),
+        !justifiedTitles.has(t.toLowerCase()) &&
+        !cannotComplyTitles.has(t.toLowerCase()),
     );
     const priorBlock =
       pendingTitles.length > 0
@@ -269,6 +297,11 @@ restrictions on what you may raise in this cycle.`;
         ? `\n\n**Author posted a JUSTIFY: reply for these findings — do NOT re-raise unless the justification is demonstrably wrong.** Re-raising a sound justification wastes a review cycle toward the arbitration limit; the validator will strip it regardless. If you DO re-raise one of these, your finding \`body\` MUST explicitly quote the author's rationale and state the specific reason it is wrong — never repeat the original finding text verbatim:\n${[...justifiedTitles].map((t) => `  - ${t}`).join('\n')}`
         : '';
 
+    const cannotComplyBlock =
+      cannotComplyTitles.size > 0
+        ? `\n\n**Author posted a CANNOT-COMPLY: reply for these findings — evaluate the claimed impossibility on its merits.** Accept it (OMIT the finding) if the claim is legitimate. If you disagree, keep the finding as a normal mandate, but its \`body\` MUST quote or paraphrase the author's specific reason and explain why it does not hold — never repeat the original finding text verbatim:\n${[...cannotComplyTitles].map((t) => `  - ${t}${cannotComplyReasons.has(t) ? `: "${cannotComplyReasons.get(t)}"` : ''}`).join('\n')}`
+        : '';
+
     const shaListBlock =
       postC1CommitShas.length > 0
         ? `\n\nCommits the author pushed since Cycle 1 — these are the ONLY SHAs you may cite:\n${postC1CommitShas.map((sha) => `  - \`${sha.slice(0, 7)}\``).join('\n')}`
@@ -280,7 +313,7 @@ restrictions on what you may raise in this cycle.`;
 You are **adjudicating Cycle 1 findings** against the current code state. \
 Re-evaluate each prior finding against the current diff **and** any author \
 replies provided below. If the issue is still present and unaddressed, re-raise \
-it (it becomes a mandate). If it is resolved or the justification is sound, omit it.${resolvedBlock}${justifiedBlock}${priorBlock}
+it (it becomes a mandate). If it is resolved or the justification is sound, omit it.${resolvedBlock}${justifiedBlock}${cannotComplyBlock}${priorBlock}
 
 **Evaluating author replies (provided as "## Author Responses" in the user prompt):**
 - \`FIX: <sha>\` — verify the fix exists in HEAD. **Do NOT re-raise** if the fix \
@@ -298,6 +331,13 @@ must directly address the author's rationale: quote or paraphrase what they \
 argued, then explain the specific reason it does not hold (e.g. "the author says \
 X is safe because Y, but Y does not apply here because Z"). A re-raise that \
 ignores the rationale is a process failure.
+- \`CANNOT-COMPLY: <reason>\` — the author claims fixing this is impossible. \
+Evaluate the claim like a JUSTIFY: **accept and omit** the finding if the claim \
+is legitimate (e.g. the file is generated, the constraint is external and real). \
+**Refute and keep** it as a normal mandate only if the claim is demonstrably \
+wrong or overstated — and as with JUSTIFY, do NOT repeat the original finding \
+verbatim; the \`body\` must directly quote the author's claimed reason and state \
+specifically why it does not hold.
 - No reply — treat as unaddressed; re-raise if the issue is still present in the diff.
 
 **Your instructions:**
@@ -324,7 +364,8 @@ they will be stripped before the review is posted.`;
     const pendingMandates = priorTitles.filter(
       (t) =>
         !resolvedTitles.has(t.toLowerCase()) &&
-        !justifiedTitles.has(t.toLowerCase()),
+        !justifiedTitles.has(t.toLowerCase()) &&
+        !cannotComplyTitles.has(t.toLowerCase()),
     );
     const mandateBlock =
       pendingMandates.length > 0
@@ -341,11 +382,16 @@ they will be stripped before the review is posted.`;
         ? `\n\n**Author posted a JUSTIFY: reply for these findings — they are NOT mandates; OMIT from output unless the justification is demonstrably wrong. If you do re-raise one, the \`body\` MUST quote the author's rationale and give the specific reason it is wrong — do not repeat the original finding verbatim:**\n${[...justifiedTitles].map((t) => `  - ${t}`).join('\n')}`
         : '';
 
+    const cannotComplyBlock =
+      cannotComplyTitles.size > 0
+        ? `\n\n**Author posted a CANNOT-COMPLY: reply for these mandates — this is the final verification cycle.** Accept the claim (OMIT from output) if it is legitimate. If you disagree, keep it in your output as an unresolved mandate — but do not repeat the original finding verbatim; the \`body\` MUST quote the author's claimed reason and state specifically why it does not hold. A mandate you keep here that still cites this reply may be escalated for human arbitration if it remains unresolved:\n${[...cannotComplyTitles].map((t) => `  - ${t}${cannotComplyReasons.has(t) ? `: "${cannotComplyReasons.get(t)}"` : ''}`).join('\n')}`
+        : '';
+
     return `\
 ## Your Role This Cycle: VERIFY (Cycle 3 of 3)
 
 You are **verifying mandate compliance** — checking only whether the author \
-addressed each specific mandate issued in Cycle 2.${resolvedBlock}${justifiedBlock}${mandateBlock}
+addressed each specific mandate issued in Cycle 2.${resolvedBlock}${justifiedBlock}${cannotComplyBlock}${mandateBlock}
 
 **Rules — strictly enforced by the post-LLM validator:**
 - Output findings **only** for mandates that are still unaddressed.
@@ -425,6 +471,27 @@ export function getMalformedInlineReplies(
 }
 
 /**
+ * Build a map from bot root review-comment id to the finding title extracted
+ * from that comment's body ("**[SEV]** title\n\n..." or "**[SEV]** title — loc").
+ * Shared by {@link buildAuthorResponsesSection} and
+ * {@link withCannotComplyTitles} so both correlate author replies to the same
+ * finding identity.
+ *
+ * @param {Array<{ id: number, inReplyToId: number | null, userLogin: string | null, body: string }>} reviewComments
+ * @param {Set<string>} botLogins
+ * @returns {Map<number, string>}
+ */
+function mapBotRootCommentIdToTitle(reviewComments, botLogins) {
+  const rootIdToTitle = new Map();
+  for (const c of reviewComments) {
+    if (!botLogins.has(c.userLogin) || c.inReplyToId !== null) continue;
+    const m = c.body.match(/\*\*\[[A-Z]+\]\*\*\s+(.+?)(?:\s+—\s+|\n|$)/m);
+    if (m) rootIdToTitle.set(c.id, m[1].trim());
+  }
+  return rootIdToTitle;
+}
+
+/**
  * Build the "## Author Responses" section to inject into the Cycle 2+ user prompt.
  *
  * Collects FIX/JUSTIFY/CANNOT-COMPLY tokens from two sources:
@@ -453,14 +520,7 @@ export function buildAuthorResponsesSection(
   let formatErrors = 0;
 
   // --- Part 1: inline review thread replies (blocking and non-blocking findings) ---
-  // Build a map from bot root comment id → finding title extracted from the
-  // comment body ("**[SEV]** title\n\n..." or "**[SEV]** title — loc").
-  const rootIdToTitle = new Map();
-  for (const c of reviewComments) {
-    if (!botLogins.has(c.userLogin) || c.inReplyToId !== null) continue;
-    const m = c.body.match(/\*\*\[[A-Z]+\]\*\*\s+(.+?)(?:\s+—\s+|\n|$)/m);
-    if (m) rootIdToTitle.set(c.id, m[1].trim());
-  }
+  const rootIdToTitle = mapBotRootCommentIdToTitle(reviewComments, botLogins);
 
   for (const c of reviewComments) {
     if (botLogins.has(c.userLogin) || c.inReplyToId === null) continue;
@@ -519,14 +579,21 @@ export function buildAuthorResponsesSection(
  *
  * Title matching is case-insensitive (normalized to lowercase).
  *
+ * Also classifies `CANNOT-COMPLY: <reason>` replies into `cannotComplyTitles`
+ * (with the claimed reason captured in `cannotComplyReasons`), so
+ * `buildCycleRoleSection` can give the LLM explicit accept/refute-with-reason
+ * guidance the same way it already does for JUSTIFY (LS-8337).
+ *
  * @param {Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }>} responseItems
  *   The `items` field returned by `buildAuthorResponsesSection`.
  * @param {string[]} prCommitShas  Full 40-char SHAs of all commits in the PR
- * @returns {{ resolvedTitles: Set<string>, justifiedTitles: Set<string> }}
+ * @returns {{ resolvedTitles: Set<string>, justifiedTitles: Set<string>, cannotComplyTitles: Set<string>, cannotComplyReasons: Map<string, string> }}
  */
 export function buildAuthorResolvedTitles(responseItems, prCommitShas) {
   const resolvedTitles = new Set();
   const justifiedTitles = new Set();
+  const cannotComplyTitles = new Set();
+  const cannotComplyReasons = new Map();
 
   for (const { title, parsed } of responseItems) {
     if (!title) continue;
@@ -536,10 +603,18 @@ export function buildAuthorResolvedTitles(responseItems, prCommitShas) {
       resolvedTitles.add(titleLower);
     } else if (parsed.type === 'JUSTIFY') {
       justifiedTitles.add(titleLower);
+    } else if (parsed.type === 'CANNOT-COMPLY') {
+      cannotComplyTitles.add(titleLower);
+      cannotComplyReasons.set(titleLower, parsed.reason);
     }
   }
 
-  return { resolvedTitles, justifiedTitles };
+  return {
+    resolvedTitles,
+    justifiedTitles,
+    cannotComplyTitles,
+    cannotComplyReasons,
+  };
 }
 
 /**
@@ -642,4 +717,64 @@ export function collectCannotComplyResponses(
     }
   }
   return out;
+}
+
+/**
+ * Correlate each {@link CannotComplyEntry} (from `collectCannotComplyResponses`)
+ * to the finding title of the bot comment thread it replied to, when the
+ * entry came from an inline review-comment reply (`source: 'review'`).
+ * PR-level issue-comment entries (`source: 'issue'`) have no originating
+ * thread to correlate and get `title: null`.
+ *
+ * Kept as a separate function (rather than adding a `title` field directly to
+ * `collectCannotComplyResponses`'s return shape) so existing callers of that
+ * function are unaffected (LS-8337).
+ *
+ * @param {CannotComplyEntry[]} entries
+ * @param {Array<{ id: number, inReplyToId: number | null, userLogin: string | null, body: string }>} reviewComments
+ * @param {Set<string>} botLogins
+ * @returns {Array<CannotComplyEntry & { title: string | null }>}
+ */
+export function withCannotComplyTitles(entries, reviewComments, botLogins) {
+  const rootIdToTitle = mapBotRootCommentIdToTitle(reviewComments, botLogins);
+  const commentById = new Map(reviewComments.map((c) => [c.id, c]));
+  return entries.map((e) => {
+    if (e.source !== 'review') return { ...e, title: null };
+    const comment = commentById.get(e.commentId);
+    const title = comment
+      ? (rootIdToTitle.get(comment.inReplyToId) ?? null)
+      : null;
+    return { ...e, title };
+  });
+}
+
+/**
+ * Determine which title-augmented CANNOT-COMPLY entries (from
+ * {@link withCannotComplyTitles}) remain unresolved after the Cycle 3
+ * post-LLM validator (`filterFindingsCycle3`) has run, and therefore require
+ * human arbitration (LS-8337 AC4).
+ *
+ * The bot is given explicit accept/refute-with-reason guidance for every
+ * titled CANNOT-COMPLY entry via `buildCycleRoleSection`'s cannotComplyBlock.
+ * An entry is **resolved** when its title is absent from `filteredFindings` —
+ * either because the bot accepted the claim (omitted the finding), or because
+ * an earlier Cycle 2 refutation already addressed it in a prior round. An
+ * entry is **unresolved** when its title is still present in
+ * `filteredFindings` — Cycle 3 is the final review cycle, so a claim the bot
+ * still cannot resolve here is a genuine standoff worth a human decision
+ * rather than waiting for the generic MAX_CYCLE overflow. An entry with no
+ * matched title (a PR-level reply with no originating thread) cannot be
+ * correlated to a specific finding and is always treated as unresolved.
+ *
+ * @param {Array<CannotComplyEntry & { title: string | null }>} entries
+ * @param {import('./findings.mjs').Finding[]} filteredFindings  Cycle 3 kept findings, post filterFindingsCycle3
+ * @returns {Array<CannotComplyEntry & { title: string | null }>} entries still requiring escalation
+ */
+export function unresolvedCannotComplyEntries(entries, filteredFindings) {
+  const survivingTitles = new Set(
+    filteredFindings.map((f) => f.title.toLowerCase()),
+  );
+  return entries.filter(
+    (e) => !e.title || survivingTitles.has(e.title.toLowerCase()),
+  );
 }

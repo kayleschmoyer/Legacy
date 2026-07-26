@@ -6,7 +6,7 @@ This repo uses a protocol-enforcing bot reviewer. After review:
 - Push your fix commits
 - Apply the `bot:ready-for-review` label to fire the next review cycle
 - Don't push without applying the label — pushes alone do not trigger a re-review
-- If a Cycle 3 mandate is genuinely impossible: `CANNOT-COMPLY: <issue-id> <reason>` (escalates to a human)
+- If a Cycle 3 mandate is genuinely impossible: `CANNOT-COMPLY: <issue-id> <reason>` (the bot accepts or refutes the claim; escalates to a human only if still unresolved after its verification pass)
 
 See [AGENTS.md](../AGENTS.md) for the full author-agent contract.
 

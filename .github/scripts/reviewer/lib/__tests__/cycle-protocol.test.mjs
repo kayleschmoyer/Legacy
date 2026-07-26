@@ -11,6 +11,8 @@ import {
   buildAuthorResolvedTitles,
   hasCannotComplyResponse,
   collectCannotComplyResponses,
+  withCannotComplyTitles,
+  unresolvedCannotComplyEntries,
   getMalformedInlineReplies,
 } from '../cycle-protocol.mjs';
 import { FORMAT_ERROR_MESSAGE } from '../parse-author-response.mjs';
@@ -1535,6 +1537,74 @@ describe("filterFindingsCycle3 — suppresses FIX'd mandate findings via resolve
   });
 });
 
+// LS-8337 AC1: filterFindingsCycle3 previously had no justifiedTitles backstop
+// at all, so a JUSTIFY reply posted against a Cycle 2 mandate had prompt-only
+// enforcement — an LLM that re-raised the mandate unchanged let the finding
+// survive into Cycle 4 (needs-human-arbitration). This mirrors
+// filterFindingsCycle2's existing justifiedTitles suppression.
+describe("filterFindingsCycle3 — suppresses JUSTIFY'd C2 mandate findings via justifiedTitles", () => {
+  it('strips a re-raised C2 mandate whose title is in justifiedTitles', () => {
+    const mandates = ['Missing tests for GraphQL changes'];
+    const finding = makeFinding({ title: 'Missing tests for GraphQL changes' });
+    const justifiedTitles = new Set(['missing tests for graphql changes']);
+
+    const { kept, stripped } = filterFindingsCycle3(
+      [finding],
+      mandates,
+      new Set(),
+      justifiedTitles,
+    );
+    assert.strictEqual(kept.length, 0);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_justified');
+  });
+
+  it('resolvedTitles wins over justifiedTitles when both contain the same title', () => {
+    const mandates = ['Type assertion unsafe'];
+    const finding = makeFinding({ title: 'Type assertion unsafe' });
+    const resolvedTitles = new Set(['type assertion unsafe']);
+    const justifiedTitles = new Set(['type assertion unsafe']);
+
+    const { stripped } = filterFindingsCycle3(
+      [finding],
+      mandates,
+      resolvedTitles,
+      justifiedTitles,
+    );
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('suppresses a non-mandate finding if its title happens to match justifiedTitles', () => {
+    const mandates = ['Existing C2 mandate'];
+    const newFinding = makeFinding({ title: 'Brand new issue' });
+    const justifiedTitles = new Set(['brand new issue']);
+
+    const { stripped } = filterFindingsCycle3(
+      [newFinding],
+      mandates,
+      new Set(),
+      justifiedTitles,
+    );
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_justified');
+  });
+
+  it('keeps a mandate not in justifiedTitles unchanged', () => {
+    const mandates = ['Missing auth check'];
+    const finding = makeFinding({ title: 'Missing auth check' });
+
+    const { kept, stripped } = filterFindingsCycle3(
+      [finding],
+      mandates,
+      new Set(),
+      new Set(['some other title']),
+    );
+    assert.strictEqual(kept.length, 1);
+    assert.strictEqual(stripped.length, 0);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // buildAuthorResolvedTitles
 // ---------------------------------------------------------------------------
@@ -1615,7 +1685,7 @@ describe('buildAuthorResolvedTitles — basic resolution', () => {
     assert.ok(!resolvedTitles.has('SQL Injection Via Unescaped Input'));
   });
 
-  it('handles a CANNOT-COMPLY item without adding to either set', () => {
+  it('handles a CANNOT-COMPLY item without adding to resolvedTitles/justifiedTitles', () => {
     const items = [
       {
         title: 'Generated file lint error',
@@ -1632,6 +1702,52 @@ describe('buildAuthorResolvedTitles — basic resolution', () => {
     );
     assert.strictEqual(resolvedTitles.size, 0);
     assert.strictEqual(justifiedTitles.size, 0);
+  });
+
+  // LS-8337 AC3: CANNOT-COMPLY items are classified into their own set (with
+  // the claimed reason preserved) the same way FIX/JUSTIFY already are.
+  it('adds a title to cannotComplyTitles for CANNOT-COMPLY replies, preserving the reason', () => {
+    const items = [
+      {
+        title: 'Generated file lint error',
+        parsed: {
+          type: 'CANNOT-COMPLY',
+          issueId: 'LS-1234',
+          reason: 'Generated file — cannot edit by hand.',
+        },
+      },
+    ];
+    const { cannotComplyTitles, cannotComplyReasons } =
+      buildAuthorResolvedTitles(items, PR_SHAS);
+    assert.ok(cannotComplyTitles.has('generated file lint error'));
+    assert.strictEqual(
+      cannotComplyReasons.get('generated file lint error'),
+      'Generated file — cannot edit by hand.',
+    );
+  });
+
+  it('skips a CANNOT-COMPLY item with null title', () => {
+    const items = [
+      {
+        title: null,
+        parsed: { type: 'CANNOT-COMPLY', issueId: 'LS-1', reason: 'reason' },
+      },
+    ];
+    const { cannotComplyTitles, cannotComplyReasons } =
+      buildAuthorResolvedTitles(items, PR_SHAS);
+    assert.strictEqual(cannotComplyTitles.size, 0);
+    assert.strictEqual(cannotComplyReasons.size, 0);
+  });
+
+  it('normalizes CANNOT-COMPLY titles to lowercase', () => {
+    const items = [
+      {
+        title: 'Race Condition In Processor',
+        parsed: { type: 'CANNOT-COMPLY', issueId: 'LS-1', reason: 'reason' },
+      },
+    ];
+    const { cannotComplyTitles } = buildAuthorResolvedTitles(items, PR_SHAS);
+    assert.ok(cannotComplyTitles.has('race condition in processor'));
   });
 
   it('handles mixed items correctly', () => {
@@ -2459,5 +2575,188 @@ describe('collectCannotComplyResponses', () => {
       hasCannotComplyResponse([], [], REVIEW_AT, BOT_LOGINS, AUTHOR_LOGIN),
       false,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// withCannotComplyTitles
+// ---------------------------------------------------------------------------
+
+describe('withCannotComplyTitles', () => {
+  it('correlates a review-sourced entry to the bot root comment title', () => {
+    const reviewComments = [
+      {
+        id: 10,
+        inReplyToId: null,
+        userLogin: 'github-actions[bot]',
+        body: '**[HIGH]** Race condition in processor — `src/index.ts:12`',
+        createdAt: REVIEW_AT,
+      },
+      {
+        id: 11,
+        inReplyToId: 10,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-1\nExternal constraint.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const entries = collectCannotComplyResponses(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+      AUTHOR_LOGIN,
+    );
+    const withTitles = withCannotComplyTitles(
+      entries,
+      reviewComments,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(withTitles.length, 1);
+    assert.strictEqual(withTitles[0].title, 'Race condition in processor');
+    // Original entry fields are preserved.
+    assert.strictEqual(withTitles[0].issueId, 'LS-1');
+  });
+
+  it('gives a null title to an issue-comment-sourced entry (no originating thread)', () => {
+    const issueComments = [
+      {
+        id: 22,
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-2\nPR-level claim.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const entries = collectCannotComplyResponses(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      AUTHOR_LOGIN,
+    );
+    const withTitles = withCannotComplyTitles(entries, [], BOT_LOGINS);
+    assert.strictEqual(withTitles.length, 1);
+    assert.strictEqual(withTitles[0].title, null);
+  });
+
+  it('gives a null title when the root comment cannot be correlated', () => {
+    const reviewComments = [
+      {
+        id: 11,
+        inReplyToId: 999, // no matching bot root comment in this list
+        userLogin: AUTHOR_LOGIN,
+        body: 'CANNOT-COMPLY: LS-1\nReason.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const entries = collectCannotComplyResponses(
+      reviewComments,
+      [],
+      REVIEW_AT,
+      BOT_LOGINS,
+      AUTHOR_LOGIN,
+    );
+    const withTitles = withCannotComplyTitles(
+      entries,
+      reviewComments,
+      BOT_LOGINS,
+    );
+    assert.strictEqual(withTitles[0].title, null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// unresolvedCannotComplyEntries — LS-8337 AC4
+// ---------------------------------------------------------------------------
+
+describe('unresolvedCannotComplyEntries', () => {
+  it('accepted: resolved when the title is absent from the Cycle 3 output (bot omitted it)', () => {
+    const entries = [
+      {
+        source: 'review',
+        commentId: 11,
+        issueId: 'LS-1',
+        reason: 'External constraint.',
+        createdAt: AFTER_REVIEW,
+        title: 'Race condition in processor',
+      },
+    ];
+    // Bot's Cycle 3 output no longer contains the finding — it accepted the claim.
+    const filteredFindings = [];
+    const unresolved = unresolvedCannotComplyEntries(entries, filteredFindings);
+    assert.strictEqual(unresolved.length, 0);
+  });
+
+  it('refuted-earlier: resolved when only a differently-titled finding survives', () => {
+    const entries = [
+      {
+        source: 'review',
+        commentId: 11,
+        issueId: 'LS-1',
+        reason: 'External constraint.',
+        createdAt: AFTER_REVIEW,
+        title: 'Race condition in processor',
+      },
+    ];
+    const filteredFindings = [makeFinding({ title: 'Some unrelated mandate' })];
+    const unresolved = unresolvedCannotComplyEntries(entries, filteredFindings);
+    assert.strictEqual(unresolved.length, 0);
+  });
+
+  it('still-unresolved: escalates when the same title survives the Cycle 3 validator', () => {
+    const entries = [
+      {
+        source: 'review',
+        commentId: 11,
+        issueId: 'LS-1',
+        reason: 'External constraint.',
+        createdAt: AFTER_REVIEW,
+        title: 'Race condition in processor',
+      },
+    ];
+    const filteredFindings = [
+      makeFinding({ title: 'Race condition in processor' }),
+    ];
+    const unresolved = unresolvedCannotComplyEntries(entries, filteredFindings);
+    assert.strictEqual(unresolved.length, 1);
+    assert.strictEqual(unresolved[0].issueId, 'LS-1');
+  });
+
+  it('matches titles case-insensitively', () => {
+    const entries = [
+      {
+        source: 'review',
+        commentId: 11,
+        issueId: 'LS-1',
+        reason: 'reason',
+        createdAt: AFTER_REVIEW,
+        title: 'Race Condition In Processor',
+      },
+    ];
+    const filteredFindings = [
+      makeFinding({ title: 'race condition in processor' }),
+    ];
+    const unresolved = unresolvedCannotComplyEntries(entries, filteredFindings);
+    assert.strictEqual(unresolved.length, 1);
+  });
+
+  it('an untitled (PR-level) entry is always treated as unresolved', () => {
+    const entries = [
+      {
+        source: 'issue',
+        commentId: 22,
+        issueId: 'LS-2',
+        reason: 'PR-level claim.',
+        createdAt: AFTER_REVIEW,
+        title: null,
+      },
+    ];
+    const unresolved = unresolvedCannotComplyEntries(entries, []);
+    assert.strictEqual(unresolved.length, 1);
+    assert.strictEqual(unresolved[0].issueId, 'LS-2');
+  });
+
+  it('returns an empty array when there are no entries', () => {
+    assert.deepStrictEqual(unresolvedCannotComplyEntries([], []), []);
   });
 });
