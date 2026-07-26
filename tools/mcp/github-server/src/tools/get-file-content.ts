@@ -16,6 +16,8 @@ interface GitHubFileResponse {
   encoding: string;
 }
 
+type GitHubDirectoryEntry = { path: string; type: string };
+
 export async function getFileContent(
   params: GetFileContentParams,
 ): Promise<ToolResult> {
@@ -23,11 +25,23 @@ export async function getFileContent(
     const repo = await getRepoOwnerName();
     const ref = params.ref ?? 'main';
 
-    const data = await githubRest<GitHubFileResponse>({
+    const data = await githubRest<GitHubFileResponse | GitHubDirectoryEntry[]>({
       method: 'GET',
       path: `/repos/${repo.owner}/${repo.name}/contents/${params.path}`,
       query: { ref },
     });
+
+    if (Array.isArray(data)) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Path '${params.path}' is a directory. Use Glob to list files or specify an exact file path.`,
+          },
+        ],
+      };
+    }
 
     if (data.encoding !== 'base64') {
       return {
