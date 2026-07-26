@@ -1,5 +1,6 @@
 import type { ToolResult } from '../types.js';
 import {
+  fetchDeployReportJobStatus,
   fetchPlaywrightReport,
   fetchPlaywrightSummary,
   renderReportAsMarkdown,
@@ -94,6 +95,54 @@ export async function getPlaywrightReport(params: {
       };
     }
     lastError = report.error;
+  }
+
+  // No name variant resolved. When the failed name was numeric (a runId, or a
+  // bare-numeric reportName), inspect the run's "Deploy Playwright Report" job
+  // to explain *why* — a failed Merge Reports step, a successful deploy that
+  // published zero blob reports, or (if the job can't be found) fall through
+  // to the generic message unchanged (LS-7882).
+  if (NUMERIC_ID_RE.test(reportName)) {
+    const numericRunId = Number(reportName);
+    try {
+      const jobStatus = await fetchDeployReportJobStatus(numericRunId);
+      if (jobStatus.jobFound) {
+        const failureConclusion =
+          jobStatus.mergeStepConclusion === 'failure'
+            ? jobStatus.mergeStepConclusion
+            : jobStatus.jobConclusion === 'failure'
+              ? jobStatus.jobConclusion
+              : null;
+        if (failureConclusion) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text:
+                  `The Deploy Playwright Report job's Merge Reports step failed for run ` +
+                  `${numericRunId} (conclusion: ${failureConclusion}) — no report was published. ` +
+                  `Check job logs with ci_get_logs({ runId: ${numericRunId} }).`,
+              },
+            ],
+          };
+        }
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text:
+                `No Playwright blob reports were produced for run ${numericRunId} ` +
+                `(0 shards uploaded artifacts) — the run may have been misconfigured ` +
+                `or skipped before tests started.`,
+            },
+          ],
+        };
+      }
+    } catch {
+      // Jobs API unreachable — fall through to the generic message below.
+    }
   }
 
   // Include the last per-name fetch error: it carries the

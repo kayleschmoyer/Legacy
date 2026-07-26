@@ -3,6 +3,7 @@ import {
   buildHeaders,
   deploysTokenWasFallback,
   getDeploysToken,
+  githubGet,
 } from './github-api.js';
 
 export const DEPLOYS_REPO = 'bkrupa/legacy-sports-deploys';
@@ -229,6 +230,54 @@ export interface FetchReportError {
 
 export function reportUrlFor(reportName: string): string {
   return `https://bkrupa.github.io/legacy-sports-deploys/playwright-report/${reportName}/`;
+}
+
+const DEPLOY_REPORT_JOB_NAME = 'Deploy Playwright Report';
+const MERGE_REPORTS_STEP_NAME = 'Merge Reports';
+
+interface GitHubJobStep {
+  name: string;
+  conclusion: string | null;
+}
+
+interface GitHubJob {
+  name: string;
+  conclusion: string | null;
+  steps?: GitHubJobStep[];
+}
+
+interface GitHubJobsResponse {
+  jobs: GitHubJob[];
+}
+
+export interface DeployReportJobStatus {
+  jobFound: boolean;
+  jobConclusion: string | null;
+  mergeStepConclusion: string | null;
+}
+
+/**
+ * Look up the "Deploy Playwright Report" job (and its "Merge Reports" step)
+ * for a GitHub Actions run, so `ci_get_playwright_report` can explain *why*
+ * no report resolved instead of returning an opaque "not found" (LS-7882).
+ */
+export async function fetchDeployReportJobStatus(
+  runId: number,
+): Promise<DeployReportJobStatus> {
+  const { jobs } = await githubGet<GitHubJobsResponse>(
+    `/actions/runs/${runId}/jobs`,
+    { per_page: '100', filter: 'latest' },
+  );
+  const job = jobs.find((j) => j.name === DEPLOY_REPORT_JOB_NAME);
+  if (!job) {
+    return { jobFound: false, jobConclusion: null, mergeStepConclusion: null };
+  }
+  const mergeStep = job.steps?.find((s) => s.name === MERGE_REPORTS_STEP_NAME);
+  return {
+    jobFound: true,
+    jobConclusion: job.conclusion,
+    mergeStepConclusion: mergeStep?.conclusion ?? null,
+  };
 }
 
 /**

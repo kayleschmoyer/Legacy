@@ -18,6 +18,7 @@ jest.mock('../playwright-report.js', () => {
     ...actual,
     fetchPlaywrightSummary: jest.fn(),
     fetchPlaywrightReport: jest.fn(),
+    fetchDeployReportJobStatus: jest.fn(),
   };
 });
 
@@ -31,6 +32,10 @@ const mockSummary =
 const mockFetch = playwrightReport.fetchPlaywrightReport as jest.MockedFunction<
   typeof playwrightReport.fetchPlaywrightReport
 >;
+const mockJobStatus =
+  playwrightReport.fetchDeployReportJobStatus as jest.MockedFunction<
+    typeof playwrightReport.fetchDeployReportJobStatus
+  >;
 
 const BASE_STATS = {
   total: 3,
@@ -281,6 +286,13 @@ describe('getPlaywrightReport — runId resolution', () => {
         'lacks read access to the private bkrupa/legacy-sports-deploys repo — ' +
         'this 404 is a credentials gap, not necessarily a missing/undeployed report.)',
     });
+    // No "Deploy Playwright Report" job for this run — the job-status lookup
+    // (LS-7882) must fall through to the unchanged generic message below.
+    mockJobStatus.mockResolvedValue({
+      jobFound: false,
+      jobConclusion: null,
+      mergeStepConclusion: null,
+    });
 
     const result = await getPlaywrightReport({ runId: 99999 });
 
@@ -290,5 +302,92 @@ describe('getPlaywrightReport — runId resolution', () => {
     );
     expect(result.content[0].text).toContain('credentials gap');
     expect(result.content[0].text).toContain('PREVIEW_APP_PRIVATE_KEY');
+  });
+});
+
+describe('getPlaywrightReport — job-status diagnosis on exhausted fallback (LS-7882)', () => {
+  it('names the Deploy Playwright Report job when its Merge Reports step failed', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'not found' });
+    mockJobStatus.mockResolvedValue({
+      jobFound: true,
+      jobConclusion: 'success',
+      mergeStepConclusion: 'failure',
+    });
+
+    const result = await getPlaywrightReport({ runId: 27257814209 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      "Deploy Playwright Report job's Merge Reports step failed",
+    );
+    expect(result.content[0].text).toContain('27257814209');
+    expect(result.content[0].text).toContain('conclusion: failure');
+    expect(result.content[0].text).toContain('ci_get_logs');
+  });
+
+  it('names the failed job conclusion when the Merge Reports step itself is missing', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'not found' });
+    mockJobStatus.mockResolvedValue({
+      jobFound: true,
+      jobConclusion: 'failure',
+      mergeStepConclusion: null,
+    });
+
+    const result = await getPlaywrightReport({ runId: 55555 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      "Deploy Playwright Report job's Merge Reports step failed",
+    );
+    expect(result.content[0].text).toContain('55555');
+  });
+
+  it('explains a zero-blob-report deploy when the job succeeded but produced no report', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'not found' });
+    mockJobStatus.mockResolvedValue({
+      jobFound: true,
+      jobConclusion: 'success',
+      mergeStepConclusion: 'success',
+    });
+
+    const result = await getPlaywrightReport({ runId: 12345 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'No Playwright blob reports were produced for run 12345',
+    );
+    expect(result.content[0].text).not.toContain('Report not found. Tried');
+  });
+
+  it('falls back to the generic message unchanged when the deploy job cannot be found', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'not found' });
+    mockJobStatus.mockResolvedValue({
+      jobFound: false,
+      jobConclusion: null,
+      mergeStepConclusion: null,
+    });
+
+    const result = await getPlaywrightReport({ runId: 424242 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Report not found. Tried:');
+    expect(result.content[0].text).toContain(
+      '424242, nightly-424242, manual-424242',
+    );
+  });
+
+  it('falls back to the generic message unchanged when the Jobs API call throws', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'not found' });
+    mockJobStatus.mockRejectedValue(new Error('GitHub API 500'));
+
+    const result = await getPlaywrightReport({ runId: 8675309 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Report not found. Tried:');
   });
 });
