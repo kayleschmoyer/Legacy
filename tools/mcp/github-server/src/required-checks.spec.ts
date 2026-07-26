@@ -1,9 +1,16 @@
 jest.mock('./github-api', () => ({ githubRest: jest.fn() }));
 jest.mock('./auth', () => ({ getRepoOwnerName: jest.fn() }));
 
-import { evaluateRequiredChecks } from './required-checks';
+import { githubRest } from './github-api';
+import {
+  clearRequireCodeOwnerReviewCache,
+  evaluateRequiredChecks,
+  requiresCodeOwnerReview,
+} from './required-checks';
 import type { RestCheckRun, RestCommitStatus } from './required-checks';
 import { diagnose } from './tools/pr-why-blocked';
+
+const mockGithubRest = githubRest as jest.MockedFunction<typeof githubRest>;
 
 // The 8 checks branch protection requires on `main` (see .github/ruleset.json).
 // bot-review is a commit STATUS; the rest are check RUNS.
@@ -77,6 +84,51 @@ describe('evaluateRequiredChecks', () => {
     // 7 required check runs + bot-review status.
     expect(result.passing).toBe(8);
     expect(result.hadDuplicateRuns).toBe(true);
+  });
+
+  // Explicit regression for PR #4919 (LS-7829): both "review" and
+  // "No Merge Conflicts" appeared twice on the head SHA — an older superseded
+  // CANCELLED run left behind by `concurrency: cancel-in-progress`, and a
+  // newer SUCCESS. Neither dedup nor the CI_FAILING verdict must resurface.
+  it('does not report CI_FAILING for the PR #4919 shape (duplicate review + No Merge Conflicts, oldest CANCELLED newest SUCCESS)', () => {
+    const required = new Set(['review', 'No Merge Conflicts']);
+    const checkRuns: RestCheckRun[] = [
+      run('review', 'cancelled', '2026-06-13T00:00:00Z'),
+      run('review', 'success', '2026-06-13T00:05:00Z'),
+      run('No Merge Conflicts', 'cancelled', '2026-06-13T00:00:00Z'),
+      run('No Merge Conflicts', 'success', '2026-06-13T00:05:00Z'),
+    ];
+
+    const result = evaluateRequiredChecks(checkRuns, [], required);
+
+    expect(result.failing).toEqual([]);
+    expect(result.passing).toBe(2);
+    expect(result.hadDuplicateRuns).toBe(true);
+
+    const pr = {
+      number: 4919,
+      title: 'PR #4919 shape',
+      state: 'OPEN',
+      url: 'https://github.com/owner/repo/pull/4919',
+      isDraft: false,
+      mergeable: 'MERGEABLE' as const,
+      isInMergeQueue: false,
+      reviewDecision: 'APPROVED',
+      headRefOid: 'deadbeef',
+      baseRefName: 'main',
+      autoMergeRequest: null,
+      labels: { pageInfo: { hasNextPage: false }, nodes: [] },
+      reviews: { pageInfo: { hasNextPage: false }, nodes: [] },
+      reviewRequests: { pageInfo: { hasNextPage: false }, nodes: [] },
+      reviewThreads: {
+        totalCount: 0,
+        pageInfo: { hasNextPage: false },
+        nodes: [],
+      },
+    };
+    const diagnosis = diagnose(pr, result);
+    expect(diagnosis.reason).not.toBe('CI_FAILING');
+    expect(diagnosis.status).toBe('READY');
   });
 
   it('feeds a READY verdict through diagnose (not CI_FAILING)', () => {
@@ -213,5 +265,76 @@ describe('evaluateRequiredChecks', () => {
       null,
     );
     expect(result.failing).toEqual(['some-check (failure)']);
+  });
+});
+
+describe('requiresCodeOwnerReview', () => {
+  beforeEach(() => {
+    clearRequireCodeOwnerReviewCache();
+    mockGithubRest.mockReset();
+  });
+
+  it('returns true when classic branch protection requires code-owner reviews', async () => {
+    mockGithubRest.mockResolvedValueOnce({
+      required_pull_request_reviews: { require_code_owner_reviews: true },
+    });
+
+    const result = await requiresCodeOwnerReview('owner', 'repo', 'main');
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when classic branch protection does not require code-owner reviews', async () => {
+    mockGithubRest
+      .mockResolvedValueOnce({
+        required_pull_request_reviews: { require_code_owner_reviews: false },
+      })
+      .mockResolvedValueOnce([]);
+
+    const result = await requiresCodeOwnerReview('owner', 'repo', 'main');
+
+    expect(result).toBe(false);
+  });
+
+  it('returns true when a repository ruleset pull_request rule requires a code-owner review', async () => {
+    mockGithubRest
+      .mockRejectedValueOnce(new Error('404 no classic protection'))
+      .mockResolvedValueOnce([
+        { type: 'required_status_checks', parameters: {} },
+        {
+          type: 'pull_request',
+          parameters: { require_code_owner_review: true },
+        },
+      ]);
+
+    const result = await requiresCodeOwnerReview('owner', 'repo', 'main');
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when neither classic protection nor rulesets require a code-owner review', async () => {
+    mockGithubRest
+      .mockRejectedValueOnce(new Error('404 no classic protection'))
+      .mockResolvedValueOnce([
+        {
+          type: 'pull_request',
+          parameters: { require_code_owner_review: false },
+        },
+      ]);
+
+    const result = await requiresCodeOwnerReview('owner', 'repo', 'main');
+
+    expect(result).toBe(false);
+  });
+
+  it('caches the result per owner/repo/branch to avoid duplicate REST calls', async () => {
+    mockGithubRest.mockResolvedValueOnce({
+      required_pull_request_reviews: { require_code_owner_reviews: true },
+    });
+
+    await requiresCodeOwnerReview('owner', 'repo', 'main');
+    await requiresCodeOwnerReview('owner', 'repo', 'main');
+
+    expect(mockGithubRest).toHaveBeenCalledTimes(1);
   });
 });

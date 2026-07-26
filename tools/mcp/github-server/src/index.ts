@@ -1151,7 +1151,7 @@ export function createServer(): McpServer {
   // --- github_pr_why_blocked ---
   server.tool(
     'github_pr_why_blocked',
-    'Diagnose why a PR is not moving forward. Returns a structured reason (DRAFT, MERGE_CONFLICT, CI_FAILING, CHANGES_REQUESTED, UNRESOLVED_THREADS, AWAITING_REVIEW, CI_PENDING, IN_MERGE_QUEUE, READY, MERGED, etc.), a one-line summary, relevant details, and a concrete next action. Use this instead of manually cross-referencing github_view_pr + check runs + review state. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    'Diagnose why a PR is not moving forward. Returns a structured reason (DRAFT, MERGE_CONFLICT, CI_FAILING, CHANGES_REQUESTED, UNRESOLVED_THREADS, AWAITING_REVIEW, AWAITING_CODE_OWNER_REVIEW, NO_REVIEWER_ASSIGNED, CI_PENDING, IN_MERGE_QUEUE, READY, MERGED, etc.), a one-line summary, relevant details, and a concrete next action. Use this instead of manually cross-referencing github_view_pr + check runs + review state. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
       number: prNumberField('number')
         .optional()

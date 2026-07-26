@@ -304,6 +304,76 @@ describe('diagnose', () => {
     });
   });
 
+  describe('code-owner review required', () => {
+    it('returns BLOCKED/AWAITING_CODE_OWNER_REVIEW when CI is green and branch protection requires a code-owner review, nobody assigned', () => {
+      const pr = makePR({ reviewDecision: 'REVIEW_REQUIRED' });
+      const result = diagnose(pr, NO_CI, true);
+      expect(result.status).toBe('BLOCKED');
+      expect(result.reason).toBe('AWAITING_CODE_OWNER_REVIEW');
+      expect(
+        (result.details as { pendingReviewers: string[] }).pendingReviewers,
+      ).toEqual([]);
+    });
+
+    it('returns BLOCKED/AWAITING_CODE_OWNER_REVIEW with pendingReviewers when a code-owner review has been requested but not submitted', () => {
+      const pr = makePR({
+        reviewDecision: 'REVIEW_REQUIRED',
+        reviewRequests: {
+          pageInfo: { hasNextPage: false },
+          nodes: [
+            { requestedReviewer: { __typename: 'User', login: 'code-owner' } },
+          ],
+        },
+      });
+      const result = diagnose(pr, NO_CI, true);
+      expect(result.status).toBe('BLOCKED');
+      expect(result.reason).toBe('AWAITING_CODE_OWNER_REVIEW');
+      expect(
+        (result.details as { pendingReviewers: string[] }).pendingReviewers,
+      ).toEqual(['code-owner']);
+    });
+
+    it('takes priority over AWAITING_REVIEW when the review requirement is code-owner-driven', () => {
+      const pr = makePR({
+        reviewDecision: 'REVIEW_REQUIRED',
+        reviewRequests: {
+          pageInfo: { hasNextPage: false },
+          nodes: [
+            { requestedReviewer: { __typename: 'User', login: 'alice' } },
+          ],
+        },
+      });
+      const result = diagnose(pr, NO_CI, true);
+      expect(result.reason).toBe('AWAITING_CODE_OWNER_REVIEW');
+    });
+
+    it('leaves NO_REVIEWER_ASSIGNED unchanged when the review requirement is not code-owner-driven', () => {
+      const pr = makePR({ reviewDecision: 'REVIEW_REQUIRED' });
+      const result = diagnose(pr, NO_CI, false);
+      expect(result.reason).toBe('NO_REVIEWER_ASSIGNED');
+    });
+
+    it('leaves AWAITING_REVIEW unchanged when the review requirement is not code-owner-driven', () => {
+      const pr = makePR({
+        reviewDecision: 'REVIEW_REQUIRED',
+        reviewRequests: {
+          pageInfo: { hasNextPage: false },
+          nodes: [
+            { requestedReviewer: { __typename: 'User', login: 'alice' } },
+          ],
+        },
+      });
+      const result = diagnose(pr, NO_CI, false);
+      expect(result.reason).toBe('AWAITING_REVIEW');
+    });
+
+    it('does not fire when CI is still failing (CI_FAILING still wins)', () => {
+      const pr = makePR({ reviewDecision: 'REVIEW_REQUIRED' });
+      const result = diagnose(pr, ci({ failing: ['lint (failure)'] }), true);
+      expect(result.reason).toBe('CI_FAILING');
+    });
+  });
+
   describe('merge queue / auto-merge', () => {
     it('returns WAITING/IN_MERGE_QUEUE when PR is in the merge queue', () => {
       const result = diagnose(makePR({ isInMergeQueue: true }), NO_CI);

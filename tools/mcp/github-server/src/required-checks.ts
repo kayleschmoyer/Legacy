@@ -99,7 +99,14 @@ interface BranchRule {
   type: string;
   parameters?: {
     required_status_checks?: Array<{ context: string }>;
+    require_code_owner_review?: boolean;
   };
+}
+
+interface ClassicBranchProtectionReviews {
+  required_pull_request_reviews?: {
+    require_code_owner_reviews?: boolean;
+  } | null;
 }
 
 interface CheckRunsPage {
@@ -175,6 +182,74 @@ export async function getRequiredCheckNames(
 /** Clear the cached required-check names (test seam / long-lived process reuse). */
 export function clearRequiredChecksCache(): void {
   requiredChecksCache.clear();
+}
+
+// Cache the code-owner-review requirement per `owner/repo#branch`, mirroring
+// requiredChecksCache above — branch protection rarely changes within a session.
+const requireCodeOwnerReviewCache = new Map<string, boolean>();
+
+/**
+ * Whether branch protection requires an approving review from a code owner for
+ * `branch`, combining classic branch protection
+ * (`required_pull_request_reviews.require_code_owner_reviews`) and the
+ * repository ruleset `pull_request` rule's `require_code_owner_review`
+ * parameter. Distinct from `getRequiredCheckNames`: this reads the review
+ * requirement, not required status checks.
+ */
+export async function requiresCodeOwnerReview(
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<boolean> {
+  const cacheKey = `${owner}/${repo}#${branch}`;
+  const cached = requireCodeOwnerReviewCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  let required = false;
+  const encodedBranch = encodeURIComponent(branch);
+
+  // Classic branch protection (404 when absent; 403 without admin).
+  try {
+    const bp = await githubRest<ClassicBranchProtectionReviews>({
+      method: 'GET',
+      path: `/repos/${owner}/${repo}/branches/${encodedBranch}/protection`,
+    });
+    if (bp.required_pull_request_reviews?.require_code_owner_reviews) {
+      required = true;
+    }
+  } catch {
+    // No classic protection / no admin access — both acceptable; rely on ruleset.
+  }
+
+  // Repository ruleset `pull_request` rule — the primary source when classic
+  // protection isn't configured or doesn't carry the code-owner flag.
+  if (!required) {
+    try {
+      const branchRules = await githubRest<BranchRule[]>({
+        method: 'GET',
+        path: `/repos/${owner}/${repo}/rules/branches/${encodedBranch}`,
+      });
+      for (const rule of branchRules) {
+        if (
+          rule.type === 'pull_request' &&
+          rule.parameters?.require_code_owner_review
+        ) {
+          required = true;
+          break;
+        }
+      }
+    } catch {
+      // Ruleset read failed — treat as not required.
+    }
+  }
+
+  requireCodeOwnerReviewCache.set(cacheKey, required);
+  return required;
+}
+
+/** Clear the cached code-owner-review requirement (test seam / long-lived process reuse). */
+export function clearRequireCodeOwnerReviewCache(): void {
+  requireCodeOwnerReviewCache.clear();
 }
 
 // ── Data fetch ────────────────────────────────────────────────────────────────

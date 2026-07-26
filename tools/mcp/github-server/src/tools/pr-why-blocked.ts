@@ -5,7 +5,10 @@ import {
   isConflictCheckFailure,
 } from '../conflict-signals.js';
 import { githubGraphQL } from '../github-api.js';
-import { evaluatePRChecks } from '../required-checks.js';
+import {
+  evaluatePRChecks,
+  requiresCodeOwnerReview,
+} from '../required-checks.js';
 import type { CIPartition } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
 
@@ -148,6 +151,7 @@ function reviewerName(
 export function diagnose(
   pr: NonNullable<PRWhyBlockedGraphQLResponse['repository']['pullRequest']>,
   ci: CIPartition,
+  requireCodeOwnerReview = false,
 ): Diagnosis {
   const labels = new Set(pr.labels.nodes.map((l) => l.name));
   const hasReadyLabel = labels.has('bot:ready-for-review');
@@ -325,6 +329,26 @@ export function diagnose(
     };
   }
 
+  // REVIEW_REQUIRED because branch protection mandates a code-owner review
+  // (CODEOWNERS / require_code_owner_review) — distinct from an ordinary
+  // manually-requested review so the agent doesn't chase already-green CI or
+  // request a review from just anyone.
+  if (pr.reviewDecision === 'REVIEW_REQUIRED' && requireCodeOwnerReview) {
+    return {
+      status: 'BLOCKED',
+      reason: 'AWAITING_CODE_OWNER_REVIEW',
+      summary:
+        pendingReviewers.length > 0
+          ? `A code-owner review is required and has not been submitted yet (requested from ${pendingReviewers.join(', ')}).`
+          : 'A code-owner review is required but no reviewer has been requested yet.',
+      details: { pendingReviewers, requireCodeOwnerReviews: true },
+      nextAction:
+        pendingReviewers.length > 0
+          ? 'Wait for the requested code owner to submit their review.'
+          : 'Request a review from the code owner (see CODEOWNERS) or wait for GitHub to auto-assign one via CODEOWNERS.',
+    };
+  }
+
   // REVIEW_REQUIRED with pending review requests
   if (pr.reviewDecision === 'REVIEW_REQUIRED' && pendingReviewers.length > 0) {
     return {
@@ -439,15 +463,15 @@ export async function prWhyBlocked(
     // Evaluate required checks the same way the merge-queue processor does:
     // required-name filter + latest-run-per-name dedup + commit statuses. This is
     // what prevents stale duplicate runs and non-required checks producing a
-    // false CI_FAILING verdict (LS-7993).
-    const ci = await evaluatePRChecks(
-      repo.owner,
-      repo.name,
-      pr.headRefOid,
-      pr.baseRefName,
-    );
+    // false CI_FAILING verdict (LS-7993). Fetched alongside the code-owner-review
+    // branch-protection flag so a green PR blocked only on CODEOWNERS reports
+    // AWAITING_CODE_OWNER_REVIEW instead of a generic review-required reason.
+    const [ci, requireCodeOwnerReview] = await Promise.all([
+      evaluatePRChecks(repo.owner, repo.name, pr.headRefOid, pr.baseRefName),
+      requiresCodeOwnerReview(repo.owner, repo.name, pr.baseRefName),
+    ]);
 
-    const diagnosis = diagnose(pr, ci);
+    const diagnosis = diagnose(pr, ci, requireCodeOwnerReview);
 
     return {
       content: [
