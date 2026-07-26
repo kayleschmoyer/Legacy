@@ -43,6 +43,7 @@ import {
   waitForJob,
 } from './jobs';
 import { rebaseOntoMain } from './rebase-onto-main';
+import { resolveCommitish } from './resolve-commitish';
 import {
   type BranchEntry,
   formatBranchList,
@@ -1586,17 +1587,26 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_show_commit',
       description:
-        'Read the diff introduced by a specific commit SHA. ' +
-        'Use `stat: true` for a file-change summary (like `git show <sha> --stat --oneline`). ' +
+        'Read the diff introduced by a specific commit-ish. ' +
+        'Use `stat: true` for a file-change summary (like `git show <ref> --stat --oneline`). ' +
         "Provide `path` to restrict output to a single file's diff. " +
         'Without either flag, returns the full commit diff. ' +
-        'Prefer this over raw `git show` shell calls during commit reconnaissance.',
+        'Prefer this over raw `git show` shell calls during commit reconnaissance. ' +
+        '`ref` is the preferred parameter name (matches worktree_show_file / worktree_commit_stat / ' +
+        'worktree_show_remote); `sha` is retained as a back-compat alias and wins if both are provided. ' +
+        'Provide one of the two.',
       inputSchema: {
         type: 'object' as const,
         properties: {
+          ref: {
+            type: 'string',
+            description:
+              'Commit SHA, HEAD, HEAD~N, or any git rev (preferred). Ignored if `sha` is also provided.',
+          },
           sha: {
             type: 'string',
-            description: 'Commit SHA, HEAD, HEAD~N, or any git rev',
+            description:
+              'Commit SHA, HEAD, HEAD~N, or any git rev. Back-compat alias for `ref` — takes precedence if both are provided.',
           },
           path: {
             type: 'string',
@@ -1614,7 +1624,6 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Ticket key, absolute path, or omit for active worktree',
           },
         },
-        required: ['sha'],
       },
     },
     {
@@ -6158,15 +6167,18 @@ const handleCallTool = async (
     case 'worktree_show_commit': {
       const {
         sha,
+        ref,
         path: filterPath,
         stat: statOnly,
         worktree: wtKey,
       } = args as {
-        sha: string;
+        sha?: string;
+        ref?: string;
         path?: string;
         stat?: boolean;
         worktree?: string;
       };
+      const resolved = resolveCommitish(sha, ref);
 
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
@@ -6177,19 +6189,20 @@ const handleCallTool = async (
       }
       const cwd = target.path;
 
-      if (!sha) {
+      if (!resolved.ok) {
         return {
-          content: [{ type: 'text', text: 'Missing required parameter: sha' }],
+          content: [{ type: 'text', text: resolved.error }],
           isError: true,
         };
       }
+      const commitish = resolved.commitish;
 
-      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(sha)) {
+      if (!/^[a-zA-Z0-9_./~^{}-]+$/.test(commitish)) {
         return {
           content: [
             {
               type: 'text',
-              text: `Invalid SHA: "${sha}". Only rev characters allowed.`,
+              text: `Invalid SHA: "${commitish}". Only rev characters allowed.`,
             },
           ],
           isError: true,
@@ -6199,15 +6212,17 @@ const handleCallTool = async (
       try {
         let output: string;
         if (statOnly) {
-          output = runGit(['show', sha, '--stat', '--oneline'], cwd, {
+          output = runGit(['show', commitish, '--stat', '--oneline'], cwd, {
             timeout: 10_000,
           }).trim();
         } else if (filterPath) {
-          output = runGit(['show', sha, '--', filterPath], cwd, {
+          output = runGit(['show', commitish, '--', filterPath], cwd, {
             timeout: 30_000,
           }).trim();
         } else {
-          output = runGit(['show', sha], cwd, { timeout: 30_000 }).trim();
+          output = runGit(['show', commitish], cwd, {
+            timeout: 30_000,
+          }).trim();
         }
 
         const MAX = 200_000;
