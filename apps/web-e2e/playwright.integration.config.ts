@@ -3,11 +3,19 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 
 import type { BackendOptions } from './src/fixtures/dual';
+import { resolvePwBrowserExecutable } from './src/resolve-pw-browser';
 
 // Load root .env so JWT_SECRET and other vars are available to test helpers
 config({ path: resolve(__dirname, '../../.env') });
 // Load .env.e2e for local integration test credentials (gitignored)
 config({ path: resolve(__dirname, '../../.env.e2e'), override: false });
+
+/* Cloud sessions (Claude Code on the web) pre-install Playwright's browsers at
+ * /opt/pw-browsers, but that image drifts independently of the repo's pinned
+ * @playwright/test version (LS-8319). Falls back to whatever build is present
+ * when the pinned one is missing; undefined (no override) on machines where
+ * /opt/pw-browsers doesn't exist, e.g. the GH Actions runner AMI. */
+const pwBrowserExecutable = resolvePwBrowserExecutable();
 
 export default defineConfig<BackendOptions>({
   testDir: './src/integration/tests',
@@ -40,6 +48,9 @@ export default defineConfig<BackendOptions>({
     baseURL:
       process.env.INTEGRATION_BASE_URL ?? 'https://api.legacy-fantasy.com/',
     trace: 'off',
+    ...(pwBrowserExecutable
+      ? { launchOptions: { executablePath: pwBrowserExecutable } }
+      : {}),
   },
 
   /* Projects select SCOPE, not test logic (ADR-0016):

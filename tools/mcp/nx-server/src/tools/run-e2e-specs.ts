@@ -534,10 +534,16 @@ async function buildE2eResult(
     const modeInfo = integration
       ? 'integration mode (live backend)'
       : `E2E_AUTH_MODE=ci, E2E_PORT=${port}`;
+    const browserMissing = /Executable doesn't exist/.test(combinedOutput);
     return {
       body: {
         error: `Playwright did not produce a results file (${modeInfo}).`,
         output: combinedOutput,
+        ...(browserMissing
+          ? {
+              hint: "No usable browser build found (LS-8319): /opt/pw-browsers has no chromium_headless_shell-* build the resolver in apps/web-e2e/src/resolve-pw-browser.ts recognizes. Check that the cloud image's /opt/pw-browsers directory exists and contains a chromium_headless_shell-* build.",
+            }
+          : {}),
       },
       isError: true,
     };

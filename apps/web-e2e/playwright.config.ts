@@ -1,6 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
 
+import { resolvePwBrowserExecutable } from './src/resolve-pw-browser';
+
+/* Cloud sessions (Claude Code on the web) pre-install Playwright's browsers at
+ * /opt/pw-browsers, but that image drifts independently of the repo's pinned
+ * @playwright/test version (LS-8319). When the pinned build is missing but an
+ * older build is present, fall back to it instead of failing at launch; when
+ * /opt/pw-browsers doesn't exist at all (e.g. the GH Actions runner AMI, which
+ * uses a separate, already version-locked /opt/playwright-browsers), this is
+ * undefined and Playwright resolves the browser itself as before. */
+const pwBrowserExecutable = resolvePwBrowserExecutable();
+
 /**
  * Dedicated E2E port — intentionally different from the Vite dev-server (4200)
  * so local test runs exercise the same static-serve path that CI uses.
@@ -105,6 +116,9 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
+        ...(pwBrowserExecutable
+          ? { launchOptions: { executablePath: pwBrowserExecutable } }
+          : {}),
       },
     },
 

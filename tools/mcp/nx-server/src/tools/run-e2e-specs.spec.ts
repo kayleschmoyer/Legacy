@@ -255,6 +255,23 @@ describe('runE2ESpecs', () => {
       expect(result.content[0].text).toMatch(/did not produce a results file/);
     });
 
+    it('surfaces a version-mismatch hint when the browser executable is missing (LS-8319)', async () => {
+      setupJob(
+        "Error: browserType.launch: Executable doesn't exist at /opt/pw-browsers/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell",
+      );
+      mockReadFile.mockRejectedValue(new Error('ENOENT') as never);
+
+      const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
+      expect(result.isError).toBe(true);
+      const payload = JSON.parse(result.content[0].text) as {
+        error: string;
+        hint?: string;
+      };
+      expect(payload.error).toMatch(/did not produce a results file/);
+      expect(payload.hint).toMatch(/LS-8319/);
+      expect(payload.hint).toMatch(/pw-browsers/);
+    });
+
     it('returns a running snapshot with a jobId when the run exceeds the sync budget', async () => {
       mockRunJob.mockImplementation(async (jobOpts: StartJobOptions) => ({
         jobId: 'nx-running-job',
