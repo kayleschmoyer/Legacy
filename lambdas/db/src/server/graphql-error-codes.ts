@@ -22,6 +22,11 @@ export const CLIENT_FACING_CODES = new Set([
   'FORBIDDEN',
   'NOT_FOUND',
   'PREMIUM_REQUIRED',
+  // A stale-token refresh signal (LS-8643): enforcement found the token's
+  // entitlement claim predates the user's entitlements_updated_at marker. The
+  // client silently re-mints the JWT and retries — this is an expected control
+  // signal, not a server defect, so it must not be forwarded to Rollbar.
+  'ENTITLEMENTS_STALE',
   'GAME_UNAVAILABLE',
   'PERSISTED_QUERY_NOT_FOUND',
   'PERSISTED_QUERY_NOT_SUPPORTED',

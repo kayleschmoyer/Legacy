@@ -26,8 +26,10 @@ describe('League Mutations', () => {
     };
 
     // Mock database utilities. Spread the real module so entitlement constants
-    // and helpers (ENTITLEMENTS, tierHasEntitlement, ENTITLEMENT_LABELS) used by
-    // the resolver's entitlement checks resolve correctly (LS-5197).
+    // (ENTITLEMENTS, ENTITLEMENT_LABELS) used by the resolver's entitlement
+    // checks resolve correctly (LS-5197). The gated create/renew/update tests
+    // use admin contexts, which short-circuit both the token-claim fast path and
+    // the fresh-from-Stripe path (LS-8643) before any Stripe call.
     jest.doMock('@legacy-sports/utils', () => ({
       ...jest.requireActual('@legacy-sports/utils'),
       getDbOptions: jest.fn(() => ({})),
@@ -88,6 +90,15 @@ describe('League Mutations', () => {
         usersInAppInternal: {
           id: 'app_internal.users.id',
           subscriptionTier: 'app_internal.users.subscription_tier',
+          entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
+        },
+        // Fresh-from-Stripe validation (LS-8643) reads the caller's Stripe
+        // customer id here. Free-user gate tests return rows without a
+        // stripeCustomerId → null customer → empty live entitlements → the
+        // PREMIUM_REQUIRED gate fires (no Stripe call).
+        subscriptions: {
+          userId: 'app_internal.subscriptions.user_id',
+          stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
         },
       },
       createBadgeService: jest.fn(() => ({

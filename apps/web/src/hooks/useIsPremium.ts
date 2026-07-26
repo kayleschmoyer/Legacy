@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
-import { type EntitlementKey, tierHasEntitlement } from '@legacy-sports/utils';
+import { type EntitlementKey } from '@legacy-sports/utils';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { useLeagueWebSocket } from './useLeagueWebSocket';
@@ -120,17 +120,20 @@ export function useIsPremiumStatus(): {
 }
 
 /**
- * Returns whether the current user's subscription tier grants a specific
- * entitlement. Prefer this over `useIsPremium()` at feature gates so each gate
- * is framed around the capability it unlocks (the Stripe entitlement) rather
- * than the tier that happens to grant it today. The tier→entitlement mapping is
- * the single source of truth in `@legacy-sports/utils` (`TIER_ENTITLEMENTS`),
- * shared with backend gating and Stripe provisioning.
+ * Returns whether the current user's plan grants a specific entitlement. Prefer
+ * this over `useIsPremium()` at feature gates so each gate is framed around the
+ * capability it unlocks (the Stripe entitlement) rather than the tier that
+ * happens to grant it today.
+ *
+ * Interim behavior (LS-8643): premium plans grant every catalog entitlement, so
+ * this resolves to the user's premium status. Wiring it to the token's per-user
+ * Stripe entitlement claim — so a plan can grant only a subset — is LS-8645. The
+ * `key` argument is retained now so call sites already name their capability and
+ * need no change when LS-8645 lands.
  *
  * Returns `false` while premium status is still loading (same conservative
  * behavior as `useIsPremium`).
  */
-export function useHasEntitlement(key: EntitlementKey): boolean {
-  const { isPremium } = useIsPremiumStatus();
-  return tierHasEntitlement(isPremium ? 'premium' : 'free', key);
+export function useHasEntitlement(_key: EntitlementKey): boolean {
+  return useIsPremiumStatus().isPremium;
 }

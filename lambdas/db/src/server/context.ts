@@ -19,10 +19,16 @@ export interface JWTPayload {
   subscriptionTier?: string;
   /**
    * Live Stripe entitlement lookup_keys minted into the token at login/refresh
-   * (LS-8644). A plain array of catalog keys. Not yet enforced here —
-   * enforcement is LS-8643.
+   * (LS-8644). A plain array of catalog keys. Enforced in LS-8643.
    */
   entitlements?: unknown;
+  /**
+   * Standard JWT issued-at claim (seconds since epoch), set by `jsonwebtoken`
+   * at sign time. Enforcement (LS-8643) compares this against the user's
+   * `entitlements_updated_at` marker to force-expire tokens minted before an
+   * entitlement change.
+   */
+  iat?: number;
   impersonatedBy?: ImpersonatedBy;
   [key: string]: unknown; // For other JWT standard fields
 }
@@ -40,6 +46,14 @@ export interface User {
    * change. Consumed for gating by LS-8643.
    */
   entitlements?: EntitlementKey[];
+  /**
+   * JWT issued-at in seconds since epoch (LS-8643), plumbed from the token's
+   * standard `iat` claim. Enforcement compares it against the user's
+   * `entitlements_updated_at` marker to force-expire tokens minted before an
+   * entitlement change. Optional on the type so hand-built User fixtures need
+   * no change; a User with no `iat` is treated as stale (fail-safe).
+   */
+  iat?: number;
   /** Present when this session was created by an admin via impersonation. */
   impersonatedBy?: ImpersonatedBy;
 }
@@ -160,6 +174,7 @@ export function parseUserFromJwtPayload(payload: JWTPayload): User {
     isAdmin: payload.isAdmin === true || accessLevel === 'admin',
     subscriptionTier,
     entitlements: parseEntitlementsClaim(payload.entitlements),
+    iat: typeof payload.iat === 'number' ? payload.iat : undefined,
     impersonatedBy,
   };
 }

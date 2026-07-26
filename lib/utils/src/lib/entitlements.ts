@@ -1,34 +1,31 @@
 /**
  * Entitlement lookup keys for feature gating.
  *
- * THIS MAP IS THE SOURCE OF TRUTH, NOT A MIRROR OF STRIPE. Stripe is
- * provisioned *from* this map (the `seed-stripe` CLI derives its Features from
- * `Object.values(ENTITLEMENTS)`), and the runtime gates by reading the cached
- * `users.subscription_tier` column against `TIER_ENTITLEMENTS` — it never queries
- * Stripe's entitlements API per request. Code owns the feature catalog
- * (`ENTITLEMENTS`/`ENTITLEMENT_LABELS`) and tier policy (`TIER_ENTITLEMENTS`);
- * Stripe owns *who is premium right now* (subscription status → webhook → tier
- * column) and billing/prices. To add or gate a feature, follow the end-to-end
- * steps in `.agents/skills/add-entitlement/SKILL.md`.
+ * STRIPE IS THE SOURCE OF TRUTH for which features a customer's plan unlocks
+ * (LS-8638). At login/refresh the oauth-proxy mints the customer's live
+ * `stripe.entitlements.activeEntitlements` into the JWT as an `entitlements`
+ * claim, and the runtime gates against that token claim (fast path) or, for
+ * sensitive/irreversible operations, re-reads live Stripe — it does NOT fan a
+ * cached tier out through a code-side tier→entitlement map. Product changes
+ * (attach a Feature to a plan, launch a new tier) are Stripe-dashboard config,
+ * no code deploy.
  *
- * Each `ENTITLEMENT` value is the `lookup_key` of a Stripe Feature
- * (provisioned by the `seed-stripe` CLI command,
- * `apps/cli/src/commands/seedStripe.ts`). Product tiers attach a subset
- * of these features; future tiers (e.g. a mid-level plan) require no code
- * changes — only a new entry in `TIER_ENTITLEMENTS` and a new Stripe price.
+ * Code still owns the *catalog* — `ENTITLEMENTS` (the machine keys, 1:1 with
+ * Stripe Feature `lookup_key`s) and `ENTITLEMENT_LABELS` (human copy for gate
+ * error messages) — and every gate call site. It no longer owns tier policy;
+ * that lives in Stripe. To add or gate a feature, follow the end-to-end steps
+ * in `.agents/skills/add-entitlement/SKILL.md`.
+ *
+ * Each `ENTITLEMENT` value is the `lookup_key` of a Stripe Feature (provisioned
+ * by the `seed-stripe` CLI command, `apps/cli/src/commands/seedStripe.ts`).
  *
  * Gating code should call `requireEntitlement(ctx, ENTITLEMENTS.salary_cap_leagues)`
- * rather than `requirePremium(ctx)` so the check is framed around the capability
- * being granted, not the tier that currently grants it.
+ * (or `requireFreshEntitlement` for sensitive ops) rather than `requirePremium(ctx)`
+ * so the check is framed around the capability being granted, not the coarse tier.
  *
  * This lives in `@legacy-sports/utils` (a platform-shared library) so both the
- * `lambdas/db` feature-gating code and the `seed-stripe` CLI command can import
- * a single source of truth — Stripe provisioning and in-app gating cannot drift.
- *
- * Follow-up (tracked separately): sync the authoritative entitlement set from
- * Stripe's Entitlements API (`entitlements.activeEntitlements.list`) on each
- * subscription webhook event so downgrade/upgrade side effects don't depend
- * on the tier column.
+ * `lambdas/db` feature-gating code and the `seed-stripe` CLI command import a
+ * single catalog — Stripe provisioning and in-app gating cannot drift.
  */
 export const ENTITLEMENTS = {
   salary_cap_leagues: 'salary_cap_leagues',
@@ -58,48 +55,14 @@ export const ENTITLEMENTS = {
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
 
-export type SubscriptionTier = 'free' | 'premium';
-
 /**
- * Static mapping of tier → granted entitlements. The single source of truth
- * for which features a tier unlocks in-app. To introduce a new tier:
- *   1. Add a Stripe Price with a matching `lookup_key` in `seedStripe.ts`.
- *   2. Attach the desired Features to the Product.
- *   3. Add the tier here with its entitlement subset.
- *   4. Extend the `SubscriptionTier` union.
- *
- * The tier→entitlement fan-out exists in code (not DB) so that adding a tier
- * is a pure schema-less code change; Stripe remains the pricing/billing
- * source of truth, and this map expresses the product policy.
+ * Coarse subscription tier. Retained as a billing-state cache (driven by the
+ * Stripe webhook → `users.subscription_tier`): it still governs the free-tier
+ * league limit (3) and downgrade side-effects. It is NO LONGER the entitlement
+ * source of truth — feature access is decided by the token's Stripe-minted
+ * entitlement claim (LS-8638), not by a tier→entitlement map.
  */
-export const TIER_ENTITLEMENTS: Record<SubscriptionTier, EntitlementKey[]> = {
-  free: [],
-  premium: [
-    ENTITLEMENTS.salary_cap_leagues,
-    ENTITLEMENTS.advanced_playoff_formats,
-    ENTITLEMENTS.unlimited_mock_drafts,
-    ENTITLEMENTS.unlimited_leagues,
-    ENTITLEMENTS.faab_waiver_type,
-    ENTITLEMENTS.historical_era_filters,
-    ENTITLEMENTS.auction_draft,
-    ENTITLEMENTS.extended_trade_expiration,
-    ENTITLEMENTS.player_comparison,
-    ENTITLEMENTS.matchup_projections,
-    ENTITLEMENTS.ai_matchup_recap,
-    ENTITLEMENTS.draft_recommendations,
-    ENTITLEMENTS.trade_analyzer,
-    ENTITLEMENTS.football_projections,
-    ENTITLEMENTS.advanced_search_filters,
-    ENTITLEMENTS.advanced_pitching_stats,
-    ENTITLEMENTS.defensive_sabermetrics,
-    ENTITLEMENTS.advanced_batting_stats,
-    ENTITLEMENTS.large_player_stats_page_size,
-    ENTITLEMENTS.league_history_analytics,
-    ENTITLEMENTS.optimal_lineup,
-    ENTITLEMENTS.logo_upload,
-    ENTITLEMENTS.advanced_scheduling,
-  ],
-};
+export type SubscriptionTier = 'free' | 'premium';
 
 /** Human-readable labels for error messages when an entitlement is missing. */
 export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
@@ -131,10 +94,3 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   logo_upload: 'Team logo upload (direct file upload)',
   advanced_scheduling: 'Advanced scheduling (custom in-division game ratio)',
 };
-
-export function tierHasEntitlement(
-  tier: SubscriptionTier,
-  key: EntitlementKey,
-): boolean {
-  return TIER_ENTITLEMENTS[tier].includes(key);
-}

@@ -3,7 +3,6 @@ import { WebSocketClient } from '@legacy-sports/websocket-client';
 import {
   ClientNotificationType,
   type EntitlementKey,
-  tierHasEntitlement,
 } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
 import { config } from '@legacy-sports/app-config/native';
@@ -96,15 +95,18 @@ export function useSubscription() {
 }
 
 /**
- * Returns whether the current user's subscription tier grants a specific
- * entitlement. Mobile counterpart of the web `useHasEntitlement` hook — prefer
- * it over a bare `isPremium` check at feature gates so each gate is framed
- * around the Stripe entitlement it unlocks. The tier→entitlement mapping is the
- * single source of truth in `@legacy-sports/utils` (`TIER_ENTITLEMENTS`).
+ * Returns whether the current user's plan grants a specific entitlement. Mobile
+ * counterpart of the web `useHasEntitlement` hook — prefer it over a bare
+ * `isPremium` check at feature gates so each gate is framed around the Stripe
+ * entitlement it unlocks.
+ *
+ * Interim behavior (LS-8643): premium plans grant every catalog entitlement, so
+ * this resolves to the user's premium status. Wiring it to the token's per-user
+ * Stripe entitlement claim is LS-8645; the `key` argument is retained now so
+ * call sites already name their capability.
  */
-export function useHasEntitlement(key: EntitlementKey): boolean {
-  const { isPremium } = useSubscription();
-  return tierHasEntitlement(isPremium ? 'premium' : 'free', key);
+export function useHasEntitlement(_key: EntitlementKey): boolean {
+  return useSubscription().isPremium;
 }
 
 export function useCheckoutSession() {

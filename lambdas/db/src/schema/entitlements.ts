@@ -11,9 +11,7 @@
  */
 export {
   ENTITLEMENTS,
-  TIER_ENTITLEMENTS,
   ENTITLEMENT_LABELS,
-  tierHasEntitlement,
   type EntitlementKey,
   type SubscriptionTier,
 } from '@legacy-sports/utils';

@@ -22,6 +22,7 @@ jest.mock('@legacy-sports/db-client', () => ({
     usersInAppInternal: {
       id: 'app_internal.users.id',
       subscriptionTier: 'app_internal.users.subscription_tier',
+      entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
     },
   },
   PublicDb: {},
@@ -284,64 +285,163 @@ describe('Premium authorization helpers', () => {
     });
   });
 
-  // LS-6071 / CLB-065 — a user who downgrades mid-session must not keep
-  // passing entitlement checks off a stale value. `hasEntitlement` must
-  // always resolve the tier from a live DB read for the *current* request,
-  // never from an optimistically-cached or JWT-carried tier claim.
-  describe('hasEntitlement freshness across the downgrade window', () => {
-    it('reflects a tier change between two separate requests for the same user', async () => {
-      // Request #1: user is still premium (e.g. before the Stripe downgrade
-      // webhook lands).
-      const beforeDowngrade = makeContext(premiumUser, 'premium');
-      await expect(
-        hasEntitlement(beforeDowngrade as any, 'unlimited_leagues' as any),
-      ).resolves.toBe(true);
+  // LS-8643 — hasEntitlement now enforces the token's Stripe-minted entitlement
+  // claim (ctx.user.entitlements) and force-expires tokens issued before the
+  // user's last entitlement change (token iat < entitlements_updated_at →
+  // ENTITLEMENTS_STALE). It no longer fans a cached tier out through a code-side
+  // tier→entitlement map. The single DB read is the memoized gating-row lookup
+  // (subscription_tier + entitlements_updated_at), keyed on the Context.
+  describe('hasEntitlement — token claim + staleness (LS-8643)', () => {
+    const NOW = 1_700_000_000_000; // fixed epoch ms
+    const MARKER = new Date(NOW);
+    const FRESH_IAT = Math.floor(NOW / 1000) + 60; // token minted after marker
+    const STALE_IAT = Math.floor(NOW / 1000) - 60; // token minted before marker
 
-      // Request #2: a brand-new Context (as Apollo builds per-invocation) for
-      // the same user, now reading the post-downgrade DB row. No shared
-      // in-memory cache should carry the stale 'premium' result forward.
-      const afterDowngrade = makeContext(premiumUser, 'free');
+    // Build a context whose gating-row read yields the given marker (or no row
+    // when entitlementsUpdatedAt === null), letting each test set the token's
+    // entitlement claim + iat on context.user.
+    function makeGatingContext(
+      user: Record<string, unknown> | null,
+      opts: {
+        entitlementsUpdatedAt?: Date | null;
+        impersonatedTier?: 'free';
+      } = {},
+    ) {
+      const row =
+        opts.entitlementsUpdatedAt === null
+          ? []
+          : [
+              {
+                tier: 'free',
+                entitlementsUpdatedAt: opts.entitlementsUpdatedAt ?? MARKER,
+              },
+            ];
+      const mockDb = {
+        select: jest.fn(() => ({
+          from: jest.fn(() => ({
+            where: jest.fn(() => ({
+              limit: jest.fn().mockResolvedValue(row),
+            })),
+          })),
+        })),
+      };
+      return {
+        user,
+        db: mockDb,
+        loaders: {},
+        isSystemRequest: false,
+        impersonatedTier: opts.impersonatedTier,
+      };
+    }
+
+    it('returns true when the key is in the token claim and the token is fresh', async () => {
+      const ctx = makeGatingContext({
+        id: 1,
+        isAdmin: false,
+        entitlements: ['unlimited_leagues'],
+        iat: FRESH_IAT,
+      });
       await expect(
-        hasEntitlement(afterDowngrade as any, 'unlimited_leagues' as any),
-      ).resolves.toBe(false);
+        hasEntitlement(ctx as any, 'unlimited_leagues' as any),
+      ).resolves.toBe(true);
     });
 
-    it('ignores a stale optimistic subscriptionTier on context.user and reads the DB instead', async () => {
-      // Simulate a JWT minted before the downgrade: context.user carries a
-      // 'premium' claim, but the DB (source of truth) has already moved the
-      // user to 'free'. hasEntitlement must never branch on
-      // context.user.subscriptionTier — only getSubscriptionTier()'s live
-      // DB read.
-      const staleJwtUser = { ...premiumUser, subscriptionTier: 'premium' };
-      const ctx = makeContext(staleJwtUser, 'free');
-      const selectSpy = jest.spyOn(ctx.db, 'select');
-
+    it('returns false when the key is NOT in the token claim (fresh token)', async () => {
+      const ctx = makeGatingContext({
+        id: 1,
+        isAdmin: false,
+        entitlements: ['salary_cap_leagues'],
+        iat: FRESH_IAT,
+      });
       await expect(
         hasEntitlement(ctx as any, 'unlimited_leagues' as any),
       ).resolves.toBe(false);
-      expect(selectSpy).toHaveBeenCalled();
     });
 
-    it('memoizes concurrent calls within a single request but re-queries on the next request', async () => {
-      // Within one request/context, concurrent hasEntitlement calls should
-      // share a single DB round-trip (tierCache keyed on the Context
-      // instance) — this is a performance optimization, not a source of
-      // staleness, because a fresh Context is built per request.
-      const ctx = makeContext(premiumUser, 'premium');
-      const selectSpy = jest.spyOn(ctx.db, 'select');
+    it('gates a free user with an empty claim out of every feature', async () => {
+      const ctx = makeGatingContext({
+        id: 1,
+        isAdmin: false,
+        entitlements: [],
+        iat: FRESH_IAT,
+      });
+      await expect(
+        hasEntitlement(ctx as any, 'unlimited_leagues' as any),
+      ).resolves.toBe(false);
+    });
 
+    it('throws ENTITLEMENTS_STALE when the token iat predates the marker', async () => {
+      const ctx = makeGatingContext({
+        id: 1,
+        isAdmin: false,
+        // The claim WOULD grant, but the token predates the last change.
+        entitlements: ['unlimited_leagues'],
+        iat: STALE_IAT,
+      });
+      await expect(
+        hasEntitlement(ctx as any, 'unlimited_leagues' as any),
+      ).rejects.toMatchObject({ extensions: { code: 'ENTITLEMENTS_STALE' } });
+    });
+
+    it('treats a token with no iat as stale (fail-safe)', async () => {
+      const ctx = makeGatingContext({
+        id: 1,
+        isAdmin: false,
+        entitlements: ['unlimited_leagues'],
+        // no iat claim
+      });
+      await expect(
+        hasEntitlement(ctx as any, 'unlimited_leagues' as any),
+      ).rejects.toMatchObject({ extensions: { code: 'ENTITLEMENTS_STALE' } });
+    });
+
+    it('skips the staleness check when the user has no marker row', async () => {
+      const ctx = makeGatingContext(
+        {
+          id: 1,
+          isAdmin: false,
+          entitlements: ['unlimited_leagues'],
+          iat: STALE_IAT, // would be stale, but there is no marker to compare
+        },
+        { entitlementsUpdatedAt: null },
+      );
+      await expect(
+        hasEntitlement(ctx as any, 'unlimited_leagues' as any),
+      ).resolves.toBe(true);
+    });
+
+    it('admins are all-entitled without reading the claim or marker', async () => {
+      const ctx = makeGatingContext({ id: 3, isAdmin: true });
+      const selectSpy = jest.spyOn(ctx.db, 'select');
+      await expect(
+        hasEntitlement(ctx as any, 'salary_cap_leagues' as any),
+      ).resolves.toBe(true);
+      expect(selectSpy).not.toHaveBeenCalled();
+    });
+
+    it('admin impersonating the free tier falls back to the claim path', async () => {
+      const ctx = makeGatingContext(
+        { id: 3, isAdmin: true, entitlements: [], iat: FRESH_IAT },
+        { impersonatedTier: 'free' },
+      );
+      await expect(
+        hasEntitlement(ctx as any, 'unlimited_leagues' as any),
+      ).resolves.toBe(false);
+    });
+
+    it('memoizes the gating-row read across concurrent calls in one request', async () => {
+      const ctx = makeGatingContext({
+        id: 1,
+        isAdmin: false,
+        entitlements: ['unlimited_leagues', 'salary_cap_leagues'],
+        iat: FRESH_IAT,
+      });
+      const selectSpy = jest.spyOn(ctx.db, 'select');
       await Promise.all([
         hasEntitlement(ctx as any, 'unlimited_leagues' as any),
         hasEntitlement(ctx as any, 'salary_cap_leagues' as any),
       ]);
       expect(selectSpy).toHaveBeenCalledTimes(1);
-
-      // A subsequent request (new Context) must not reuse that memoized
-      // value even for the same user.
-      const nextRequestCtx = makeContext(premiumUser, 'free');
-      await expect(
-        hasEntitlement(nextRequestCtx as any, 'unlimited_leagues' as any),
-      ).resolves.toBe(false);
     });
   });
 });

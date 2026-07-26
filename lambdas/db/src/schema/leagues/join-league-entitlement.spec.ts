@@ -59,9 +59,10 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
     jest.doMock('@legacy-sports/logging', () => ({
       LOGGER: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
     }));
-    // ENTITLEMENTS / tierHasEntitlement now live in @legacy-sports/utils
-    // (LS-5229) and are re-exported by ../entitlements, so keep the real
-    // exports and only override getDbOptions.
+    // ENTITLEMENTS now lives in @legacy-sports/utils (LS-5229) and is
+    // re-exported by ../entitlements, so keep the real exports and only
+    // override getDbOptions. The unlimited_leagues cap gates on the token's
+    // entitlement claim (LS-8643), set on context.user below.
     jest.doMock('@legacy-sports/utils', () => ({
       ...jest.requireActual('@legacy-sports/utils'),
       getDbOptions: jest.fn(() => ({})),
@@ -149,7 +150,16 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
       const db = makeChainableDb(readQueue);
       return {
         resolve: resolverFor('joinLeagueByCode'),
-        context: { user: { id: 1, isAdmin: false }, db },
+        context: {
+          user: {
+            id: 1,
+            isAdmin: false,
+            // Premium plans carry unlimited_leagues in the token claim (LS-8643);
+            // free users carry an empty claim.
+            entitlements: tier === 'premium' ? ['unlimited_leagues'] : [],
+          },
+          db,
+        },
       };
     }
 
@@ -187,7 +197,15 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
       ];
       const db = makeChainableDb(readQueue);
       const resolve = resolverFor('joinLeagueByCode');
-      const context = { user: { id: 1, isAdmin: false }, db };
+      const context = {
+        user: {
+          id: 1,
+          isAdmin: false,
+          // Premium plans carry unlimited_leagues in the token claim (LS-8643).
+          entitlements: ['unlimited_leagues'],
+        },
+        db,
+      };
       await expect(
         resolve(
           {},
@@ -300,7 +318,16 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
       const db = makeChainableDb(readQueue);
       return {
         resolve: resolverFor('joinLeague'),
-        context: { user: { id: 1, isAdmin: false }, db },
+        context: {
+          user: {
+            id: 1,
+            isAdmin: false,
+            // Premium plans carry unlimited_leagues in the token claim (LS-8643);
+            // free users carry an empty claim.
+            entitlements: tier === 'premium' ? ['unlimited_leagues'] : [],
+          },
+          db,
+        },
       };
     }
 
@@ -364,7 +391,16 @@ describe('join mutations — free-tier active-league cap (LS-5172)', () => {
       const db = makeChainableDb(readQueue);
       return {
         resolve: resolverFor('joinPublicLeague'),
-        context: { user: { id: 1, isAdmin: false }, db },
+        context: {
+          user: {
+            id: 1,
+            isAdmin: false,
+            // Premium plans carry unlimited_leagues in the token claim (LS-8643);
+            // free users carry an empty claim.
+            entitlements: tier === 'premium' ? ['unlimited_leagues'] : [],
+          },
+          db,
+        },
       };
     }
 

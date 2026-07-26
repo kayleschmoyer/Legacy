@@ -17,7 +17,6 @@ import {
 } from 'tamagui';
 import { ExternalLink, X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
-import { ENTITLEMENTS, tierHasEntitlement } from '@legacy-sports/utils';
 import {
   useGetAllPlayerSeasonStatsQuery,
   useGetPlayerCareerArcQuery,
@@ -773,23 +772,13 @@ export function PlayerDetailModal({
   const [activeTab, setActiveTab] = useState<StatsTab>('career-arc');
   const [arcMode, setArcMode] = useState<CareerArcMode>('batting');
   const { isPremium } = useIsPremiumStatus();
-  const hasAdvancedBatting = tierHasEntitlement(
-    isPremium ? 'premium' : 'free',
-    ENTITLEMENTS.advanced_batting_stats,
-  );
-  const hasPremiumPitching = tierHasEntitlement(
-    isPremium ? 'premium' : 'free',
-    ENTITLEMENTS.advanced_pitching_stats,
-  );
-  const hasPremiumFielding = tierHasEntitlement(
-    isPremium ? 'premium' : 'free',
-    ENTITLEMENTS.defensive_sabermetrics,
-  );
-
-  const hasPremiumBatting = tierHasEntitlement(
-    isPremium ? 'premium' : 'free',
-    ENTITLEMENTS.advanced_batting_stats,
-  );
+  // Premium plans grant every catalog entitlement, so these advanced-stats gates
+  // resolve to the user's premium status (LS-8643). Per-entitlement client
+  // resolution from the token claim lands in LS-8645.
+  const hasAdvancedBatting = isPremium;
+  const hasPremiumPitching = isPremium;
+  const hasPremiumFielding = isPremium;
+  const hasPremiumBatting = isPremium;
 
   // ------ Data fetching ------
   const { data, previousData, loading, error } =

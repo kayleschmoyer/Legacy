@@ -67,11 +67,8 @@ import {
   PremiumRequiredError,
   UserInputError,
 } from '../graphql-errors';
-import {
-  checkAdminInDb,
-  hasEntitlement,
-  requireEntitlement,
-} from '../authorization';
+import { checkAdminInDb, hasEntitlement } from '../authorization';
+import { requireFreshEntitlement } from '../fresh-entitlements';
 import { ENTITLEMENTS } from '../entitlements';
 import { applyDecay, applyEscalation } from '../../services/salary-rollover';
 
@@ -356,7 +353,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         : 3;
 
       if (inputWaiverType === 'faab') {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.faab_waiver_type,
           'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
@@ -364,7 +361,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       }
 
       if (inputSalaryCapEnabled) {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.salary_cap_leagues,
           'Salary cap leagues require a premium subscription. Upgrade to unlock salary cap features.',
@@ -384,7 +381,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       // previously could create auction leagues because this branch had no
       // entitlement gate, unlike salary cap / FAAB / era filters above.
       if (selectionMethod === 'auction') {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.auction_draft,
           'Auction draft mode requires a premium subscription. Upgrade to unlock auction drafts.',
@@ -405,7 +402,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
             'schedulingDivisionalWeightPct must be between 0 and 100.',
           );
         }
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.advanced_scheduling,
           'Advanced scheduling requires a premium subscription. Upgrade to customize your in-division game ratio.',
@@ -456,7 +453,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       }
 
       if (inputEraFilter && !isEraFreeForSport(resolvedSport, inputEraFilter)) {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.historical_era_filters,
           'Era-based filtering (non-free eras) requires a premium subscription. Upgrade to access historical era leagues.',
@@ -469,7 +466,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       // Commissioner"), but the resolver previously wrote it through
       // unconditionally, bypassing the entitlement check entirely.
       if (inputHofOnly) {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.historical_era_filters,
           'Hall-of-Fame-only draft pools require a premium subscription. Upgrade to unlock this feature.',
@@ -2270,7 +2267,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
         }
         // 6-team and 8-team playoff formats are premium only
         if (['6-team', '8-team'].includes(playoffFormat)) {
-          await requireEntitlement(
+          await requireFreshEntitlement(
             context,
             ENTITLEMENTS.advanced_playoff_formats,
             'Advanced playoff formats require a premium subscription.',
@@ -2291,7 +2288,10 @@ builder.mutationField('updateLeagueSettings', (t) =>
       if (salaryCapEnabled !== null && salaryCapEnabled !== undefined) {
         // Enabling salary cap is a premium feature
         if (salaryCapEnabled) {
-          await requireEntitlement(context, ENTITLEMENTS.salary_cap_leagues);
+          await requireFreshEntitlement(
+            context,
+            ENTITLEMENTS.salary_cap_leagues,
+          );
         }
         leagueUpdate.salaryCapEnabled = salaryCapEnabled;
         changeDescriptions.push(
@@ -2320,7 +2320,10 @@ builder.mutationField('updateLeagueSettings', (t) =>
           .where(eq(PublicSchema.leagues.id, leagueId))
           .limit(1);
         if (currentLeague?.salaryCapEnabled) {
-          await requireEntitlement(context, ENTITLEMENTS.salary_cap_leagues);
+          await requireFreshEntitlement(
+            context,
+            ENTITLEMENTS.salary_cap_leagues,
+          );
         }
       }
 
@@ -2375,7 +2378,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
           );
         }
         if (waiverType === 'faab') {
-          await requireEntitlement(
+          await requireFreshEntitlement(
             context,
             ENTITLEMENTS.faab_waiver_type,
             'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
@@ -2415,7 +2418,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
           );
         }
 
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.faab_waiver_type,
           'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
@@ -2808,13 +2811,13 @@ builder.mutationField('renewLeague', (t) =>
       // active (non-frozen, non-mock) leagues, since the current league is
       // about to be frozen and replaced 1-for-1.
       //
-      // Note: hasEntitlement/requireEntitlement resolve tier→entitlements via
-      // TIER_ENTITLEMENTS internally — there is no separate "premium" key;
-      // callers gate on the specific capability being checked, not the tier.
-      // Re-check league cap for free users. Uses `await` + `hasEntitlement`
-      // to ensure the entitlement is evaluated asynchronously before the count
-      // query runs. `ne(id, leagueId)` explicitly excludes the league being
-      // renewed so the 1-for-1 replacement is not counted against the limit.
+      // Note: the league cap gates on the `unlimited_leagues` entitlement via
+      // the fast path (`hasEntitlement` reads the token's Stripe-minted claim,
+      // LS-8643) — it is a soft product limit, not an irreversible paid-feature
+      // write, so it does not use the fresh-from-Stripe path that the carried-
+      // forward premium *features* below (FAAB / salary cap / era / playoff /
+      // auction) require. `ne(id, leagueId)` explicitly excludes the league
+      // being renewed so the 1-for-1 replacement is not counted against the limit.
       //
       // The cap counts every active league the renewing user *participates in*,
       // not only the ones they own (LS-5181). A membership join against
@@ -2845,7 +2848,7 @@ builder.mutationField('renewLeague', (t) =>
       }
 
       if (oldLeague.waiverType === 'faab') {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.faab_waiver_type,
           'FAAB waiver type requires a premium subscription. Upgrade to unlock advanced waiver settings.',
@@ -2853,7 +2856,7 @@ builder.mutationField('renewLeague', (t) =>
       }
 
       if (oldLeague.salaryCapEnabled) {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.salary_cap_leagues,
           'Salary cap leagues require a premium subscription. Upgrade to unlock salary cap features.',
@@ -2867,7 +2870,7 @@ builder.mutationField('renewLeague', (t) =>
           oldLeague.baseballEraFilter,
         )
       ) {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.historical_era_filters,
           'Era-based filtering (non-free eras) requires a premium subscription. Upgrade to access historical era leagues.',
@@ -2878,7 +2881,7 @@ builder.mutationField('renewLeague', (t) =>
         oldLeague.playoffFormat != null &&
         ['6-team', '8-team'].includes(oldLeague.playoffFormat)
       ) {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.advanced_playoff_formats,
           'Advanced playoff formats require a premium subscription.',
@@ -2978,7 +2981,7 @@ builder.mutationField('renewLeague', (t) =>
       // re-checks above (LS-5127). Checked after all reads but before any
       // writes so renewal fails cleanly with no partial state.
       if (oldDraft?.selectionMethod === 'auction') {
-        await requireEntitlement(
+        await requireFreshEntitlement(
           context,
           ENTITLEMENTS.auction_draft,
           'Auction draft mode requires a premium subscription. Upgrade to unlock auction drafts.',

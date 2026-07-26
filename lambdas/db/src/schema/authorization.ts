@@ -43,6 +43,7 @@ import { and, eq, inArray, ne, or } from 'drizzle-orm';
 import type { Context } from './builder';
 import {
   AuthenticationError,
+  EntitlementsStaleError,
   ForbiddenError,
   PremiumRequiredError,
   UserInputError,
@@ -51,7 +52,6 @@ import {
   ENTITLEMENT_LABELS,
   type EntitlementKey,
   type SubscriptionTier,
-  tierHasEntitlement,
 } from './entitlements';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -62,6 +62,18 @@ export interface AuthenticatedUser {
   email?: string | null;
   username?: string | null;
   isAdmin?: boolean;
+  subscriptionTier?: 'free' | 'premium';
+  /**
+   * Live Stripe entitlement lookup_keys carried by the token (LS-8644). Empty
+   * for free users / users with no Stripe customer. Source of truth for
+   * non-admin feature gating on the fast path ({@link hasEntitlement}).
+   */
+  entitlements?: EntitlementKey[];
+  /**
+   * JWT issued-at in seconds since epoch. Compared against the user's
+   * `entitlements_updated_at` marker to force-expire stale tokens (LS-8643).
+   */
+  iat?: number;
   impersonatedBy?: {
     id: number;
     email?: string;
@@ -169,54 +181,121 @@ export type AuthorizedHandler<TParent, TArgs, TResult> = (
 
 // ── Building Blocks ────────────────────────────────────────────────────────────
 
-// ── Premium Tier Helpers ──────────────────────────────────────────────────────
+// ── Premium Tier + Entitlement Helpers ─────────────────────────────────────────
 
 /**
- * Returns the subscription tier (`'free'` | `'premium'`) for the authenticated
- * user.  Admin users are treated as premium immediately (no DB lookup);
- * for non-admin users, performs a single DB lookup against `app_internal.users`.
- *
- * @throws Error when `context.user` is null/undefined (same as {@link requireAuth}).
+ * Per-request gating row loaded once from `app_internal.users`: the coarse
+ * billing `tier` cache AND the `entitlements_updated_at` invalidation marker.
+ * Both are read in a single query (the marker read piggybacks the tier read) and
+ * memoized on the GraphQL `Context` (a new instance per request), so concurrent
+ * `getSubscriptionTier` / `hasEntitlement` calls in the same resolver share one
+ * DB round-trip. The WeakMap auto-clears when the context is GC'd, so a fresh
+ * request always re-reads — no cross-request staleness.
  */
-/**
- * Per-request memoization cache for subscription tier lookups. Keyed on the
- * GraphQL `Context` object (new instance per request), so concurrent
- * `hasEntitlement` / `requireEntitlement` calls in the same resolver share a
- * single DB query. The WeakMap auto-clears when the context is GC'd.
- */
-const tierCache = new WeakMap<Context, Promise<SubscriptionTier>>();
+interface UserGatingRow {
+  tier: SubscriptionTier;
+  /**
+   * `entitlements_updated_at` as epoch milliseconds, or `null` when the user has
+   * no `app_internal.users` row. Compared against the token `iat` to detect a
+   * stale entitlement claim.
+   */
+  entitlementsUpdatedAtMs: number | null;
+}
 
-export async function getSubscriptionTier(
-  context: Context,
-): Promise<SubscriptionTier> {
-  const cached = tierCache.get(context);
+const gatingRowCache = new WeakMap<Context, Promise<UserGatingRow>>();
+
+function getUserGatingRow(context: Context): Promise<UserGatingRow> {
+  const cached = gatingRowCache.get(context);
   if (cached) return cached;
-  const promise = resolveSubscriptionTier(context);
-  tierCache.set(context, promise);
+  const promise = loadUserGatingRow(context);
+  gatingRowCache.set(context, promise);
   return promise;
 }
 
-async function resolveSubscriptionTier(
+async function loadUserGatingRow(context: Context): Promise<UserGatingRow> {
+  const user = requireAuth(context);
+  const rows = await context.db
+    .select({
+      tier: InternalSchema.usersInAppInternal.subscriptionTier,
+      entitlementsUpdatedAt:
+        InternalSchema.usersInAppInternal.entitlementsUpdatedAt,
+    })
+    .from(InternalSchema.usersInAppInternal)
+    .where(eq(InternalSchema.usersInAppInternal.id, user.id))
+    .limit(1);
+  const raw = rows[0];
+  return {
+    tier: raw?.tier === 'premium' ? 'premium' : 'free',
+    entitlementsUpdatedAtMs:
+      raw?.entitlementsUpdatedAt != null
+        ? new Date(raw.entitlementsUpdatedAt).getTime()
+        : null,
+  };
+}
+
+/**
+ * Returns the subscription tier (`'free'` | `'premium'`) for the authenticated
+ * user. Admin users are treated as premium immediately (no DB lookup); for
+ * non-admin users, performs a single memoized lookup against `app_internal.users`.
+ *
+ * This is the coarse *billing-state* cache (driven by the Stripe webhook →
+ * `subscription_tier`), NOT the entitlement source of truth. It still governs
+ * the free-tier league limit and downgrade side-effects; feature gating goes
+ * through {@link hasEntitlement} / {@link requireEntitlement}.
+ *
+ * @throws AuthenticationError when `context.user` is null/undefined.
+ */
+export async function getSubscriptionTier(
   context: Context,
 ): Promise<SubscriptionTier> {
   const user = requireAuth(context);
   // Admins are treated as premium unless impersonating a free tier for testing
   if (user.isAdmin && context.impersonatedTier !== 'free') return 'premium';
-  const rows = await context.db
-    .select({ tier: InternalSchema.usersInAppInternal.subscriptionTier })
-    .from(InternalSchema.usersInAppInternal)
-    .where(eq(InternalSchema.usersInAppInternal.id, user.id))
-    .limit(1);
-  const raw = rows[0]?.tier;
-  return raw === 'premium' ? 'premium' : 'free';
+  return (await getUserGatingRow(context)).tier;
 }
 
 /**
- * Non-throwing entitlement check. Admins always return `true`.
+ * Throws {@link EntitlementsStaleError} when the caller's token predates the
+ * user's last entitlement change — its `iat` is older than the memoized
+ * `entitlements_updated_at` marker — so the Stripe-minted entitlement claim it
+ * carries can no longer be trusted (epic LS-8638 SHARED CONTRACTS #1). A token
+ * with no `iat` is treated as stale (fail-safe). When the user has no marker row
+ * there is nothing to compare against, so the check is skipped.
  *
- * Resolves the user's tier once and delegates to the static tier→entitlement
- * map in `./entitlements`. Safe to call from resolvers that branch on
- * capability (e.g. "show upgrade CTA vs. show feature").
+ * Admin callers are exempt and must be short-circuited *before* calling this.
+ */
+async function assertEntitlementsFresh(
+  context: Context,
+  user: AuthenticatedUser,
+): Promise<void> {
+  const { entitlementsUpdatedAtMs } = await getUserGatingRow(context);
+  if (entitlementsUpdatedAtMs == null) return;
+  const iatMs = typeof user.iat === 'number' ? user.iat * 1000 : 0;
+  if (iatMs < entitlementsUpdatedAtMs) {
+    throw EntitlementsStaleError();
+  }
+}
+
+/**
+ * Non-throwing entitlement check for the common capability branch (e.g. "show
+ * feature vs. show upgrade CTA"). Enforces against the token's Stripe-minted
+ * entitlement claim — there is NO per-request Stripe call on this fast path.
+ *
+ * Resolution order for non-admin callers:
+ *   1. Force-expire the token if its claim is stale — {@link assertEntitlementsFresh}
+ *      throws `ENTITLEMENTS_STALE` when the token `iat` predates the user's
+ *      `entitlements_updated_at` marker. This is the one exception to
+ *      "non-throwing": it is a client-refresh control signal, not a
+ *      not-entitled verdict, so no premium access is granted from a stale token.
+ *   2. Return whether `key` is present in the token's entitlement claim.
+ *
+ * Admins are all-entitled for reads (no claim / marker read) unless explicitly
+ * impersonating the free tier for testing. Free users (empty claim) are gated
+ * out of every premium feature.
+ *
+ * Sensitive/irreversible operations must NOT trust this fast path — they
+ * validate fresh from live Stripe via `requireFreshEntitlement`
+ * (see ./fresh-entitlements).
  */
 export async function hasEntitlement(
   context: Context,
@@ -224,15 +303,18 @@ export async function hasEntitlement(
 ): Promise<boolean> {
   const user = requireAuth(context);
   if (user.isAdmin && context.impersonatedTier !== 'free') return true;
-  const tier = await getSubscriptionTier(context);
-  return tierHasEntitlement(tier, key);
+  await assertEntitlementsFresh(context, user);
+  return user.entitlements?.includes(key) ?? false;
 }
 
 /**
- * Throws {@link PremiumRequiredError} when the authenticated user's tier does
- * not grant the given entitlement. Prefer this over {@link requirePremium}
- * for new code — the error message is derived from the entitlement label so
- * a future tier that grants only a subset still produces an accurate prompt.
+ * Throws {@link PremiumRequiredError} when the authenticated user's token claim
+ * does not grant the given entitlement. Prefer this over {@link requirePremium}
+ * for new code — the error message is derived from the entitlement label so a
+ * future plan that grants only a subset still produces an accurate prompt.
+ *
+ * May instead throw `ENTITLEMENTS_STALE` (via {@link hasEntitlement}) when the
+ * token's entitlement claim is stale, signalling the client to refresh + retry.
  */
 export async function requireEntitlement(
   context: Context,

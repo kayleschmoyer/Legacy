@@ -158,7 +158,6 @@ jest.mock('@legacy-sports/utils', () => ({
     superflex: 'superflex',
     idp: 'idp',
   },
-  tierHasEntitlement: jest.fn().mockReturnValue(false),
   ClientNotificationType: {},
 }));
 

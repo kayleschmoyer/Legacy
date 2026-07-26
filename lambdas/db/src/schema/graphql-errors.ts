@@ -57,6 +57,27 @@ export function PremiumRequiredError(
 }
 
 /**
+ * Throw when an authenticated user presents a token whose entitlement claim is
+ * stale — its `iat` predates the user's `entitlements_updated_at` invalidation
+ * marker, so the Stripe-minted entitlement set it carries can no longer be
+ * trusted (LS-8643, epic LS-8638 SHARED CONTRACTS #1).
+ *
+ * Maps to Apollo code `ENTITLEMENTS_STALE` — distinct from `UNAUTHENTICATED`
+ * (the token itself is still valid) and `PREMIUM_REQUIRED` (a definitive
+ * not-entitled verdict). The client's error link intercepts this code, silently
+ * re-mints the JWT with fresh entitlements + a new `iat` via the oauth-proxy
+ * RefreshJwt endpoint, and retries the failed operation once (handling is
+ * LS-8645). No premium access is granted from a stale token.
+ */
+export function EntitlementsStaleError(
+  message = 'Your access needs to be refreshed. Please retry.',
+): GraphQLError {
+  return new GraphQLError(message, {
+    extensions: { code: 'ENTITLEMENTS_STALE' },
+  });
+}
+
+/**
  * Throw when the request contains invalid or conflicting user input.
  *
  * Maps to Apollo code `BAD_USER_INPUT` (HTTP 400 equivalent).

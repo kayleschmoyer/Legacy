@@ -15,9 +15,11 @@
  *   4. Active FAAB-waiver leagues: waiver type converted to standard.
  *   5. Mock-draft limit (2/week) is re-enforced by the existing check in
  *      initialize-mock-draft — no separate action needed here.
- *   6. Premium-gated features need no downgrade action here — a tier change
- *      flips entitlements automatically via the tier→entitlement map in
- *      `@legacy-sports/utils`. Enforcement varies by feature:
+ *   6. Premium-gated features need no downgrade action here — access follows the
+ *      customer's live Stripe entitlements carried in the JWT (LS-8638): when
+ *      Stripe drops an entitlement the webhook bumps `entitlements_updated_at`,
+ *      force-expiring the stale token so the next request re-mints an empty/
+ *      reduced claim. Enforcement varies by feature:
  *        - AI matchup recaps (`ai_matchup_recap`) and draft recommendations
  *          (`draft_recommendations`) are enforced server-side at the GraphQL
  *          resolver level via `requireEntitlement` / `hasEntitlement`.

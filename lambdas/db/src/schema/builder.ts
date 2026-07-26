@@ -7,6 +7,7 @@ import {
   type GenericDatabase,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
+import type { EntitlementKey } from '@legacy-sports/utils';
 import type * as PublicSchema from '@legacy-sports/db-client/src/drizzle/public/schema';
 import type {
   NotificationPublisher,
@@ -25,6 +26,16 @@ export interface Context {
     username?: string | null;
     isAdmin?: boolean;
     subscriptionTier?: 'free' | 'premium';
+    /**
+     * Live Stripe entitlement lookup_keys carried by the token (LS-8644),
+     * enforced for non-admin callers in authorization.ts (LS-8643).
+     */
+    entitlements?: EntitlementKey[];
+    /**
+     * JWT issued-at (seconds since epoch). Compared against the user's
+     * `entitlements_updated_at` marker to force-expire stale tokens (LS-8643).
+     */
+    iat?: number;
     impersonatedBy?: {
       id: number;
       email?: string;

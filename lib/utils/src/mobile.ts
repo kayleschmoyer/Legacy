@@ -1,9 +1,9 @@
 // Mobile-safe utilities - no AWS SDK dependencies
 
 export * from './lib/allowed-positions';
-// Pure entitlement constants + tier→entitlement helpers (no AWS / Node deps).
-// Must be re-exported here so the mobile app's PremiumGate keys and
-// `useHasEntitlement` resolve at runtime — Metro resolves '@legacy-sports/utils'
+// Pure entitlement catalog constants + labels (no AWS / Node deps). Must be
+// re-exported here so the mobile app's PremiumGate keys and `useHasEntitlement`
+// resolve at runtime — Metro resolves '@legacy-sports/utils'
 // to this file via the package "react-native" field, so anything missing here
 // is `undefined` on Hermes (the LS-7946/LS-7953 failure mode).
 export * from './lib/entitlements';
