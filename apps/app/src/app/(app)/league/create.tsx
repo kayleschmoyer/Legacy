@@ -18,6 +18,8 @@ import {
   CustomEraRange,
   EraFilterGrid,
   FaabBudgetField,
+  MAX_SALARY_CAP,
+  MIN_SALARY_CAP,
   SalaryCapField,
   WaiverSystemField,
   type WaiverType,
@@ -117,6 +119,14 @@ const SCORING_FORMAT_OPTIONS: ReadonlyArray<{
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Range check for the salary cap amount (LS-8361) — mirrors the LS-6115 web
+// fix in apps/web/src/pages/baseball/LeagueCreatePage.tsx validateFormFull.
+function getSalaryCapRangeError(cap: number | undefined): string | undefined {
+  return cap !== undefined && (cap < MIN_SALARY_CAP || cap > MAX_SALARY_CAP)
+    ? `Salary cap must be between ${MIN_SALARY_CAP} and ${MAX_SALARY_CAP}`
+    : undefined;
+}
 
 function SelectRow<T extends string | number>({
   label,
@@ -344,10 +354,18 @@ export default function CreateLeagueScreen(): React.JSX.Element {
       )
         return `Custom era end year must be between ${minYear} and ${currentYear}`;
     }
-    if (baseballForm.salaryCapEnabled && baseballForm.salaryCap === undefined)
-      return 'Please enter a salary cap amount';
+    if (baseballForm.salaryCapEnabled) {
+      if (baseballForm.salaryCap === undefined)
+        return 'Please enter a salary cap amount';
+      const rangeError = getSalaryCapRangeError(baseballForm.salaryCap);
+      if (rangeError) return rangeError;
+    }
     return null;
   };
+
+  const salaryCapError = baseballForm.salaryCapEnabled
+    ? getSalaryCapRangeError(baseballForm.salaryCap)
+    : undefined;
 
   // ── Football helpers ──────────────────────────────────────────────────────
   const setFootballField = <K extends keyof FootballFormData>(
@@ -949,6 +967,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
                     onAmountChange={(v) => setBaseballField('salaryCap', v)}
                     isPremium={canUsePremium}
                     disabled={loading}
+                    error={salaryCapError}
                     onUpgrade={() => goToUpgrade('Salary Cap')}
                     numberOfTeams={baseballForm.numberOfTeams}
                     maxRosterSize={baseballForm.maxRosterSize}

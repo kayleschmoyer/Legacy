@@ -105,6 +105,12 @@ export const FAAB_BUDGET_OPTIONS = [50, 100, 150, 200, 250, 500] as const;
 export const FAAB_BUDGET_MIN = 1;
 export const FAAB_BUDGET_MAX = 100_000;
 
+// Valid range for the salary cap amount (LS-8361). Kept in sync with
+// MIN_SALARY_CAP / MAX_SALARY_CAP in lambdas/db/src/schema/leagues/mutations.ts
+// and apps/web/src/constants/league.ts (LS-6115).
+export const MIN_SALARY_CAP = 1;
+export const MAX_SALARY_CAP = 1_000_000_000;
+
 /** Waiver system options. FAAB is a premium feature. */
 export const WAIVER_TYPE_OPTIONS: ReadonlyArray<{
   label: string;

@@ -5,7 +5,13 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import type { Text as RNText, View as RNView } from 'react-native';
+import { Alert } from 'react-native';
+import type {
+  Pressable as RNPressable,
+  Text as RNText,
+  TextInput as RNTextInput,
+  View as RNView,
+} from 'react-native';
 
 import CreateLeagueScreen from './create';
 
@@ -14,6 +20,8 @@ import CreateLeagueScreen from './create';
 type RNComponents = {
   View: typeof RNView;
   Text: typeof RNText;
+  TextInput: typeof RNTextInput;
+  Pressable: typeof RNPressable;
 };
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -37,13 +45,58 @@ jest.mock('../../../features/subscription', () => ({
   PremiumGate: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-jest.mock('@legacy-sports/shared-components/leagues', () => ({
-  EraFilterGrid: () => null,
-  CustomEraRange: () => null,
-  WaiverSystemField: () => null,
-  FaabBudgetField: () => null,
-  SalaryCapField: () => null,
-}));
+jest.mock('@legacy-sports/shared-components/leagues', () => {
+  const { View, Text, TextInput, Pressable } =
+    jest.requireActual<RNComponents>('react-native');
+  // Real salary-cap bounds so the LS-8361 validation tests exercise the same
+  // range the component enforces.
+  const { MIN_SALARY_CAP, MAX_SALARY_CAP } = jest.requireActual<
+    typeof import('../../../../../../lib/shared-components/src/features/leagues/premium/constants')
+  >(
+    '../../../../../../lib/shared-components/src/features/leagues/premium/constants',
+  );
+  return {
+    MIN_SALARY_CAP,
+    MAX_SALARY_CAP,
+    EraFilterGrid: () => null,
+    CustomEraRange: () => null,
+    WaiverSystemField: () => null,
+    FaabBudgetField: () => null,
+    // Lean stand-in exposing the toggle, amount input, and inline error used
+    // by the salary-cap validation tests (LS-8361).
+    SalaryCapField: ({
+      enabled,
+      amount,
+      onToggleEnabled,
+      onAmountChange,
+      error,
+    }: {
+      enabled: boolean;
+      amount?: number;
+      onToggleEnabled: (v: boolean) => void;
+      onAmountChange: (v: number | undefined) => void;
+      error?: string;
+    }) => (
+      <View>
+        <Pressable
+          testID="salary-cap-toggle"
+          onPress={() => onToggleEnabled(!enabled)}
+        />
+        {enabled && (
+          <TextInput
+            testID="salary-cap-input"
+            value={amount !== undefined ? String(amount) : ''}
+            onChangeText={(text: string) => {
+              const n = parseInt(text, 10);
+              onAmountChange(isNaN(n) ? undefined : n);
+            }}
+          />
+        )}
+        {error !== undefined && <Text testID="salary-cap-error">{error}</Text>}
+      </View>
+    ),
+  };
+});
 
 jest.mock('../../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
@@ -58,8 +111,11 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// react-native's index re-exports `require('./Libraries/Alert/Alert').default`,
+// so the mock must live on `default` for `import { Alert }` to resolve to it.
 jest.mock('react-native/Libraries/Alert/Alert', () => ({
-  alert: jest.fn(),
+  __esModule: true,
+  default: { alert: jest.fn() },
 }));
 
 jest.mock('@legacy-sports/shared-components', () => {
@@ -227,6 +283,103 @@ describe('CreateLeagueScreen (unified)', () => {
       );
       fireEvent.press(screen.getByRole('button', { name: 'Create League' }));
       expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('baseball salary cap validation (LS-8361)', () => {
+    // Renders the screen with a valid league name and the salary cap enabled,
+    // then types `amountText` into the cap input (skipped when undefined).
+    const setUpWithSalaryCap = (amountText?: string) => {
+      render(<CreateLeagueScreen />);
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Enter your league name'),
+        'My Baseball League',
+      );
+      fireEvent.press(screen.getByTestId('salary-cap-toggle'));
+      if (amountText !== undefined) {
+        fireEvent.changeText(
+          screen.getByTestId('salary-cap-input'),
+          amountText,
+        );
+      }
+    };
+
+    const submit = () =>
+      fireEvent.press(screen.getByRole('button', { name: 'Create League' }));
+
+    it('rejects salaryCap 0 (previously passed the undefined-only check)', () => {
+      setUpWithSalaryCap('0');
+      submit();
+      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Error',
+        expect.stringMatching(/Salary cap must be between/),
+      );
+    });
+
+    it('rejects a negative salaryCap', () => {
+      setUpWithSalaryCap('-100');
+      submit();
+      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Error',
+        expect.stringMatching(/Salary cap must be between/),
+      );
+    });
+
+    it('rejects a salaryCap above the maximum', () => {
+      setUpWithSalaryCap('9999999999');
+      submit();
+      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Error',
+        expect.stringMatching(/Salary cap must be between/),
+      );
+    });
+
+    it('still requires an amount when the cap is enabled and empty', () => {
+      setUpWithSalaryCap();
+      submit();
+      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Error',
+        'Please enter a salary cap amount',
+      );
+    });
+
+    it('shows an inline validation error on the field for an invalid amount', () => {
+      setUpWithSalaryCap('0');
+      expect(screen.getByTestId('salary-cap-error')).toBeTruthy();
+      expect(screen.getByText(/Salary cap must be between/)).toBeTruthy();
+    });
+
+    it('shows no inline error for a valid amount', () => {
+      setUpWithSalaryCap('50000000');
+      expect(screen.queryByTestId('salary-cap-error')).toBeNull();
+    });
+
+    it('accepts a valid salaryCap and submits it', async () => {
+      setUpWithSalaryCap('50000000');
+      submit();
+      await waitFor(() => {
+        expect(mockCreateLeagueMutate).toHaveBeenCalled();
+      });
+      type MutateCallArgs = {
+        variables: { input: { salaryCap?: number; salaryCapEnabled: boolean } };
+      };
+      const calls = mockCreateLeagueMutate.mock.calls as MutateCallArgs[][];
+      expect(calls[0][0].variables.input.salaryCapEnabled).toBe(true);
+      expect(calls[0][0].variables.input.salaryCap).toBe(50000000);
+    });
+
+    it('does not validate salaryCap when the cap is disabled', async () => {
+      setUpWithSalaryCap('0');
+      // Toggle the cap back off — the stale 0 amount must not block submit.
+      fireEvent.press(screen.getByTestId('salary-cap-toggle'));
+      submit();
+      await waitFor(() => {
+        expect(mockCreateLeagueMutate).toHaveBeenCalled();
+      });
     });
   });
 
