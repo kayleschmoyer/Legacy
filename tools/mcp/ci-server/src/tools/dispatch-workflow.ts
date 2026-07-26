@@ -239,6 +239,27 @@ export async function dispatchWorkflow(
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    const is422NoDispatchTrigger =
+      msg.includes('GitHub API 422') && /workflow_dispatch/i.test(msg);
+    if (is422NoDispatchTrigger) {
+      const ref = params.ref ?? 'main';
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: [
+              `Cannot dispatch workflow "${params.workflow}": it has no 'workflow_dispatch' trigger (HTTP 422 from GitHub).`,
+              '',
+              'This workflow only runs on other events (e.g. pull_request, push) and cannot be manually dispatched. ' +
+                'Retrigger the existing run instead:',
+              `  1. ci_list_runs({ workflow: "${params.workflow}", branch: "${ref}" }) — find the failed run's "id"`,
+              '  2. ci_rerun_failed_jobs({ runId: <id> })',
+            ].join('\n'),
+          },
+        ],
+      };
+    }
     const is403 =
       msg.includes('GitHub API 403') ||
       msg.includes('(403)') ||
