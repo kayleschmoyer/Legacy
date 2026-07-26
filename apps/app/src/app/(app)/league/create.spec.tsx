@@ -40,8 +40,12 @@ jest.mock('expo-router', () => ({
 }));
 
 let mockIsPremium = false;
+let mockPremiumLoading = false;
 jest.mock('../../../features/subscription', () => ({
-  useSubscription: () => ({ isPremium: mockIsPremium, loading: false }),
+  useSubscription: () => ({
+    isPremium: mockIsPremium,
+    loading: mockPremiumLoading,
+  }),
   PremiumGate: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -138,6 +142,7 @@ jest.mock('@legacy-sports/shared-components', () => {
         </Text>
       </View>
     ),
+    Skeleton: () => <View testID="skeleton" />,
   };
 });
 
@@ -181,6 +186,7 @@ describe('CreateLeagueScreen (unified)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsPremium = false;
+    mockPremiumLoading = false;
     mockSearchParams = {};
   });
 
@@ -380,6 +386,38 @@ describe('CreateLeagueScreen (unified)', () => {
       await waitFor(() => {
         expect(mockCreateLeagueMutate).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('premium settings entitlement loading (LS-8380)', () => {
+    it('shows a loading placeholder instead of the upsell card while premiumLoading is true', () => {
+      mockIsPremium = true;
+      mockPremiumLoading = true;
+      render(<CreateLeagueScreen />);
+      expect(screen.getByTestId('premium-settings-loading')).toBeTruthy();
+      expect(
+        screen.queryByText(/Premium features. Free leagues use All Eras/),
+      ).toBeNull();
+    });
+
+    it('does not show the non-premium upsell card for a premium user once loading resolves', () => {
+      mockIsPremium = true;
+      mockPremiumLoading = false;
+      render(<CreateLeagueScreen />);
+      expect(screen.queryByTestId('premium-settings-loading')).toBeNull();
+      expect(
+        screen.queryByText(/Premium features. Free leagues use All Eras/),
+      ).toBeNull();
+    });
+
+    it('shows the non-premium upsell card for a free user once loading resolves', () => {
+      mockIsPremium = false;
+      mockPremiumLoading = false;
+      render(<CreateLeagueScreen />);
+      expect(screen.queryByTestId('premium-settings-loading')).toBeNull();
+      expect(
+        screen.getByText(/Premium features. Free leagues use All Eras/),
+      ).toBeTruthy();
     });
   });
 

@@ -12,7 +12,7 @@ import {
 } from 'tamagui';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert } from 'react-native';
-import { DateTimePicker } from '@legacy-sports/shared-components';
+import { DateTimePicker, Skeleton } from '@legacy-sports/shared-components';
 import {
   CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   CustomEraRange,
@@ -283,7 +283,6 @@ export default function CreateLeagueScreen(): React.JSX.Element {
   });
 
   const { isPremium, loading: premiumLoading } = useSubscription();
-  const canUsePremium = isPremium && !premiumLoading;
 
   const goToUpgrade = (featureName: string) => {
     trackPremiumFeatureClick(featureName);
@@ -886,93 +885,118 @@ export default function CreateLeagueScreen(): React.JSX.Element {
                   🏆 Premium Settings
                 </H2>
 
-                {!canUsePremium && (
-                  <Card
-                    backgroundColor="$color2"
-                    borderColor="$borderColor"
-                    padding="$3"
-                    bordered
+                {premiumLoading ? (
+                  // While the entitlement fetch is in flight, show a neutral
+                  // loading placeholder instead of the non-premium upsell card
+                  // and "locked" controls — otherwise a premium user briefly
+                  // sees themselves treated as free on cold load (LS-8380,
+                  // same defect class as the web fix in LS-6088).
+                  <YStack
+                    space="$3"
+                    testID="premium-settings-loading"
+                    accessibilityLabel="Loading premium settings"
                   >
-                    <Text size="$3" color="$gray11">
-                      Salary cap, FAAB waivers, and historical era filters are
-                      Premium features. Free leagues use All Eras and standard
-                      waivers.
-                    </Text>
-                  </Card>
-                )}
+                    <Skeleton height={72} radius={8} />
+                    <Skeleton height={56} radius={8} />
+                    <Skeleton height={56} radius={8} />
+                  </YStack>
+                ) : (
+                  <>
+                    {!isPremium && (
+                      <Card
+                        backgroundColor="$color2"
+                        borderColor="$borderColor"
+                        padding="$3"
+                        bordered
+                      >
+                        <Text size="$3" color="$gray11">
+                          Salary cap, FAAB waivers, and historical era filters
+                          are Premium features. Free leagues use All Eras and
+                          standard waivers.
+                        </Text>
+                      </Card>
+                    )}
 
-                <YStack space="$2">
-                  <Text size="$4" fontWeight="600" color="$gray12">
-                    Historical Era Filter
-                  </Text>
-                  <EraFilterGrid
-                    sport="baseball"
-                    value={baseballForm.baseballEraFilter}
-                    onChange={(v) => setBaseballField('baseballEraFilter', v)}
-                    isPremium={canUsePremium}
-                    disabled={loading}
-                    onUpgrade={() => goToUpgrade('Historical Era Selection')}
-                  />
-                  {baseballForm.baseballEraFilter === 'custom' && (
-                    <CustomEraRange
-                      startYear={baseballForm.customEraStartYear}
-                      endYear={baseballForm.customEraEndYear}
-                      onChangeStart={(v) =>
-                        setBaseballField('customEraStartYear', v)
-                      }
-                      onChangeEnd={(v) =>
-                        setBaseballField('customEraEndYear', v)
-                      }
+                    <YStack space="$2">
+                      <Text size="$4" fontWeight="600" color="$gray12">
+                        Historical Era Filter
+                      </Text>
+                      <EraFilterGrid
+                        sport="baseball"
+                        value={baseballForm.baseballEraFilter}
+                        onChange={(v) =>
+                          setBaseballField('baseballEraFilter', v)
+                        }
+                        isPremium={isPremium}
+                        disabled={loading}
+                        onUpgrade={() =>
+                          goToUpgrade('Historical Era Selection')
+                        }
+                      />
+                      {baseballForm.baseballEraFilter === 'custom' && (
+                        <CustomEraRange
+                          startYear={baseballForm.customEraStartYear}
+                          endYear={baseballForm.customEraEndYear}
+                          onChangeStart={(v) =>
+                            setBaseballField('customEraStartYear', v)
+                          }
+                          onChangeEnd={(v) =>
+                            setBaseballField('customEraEndYear', v)
+                          }
+                          disabled={loading}
+                        />
+                      )}
+                      <Text size="$2" color="$gray10">
+                        Only players active during this window are draftable.
+                      </Text>
+                    </YStack>
+
+                    <WaiverSystemField
+                      value={baseballForm.waiverType}
+                      onChange={(v) => setBaseballField('waiverType', v)}
+                      isPremium={isPremium}
                       disabled={loading}
+                      onUpgrade={() => goToUpgrade('FAAB Waiver Settings')}
                     />
-                  )}
-                  <Text size="$2" color="$gray10">
-                    Only players active during this window are draftable.
-                  </Text>
-                </YStack>
 
-                <WaiverSystemField
-                  value={baseballForm.waiverType}
-                  onChange={(v) => setBaseballField('waiverType', v)}
-                  isPremium={canUsePremium}
-                  disabled={loading}
-                  onUpgrade={() => goToUpgrade('FAAB Waiver Settings')}
-                />
+                    {baseballForm.waiverType === 'faab' && (
+                      <PremiumGate
+                        isPremium={isPremium}
+                        featureName="FAAB Waiver Settings"
+                        featureDescription="Configure Free Agent Acquisition Budget (FAAB) bidding."
+                      >
+                        <FaabBudgetField
+                          value={baseballForm.faabBudgetDefault}
+                          onChange={(v) =>
+                            setBaseballField('faabBudgetDefault', v)
+                          }
+                          disabled={loading}
+                        />
+                      </PremiumGate>
+                    )}
 
-                {baseballForm.waiverType === 'faab' && (
-                  <PremiumGate
-                    isPremium={canUsePremium}
-                    featureName="FAAB Waiver Settings"
-                    featureDescription="Configure Free Agent Acquisition Budget (FAAB) bidding."
-                  >
-                    <FaabBudgetField
-                      value={baseballForm.faabBudgetDefault}
-                      onChange={(v) => setBaseballField('faabBudgetDefault', v)}
-                      disabled={loading}
-                    />
-                  </PremiumGate>
+                    <PremiumGate
+                      isPremium={isPremium}
+                      featureName="Salary Cap"
+                      featureDescription="Track player salaries and enforce roster spending caps."
+                    >
+                      <SalaryCapField
+                        enabled={baseballForm.salaryCapEnabled}
+                        amount={baseballForm.salaryCap}
+                        onToggleEnabled={(v) =>
+                          setBaseballField('salaryCapEnabled', v)
+                        }
+                        onAmountChange={(v) => setBaseballField('salaryCap', v)}
+                        isPremium={isPremium}
+                        disabled={loading}
+                        error={salaryCapError}
+                        onUpgrade={() => goToUpgrade('Salary Cap')}
+                        numberOfTeams={baseballForm.numberOfTeams}
+                        maxRosterSize={baseballForm.maxRosterSize}
+                      />
+                    </PremiumGate>
+                  </>
                 )}
-
-                <PremiumGate
-                  isPremium={canUsePremium}
-                  featureName="Salary Cap"
-                  featureDescription="Track player salaries and enforce roster spending caps."
-                >
-                  <SalaryCapField
-                    enabled={baseballForm.salaryCapEnabled}
-                    amount={baseballForm.salaryCap}
-                    onToggleEnabled={(v) =>
-                      setBaseballField('salaryCapEnabled', v)
-                    }
-                    onAmountChange={(v) => setBaseballField('salaryCap', v)}
-                    isPremium={canUsePremium}
-                    disabled={loading}
-                    error={salaryCapError}
-                    onUpgrade={() => goToUpgrade('Salary Cap')}
-                    numberOfTeams={baseballForm.numberOfTeams}
-                    maxRosterSize={baseballForm.maxRosterSize}
-                  />
-                </PremiumGate>
               </YStack>
             )}
 
