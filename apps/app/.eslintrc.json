@@ -22,7 +22,7 @@
     {
       "files": ["*.ts", "*.tsx"],
       "parserOptions": {
-        "project": ["tsconfig.*?.json"]
+        "project": ["apps/app/tsconfig.*?.json"]
       },
       "rules": {
         "@typescript-eslint/no-redundant-type-constituents": "error",
