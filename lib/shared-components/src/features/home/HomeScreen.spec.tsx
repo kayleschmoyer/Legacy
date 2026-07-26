@@ -188,6 +188,15 @@ describe('HomeScreen', () => {
         ),
       ).not.toThrow();
     });
+
+    it('shows a "Coming Soon" badge on the unavailable sport card in the compact "Pick your sport" section', () => {
+      const { getByText } = render(
+        <HomeScreen {...baseProps} leagues={[league]} />,
+      );
+      expect(getByText('Pick your sport')).toBeTruthy();
+      expect(getByText('Coming Soon')).toBeTruthy();
+      expect(getByText('Live Season')).toBeTruthy();
+    });
   });
 
   describe('mock draft CTA', () => {

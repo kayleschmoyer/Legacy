@@ -769,12 +769,14 @@ function SportCard({
   sport,
   isLight,
   full,
+  showBadge,
   onView,
   onCreate,
 }: {
   sport: SportConfig;
   isLight?: boolean;
   full?: boolean;
+  showBadge?: boolean;
   onView: () => void;
   onCreate: () => void;
 }) {
@@ -791,7 +793,6 @@ function SportCard({
       borderRadius={20}
       padding={full ? 32 : 28}
       gap="$4"
-      opacity={sport.available ? 1 : 0.6}
     >
       <XStack justifyContent="space-between" alignItems="flex-start" gap="$3">
         <YStack
@@ -803,6 +804,7 @@ function SportCard({
           borderColor="$surfacePanelBorder"
           alignItems="center"
           justifyContent="center"
+          opacity={sport.available ? 1 : 0.6}
         >
           <BrandIcon
             name={sport.icon}
@@ -811,7 +813,7 @@ function SportCard({
             title={sport.title}
           />
         </YStack>
-        {full ? (
+        {full || showBadge ? (
           <XStack
             backgroundColor={
               sport.available
@@ -1479,6 +1481,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                       key={sport.key}
                       sport={sport}
                       isLight={isLight}
+                      showBadge
                       onView={() => onViewSport(sport.key)}
                       onCreate={onCreateLeague}
                     />
