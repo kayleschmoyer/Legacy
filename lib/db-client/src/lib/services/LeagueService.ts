@@ -7,6 +7,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '../client/Helpers';
 import { PublicSchema } from '../client/PublicDbClient';
+import type { KeeperSettings } from '../../types/DatabaseTypes';
 import type { DraftMode, DraftOrder, SelectionMethod } from '../DraftUtils';
 
 // Default team names (owner's team name is generated dynamically)
@@ -88,6 +89,13 @@ export interface CreateLeagueOptions {
   waiverEnabled?: boolean;
   faabBudgetDefault?: number;
   isPublic?: boolean;
+  /** Roster continuity across seasons (LS-8671). Defaults to 'redraft'
+   *  (full roster reset — historical behaviour). */
+  rosterContinuity?: 'redraft' | 'keeper' | 'dynasty';
+  /** Keeper configuration jsonb (LS-8671). Callers must have already
+   *  validated that this is only present when rosterContinuity = 'keeper' —
+   *  this service does not gate. */
+  keeperSettings?: KeeperSettings | null;
   // ── Salary cap settings (LS-634/LS-646) ────────────────────────────
   salaryCapEnabled?: boolean;
   salaryCap?: number | null;
@@ -152,6 +160,8 @@ export interface CreateLeagueResult {
     faabBudgetDefault?: number;
     isPublic: boolean;
     playoffEnabled: boolean;
+    rosterContinuity?: 'redraft' | 'keeper' | 'dynasty';
+    keeperSettings?: KeeperSettings | null;
   };
   teams: {
     id: number;
@@ -206,6 +216,8 @@ export class LeagueService {
       waiverEnabled = true,
       faabBudgetDefault = 100,
       isPublic = false,
+      rosterContinuity = 'redraft',
+      keeperSettings = null,
       defensiveFormat = 'dst',
       salaryCapEnabled = false,
       salaryCap = null,
@@ -293,6 +305,8 @@ export class LeagueService {
                 faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
                 isPublic: PublicSchema.leagues.isPublic,
                 playoffEnabled: PublicSchema.leagues.playoffEnabled,
+                rosterContinuity: PublicSchema.leagues.rosterContinuity,
+                keeperSettings: PublicSchema.leagues.keeperSettings,
               })
               .from(PublicSchema.leagues)
               .where(
@@ -406,6 +420,8 @@ export class LeagueService {
             schedulingDivisionalWeightPct,
             numberOfDivisions,
             isPublic,
+            rosterContinuity,
+            keeperSettings,
             // Idempotency key for this create attempt (LS-6063). Only ever
             // set when leagueLimit is defined (the free-tier path this
             // dedup exists for) — see the lookup above.
@@ -444,6 +460,8 @@ export class LeagueService {
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
             playoffEnabled: PublicSchema.leagues.playoffEnabled,
+            rosterContinuity: PublicSchema.leagues.rosterContinuity,
+            keeperSettings: PublicSchema.leagues.keeperSettings,
           });
 
         // 2. Create teams — assign each team to a division (round-robin across divisions)

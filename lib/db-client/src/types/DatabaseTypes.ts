@@ -20,6 +20,7 @@ import {
   gameFootballReceiving,
   gameFootballRushing,
   gamePitching,
+  keeperDesignations,
   leagueMembers,
   leaguePosition,
   leagues,
@@ -95,6 +96,11 @@ export type TeamMember = typeof teamMembers.$inferSelect;
 export type TeamPosition = typeof leaguePosition.$inferSelect;
 export type League = typeof leagues.$inferSelect;
 export type Team = typeof teams.$inferSelect;
+// Keeper settings jsonb shape (LS-8671) — defined next to the leagues model.
+export type { KeeperSettings } from '../drizzle/public/schema';
+export type KeeperDesignation = typeof keeperDesignations.$inferSelect;
+export type CreateKeeperDesignationInput =
+  typeof keeperDesignations.$inferInsert;
 export type TradeOffer = typeof tradeOffers.$inferSelect;
 export type TradeOfferPlayer = typeof tradeOfferPlayers.$inferSelect;
 export type CreateTradeOfferInput = typeof tradeOffers.$inferInsert;

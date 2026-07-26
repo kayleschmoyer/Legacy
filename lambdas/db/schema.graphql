@@ -538,6 +538,7 @@ input CreateLeagueAndTeamsInput {
   gamesPerMatchup: Int
   idempotencyKey: String
   isPublic: Boolean
+  keeperSettings: KeeperSettingsInput
   leagueName: String!
   luxuryTaxThreshold: Int
   maxBatters: Int
@@ -548,6 +549,7 @@ input CreateLeagueAndTeamsInput {
   numberOfTeams: Int!
   pickTimeLimitSeconds: Int
   playerPool: String!
+  rosterContinuity: RosterContinuity
   salaryCap: Int
   salaryCapEnabled: Boolean
   salaryDecayPct: Int
@@ -1512,6 +1514,53 @@ type JoinLeaguePayload {
 }
 
 """
+Keeper-mode configuration for a league. Only present when rosterContinuity is keeper. (LS-8671)
+"""
+type KeeperSettings {
+  """
+  Cost model applied to kept players: 'round-penalty' (forfeit the round the player was drafted in last season; standard drafts) or 'auction-budget' (deduct a configured amount from the team budget; auction drafts).
+  """
+  costModel: String
+
+  """
+  Players each team may keep season-over-season (1-10).
+  """
+  keeperCount: Int
+
+  """
+  Seasons in a row the same player may be kept. Null means unlimited.
+  """
+  maxConsecutiveKeeps: Int
+
+  """
+  When true, rookies do not count against keeper limits.
+  """
+  rookieExempt: Boolean
+}
+
+input KeeperSettingsInput {
+  """
+  Cost model for kept players: 'round-penalty' (requires selectionMethod 'standard') or 'auction-budget' (requires 'auction'). Hyphenated values are not legal GraphQL enum names, so this is a validated string like selectionMethod.
+  """
+  costModel: String!
+
+  """
+  Players each team may keep season-over-season (1-10).
+  """
+  keeperCount: Int!
+
+  """
+  Seasons in a row the same player may be kept. Omit or null for unlimited.
+  """
+  maxConsecutiveKeeps: Int
+
+  """
+  When true, rookies do not count against keeper limits. Defaults to false.
+  """
+  rookieExempt: Boolean
+}
+
+"""
 A fantasy sports league
 """
 type League {
@@ -1548,6 +1597,11 @@ type League {
   isPublic: Boolean
 
   """
+  Keeper-mode configuration. Null unless rosterContinuity is keeper. (LS-8671)
+  """
+  keeperSettings: KeeperSettings
+
+  """
   Lifecycle phase of the league: pre-draft (awaiting draft), active (season in play), offseason (post-renewal, before commissioner starts new season)
   """
   leaguePhase: String
@@ -1567,6 +1621,11 @@ type League {
   playoffMultiWeek: Boolean
   previousLeagueId: Int
   primaryColor: String
+
+  """
+  How rosters carry across seasons. Defaults to redraft. (LS-8671)
+  """
+  rosterContinuity: RosterContinuity
   salaryCap: Int
   salaryCapEnabled: Boolean
   salaryDecayPct: Int
@@ -3755,6 +3814,15 @@ input RecordConsentInput {
   consentType: ConsentType!
   ipAddress: String
   userAgent: String
+}
+
+"""
+How rosters carry across seasons: redraft (full reset, default), keeper (retain up to keeperCount players), or dynasty (full roster carries over).
+"""
+enum RosterContinuity {
+  dynasty
+  keeper
+  redraft
 }
 
 """

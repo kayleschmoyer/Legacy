@@ -23,9 +23,11 @@ import {
   playerPool,
   eraFilter,
   draftStatus,
+  keeperDesignationStatus,
   leaguePhase,
   leaguePermissionLevel,
   positionSlot,
+  rosterContinuity,
   rosterLockTiming,
   schedulingStrategy,
   waiverClaimStatus,
@@ -34,6 +36,25 @@ import {
   tradeOfferStatus,
   sportKind,
 } from './Enums';
+
+/**
+ * Commissioner-configured keeper rules stored on `leagues.keeper_settings`
+ * (LS-8671). Only present when rosterContinuity = 'keeper'.
+ *
+ * - keeperCount          : players each team may keep (1–10)
+ * - costModel            : 'round-penalty' (forfeit the round the player was
+ *                          drafted in last season; requires standard drafts) |
+ *                          'auction-budget' (deduct a configured amount from
+ *                          the team budget; requires auction drafts)
+ * - maxConsecutiveKeeps  : seasons in a row a player may be kept (null = unlimited)
+ * - rookieExempt         : rookies do not count against keeperCount limits
+ */
+export interface KeeperSettings {
+  keeperCount: number;
+  costModel: 'round-penalty' | 'auction-budget';
+  maxConsecutiveKeeps: number | null;
+  rookieExempt: boolean;
+}
 
 // Define leagues first since other tables reference it
 export const leagues = pgTable(
@@ -60,6 +81,15 @@ export const leagues = pgTable(
     draftStatus: draftStatus('draft_status').notNull().default('not-started'),
     /** Lifecycle phase: pre-draft (awaiting draft), active (season in play), offseason (post-renewal, pre-start) */
     leaguePhase: leaguePhase('league_phase').notNull().default('pre-draft'),
+    /** Roster continuity across seasons (LS-8671): redraft (full reset,
+     *  default), keeper (retain up to keeperCount players), dynasty (full
+     *  roster carries over — LS-8386). */
+    rosterContinuity: rosterContinuity('roster_continuity')
+      .notNull()
+      .default('redraft'),
+    /** Keeper configuration (LS-8671). Null unless rosterContinuity =
+     *  'keeper' — enforced by createLeagueAndTeams validation, not the DB. */
+    keeperSettings: jsonb('keeper_settings').$type<KeeperSettings>(),
     inviteCode: varchar('invite_code', { length: 8 }).notNull().unique(),
     minGamesPerSeason: integer('min_games_per_season').default(10),
     gamesPerMatchup: integer('games_per_matchup').default(5),
@@ -599,6 +629,70 @@ export const waiverClaims = pgTable(
       leagueIdIdx: index('waiver_claims_league_id_idx').on(table.leagueId),
       teamIdIdx: index('waiver_claims_team_id_idx').on(table.teamId),
       statusIdx: index('waiver_claims_status_idx').on(table.status),
+    };
+  },
+);
+
+/**
+ * A manager's designation of a player to keep into the next season
+ * (LS-8671, foundation for keeper mode LS-8385).
+ *
+ * One row per (league, team, player, season). `season` is the league
+ * seasonNumber the keeper applies to (i.e. the upcoming draft's season).
+ * Cost columns mirror the league's keeper costModel: costRound for
+ * 'round-penalty' leagues, costAmount for 'auction-budget' leagues —
+ * both nullable here since cost is resolved at draft initialization
+ * (LS-8385 child 4).
+ */
+export const keeperDesignations = pgTable(
+  'keeper_designations',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    teamId: integer('team_id').notNull(),
+    playerId: integer('player_id').notNull(),
+    season: integer('season').notNull(),
+    /** Draft round forfeited for this keeper ('round-penalty' cost model). */
+    costRound: integer('cost_round'),
+    /** Auction budget deducted for this keeper ('auction-budget' cost model). */
+    costAmount: integer('cost_amount'),
+    status: keeperDesignationStatus('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      keeperDesignationsLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'keeper_designations_league_fk',
+      }).onDelete('cascade'),
+      keeperDesignationsTeamFk: foreignKey({
+        columns: [table.teamId],
+        foreignColumns: [teams.id],
+        name: 'keeper_designations_team_fk',
+      }).onDelete('cascade'),
+      keeperDesignationsPlayerFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: 'keeper_designations_player_fk',
+      }),
+      // A player can only be designated once per team per season.
+      keeperDesignationsUk: unique('keeper_designations_uk').on(
+        table.leagueId,
+        table.teamId,
+        table.playerId,
+        table.season,
+      ),
+      leagueSeasonIdx: index('keeper_designations_league_season_idx').on(
+        table.leagueId,
+        table.season,
+      ),
+      teamIdIdx: index('keeper_designations_team_id_idx').on(table.teamId),
     };
   },
 );

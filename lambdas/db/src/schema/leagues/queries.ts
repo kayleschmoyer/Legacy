@@ -132,6 +132,9 @@ builder.queryField('league', (t) =>
             customEraEndYear: PublicSchema.leagues.customEraEndYear,
             // Trade deadline (LS-4099)
             tradeDeadlineWeek: PublicSchema.leagues.tradeDeadlineWeek,
+            // Roster continuity (LS-8671)
+            rosterContinuity: PublicSchema.leagues.rosterContinuity,
+            keeperSettings: PublicSchema.leagues.keeperSettings,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -294,6 +297,9 @@ builder.queryField('userLeagues', (t) =>
             auctionMinBid: PublicSchema.leagues.auctionMinBid,
             // Tier downgrade freeze (LS-846)
             tierFrozenAt: PublicSchema.leagues.tierFrozenAt,
+            // Roster continuity (LS-8671)
+            rosterContinuity: PublicSchema.leagues.rosterContinuity,
+            keeperSettings: PublicSchema.leagues.keeperSettings,
           })
           .from(PublicSchema.leagues)
           .innerJoin(

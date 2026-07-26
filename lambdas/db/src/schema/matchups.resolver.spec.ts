@@ -26,6 +26,7 @@ describe('Matchup Queries', () => {
 
     // Mock database utilities
     jest.doMock('@legacy-sports/utils', () => ({
+      ...jest.requireActual('@legacy-sports/utils'),
       getDbOptions: jest.fn(() => ({})),
     }));
 

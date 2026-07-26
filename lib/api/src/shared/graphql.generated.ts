@@ -473,6 +473,7 @@ export type CreateLeagueAndTeamsInput = {
   gamesPerMatchup?: InputMaybe<Scalars['Int']['input']>;
   idempotencyKey?: InputMaybe<Scalars['String']['input']>;
   isPublic?: InputMaybe<Scalars['Boolean']['input']>;
+  keeperSettings?: InputMaybe<KeeperSettingsInput>;
   leagueName: Scalars['String']['input'];
   luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;
   maxBatters?: InputMaybe<Scalars['Int']['input']>;
@@ -483,6 +484,7 @@ export type CreateLeagueAndTeamsInput = {
   numberOfTeams: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool: Scalars['String']['input'];
+  rosterContinuity?: InputMaybe<RosterContinuity>;
   salaryCap?: InputMaybe<Scalars['Int']['input']>;
   salaryCapEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   salaryDecayPct?: InputMaybe<Scalars['Int']['input']>;
@@ -1334,6 +1336,30 @@ export type JoinLeaguePayload = {
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** Keeper-mode configuration for a league. Only present when rosterContinuity is keeper. (LS-8671) */
+export type KeeperSettings = {
+  __typename?: 'KeeperSettings';
+  /** Cost model applied to kept players: 'round-penalty' (forfeit the round the player was drafted in last season; standard drafts) or 'auction-budget' (deduct a configured amount from the team budget; auction drafts). */
+  costModel?: Maybe<Scalars['String']['output']>;
+  /** Players each team may keep season-over-season (1-10). */
+  keeperCount?: Maybe<Scalars['Int']['output']>;
+  /** Seasons in a row the same player may be kept. Null means unlimited. */
+  maxConsecutiveKeeps?: Maybe<Scalars['Int']['output']>;
+  /** When true, rookies do not count against keeper limits. */
+  rookieExempt?: Maybe<Scalars['Boolean']['output']>;
+};
+
+export type KeeperSettingsInput = {
+  /** Cost model for kept players: 'round-penalty' (requires selectionMethod 'standard') or 'auction-budget' (requires 'auction'). Hyphenated values are not legal GraphQL enum names, so this is a validated string like selectionMethod. */
+  costModel: Scalars['String']['input'];
+  /** Players each team may keep season-over-season (1-10). */
+  keeperCount: Scalars['Int']['input'];
+  /** Seasons in a row the same player may be kept. Omit or null for unlimited. */
+  maxConsecutiveKeeps?: InputMaybe<Scalars['Int']['input']>;
+  /** When true, rookies do not count against keeper limits. Defaults to false. */
+  rookieExempt?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 /** A fantasy sports league */
 export type League = {
   __typename?: 'League';
@@ -1359,6 +1385,8 @@ export type League = {
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
+  /** Keeper-mode configuration. Null unless rosterContinuity is keeper. (LS-8671) */
+  keeperSettings?: Maybe<KeeperSettings>;
   /** Lifecycle phase of the league: pre-draft (awaiting draft), active (season in play), offseason (post-renewal, before commissioner starts new season) */
   leaguePhase?: Maybe<Scalars['String']['output']>;
   lmNotes?: Maybe<Scalars['String']['output']>;
@@ -1377,6 +1405,8 @@ export type League = {
   playoffMultiWeek?: Maybe<Scalars['Boolean']['output']>;
   previousLeagueId?: Maybe<Scalars['Int']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
+  /** How rosters carry across seasons. Defaults to redraft. (LS-8671) */
+  rosterContinuity?: Maybe<RosterContinuity>;
   salaryCap?: Maybe<Scalars['Int']['output']>;
   salaryCapEnabled?: Maybe<Scalars['Boolean']['output']>;
   salaryDecayPct?: Maybe<Scalars['Int']['output']>;
@@ -3805,6 +3835,13 @@ export type RecordConsentInput = {
   ipAddress?: InputMaybe<Scalars['String']['input']>;
   userAgent?: InputMaybe<Scalars['String']['input']>;
 };
+
+/** How rosters carry across seasons: redraft (full reset, default), keeper (retain up to keeperCount players), or dynasty (full roster carries over). */
+export enum RosterContinuity {
+  Dynasty = 'dynasty',
+  Keeper = 'keeper',
+  Redraft = 'redraft',
+}
 
 /** Live MLB scoreboard data for a single date */
 export type Scoreboard = {

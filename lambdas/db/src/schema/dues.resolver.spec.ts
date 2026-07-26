@@ -29,6 +29,7 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
     };
 
     jest.doMock('@legacy-sports/utils', () => ({
+      ...jest.requireActual('@legacy-sports/utils'),
       getDbOptions: jest.fn(() => ({})),
     }));
 

@@ -9,6 +9,7 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import {
   createDraftForLeague,
   createLeagueService,
+  type KeeperSettings as DbKeeperSettings,
   DraftService,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
@@ -34,6 +35,7 @@ import {
   League,
   LeagueMember,
   LeaguePosition,
+  RosterContinuityEnum,
   SportKindEnum,
   Team,
 } from './types';
@@ -123,7 +125,130 @@ export function validateAuctionMinBid(value: number | null | undefined): void {
 const MIN_SALARY_CAP = 1;
 const MAX_SALARY_CAP = 1_000_000_000;
 
+// ── Keeper configuration validation (LS-8671) ──────────────────────────────
+
+const KEEPER_COUNT_MIN = 1;
+const KEEPER_COUNT_MAX = 10;
+
+// Hyphenated values are not legal GraphQL enum names, so costModel is a
+// validated string, following the selectionMethod pattern above.
+const VALID_KEEPER_COST_MODELS = ['round-penalty', 'auction-budget'] as const;
+export type KeeperCostModel = (typeof VALID_KEEPER_COST_MODELS)[number];
+
+/** Raw keeperSettings input shape prior to normalization. costModel arrives
+ *  as an untrusted string; validateKeeperConfig narrows it. */
+export interface KeeperSettingsInputShape {
+  keeperCount: number;
+  costModel: string;
+  maxConsecutiveKeeps?: number | null;
+  rookieExempt?: boolean | null;
+}
+
+/**
+ * Validates the roster-continuity / keeper-settings combination for
+ * createLeagueAndTeams (LS-8671) and narrows costModel. Throws
+ * UserInputError on:
+ * - keeperSettings supplied when rosterContinuity is not 'keeper'
+ * - rosterContinuity 'keeper' without keeperSettings
+ * - keeperCount outside 1–10
+ * - costModel not 'round-penalty' | 'auction-budget'
+ * - costModel 'auction-budget' on a non-auction league
+ * - costModel 'round-penalty' on a non-standard league
+ * - maxConsecutiveKeeps < 1 when set
+ *
+ * Returns the validated cost model, or null when the league is not a keeper
+ * league (no settings to validate).
+ */
+export function validateKeeperConfig(
+  rosterContinuity: 'redraft' | 'keeper' | 'dynasty' | null | undefined,
+  keeperSettings: KeeperSettingsInputShape | null | undefined,
+  selectionMethod: 'standard' | 'auction' | 'random',
+): KeeperCostModel | null {
+  const resolvedContinuity = rosterContinuity ?? 'redraft';
+
+  if (keeperSettings != null && resolvedContinuity !== 'keeper') {
+    throw UserInputError(
+      `Keeper settings are only allowed when rosterContinuity is 'keeper' (got '${resolvedContinuity}')`,
+    );
+  }
+
+  if (resolvedContinuity !== 'keeper') {
+    return null;
+  }
+
+  if (keeperSettings == null) {
+    throw UserInputError(
+      "Keeper settings are required when rosterContinuity is 'keeper'",
+    );
+  }
+
+  const { keeperCount, maxConsecutiveKeeps } = keeperSettings;
+
+  if (
+    !(VALID_KEEPER_COST_MODELS as readonly string[]).includes(
+      keeperSettings.costModel,
+    )
+  ) {
+    throw UserInputError(
+      `Invalid keeper costModel: "${keeperSettings.costModel}". Allowed values: ${VALID_KEEPER_COST_MODELS.join(', ')}.`,
+    );
+  }
+  const costModel = keeperSettings.costModel as KeeperCostModel;
+
+  if (keeperCount < KEEPER_COUNT_MIN || keeperCount > KEEPER_COUNT_MAX) {
+    throw UserInputError(
+      `Keeper count must be between ${KEEPER_COUNT_MIN} and ${KEEPER_COUNT_MAX}`,
+    );
+  }
+
+  if (costModel === 'auction-budget' && selectionMethod !== 'auction') {
+    throw UserInputError(
+      "The 'auction-budget' keeper cost model requires selectionMethod 'auction'",
+    );
+  }
+
+  if (costModel === 'round-penalty' && selectionMethod !== 'standard') {
+    throw UserInputError(
+      "The 'round-penalty' keeper cost model requires selectionMethod 'standard'",
+    );
+  }
+
+  if (maxConsecutiveKeeps != null && maxConsecutiveKeeps < 1) {
+    throw UserInputError(
+      'Max consecutive keeps must be at least 1 when set (omit or null for unlimited)',
+    );
+  }
+
+  return costModel;
+}
+
 // ── Input / payload types ──────────────────────────────────────────────────
+
+// Keeper configuration input (LS-8671). Only valid when the accompanying
+// rosterContinuity is 'keeper' — enforced by validateKeeperConfig.
+const KeeperSettingsInput = builder.inputType('KeeperSettingsInput', {
+  fields: (t) => ({
+    keeperCount: t.int({
+      required: true,
+      description: 'Players each team may keep season-over-season (1-10).',
+    }),
+    costModel: t.string({
+      required: true,
+      description:
+        "Cost model for kept players: 'round-penalty' (requires selectionMethod 'standard') or 'auction-budget' (requires 'auction'). Hyphenated values are not legal GraphQL enum names, so this is a validated string like selectionMethod.",
+    }),
+    maxConsecutiveKeeps: t.int({
+      required: false,
+      description:
+        'Seasons in a row the same player may be kept. Omit or null for unlimited.',
+    }),
+    rookieExempt: t.boolean({
+      required: false,
+      description:
+        'When true, rookies do not count against keeper limits. Defaults to false.',
+    }),
+  }),
+});
 
 const CreateLeagueAndTeamsInput = builder.inputType(
   'CreateLeagueAndTeamsInput',
@@ -148,6 +273,13 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       draftMode: t.string({ required: false }), // 'live' | 'automated' (optional, defaults to 'live')
       selectionMethod: t.string({ required: false }), // 'standard' | 'auction' | 'random' (optional, defaults to 'standard')
       draftOrder: t.string({ required: false }), // 'snake' | 'linear' (optional, defaults to 'snake')
+      // Roster continuity across seasons (LS-8671). Defaults to 'redraft'.
+      rosterContinuity: t.field({
+        type: RosterContinuityEnum,
+        required: false,
+      }),
+      // Keeper configuration (LS-8671). Rejected unless rosterContinuity = 'keeper'.
+      keeperSettings: t.field({ type: KeeperSettingsInput, required: false }),
       // Era-based league settings (LS-295)
       eraFilter: t.string({ required: false }), // 'all' | 'dead_ball' | 'golden_age' | 'expansion' | 'free_agency' | 'steroid_era' | 'modern' | 'custom'
       baseballHofOnly: t.boolean({ required: false }), // restrict draft board to Hall of Famers
@@ -195,6 +327,8 @@ const CreateLeagueAndTeamsPayload = builder.objectRef<{
     waiverType?: string;
     waiverEnabled?: boolean;
     faabBudgetDefault?: number;
+    rosterContinuity?: 'redraft' | 'keeper' | 'dynasty';
+    keeperSettings?: DbKeeperSettings | null;
   };
   teams?: Array<{
     id: number;
@@ -286,6 +420,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         draftMode = 'live',
         selectionMethod = 'standard',
         draftOrder = 'snake',
+        rosterContinuity: inputRosterContinuity,
+        keeperSettings: inputKeeperSettings,
         maxRosterSize,
         waiverEnabled: inputWaiverEnabled,
         waiverType: inputWaiverType,
@@ -528,6 +664,26 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       const validatedSelectionMethod = (selectionMethod ??
         'standard') as (typeof VALID_SELECTION_METHODS)[number];
 
+      // ── Roster continuity / keeper settings validation (LS-8671) ────────
+      const validatedCostModel = validateKeeperConfig(
+        inputRosterContinuity,
+        inputKeeperSettings,
+        validatedSelectionMethod,
+      );
+      const resolvedRosterContinuity = inputRosterContinuity ?? 'redraft';
+      // Normalize the validated input into the full jsonb shape so optional
+      // fields are always materialized in storage (LS-8671).
+      const resolvedKeeperSettings =
+        validatedCostModel != null && inputKeeperSettings != null
+          ? {
+              keeperCount: inputKeeperSettings.keeperCount,
+              costModel: validatedCostModel,
+              maxConsecutiveKeeps:
+                inputKeeperSettings.maxConsecutiveKeeps ?? null,
+              rookieExempt: inputKeeperSettings.rookieExempt ?? false,
+            }
+          : null;
+
       // ── scoringFormat validation ─────────────────────────────────────────
       const VALID_SCORING_FORMATS = ['standard', 'half_ppr', 'ppr'] as const;
       if (
@@ -646,6 +802,8 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           draftMode: draftMode as 'live' | 'automated',
           selectionMethod: validatedSelectionMethod,
           draftOrder: draftOrder as 'snake' | 'linear',
+          rosterContinuity: resolvedRosterContinuity,
+          keeperSettings: resolvedKeeperSettings,
           waiverType:
             inputWaiverType === 'faab'
               ? ('faab' as const)

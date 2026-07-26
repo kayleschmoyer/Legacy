@@ -65,6 +65,7 @@ describe('analytics resolver', () => {
     }));
 
     jest.doMock('@legacy-sports/utils', () => ({
+      ...jest.requireActual('@legacy-sports/utils'),
       getDbOptions: jest.fn(() => ({})),
     }));
 

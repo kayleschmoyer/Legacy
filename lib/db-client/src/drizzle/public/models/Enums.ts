@@ -238,3 +238,32 @@ export const tiebreakerMethod = pgEnum('tiebreaker_method', [
 ]);
 
 export const sosTier = pgEnum('sos_tier', ['easy', 'medium', 'hard']);
+
+/**
+ * Roster continuity across seasons (LS-8671, shared foundation for keeper
+ * LS-8385 and dynasty LS-8386 modes).
+ *
+ * redraft : rosters fully reset every season (historical behaviour, default)
+ * keeper  : each team retains up to keeperCount players season-over-season
+ * dynasty : full roster carries over; only rookies/free agents are drafted
+ */
+export const rosterContinuity = pgEnum('roster_continuity', [
+  'redraft',
+  'keeper',
+  'dynasty',
+]);
+
+/**
+ * Lifecycle of a keeper designation (LS-8671).
+ *
+ * pending  : manager has selected the player; editable until draft start
+ * locked   : draft has started; designation is frozen (LS-8385 child 3)
+ * applied  : draft initialization assigned the player + cost (child 4)
+ * released : designation was withdrawn before lock
+ */
+export const keeperDesignationStatus = pgEnum('keeper_designation_status', [
+  'pending',
+  'locked',
+  'applied',
+  'released',
+]);

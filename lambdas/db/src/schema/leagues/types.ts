@@ -4,7 +4,10 @@
  * This module defines the core GraphQL types used across league,
  * team, and waiver resolvers.
  */
-import type { Team as DbTeam } from '@legacy-sports/db-client';
+import type {
+  KeeperSettings as DbKeeperSettings,
+  Team as DbTeam,
+} from '@legacy-sports/db-client';
 import { builder } from '../builder';
 import { loadLeagueScoringConfig, ScoringConfigRef } from '../scoring';
 import { AuthenticationError } from '../graphql-errors';
@@ -22,6 +25,43 @@ export const DefensiveFormatEnum = builder.enumType('DefensiveFormat', {
   values: ['dst', 'idp'] as const,
   description:
     'Defensive scoring format for football leagues: dst (team defense) or idp (individual defensive players).',
+});
+
+// Roster continuity enum (LS-8671) — how rosters carry across seasons.
+// Mirrors the `roster_continuity` Postgres enum.
+export const RosterContinuityEnum = builder.enumType('RosterContinuity', {
+  values: ['redraft', 'keeper', 'dynasty'] as const,
+  description:
+    'How rosters carry across seasons: redraft (full reset, default), keeper (retain up to keeperCount players), or dynasty (full roster carries over).',
+});
+
+// Keeper settings (LS-8671) — commissioner-configured keeper rules stored on
+// leagues.keeper_settings. Null unless rosterContinuity = 'keeper'.
+export const KeeperSettings =
+  builder.objectRef<DbKeeperSettings>('KeeperSettings');
+
+KeeperSettings.implement({
+  description:
+    'Keeper-mode configuration for a league. Only present when rosterContinuity is keeper. (LS-8671)',
+  fields: (t) => ({
+    keeperCount: t.exposeInt('keeperCount', {
+      description: 'Players each team may keep season-over-season (1-10).',
+    }),
+    // 'round-penalty' | 'auction-budget' — hyphenated values are not legal
+    // GraphQL enum names, so this follows the selectionMethod string pattern.
+    costModel: t.exposeString('costModel', {
+      description:
+        "Cost model applied to kept players: 'round-penalty' (forfeit the round the player was drafted in last season; standard drafts) or 'auction-budget' (deduct a configured amount from the team budget; auction drafts).",
+    }),
+    maxConsecutiveKeeps: t.exposeInt('maxConsecutiveKeeps', {
+      nullable: true,
+      description:
+        'Seasons in a row the same player may be kept. Null means unlimited.',
+    }),
+    rookieExempt: t.exposeBoolean('rookieExempt', {
+      description: 'When true, rookies do not count against keeper limits.',
+    }),
+  }),
 });
 
 export {
@@ -88,6 +128,12 @@ export const League = builder.objectRef<{
   tradeDeadlineWeek?: number | null;
   /** Monotonic season counter (1 = founding, incremented on renewal) */
   seasonNumber?: number;
+  // ── Roster continuity (LS-8671) ─────────────────────────────────────
+  /** How rosters carry across seasons. Defaults to 'redraft' when the
+   *  resolver's parent select did not include it. */
+  rosterContinuity?: 'redraft' | 'keeper' | 'dynasty';
+  /** Keeper configuration — null unless rosterContinuity = 'keeper'. */
+  keeperSettings?: DbKeeperSettings | null;
   // ── Salary cap settings (LS-634/LS-646) ─────────────────────────────
   salaryCapEnabled?: boolean;
   salaryCap?: number | null;
@@ -213,6 +259,20 @@ League.implement({
 
         return loadLeagueScoringConfig(parent.id);
       },
+    }),
+    // ── Roster continuity (LS-8671) ──────────────────────────────────
+    rosterContinuity: t.field({
+      type: RosterContinuityEnum,
+      description:
+        'How rosters carry across seasons. Defaults to redraft. (LS-8671)',
+      resolve: (parent) => parent.rosterContinuity ?? 'redraft',
+    }),
+    keeperSettings: t.field({
+      type: KeeperSettings,
+      nullable: true,
+      description:
+        'Keeper-mode configuration. Null unless rosterContinuity is keeper. (LS-8671)',
+      resolve: (parent) => parent.keeperSettings ?? null,
     }),
     // ── Salary cap settings ──────────────────────────────────────────
     salaryCapEnabled: t.exposeBoolean('salaryCapEnabled', { nullable: true }),
