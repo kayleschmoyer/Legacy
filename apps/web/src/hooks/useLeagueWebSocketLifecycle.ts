@@ -40,6 +40,14 @@ export function useLeagueWebSocketLifecycle({
   const [connected, setConnected] = useState(false);
   const lastErrorRef = useRef<string | null>(null);
 
+  // Read via ref (not the effect's dependency array) so an authToken update
+  // — e.g. the async JWT refresh that resolves shortly after initial mount —
+  // doesn't tear down and recreate the socket. The connection is instead kept
+  // alive and told about the new token via `updateToken` below; only a real
+  // identity change (leagueId/isAuthenticated) warrants a teardown/recreate.
+  const authTokenRef = useRef(authToken);
+  authTokenRef.current = authToken;
+
   useEffect(() => {
     const wsUrl = env.websocketUrl;
     LOGGER.info('[useLeagueWebSocketLifecycle] WebSocket config', {
@@ -56,7 +64,7 @@ export function useLeagueWebSocketLifecycle({
       // even when the HttpOnly cookie isn't sent (e.g. when the WS endpoint is
       // on a different subdomain and the cookie domain wasn't set at login time).
       // Falls back to cookie-based auth when the token isn't available yet.
-      token: authToken ?? undefined,
+      token: authTokenRef.current ?? undefined,
       leagueId,
       viewContext: 'league',
       autoConnect: false,
@@ -84,7 +92,14 @@ export function useLeagueWebSocketLifecycle({
       setClient(null);
       setConnected(false);
     };
-  }, [leagueId, isAuthenticated, authToken]);
+  }, [leagueId, isAuthenticated]);
+
+  // Keep the client's token current for future (re)connects — e.g. once the
+  // async JWT refresh resolves, or if the token rotates later — without
+  // disposing the live connection above.
+  useEffect(() => {
+    client?.updateToken(authToken ?? undefined);
+  }, [client, authToken]);
 
   useEffect(() => {
     LOGGER.info(

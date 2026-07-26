@@ -514,11 +514,27 @@ test.describe('WebSocket real-time updates @critical', () => {
       /Pre-Draft/i,
     );
 
-    // 2. Wait for WS connection
+    // 2. Wait for WS connection. `expect.poll` only confirms *some* connection
+    // has been observed — useLeagueWebSocketLifecycle no longer tears down and
+    // recreates the socket once the async JWT refresh resolves (LS-7856), so
+    // there is exactly one connection per page load and `wsRoute` is
+    // unambiguous by construction. Still, guard against sending before the
+    // final connection is up.
     await expect.poll(() => wsRoute !== undefined).toBe(true);
     if (!wsRoute) throw new Error('WebSocket route not established');
 
-    // 3. Push DRAFT_STARTED — LeagueWSPageHandler calls refetchLeague()
+    // 3. Push DRAFT_STARTED — LeagueWSPageHandler calls refetchLeague().
+    // Register the refetch wait *before* sending (mirroring the "matchup score
+    // update" test above) so the test fails fast and clearly if the event
+    // never reaches the app, instead of hitting the generic toContainText
+    // timeout below.
+    const refetchPromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/graphql') &&
+        !resp.url().includes('/@fs/') &&
+        (resp.request().postData()?.toLowerCase().includes('getleaguebyid') ??
+          false),
+    );
     wsRoute.send(
       wsNotification({
         type: 'DRAFT_STARTED',
@@ -535,6 +551,7 @@ test.describe('WebSocket real-time updates @critical', () => {
     // 4. After the refetch resolves the badge should change to "Draft Queued"
     // (DraftStatusChip maps 'queued' → 'Draft Queued'). Scope to the chip testid
     // so the assertion targets the hero badge specifically. LS-7845.
+    await refetchPromise;
     await expect(page.getByTestId('draft-status-chip')).toContainText(
       'Draft Queued',
     );

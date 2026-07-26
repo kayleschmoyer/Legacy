@@ -356,11 +356,22 @@ test.describe('Season Renewal Flow — settings inheritance @critical', () => {
     await expect(leagueSettingsToggle).toBeVisible({ timeout: 10_000 });
     await leagueSettingsToggle.click();
 
+    // Wait for the expanded panel container itself (not just the toggle
+    // button) to settle before asserting on its inner text — under
+    // CI-equivalent parallel-worker contention the accordion body can take
+    // longer to mount than the default assertion timeout (LS-7856).
+    const settingsPanel = page.getByRole('region', { name: 'League Settings' });
+    await expect(settingsPanel).toBeVisible({ timeout: 10_000 });
+
     // Verify key inherited settings sections are visible on the commissioner UI
-    await expect(page.getByText(/Games Per Matchup/i).first()).toBeVisible({
+    await expect(
+      settingsPanel.getByText(/Games Per Matchup/i).first(),
+    ).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText(/Minimum Career Games/i).first()).toBeVisible({
+    await expect(
+      settingsPanel.getByText(/Minimum Career Games/i).first(),
+    ).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -389,8 +400,13 @@ test.describe('Season Renewal Flow — settings inheritance @critical', () => {
     await expect(page.getByTestId('draft-status-chip')).toBeVisible({
       timeout: 15_000,
     });
+    // Widen beyond the 3s default expect timeout: under CI-equivalent parallel
+    // load the chip can mount before its label text finishes settling
+    // (contention-mitigation, not a logic fix — no code defect was found
+    // here; see LS-7856).
     await expect(page.getByTestId('draft-status-chip')).toContainText(
       /Pre-Draft/i,
+      { timeout: 10_000 },
     );
   });
 

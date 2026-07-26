@@ -42,6 +42,7 @@ function makeMockClient() {
     }),
     connect: jest.fn(),
     dispose: jest.fn(),
+    updateToken: jest.fn(),
     _emit(event: string, ...args: unknown[]) {
       (handlers[event] ?? []).forEach((h) => h(...args));
     },
@@ -144,13 +145,14 @@ describe('useLeagueWebSocketLifecycle', () => {
     expect(result.current.connected).toBe(false);
   });
 
-  // Reconnect-on-token-refresh: when the in-memory JWT rotates, the effect's
-  // dependency array ([leagueId, isAuthenticated, authToken]) re-runs — the
-  // cleanup disposes the old client and the body creates + connects a fresh
-  // one with the new token. See LS-7625 (GAP-001).
-  it('disposes the old client and creates + connects a new one with the updated token when authToken changes', () => {
-    const firstClient = mockClient;
-
+  // No-reconnect-on-token-refresh: authToken is read via a ref, not the
+  // effect's dependency array, so a token rotation (e.g. the async JWT
+  // refresh that resolves shortly after mount) must NOT tear down and
+  // recreate the live connection — doing so raced e2e tests that sent a
+  // simulated server event against a connection that was about to be
+  // disposed (LS-7856). The client is instead told about the new token via
+  // `updateToken` so future (re)connects pick it up.
+  it('does not recreate the client when only authToken changes, but does update its token', () => {
     const { rerender } = renderHook(
       (props: typeof defaultOptions) => useLeagueWebSocketLifecycle(props),
       { initialProps: defaultOptions },
@@ -161,22 +163,61 @@ describe('useLeagueWebSocketLifecycle', () => {
       1,
       expect.objectContaining({ token: 'test-token' }),
     );
-    expect(firstClient.connect).toHaveBeenCalledTimes(1);
+    expect(mockClient.connect).toHaveBeenCalledTimes(1);
 
-    // Hand out a distinct second client so we can assert a brand-new instance
-    // is created (not the disposed original).
+    rerender({ ...defaultOptions, authToken: 'rotated-token' });
+
+    expect(mockClient.dispose).not.toHaveBeenCalled();
+    expect(WebSocketClient).toHaveBeenCalledTimes(1);
+    expect(mockClient.updateToken).toHaveBeenCalledWith('rotated-token');
+  });
+
+  // Recreate-on-identity-change: leagueId/isAuthenticated changes still
+  // represent a real change of context, so the client must be torn down and
+  // recreated for those (only the authToken-alone case is exempted above).
+  it('disposes the old client and creates + connects a new one when leagueId changes', () => {
+    const firstClient = mockClient;
+
+    const { rerender } = renderHook(
+      (props: typeof defaultOptions) => useLeagueWebSocketLifecycle(props),
+      { initialProps: defaultOptions },
+    );
+
+    expect(WebSocketClient).toHaveBeenCalledTimes(1);
+
     const secondClient = makeMockClient();
     WebSocketClient.mockImplementation(() => secondClient);
 
-    rerender({ ...defaultOptions, authToken: 'rotated-token' });
+    rerender({ ...defaultOptions, leagueId: 99 });
 
     expect(firstClient.dispose).toHaveBeenCalledTimes(1);
     expect(WebSocketClient).toHaveBeenCalledTimes(2);
     expect(WebSocketClient).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ token: 'rotated-token' }),
+      expect.objectContaining({ leagueId: 99 }),
     );
     expect(secondClient.connect).toHaveBeenCalledTimes(1);
+  });
+
+  // Recreate-on-identity-change: same as above, but for isAuthenticated.
+  it('disposes the old client and creates + connects a new one when isAuthenticated changes', () => {
+    const firstClient = mockClient;
+
+    const { rerender } = renderHook(
+      (props: typeof defaultOptions) => useLeagueWebSocketLifecycle(props),
+      { initialProps: defaultOptions },
+    );
+
+    expect(WebSocketClient).toHaveBeenCalledTimes(1);
+
+    const secondClient = makeMockClient();
+    WebSocketClient.mockImplementation(() => secondClient);
+
+    rerender({ ...defaultOptions, isAuthenticated: false });
+
+    expect(firstClient.dispose).toHaveBeenCalledTimes(1);
+    // isAuthenticated: false means the effect returns early — no new client.
+    expect(WebSocketClient).toHaveBeenCalledTimes(1);
   });
 
   // Disabled/misconfigured URL: when env.websocketUrl is empty the effect

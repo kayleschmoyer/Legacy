@@ -323,6 +323,19 @@ export class WebSocketClient {
   }
 
   /**
+   * Update the auth token used for future connect attempts.
+   *
+   * Does NOT tear down or reconnect an already-open connection — the token is
+   * only read at connect time (via `buildUrl`), so this only takes effect on
+   * the next `connect()` call (e.g. after a drop-and-reconnect). Use this when
+   * a fresh token becomes available (e.g. JWT refresh) instead of disposing
+   * and recreating the client, which would needlessly interrupt a live socket.
+   */
+  public updateToken(token: string | undefined): void {
+    this.options.token = token;
+  }
+
+  /**
    * Build WebSocket URL with query parameters
    */
   private buildUrl(): string {
