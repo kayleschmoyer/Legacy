@@ -45,7 +45,7 @@ Preconditions that hold on every platform:
 
 - **Before any chunk**: the draft PR exists and the branch is pushed (spine [draft-PR-before-validation gate](../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions)). A container reap mid-validation is then non-fatal.
 - **Before `pc-db-prep`**: migrations applied where a DB exists (Copilot: `pnpm --prefix lib/db-client run db:status` → `db:up` against local Docker Postgres; default CC web has no DB — see [degraded mode](#default-cc-web-degraded-mode)).
-- **Before `pc-format`**: commit all your changes so the working tree is clean. `pc-format` runs `prettier --write .` repo-wide; with a dirty tree it exits 1 ("You have other uncommitted changes alongside the format fixes"); with a clean tree it auto-amends any formatter rewrites into your last commit (verified in the Makefile `_PC_FORMAT_RECIPE`).
+- **Before `pc-format`**: commit all your changes so the working tree is clean. `pc-format` runs `prettier --write .` repo-wide; with a dirty tree it exits 1 ("You have other uncommitted changes alongside the format fixes"); with a clean tree it commits any formatter rewrites as a new `style: apply formatting` commit on top of your tip commit — never an amend of the tip, since the tip is always already pushed by this point (LS-8367; verified in the Makefile `_PC_FORMAT_RECIPE`).
 - **After each chunk**: refresh the continuation checkpoint; on failure, fix and re-run that chunk before moving on.
 - Monolithic `make pc` / `make_run(target: "pc")` never runs in cloud on any platform — it exceeds transport windows and gets the container reaped mid-run.
 
@@ -239,5 +239,5 @@ Re-verification commands for volatile facts:
 - Review trigger semantics: `grep -n "bot:ready-for-review" .github/workflows/review.yml`
 - App IDs: `grep -rn "3158619\|3142924" .github/actions/resolve-runner-label/action.yml`
 - Cloud bootstrap contents: read `.claude/cloud-setup.sh` (gh/git-lfs installs removed 2026-07-02, commit "Remove GitHub CLI and git-lfs installation steps")
-- pc-format auto-amend/dirty-tree behavior: `grep -n "_PC_FORMAT_RECIPE" Makefile`
+- pc-format auto-commit/dirty-tree behavior: `grep -n "_PC_FORMAT_RECIPE" Makefile`
 - Jira site default: `grep -n "JIRA_SITE_URL_DEFAULT" tools/mcp/jira-server/src/netrc.ts`

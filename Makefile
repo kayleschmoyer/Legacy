@@ -942,11 +942,21 @@ _PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
 _PC_TEST_CMD = pnpm exec nx affected -t test --base=$(NX_BASE)
 _PC_BUILD_CMD = pnpm exec nx affected -t build --base=$(NX_BASE)
 
-# Formatting step (prettier + auto-amend of formatter rewrites). Canned recipe so the
-# `pre-commit` pipeline and the standalone `pc-format` target share one implementation.
+# Formatting step (prettier + auto-commit of formatter rewrites as a new commit).
+# Canned recipe so the `pre-commit` pipeline and the standalone `pc-format` target
+# share one implementation.
+#
+# Commits as a new "style: apply formatting" commit rather than amending the tip
+# commit (LS-8367): the ticket-to-merge spine mandates commit -> push -> draft PR
+# BEFORE validation runs, so by the time this recipe runs the tip commit has
+# always already been pushed to the remote PR branch. Amending it would rewrite
+# already-pushed history, requiring a force-push that Claude Code's auto-mode
+# permission classifier blocks as history-rewrite tunneling, with no
+# non-destructive recovery path. A new commit reaches the remote with a normal
+# fast-forward push. Matches the existing `make format-commit` target.
 ifeq ($(DETECTED_OS),Windows)
 define _PC_FORMAT_RECIPE
-@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec prettier --write --ignore-unknown .; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; auto-amending last commit...' -ForegroundColor Yellow; git add -A; git commit --amend --no-edit; Write-Host '  ✓ Format fixes folded into previous commit.' -ForegroundColor Green } }"
+@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec prettier --write --ignore-unknown .; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; committing as a new commit...' -ForegroundColor Yellow; git add -A; git commit -m 'style: apply formatting'; Write-Host '  ✓ Format fixes committed as a new commit.' -ForegroundColor Green } }"
 endef
 else
 define _PC_FORMAT_RECIPE
@@ -967,10 +977,10 @@ if [ -n "$$changed" ]; then \
 		echo "You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc."; \
 		exit 1; \
 	else \
-		echo "  Formatting changed files; auto-amending last commit..."; \
+		echo "  Formatting changed files; committing as a new commit..."; \
 		git add -A; \
-		git commit --amend --no-edit; \
-		echo "  ✓ Format fixes folded into previous commit."; \
+		git commit -m 'style: apply formatting'; \
+		echo "  ✓ Format fixes committed as a new commit."; \
 	fi; \
 fi
 endef
@@ -1012,7 +1022,7 @@ pc-typecheck: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_
 pc-typecheck: ## pc step 4: typecheck affected projects
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,4/9 Type checking...) && $(_PC_TYPECHECK_CMD),@$(call echo_yellow,4/9 Type checking... SKIPPED (docs-only changes)))
 
-pc-format: ## pc step 5: prettier + auto-amend formatter rewrites
+pc-format: ## pc step 5: prettier + auto-commit formatter rewrites (new commit, LS-8367)
 	@$(call echo_plain,5/9 Formatting...)
 	$(_PC_FORMAT_RECIPE)
 

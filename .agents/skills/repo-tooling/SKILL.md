@@ -17,17 +17,17 @@ The `_PC_*_CMD` variable block in the root `Makefile` (search for the `_PC_` pre
 
 `make pc` (alias for `make pre-commit`) runs nine steps. The seven standalone chunk targets exist because the monolith exceeds cloud-session transport timeouts (LS-7906); they are equivalent to `make pc` **only when all seven run in this order**:
 
-| #   | Step                           | Command (from `_PC_*_CMD`)                                              | Chunk target   | Runs when            |
-| --- | ------------------------------ | ----------------------------------------------------------------------- | -------------- | -------------------- |
-| 1   | Migration immutability         | `node scripts/check-migration-immutability.js --branch`                 | `pc-db-prep`   | `PC_HAS_DB=1`        |
-| 2   | Schema generation              | `pnpm exec nx run db:print-schema`                                      | `pc-db-prep`   | `PC_HAS_DB=1`        |
-| 3   | Codegen                        | `GRAPHQL_SCHEMA=<abs>/lambdas/db/schema.graphql nx run-many -t codegen` | `pc-db-prep`   | `PC_HAS_DB=1`        |
-| 4   | Typecheck                      | `pnpm exec nx affected -t typecheck --base=$(NX_BASE)`                  | `pc-typecheck` | `PC_DOCS_ONLY=0`     |
-| 5   | Format (prettier + auto-amend) | `_PC_FORMAT_RECIPE` (see below)                                         | `pc-format`    | always               |
-| 6   | Lint (auto-fix)                | `pnpm exec nx affected -t lint --fix --base=$(NX_BASE)`                 | `pc-lint`      | `PC_DOCS_ONLY=0`     |
-| 7   | Workflow validation            | `node scripts/validate-workflows.js`                                    | `pc-workflows` | `PC_HAS_WORKFLOWS=1` |
-| 8   | Test                           | `pnpm exec nx affected -t test --base=$(NX_BASE)`                       | `pc-test`      | `PC_DOCS_ONLY=0`     |
-| 9   | Build                          | `pnpm exec nx affected -t build --base=$(NX_BASE)`                      | `pc-build`     | `PC_DOCS_ONLY=0`     |
+| #   | Step                            | Command (from `_PC_*_CMD`)                                              | Chunk target   | Runs when            |
+| --- | ------------------------------- | ----------------------------------------------------------------------- | -------------- | -------------------- |
+| 1   | Migration immutability          | `node scripts/check-migration-immutability.js --branch`                 | `pc-db-prep`   | `PC_HAS_DB=1`        |
+| 2   | Schema generation               | `pnpm exec nx run db:print-schema`                                      | `pc-db-prep`   | `PC_HAS_DB=1`        |
+| 3   | Codegen                         | `GRAPHQL_SCHEMA=<abs>/lambdas/db/schema.graphql nx run-many -t codegen` | `pc-db-prep`   | `PC_HAS_DB=1`        |
+| 4   | Typecheck                       | `pnpm exec nx affected -t typecheck --base=$(NX_BASE)`                  | `pc-typecheck` | `PC_DOCS_ONLY=0`     |
+| 5   | Format (prettier + auto-commit) | `_PC_FORMAT_RECIPE` (see below)                                         | `pc-format`    | always               |
+| 6   | Lint (auto-fix)                 | `pnpm exec nx affected -t lint --fix --base=$(NX_BASE)`                 | `pc-lint`      | `PC_DOCS_ONLY=0`     |
+| 7   | Workflow validation             | `node scripts/validate-workflows.js`                                    | `pc-workflows` | `PC_HAS_WORKFLOWS=1` |
+| 8   | Test                            | `pnpm exec nx affected -t test --base=$(NX_BASE)`                       | `pc-test`      | `PC_DOCS_ONLY=0`     |
+| 9   | Build                           | `pnpm exec nx affected -t build --base=$(NX_BASE)`                      | `pc-build`     | `PC_DOCS_ONLY=0`     |
 
 Canonical chunk order: `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`.
 
@@ -45,18 +45,18 @@ Each pc invocation runs `node scripts/classify-changes.js --base $(NX_BASE)`, wh
 
 **NX_BASE:** defaults to `origin/main` (falls back to `main` on non-Windows if `origin/main` is missing). Override per-invocation: `make pc NX_BASE=<ref>`. The same base feeds both classify-changes and every `nx affected` step.
 
-### pc-format: auto-amend and recovery
+### pc-format: auto-commit and recovery
 
 Step 5 runs `pnpm exec prettier --write --ignore-unknown .`, then:
 
-- **Clean working tree + formatter rewrote files** → `git add -A && git commit --amend --no-edit`: the fixes are folded into your **last commit** (local history rewrite — if that commit was already pushed, the next push needs the amended SHA).
+- **Clean working tree + formatter rewrote files** → `git add -A && git commit -m 'style: apply formatting'`: the fixes land in a **new commit** on top of your tip commit. Deliberately does **not** amend the tip (LS-8367) — the ticket-to-merge spine mandates commit → push → draft PR before validation runs, so the tip commit is always already on the remote by the time this step runs; amending it would rewrite pushed history and require a force-push, which Claude Code's auto-mode permission classifier blocks. A new commit reaches the remote with a normal push.
 - **Dirty working tree + formatter rewrote files** → **exit 1** with "Commit or stash them first, then re-run make pc."
 
 Preconditions and recovery:
 
 1. Before running `make pc` or `pc-format`, commit all your work so the tree is clean.
-2. If pc-format failed on a dirty tree: commit (or stash) your changes, then re-run — the rewrites will amend cleanly.
-3. If amending is undesirable (e.g. the last commit is not yours, or is already pushed and you don't want to rewrite it): run `make format-commit` — it requires a clean tree, runs the same prettier command, and creates a separate `style: apply formatting` commit instead of amending. Then re-run `make pc`.
+2. If pc-format failed on a dirty tree: commit (or stash) your changes, then re-run — the rewrites will commit cleanly as a new commit.
+3. `make format-commit` remains available as a standalone target with the same "new commit, not amend" behavior, for use outside the `pc-*` pipeline (e.g. formatting before the first commit of a session).
 
 ## Running validation per environment
 

@@ -44,8 +44,9 @@ Use the 7 pc-* chunks IN ORDER instead, one per call:
     completion before starting the next chunk.
 
 Before pc-format: commit all your changes so the working tree is clean.
-With a clean tree the formatter auto-amends its rewrites into your last commit;
-with a dirty tree it exits 1.
+With a clean tree the formatter commits its rewrites as a new commit (never
+amends your tip commit — it's always already pushed by this point); with a
+dirty tree it exits 1.
 
 See .agents/skills/cloud-agent-mode/SKILL.md → "Validation binding".
 
