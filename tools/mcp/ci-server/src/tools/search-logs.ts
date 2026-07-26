@@ -16,6 +16,8 @@ interface SearchLogsParams {
   contextBefore?: number;
   contextAfter?: number;
   limitMatches?: number;
+  truncateLineLength?: number;
+  maxChars?: number;
 }
 
 /**
@@ -144,6 +146,10 @@ export async function searchLogs(
               truncated: totalMatches > matches.length,
             },
             matches,
+            {
+              truncateLineLength: params.truncateLineLength,
+              maxChars: params.maxChars,
+            },
           ),
         },
       ],

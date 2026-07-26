@@ -289,6 +289,24 @@ export function createServer(): McpServer {
         .max(30)
         .default(10)
         .describe('Max matches to return'),
+      truncateLineLength: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(10_000)
+        .optional()
+        .describe(
+          'Truncate every line (the matched line and every before/after context line) longer than this many characters. Defaults to 500 for the matched line and 200 for context lines when omitted.',
+        ),
+      maxChars: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(200_000)
+        .optional()
+        .describe(
+          'Hard cap on total output characters (default: 50000). Prevents context overflow when limitMatches and context lines together still produce a large response — trailing matches are dropped until the response fits.',
+        ),
     },
     async (params) => searchLogs(params),
   );

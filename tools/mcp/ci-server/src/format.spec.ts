@@ -208,6 +208,66 @@ describe('formatLogSearch', () => {
     expect(parsed.matches[0].line.length).toBeLessThanOrEqual(500);
     expect(parsed.matches[0].line).toContain('…+');
   });
+
+  it('accepts a caller-supplied truncateLineLength applied to matched line and context alike', () => {
+    const parsed = JSON.parse(
+      formatLogSearch(
+        meta,
+        [
+          {
+            ...match,
+            line: 'x'.repeat(100),
+            before: ['y'.repeat(100)],
+            after: ['z'.repeat(100)],
+          },
+        ],
+        { truncateLineLength: 20 },
+      ),
+    );
+    expect(parsed.matches[0].line.length).toBeLessThanOrEqual(20);
+    expect(parsed.matches[0].before[0].length).toBeLessThanOrEqual(20);
+    expect(parsed.matches[0].after[0].length).toBeLessThanOrEqual(20);
+  });
+
+  it('drops trailing matches to keep the full serialized response under maxChars (LS-8390)', () => {
+    // Reproduces LS-8390: 20 matches with long context arrays can overflow the
+    // token limit in aggregate even though every individual line is capped.
+    const manyMatches: LogMatch[] = Array.from({ length: 20 }, (_, i) => ({
+      lineNumber: i + 1,
+      line: `ERROR: verbose CI step output ${'v'.repeat(400)}`,
+      before: Array.from({ length: 2 }, () => 'x'.repeat(180)),
+      after: Array.from({ length: 15 }, () => 'y'.repeat(180)),
+    }));
+
+    const out = formatLogSearch(
+      { ...meta, totalMatches: 20, returnedMatches: 20 },
+      manyMatches,
+      { maxChars: 5_000 },
+    );
+
+    expect(out.length).toBeLessThanOrEqual(5_000);
+    const parsed = JSON.parse(out);
+    expect(parsed.charTruncated).toBe(true);
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.matches.length).toBeLessThan(20);
+    expect(parsed.matches.length).toBe(parsed.returnedMatches);
+  });
+
+  it('stays under the default 50000-char cap without a caller-supplied maxChars', () => {
+    const manyMatches: LogMatch[] = Array.from({ length: 20 }, (_, i) => ({
+      lineNumber: i + 1,
+      line: `ERROR: verbose CI step output ${'v'.repeat(400)}`,
+      before: Array.from({ length: 2 }, () => 'x'.repeat(180)),
+      after: Array.from({ length: 15 }, () => 'y'.repeat(180)),
+    }));
+
+    const out = formatLogSearch(
+      { ...meta, totalMatches: 20, returnedMatches: 20 },
+      manyMatches,
+    );
+
+    expect(out.length).toBeLessThanOrEqual(50_000);
+  });
 });
 
 describe('formatSessionStats', () => {

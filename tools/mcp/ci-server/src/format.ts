@@ -131,28 +131,72 @@ export interface LogSearchMeta {
 const LOG_LINE_MAX = 500;
 /** Context lines are secondary — cap them tighter than the matched line. */
 const LOG_CONTEXT_MAX = 200;
+/**
+ * Hard cap, in characters, on the full serialized response — mirrors
+ * ci_get_logs's `maxChars` backstop. Per-line truncation alone doesn't bound
+ * the total: enough matches with long context arrays can still overflow the
+ * token limit even when every individual line is capped (LS-8390).
+ */
+export const DEFAULT_LOG_SEARCH_MAX_CHARS = 50_000;
+
+export interface FormatLogSearchOptions {
+  /**
+   * Per-line truncation length applied to every line — the matched line and
+   * every before/after context line — in every match. Mirrors ci_get_logs's
+   * `truncateLineLength`. Omit to keep the default asymmetric caps (500 for
+   * the matched line, 200 for context lines).
+   */
+  truncateLineLength?: number;
+  /**
+   * Hard cap on the full serialized response (default {@link
+   * DEFAULT_LOG_SEARCH_MAX_CHARS}). When per-line truncation alone still
+   * leaves the response over this limit, trailing matches are dropped one at
+   * a time until it fits, rather than returning an unparseable oversized blob.
+   */
+  maxChars?: number;
+}
 
 /**
  * Format log-search results as minified JSON. The matches nest `before`/`after`
  * context arrays, so a table doesn't apply; minified JSON keeps it
  * machine-parseable without pretty-print whitespace. Each line is truncated with
- * a `…+{omitted}` marker so a single long line can't dominate.
+ * a `…+{omitted}` marker so a single long line can't dominate, and the full
+ * response is capped by total character count so a large match count times
+ * long context arrays can't overflow it either.
  */
 export function formatLogSearch(
   meta: LogSearchMeta,
   matches: readonly LogMatch[],
+  options: FormatLogSearchOptions = {},
 ): string {
+  const lineMax = options.truncateLineLength ?? LOG_LINE_MAX;
+  const contextMax = options.truncateLineLength ?? LOG_CONTEXT_MAX;
+  const maxChars = options.maxChars ?? DEFAULT_LOG_SEARCH_MAX_CHARS;
+
   const capped = matches.map((match) => ({
     lineNumber: match.lineNumber,
-    line: truncate(match.line, LOG_LINE_MAX, { showOmitted: true }),
+    line: truncate(match.line, lineMax, { showOmitted: true }),
     before: match.before.map((l) =>
-      truncate(l, LOG_CONTEXT_MAX, { showOmitted: true }),
+      truncate(l, contextMax, { showOmitted: true }),
     ),
     after: match.after.map((l) =>
-      truncate(l, LOG_CONTEXT_MAX, { showOmitted: true }),
+      truncate(l, contextMax, { showOmitted: true }),
     ),
   }));
-  return minifiedJson({ ...meta, matches: capped });
+
+  let kept = capped.length;
+  let out = minifiedJson({ ...meta, matches: capped });
+  while (out.length > maxChars && kept > 0) {
+    kept -= 1;
+    out = minifiedJson({
+      ...meta,
+      returnedMatches: kept,
+      truncated: true,
+      charTruncated: true,
+      matches: capped.slice(0, kept),
+    });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
