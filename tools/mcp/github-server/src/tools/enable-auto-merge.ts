@@ -43,6 +43,42 @@ export async function enableAutoMerge(
       { prId, mergeMethod: params.mergeMethod },
     );
 
+    // GitHub returns HTTP 200 with `enablePullRequestAutoMerge: null` (errors
+    // attached separately as `warnings` by githubGraphQL) when the mutation
+    // can't apply — most commonly because the PR is already enqueued/has
+    // auto-merge enabled, e.g. via a prior github_merge_pr call. Detect that
+    // case from the GraphQL error text and report it as a no-op success
+    // instead of dereferencing null; surface anything else as a clear error.
+    if (!result.data.enablePullRequestAutoMerge?.pullRequest) {
+      const warningText = result.warnings?.map((w) => w.message).join('; ');
+      const alreadyActive =
+        warningText != null && /already|queue/i.test(warningText);
+      if (alreadyActive) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: minifiedJson({
+                success: true,
+                prNumber: params.prNumber,
+                mergeMethod: params.mergeMethod,
+                output: `PR #${params.prNumber} is already in the merge queue — auto-merge is already active (no change made). GitHub: ${warningText}`,
+              }),
+            },
+          ],
+        };
+      }
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Failed to enable auto-merge for PR #${params.prNumber}: ${warningText ?? 'GitHub returned no pull request data for this mutation.'}`,
+          },
+        ],
+      };
+    }
+
     const autoMergeRequest =
       result.data.enablePullRequestAutoMerge.pullRequest.autoMergeRequest;
     const resolvedMethod = autoMergeRequest?.mergeMethod ?? params.mergeMethod;
