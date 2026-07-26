@@ -157,6 +157,7 @@ resource "aws_lambda_function" "mcp_ci" {
   depends_on = [
     aws_iam_role_policy_attachment.mcp_ci_lambda_basic,
     aws_iam_role_policy_attachment.mcp_ci_lambda_secrets,
+    aws_iam_role_policy_attachment.mcp_ci_lambda_artifacts_read,
     aws_cloudwatch_log_group.mcp_ci_lambda,
   ]
 
