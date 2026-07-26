@@ -15,13 +15,13 @@ This produces a structured JSON report with:
 - **Noise filtering** (one-off investigative commands auto-excluded)
 - **Overflow/failure triage** items for review
 
-Shell fallback: `python scripts/audit-session-bash.py --audit`
+The tool is Node-native (LS-8316) — it needs no Python interpreter and works in every environment (local Windows, cloud Linux, hosted server). There is no shell fallback; if the `legacy-sports-ci` MCP server is unavailable, fix the server connection instead (see [diagnostics.md](diagnostics.md)).
 
 ## Steps
 
 ### 1. Run the audit
 
-Call `ci_audit_session_bash({ auditMode: true })`. The script:
+Call `ci_audit_session_bash({ auditMode: true })`. The tool:
 
 - Parses the full JSONL transcript (parent + all subagents)
 - Classifies every Bash command as `covered` (has MCP equivalent), `gap` (needs a ticket), or `noise` (one-off investigative)

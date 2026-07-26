@@ -1,9 +1,10 @@
 /**
  * Helpers for locating Claude Code session JSONL files on disk.
  *
- * Mirrors the logic in scripts/audit-session-bash.py — see that file for the
- * canonical project-slug rules. Kept in TypeScript so MCP tools that need to
- * scan transcripts can do so without shelling out to Python.
+ * This module is the canonical home of the project-slug rules (formerly
+ * mirrored in the retired scripts/audit-session-bash.py — ported to
+ * TypeScript in LS-8316 so MCP tools that scan transcripts never shell out
+ * to Python). Parsing/classification lives in tools/audit-session-bash-parse.ts.
  *
  * Cross-platform: works on Linux/macOS (homedir path) and Windows (APPDATA path).
  */

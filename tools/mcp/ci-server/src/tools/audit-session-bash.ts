@@ -1,7 +1,20 @@
-import { execFile, execFileSync } from 'node:child_process';
-import { basename, resolve as resolvePath } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { getRepoRoot } from '../github-api.js';
+import { findClaudeProjectsDir, resolveProjectSlug } from '../session-files.js';
 import type { ToolResult } from '../types.js';
+import {
+  extractBashCalls,
+  extractMcpCalls,
+  extractScratchSubprocessCalls,
+  findLatestSession,
+  findSessionByPid,
+  formatAudit,
+  formatGapsOnly,
+  type BashCall,
+  type McpIssue,
+  type ScratchCall,
+} from './audit-session-bash-parse.js';
 
 /**
  * Strict allow-list for project slug basenames. Mirrors assertSafeSlug in session-files.ts.
@@ -35,199 +48,155 @@ export interface AuditSessionBashParams {
   auditMode?: boolean;
 }
 
-/**
- * Ordered list of Python interpreter candidates to try.
- * If the `PYTHON` env var is set, it is used as the sole candidate.
- * Otherwise on Windows: `py` launcher first (installed to C:\Windows\ by the
- * Python installer, present on system PATH even when the user PATH is stripped
- * in MCP server processes), then `python3`/`python` for non-launcher installs,
- * then common absolute paths for Program Files / AppData installs.
- * On Linux/macOS: shell-discovered paths first (via `which`) so the MCP server
- * finds the same interpreter the user shell sees even when the server process
- * inherits a stripped PATH, followed by `python3`/`python` and common absolute
- * paths as fallbacks.
- */
-export function pythonInterpreterCandidates(): string[] {
-  if (process.env.PYTHON) return [process.env.PYTHON];
-  if (process.platform === 'win32') {
-    return [
-      'py',
-      'python3',
-      'python',
-      'C:\\Windows\\py.exe',
-      `${process.env.LOCALAPPDATA ?? 'C:\\Users\\Default\\AppData\\Local'}\\Programs\\Python\\Python313\\python.exe`,
-      `${process.env.LOCALAPPDATA ?? 'C:\\Users\\Default\\AppData\\Local'}\\Programs\\Python\\Python312\\python.exe`,
-      `${process.env.LOCALAPPDATA ?? 'C:\\Users\\Default\\AppData\\Local'}\\Programs\\Python\\Python311\\python.exe`,
-      `${process.env.LOCALAPPDATA ?? 'C:\\Users\\Default\\AppData\\Local'}\\Programs\\Python\\Python310\\python.exe`,
-      'C:\\Program Files\\Python313\\python.exe',
-      'C:\\Program Files\\Python312\\python.exe',
-      'C:\\Program Files\\Python311\\python.exe',
-      'C:\\Program Files\\Python310\\python.exe',
-    ];
-  }
-  // Probe the shell's PATH via `which` first — resolves paths that the MCP
-  // server process can't see because it inherits a stripped PATH environment.
-  const shellDiscovered = discoverPythonViaShell();
-  const fixed = [
-    'python3',
-    'python',
-    '/usr/local/bin/python3',
-    '/usr/local/bin/python',
-    '/usr/bin/python3',
-    '/usr/bin/python',
-  ];
-  // Prepend shell-discovered paths; deduplicate against the fixed list.
-  const seen = new Set(fixed);
-  return [...shellDiscovered.filter((p) => !seen.has(p)), ...fixed];
+function textError(text: string): ToolResult {
+  return { isError: true, content: [{ type: 'text', text }] };
 }
 
 /**
- * Ask the user shell where Python lives. Returns absolute paths that `which`
- * resolves from the shell's own PATH — the MCP server process may have a
- * stripped PATH that omits directories the user shell includes.
- * Never throws; returns an empty array if `which` is unavailable or finds nothing.
- */
-function discoverPythonViaShell(): string[] {
-  const discovered: string[] = [];
-  for (const name of ['python3', 'python']) {
-    try {
-      const found = execFileSync('which', [name], {
-        encoding: 'utf8',
-        timeout: 2_000,
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-      if (found) discovered.push(found);
-    } catch {
-      // `which` not on PATH or interpreter not found — skip silently
-    }
-  }
-  return discovered;
-}
-
-/**
- * Run scripts/audit-session-bash.py and return its output.
- * When gapsOnly is true, passes --gaps-only and returns compact text.
- * Otherwise passes --format json and returns structured JSON.
+ * Extract Bash tool_use calls (and optionally MCP overflows/failures) from a
+ * Claude Code session transcript.
+ *
+ * Node-native implementation (LS-8316): session JSONL discovery comes from
+ * session-files.ts and the parsing/classification/formatting logic lives in
+ * audit-session-bash-parse.ts — a 1:1 TypeScript port of the retired
+ * scripts/audit-session-bash.py. No external interpreter is involved, so the
+ * tool works identically on local Windows (with or without Python), cloud
+ * Linux containers with no Python at all, and hosted server environments
+ * where the server process PATH differs from the user shell PATH.
+ *
+ * Output modes match the Python script's:
+ *   - default: structured JSON report with full command details
+ *   - gapsOnly: compact plain-text frequency table
+ *   - auditMode: structured JSON audit report with pre-classified gaps
  */
 export async function auditSessionBash(
   params: AuditSessionBashParams,
 ): Promise<ToolResult> {
-  const repoRoot = getRepoRoot();
-  const scriptPath = resolvePath(repoRoot, 'scripts', 'audit-session-bash.py');
-  const interpreters = pythonInterpreterCandidates();
-
-  const args = [scriptPath];
-  if (params.auditMode) {
-    args.push('--audit');
-  } else if (params.gapsOnly) {
-    args.push('--gaps-only');
-  } else {
-    args.push('--format', 'json');
+  let projectsDir: string;
+  try {
+    projectsDir = findClaudeProjectsDir();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return textError(`audit-session-bash failed: ${message}`);
   }
-  if (params.sessionId) args.push('--session-id', params.sessionId);
+
+  let projectSlug: string;
   if (params.project) {
     const safe = validateProjectSlug(params.project);
     if (!safe) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text:
-              `Invalid project slug: ${JSON.stringify(params.project)}. ` +
-              'Must match /^[A-Za-z0-9._-]+$/ with no path separators or ".." components.',
-          },
-        ],
-      };
-    }
-    args.push('--project', safe);
-  }
-  if (params.includeMcp) args.push('--include-mcp');
-  if (params.pid !== undefined) args.push('--pid', String(params.pid));
-  if (params.scanScratch) args.push('--scan-scratch');
-
-  interface ExecOutcome {
-    result: ToolResult;
-    notFound: boolean;
-  }
-
-  const tryExec = (interpreter: string): Promise<ExecOutcome> =>
-    new Promise((done) => {
-      execFile(
-        interpreter,
-        args,
-        { cwd: repoRoot, timeout: 30_000, maxBuffer: 10 * 1024 * 1024 },
-        (err, stdout, stderr) => {
-          if (err) {
-            const errCode = (err as NodeJS.ErrnoException).code;
-            const notFound =
-              errCode === 'ENOENT' ||
-              (stderr ?? '').includes('ENOENT') ||
-              err.message.includes('ENOENT');
-            done({
-              notFound,
-              result: {
-                isError: true,
-                content: [
-                  {
-                    type: 'text',
-                    text: `audit-session-bash failed (interpreter: ${interpreter}): ${stderr.trim() || err.message}`,
-                  },
-                ],
-              },
-            });
-            return;
-          }
-          if (params.gapsOnly && !params.auditMode) {
-            // --gaps-only returns plain text, not JSON
-            done({
-              notFound: false,
-              result: { content: [{ type: 'text', text: stdout.trim() }] },
-            });
-            return;
-          }
-          try {
-            const data: unknown = JSON.parse(stdout.trim());
-            done({
-              notFound: false,
-              result: {
-                content: [
-                  { type: 'text', text: JSON.stringify(data, null, 2) },
-                ],
-              },
-            });
-          } catch {
-            const preview = stdout.slice(0, 500);
-            const truncated = stdout.length > 500 ? '... (truncated)' : '';
-            done({
-              notFound: false,
-              result: {
-                isError: true,
-                content: [
-                  {
-                    type: 'text',
-                    text: `Failed to parse JSON output from audit-session-bash.py:\n${preview}${truncated}`,
-                  },
-                ],
-              },
-            });
-          }
-        },
+      return textError(
+        `Invalid project slug: ${JSON.stringify(params.project)}. ` +
+          'Must match /^[A-Za-z0-9._-]+$/ with no path separators or ".." components.',
       );
-    });
-
-  for (const interpreter of interpreters) {
-    const outcome = await tryExec(interpreter);
-    if (!outcome.notFound) return outcome.result;
+    }
+    projectSlug = safe;
+  } else {
+    try {
+      projectSlug = resolveProjectSlug(projectsDir);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return textError(`audit-session-bash failed: ${message}`);
+    }
   }
-  // All candidates failed with ENOENT — no Python found on PATH.
+
+  const projectDir = join(projectsDir, projectSlug);
+  if (!existsSync(projectDir) || !statSync(projectDir).isDirectory()) {
+    return textError(`Error: project directory not found: ${projectDir}`);
+  }
+
+  // Resolve session ID: explicit param > PID lookup > most recent JSONL.
+  let sessionId = params.sessionId;
+  if (!sessionId && params.pid !== undefined) {
+    const fromPid = findSessionByPid(params.pid);
+    if (!fromPid) {
+      return textError(`Error: no session found for PID ${params.pid}`);
+    }
+    sessionId = fromPid;
+  }
+  if (!sessionId) {
+    try {
+      sessionId = findLatestSession(projectDir);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return textError(message);
+    }
+  }
+
+  // auditMode implies includeMcp
+  const includeMcp = Boolean(params.includeMcp || params.auditMode);
+
+  // Parse parent JSONL
+  const parentJsonl = join(projectDir, `${sessionId}.jsonl`);
+  const bashCalls: BashCall[] = extractBashCalls(parentJsonl, 'parent');
+  const mcpIssues: McpIssue[] = includeMcp
+    ? extractMcpCalls(parentJsonl, 'parent')
+    : [];
+
+  // Parse subagent JSONLs
+  const subagentDir = join(projectDir, sessionId, 'subagents');
+  if (existsSync(subagentDir) && statSync(subagentDir).isDirectory()) {
+    const subagentFiles = readdirSync(subagentDir)
+      .filter((f) => f.endsWith('.jsonl'))
+      .sort();
+    for (const saFile of subagentFiles) {
+      const sourceName = saFile.replace(/\.jsonl$/, '');
+      const saPath = join(subagentDir, saFile);
+      bashCalls.push(...extractBashCalls(saPath, sourceName));
+      if (includeMcp) {
+        mcpIssues.push(...extractMcpCalls(saPath, sourceName));
+      }
+    }
+  }
+
+  // Sort all by timestamp (Array.prototype.sort is stable, matching Python)
+  bashCalls.sort((a, b) =>
+    a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0,
+  );
+  mcpIssues.sort((a, b) =>
+    a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0,
+  );
+
+  // Scan scratch/*.py for subprocess calls if requested
+  const scratchCalls: ScratchCall[] | null = params.scanScratch
+    ? extractScratchSubprocessCalls(getRepoRoot())
+    : null;
+
+  if (params.auditMode) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: formatAudit(bashCalls, mcpIssues, sessionId, scratchCalls),
+        },
+      ],
+    };
+  }
+
+  if (params.gapsOnly) {
+    // gaps-only returns plain text, not JSON
+    return {
+      content: [
+        {
+          type: 'text',
+          text: formatGapsOnly(bashCalls, sessionId, scratchCalls).trim(),
+        },
+      ],
+    };
+  }
+
+  const output: Record<string, unknown> = {
+    session_id: sessionId,
+    project: projectSlug,
+    bash_commands: bashCalls,
+    total: bashCalls.length,
+  };
+  if (includeMcp) {
+    output['mcp_issues'] = mcpIssues;
+  }
+  if (scratchCalls !== null) {
+    output['scratch_subprocess_calls'] = scratchCalls;
+  }
   return {
-    isError: true,
-    content: [
-      {
-        type: 'text',
-        text: `audit-session-bash failed: no Python interpreter found on PATH. Tried: ${interpreters.join(', ')}. Set the PYTHON env var to a valid interpreter path.`,
-      },
-    ],
+    content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
   };
 }

@@ -39,14 +39,14 @@ Before running the audit, check session depth. If **all three** of the following
 
 The audit adds ~850K tokens to a session. On short sessions (ticket triage, single Jira transition, quick investigation), it contributes noise without actionable signal. Save it for sessions where real tool friction occurred.
 
-1. **Run** `ci_audit_session_bash({ auditMode: true })` — produces a structured JSON report with pre-classified gaps, confidence scores, draft ticket summaries, and noise filtering for Bash activity. Shell fallback: `python scripts/audit-session-bash.py --audit`
+1. **Run** `ci_audit_session_bash({ auditMode: true })` — produces a structured JSON report with pre-classified gaps, confidence scores, draft ticket summaries, and noise filtering for Bash activity. The tool is Node-native (LS-8316) and needs no Python interpreter; there is no shell fallback — if the `legacy-sports-ci` server is unavailable, fix the connection (see [diagnostics.md](diagnostics.md)) or fall back to manual review of session Bash commands.
 2. **Manually review** conversation history for Copilot CLI `powershell` tool invocations — `ci_audit_session_bash` does **not** currently extract them, so inspect those commands separately and include any gaps they reveal in the audit
 3. **Review** the `action_required` section — accept high-confidence gaps, verify medium/low-confidence ones, classify overflow/failure fix types
 4. **Check** for existing tickets under the current bucket epic (`jira_list_children`)
 5. **Create** tickets for approved gaps using the draft summaries from the report plus any manually identified `powershell` gaps
 6. **Report** findings to the user
 
-The script handles Bash classification, noise filtering, and ticket drafting automatically. The agent's role is to review and approve, not classify from scratch; `powershell` command review is still manual until extraction support is added.
+The tool handles Bash classification, noise filtering, and ticket drafting automatically. The agent's role is to review and approve, not classify from scratch; `powershell` command review is still manual until extraction support is added.
 
 ---
 
@@ -96,47 +96,17 @@ Each JSONL line is a message object. Bash tool calls appear as:
 }
 ```
 
-> **Note:** `~/.claude/projects/` contains only Claude Code session transcripts. GitHub Copilot CLI sessions are logged separately (outside `~/.claude/projects/`) and cannot be mined with the script below. For Copilot CLI `powershell` invocations, rely on conversation-history review (Step 1).
+> **Note:** `~/.claude/projects/` contains only Claude Code session transcripts. GitHub Copilot CLI sessions are logged separately (outside `~/.claude/projects/`) and cannot be mined with the tools below. For Copilot CLI `powershell` invocations, rely on conversation-history review (Step 1).
 
 ### Extraction procedure
 
-1. **Aggregate Bash commands** across all Claude Code sessions in the project directory:
+All extraction is Node-native via the `legacy-sports-ci` MCP tools (LS-8316) — no Python, no ad-hoc transcript scripts.
 
-   ```python
-   # One-liner to extract all Bash commands from recent Claude Code sessions
-   python -c "
-   import json, collections
-   from pathlib import Path
-   cmds = collections.Counter()
-   for f in Path('~/.claude/projects').expanduser().rglob('*.jsonl'):
-       for line in open(f):
-           msg = json.loads(line).get('message', {})
-           for block in msg.get('content', []):
-               if block.get('name') == 'Bash':
-                   cmd = block['input']['command'].split()[0]
-                   cmds[cmd] += 1
-   for cmd, count in cmds.most_common(20):
-       print(f'{count:4d}  {cmd}')
-   "
-   ```
+1. **Aggregate Bash commands per session** — run `ci_audit_session_bash({ sessionId: "<uuid>", gapsOnly: true })` for each recent session (enumerate candidates with `ci_find_session` or take the most recent by omitting `sessionId`). Each call returns a frequency table of normalised command patterns already split into potential-gap vs MCP-covered; merge the per-session tables to spot cross-session repeats. `ci_session_stats` gives the quick per-session `bashFallbackRatio` heuristic to decide which sessions are worth auditing.
 
-2. **Drill into high-frequency commands** — for each command appearing 5+ times, extract the full command strings to understand patterns:
+2. **Drill into high-frequency commands** — for each pattern appearing 5+ times, locate the sessions using it with `ci_find_session({ query: "<command prefix>" })`, then pull the full command strings from those sessions via `ci_audit_session_bash({ sessionId, ... })` (default JSON mode returns every command verbatim with timestamps and source transcripts).
 
-   ```python
-   # Extract full commands for a specific binary (e.g., find) across Bash tools (Claude Code sessions)
-   python -c "
-   import json
-   from pathlib import Path
-   for f in Path('~/.claude/projects').expanduser().rglob('*.jsonl'):
-       for line in open(f):
-           msg = json.loads(line).get('message', {})
-           for block in msg.get('content', []):
-               if block.get('name') == 'Bash' and 'find ' in block['input']['command']:
-                   print(block['input']['command'][:120])
-   "
-   ```
-
-3. **Classify** using the same taxonomy as Phase 1 (Step 2): `missing-tool`, `missing-feature`, `missing-awareness`
+3. **Classify** using the same taxonomy as Phase 1 (Step 2): `missing-tool`, `missing-feature`, `missing-awareness` — or let `ci_audit_session_bash({ auditMode: true })` pre-classify with confidence scores and draft ticket summaries.
 
 ### Frequency thresholds
 
