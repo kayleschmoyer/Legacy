@@ -2,18 +2,25 @@ import { bulkRebase } from './bulk-rebase';
 
 jest.mock('./rebase-pr', () => ({
   rebasePRWorker: jest.fn(),
+  rebasePRViaApi: jest.fn(),
 }));
 
 jest.mock('../auth', () => ({
   isLambda: jest.fn(() => false),
 }));
 
-const { rebasePRWorker: mockRebasePR } = jest.requireMock('./rebase-pr') as {
-  rebasePRWorker: jest.Mock;
+const { rebasePRWorker: mockRebasePR, rebasePRViaApi: mockRebasePRViaApi } =
+  jest.requireMock('./rebase-pr') as {
+    rebasePRWorker: jest.Mock;
+    rebasePRViaApi: jest.Mock;
+  };
+const { isLambda: mockIsLambda } = jest.requireMock('../auth') as {
+  isLambda: jest.Mock;
 };
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockIsLambda.mockReturnValue(false);
 });
 
 function successResult(number: number) {
@@ -84,5 +91,20 @@ describe('bulkRebase', () => {
     expect(body.failed).toEqual([
       { index: 1, key: 2, error: 'Rebase conflicts detected' },
     ]);
+  });
+
+  it('uses rebasePRViaApi (not the git worker) per PR when isLambda() is true (LS-7753)', async () => {
+    mockIsLambda.mockReturnValue(true);
+    mockRebasePRViaApi.mockImplementation(
+      async ({ number }: { number: number }) => successResult(number),
+    );
+
+    const result = await bulkRebase({ numbers: [10, 20] });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockRebasePRViaApi).toHaveBeenCalledTimes(2);
+    expect(mockRebasePRViaApi).toHaveBeenNthCalledWith(1, { number: 10 });
+    expect(mockRebasePRViaApi).toHaveBeenNthCalledWith(2, { number: 20 });
+    expect(mockRebasePR).not.toHaveBeenCalled();
   });
 });

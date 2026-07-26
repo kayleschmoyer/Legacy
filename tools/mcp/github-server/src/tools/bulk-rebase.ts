@@ -3,7 +3,7 @@ import { assembleBatchResult, checkBatchSize } from '../batch.js';
 import type { BatchFailure } from '../batch.js';
 import { runWithSyncBudget, withCheckoutLock } from '../jobs.js';
 import type { JobLogger } from '../jobs.js';
-import { rebasePRWorker } from './rebase-pr.js';
+import { rebasePRViaApi, rebasePRWorker } from './rebase-pr.js';
 import type { ToolResult } from '../types.js';
 
 export interface BulkRebaseParams {
@@ -61,9 +61,13 @@ async function bulkRebaseWorker(
   for (let i = 0; i < params.numbers.length; i++) {
     const number = params.numbers[i];
     try {
-      const result = await withCheckoutLock(() =>
-        rebasePRWorker({ number }, (line) => jobLog(`#${number}: ${line}`)),
-      );
+      // Lambda has no git binary (LS-7753): use the API-based rebase, which
+      // needs no local checkout lock since it doesn't mutate one.
+      const result = isLambda()
+        ? await rebasePRViaApi({ number })
+        : await withCheckoutLock(() =>
+            rebasePRWorker({ number }, (line) => jobLog(`#${number}: ${line}`)),
+          );
       const text = result.content[0]?.text ?? '';
       let parsed: RebaseResultPayload | null = null;
       try {

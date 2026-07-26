@@ -1,7 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
 import { getRepoRoot, getRepoOwnerName, isLambda } from '../auth.js';
-import { githubGraphQL } from '../github-api.js';
+import { githubGraphQL, githubRest } from '../github-api.js';
 import { runWithSyncBudget, withCheckoutLock } from '../jobs.js';
 import type { JobLogger } from '../jobs.js';
 import type { ToolResult } from '../types.js';
@@ -100,13 +100,112 @@ async function getCurrentRef(cwd: string): Promise<string> {
  *
  * Stdio deployments run this under a bounded sync budget: fast rebases return
  * their result inline; slow ones return { jobId, status: "running" } to poll
- * with github_job_wait. The Lambda deployment (no git) keeps the direct path.
+ * with github_job_wait. The Lambda deployment has no `git` binary on its PATH
+ * (LS-7753), so it takes a different path entirely — a GitHub API merge-style
+ * branch update — rather than the git-subprocess worker used everywhere else.
  */
 export async function rebasePR(params: RebasePRParams): Promise<ToolResult> {
-  if (isLambda()) return rebasePRWorker(params);
+  if (isLambda()) return rebasePRViaApi(params);
   return runWithSyncBudget(`rebase-pr #${params.number}`, (log) =>
     withCheckoutLock(() => rebasePRWorker(params, log)),
   );
+}
+
+/**
+ * Lambda-only rebase path: no `git` binary is available there (spawning one
+ * fails with `spawnSync git ENOENT`, LS-7753), so instead of a real rebase
+ * this updates the PR branch via GitHub's REST "update pull request branch"
+ * endpoint, which merges the base branch into the head branch server-side.
+ * Note this produces a merge commit, not a linear rebase — an accepted
+ * trade-off for the Lambda deployment per the ticket's proposed fix.
+ */
+export async function rebasePRViaApi(
+  params: RebasePRParams,
+): Promise<ToolResult> {
+  const { number } = params;
+
+  try {
+    const repo = await getRepoOwnerName();
+    const { data } = await githubGraphQL<PRGraphQLResponse>(PR_QUERY, {
+      owner: repo.owner,
+      name: repo.name,
+      number,
+    });
+    const pr = data.repository.pullRequest;
+    const { headRefName, baseRefName, headRepository, baseRepository } = pr;
+
+    // Detect cross-repo (fork) PRs — the update-branch endpoint operates on
+    // the PR's own head branch, but we still can't meaningfully "rebase" a
+    // fork PR onto a differently-owned base the way this tool is used.
+    if (
+      headRepository.owner.login !== baseRepository.owner.login ||
+      headRepository.name !== baseRepository.name
+    ) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: minifiedJson({
+              success: false,
+              number,
+              branch: headRefName,
+              error:
+                'Cross-repo (fork) PRs are not supported — cannot force-push to a fork remote',
+              headOwner: headRepository.owner.login,
+              baseOwner: baseRepository.owner.login,
+            }),
+          },
+        ],
+      };
+    }
+
+    await githubRest({
+      method: 'PUT',
+      path: `/repos/${repo.owner}/${repo.name}/pulls/${number}/update-branch`,
+    });
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            success: true,
+            number,
+            branch: headRefName,
+            base: baseRefName,
+            message:
+              `PR #${number} updated with latest ${baseRefName} via GitHub API ` +
+              'merge-style update (Lambda has no git binary, LS-7753) — this ' +
+              'creates a merge commit rather than a linear rebase',
+          }),
+        },
+      ],
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Match the HTTP status githubRest embeds as "failed (NNN):" — a bare
+    // \b422\b would also match a PR numbered 422 in the request path.
+    const isConflict =
+      /failed \((422|409)\)/.test(message) ||
+      /conflict|diverged/i.test(message);
+
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            success: false,
+            number,
+            error: isConflict
+              ? `Rebase conflicts detected — manual resolution needed (via GitHub API update-branch): ${message}`
+              : `Failed to rebase PR #${number}: ${message}`,
+          }),
+        },
+      ],
+    };
+  }
 }
 
 /**
