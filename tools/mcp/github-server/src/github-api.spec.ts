@@ -107,6 +107,18 @@ describe('githubRest secondary rate limit handling', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it('names "Administration: Read" for a 403 on /actions/runners', async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeResponse(403, { message: 'Resource not accessible by integration' }),
+    );
+
+    await expect(
+      githubRest({ method: 'GET', path: '/repos/o/r/actions/runners' }),
+    ).rejects.toThrow(/Administration/);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('githubGraphQL secondary rate limit handling', () => {

@@ -29,6 +29,17 @@ interface RestOptions {
 }
 
 /**
+ * Known REST paths that 403 with "Resource not accessible by integration"
+ * when the Agent Author GitHub App installation lacks the matching repo
+ * permission, mapped to the exact permission name to grant (LS-7909).
+ */
+const PATH_PERMISSION_TABLE: Array<[RegExp, string]> = [
+  [/\/actions\/runners(\/|$|\?)/, 'Administration: Read'],
+  [/\/statuses(\/|$|\?)/, 'Commit statuses: Read'],
+  [/\/check-runs(\/|$|\?)/, 'Checks: Read'],
+];
+
+/**
  * Max attempts to retry a request that hit a GitHub *secondary* rate limit
  * (a.k.a. abuse-detection throttle), distinct from the primary hourly quota.
  * Secondary limits fire on short bursts of content-creating requests — e.g.
@@ -211,13 +222,18 @@ async function doRest<T>(
       response.status === 403 &&
       /resource not accessible by integration/i.test(text)
     ) {
+      const permissionMatch = PATH_PERMISSION_TABLE.find(([re]) =>
+        re.test(opts.path),
+      );
+      const permissionHint = permissionMatch
+        ? `lacks the repository permission governing this endpoint: "${permissionMatch[1]}".`
+        : 'lacks the repository permission governing this endpoint (e.g. "Commit ' +
+          'statuses: Read" for /statuses, "Checks: Read" for /check-runs).';
       throw new Error(
         `GitHub API ${opts.method} ${opts.path} failed (403): ${sanitized}. ` +
           'This is a missing GitHub App permission/scope, not a missing token — a ' +
           'token was provisioned and accepted. The Agent Author GitHub App installation ' +
-          'lacks the repository permission governing this endpoint (e.g. "Commit ' +
-          'statuses: Read" for /statuses, "Checks: Read" for /check-runs). Grant the ' +
-          "permission in the App's settings and approve the updated installation, then retry.",
+          `${permissionHint} Grant the permission in the App's settings and approve the updated installation, then retry.`,
       );
     }
     throw new Error(
