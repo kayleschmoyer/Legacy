@@ -27,8 +27,12 @@ import type { BackendOptions, PlatformOptions } from './src/fixtures/dual';
  * missing capability skips cleanly rather than failing at runtime.
  *
  * Native EXECUTION (Appium driver LS-8447, per-worker hermetic mock server
- * LS-8448, and emulator provisioning LS-8450) is not wired yet; this config is
- * the runner-side scaffold those tickets build on. It is not run in PR CI.
+ * LS-8448, and emulator provisioning LS-8450) is wired: this config's
+ * `native-android` project runs against a real emulator via
+ * `.github/workflows/e2e-native-android.yml` (dispatch + post-build trigger).
+ * See ADR-0018 for the as-built design record. It is still not run in PR CI —
+ * that workflow is the dedicated native entry point, mirroring the
+ * `test-suite`-gated dispatch pattern in `run-playwright-tests.yml`.
  */
 export default defineConfig<BackendOptions & PlatformOptions>({
   // The shared, platform-neutral suite — the native functional surface.
