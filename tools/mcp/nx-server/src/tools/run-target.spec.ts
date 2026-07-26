@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../run-command.js', () => ({
   getRepoRoot: jest.fn(() => '/repo'),
-  runNx: jest.fn(),
 }));
 jest.mock('../jobs.js', () => ({ runJobWithBudget: jest.fn() }));
 
@@ -39,6 +38,11 @@ function setupJob(): void {
 /** The nx args passed to the (mocked) job runner in the first call. */
 function jobCallArgs(): string[] {
   return mockRunJob.mock.calls[0][0].args;
+}
+
+/** The StartJobOptions passed to the (mocked) job runner in the first call. */
+function jobCallOpts(): StartJobOptions {
+  return mockRunJob.mock.calls[0][0];
 }
 
 describe('coalesceWindowsTestPathPatterns', () => {
@@ -197,5 +201,126 @@ describe('runTarget', () => {
       updateSnapshot: true,
     });
     expect(jobCallArgs()).toContain('--updateSnapshot');
+  });
+
+  it('returns the finished result when the job completes inside the sync budget', async () => {
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-1',
+      status: 'done',
+      label: 'nx run shared-components:test',
+      cwd: '/repo',
+      elapsedSec: 3,
+      exitCode: 0,
+      error: null,
+      log: 'PASS shared-components/LoginPage.spec.ts',
+    } satisfies JobSnapshot);
+
+    const result = await runTarget({
+      project: 'shared-components',
+      target: 'test',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(JSON.parse(result.content[0].text as string)).toEqual({
+      project: 'shared-components',
+      target: 'test',
+      passed: true,
+      output: 'PASS shared-components/LoginPage.spec.ts',
+    });
+  });
+
+  it('returns a running snapshot with jobId instead of blocking past the sync budget', async () => {
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-2',
+      status: 'running',
+      label: 'nx run shared-components:test',
+      cwd: '/repo',
+      elapsedSec: 50,
+      exitCode: null,
+      error: null,
+      logTail: 'compiling project graph...',
+      hint: 'Job still running. Call nx_job_wait({ jobId: "nx-2" }) to continue waiting.',
+    } satisfies JobSnapshot);
+
+    const result = await runTarget({
+      project: 'shared-components',
+      target: 'test',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(JSON.parse(result.content[0].text as string)).toEqual({
+      project: 'shared-components',
+      target: 'test',
+      status: 'running',
+      jobId: 'nx-2',
+      elapsedSec: 50,
+      logTail: 'compiling project graph...',
+      hint: 'Job still running. Call nx_job_wait({ jobId: "nx-2" }) to continue waiting.',
+    });
+  });
+
+  it('sets isError when the job fails', async () => {
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-3',
+      status: 'failed',
+      label: 'nx run shared-components:test',
+      cwd: '/repo',
+      elapsedSec: 5,
+      exitCode: 1,
+      error: 'nx run shared-components:test exited with code 1',
+      log: 'FAIL shared-components/LoginPage.spec.ts',
+    } satisfies JobSnapshot);
+
+    const result = await runTarget({
+      project: 'shared-components',
+      target: 'test',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text as string)).toMatchObject({
+      passed: false,
+      error: 'nx run shared-components:test exited with code 1',
+      output: 'FAIL shared-components/LoginPage.spec.ts',
+    });
+  });
+
+  it('passes a cwd/args-derived idempotencyKey so a duplicate call joins the in-flight job', async () => {
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-4',
+      status: 'done',
+      label: 'nx run shared-components:test',
+      cwd: '/repo',
+      elapsedSec: 1,
+      exitCode: 0,
+      error: null,
+      log: '',
+    } satisfies JobSnapshot);
+
+    await runTarget({ project: 'shared-components', target: 'test' });
+
+    expect(jobCallOpts().idempotencyKey).toBe(
+      'nx-run:/repo:run shared-components:test',
+    );
+  });
+
+  it('forwards params.env to the job runner', async () => {
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-5',
+      status: 'done',
+      label: 'nx run shared-components:test',
+      cwd: '/repo',
+      elapsedSec: 1,
+      exitCode: 0,
+      error: null,
+      log: '',
+    } satisfies JobSnapshot);
+
+    await runTarget({
+      project: 'shared-components',
+      target: 'test',
+      env: { PLAYWRIGHT_GREP: '@regression' },
+    });
+
+    expect(jobCallOpts().env).toEqual({ PLAYWRIGHT_GREP: '@regression' });
   });
 });
