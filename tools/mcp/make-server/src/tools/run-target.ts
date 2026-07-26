@@ -198,10 +198,6 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     'pc-typecheck',
     'pc-test',
     'pc-build',
-    'build-all',
-    'test-all',
-    'install',
-    'install-force',
     'full-check',
     'dev-setup',
     'ami-build',
@@ -214,7 +210,24 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     // via the variables parameter to avoid blocking on stdin (execFile has no tty).
     'runner-apply',
   ]);
-  const defaultTimeoutMs = heavyTargets.has(target) ? 600_000 : 300_000;
+  // `nx run-many` (build-all/test-all) runs every project in the workspace,
+  // not just the affected set, and `install`/`install-force` runs a
+  // frozen-lockfile install across the whole monorepo — a cold cache or cold
+  // pnpm store can push these well past the 10-minute heavyTargets budget.
+  // Match nx-server's equivalent full-workspace timeouts (NX_RUN_TIMEOUT_MS /
+  // PC_CHUNK_TIMEOUT_MS = 30min) and CI's own 30-minute build/test job budget
+  // (ci-pipeline.yml) instead of a value a legitimate run can hit (LS-8354).
+  const veryHeavyTargets = new Set([
+    'build-all',
+    'test-all',
+    'install',
+    'install-force',
+  ]);
+  const defaultTimeoutMs = veryHeavyTargets.has(target)
+    ? 1_800_000
+    : heavyTargets.has(target)
+      ? 600_000
+      : 300_000;
   // Caller-provided timeoutMs overrides the default; useful for make pc on a cold cache.
   const timeoutMs = params.timeoutMs ?? defaultTimeoutMs;
 

@@ -154,6 +154,21 @@ describe('runTarget — runInBackground: true', () => {
     expect(body.status).toBe('running');
     expect(body.timeoutMs).toBe(600_000);
   });
+
+  it.each(['build-all', 'test-all', 'install', 'install-force'])(
+    'uses the 1800000ms very-heavy-target default timeout for %s (LS-8354)',
+    async (target) => {
+      const result = await runTarget({
+        target,
+        worktreePath: workDir,
+        runInBackground: true,
+      });
+      expect(result.isError).toBeFalsy();
+      const body = payload(result);
+      expect(body.status).toBe('running');
+      expect(body.timeoutMs).toBe(1_800_000);
+    },
+  );
 });
 
 describe('runTarget — default path (budgeted background job)', () => {
