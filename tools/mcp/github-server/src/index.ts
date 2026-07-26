@@ -1097,16 +1097,36 @@ export function createServer(): McpServer {
   // --- github_mark_pr_ready ---
   server.tool(
     'github_mark_pr_ready',
-    'Convert a draft PR to ready for review and apply the bot:ready-for-review label (the Reviewer Bot trigger). Use after validation passes to signal the PR is ready for sweep/review agents. The label is applied last and is idempotent, so fix-push cycles re-trigger review without a separate label call.',
+    'Convert a draft PR to ready for review and apply the bot:ready-for-review label (the Reviewer Bot trigger). Use after validation passes to signal the PR is ready for sweep/review agents. The label is applied last and is idempotent, so fix-push cycles re-trigger review without a separate label call. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
       applyReadyLabel: coercedBoolean
         .default(true)
         .describe(
           'Apply the bot:ready-for-review label after marking ready (default true). Set false only when the caller manages the label itself (e.g. a remove-then-add re-trigger).',
         ),
     },
-    async (params) => markPRReady(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return markPRReady({
+        number: resolved,
+        applyReadyLabel: params.applyReadyLabel,
+      });
+    },
   );
 
   // --- github_pr_batch_status ---
@@ -1131,15 +1151,30 @@ export function createServer(): McpServer {
   // --- github_pr_why_blocked ---
   server.tool(
     'github_pr_why_blocked',
-    'Diagnose why a PR is not moving forward. Returns a structured reason (DRAFT, MERGE_CONFLICT, CI_FAILING, CHANGES_REQUESTED, UNRESOLVED_THREADS, AWAITING_REVIEW, CI_PENDING, IN_MERGE_QUEUE, READY, MERGED, etc.), a one-line summary, relevant details, and a concrete next action. Use this instead of manually cross-referencing github_view_pr + check runs + review state.',
+    'Diagnose why a PR is not moving forward. Returns a structured reason (DRAFT, MERGE_CONFLICT, CI_FAILING, CHANGES_REQUESTED, UNRESOLVED_THREADS, AWAITING_REVIEW, CI_PENDING, IN_MERGE_QUEUE, READY, MERGED, etc.), a one-line summary, relevant details, and a concrete next action. Use this instead of manually cross-referencing github_view_pr + check runs + review state. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce
-        .number()
-        .int()
-        .positive()
+      number: prNumberField('number')
+        .optional()
         .describe('PR number to diagnose'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
     },
-    async (params) => prWhyBlocked(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return prWhyBlocked({ number: resolved });
+    },
   );
 
   // --- github_pr_dashboard ---

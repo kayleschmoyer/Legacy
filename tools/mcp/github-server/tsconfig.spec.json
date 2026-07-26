@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "../../../dist/out-tsc",
     "module": "commonjs",
+    "moduleResolution": "nodenext",
     "allowJs": true,
     "types": ["jest", "node"]
   },
