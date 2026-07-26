@@ -5,10 +5,6 @@ import Players from './players';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn() }),
-}));
-
 // Avoids pulling in the real ThemeContext (which imports secureStorage from
 // the @legacy-sports/shared-components barrel — untransformed native deps in
 // that barrel, e.g. Google Sign-In, break Jest's module parser).
@@ -22,9 +18,13 @@ jest.mock('tamagui', () => {
   const mocks = jest.requireActual<
     typeof import('../../../__test-utils__/tamagui-mocks')
   >('../../../__test-utils__/tamagui-mocks');
-  return {
-    ...mocks.tamaguiMocks,
-    YStack: ({
+
+  // The base XStack/YStack mocks drop onPress/testID — this codebase's rows
+  // (player rows, the "premium stats lock" chip, etc.) rely on both, so wrap
+  // either stack in a Pressable when onPress is present.
+  const pressableStack =
+    () =>
+    ({
       children,
       onPress,
       testID,
@@ -40,7 +40,12 @@ jest.mock('tamagui', () => {
         return createElement(Pressable, { onPress, testID }, children);
       }
       return createElement(View, { testID }, children);
-    },
+    };
+
+  return {
+    ...mocks.tamaguiMocks,
+    XStack: pressableStack(),
+    YStack: pressableStack(),
   };
 });
 
@@ -62,6 +67,27 @@ jest.mock('./hooks/useBaseballRosteredPlayerIds', () => ({
       playerIds: Set<number>;
       loading: boolean;
     },
+}));
+
+const mockUseSubscription = jest.fn();
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useSubscription: () => mockUseSubscription() as unknown,
+}));
+
+const mockTrackPremiumFeatureClick = jest.fn();
+const mockTrackPremiumFeatureBlocked = jest.fn();
+jest.mock('../../../utils/analytics', () => ({
+  trackPremiumFeatureClick: (...args: unknown[]) => {
+    mockTrackPremiumFeatureClick(...args);
+  },
+  trackPremiumFeatureBlocked: (...args: unknown[]) => {
+    mockTrackPremiumFeatureBlocked(...args);
+  },
+}));
+
+const mockNavigate = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), navigate: mockNavigate }),
 }));
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -122,6 +148,7 @@ describe('Baseball Players', () => {
       playerIds: new Set<number>(),
       loading: false,
     });
+    mockUseSubscription.mockReturnValue({ isPremium: true, loading: false });
   });
 
   describe('rendering', () => {
@@ -285,6 +312,53 @@ describe('Baseball Players', () => {
       // Availability filter still works independently of the position filter.
       fireEvent.press(screen.getByTestId('availability-pill-rostered'));
       expect(screen.queryByText('Mike Trout')).toBeNull();
+    });
+  });
+
+  describe('premium stats gating (LS-8634)', () => {
+    // careerBatting/careerPitching are entitlement-gated server-side
+    // (player_comparison, LS-7004) and resolve null for non-premium callers
+    // regardless of real data — the screen must tell free users this is a
+    // premium feature rather than silently showing "No stats available".
+    it('shows a locked Premium indicator instead of "No stats available" for non-premium users', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
+      render(<Players />);
+      expect(screen.getAllByTestId('premium-stats-lock')).toHaveLength(2);
+      expect(screen.queryByText('No stats available')).toBeNull();
+    });
+
+    it('tapping the locked indicator navigates to subscription-settings and tracks the click', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
+      render(<Players />);
+      fireEvent.press(screen.getAllByTestId('premium-stats-lock')[0]);
+      expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
+      expect(mockTrackPremiumFeatureClick).toHaveBeenCalledWith(
+        'Player Statistics',
+      );
+    });
+
+    it('fires trackPremiumFeatureBlocked exactly once when stats are locked', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
+      render(<Players />);
+      expect(mockTrackPremiumFeatureBlocked).toHaveBeenCalledTimes(1);
+      expect(mockTrackPremiumFeatureBlocked).toHaveBeenCalledWith(
+        'Player Statistics',
+      );
+    });
+
+    it('shows plain "No stats available" (no lock) for premium users with genuinely missing stats', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: true, loading: false });
+      render(<Players />);
+      expect(screen.queryByTestId('premium-stats-lock')).toBeNull();
+      expect(screen.getAllByText('No stats available')).toHaveLength(2);
+    });
+
+    it('does not show the locked indicator while subscription status is still loading', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: false, loading: true });
+      render(<Players />);
+      expect(screen.queryByTestId('premium-stats-lock')).toBeNull();
+      expect(screen.getAllByText('No stats available')).toHaveLength(2);
+      expect(mockTrackPremiumFeatureBlocked).not.toHaveBeenCalled();
     });
   });
 });

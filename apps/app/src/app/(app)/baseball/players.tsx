@@ -12,6 +12,13 @@ import {
 import { useBaseballRosteredPlayerIds } from './hooks/useBaseballRosteredPlayerIds';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { SafeScreen } from '../../../components/SafeScreen';
+import { useSubscription } from '../../../features/subscription/useSubscription';
+import {
+  trackPremiumFeatureBlocked,
+  trackPremiumFeatureClick,
+} from '../../../utils/analytics';
+
+const PREMIUM_STATS_FEATURE_NAME = 'Player Statistics';
 
 type BaseballPlayerNode = NonNullable<
   NonNullable<BaseballPlayersQuery['players']>[number]
@@ -86,16 +93,51 @@ function StatChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PlayerStats({ player }: { player: BaseballPlayerNode }) {
+function NoStatsAvailable() {
+  return (
+    <Text fontSize={12} color="$gray9">
+      No stats available
+    </Text>
+  );
+}
+
+function LockedPremiumStats({ onPress }: { onPress: () => void }) {
+  return (
+    <XStack
+      gap={4}
+      alignItems="center"
+      onPress={onPress}
+      pressStyle={{ opacity: 0.7 }}
+      testID="premium-stats-lock"
+      accessibilityRole="button"
+      accessibilityLabel="Career stats are a Premium feature. Upgrade to view."
+    >
+      <Text fontSize={12}>🔒</Text>
+      <Text fontSize={12} color="$gray9" textDecorationLine="underline">
+        Premium
+      </Text>
+    </XStack>
+  );
+}
+
+function PlayerStats({
+  player,
+  statsLocked,
+  onUpgradePress,
+}: {
+  player: BaseballPlayerNode;
+  statsLocked: boolean;
+  onUpgradePress: () => void;
+}) {
   const pitcher = isPitcher(player.eligiblePositions);
 
   if (pitcher) {
     const p = player.careerPitching;
     if (!p) {
-      return (
-        <Text fontSize={12} color="$gray9">
-          No stats available
-        </Text>
+      return statsLocked ? (
+        <LockedPremiumStats onPress={onUpgradePress} />
+      ) : (
+        <NoStatsAvailable />
       );
     }
     return (
@@ -110,10 +152,10 @@ function PlayerStats({ player }: { player: BaseballPlayerNode }) {
 
   const b = player.careerBatting;
   if (!b) {
-    return (
-      <Text fontSize={12} color="$gray9">
-        No stats available
-      </Text>
+    return statsLocked ? (
+      <LockedPremiumStats onPress={onUpgradePress} />
+    ) : (
+      <NoStatsAvailable />
     );
   }
   return (
@@ -129,9 +171,13 @@ function PlayerStats({ player }: { player: BaseballPlayerNode }) {
 function PlayerRow({
   player,
   onPress,
+  statsLocked,
+  onUpgradePress,
 }: {
   player: BaseballPlayerNode;
   onPress: () => void;
+  statsLocked: boolean;
+  onUpgradePress: () => void;
 }) {
   const positions = player.eligiblePositions ?? [];
 
@@ -179,7 +225,11 @@ function PlayerRow({
         </YStack>
       </XStack>
 
-      <PlayerStats player={player} />
+      <PlayerStats
+        player={player}
+        statsLocked={statsLocked}
+        onUpgradePress={onUpgradePress}
+      />
     </YStack>
   );
 }
@@ -242,6 +292,22 @@ export default function BaseballPlayers(): React.JSX.Element {
   const router = useRouter();
   const { resolvedTheme } = useThemeContext();
   const palette = colors[resolvedTheme];
+  const { isPremium, loading: subscriptionLoading } = useSubscription();
+  // Career stats are gated server-side behind the player_comparison premium
+  // entitlement (LS-7004) — careerBatting/careerPitching resolve null for
+  // non-premium callers regardless of real data. Suppress the lock treatment
+  // while subscription status is still loading so premium users don't briefly
+  // see rows flagged as locked (same defect class as LS-8380).
+  const statsLocked = !subscriptionLoading && !isPremium;
+  const handleUpgradePress = useCallback(() => {
+    trackPremiumFeatureClick(PREMIUM_STATS_FEATURE_NAME);
+    router.navigate('subscription-settings');
+  }, [router]);
+  useEffect(() => {
+    if (statsLocked) {
+      trackPremiumFeatureBlocked(PREMIUM_STATS_FEATURE_NAME);
+    }
+  }, [statsLocked]);
   const [position, setPosition] = useState<BaseballPosition>('All');
   const [searchInput, setSearchInput] = useState('');
   const [offset, setOffset] = useState(0);
@@ -477,6 +543,8 @@ export default function BaseballPlayers(): React.JSX.Element {
                     },
                   });
                 }}
+                statsLocked={statsLocked}
+                onUpgradePress={handleUpgradePress}
               />
             )}
             windowSize={10}
