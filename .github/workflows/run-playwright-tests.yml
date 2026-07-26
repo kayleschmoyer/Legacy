@@ -316,6 +316,13 @@ jobs:
               # handful of quick specs, so always one shard / one worker.
               TOTAL=1
             fi
+            if [ "$SUITE" = "integration" ] && [ -n "${{ inputs.test-file }}" ]; then
+              # A manually-named spec subset (LS-7883) isn't split by the
+              # weighted partitioner — force a single shard, mirroring the
+              # shared-live special case above.
+              echo "test-file supplied for the integration suite — forcing a single shard (named specs bypass shard-partition.ts)."
+              TOTAL=1
+            fi
             MATRIX=$(emit_shards "$SUITE" "$TOTAL" | jq -sc '.')
             echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           fi
@@ -719,17 +726,32 @@ jobs:
             SHARD_TOTAL="${SHARD_SPEC##*/}"
             export INTEGRATION_SHARD_CURRENT="$SHARD_INDEX"
             export INTEGRATION_SHARD_TOTAL="$SHARD_TOTAL"
-            if ! pnpm exec tsx apps/web-e2e/src/integration/shard-partition.ts \
-              --dir apps/web-e2e/src/integration/tests \
-              --weights apps/web-e2e/src/integration/integration-shard-weights.json \
-              --shards "$SHARD_TOTAL" --index "$SHARD_INDEX" \
-              > /tmp/integration-shard-specs.txt; then
-              echo "::error::Failed to compute weighted integration shard $SHARD_INDEX/$SHARD_TOTAL"
-              exit 1
+
+            if [ -n "$TEST_FILE" ]; then
+              # Manually-named spec subset (LS-7883): bypass shard-partition.ts
+              # and the weights manifest entirely — the prepare job already
+              # forces SHARD_TOTAL=1 whenever test-file is set for this suite,
+              # so there is nothing to partition. Word-split the same way the
+              # non-integration TEST_FILE branch below does.
+              read -ra TEST_FILE_ARGS <<< "$TEST_FILE"
+              for spec_file in "${TEST_FILE_ARGS[@]}"; do
+                INTEGRATION_SPEC_ARGS+=( "apps/web-e2e/src/integration/tests/$spec_file" )
+              done
+              echo "Named integration spec(s) (bypassing shard-partition.ts) → ${#INTEGRATION_SPEC_ARGS[@]} spec(s):"
+              printf '  - %s\n' "${INTEGRATION_SPEC_ARGS[@]}"
+            else
+              if ! pnpm exec tsx apps/web-e2e/src/integration/shard-partition.ts \
+                --dir apps/web-e2e/src/integration/tests \
+                --weights apps/web-e2e/src/integration/integration-shard-weights.json \
+                --shards "$SHARD_TOTAL" --index "$SHARD_INDEX" \
+                > /tmp/integration-shard-specs.txt; then
+                echo "::error::Failed to compute weighted integration shard $SHARD_INDEX/$SHARD_TOTAL"
+                exit 1
+              fi
+              mapfile -t INTEGRATION_SPEC_ARGS < /tmp/integration-shard-specs.txt
+              echo "Balanced integration shard $SHARD_INDEX/$SHARD_TOTAL → ${#INTEGRATION_SPEC_ARGS[@]} spec(s):"
+              printf '  - %s\n' "${INTEGRATION_SPEC_ARGS[@]}"
             fi
-            mapfile -t INTEGRATION_SPEC_ARGS < /tmp/integration-shard-specs.txt
-            echo "Balanced integration shard $SHARD_INDEX/$SHARD_TOTAL → ${#INTEGRATION_SPEC_ARGS[@]} spec(s):"
-            printf '  - %s\n' "${INTEGRATION_SPEC_ARGS[@]}"
 
             # Per-shard staggered start (LS-7867). The integration shards may
             # share a NAT egress IP on the self-hosted runners; without a stagger
