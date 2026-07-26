@@ -1286,7 +1286,7 @@ export function CommissionerToolsControl({
         borderRadius="$4"
       >
         <XStack alignItems="center" gap="$2">
-          <AlertTriangle size={14} color="#60A5FA" />
+          <AlertTriangle size={14} color="$brandGoldLight" />
           <Text fontSize="$2" color="$brandGoldLight">
             <Text fontWeight="700">Advanced Commissioner Tools</Text> — All
             actions are audit-logged and visible to other commissioners.
