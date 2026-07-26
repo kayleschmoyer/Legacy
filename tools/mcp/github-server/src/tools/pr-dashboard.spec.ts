@@ -8,11 +8,21 @@ jest.mock('../github-api', () => ({
   githubRest: jest.fn(),
 }));
 
+import { githubGraphQL } from '../github-api';
+import { getRepoOwnerName } from '../auth';
 import {
+  prDashboard,
   renderDashboardMarkdown,
   type DashboardPayload,
   type DashboardRow,
 } from './pr-dashboard';
+
+const mockedGraphQL = githubGraphQL as jest.MockedFunction<
+  typeof githubGraphQL
+>;
+const mockedRepo = getRepoOwnerName as jest.MockedFunction<
+  typeof getRepoOwnerName
+>;
 
 function row(overrides: Partial<DashboardRow>): DashboardRow {
   return {
@@ -53,6 +63,7 @@ function payload(rows: DashboardRow[]): DashboardPayload {
     },
     recommendBatchStatus: false,
     prs: rows,
+    truncated: false,
   };
 }
 
@@ -170,6 +181,7 @@ describe('renderDashboardMarkdown', () => {
       recommendBatchStatus: false,
       prs: [],
       message: 'No PRs found matching filters.',
+      truncated: false,
     };
     const md = renderDashboardMarkdown(p);
     expect(md).toContain('## PR Dashboard — 0 open, 0 draft, 0 blocked');
@@ -268,5 +280,167 @@ describe('renderDashboardMarkdown', () => {
     );
     // Pipe in title is escaped; newline collapsed to space.
     expect(md).toContain('feat(pipe\\|test): handle a \\| character in titles');
+  });
+
+  it('appends a truncation footer note when payload.truncated is true', () => {
+    const p = payload(FIXTURE_ROWS);
+    p.truncated = true;
+    const md = renderDashboardMarkdown(p);
+    expect(md).toContain(
+      'more PRs exist beyond this page — re-run with a higher limit or narrower filters',
+    );
+  });
+});
+
+// LS-8196: prDashboard() fetch-loop pagination (AC5/AC6) — modeled on
+// list-prs.spec.ts's page()/prNode() helpers and multi-page test shape.
+function prNode(overrides: Record<string, unknown> = {}) {
+  return {
+    number: 42,
+    title: 'feat(x): do the thing',
+    state: 'OPEN',
+    headRefName: 'claude/branch',
+    baseRefName: 'main',
+    author: { login: 'alice' },
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-02T00:00:00Z',
+    url: 'https://github.com/o/r/pull/42',
+    labels: { nodes: [] },
+    isDraft: false,
+    mergeable: 'MERGEABLE',
+    reviewDecision: 'APPROVED',
+    commits: { nodes: [{ commit: { oid: 'sha' } }] },
+    ...overrides,
+  };
+}
+
+function repoPage(
+  nodes: unknown[],
+  hasNextPage: boolean,
+  endCursor: string | null = null,
+) {
+  return {
+    data: {
+      repository: {
+        pullRequests: {
+          pageInfo: { hasNextPage, endCursor },
+          nodes,
+        },
+      },
+    },
+  };
+}
+
+function searchPage(
+  nodes: unknown[],
+  hasNextPage: boolean,
+  endCursor: string | null = null,
+) {
+  return {
+    data: {
+      search: {
+        pageInfo: { hasNextPage, endCursor },
+        nodes,
+      },
+    },
+  };
+}
+
+async function jsonPayload(
+  result: Awaited<ReturnType<typeof prDashboard>>,
+): Promise<DashboardPayload> {
+  return JSON.parse(result.content[0].text as string) as DashboardPayload;
+}
+
+describe('prDashboard fetch loop (LS-8196)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedRepo.mockResolvedValue({ owner: 'o', name: 'r' });
+  });
+
+  it('aggregates rows across multiple pages for the default (repository.pullRequests) path', async () => {
+    mockedGraphQL
+      .mockResolvedValueOnce(
+        repoPage(
+          [prNode({ number: 1 }), prNode({ number: 2 })],
+          true,
+          'c1',
+        ) as never,
+      )
+      .mockResolvedValueOnce(
+        repoPage(
+          [prNode({ number: 3 }), prNode({ number: 4 })],
+          false,
+        ) as never,
+      );
+
+    const result = await prDashboard({ limit: 10, format: 'json' });
+    const payload = await jsonPayload(result);
+
+    expect(payload.prs.map((p) => p.number).sort()).toEqual([1, 2, 3, 4]);
+    expect(payload.truncated).toBe(false);
+  });
+
+  it('flags truncated when the aggregated count reaches limit while hasNextPage is still true (default path)', async () => {
+    mockedGraphQL.mockResolvedValueOnce(
+      repoPage(
+        [prNode({ number: 1 }), prNode({ number: 2 })],
+        true,
+        'c1',
+      ) as never,
+    );
+
+    const result = await prDashboard({ limit: 2, format: 'json' });
+    const payload = await jsonPayload(result);
+
+    expect(payload.prs.map((p) => p.number)).toEqual([1, 2]);
+    expect(payload.truncated).toBe(true);
+  });
+
+  it('aggregates rows across multiple pages for the author-filtered search() path', async () => {
+    mockedGraphQL
+      .mockResolvedValueOnce(
+        searchPage(
+          [prNode({ number: 11 }), prNode({ number: 12 })],
+          true,
+          'c1',
+        ) as never,
+      )
+      .mockResolvedValueOnce(
+        searchPage(
+          [prNode({ number: 13 }), prNode({ number: 14 })],
+          false,
+        ) as never,
+      );
+
+    const result = await prDashboard({
+      author: 'alice',
+      limit: 10,
+      format: 'json',
+    });
+    const payload = await jsonPayload(result);
+
+    expect(payload.prs.map((p) => p.number).sort()).toEqual([11, 12, 13, 14]);
+    expect(payload.truncated).toBe(false);
+  });
+
+  it('flags truncated when the aggregated count reaches limit while hasNextPage is still true (search path)', async () => {
+    mockedGraphQL.mockResolvedValueOnce(
+      searchPage(
+        [prNode({ number: 11 }), prNode({ number: 12 })],
+        true,
+        'c1',
+      ) as never,
+    );
+
+    const result = await prDashboard({
+      author: 'alice',
+      limit: 2,
+      format: 'json',
+    });
+    const payload = await jsonPayload(result);
+
+    expect(payload.prs.map((p) => p.number)).toEqual([11, 12]);
+    expect(payload.truncated).toBe(true);
   });
 });

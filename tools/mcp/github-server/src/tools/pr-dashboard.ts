@@ -1,7 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { detectConflictSignals } from '../conflict-signals.js';
-import { githubGraphQL } from '../github-api.js';
+import { githubGraphQL, type GraphQLResult } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
 import type { CIPartition } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
@@ -34,6 +34,19 @@ interface PRNode {
   commits: {
     nodes: Array<{ commit: { oid: string } }>;
   };
+}
+
+interface PageInfo {
+  hasNextPage: boolean;
+  endCursor: string | null;
+}
+
+interface SearchPageResponse {
+  search: { pageInfo: PageInfo; nodes: PRNode[] };
+}
+
+interface RepoPageResponse {
+  repository: { pullRequests: { pageInfo: PageInfo; nodes: PRNode[] } } | null;
 }
 
 interface ReviewThreadCounts {
@@ -104,6 +117,15 @@ export interface DashboardPayload {
   note?: string;
   prs: DashboardRow[];
   message?: string;
+  /**
+   * True when more PRs matched the filters than were fetched — either the
+   * per-request fetch cap (FETCH_CAP) or `limit` was hit while GraphQL
+   * `pageInfo.hasNextPage` was still true. The dashboard never silently
+   * drops PRs without surfacing this (LS-8196).
+   */
+  truncated: boolean;
+  /** Cursor to resume from when `truncated` is true. */
+  nextCursor?: string;
 }
 
 // GraphQL state enum values
@@ -343,6 +365,11 @@ export function renderDashboardMarkdown(payload: DashboardPayload): string {
     extras.push(`${summary.withStaleChecks} PR(s) with stale checks`);
   }
   if (note) extras.push(note);
+  if (payload.truncated) {
+    extras.push(
+      'more PRs exist beyond this page — re-run with a higher limit or narrower filters',
+    );
+  }
   if (extras.length > 0) {
     lines.push('');
     lines.push(`_${extras.join(' · ')}_`);
@@ -355,6 +382,8 @@ export function renderDashboardMarkdown(payload: DashboardPayload): string {
 function buildPayload(
   rows: DashboardRow[],
   draftsExcluded: number,
+  truncated: boolean,
+  nextCursor?: string,
 ): DashboardPayload {
   const summary: DashboardSummary = {
     total: rows.length,
@@ -383,8 +412,16 @@ function buildPayload(
         }
       : {}),
     prs: rows,
+    truncated,
+    ...(nextCursor ? { nextCursor } : {}),
   };
 }
+
+// Per-page node count for the GraphQL fetch loop, mirroring list-prs.ts.
+const PAGE_SIZE = 100;
+// Hard cap on total PRs fetched across pages, bounding API cost for repos
+// with very large open-PR counts (LS-8196).
+const FETCH_CAP = 500;
 
 export async function prDashboard(
   params: PRDashboardParams,
@@ -401,6 +438,9 @@ export async function prDashboard(
 
     // If author filter is needed, use search query instead
     let prNodes: PRNode[];
+    let truncated = false;
+    let nextCursor: string | undefined;
+    const effectiveLimit = Math.min(limit, FETCH_CAP);
 
     if (params.author) {
       const queryParts = [
@@ -415,10 +455,12 @@ export async function prDashboard(
       if (params.label) {
         queryParts.push(`label:"${params.label.replace(/"/g, '\\"')}"`);
       }
+      const searchQueryStr = queryParts.join(' ');
 
       const searchQuery = `
-query($query: String!, $first: Int!) {
-  search(query: $query, type: ISSUE, first: $first) {
+query($query: String!, $first: Int!, $after: String) {
+  search(query: $query, type: ISSUE, first: $first, after: $after) {
+    pageInfo { hasNextPage endCursor }
     nodes {
       ... on PullRequest {
         number
@@ -443,18 +485,38 @@ query($query: String!, $first: Int!) {
     }
   }
 }`;
-      const result = await githubGraphQL<{
-        search: { nodes: PRNode[] };
-      }>(searchQuery, {
-        query: queryParts.join(' '),
-        first: limit,
-      });
-      prNodes = result.data.search.nodes.filter((n) => n.number != null);
+
+      const accumulated: PRNode[] = [];
+      let after: string | null = null;
+      while (accumulated.length < effectiveLimit) {
+        const pageSize = Math.min(
+          PAGE_SIZE,
+          effectiveLimit - accumulated.length,
+        );
+        const result: GraphQLResult<SearchPageResponse> =
+          await githubGraphQL<SearchPageResponse>(searchQuery, {
+            query: searchQueryStr,
+            first: pageSize,
+            after,
+          });
+        const page = result.data.search;
+        accumulated.push(...page.nodes.filter((n) => n.number != null));
+
+        if (!page.pageInfo.hasNextPage) break;
+        if (accumulated.length >= effectiveLimit) {
+          truncated = true;
+          nextCursor = page.pageInfo.endCursor ?? undefined;
+          break;
+        }
+        after = page.pageInfo.endCursor;
+      }
+      prNodes = accumulated;
     } else {
       const query = `
-query($owner: String!, $repo: String!, $first: Int!) {
+query($owner: String!, $repo: String!, $first: Int!, $after: String) {
   repository(owner: $owner, name: $repo) {
-    pullRequests(first: $first, states: [${statesStr}]${labelFilter}, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    pullRequests(first: $first, after: $after, states: [${statesStr}]${labelFilter}, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      pageInfo { hasNextPage endCursor }
       nodes {
         number
         title
@@ -478,20 +540,39 @@ query($owner: String!, $repo: String!, $first: Int!) {
     }
   }
 }`;
-      const result = await githubGraphQL<{
-        repository: { pullRequests: { nodes: PRNode[] } } | null;
-      }>(query, {
-        owner: repo.owner,
-        repo: repo.name,
-        first: limit,
-      });
-      if (result.data.repository == null) {
-        const warningMsg = result.warnings?.map((w) => w.message).join('; ');
-        throw new Error(
-          `GraphQL returned null repository${warningMsg ? `: ${warningMsg}` : ''}`,
+
+      const accumulated: PRNode[] = [];
+      let after: string | null = null;
+      while (accumulated.length < effectiveLimit) {
+        const pageSize = Math.min(
+          PAGE_SIZE,
+          effectiveLimit - accumulated.length,
         );
+        const result: GraphQLResult<RepoPageResponse> =
+          await githubGraphQL<RepoPageResponse>(query, {
+            owner: repo.owner,
+            repo: repo.name,
+            first: pageSize,
+            after,
+          });
+        if (result.data.repository == null) {
+          const warningMsg = result.warnings?.map((w) => w.message).join('; ');
+          throw new Error(
+            `GraphQL returned null repository${warningMsg ? `: ${warningMsg}` : ''}`,
+          );
+        }
+        const page = result.data.repository.pullRequests;
+        accumulated.push(...page.nodes);
+
+        if (!page.pageInfo.hasNextPage) break;
+        if (accumulated.length >= effectiveLimit) {
+          truncated = true;
+          nextCursor = page.pageInfo.endCursor ?? undefined;
+          break;
+        }
+        after = page.pageInfo.endCursor;
       }
-      prNodes = result.data.repository.pullRequests.nodes;
+      prNodes = accumulated;
     }
 
     // Filter out draft PRs when excludeDrafts is enabled (default: true)
@@ -520,6 +601,8 @@ query($owner: String!, $repo: String!, $first: Int!) {
         recommendBatchStatus: false,
         prs: [],
         message: 'No PRs found matching filters.',
+        truncated,
+        ...(nextCursor ? { nextCursor } : {}),
       };
       return {
         content: [
@@ -600,7 +683,7 @@ query($owner: String!, $repo: String!, $first: Int!) {
       };
     });
 
-    const payload = buildPayload(rows, draftsExcluded);
+    const payload = buildPayload(rows, draftsExcluded, truncated, nextCursor);
 
     return {
       content: [
