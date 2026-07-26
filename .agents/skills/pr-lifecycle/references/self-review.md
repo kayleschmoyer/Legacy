@@ -13,7 +13,10 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 
 1. **Gather the diff**
 
-   ```
+   Fetch `origin/main` first — a stale local ref makes the three-dot diff's merge-base wrong, which can balloon the diff to include unrelated files from other PRs merged upstream since this branch was created (LS-8379):
+
+   ```bash
+   git fetch origin main
    git diff origin/main...HEAD --stat
    git diff origin/main...HEAD
    ```
