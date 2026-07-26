@@ -1,8 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createSign } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { readGitRemoteUrl } from './git-config.js';
 import {
@@ -10,18 +8,17 @@ import {
   sanitizeErrorBody,
   withRetryOnAlreadyRunning,
 } from './http-retry.js';
+import { getRepoRoot } from './repo-root.js';
 
 export { sanitizeErrorBody } from './http-retry.js';
+// getRepoRoot lives in ./repo-root.js so its `import.meta.url` usage stays
+// out of CommonJS-compiled specs (LS-8322, mirroring the LS-5982 pattern) —
+// re-exported here for the one existing consumer (audit-session-bash.ts).
+export { getRepoRoot };
 
 const GITHUB_API = 'https://api.github.com';
 const DEFAULT_APP_ID = '3158619';
 const DEFAULT_INSTALLATION_ID = '118260223';
-
-/** Resolve the repository root from this script's location (tools/mcp/ci-server/src/). */
-export function getRepoRoot(): string {
-  const thisDir = resolve(fileURLToPath(import.meta.url), '..');
-  return resolve(thisDir, '..', '..', '..', '..');
-}
 
 // ---------------------------------------------------------------------------
 // GitHub App token generation (cloud environments)

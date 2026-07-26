@@ -36,14 +36,18 @@ broken before 2026-07-04). In cloud sandboxes `gh` is usually NOT
 installed, so the GitHub-API artifact download is not a fallback there —
 raw CI logs are the fallback of record. (Canary finding, 2026-07-04.)
 
-## 404s from `ci_get_playwright_report` may be a credentials gap (LS-8546)
+## 404s from `ci_get_playwright_report` may be a credentials gap (LS-8546, fixed in code by LS-8322)
 
 `bkrupa/legacy-sports-deploys` is **private**. The CI MCP server reads it with
-a token minted from `PREVIEW_APP_PRIVATE_KEY`/`PREVIEW_APP_ID` — but those
-vars are provisioned **nowhere** for the MCP server (they exist only as
-GitHub Actions secrets consumed by workflows). Every session therefore uses
-the fallback token, and whether reports fetch depends on what that fallback
-is:
+a token minted from `PREVIEW_APP_PRIVATE_KEY`/`PREVIEW_APP_ID`. LS-8322 wires
+those vars into the hosted Lambda's cold-start (a new `mcp-preview-app-token`
+Secrets Manager secret, fetched by `ensureCredentials()` in
+`tools/mcp/ci-server/src/lambda.ts`) — but that fix only takes effect once
+someone with AWS access runs `terraform apply`, seeds the new secret, and
+redeploys the `mcp-ci` Lambda (agents in cloud sessions generally can't do
+this themselves; see the LS-8322 PR body for the exact follow-up steps). Until
+that rollout happens, every hosted/cloud session still uses the fallback
+token, and whether reports fetch depends on what that fallback is:
 
 | Session class                            | Fallback token                                                 | Result                    |
 | ---------------------------------------- | -------------------------------------------------------------- | ------------------------- |

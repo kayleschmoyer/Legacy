@@ -404,6 +404,27 @@ resource "aws_secretsmanager_secret" "mcp_github_token" {
   tags = local.common_tags
 }
 
+# Preview/Deploy GitHub App credentials for the MCP CI server Lambda.
+# Read via PREVIEW_APP_TOKEN_SECRET_NAME at cold-start (lambda.ts
+# ensureCredentials()), which sets PREVIEW_APP_PRIVATE_KEY / PREVIEW_APP_ID so
+# getDeploysToken() (github-api.ts) mints a token scoped to the private
+# bkrupa/legacy-sports-deploys repo instead of falling back to the Agent
+# Author token, which cannot read it (LS-8322 — the mcp_github_token secret
+# above only covers bkrupa/legacy-sports). Same JSON shape as
+# mcp_github_token (app_id, private_key; installation_id unused here).
+# This is the SAME Preview/Deploy App already used as a GitHub Actions secret
+# by ci-pipeline.yml / deploy-pr-preview.yml / deploy-storybook.yml — this
+# only wires that existing credential into a new AWS secret for Lambda
+# consumption. Do not commit a plaintext secret version; seed it out-of-band
+# the same way as mcp_github_token above:
+#   node scratch/seed-preview-app-secret.mjs
+resource "aws_secretsmanager_secret" "mcp_preview_app_token" {
+  name        = "${var.environment}/mcp-preview-app-token"
+  description = "Preview/Deploy GitHub App credentials (app_id, private_key) for the MCP CI server Lambda's deploys-repo token"
+
+  tags = local.common_tags
+}
+
 # Rollbar post_server_item access token for server-side error tracking.
 # Previously passed as plaintext env var to every Lambda — migrated to Secrets
 # Manager so the token is no longer visible via Lambda GetFunctionConfiguration

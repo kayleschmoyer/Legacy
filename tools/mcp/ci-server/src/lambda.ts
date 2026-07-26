@@ -17,7 +17,55 @@ import {
 const sm = new SecretsManagerClient({});
 let credentialsInitialized = false;
 
-async function ensureCredentials(): Promise<void> {
+/**
+ * Fetch the Preview/Deploy App's credentials (PREVIEW_APP_TOKEN_SECRET_NAME)
+ * so `getDeploysToken()` in github-api.ts mints a token scoped to the private
+ * `bkrupa/legacy-sports-deploys` repo, instead of falling back to the Agent
+ * Author token, which cannot read that repo and produces a deterministic 404
+ * from `ci_get_playwright_report`/`ci_get_playwright_test_result` (LS-8322).
+ *
+ * Non-fatal by design: skips gracefully with a stderr warning when the env
+ * var is unset (keeps local/non-Lambda invocations working) or when the
+ * secret fetch/parse fails — a broken Preview App secret must not take down
+ * every other tool this Lambda serves.
+ */
+async function ensurePreviewAppCredentials(): Promise<void> {
+  const secretName = process.env['PREVIEW_APP_TOKEN_SECRET_NAME'];
+  if (!secretName) {
+    process.stderr.write(
+      'PREVIEW_APP_TOKEN_SECRET_NAME not configured — getDeploysToken() will ' +
+        'fall back to the Agent Author token, which cannot read the private ' +
+        'bkrupa/legacy-sports-deploys repo.\n',
+    );
+    return;
+  }
+  try {
+    const result = await sm.send(
+      new GetSecretValueCommand({ SecretId: secretName }),
+    );
+    const raw = result.SecretString?.trim();
+    if (!raw) {
+      throw new Error('missing SecretString or contains only whitespace');
+    }
+    const secret = JSON.parse(raw) as {
+      app_id?: string;
+      private_key?: string;
+    };
+    if (!secret.app_id || !secret.private_key) {
+      throw new Error('missing required fields: app_id, private_key');
+    }
+    process.env['PREVIEW_APP_PRIVATE_KEY'] = secret.private_key;
+    process.env['PREVIEW_APP_ID'] = secret.app_id;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `Failed to load Preview App credentials from secret "${secretName}": ${msg} — ` +
+        'getDeploysToken() will fall back to the Agent Author token.\n',
+    );
+  }
+}
+
+export async function ensureCredentials(): Promise<void> {
   if (credentialsInitialized) return;
   const secretName = process.env['GITHUB_TOKEN_SECRET_NAME'];
   if (!secretName) throw new Error('GITHUB_TOKEN_SECRET_NAME not configured');
@@ -49,6 +97,9 @@ async function ensureCredentials(): Promise<void> {
   if (secret.app_id) process.env['GITHUB_APP_ID'] = secret.app_id;
   if (secret.installation_id)
     process.env['GITHUB_INSTALLATION_ID'] = secret.installation_id;
+
+  await ensurePreviewAppCredentials();
+
   credentialsInitialized = true;
 }
 

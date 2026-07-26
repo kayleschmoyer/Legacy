@@ -31,7 +31,13 @@ resource "aws_iam_role_policy_attachment" "mcp_ci_lambda_basic" {
 }
 
 resource "aws_iam_policy" "mcp_ci_lambda_secrets" {
-  name        = "${local.name_prefix}-mcp-ci-lambda-secrets"
+  name = "${local.name_prefix}-mcp-ci-lambda-secrets"
+  # NOTE: `description` is immutable for aws_iam_policy (AWS UpdatePolicy has no
+  # description field) — Terraform marks it ForceNew, so editing this string
+  # forces a destroy+recreate of this policy (and its role attachment), with a
+  # brief window where the mcp-ci Lambda loses secret-read access. Left
+  # unchanged intentionally; only the `policy` Resource list below changes,
+  # which IS an in-place update (LS-8322).
   description = "Allows the MCP CI Lambda to read GitHub token and Rollbar token from Secrets Manager"
 
   policy = jsonencode({
@@ -43,6 +49,7 @@ resource "aws_iam_policy" "mcp_ci_lambda_secrets" {
         Resource = [
           aws_secretsmanager_secret.mcp_github_token.arn,
           aws_secretsmanager_secret.rollbar_access_token.arn,
+          aws_secretsmanager_secret.mcp_preview_app_token.arn,
         ]
       }
     ]
@@ -128,6 +135,7 @@ resource "aws_lambda_function" "mcp_ci" {
   environment {
     variables = {
       GITHUB_TOKEN_SECRET_NAME            = aws_secretsmanager_secret.mcp_github_token.name
+      PREVIEW_APP_TOKEN_SECRET_NAME       = aws_secretsmanager_secret.mcp_preview_app_token.name
       NODE_ENV                            = var.environment
       LOG_LEVEL                           = "info"
       AWS_NODEJS_CONNECTION_REUSE_ENABLED = "1"

@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import {
   describe,
   expect,
@@ -9,7 +10,7 @@ import {
 
 // http-retry.ts has no import.meta / auth dependencies, so it compiles cleanly
 // under the CommonJS spec tsconfig. We test the retry logic here rather than
-// importing github-api.ts directly (which would fail due to import.meta.url).
+// importing github-api.ts directly.
 import {
   fetchWithRetry,
   isAlreadyRunningError,
@@ -284,5 +285,132 @@ describe('withRetryOnAlreadyRunning', () => {
     expect(backoffDelays).toContain(20_000);
 
     setSpy.mockRestore();
+  });
+});
+
+// getRepoRoot's import.meta.url usage was extracted into ./repo-root.ts
+// (LS-8322), so github-api.ts itself now compiles under the CommonJS spec
+// tsconfig and can be imported directly below for getDeploysToken() coverage.
+// Mock the extracted module anyway (mirrors the LS-5982 pattern) since we
+// never exercise the repo-slug fallback path here.
+jest.mock('./repo-root', () => ({
+  getRepoRoot: jest.fn(() => '/tmp/repo-root-that-does-not-exist'),
+}));
+
+// ---------------------------------------------------------------------------
+// getDeploysToken (LS-8322)
+// ---------------------------------------------------------------------------
+
+const ENV_KEYS = [
+  'PREVIEW_APP_PRIVATE_KEY',
+  'PREVIEW_APP_ID',
+  'GH_TOKEN',
+  'GITHUB_TOKEN',
+  'AGENT_AUTHOR_APP_PRIVATE_KEY',
+] as const;
+
+function makeJsonResponse(status: number, body: unknown): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: jest.fn<() => Promise<unknown>>().mockResolvedValue(body),
+    text: jest
+      .fn<() => Promise<string>>()
+      .mockResolvedValue(JSON.stringify(body)),
+  } as unknown as Response;
+}
+
+describe('getDeploysToken (LS-8322)', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+  const savedFetch = global.fetch;
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
+    for (const key of ENV_KEYS) delete process.env[key];
+    jest.resetModules();
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    global.fetch = savedFetch;
+  });
+
+  it('mints a Preview-App-scoped token when PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID are configured', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env['PREVIEW_APP_PRIVATE_KEY'] = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+    process.env['PREVIEW_APP_ID'] = '999999';
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      // GET /repos/bkrupa/legacy-sports-deploys/installation
+      .mockResolvedValueOnce(makeJsonResponse(200, { id: 12345 }))
+      // POST /app/installations/12345/access_tokens
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'preview-app-scoped-token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      );
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { getDeploysToken, deploysTokenWasFallback } =
+      await import('./github-api.js');
+    const token = await getDeploysToken();
+
+    expect(token).toBe('preview-app-scoped-token');
+    expect(deploysTokenWasFallback()).toBe(false);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[0][0]).toContain(
+      '/repos/bkrupa/legacy-sports-deploys/installation',
+    );
+    expect(mockFetch.mock.calls[1][0]).toContain(
+      '/app/installations/12345/access_tokens',
+    );
+  });
+
+  it('falls back to getToken() when PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID are not configured', async () => {
+    delete process.env['PREVIEW_APP_PRIVATE_KEY'];
+    delete process.env['PREVIEW_APP_ID'];
+    process.env['GH_TOKEN'] = 'ghp_broad_fallback_token';
+
+    const mockFetch = jest.fn<typeof fetch>();
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { getDeploysToken, deploysTokenWasFallback } =
+      await import('./github-api.js');
+    const token = await getDeploysToken();
+
+    expect(token).toBe('ghp_broad_fallback_token');
+    expect(deploysTokenWasFallback()).toBe(true);
+    // GH_TOKEN short-circuits resolveToken() — no network calls needed.
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to getToken() when PREVIEW_APP installation discovery fails', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env['PREVIEW_APP_PRIVATE_KEY'] = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+    process.env['PREVIEW_APP_ID'] = '999999';
+    process.env['GH_TOKEN'] = 'ghp_broad_fallback_token';
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch.mockResolvedValueOnce(
+      makeJsonResponse(404, { message: 'Not Found' }),
+    );
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { getDeploysToken, deploysTokenWasFallback } =
+      await import('./github-api.js');
+    const token = await getDeploysToken();
+
+    expect(token).toBe('ghp_broad_fallback_token');
+    expect(deploysTokenWasFallback()).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
