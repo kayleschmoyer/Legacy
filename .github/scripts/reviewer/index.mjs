@@ -1674,5 +1674,18 @@ main().catch((err) => {
   process.stderr.write(
     `[reviewer] Unexpected error: ${err instanceof Error ? err.message : String(err)}\n`,
   );
-  process.exit(0);
+  // LS-8299: best-effort leave a terminal bot-review status so review.yml's
+  // invariant check can distinguish this crash from a never-resolving
+  // pending. Never let this fail silently mask the real exit code below.
+  const sha = process.env.PR_HEAD_SHA;
+  if (sha) {
+    try {
+      setCommitStatus(sha, 'failure', 'Review crashed unexpectedly');
+    } catch (statusErr) {
+      process.stderr.write(
+        `[reviewer] Failed to set bot-review failure after crash: ${statusErr instanceof Error ? statusErr.message : String(statusErr)}\n`,
+      );
+    }
+  }
+  process.exit(1);
 });

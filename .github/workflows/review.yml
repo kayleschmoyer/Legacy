@@ -22,6 +22,14 @@ name: Reviewer (W1)
 # normal queue path. merge-to-parent is a manual escape hatch (merge a child
 # into its parent branch ahead of the parent landing) and is never applied by
 # automation.
+#
+# Crash visibility (LS-8299): "Run reviewer" keeps continue-on-error so a
+# crashed run doesn't itself fail the job — but the always() step that
+# follows it enforces the invariant that every run leaves a terminal
+# (success/failure) bot-review status. If the reviewer step failed AND left
+# bot-review missing or pending, that step fails the job visibly. Known/handled
+# failure modes (e.g. the rate-limit path, which already sets bot-review to a
+# terminal failure) are unaffected and stay exactly as visible as before.
 
 on:
   pull_request:
@@ -106,6 +114,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_CI_ARTIFACTS_ROLE_ARN || 'arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts' }}
           aws-region: us-east-1
       - name: Run reviewer
+        id: run-reviewer
         continue-on-error: true
         env:
           GEMINI_CODE_REVIEW_API_KEY: ${{ secrets.GEMINI_CODE_REVIEW_API_KEY }}
@@ -127,3 +136,15 @@ jobs:
           else
             echo "Skipping reviewer: .github/scripts/reviewer/index.mjs not found."
           fi
+      - name: Fail visibly on unrecovered reviewer crash
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+        run: |
+          sha="${{ github.event.pull_request.head.sha }}"
+          state=$(gh api "repos/${{ github.repository }}/commits/$sha/status" --jq '.statuses[]? | select(.context=="bot-review") | .state' | head -1)
+          if [ "${{ steps.run-reviewer.outcome }}" = "failure" ] && { [ -z "$state" ] || [ "$state" = "pending" ]; }; then
+            echo "::error::Reviewer crashed on $sha and left bot-review as '${state:-<none>}' instead of a terminal status (LS-8299 invariant broken)"
+            exit 1
+          fi
+          echo "bot-review=${state:-<none>}, run-reviewer outcome=${{ steps.run-reviewer.outcome }} - invariant holds"
