@@ -4,26 +4,32 @@
 
 This document is the **authoritative, human-owned statement of which features
 belong to which subscription tier.** It captures product _intent_ — the
-decisions made by the team about what is free and what is premium — independent
-of how the code happens to enforce it today.
+decisions made by the team about what is free and what is premium.
 
 > **Why this file exists.** Feature gating intent was previously implied by
 > scattered `PremiumGate` overlays and resolver checks added piecemeal. That let
 > intent drift (features marketed as premium with no billing object behind them;
 > a fundamental feature accidentally gated). This document is the single place
-> the team decides tiering. **Code and Stripe conform to this file, not the
-> other way around.** When intent changes, edit this file first, then update
-> `ENTITLEMENTS` and the gates to match.
+> the team records tiering intent.
+>
+> **The _runtime_ source of truth is Stripe, not this file.** As of epic
+> [LS-8638](https://legacy-sports.atlassian.net/browse/LS-8638), what a customer
+> can actually access is decided by their **live Stripe entitlements**, minted
+> into the JWT at login/refresh and enforced against that token claim (see
+> [How gating is enforced](#how-gating-is-enforced-runtime) below). This doc and
+> the Stripe dashboard configuration should agree; when they diverge, Stripe is
+> authoritative for access and this doc must be corrected to match reality.
 
 ## How the layers connect
 
-- **This doc** = intent (free vs. premium per feature) — owned by Product.
-- **`ENTITLEMENTS`** in [`lib/utils/src/lib/entitlements.ts`](../../lib/utils/src/lib/entitlements.ts) = the machine-readable key per premium feature. `TIER_ENTITLEMENTS` maps tiers → keys.
-- **Stripe** = billing. The `seed-stripe` CLI ([`apps/cli/src/commands/seedStripe.ts`](../../apps/cli/src/commands/seedStripe.ts)) derives Stripe Features directly from `ENTITLEMENTS`, so every key here is provisioned automatically.
-- **Backend gates** = `requireEntitlement(ctx, ENTITLEMENTS.x)` / `hasEntitlement(...)` in resolvers (the real enforcement).
+- **This doc** = product intent (free vs. premium per feature) — owned by Product.
+- **Stripe** = the runtime source of truth. A Product's attached Features (per price/plan) decide which entitlement `lookup_key`s a customer holds. The `seed-stripe` CLI ([`apps/cli/src/commands/seedStripe.ts`](../../apps/cli/src/commands/seedStripe.ts)) provisions a Stripe Feature for every catalog key, but which features a _plan_ unlocks is Stripe-dashboard configuration.
+- **`ENTITLEMENTS`** in [`lib/utils/src/lib/entitlements.ts`](../../lib/utils/src/lib/entitlements.ts) = the code **catalog** — the machine keys (1:1 with Stripe Feature `lookup_key`s) plus `ENTITLEMENT_LABELS`. It is the shared vocabulary for gate call sites and the Stripe seed; it is **not** a tier→feature policy map (the former `TIER_ENTITLEMENTS` array that fanned a coarse tier out to keys was deleted in LS-8638 — Stripe now owns which plan grants which feature).
+- **JWT entitlement claim** = the live Stripe `lookup_key` set, minted into the token by the oauth-proxy at login and refresh. This is what non-admin gates read.
+- **Backend gates** = `requireEntitlement(ctx, ENTITLEMENTS.x)` / `hasEntitlement(...)` (fast path, reads the token claim) or `requireFreshEntitlement(...)` (fresh from live Stripe, for sensitive ops) in resolvers — the real enforcement.
 - **Frontend gates** = `PremiumGate` + `useHasEntitlement(ENTITLEMENTS.x)` (web) / the mobile equivalent in `useSubscription.ts`. These are UX upsell surfaces; they are NOT a security boundary.
 
-To change a feature's tier: edit the table below → add/remove its key in `TIER_ENTITLEMENTS` → adjust the resolver gate and the `useHasEntitlement` call. The Stripe seed and the marketing comparison table should then be re-synced.
+To change a feature's tier: attach/detach its Stripe **Feature** on the plan in the Stripe dashboard — **no code deploy** — then update the table below and the marketing comparison table to match. Access changes after each user's next token refresh (see force-expiry below). The `ENTITLEMENTS` catalog key and the gate call site stay in code; you only add/remove them when introducing or retiring a _capability_, not when re-pricing an existing one.
 
 ## Tiers
 
@@ -34,9 +40,58 @@ To change a feature's tier: edit the table below → add/remove its key in `TIER
 
 Free tier includes **up to 3 active leagues** and **2 mock drafts/week**; Premium lifts both limits.
 
+## How gating is enforced (runtime)
+
+Enacted by epic [LS-8638](https://legacy-sports.atlassian.net/browse/LS-8638). The
+model is **JWT-carried, Stripe-driven entitlements with per-user force-expiry**:
+
+1. **Mint from live Stripe.** At login (`createJwt`) and refresh (`RefreshJwt`) the
+   oauth-proxy reads the customer's live
+   `stripe.entitlements.activeEntitlements.list`, filters to the code catalog, and
+   embeds the resulting `lookup_key` array as an `entitlements` claim in the JWT
+   ([`lambdas/oauth-proxy/src/util/jwt.ts`](../../lambdas/oauth-proxy/src/util/jwt.ts)).
+   A free user / user with no Stripe customer mints an **empty claim** and is gated
+   out of every premium feature. On a persistent Stripe read failure the mint falls
+   back per the epic's Resolved Decision #1 (refresh carries the prior claim forward;
+   a fresh login fails closed to empty and self-heals on the next refresh).
+2. **Non-admin enforcement reads the token claim (fast path).**
+   `hasEntitlement(ctx, key)` / `requireEntitlement(ctx, key)` in
+   [`lambdas/db/src/schema/authorization.ts`](../../lambdas/db/src/schema/authorization.ts)
+   return true iff `key` is in the token's claim — **no per-request Stripe call**.
+3. **Force-expiry of stale tokens.** A per-user
+   `app_internal.users.entitlements_updated_at` marker is bumped by the Stripe webhook
+   on any tier/entitlement change ([`lambdas/stripe-webhook/src/index.ts`](../../lambdas/stripe-webhook/src/index.ts)).
+   When a gate finds the token's `iat` older than that marker, it throws a GraphQL
+   error with `extensions.code = "ENTITLEMENTS_STALE"` (distinct from
+   `UNAUTHENTICATED`). The web/app Apollo error link intercepts it, calls the
+   oauth-proxy `RefreshJwt` endpoint to re-mint a token with fresh entitlements + a
+   new `iat`, and retries the operation once; the proactive `subscription_updated`
+   notification triggers the same silent refresh so most changes propagate before any
+   request is rejected. If refresh/retry still fails, the client treats the user as
+   free (fail-safe) and prompts re-login.
+4. **Admin + sensitive ops validate fresh from Stripe.** Admin callers are
+   all-entitled for reads (admin _authority_ for admin-only actions is re-checked
+   fresh via `requireAdmin`). Any irreversible or financial/commissioner operation
+   tied to a paid capability bypasses the token entirely and reads live Stripe via
+   `requireFreshEntitlement` ([`lambdas/db/src/schema/fresh-entitlements.ts`](../../lambdas/db/src/schema/fresh-entitlements.ts)),
+   so a change that has not yet propagated into a refreshed token cannot be exploited
+   inside the refresh window. The concrete gated mutations are enumerated in
+   [Fresh-validation call sites](#fresh-validation-call-sites-sensitive-ops).
+5. **`subscription_tier` is a coarse billing-state cache** (Stripe webhook →
+   `users.subscription_tier`), **not** the entitlement source of truth. It still
+   governs the free-tier league limit (3) and downgrade side-effects; the local
+   grace period (`STRIPE_GRACE_PERIOD_DAYS`, default 7) governs `subscription_tier` +
+   downgrade timing only. Entitlements themselves follow Stripe's live
+   `activeEntitlements` as-is (no local entitlement grace override).
+
+The `ENTITLEMENTS` catalog and every gate call site remain in code (1:1 with Stripe
+Feature `lookup_key`s). There is **no local `user_entitlements` cache/projection
+table** — that approach was explicitly rejected in LS-8638 as a drift risk;
+entitlements live in the JWT and are re-minted from Stripe.
+
 ## Feature → tier matrix
 
-Legend for **Enforcement**: 🔒 server-enforced (resolver gate) · 🖥️ UI-gated only (no server resolver yet — see notes) · ➖ limit-based.
+Legend for **Enforcement**: 🔒 server-enforced (resolver gate) · 🖥️ UI-gated only (no server resolver yet — see notes) · ➖ limit-based. Sensitive league-configuration writes marked 🔒 validate **fresh from Stripe** (`requireFreshEntitlement`), not the token claim — see [Fresh-validation call sites](#fresh-validation-call-sites-sensitive-ops).
 
 ### Premium features
 
@@ -75,6 +130,25 @@ Legend for **Enforcement**: 🔒 server-enforced (resolver gate) · 🖥️ UI-g
 | Career & season stats                          | Free     | Authenticated, all tiers (deliberate — see `football.ts` `careerStats` note, LS-6248).                                                                                                                                                                      |
 | Assistant manager invites (team collaboration) | Free     | Unlimited assistant-manager invites per team, no cap or entitlement — collaboration/delegation features (assistant manager, and any future co-commissioner role) are explicit non-premium decisions, not a marketed Stripe entitlement (LS-6030 / BTD-007). |
 
+## Fresh-validation call sites (sensitive ops)
+
+Per the epic's fresh-validation rule, irreversible / financial / commissioner
+operations tied to a paid capability read **live Stripe** (`requireFreshEntitlement`)
+rather than trusting the token claim. The current call sites, all in
+[`lambdas/db/src/schema/leagues/mutations.ts`](../../lambdas/db/src/schema/leagues/mutations.ts):
+
+| Mutation                        | Fresh-validated entitlement(s)                                                                                  | Trigger                                                                                                                               |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `createLeagueAndTeams` (create) | `faab_waiver_type`, `salary_cap_leagues`, `auction_draft`, `advanced_scheduling`, `historical_era_filters`      | Creating a league with FAAB waivers, salary cap, auction draft, custom in-division ratio, a non-free era, or a Hall-of-Fame-only pool |
+| `updateLeagueSettings`          | `advanced_playoff_formats`, `salary_cap_leagues`, `faab_waiver_type`                                            | Switching to a 6/8-team playoff format, enabling/editing salary-cap fields, or switching to FAAB waivers / setting a FAAB budget      |
+| `renewLeague`                   | `faab_waiver_type`, `salary_cap_leagues`, `historical_era_filters`, `advanced_playoff_formats`, `auction_draft` | Carrying forward any of these premium settings when retiring a league into a new season (a downgraded owner must re-qualify)          |
+
+The free-tier **league cap** (3 active non-mock leagues) gates on `unlimited_leagues`
+via the **fast path** (`hasEntitlement`) in `createLeague`, `createLeagueAndTeams`,
+`renewLeague`, and the join guards (`joinLeagueByCode` / `joinPublicLeague`) — it is a
+soft product limit, not an irreversible paid-feature write, so it does not use the
+fresh-from-Stripe path.
+
 ## Enforcement gaps to close (tracked work)
 
 The 🖥️ rows above are tracked in Stripe and gated in the UI, but have **no
@@ -98,6 +172,7 @@ matrix becomes fully 🔒:
 
 | Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-26 | **Rewrote the enforcement framing to the JWT-carried, Stripe-driven model (LS-8646, epic [LS-8638](https://legacy-sports.atlassian.net/browse/LS-8638)).** Docs-only, no feature moved tiers. Stripe (via the live entitlements minted into the JWT), not this file, is now the runtime source of truth for access. Documented mint-at-login/refresh, non-admin token-claim enforcement, `ENTITLEMENTS_STALE` force-expiry + silent client refresh, fresh-from-Stripe validation for sensitive league-config mutations, and `subscription_tier` as a coarse billing-state cache. Dropped all `TIER_ENTITLEMENTS`-as-policy language (the array was deleted by LS-8643) and clarified there is no local entitlements cache table (rejected as a drift risk).                                                                                                                                                                                                                            |
 | 2026-07-22 | **Removed all injury-related tiering (LS-8604 / LS-8610).** Product decision: Legacy Sports is a historical-data platform — players cannot get injured — so every injury feature is being removed. Dropped the "Football injury status badge" Free row, the planned "Expert injury analysis" (`expert_injury_analysis`) row (never in `ENTITLEMENTS` or Stripe, so no billing cleanup), and "injury status" from the `advanced_search_filters` scope (the resolver-side filter arg is removed by the LS-8604 code tickets). Marketing copy touting "no injuries" is intentionally kept — it supports the historical-only positioning.                                                                                                                                                                                                                                                                                                                                                  |
 | 2026-07-22 | Recorded assistant-manager invites (team collaboration) as an explicit Free decision (LS-6030 / BTD-007). QA flagged the feature's flat parity as a possible missed upsell opportunity; product decision is that collaboration/delegation features are not premium — no entitlement key exists or is planned for this.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-07-07 | Added `advanced_scheduling` (LS-6106 / CLB-014). Marketing already positioned "advanced scheduling" as a Premium capability but no control existed — the create-league UI showed 3 fixed strategies regardless of tier. Premium users creating a Divisional-strategy league can now set a custom in-division vs out-of-division game ratio; free users are unaffected and the default 100% in-division split (existing behavior) is unchanged when unset.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |

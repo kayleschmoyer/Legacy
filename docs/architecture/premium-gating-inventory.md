@@ -5,8 +5,17 @@
 > human-owned product source of truth). This file is the original audit that
 > motivated it — kept for the gap analysis and history. For "what tier is feature
 > X", read the product doc, not this one.
+>
+> **Enforcement model:** as of epic
+> [LS-8638](https://legacy-sports.atlassian.net/browse/LS-8638), entitlements are
+> minted into the JWT from live Stripe at login/refresh and enforced against that
+> token claim (fresh-from-Stripe for sensitive ops), with a per-user
+> `entitlements_updated_at` marker force-expiring stale tokens. See
+> [How premium gating works here](#how-premium-gating-works-here-the-three-layers)
+> and the product doc's
+> [runtime enforcement section](../product/subscription-tiers.md#how-gating-is-enforced-runtime).
 
-**Generated:** 2026-06-13
+**Generated:** 2026-06-13 · **Enforcement model updated:** 2026-07-26 (LS-8646)
 **Purpose:** Catalogue every feature that is presented or enforced as "premium"
 across the codebase and reconcile it against the Stripe entitlements that are
 actually provisioned. Flags the gaps where something is gated in the product
@@ -16,38 +25,65 @@ but has **no backing Stripe entitlement** (or no backend enforcement at all).
 
 ## How premium gating works here (the three layers)
 
-1. **Stripe entitlements (source of truth for billing).** The canonical set
-   lives in [`lib/utils/src/lib/entitlements.ts`](../../lib/utils/src/lib/entitlements.ts)
-   as the `ENTITLEMENTS` map. The `seed-stripe` CLI command
-   ([`apps/cli/src/commands/seedStripe.ts`](../../apps/cli/src/commands/seedStripe.ts))
-   **derives** the Stripe Feature list directly from that map, so every key in
-   `ENTITLEMENTS` is guaranteed to have a matching Stripe Feature `lookup_key`.
-   There is exactly **one product** (`Legacy Sports Premium`) with two prices
-   (`premium_monthly` $4.99, `premium_annual` $39.99) and all features attached.
+> **Model update (LS-8638, enforced by LS-8643/8644):** entitlements are now
+> **carried in the JWT**, minted from live Stripe at login/refresh, and enforced
+> against that token claim for non-admin ops (fresh-from-Stripe for sensitive
+> ops). The description below reflects the shipped model. The gap analysis that
+> follows (Gap A / Gap B) is preserved from the 2026-06-13 audit for history — it
+> predates the cutover and describes billing-coverage gaps, which are orthogonal
+> to _how_ a held entitlement is enforced.
 
-2. **Backend enforcement (GraphQL resolvers).** Resolvers call
-   `requireEntitlement(ctx, ENTITLEMENTS.x)` / `hasEntitlement(...)` (preferred),
-   or the legacy `requirePremium(ctx)` (raw tier check, no entitlement key) from
+1. **Stripe entitlements (runtime source of truth).** Which features a customer's
+   plan unlocks is **Stripe-dashboard configuration** — the Features attached to the
+   Product/price. At login (`createJwt`) and refresh (`RefreshJwt`) the oauth-proxy
+   reads the customer's live `stripe.entitlements.activeEntitlements.list` and mints
+   the matching `lookup_key`s into the JWT as an `entitlements` claim
+   ([`lambdas/oauth-proxy/src/util/jwt.ts`](../../lambdas/oauth-proxy/src/util/jwt.ts)).
+   The code owns only the **catalog** —
+   [`lib/utils/src/lib/entitlements.ts`](../../lib/utils/src/lib/entitlements.ts)'s
+   `ENTITLEMENTS` map (machine keys, 1:1 with Stripe Feature `lookup_key`s). The
+   `seed-stripe` CLI ([`apps/cli/src/commands/seedStripe.ts`](../../apps/cli/src/commands/seedStripe.ts))
+   provisions one Stripe Feature per catalog key. There is exactly **one product**
+   (`Legacy Sports Premium`) with two prices (`premium_monthly` $4.99,
+   `premium_annual` $39.99). The former `TIER_ENTITLEMENTS` array that fanned a coarse
+   tier out to feature keys in code was **deleted** by LS-8643 — Stripe, not code,
+   decides which plan grants which feature. There is **no local entitlements cache
+   table** (rejected in LS-8638 as a drift risk).
+
+2. **Backend enforcement (GraphQL resolvers).** Non-admin gates
+   `requireEntitlement(ctx, ENTITLEMENTS.x)` / `hasEntitlement(...)` read the token's
+   entitlement claim (fast path, no per-request Stripe call), from
    [`lambdas/db/src/schema/authorization.ts`](../../lambdas/db/src/schema/authorization.ts).
-   Tier is read from `app_internal.users.subscription_tier`; admins are treated
-   as premium.
+   A per-user `app_internal.users.entitlements_updated_at` marker (bumped by the Stripe
+   webhook) force-expires a token whose `iat` predates it: the gate throws
+   `ENTITLEMENTS_STALE`, and the client silently refreshes the JWT and retries.
+   Sensitive / irreversible operations instead call `requireFreshEntitlement(...)`
+   ([`lambdas/db/src/schema/fresh-entitlements.ts`](../../lambdas/db/src/schema/fresh-entitlements.ts)),
+   which reads live Stripe and ignores the token. `subscription_tier`
+   (`app_internal.users.subscription_tier`) is retained only as a coarse billing-state
+   cache (free-tier league limit + downgrade side-effects); admins are treated as
+   premium for reads. The legacy `requirePremium(ctx)` (raw tier check, no entitlement
+   key) remains for coarse cases.
 
 3. **Frontend gates (`PremiumGate` upsell overlays).** Purely presentational —
    they blur/overlay content and show an "Upgrade" CTA based on an `isPremium`
    boolean and a free-text `featureName` string. **A `PremiumGate` is NOT tied
    to an entitlement key** and does not, by itself, enforce anything server-side.
 
-The headline risk the audit confirms: **layers 2 and 3 contain "premium"
-features that do not exist in layer 1**, and one Stripe entitlement is enforced
-nowhere.
+The headline risk the original audit confirmed: **layers 2 and 3 contained "premium"
+features that did not exist in layer 1** (no Stripe billing object), and one Stripe
+entitlement was enforced nowhere. Those billing-coverage findings are recorded below.
 
 ---
 
 ## 1. Stripe entitlements (provisioned & auto-synced)
 
-These 8 keys are in `ENTITLEMENTS`, attached to the premium tier in
-`TIER_ENTITLEMENTS`, and seeded into Stripe by `seedStripe.ts`. Billing coverage
-for these is **guaranteed** (the seed derives from the same map).
+These 8 keys are in the `ENTITLEMENTS` catalog and seeded into Stripe by
+`seedStripe.ts`, and each is attached to the premium plan in the Stripe dashboard
+(post-LS-8638, plan→feature attachment is Stripe config, not a code-side
+`TIER_ENTITLEMENTS` map). Billing coverage for these is **guaranteed** (the seed
+derives from the same catalog); a customer on the premium plan receives them in
+their JWT entitlement claim at login/refresh.
 
 | Entitlement key             | Label                               | Backend enforced? | Where                                                            |
 | --------------------------- | ----------------------------------- | ----------------- | ---------------------------------------------------------------- |
