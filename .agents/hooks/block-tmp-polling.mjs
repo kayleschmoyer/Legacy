@@ -10,6 +10,12 @@
  * The fix is to wait for the push notification that signals task completion
  * rather than reading intermediate output. This hook enforces that contract.
  *
+ * Allowlisted (LS-8377 / LS-8389 — paths the harness itself directs agents to Read):
+ *  - Background-task output files (tasks/<id>.output): the Bash and TaskOutput
+ *    tool docs both say to Read these directly.
+ *  - The session's designated scratchpad directory (.../scratchpad/): the system
+ *    prompt designates it for temporary files agents write and read back.
+ *
  * Exits 2 to block the Read call.
  */
 
@@ -39,12 +45,25 @@ const TMP_CLAUDE = /[/\\]tmp[/\\]claude|[/\\]Temp[/\\]claude/i;
 
 if (!TMP_CLAUDE.test(filePath)) process.exit(0);
 
+// Allowlist: paths under /tmp/claude* the harness explicitly tells agents to Read.
+const ALLOWED = [
+  // Harness background-task output files — Bash/TaskOutput docs direct agents
+  // to Read them directly (LS-8377)
+  /[/\\]tasks[/\\][^/\\]+\.output$/i,
+  // The session's designated scratchpad directory (LS-8389)
+  /[/\\]scratchpad([/\\]|$)/i,
+];
+
+if (ALLOWED.some((pattern) => pattern.test(filePath))) process.exit(0);
+
 process.stdout.write(
-  `[POLLING BLOCKED] Do not read task output files while they are running.\n\n` +
+  `[POLLING BLOCKED] Do not poll harness-internal files under /tmp/claude*.\n\n` +
     `Reading ${filePath} returns partial output that causes agents to\n` +
     `loop waiting for more data, stalling mid-validation.\n\n` +
     `Instead: wait for the push notification that fires when the background\n` +
     `task completes. It will surface the full result without polling.\n\n` +
+    `Allowed paths: a background task's tasks/<id>.output file and the\n` +
+    `session's designated scratchpad directory — this path is neither.\n` +
     `If you need to check on a running task, use TaskGet({ taskId }) to read\n` +
     `its current status — not the raw output file.\n`,
 );
