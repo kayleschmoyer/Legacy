@@ -21,8 +21,8 @@ export interface LeagueSettingsControlProps {
   /** Sport for the league — determines per-sport gamesPerMatchup bounds. Defaults to 'baseball'. */
   sport?: string;
   draftStatus?: string | null;
-  currentGamesPerMatchup: number;
-  currentSpStartsPerMatchup: number;
+  currentGamesPerMatchup?: number;
+  currentSpStartsPerMatchup?: number;
   currentMinCareerGames?: number;
   currentMinCareerSeasons?: number;
   currentTotalMatchups?: number;
@@ -87,8 +87,8 @@ export function LeagueSettingsControl({
   leagueId,
   sport = 'baseball',
   draftStatus,
-  currentGamesPerMatchup,
-  currentSpStartsPerMatchup,
+  currentGamesPerMatchup = 1,
+  currentSpStartsPerMatchup = 1,
   currentMinCareerGames = 50,
   currentMinCareerSeasons = 3,
   currentTotalMatchups = 10,

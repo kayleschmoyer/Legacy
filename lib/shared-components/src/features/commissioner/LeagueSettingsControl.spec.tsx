@@ -235,3 +235,21 @@ describe('LeagueSettingsControl — bounded numeric inputs (LS-8660)', () => {
     expect(input).toHaveValue('10');
   });
 });
+
+/**
+ * Regression guard for LS-8656: tapping the Settings tab crashed with
+ * "TypeError: Cannot convert undefined value to object" because
+ * currentGamesPerMatchup/currentSpStartsPerMatchup had no defaults, unlike
+ * every other prop on this component. A caller that omits them (e.g. a
+ * host screen that hasn't loaded league data yet) must not crash.
+ */
+describe('LeagueSettingsControl — safe defaults for required matchup props (LS-8656)', () => {
+  it('renders without throwing when currentGamesPerMatchup/currentSpStartsPerMatchup are omitted', () => {
+    expect(() =>
+      render(<LeagueSettingsControl leagueId={1} sport="baseball" />),
+    ).not.toThrow();
+
+    expect(screen.getByLabelText('Games per matchup')).toHaveValue('1');
+    expect(screen.getByLabelText('SP starts per matchup')).toHaveValue('1');
+  });
+});
