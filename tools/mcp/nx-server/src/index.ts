@@ -109,7 +109,7 @@ server.tool(
 // ALLOWED_TARGETS in tools/run-target.ts (the canonical enforcement source).
 server.tool(
   'nx_run',
-  'Prefer this over `pnpm exec nx run <project>:<target>` via shell. Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format. ' +
+  'Prefer this over `pnpm exec nx run <project>:<target>` via shell. Run an Nx target on a project. Allowed: build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, integration, storybook, format. Colon-suffixed variants of an allowed target (e.g. test:web, test:mobile) are also accepted. ' +
     'Fast targets return pass/fail output in one call. A run still going after ~45s returns { status: "running", jobId } instead of blocking into the ~60s MCP transport timeout — call nx_job_wait({ jobId }) to continue waiting; do NOT re-run (re-invoking joins the in-flight run).',
   {
     project: z.string().describe('Project name'),

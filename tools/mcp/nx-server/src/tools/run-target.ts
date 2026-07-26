@@ -28,6 +28,17 @@ const ALLOWED_TARGETS = new Set([
 ]);
 
 /**
+ * A target is allowed if it exactly matches an entry in ALLOWED_TARGETS
+ * (e.g. "deploy:plan"), or if it is a colon-suffixed sub-variant of an
+ * allowed base target (e.g. "test:web" is a variant of the allowed "test").
+ * Exported for unit testing.
+ */
+export function isTargetAllowed(target: string): boolean {
+  if (ALLOWED_TARGETS.has(target)) return true;
+  return target.includes(':') && ALLOWED_TARGETS.has(target.split(':')[0]);
+}
+
+/**
  * Shell metacharacters that must not appear in passthrough args.
  *
  * On Windows, pnpm is a `.cmd` batch script that requires `shell: true`
@@ -135,7 +146,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     };
   }
 
-  if (!ALLOWED_TARGETS.has(params.target)) {
+  if (!isTargetAllowed(params.target)) {
     return {
       content: [
         {
@@ -151,6 +162,12 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     const runSpec = params.configuration
       ? `${params.project}:${params.target}:${params.configuration}`
       : `${params.project}:${params.target}`;
+
+    // Jest-specific arg handling (--all injection, --updateSnapshot) applies
+    // equally to colon-suffixed test variants (test:web, test:mobile,
+    // test:stories) since they are @nx/jest:jest executors too.
+    const isTestTarget =
+      params.target === 'test' || params.target.startsWith('test:');
 
     const nxArgs = ['run', runSpec];
     if (params.noCache) nxArgs.push('--skip-nx-cache');
@@ -193,7 +210,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       // Without this, jest's --onlyChanged filters out files that haven't been
       // modified in git, causing "0 tests found" even with an explicit pattern.
       if (
-        params.target === 'test' &&
+        isTestTarget &&
         translated.some((t) => t.startsWith('--testPathPatterns'))
       ) {
         if (!translated.some((t) => t === '--all' || t === '--onlyChanged')) {
@@ -202,13 +219,13 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       }
 
       nxArgs.push('--', ...translated);
-    } else if (params.updateSnapshot && params.target === 'test') {
+    } else if (params.updateSnapshot && isTestTarget) {
       // No extra args provided — still need the -- separator for --updateSnapshot.
       nxArgs.push('--');
     }
 
     // Append --updateSnapshot after all other Jest flags when requested.
-    if (params.updateSnapshot && params.target === 'test') {
+    if (params.updateSnapshot && isTestTarget) {
       nxArgs.push('--updateSnapshot');
     }
 
