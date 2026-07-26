@@ -43,6 +43,7 @@ import {
   waitForJob,
 } from './jobs';
 import { rebaseOntoMain } from './rebase-onto-main';
+import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitish } from './resolve-commitish';
 import {
   type BranchEntry,
@@ -1149,7 +1150,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_commit',
       description:
-        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Auto-appends Co-Authored-By.',
+        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Auto-appends Co-Authored-By.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1189,6 +1190,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'boolean',
             description:
               'When combined with amend: true, passes --reset-author to git commit. Use this in cloud sessions to fix the commit author (git config user.email + --reset-author). Has no effect without amend: true.',
+          },
+          addAll: {
+            type: 'boolean',
+            description:
+              "When combined with amend: true and no explicit files, stages tracked-modified AND untracked files (git add -A) before amending, instead of the default tracked-only git add -u — use this to fold newly-added files into the amended commit without enumerating every path. Has no effect without amend: true, and is ignored whenever files is provided (files already stages exactly the given paths, tracked or untracked — use it instead of addAll for surgical control). Default: false, preserving today's tracked-only amend behavior.",
           },
         },
         required: [],
@@ -2131,7 +2137,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           items: {
             type: 'array',
             description:
-              'Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor.',
+              'Per-worktree commit specs (max 50). Each item accepts the same fields as worktree_commit: worktree (ticket key, path, or branch), message, files, amend, resetAuthor, addAll.',
             items: {
               type: 'object',
               properties: {
@@ -2162,6 +2168,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
                   type: 'boolean',
                   description:
                     'Reset commit author when amending. Same semantics as worktree_commit.resetAuthor.',
+                },
+                addAll: {
+                  type: 'boolean',
+                  description:
+                    'Fold untracked files into an amended commit (git add -A instead of git add -u). Same semantics as worktree_commit.addAll.',
                 },
               },
               required: ['worktree'],
@@ -2901,6 +2912,7 @@ const handleCallTool = async (
         worktreeId,
         amend,
         resetAuthor,
+        addAll,
       } = args as {
         message?: string;
         files?: unknown;
@@ -2909,6 +2921,7 @@ const handleCallTool = async (
         worktreeId?: unknown;
         amend?: boolean;
         resetAuthor?: boolean;
+        addAll?: boolean;
       };
       // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
       // from older documentation or habit).
@@ -3251,12 +3264,14 @@ const handleCallTool = async (
           }
 
           // Check for dangerous files in the would-be-staged set.
-          // When amending we use `git add -u` (tracked only), so untracked
-          // files (lines starting with "??") are NOT staged — exclude them
-          // from the danger scan to avoid false positives.
+          // When amending without addAll we use `git add -u` (tracked only),
+          // so untracked files (lines starting with "??") are NOT staged —
+          // exclude them from the danger scan to avoid false positives.
+          // With addAll they WILL be staged (git add -A), so they must be
+          // scanned like any other file.
           const changedFiles = status
             .split('\n')
-            .filter((l) => l && !(amend && l.startsWith('??')))
+            .filter((l) => l && !(amend && !addAll && l.startsWith('??')))
             .map((l) => l.slice(3).trim())
             .filter(Boolean);
           for (const f of changedFiles) {
@@ -3276,14 +3291,15 @@ const handleCallTool = async (
           }
 
           if (amend) {
-            // Reset the index to HEAD first, then restage only tracked changes.
-            // This removes any previously-staged untracked files that
-            // git add -u alone would leave in the index, preventing stray
-            // files from corrupting the amended commit.
+            // Reset the index to HEAD first, then restage per addAll: by
+            // default only tracked changes (git add -u), removing any
+            // previously-staged untracked files so stray files can't
+            // corrupt the amended commit; with addAll, untracked files are
+            // restaged too (git add -A), folding them into the amend.
             if (headExists) {
               runGit(['reset', 'HEAD', '--'], cwd);
             }
-            runGit(['add', '-u'], cwd);
+            runGit(resolveAmendAddArgs(addAll ?? false), cwd);
           } else {
             runGit(['add', '-A'], cwd);
           }
