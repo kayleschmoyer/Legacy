@@ -39,6 +39,12 @@ Drive to merge per AGENTS.md. A task is complete only when the PR is MERGED and 
 
 **mcp-gaps / client-bugs / generic (per-child chip):** use the canonical work-ticket chip template in [dispatch-modes.md](dispatch-modes.md) Parent Dispatch Mode step 5 verbatim — the per-child workflow is the same as a standalone leaf ticket.
 
+## Gotcha: filing GAP bugs under a bucket's own Story
+
+Some bucket tickets (e.g. an umbrella Story like "Feature Discovery Gaps Bucket") word their own acceptance criteria as "file GAP-### bugs as a child of this Story." Doing that literally — `jira_create_ticket({ type: "Bug", parent: "<story-key>" })` — 400s with `"Please select valid parent issue"`: Jira's hierarchy only allows an **Epic** to parent a Bug/Task, never a Story (LS-8481). `jira_create_ticket`'s error response now includes a `hint` field pointing at the workaround when it detects this case.
+
+The established workaround (see LS-7607 → LS-7657/LS-7658): parent the GAP bug to the bucket's **page Epic** instead, then link it to the bucket Story with `jira_link_issues({ inwardKey: "<gap-bug-key>", outwardKey: "<story-key>", linkType: "Relates" })`. Full mechanics: [plan-ticket's umbrella grouping pattern](../../plan-ticket/references/create.md#umbrella-grouping-pattern).
+
 ## Scope skip-list (when fanning out)
 
 Skip a child during fan-out when **any** of these are true:

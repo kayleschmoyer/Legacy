@@ -166,6 +166,22 @@ export async function createTicket(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
+    // Jira's issue-type hierarchy only allows an Epic to parent a Task/Bug —
+    // a Story cannot (they're peers). Bucket-epic GAP-filing conventions
+    // routinely ask agents to parent a Bug/Task to a Story, which 400s with
+    // this exact message and no guidance (LS-8481). Surface the known
+    // workaround instead of leaving the agent to rediscover it by trial and
+    // error.
+    const isInvalidParentError = message.includes(
+      'Please select valid parent issue',
+    );
+    const hint =
+      parent &&
+      (resolvedType === 'Task' || resolvedType === 'Bug') &&
+      isInvalidParentError
+        ? `Jira only allows an Epic to parent a ${resolvedType} — a Story cannot (they're peers in the hierarchy). If "${parent}" is a Story, parent this ticket to its bucket Epic instead, then run jira_link_issues({ inwardKey: "<new-key>", outwardKey: "${parent}", linkType: "Relates" }) to associate it with "${parent}". See the umbrella grouping pattern: .agents/skills/plan-ticket/references/create.md#umbrella-grouping-pattern.`
+        : undefined;
+
     return {
       isError: true,
       content: [
@@ -174,6 +190,7 @@ export async function createTicket(
           text: JSON.stringify({
             success: false,
             error: message,
+            ...(hint ? { hint } : {}),
           }),
         },
       ],

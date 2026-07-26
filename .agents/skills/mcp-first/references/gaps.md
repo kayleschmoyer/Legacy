@@ -140,3 +140,4 @@ After a deep audit, summarize:
 - **Overflow != gap** — if the tool works with correct parameters, fix the docs, not the tool
 - **No `console.*`** — MCP servers use `process.stderr.write`; never `console.log`
 - **Test manually** if possible — restart the MCP server and invoke the new tool to verify
+- **A Bug/Task cannot parent to a Story** — if the bucket epic's ACs say to file GAP bugs "as a child of this Story," parenting directly 400s (`"Please select valid parent issue"`). Parent to the bucket Epic instead and `jira_link_issues(..., linkType: "Relates")` to the Story. See [bucket-epic-routing.md](../../work-ticket/references/bucket-epic-routing.md#gotcha-filing-gap-bugs-under-a-buckets-own-story) (LS-8481).

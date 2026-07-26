@@ -108,3 +108,65 @@ describe('createTicket — issuetype mapping (LS-7852)', () => {
     expect(createBody().fields.parent).toEqual({ key: 'LS-7853' });
   });
 });
+
+describe('createTicket — invalid Story-parent hint (LS-8481)', () => {
+  const invalidParentError = new Error(
+    'Jira API POST /rest/api/3/issue failed (400): {"errors":{"parent":"Please select valid parent issue.","parentId":"Please select valid parent issue."}}',
+  );
+
+  it('adds a workaround hint when a Bug/Task 400s parenting to a Story', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'POST' && opts.path === '/rest/api/3/issue') {
+          return Promise.reject(invalidParentError);
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await createTicket({
+      summary: 'GAP bug',
+      type: 'Bug',
+      parent: 'LS-7595',
+    });
+
+    const parsed = parse(result);
+    expect(parsed['success']).toBe(false);
+    expect(parsed['hint']).toContain('LS-7595');
+    expect(parsed['hint']).toContain('linkType: "Relates"');
+  });
+
+  it('does not add a hint for unrelated 400s or non-Bug/Task types', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'POST' && opts.path === '/rest/api/3/issue') {
+          return Promise.reject(new Error('Jira API POST failed (400): boom'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const unrelatedResult = await createTicket({
+      summary: 'Unrelated failure',
+      type: 'Bug',
+      parent: 'LS-7595',
+    });
+    expect(parse(unrelatedResult)['hint']).toBeUndefined();
+
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'POST' && opts.path === '/rest/api/3/issue') {
+          return Promise.reject(invalidParentError);
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const storyResult = await createTicket({
+      summary: 'Story-to-story attempt',
+      type: 'Story',
+      parent: 'LS-7595',
+    });
+    expect(parse(storyResult)['hint']).toBeUndefined();
+  });
+});
