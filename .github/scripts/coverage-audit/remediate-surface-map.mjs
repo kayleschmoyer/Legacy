@@ -311,6 +311,10 @@ export function renderPrBody(
   { runUrl, maxChars = MAX_PR_BODY_CHARS } = {},
 ) {
   const headerLines = [
+    '<!-- jira-link',
+    'primary: none',
+    '-->',
+    '',
     'Automated, **additive-only** surface-map update proposed by the ' +
       'auto-remediation bot (LS-7851), closing the loop on the nightly drift ' +
       'auditor (LS-7850).',

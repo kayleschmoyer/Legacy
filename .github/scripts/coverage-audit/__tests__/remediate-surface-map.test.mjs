@@ -324,6 +324,16 @@ describe('renderPrBody', () => {
     assert.match(body, /Never auto-merged/i);
     assert.match(body, /Review notes/);
   });
+
+  it('leads with exactly one jira-link marker declaring primary: none (LS-8338)', () => {
+    // The PR carries the no-jira label but Jira Link Check also requires the
+    // body to declare the marker — without it, assertion 1 in
+    // jira-link-check.mjs fails every night.
+    const body = renderPrBody({ e2e: [], integration: [] }, {});
+    assert.match(body, /^<!-- jira-link\nprimary: none\n-->\n/);
+    const markers = [...body.matchAll(/<!--\s*jira-link\b/gi)];
+    assert.equal(markers.length, 1);
+  });
 });
 
 describe('renderPrBody size cap (LS-7908)', () => {
