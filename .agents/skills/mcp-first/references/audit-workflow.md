@@ -138,18 +138,20 @@ These are pre-classified by the script at high confidence:
 
 Operations that were previously routed through `worktree_run` but now have dedicated tools. Flag these as `missing-awareness` if observed in a session transcript.
 
-| Pattern                                                    | Dedicated tool                                        |
-| ---------------------------------------------------------- | ----------------------------------------------------- |
-| `worktree_run(command: "git stash")`                       | `worktree_stash({ message? })`                        |
-| `worktree_run(command: "git stash pop")`                   | `worktree_stash_pop()`                                |
-| `worktree_run(command: "git rm <file>")`                   | `worktree_rm({ path: "<file>" })`                     |
-| `worktree_run(command: "git reset HEAD -- <files>")`       | `worktree_unstage({ files: ["<file>"] })`             |
-| `worktree_run(command: "git ls-files <path>")`             | `worktree_is_tracked({ paths: ["<path>"] })`          |
-| `worktree_run(command: "git check-ignore <path>")`         | `worktree_check_ignore({ paths: ["<path>"] })`        |
-| `worktree_run(command: "git fetch origin")`                | `worktree_fetch()`                                    |
-| `worktree_run(command: "git fetch origin <branch>")`       | `worktree_fetch({ branch: "<branch>" })`              |
-| `worktree_run(command: "git push --set-upstream ...")`     | `worktree_push({ setUpstream: true })`                |
-| `worktree_run(command: "git fetch && git merge-base ...")` | `worktree_fetch()` then `worktree_run` for merge-base |
+| Pattern                                                       | Dedicated tool                                                  |
+| ------------------------------------------------------------- | --------------------------------------------------------------- |
+| `worktree_run(command: "git stash")`                          | `worktree_stash({ message? })`                                  |
+| `worktree_run(command: "git stash pop")`                      | `worktree_stash_pop()`                                          |
+| `worktree_run(command: "git rm <file>")`                      | `worktree_rm({ path: "<file>" })`                               |
+| `worktree_run(command: "git reset HEAD -- <files>")`          | `worktree_unstage({ files: ["<file>"] })`                       |
+| `worktree_run(command: "git ls-files <path>")`                | `worktree_is_tracked({ paths: ["<path>"] })`                    |
+| `worktree_run(command: "git check-ignore <path>")`            | `worktree_check_ignore({ paths: ["<path>"] })`                  |
+| `worktree_run(command: "git ls-files -s <path>")`             | `worktree_file_mode({ paths: ["<path>"] })`                     |
+| `worktree_run(command: "git update-index --chmod=+x <path>")` | `worktree_set_executable({ path: "<path>", executable: true })` |
+| `worktree_run(command: "git fetch origin")`                   | `worktree_fetch()`                                              |
+| `worktree_run(command: "git fetch origin <branch>")`          | `worktree_fetch({ branch: "<branch>" })`                        |
+| `worktree_run(command: "git push --set-upstream ...")`        | `worktree_push({ setUpstream: true })`                          |
+| `worktree_run(command: "git fetch && git merge-base ...")`    | `worktree_fetch()` then `worktree_run` for merge-base           |
 
 **Remaining legitimate `worktree_run` uses** (no dedicated tool exists; do NOT flag these):
 

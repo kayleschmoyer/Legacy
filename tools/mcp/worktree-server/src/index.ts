@@ -34,6 +34,10 @@ import { homedir, tmpdir } from 'node:os';
 import { scanStagedForConflictMarkers } from './conflict-markers';
 import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
 import {
+  executeWorktreeFileMode,
+  executeWorktreeSetExecutable,
+} from './file-mode-utils';
+import {
   type JobSnapshot,
   listJobs,
   MAX_WAIT_MS,
@@ -1520,6 +1524,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         'worktree_fetch (git fetch), worktree_stash/worktree_stash_pop (git stash), ' +
         'worktree_unstage (git reset HEAD --), worktree_rm (git rm / file deletion), ' +
         'worktree_is_tracked (git ls-files), worktree_check_ignore (git check-ignore), ' +
+        'worktree_file_mode / worktree_set_executable (git ls-files -s / git update-index --chmod), ' +
         'worktree_commit (git add + commit), worktree_push (git push), ' +
         'worktree_status (git status), worktree_diff (git diff), ' +
         'worktree_reset (git reset), worktree_reflog (git reflog). ' +
@@ -2286,6 +2291,61 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
         },
         required: ['paths'],
+      },
+    },
+    {
+      name: 'worktree_file_mode',
+      description:
+        'Read the git index mode (100644 or 100755) of one or more tracked paths ' +
+        '(git ls-files -s). Answers "is this file executable in the index?" without ' +
+        'falling back to raw `git ls-files -s` via Bash. Paths not tracked by git are ' +
+        'reported with tracked: false rather than erroring.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          paths: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'One or more file paths to check (maximum 100). Relative to the worktree root.',
+            minItems: 1,
+            maxItems: 100,
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: ['paths'],
+      },
+    },
+    {
+      name: 'worktree_set_executable',
+      description:
+        "Set or clear the executable bit on a tracked file's git index mode " +
+        '(git update-index --chmod=+x|-x). MCP alternative to running ' +
+        '`git update-index --chmod` via Bash. The path must already be tracked ' +
+        '(commit or stage it first) — git update-index --chmod fails on untracked paths.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          path: {
+            type: 'string',
+            description: 'File path to modify. Relative to the worktree root.',
+          },
+          executable: {
+            type: 'boolean',
+            description:
+              'true to set the executable bit (100755), false to clear it (100644).',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: ['path', 'executable'],
       },
     },
     {
@@ -9795,6 +9855,39 @@ const handleCallTool = async (
           },
         ],
       };
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_file_mode
+    // -----------------------------------------------------------------------
+    case 'worktree_file_mode': {
+      const { paths, worktree: wtKey } = args as {
+        paths: string[];
+        worktree?: string;
+      };
+      return executeWorktreeFileMode(
+        { paths, worktree: wtKey },
+        { resolveTargetDir, runGit },
+      );
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_set_executable
+    // -----------------------------------------------------------------------
+    case 'worktree_set_executable': {
+      const {
+        path: filePath,
+        executable,
+        worktree: wtKey,
+      } = args as {
+        path: string;
+        executable: boolean;
+        worktree?: string;
+      };
+      return executeWorktreeSetExecutable(
+        { path: filePath, executable, worktree: wtKey },
+        { resolveTargetDir, runGit },
+      );
     }
 
     // -----------------------------------------------------------------------
