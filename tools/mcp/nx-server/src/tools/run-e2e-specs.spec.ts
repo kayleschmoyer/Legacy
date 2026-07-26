@@ -362,6 +362,65 @@ describe('runE2ESpecs', () => {
     });
   });
 
+  // --- Windows spawn shape (LS-7836) ---
+
+  describe('Windows spawn shape', () => {
+    const originalPlatform = process.platform;
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+    });
+
+    it('spawns plain pnpm through a shell on Windows (not pnpm.cmd with no shell)', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+
+      await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
+
+      const opts = jobCallOpts();
+      expect(opts.command).toBe('pnpm');
+      expect(opts.shell).toBe(true);
+    });
+
+    it('escapes shell-metacharacter args via escapeCmdShellArg on Windows', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+
+      await runE2ESpecs({
+        specs: ['src/tests/auth.spec.ts'],
+        project: 'Mobile Chrome',
+      });
+
+      expect(jobCallOpts().args).toContain('"--project=Mobile Chrome"');
+    });
+
+    it('spawns plain pnpm with shell:false on non-Windows platforms', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true,
+      });
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+
+      await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
+
+      const opts = jobCallOpts();
+      expect(opts.command).toBe('pnpm');
+      expect(opts.shell).toBe(false);
+    });
+  });
+
   // --- Integration mode ---
 
   describe('integration mode', () => {
