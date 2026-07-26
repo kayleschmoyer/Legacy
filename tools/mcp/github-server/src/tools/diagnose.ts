@@ -101,6 +101,30 @@ async function fetchFailingCheckRuns(
   );
 }
 
+/**
+ * Reduce a PR's review history to each reviewer's most recent review.
+ *
+ * GraphQL's `reviews` connection returns every review ever submitted, so a
+ * reviewer who requested changes and later approved shows up twice. Without
+ * this dedup, a stale CHANGES_REQUESTED review outlives the reviewer's
+ * actual (approved) state indefinitely (LS-8364).
+ */
+function latestReviewsByAuthor(
+  reviews: NonNullable<
+    PRStateResponse['repository']['pullRequest']
+  >['reviews']['nodes'],
+): typeof reviews {
+  const seen = new Map<string, (typeof reviews)[number]>();
+  for (const review of reviews) {
+    const key = review.author?.login ?? 'unknown';
+    const existing = seen.get(key);
+    if (!existing || review.submittedAt > existing.submittedAt) {
+      seen.set(key, review);
+    }
+  }
+  return [...seen.values()];
+}
+
 type BlockReason =
   | 'DRAFT'
   | 'MERGE_CONFLICT'
@@ -167,7 +191,7 @@ function deriveReason(
       nextAction: 'Fix the failing tests/checks, then push.',
     };
   }
-  const changesRequested = pr.reviews.nodes.some(
+  const changesRequested = latestReviewsByAuthor(pr.reviews.nodes).some(
     (r) => r.state === 'CHANGES_REQUESTED',
   );
   if (changesRequested) {

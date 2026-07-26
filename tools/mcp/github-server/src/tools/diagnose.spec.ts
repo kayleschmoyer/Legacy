@@ -182,6 +182,61 @@ describe('diagnose', () => {
     expect(payload.failingJobs).toHaveLength(1);
   });
 
+  it('returns CHANGES_REQUESTED when the latest review from a reviewer requests changes', async () => {
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: {
+          pullRequest: {
+            ...BASE_PR,
+            reviews: {
+              nodes: [
+                {
+                  author: { login: 'bot' },
+                  state: 'CHANGES_REQUESTED',
+                  submittedAt: '2026-07-07T16:30:33Z',
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.reason).toBe('CHANGES_REQUESTED');
+  });
+
+  it('does not report stale CHANGES_REQUESTED once the same reviewer later approves (LS-8364)', async () => {
+    mockGithubGraphQL.mockResolvedValue({
+      data: {
+        repository: {
+          pullRequest: {
+            ...BASE_PR,
+            reviewDecision: 'APPROVED',
+            reviews: {
+              nodes: [
+                {
+                  author: { login: 'bot' },
+                  state: 'CHANGES_REQUESTED',
+                  submittedAt: '2026-07-07T16:30:33Z',
+                },
+                {
+                  author: { login: 'bot' },
+                  state: 'APPROVED',
+                  submittedAt: '2026-07-07T16:50:50Z',
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.reason).not.toBe('CHANGES_REQUESTED');
+    expect(payload.reason).toBe('READY');
+  });
+
   it('returns MERGED for merged PRs', async () => {
     mockGithubGraphQL.mockResolvedValue({
       data: { repository: { pullRequest: { ...BASE_PR, state: 'MERGED' } } },
