@@ -16,6 +16,7 @@ import {
   useGetPublicLeaguesQuery,
   useJoinPublicLeagueMutation,
 } from '@legacy-sports/graphql';
+import { formatDraftStatusForBadge } from '@legacy-sports/shared-components/utils';
 import { useIsMounted } from '../../common/hooks/useIsMounted';
 
 const DRAFT_STATUS_FILTERS = ['All', 'Open', 'Queued', 'In Progress'] as const;
@@ -184,7 +185,9 @@ export default function LeagueDiscoveryScreen() {
                     borderRadius="$2"
                     fontWeight="600"
                   >
-                    {league.draftStatus ?? 'Open'}
+                    {league.draftStatus
+                      ? formatDraftStatusForBadge(league.draftStatus)
+                      : 'Open'}
                   </Text>
                   {league.playerPool && (
                     <Text

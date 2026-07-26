@@ -34,20 +34,27 @@ export function formatDraftStatusForCard(status?: string | null): string {
 }
 
 /**
- * Format a raw draft status string for inline badge display.
+ * Format a raw draft status string for inline badge display. `weekNumber`
+ * refines the 'completed' case to "Week N" once the season is underway.
+ *
+ * This is the canonical badge-label mapping — Browse Leagues, Home, and
+ * Baseball Home all render through it so a given status reads the same
+ * everywhere (LS-8635).
  */
-export function formatDraftStatusForBadge(status?: string | null): string {
+export function formatDraftStatusForBadge(
+  status?: string | null,
+  weekNumber?: number | null,
+): string {
   if (!status) return 'Unknown';
 
   switch (status) {
     case 'not-started':
-      return 'Pre-Draft';
     case 'queued':
-      return 'Queued';
+      return 'Draft Scheduled';
     case 'in-progress':
       return 'Drafting';
     case 'completed':
-      return 'Season Active';
+      return weekNumber ? `Week ${weekNumber}` : 'In Season';
     default:
       return status.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   }

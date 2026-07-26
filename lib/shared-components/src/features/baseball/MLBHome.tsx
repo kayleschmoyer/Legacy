@@ -30,6 +30,7 @@ import {
   withAlpha,
   YELLOW,
 } from '../../utils/colors';
+import { formatDraftStatusForBadge } from '../../utils/draftStatus';
 
 export interface MLBHomeLeague {
   id: number | string;
@@ -130,17 +131,18 @@ function getLeagueBadge(
       text: '$gray11',
     };
   }
+  const label = formatDraftStatusForBadge(draftStatus, weekNumber);
   switch (draftStatus) {
     case 'in-progress':
       return {
-        label: 'Drafting',
+        label,
         bg: withAlpha(BRAND_NAVY, 0.18),
         border: withAlpha(BRAND_NAVY, 0.45),
         text: BRAND_GOLD_LIGHT,
       };
     case 'completed':
       return {
-        label: weekNumber ? `Week ${weekNumber}` : 'In Season',
+        label,
         bg: withAlpha(GREEN, 0.14),
         border: withAlpha(GREEN, 0.36),
         text: '$green11',
@@ -148,18 +150,14 @@ function getLeagueBadge(
     case 'queued':
     case 'not-started':
       return {
-        label: 'Draft Scheduled',
+        label,
         bg: withAlpha(AMBER_LIGHT, 0.12),
         border: withAlpha(AMBER_LIGHT, 0.3),
         text: '$orange11',
       };
     default:
       return {
-        label: draftStatus
-          ? draftStatus
-              .replace('-', ' ')
-              .replace(/\b\w/g, (l) => l.toUpperCase())
-          : 'Unknown',
+        label,
         bg: withAlpha(SLATE_400, 0.12),
         border: withAlpha(SLATE_400, 0.3),
         text: '$gray11',

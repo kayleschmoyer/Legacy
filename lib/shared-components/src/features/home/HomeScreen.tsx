@@ -325,7 +325,7 @@ function PhaseChip({
     bg = withAlpha(GREEN, 0.12);
     textColor = GREEN_LIGHTER;
   } else if (isPreDraft) {
-    label = 'Pre-Draft';
+    label = 'Draft Scheduled';
     bg = withAlpha(BRAND_GOLD, 0.12);
     textColor = BRAND_GOLD_LIGHT;
   } else {
