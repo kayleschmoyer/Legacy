@@ -197,7 +197,7 @@ These rules apply to both leaf and parent tickets:
 | Transition               | When                                                                                                                                                  |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | To Do -> In Progress     | Work begins (after blocker check passes)                                                                                                              |
-| In Progress -> In Review | PR is created, marked ready, Copilot review requested, and PR activity subscribed                                                                     |
+| In Progress -> In Review | PR is created, marked ready, and PR activity subscribed                                                                                               |
 | In Review -> Done        | PR is merged. Usually handled automatically by Jira Branch Sync on merge — fall back to `jira_transition(key: "LS-####", status: "Done")` if it lags. |
 
 The skill shepherds the PR all the way to "merged" (Leaf Mode step 9). It does NOT exit at "In Review".
