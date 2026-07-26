@@ -72,9 +72,20 @@ describe('runTarget — runInBackground: true', () => {
     writeFileSync(join(workDir, 'Makefile'), 'kill-stale:\n\t@echo ok\n');
   });
 
-  afterAll(() => {
-    rmSync(workDir, { recursive: true, force: true });
-  });
+  afterAll(async () => {
+    // format/codegen jobs (LS-7903) spawn real make processes for undefined
+    // targets; the job runner's tree-kill (taskkill /T on Windows) fires
+    // asynchronously, so the node grandchild can briefly outlive the job and
+    // hold workDir open. Outwait it, then retry the removal to absorb any
+    // EBUSY tail — same pattern as the "default path" describe block below.
+    await new Promise((r) => setTimeout(r, 2_000));
+    rmSync(workDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 500,
+    });
+  }, 15_000);
 
   // Background mode calls startMakeInBackground (real make process), not runMake.
   it('returns status: running and a jobId immediately', async () => {
@@ -119,6 +130,30 @@ describe('runTarget — runInBackground: true', () => {
     expect(body.success).toBe(false);
     expect(waitResult.isError).toBe(true);
   }, 20_000);
+
+  it('uses the 600000ms heavy-target default timeout for format (LS-7903)', async () => {
+    const result = await runTarget({
+      target: 'format',
+      worktreePath: workDir,
+      runInBackground: true,
+    });
+    expect(result.isError).toBeFalsy();
+    const body = payload(result);
+    expect(body.status).toBe('running');
+    expect(body.timeoutMs).toBe(600_000);
+  });
+
+  it('uses the 600000ms heavy-target default timeout for codegen (LS-7903)', async () => {
+    const result = await runTarget({
+      target: 'codegen',
+      worktreePath: workDir,
+      runInBackground: true,
+    });
+    expect(result.isError).toBeFalsy();
+    const body = payload(result);
+    expect(body.status).toBe('running');
+    expect(body.timeoutMs).toBe(600_000);
+  });
 });
 
 describe('runTarget — default path (budgeted background job)', () => {

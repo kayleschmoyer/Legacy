@@ -205,6 +205,10 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
     'full-check',
     'dev-setup',
     'ami-build',
+    // format runs prettier across the whole monorepo and codegen runs GraphQL
+    // codegen across the workspace — both can exceed 300s on a cold cache (LS-7903).
+    'format',
+    'codegen',
     // runner-apply runs terraform plan + apply which can take 10+ minutes.
     // It also has an interactive confirmation prompt — always pass NO_CONFIRM=1
     // via the variables parameter to avoid blocking on stdin (execFile has no tty).

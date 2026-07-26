@@ -55,7 +55,7 @@ server.tool(
       .describe(
         'Process-level timeout in milliseconds (runaway backstop — NOT a transport guard). ' +
           'Defaults: 600000 (10 min) for heavy targets ' +
-          '(pc, pre-commit, build-all, test-all, install, full-check, dev-setup, ami-build, runner-apply), ' +
+          '(pc, pre-commit, build-all, test-all, install, full-check, dev-setup, ami-build, runner-apply, format, codegen), ' +
           '300000 (5 min) for all others. ' +
           'Pass 900000 for make pc on a cold cache. ' +
           'On timeout, the result carries { timedOut: true } with the captured output.',
