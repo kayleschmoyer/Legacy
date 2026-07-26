@@ -30,6 +30,24 @@ interface JwtDecoded {
   expiresAt: Date | null;
 }
 
+const MAX_JWT_SEGMENT_JSON_LENGTH = 65536;
+
+function parseSafeJson(json: string): Record<string, unknown> {
+  if (typeof json !== 'string') {
+    throw new Error('Invalid JWT: decoded segment is not a string');
+  }
+  if (json.length > MAX_JWT_SEGMENT_JSON_LENGTH) {
+    throw new Error(
+      'Invalid JWT: decoded segment exceeds maximum allowed size',
+    );
+  }
+  const parsed: unknown = JSON.parse(json);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('Invalid JWT: decoded segment is not a JSON object');
+  }
+  return parsed as Record<string, unknown>;
+}
+
 function decodeJwtParts(token: string): JwtDecoded {
   const parts = token.trim().split('.');
   if (parts.length !== 3) {
@@ -45,7 +63,7 @@ function decodeJwtParts(token: string): JwtDecoded {
         .map((c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`)
         .join(''),
     );
-    return JSON.parse(json) as Record<string, unknown>;
+    return parseSafeJson(json);
   };
 
   const header = decodeBase64Url(parts[0]);
