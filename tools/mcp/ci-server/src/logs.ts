@@ -253,6 +253,22 @@ function isAbortError(err: unknown): boolean {
   return false;
 }
 
+/** Result of {@link fetchRunLogs} — log text plus how much of the run it actually covered. */
+export interface FetchRunLogsResult {
+  text: string;
+  /** Number of jobs whose logs were actually fetched and included in `text`. */
+  jobsSearched: number;
+  /** Total number of jobs in the run's scope (post jobName filter, pre failedOnly/MAX_LOG_JOBS filtering). */
+  jobsTotal: number;
+  /**
+   * True when `failedOnly` (the default) filtered every job out of scope —
+   * i.e. jobs existed but none were non-successful — as opposed to a run
+   * with genuinely zero jobs. Callers should not treat a zero-match search
+   * result as "pattern absent" when this is true.
+   */
+  skippedByFailedOnly: boolean;
+}
+
 /**
  * Fetch logs for a workflow run or a specific job.
  *
@@ -266,10 +282,17 @@ function isAbortError(err: unknown): boolean {
  */
 export async function fetchRunLogs(
   params: FetchRunLogsParams,
-): Promise<string> {
-  // Single job requested — fetch directly
+): Promise<FetchRunLogsResult> {
+  // Single job requested — fetch directly. A directly-targeted jobId is
+  // never filtered by failedOnly, so scope is always exactly that one job.
   if (params.jobId) {
-    return fetchJobLogs(params.jobId, params.signal);
+    const text = await fetchJobLogs(params.jobId, params.signal);
+    return {
+      text,
+      jobsSearched: 1,
+      jobsTotal: 1,
+      skippedByFailedOnly: false,
+    };
   }
 
   if (!params.runId) {
@@ -277,26 +300,30 @@ export async function fetchRunLogs(
   }
 
   const attemptSuffix = params.attempt ? `/attempts/${params.attempt}` : '';
-  const allJobs = await fetchAllJobs(
-    params.runId,
-    attemptSuffix,
-    params.signal,
-  );
+  let allJobs = await fetchAllJobs(params.runId, attemptSuffix, params.signal);
+
+  if (params.jobName) {
+    const nameLower = params.jobName.toLowerCase();
+    allJobs = allJobs.filter((j) => j.name.toLowerCase().includes(nameLower));
+  }
 
   const failedOnly = params.failedOnly !== false;
+  const jobsTotal = allJobs.length;
   let jobs = failedOnly
     ? allJobs.filter((j) => j.conclusion !== 'success')
     : allJobs;
 
-  if (params.jobName) {
-    const nameLower = params.jobName.toLowerCase();
-    jobs = jobs.filter((j) => j.name.toLowerCase().includes(nameLower));
-  }
+  const skippedByFailedOnly = failedOnly && jobsTotal > 0 && jobs.length === 0;
 
   if (jobs.length === 0) {
-    return failedOnly
-      ? 'No failed jobs found in this workflow run.'
-      : 'No jobs found in this workflow run.';
+    return {
+      text: failedOnly
+        ? 'No failed jobs found in this workflow run.'
+        : 'No jobs found in this workflow run.',
+      jobsSearched: 0,
+      jobsTotal,
+      skippedByFailedOnly,
+    };
   }
 
   const skipped = jobs.length > MAX_LOG_JOBS ? jobs.length - MAX_LOG_JOBS : 0;
@@ -315,7 +342,12 @@ export async function fetchRunLogs(
     );
   }
 
-  return logEntries.join('\n\n');
+  return {
+    text: logEntries.join('\n\n'),
+    jobsSearched: jobs.length,
+    jobsTotal,
+    skippedByFailedOnly: false,
+  };
 }
 
 /**

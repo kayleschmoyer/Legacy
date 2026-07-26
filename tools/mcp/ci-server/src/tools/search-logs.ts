@@ -110,7 +110,7 @@ export async function searchLogs(
       ...params,
       signal: AbortSignal.timeout(SEARCH_FETCH_TIMEOUT_MS),
     });
-    const lines = rawLogs.split(/\r?\n/);
+    const lines = rawLogs.text.split(/\r?\n/);
     const matches: LogMatch[] = [];
     let totalMatches = 0;
 
@@ -132,6 +132,10 @@ export async function searchLogs(
       });
     }
 
+    const scopeNote = rawLogs.skippedByFailedOnly
+      ? `0 of ${rawLogs.jobsTotal} job(s) were searched — all were excluded by failedOnly=true (default). Retry with failedOnly=false to search successful-job logs too.`
+      : undefined;
+
     return {
       content: [
         {
@@ -144,6 +148,9 @@ export async function searchLogs(
               totalMatches,
               returnedMatches: matches.length,
               truncated: totalMatches > matches.length,
+              jobsSearched: rawLogs.jobsSearched,
+              jobsTotal: rawLogs.jobsTotal,
+              ...(scopeNote ? { scopeNote } : {}),
             },
             matches,
             {

@@ -292,11 +292,25 @@ export function createServer(): McpServer {
         .positive()
         .optional()
         .describe('Run ID (required when jobId is not provided)'),
-      pattern: z.string().min(1).describe('Search string or regex pattern'),
+      pattern: z
+        .string()
+        .min(1)
+        .describe(
+          'Search string or regex pattern. Note: `|` alone does NOT enable ' +
+            'alternation (a|b|c) — it is matched as a literal pipe character ' +
+            'unless isRegex is also set to true.',
+        ),
       jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
       failedOnly: coercedBoolean
         .default(true)
-        .describe('Failed steps only (default: true)'),
+        .describe(
+          'Failed steps only (default: true). WARNING: when the job whose ' +
+            'logs contain the searched-for text actually succeeded, this can ' +
+            'silently exclude it from the search entirely — the response will ' +
+            'still return totalMatches: 0, but with a scopeNote explaining 0 ' +
+            'jobs were searched. Set false to search all jobs regardless of ' +
+            'conclusion.',
+        ),
       attempt: z.coerce
         .number()
         .int()

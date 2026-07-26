@@ -125,6 +125,17 @@ export interface LogSearchMeta {
   totalMatches: number;
   returnedMatches: number;
   truncated: boolean;
+  /** Number of jobs whose logs were actually fetched and searched. */
+  jobsSearched: number;
+  /** Total number of jobs in scope (after jobName filtering, before failedOnly). */
+  jobsTotal: number;
+  /**
+   * Present (and non-null) only when `failedOnly` filtered every job out of
+   * scope — i.e. jobs existed but none were searched — so a bare
+   * `totalMatches: 0` is never mistaken for "content was searched and the
+   * pattern is absent" when in fact nothing was searched at all.
+   */
+  scopeNote?: string;
 }
 
 /** Cap a matched log line; long stack traces / JSON dumps would blow the budget. */

@@ -5,7 +5,7 @@ jest.mock('../logs.js', () => ({
 }));
 
 import { searchLogs } from './search-logs.js';
-import { fetchRunLogs } from '../logs.js';
+import { fetchRunLogs, type FetchRunLogsResult } from '../logs.js';
 
 const mockFetchRunLogs = fetchRunLogs as jest.MockedFunction<
   typeof fetchRunLogs
@@ -13,6 +13,21 @@ const mockFetchRunLogs = fetchRunLogs as jest.MockedFunction<
 
 function textOf(result: { content: Array<{ text?: string }> }): string {
   return result.content[0]?.text ?? '';
+}
+
+/** Builds a resolved fetchRunLogs() result for a normal (non-zero-scope) fetch. */
+function fetchResult(
+  text: string,
+  overrides: Partial<FetchRunLogsResult> = {},
+): FetchRunLogsResult {
+  const lineCount = text.length === 0 ? 0 : text.split(/\r?\n/).length;
+  return {
+    text,
+    jobsSearched: lineCount > 0 ? 1 : 0,
+    jobsTotal: lineCount > 0 ? 1 : 0,
+    skippedByFailedOnly: false,
+    ...overrides,
+  };
 }
 
 describe('searchLogs ReDoS guard', () => {
@@ -54,7 +69,9 @@ describe('searchLogs ReDoS guard', () => {
   });
 
   it('does not apply the regex guard to literal substring search', async () => {
-    mockFetchRunLogs.mockResolvedValue('line one\n(a+)+ literal\nline three');
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult('line one\n(a+)+ literal\nline three'),
+    );
     const result = await searchLogs({
       runId: 1,
       pattern: '(a+)+', // would be rejected as a regex, but here it is literal
@@ -67,7 +84,9 @@ describe('searchLogs ReDoS guard', () => {
   });
 
   it('allows a safe regex and returns matches', async () => {
-    mockFetchRunLogs.mockResolvedValue('INFO ok\nERROR boom\nINFO done');
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult('INFO ok\nERROR boom\nINFO done'),
+    );
     const result = await searchLogs({
       runId: 1,
       pattern: '^ERROR',
@@ -102,7 +121,7 @@ describe('searchLogs response-size bound (LS-8390)', () => {
   }
 
   it('stays well under the tool-output token limit with limitMatches + generous context', async () => {
-    mockFetchRunLogs.mockResolvedValue(buildVerboseLog());
+    mockFetchRunLogs.mockResolvedValue(fetchResult(buildVerboseLog()));
     const result = await searchLogs({
       jobId: 123,
       pattern: 'MATCH',
@@ -119,7 +138,7 @@ describe('searchLogs response-size bound (LS-8390)', () => {
   });
 
   it('threads a caller-supplied truncateLineLength through to every context line', async () => {
-    mockFetchRunLogs.mockResolvedValue(buildVerboseLog());
+    mockFetchRunLogs.mockResolvedValue(fetchResult(buildVerboseLog()));
     const result = await searchLogs({
       jobId: 123,
       pattern: 'MATCH',
@@ -138,7 +157,7 @@ describe('searchLogs response-size bound (LS-8390)', () => {
   });
 
   it('honors a caller-supplied maxChars, dropping trailing matches to fit', async () => {
-    mockFetchRunLogs.mockResolvedValue(buildVerboseLog());
+    mockFetchRunLogs.mockResolvedValue(fetchResult(buildVerboseLog()));
     const result = await searchLogs({
       jobId: 123,
       pattern: 'MATCH',
@@ -151,5 +170,54 @@ describe('searchLogs response-size bound (LS-8390)', () => {
     expect(text.length).toBeLessThanOrEqual(4_000);
     const parsed = JSON.parse(text);
     expect(parsed.charTruncated).toBe(true);
+  });
+});
+
+describe('searchLogs zero-scope visibility (LS-8301)', () => {
+  beforeEach(() => {
+    mockFetchRunLogs.mockReset();
+  });
+
+  it('signals zero-scope instead of a bare totalMatches: 0 when failedOnly excludes every job', async () => {
+    // failedOnly=true (default) filtered every job in the run to zero — the
+    // run itself had jobs, but none matched failedOnly's non-success filter.
+    mockFetchRunLogs.mockResolvedValue({
+      text: 'No failed jobs found in this workflow run.',
+      jobsSearched: 0,
+      jobsTotal: 3,
+      skippedByFailedOnly: true,
+    });
+    const result = await searchLogs({
+      runId: 28615049081,
+      pattern: 'Successfully merged',
+    });
+    expect(result.isError).toBeUndefined();
+    const parsed = JSON.parse(textOf(result));
+    expect(parsed.totalMatches).toBe(0);
+    expect(parsed.jobsSearched).toBe(0);
+    expect(parsed.jobsTotal).toBe(3);
+    expect(parsed.scopeNote).toMatch(/0 of 3 job\(s\) were searched/);
+    expect(parsed.scopeNote).toMatch(/failedOnly=false/);
+  });
+
+  it('finds matches in a successful job previously excluded by failedOnly when failedOnly=false', async () => {
+    // Same run as above, but the caller retried with failedOnly=false — the
+    // successful merge-queue job's logs are now in scope and searched.
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult('merge-queue-processor\nSuccessfully merged PR #5910', {
+        jobsSearched: 3,
+        jobsTotal: 3,
+      }),
+    );
+    const result = await searchLogs({
+      runId: 28615049081,
+      pattern: 'Successfully merged',
+      failedOnly: false,
+    });
+    expect(result.isError).toBeUndefined();
+    const parsed = JSON.parse(textOf(result));
+    expect(parsed.totalMatches).toBe(1);
+    expect(parsed.jobsSearched).toBe(3);
+    expect(parsed.scopeNote).toBeUndefined();
   });
 });

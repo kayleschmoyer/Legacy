@@ -169,6 +169,8 @@ describe('formatLogSearch', () => {
     totalMatches: 3,
     returnedMatches: 1,
     truncated: true,
+    jobsSearched: 2,
+    jobsTotal: 2,
   };
 
   const match: LogMatch = {
@@ -198,6 +200,28 @@ describe('formatLogSearch', () => {
     expect(parsed.truncated).toBe(true);
     expect(parsed.matches).toHaveLength(1);
     expect(parsed.matches[0].lineNumber).toBe(42);
+    expect(parsed.jobsSearched).toBe(2);
+    expect(parsed.jobsTotal).toBe(2);
+  });
+
+  it('surfaces scopeNote when the caller supplies one (zero-scope search)', () => {
+    const parsed = JSON.parse(
+      formatLogSearch(
+        {
+          ...meta,
+          totalMatches: 0,
+          returnedMatches: 0,
+          truncated: false,
+          jobsSearched: 0,
+          jobsTotal: 3,
+          scopeNote:
+            '0 of 3 job(s) were searched — all were excluded by failedOnly=true (default). Retry with failedOnly=false to search successful-job logs too.',
+        },
+        [],
+      ),
+    );
+    expect(parsed.jobsSearched).toBe(0);
+    expect(parsed.scopeNote).toMatch(/0 of 3 job\(s\) were searched/);
   });
 
   it('truncates a pathologically long matched line with an omitted-count marker', () => {

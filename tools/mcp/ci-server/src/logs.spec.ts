@@ -5,7 +5,11 @@ jest.mock('./github-api.js', () => ({
   githubGetArrayBuffer: jest.fn(),
 }));
 
-import { fetchRunLogsRing, JOB_NEVER_STARTED_MESSAGE } from './logs.js';
+import {
+  fetchRunLogs,
+  fetchRunLogsRing,
+  JOB_NEVER_STARTED_MESSAGE,
+} from './logs.js';
 import * as githubApi from './github-api.js';
 
 const mockGithubGet = githubApi.githubGet as jest.MockedFunction<
@@ -233,5 +237,135 @@ describe('fetchRunLogsRing', () => {
     ]);
     // Steps were already available from the jobs list — no per-job detail lookup.
     expect(mockGithubGet).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('fetchRunLogs scope metadata (LS-8301)', () => {
+  beforeEach(() => {
+    mockGithubGet.mockReset();
+    mockGithubGetArrayBuffer.mockReset();
+  });
+
+  it('flags skippedByFailedOnly when every job in the run succeeded', async () => {
+    // Reproduces LS-8301: a completed run where every job succeeded — the
+    // failedOnly=true default filters jobs to zero even though the run had
+    // jobs whose logs contain the searched-for text.
+    mockGithubGet.mockResolvedValue({
+      total_count: 2,
+      jobs: [
+        {
+          id: 1,
+          name: 'merge-queue-processor',
+          status: 'completed',
+          conclusion: 'success',
+        },
+        {
+          id: 2,
+          name: 'notify',
+          status: 'completed',
+          conclusion: 'success',
+        },
+      ],
+    });
+
+    const result = await fetchRunLogs({ runId: 28615049081, failedOnly: true });
+
+    expect(result).toEqual({
+      text: 'No failed jobs found in this workflow run.',
+      jobsSearched: 0,
+      jobsTotal: 2,
+      skippedByFailedOnly: true,
+    });
+    expect(mockGithubGetArrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('searches successful jobs and reports full scope when failedOnly=false', async () => {
+    mockGithubGet.mockResolvedValue({
+      total_count: 2,
+      jobs: [
+        {
+          id: 1,
+          name: 'merge-queue-processor',
+          status: 'completed',
+          conclusion: 'success',
+        },
+        {
+          id: 2,
+          name: 'notify',
+          status: 'completed',
+          conclusion: 'success',
+        },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      textToArrayBuffer('Successfully merged PR #5910'),
+    );
+
+    const result = await fetchRunLogs({
+      runId: 28615049081,
+      failedOnly: false,
+    });
+
+    expect(result.jobsSearched).toBe(2);
+    expect(result.jobsTotal).toBe(2);
+    expect(result.skippedByFailedOnly).toBe(false);
+    expect(result.text).toContain('Successfully merged PR #5910');
+  });
+
+  it('does not flag skippedByFailedOnly when the run genuinely has zero jobs', async () => {
+    mockGithubGet.mockResolvedValue({ total_count: 0, jobs: [] });
+
+    const result = await fetchRunLogs({ runId: 1, failedOnly: true });
+
+    expect(result).toEqual({
+      text: 'No failed jobs found in this workflow run.',
+      jobsSearched: 0,
+      jobsTotal: 0,
+      skippedByFailedOnly: false,
+    });
+  });
+
+  it('reports a single directly-targeted jobId as fully in scope, never filtered', async () => {
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      textToArrayBuffer('some log output'),
+    );
+
+    const result = await fetchRunLogs({ jobId: 42 });
+
+    expect(result).toEqual({
+      text: 'some log output',
+      jobsSearched: 1,
+      jobsTotal: 1,
+      skippedByFailedOnly: false,
+    });
+  });
+
+  it('reports a mix of failed and successful jobs correctly under failedOnly=true', async () => {
+    mockGithubGet.mockResolvedValue({
+      total_count: 2,
+      jobs: [
+        {
+          id: 1,
+          name: 'ok-job',
+          status: 'completed',
+          conclusion: 'success',
+        },
+        {
+          id: 2,
+          name: 'broken-job',
+          status: 'completed',
+          conclusion: 'failure',
+        },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      textToArrayBuffer('boom, failed here'),
+    );
+
+    const result = await fetchRunLogs({ runId: 1, failedOnly: true });
+
+    expect(result.jobsSearched).toBe(1);
+    expect(result.jobsTotal).toBe(2);
+    expect(result.skippedByFailedOnly).toBe(false);
   });
 });
