@@ -8,6 +8,7 @@ jest.mock('../github-api', () => ({
 jest.mock('../auth', () => ({
   getRepoRoot: jest.fn(() => '/tmp/repo-root-that-does-not-exist'),
   getRepoOwnerName: jest.fn(),
+  getAuthorToken: jest.fn(),
   isLambda: jest.fn(),
 }));
 
@@ -16,11 +17,15 @@ const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
     githubRest: jest.Mock;
     githubGraphQL: jest.Mock;
   };
-const { getRepoOwnerName: mockGetRepoOwnerName, isLambda: mockIsLambda } =
-  jest.requireMock('../auth') as {
-    getRepoOwnerName: jest.Mock;
-    isLambda: jest.Mock;
-  };
+const {
+  getRepoOwnerName: mockGetRepoOwnerName,
+  getAuthorToken: mockGetAuthorToken,
+  isLambda: mockIsLambda,
+} = jest.requireMock('../auth') as {
+  getRepoOwnerName: jest.Mock;
+  getAuthorToken: jest.Mock;
+  isLambda: jest.Mock;
+};
 
 describe('createPR Lambda behavior (LS-4881)', () => {
   beforeEach(() => {
@@ -29,6 +34,7 @@ describe('createPR Lambda behavior (LS-4881)', () => {
       owner: 'bkrupa',
       name: 'legacy-sports',
     });
+    mockGetAuthorToken.mockResolvedValue('ghs_bot_author_token');
     mockGithubRest.mockResolvedValue({
       number: 42,
       html_url: 'https://example/pr/42',
@@ -178,6 +184,7 @@ describe('createPR jira-link marker emission (LS-7895)', () => {
       owner: 'bkrupa',
       name: 'legacy-sports',
     });
+    mockGetAuthorToken.mockResolvedValue('ghs_bot_author_token');
     mockGithubRest.mockResolvedValue({
       number: 42,
       html_url: 'https://example/pr/42',
@@ -334,6 +341,7 @@ describe('createPR timeout reconciliation (LS-8213)', () => {
       owner: 'bkrupa',
       name: 'legacy-sports',
     });
+    mockGetAuthorToken.mockResolvedValue('ghs_bot_author_token');
   });
 
   it('returns the existing PR when creation times out but the PR was created server-side', async () => {

@@ -8,6 +8,7 @@ jest.mock('../github-api', () => ({
 jest.mock('../auth', () => ({
   getRepoRoot: jest.fn(() => '/tmp/test-repo-root'),
   getRepoOwnerName: jest.fn(),
+  getAuthorToken: jest.fn(),
   isLambda: jest.fn(),
 }));
 
@@ -26,10 +27,12 @@ const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
   };
 const {
   getRepoOwnerName: mockGetRepoOwnerName,
+  getAuthorToken: mockGetAuthorToken,
   isLambda: mockIsLambda,
   getRepoRoot: mockGetRepoRoot,
 } = jest.requireMock('../auth') as {
   getRepoOwnerName: jest.Mock;
+  getAuthorToken: jest.Mock;
   isLambda: jest.Mock;
   getRepoRoot: jest.Mock;
 };
@@ -55,6 +58,7 @@ describe('openPR', () => {
       owner: 'bkrupa',
       name: 'legacy-sports',
     });
+    mockGetAuthorToken.mockResolvedValue('ghs_bot_author_token');
     mockGithubRest.mockResolvedValue({
       number: 99,
       html_url: 'https://example/pr/99',

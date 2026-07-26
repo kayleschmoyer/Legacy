@@ -831,6 +831,205 @@ export async function getToken(): Promise<string> {
   return deviceToken;
 }
 
+/** Result of a GitHub user lookup. */
+export type GitHubUserResult =
+  | { status: 'valid'; login: string }
+  | { status: 'invalid' }
+  | { status: 'unknown'; reason: string };
+
+const GH_AUTH_TOKEN_TIMEOUT_MS = 5_000;
+
+/**
+ * Validate a GitHub token by fetching the authenticated user via direct API.
+ * Distinguishes auth failures from transient errors (rate-limit, 5xx, network).
+ *
+ * GitHub App installation tokens (`ghs_*`) 403 on `GET /user` — the endpoint
+ * represents a user, and an app token represents an app, not a user. That
+ * branch falls back to a repo-scoped endpoint and, on success, reports the
+ * generic bot login `"app[bot]"` (GET /user cannot reveal *which* app a
+ * `ghs_*` token belongs to — good enough to distinguish bot-vs-human, which
+ * is all `getAuthorToken` below needs).
+ */
+export async function getGitHubUser(token: string): Promise<GitHubUserResult> {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  try {
+    const res = await fetch('https://api.github.com/user', {
+      headers,
+      signal: AbortSignal.timeout(GH_AUTH_TOKEN_TIMEOUT_MS),
+    });
+
+    if (res.ok) {
+      const data = (await res.json()) as { login?: string };
+      const login = data.login;
+      if (login) return { status: 'valid', login };
+      return {
+        status: 'unknown',
+        reason: 'API returned 200 but no login field',
+      };
+    }
+
+    // 401 — definitively invalid/expired token
+    if (res.status === 401) return { status: 'invalid' };
+
+    // Rate limiting (429, or 403 with exhausted rate limit)
+    if (
+      res.status === 429 ||
+      (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0')
+    ) {
+      return {
+        status: 'unknown',
+        reason: `GitHub API rate-limited (${res.status}). Token may still be valid.`,
+      };
+    }
+
+    // Server errors (5xx) — transient, don't treat as invalid
+    if (res.status >= 500) {
+      return {
+        status: 'unknown',
+        reason: `GitHub API server error (${res.status}). Token may still be valid.`,
+      };
+    }
+
+    // 403 without rate-limit: may be a GitHub App installation token (ghs_*).
+    // App tokens return 403 for /user because they represent an app, not a user.
+    // Fall back to a repo-scoped endpoint that works for both token types.
+    if (res.status === 403) {
+      try {
+        const { owner, name } = await getRepoOwnerName();
+        const repoRes = await fetch(
+          `https://api.github.com/repos/${owner}/${name}`,
+          { headers, signal: AbortSignal.timeout(GH_AUTH_TOKEN_TIMEOUT_MS) },
+        );
+        if (repoRes.ok) {
+          return { status: 'valid', login: `app[bot]` };
+        }
+        if (repoRes.status === 401) return { status: 'invalid' };
+        if (
+          repoRes.status === 429 ||
+          (repoRes.status === 403 &&
+            repoRes.headers.get('x-ratelimit-remaining') === '0')
+        ) {
+          return {
+            status: 'unknown',
+            reason: `GitHub API rate-limited (${repoRes.status}). Token may still be valid.`,
+          };
+        }
+        if (repoRes.status >= 500) {
+          return {
+            status: 'unknown',
+            reason: `GitHub API server error (${repoRes.status}). Token may still be valid.`,
+          };
+        }
+        return { status: 'invalid' };
+      } catch {
+        return {
+          status: 'unknown',
+          reason:
+            'Could not validate app token against repo endpoint. Token may still be valid.',
+        };
+      }
+    }
+
+    // Other 4xx — likely invalid
+    return { status: 'invalid' };
+  } catch {
+    return {
+      status: 'unknown',
+      reason: 'Network error contacting GitHub API. Token may still be valid.',
+    };
+  }
+}
+
+/** Login suffix common to every GitHub App installation token's identity
+ * (e.g. `legacy-sports-code-bot[bot]`), as opposed to a human's personal
+ * login. Used by `getAuthorToken` to refuse authoring a PR as a human. */
+const BOT_LOGIN_SUFFIX = '[bot]';
+
+/**
+ * Resolve a token guaranteed to authenticate as the legacy-sports-code-bot
+ * GitHub App ("Agent Author", id 3158619) — never a human's personal
+ * credential. Exclusively for PR-authoring call sites (`createPR`, `openPR`):
+ * every other MCP tool may reasonably use whichever token `getToken()`
+ * resolves, but PR authorship must never silently fall back to a human's
+ * `GH_TOKEN`/`.netrc`/`gh auth login` credential — that breaks the Author
+ * Agent Contract (GitHub blocks self-approval, so the PR can only be merged
+ * via `review-bot-override`) and confuses merge-queue reviewDecision
+ * handling (LS-8333, surfaced by PR #5906).
+ *
+ * Resolution order:
+ *   1. Mint a fresh installation token directly from
+ *      `AGENT_AUTHOR_APP_PRIVATE_KEY`, bypassing the general token cache
+ *      entirely — a stale cached human credential (env/.netrc/gh-cli, cached
+ *      to the same file `getToken()` reads from) can never win over the
+ *      bot's own key here.
+ *   2. If the private key isn't configured in this environment (e.g. Copilot
+ *      Coding Agent, which mints the same app's token via
+ *      `actions/create-github-app-token` and exports it as
+ *      `GH_TOKEN`/`GITHUB_TOKEN` instead of the raw key — see
+ *      `copilot-setup-steps.yml`), fall back to the standard resolution
+ *      chain but require the resolved identity to verify as a GitHub App
+ *      bot login before trusting it.
+ *   3. Otherwise, throw — never author as whatever human credential happens
+ *      to be resolvable.
+ */
+export async function getAuthorToken(): Promise<string> {
+  try {
+    const appResult = await generateGitHubAppToken();
+    if (appResult) {
+      cachedToken = appResult.token;
+      cachedTokenSource = 'github-app';
+      await writeCachedToken(appResult.token, appResult.expiresAt).catch(
+        (cacheErr) => {
+          LOGGER.warn(
+            `Failed to cache GitHub App author token to file: ${cacheErr instanceof Error ? cacheErr.message : cacheErr}`,
+          );
+        },
+      );
+      return appResult.token;
+    }
+  } catch (err) {
+    lastTokenResolutionFailureReason =
+      err instanceof Error ? err.message : String(err);
+    LOGGER.warn(
+      `GitHub App token generation failed in getAuthorToken: ${lastTokenResolutionFailureReason}`,
+    );
+  }
+
+  const resolved = await tryResolveToken();
+  if (!resolved) {
+    throw new Error(
+      'Could not provision a GitHub token for PR authorship. Configure ' +
+        'AGENT_AUTHOR_APP_PRIVATE_KEY (GitHub App auth for the legacy-sports-code-bot ' +
+        '"Agent Author" app) so PR creation always authors as the bot. Refusing to fall ' +
+        'back to a personal credential. (LS-8333)',
+    );
+  }
+
+  const user = await getGitHubUser(resolved.token);
+  if (user.status === 'valid' && user.login.endsWith(BOT_LOGIN_SUFFIX)) {
+    return resolved.token;
+  }
+
+  const identity =
+    user.status === 'valid'
+      ? `"${user.login}"`
+      : user.status === 'invalid'
+        ? 'an invalid credential'
+        : `an unverifiable credential (${user.reason})`;
+  throw new Error(
+    'Agent-driven PR creation must author as the legacy-sports-code-bot GitHub App, but the ' +
+      `only resolvable token (source: ${resolved.source}) authenticates as ${identity}. Refusing ` +
+      'to open the PR under this identity — a human-authored PR cannot be self-approved by the ' +
+      'maintainer and confuses merge-queue reviewDecision handling. Configure ' +
+      'AGENT_AUTHOR_APP_PRIVATE_KEY, or ensure GH_TOKEN/GITHUB_TOKEN holds a ' +
+      'legacy-sports-code-bot[bot] installation token rather than a personal credential. (LS-8333)',
+  );
+}
+
 /**
  * Parse git remote URL to extract owner and repo name.
  * Caches the result in memory (doesn't change during a session).

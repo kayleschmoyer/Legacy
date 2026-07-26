@@ -48,6 +48,8 @@ const ENV_KEYS = [
   'GITHUB_TOKEN',
   'GITHUB_APP_ID',
   'GITHUB_INSTALLATION_ID',
+  'GITHUB_REPO_OWNER',
+  'GITHUB_REPO_NAME',
 ] as const;
 
 describe('github-server auth token cache (LS-5982)', () => {
@@ -286,6 +288,120 @@ describe('github-server auth token cache (LS-5982)', () => {
       // The failure is surfaced as a non-fatal LOGGER.warn, not a thrown error.
       expect(LOGGER.warn).toHaveBeenCalledWith(
         expect.stringContaining("mkdir '/home/sbx_user1051'"),
+      );
+    });
+  });
+
+  describe('getAuthorToken (LS-8333 — PR-authoring must never silently use a human token)', () => {
+    function noCacheFile() {
+      const fsp = freshFsPromisesMock();
+      fsp.readFile.mockRejectedValue(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      );
+      fsp.mkdir.mockResolvedValue(undefined);
+      fsp.writeFile.mockResolvedValue(undefined);
+      fsp.chmod.mockResolvedValue(undefined);
+      return fsp;
+    }
+
+    it('mints the GitHub App token directly and never touches a co-configured personal token', async () => {
+      // Simulates the common local/Lambda setup: AGENT_AUTHOR_APP_PRIVATE_KEY is
+      // configured (as recommended), but GH_TOKEN also happens to be set to a
+      // human's personal credential. Before the fix, getToken()'s generic
+      // resolution order (env before github-app) would have picked the human
+      // token; getAuthorToken must prefer minting the bot's own token directly
+      // and never even attempt to resolve/validate GH_TOKEN.
+      process.env['AWS_LAMBDA_FUNCTION_NAME'] = 'mcp-github';
+      process.env['GH_TOKEN'] = 'human_personal_pat';
+      delete process.env['GITHUB_TOKEN'];
+
+      const { privateKey } = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+      });
+      process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = privateKey
+        .export({ type: 'pkcs1', format: 'pem' })
+        .toString();
+
+      noCacheFile();
+
+      global.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          token: 'ghs_minted_bot_token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      })) as unknown as typeof fetch;
+
+      const { getAuthorToken } = await import('./auth');
+      const token = await getAuthorToken();
+
+      expect(token).toBe('ghs_minted_bot_token');
+      // Only the installation-token exchange ran — GH_TOKEN was never
+      // resolved or validated against GET /user.
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to a resolved token that verifies as a GitHub App bot identity when no private key is configured', async () => {
+      // Simulates Copilot Coding Agent: AGENT_AUTHOR_APP_PRIVATE_KEY is never
+      // set on the MCP server process (only consumed by the Actions step that
+      // mints the token); the Agent Author app's own installation token is
+      // exported as GH_TOKEN instead. getAuthorToken must accept it once its
+      // identity is verified as a bot login.
+      process.env['AWS_LAMBDA_FUNCTION_NAME'] = 'mcp-github';
+      process.env['GH_TOKEN'] = 'ghs_copilot_minted_token';
+      delete process.env['GITHUB_TOKEN'];
+      delete process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'];
+      process.env['GITHUB_REPO_OWNER'] = 'bkrupa';
+      process.env['GITHUB_REPO_NAME'] = 'legacy-sports';
+
+      noCacheFile();
+
+      global.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({ login: 'legacy-sports-code-bot[bot]' }),
+      })) as unknown as typeof fetch;
+
+      const { getAuthorToken } = await import('./auth');
+      const token = await getAuthorToken();
+
+      expect(token).toBe('ghs_copilot_minted_token');
+    });
+
+    it('throws instead of silently authoring as a human when only a personal token resolves (PR #5906)', async () => {
+      process.env['AWS_LAMBDA_FUNCTION_NAME'] = 'mcp-github';
+      process.env['GH_TOKEN'] = 'human_personal_pat';
+      delete process.env['GITHUB_TOKEN'];
+      delete process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'];
+      process.env['GITHUB_REPO_OWNER'] = 'bkrupa';
+      process.env['GITHUB_REPO_NAME'] = 'legacy-sports';
+
+      noCacheFile();
+
+      global.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({ login: 'bkrupa' }),
+      })) as unknown as typeof fetch;
+
+      const { getAuthorToken } = await import('./auth');
+
+      await expect(getAuthorToken()).rejects.toThrow(
+        /legacy-sports-code-bot.*"bkrupa"/s,
+      );
+    });
+
+    it('throws when no token can be resolved at all', async () => {
+      process.env['AWS_LAMBDA_FUNCTION_NAME'] = 'mcp-github';
+      delete process.env['GH_TOKEN'];
+      delete process.env['GITHUB_TOKEN'];
+      delete process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'];
+
+      noCacheFile();
+      global.fetch = jest.fn() as unknown as typeof fetch;
+
+      const { getAuthorToken } = await import('./auth');
+
+      await expect(getAuthorToken()).rejects.toThrow(
+        /Could not provision a GitHub token for PR authorship/,
       );
     });
   });

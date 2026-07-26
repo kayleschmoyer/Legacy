@@ -2,7 +2,12 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
-import { getRepoRoot, getRepoOwnerName, isLambda } from '../auth.js';
+import {
+  getRepoRoot,
+  getRepoOwnerName,
+  getAuthorToken,
+  isLambda,
+} from '../auth.js';
 import {
   githubRest,
   githubGraphQL,
@@ -189,6 +194,12 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
   // Hoisted so the catch block can use head for timeout reconciliation. (LS-8213)
   let head = '';
   try {
+    // Resolve the PR-authoring token up front — must be the
+    // legacy-sports-code-bot GitHub App token, never a human's personal
+    // credential (LS-8333). Thrown errors are caught below and returned as
+    // an explicit failure rather than silently falling through to create
+    // the PR under whichever token getToken() would otherwise resolve.
+    const authorToken = await getAuthorToken();
     const repo = await getRepoOwnerName();
 
     // Determine PR head branch. Priority: explicit param > upstream tracking ref > local branch name.
@@ -248,6 +259,7 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
         base,
         draft: params.draft ?? false,
       },
+      token: authorToken,
     });
 
     // Jira Link Check requires the visible `no-jira` label whenever the

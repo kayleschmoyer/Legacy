@@ -8,6 +8,7 @@ import {
   tryResolveToken,
   isLambda,
   getLastTokenResolutionFailureReason,
+  getGitHubUser,
 } from './auth.js';
 import type { TokenSource } from './auth.js';
 import type { ToolResult } from './types.js';
@@ -158,8 +159,6 @@ const coercedBoolean = z.preprocess((val) => {
   return val;
 }, z.boolean());
 
-const GH_AUTH_TOKEN_TIMEOUT_MS = 5_000;
-
 /**
  * Passive auth check — reuses the non-interactive token resolution from auth.ts
  * (env vars → cached file → GitHub App → .netrc → gh CLI). Does NOT trigger
@@ -170,110 +169,6 @@ async function tryGetGitHubAuth(): Promise<{
   source: TokenSource;
 } | null> {
   return tryResolveToken();
-}
-
-/** Result of a GitHub user lookup. */
-type GitHubUserResult =
-  | { status: 'valid'; login: string }
-  | { status: 'invalid' }
-  | { status: 'unknown'; reason: string };
-
-/**
- * Validate a GitHub token by fetching the authenticated user via direct API.
- * Distinguishes auth failures from transient errors (rate-limit, 5xx, network).
- */
-async function getGitHubUser(token: string): Promise<GitHubUserResult> {
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-  try {
-    const res = await fetch('https://api.github.com/user', {
-      headers,
-      signal: AbortSignal.timeout(GH_AUTH_TOKEN_TIMEOUT_MS),
-    });
-
-    if (res.ok) {
-      const data = (await res.json()) as { login?: string };
-      const login = data.login;
-      if (login) return { status: 'valid', login };
-      return {
-        status: 'unknown',
-        reason: 'API returned 200 but no login field',
-      };
-    }
-
-    // 401 — definitively invalid/expired token
-    if (res.status === 401) return { status: 'invalid' };
-
-    // Rate limiting (429, or 403 with exhausted rate limit)
-    if (
-      res.status === 429 ||
-      (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0')
-    ) {
-      return {
-        status: 'unknown',
-        reason: `GitHub API rate-limited (${res.status}). Token may still be valid.`,
-      };
-    }
-
-    // Server errors (5xx) — transient, don't treat as invalid
-    if (res.status >= 500) {
-      return {
-        status: 'unknown',
-        reason: `GitHub API server error (${res.status}). Token may still be valid.`,
-      };
-    }
-
-    // 403 without rate-limit: may be a GitHub App installation token (ghs_*).
-    // App tokens return 403 for /user because they represent an app, not a user.
-    // Fall back to a repo-scoped endpoint that works for both token types.
-    if (res.status === 403) {
-      try {
-        const { owner, name } = await getRepoOwnerName();
-        const repoRes = await fetch(
-          `https://api.github.com/repos/${owner}/${name}`,
-          { headers, signal: AbortSignal.timeout(GH_AUTH_TOKEN_TIMEOUT_MS) },
-        );
-        if (repoRes.ok) {
-          return { status: 'valid', login: `app[bot]` };
-        }
-        if (repoRes.status === 401) return { status: 'invalid' };
-        if (
-          repoRes.status === 429 ||
-          (repoRes.status === 403 &&
-            repoRes.headers.get('x-ratelimit-remaining') === '0')
-        ) {
-          return {
-            status: 'unknown',
-            reason: `GitHub API rate-limited (${repoRes.status}). Token may still be valid.`,
-          };
-        }
-        if (repoRes.status >= 500) {
-          return {
-            status: 'unknown',
-            reason: `GitHub API server error (${repoRes.status}). Token may still be valid.`,
-          };
-        }
-        return { status: 'invalid' };
-      } catch {
-        return {
-          status: 'unknown',
-          reason:
-            'Could not validate app token against repo endpoint. Token may still be valid.',
-        };
-      }
-    }
-
-    // Other 4xx — likely invalid
-    return { status: 'invalid' };
-  } catch {
-    return {
-      status: 'unknown',
-      reason: 'Network error contacting GitHub API. Token may still be valid.',
-    };
-  }
 }
 
 // Preflight auth — best-effort, non-blocking so server starts even if

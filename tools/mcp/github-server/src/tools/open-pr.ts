@@ -2,7 +2,12 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve, relative } from 'node:path';
-import { getRepoOwnerName, getRepoRoot, isLambda } from '../auth.js';
+import {
+  getRepoOwnerName,
+  getRepoRoot,
+  getAuthorToken,
+  isLambda,
+} from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import { runWithSyncBudget } from '../jobs.js';
 import type { JobLogger } from '../jobs.js';
@@ -173,6 +178,18 @@ async function openPRWorker(
     );
   }
 
+  // Resolve the PR-authoring token up front — must be the
+  // legacy-sports-code-bot GitHub App token, never a human's personal
+  // credential (LS-8333). Resolved before the push below so a session
+  // without bot credentials fails loudly instead of leaving a pushed branch
+  // with no PR behind it.
+  let authorToken: string;
+  try {
+    authorToken = await getAuthorToken();
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e));
+  }
+
   // Push branch
   let pushOutput: string | undefined;
   if (shouldPush && !lambda) {
@@ -231,6 +248,7 @@ async function openPRWorker(
         base,
         draft: true,
       },
+      token: authorToken,
     });
 
     const prNumber = pr.number;

@@ -26,6 +26,14 @@ interface RestOptions {
   path: string;
   body?: unknown;
   query?: Record<string, string>;
+  /**
+   * Explicit bearer token to use instead of the default `getToken()`
+   * resolution. Used by PR-authoring call sites (createPR, openPR) to force
+   * the legacy-sports-code-bot identity via `getAuthorToken()` (LS-8333) —
+   * bypassing the general resolution chain, which may legitimately return a
+   * human's personal credential for non-authoring operations.
+   */
+  token?: string;
 }
 
 /**
@@ -127,8 +135,10 @@ async function handleSecondaryRateLimit(
   return true;
 }
 
-async function buildHeaders(): Promise<Record<string, string>> {
-  const token = await getToken();
+async function buildHeaders(
+  tokenOverride?: string,
+): Promise<Record<string, string>> {
+  const token = tokenOverride ?? (await getToken());
   return {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
@@ -169,7 +179,7 @@ async function doRest<T>(
   canRetry: boolean,
   secondaryRetries: number,
 ): Promise<T> {
-  const headers = await buildHeaders();
+  const headers = await buildHeaders(opts.token);
   let url = `${BASE_URL}${opts.path}`;
 
   if (opts.query) {
@@ -182,6 +192,18 @@ async function doRest<T>(
     headers,
     body: opts.body != null ? JSON.stringify(opts.body) : undefined,
   });
+
+  // 401 with an explicit token override — invalidating the shared cache
+  // (which this call never consulted) and retrying would just resend the
+  // same bad override, so fail fast with an actionable message instead.
+  if (response.status === 401 && opts.token) {
+    throw new Error(
+      `GitHub API ${opts.method} ${opts.path} failed (401): the explicit ` +
+        'author token is invalid or expired. This should not happen with a ' +
+        'freshly-minted GitHub App installation token — check ' +
+        'AGENT_AUTHOR_APP_PRIVATE_KEY / GITHUB_APP_ID / GITHUB_INSTALLATION_ID.',
+    );
+  }
 
   // 401 — token invalid, invalidate and retry once
   if (response.status === 401 && canRetry) {
