@@ -246,7 +246,9 @@ test.describe('Team Detail Page – team identity @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('My Team')).toBeVisible();
+    // Longer timeout: TeamDetailPage's members→positions query waterfall can
+    // outrun the default 3s expect timeout under CI worker contention (LS-8399).
+    await expect(page.getByText('My Team')).toBeVisible({ timeout: 10000 });
   });
 
   test('displays a Back button', async ({ page }) => {
@@ -254,7 +256,9 @@ test.describe('Team Detail Page – team identity @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByRole('button', { name: /back/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /back/i })).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('shows the first letter of team name as avatar fallback', async ({
@@ -265,7 +269,9 @@ test.describe('Team Detail Page – team identity @regression', () => {
     await page.waitForLoadState('load');
 
     // Avatar fallback shows 'M' (first char of 'My Team')
-    await expect(page.getByText('M', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('M', { exact: true }).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 });
 
@@ -277,9 +283,9 @@ test.describe('Team Detail Page – roster @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByText('Roster', { exact: true }).first(),
-    ).toBeVisible();
+    await expect(page.getByText('Roster', { exact: true }).first()).toBeVisible(
+      { timeout: 10000 },
+    );
   });
 
   test('shows player name from team members', async ({ page }) => {
@@ -298,7 +304,7 @@ test.describe('Team Detail Page – roster @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
+    await expect(page.getByText('Babe Ruth')).toBeVisible({ timeout: 10000 });
   });
 
   test('shows multiple players', async ({ page }) => {
@@ -333,8 +339,8 @@ test.describe('Team Detail Page – roster @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Babe Ruth')).toBeVisible();
-    await expect(page.getByText('Ty Cobb')).toBeVisible();
+    await expect(page.getByText('Babe Ruth')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Ty Cobb')).toBeVisible({ timeout: 10000 });
   });
 
   test('shows position ID for each roster member', async ({ page }) => {
@@ -348,7 +354,9 @@ test.describe('Team Detail Page – roster @regression', () => {
     // The component renders the positionType from the positions query,
     // not the raw positionId number. Exact match avoids colliding with nav
     // labels like "Players"+"Stats" whose combined text contains "ss".
-    await expect(page.getByText('SS', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('SS', { exact: true }).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 });
 
@@ -366,7 +374,9 @@ test.describe('Team Detail Page — GM settings @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Team Settings')).toBeVisible();
+    await expect(page.getByText('Team Settings')).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('GM sees "Team Branding" section', async ({ page }) => {
@@ -374,7 +384,9 @@ test.describe('Team Detail Page — GM settings @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Team Branding')).toBeVisible();
+    await expect(page.getByText('Team Branding')).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('visitor does not see Team Settings section', async ({ page }) => {
@@ -403,9 +415,9 @@ test.describe('Team Detail Page — GM settings @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(
-      page.getByText(/viewing this team as a visitor/i),
-    ).toBeVisible();
+    await expect(page.getByText(/viewing this team as a visitor/i)).toBeVisible(
+      { timeout: 10000 },
+    );
   });
 });
 
@@ -419,6 +431,8 @@ test.describe('Team Detail Page — error state @regression', () => {
     await page.goto(TEAM_URL);
     await page.waitForLoadState('load');
 
-    await expect(page.getByText(/error loading team/i)).toBeVisible();
+    await expect(page.getByText(/error loading team/i)).toBeVisible({
+      timeout: 10000,
+    });
   });
 });

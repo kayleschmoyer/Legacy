@@ -228,12 +228,15 @@ test.describe('Lineup Editor — GM assigns and benches a player @regression', (
 
     // Starts on the bench, the 1B slot is open ("1st Base" is the slot's
     // human-readable label — see getPositionLabel in rosterEligibility.ts).
+    // Longer timeout: TeamDetailPage's members→positions query waterfall can
+    // outrun the default 3s expect timeout under CI worker contention (LS-8399).
     await expect(page.getByTestId('roster-section-bench')).toContainText(
       'Babe Ruth',
+      { timeout: 10000 },
     );
     await expect(
       page.getByRole('button', { name: /1st base — open slot/i }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
 
     const mutationRequest = page.waitForRequest(
       (req) =>
@@ -270,7 +273,7 @@ test.describe('Lineup Editor — GM assigns and benches a player @regression', (
     await page.waitForLoadState('load');
 
     const startingSlot = page.getByRole('button', { name: /babe ruth at 1b/i });
-    await expect(startingSlot).toBeVisible();
+    await expect(startingSlot).toBeVisible({ timeout: 10000 });
 
     const mutationRequest = page.waitForRequest(
       (req) =>
@@ -316,7 +319,9 @@ test.describe('Lineup Editor — visitor sees a read-only board @regression', ()
     await page.waitForLoadState('load');
 
     const startingSlot = page.getByRole('button', { name: /babe ruth at 1b/i });
-    await expect(startingSlot).toBeVisible();
+    // Longer timeout: TeamDetailPage's members→positions query waterfall can
+    // outrun the default 3s expect timeout under CI worker contention (LS-8399).
+    await expect(startingSlot).toBeVisible({ timeout: 10000 });
     await expect(startingSlot).toHaveAttribute('tabindex', '-1');
     // Read-only slots render as genuinely disabled buttons, so a normal
     // click is refused by Playwright's actionability checks — assert the
