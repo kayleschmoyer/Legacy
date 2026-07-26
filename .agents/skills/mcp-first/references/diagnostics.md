@@ -111,6 +111,8 @@ The resolver is idempotent — it links `node_modules` to the content-addressabl
 **Native ephemeral worktrees (`.claude/worktrees/<name>/`):**
 `mcp-bootstrap.mjs` detects both worktree patterns (Pattern A: `<repo>/.claude/worktrees/<name>`; Pattern B: `<root>/<repo>.worktrees/<name>`) and creates the symlink to the main repo's `node_modules`. Before LS-3716 was fixed, Pattern A fell through to the cloud branch, which incorrectly ran `corepack pnpm install` when `node_modules` was absent instead of creating the symlink.
 
+**Not the same symptom as a present-but-corrupted `node_modules`.** The checks above cover `node_modules`/`tsx` being **absent or unlinked**, which breaks stdio MCP server startup. If `tsx` is present and MCP servers connect fine, but `pc-typecheck`/`pc-lint`/`pc-build`/`pc-test` fail on files your branch never touched (in a long-lived persistent container), that's a different failure mode — see [cloud-agent-mode: phantom typecheck/lint errors](../../cloud-agent-mode/SKILL.md#known-failure-mode-phantom-typechecklint-errors-on-unrelated-files-ls-8384) (LS-8384) — `make clean-cache` does not fix it (its auto-relink only runs in a worktree checkout); a plain `node scripts/modules-pool/link.mjs` run does, by auto-detecting the corrupted slot and quarantine-rebuilding it (`--check` only diagnoses, no filesystem changes; `--rebuild` forces the rebuild even when the health check finds nothing).
+
 ### Recovery: Wrong session root / `CLAUDE_PROJECT_DIR`
 
 In native-worktree sessions, `CLAUDE_PROJECT_DIR` must be the worktree path
