@@ -5,7 +5,9 @@
 # Referenced from the cloud environment setup script UI via:
 #   source "$HOME/legacy-sports/.claude/cloud-setup.sh"
 #
-# This runs ONCE when a new cloud session is created (not on resume).
+# This runs when a new cloud session is created, AND on every session
+# resume (it is registered as a SessionStart hook — see LS-8113). Steps
+# are written to be idempotent so re-running is always safe.
 # It installs tools that aren't in the default Ubuntu 24.04 image.
 #
 # This also installs Node.js dependencies (pnpm install) so that
@@ -15,7 +17,7 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# 0. Navigate to repo root (cloud env starts in /home/user, not the repo)
+# Navigate to repo root (cloud env starts in /home/user, not the repo)
 # ---------------------------------------------------------------------------
 REPO_DIR="$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")"
 if [ ! -d "$REPO_DIR/.git" ] || [ ! -f "$REPO_DIR/package.json" ]; then
@@ -26,7 +28,36 @@ cd "$REPO_DIR"
 echo "=== Legacy Sports cloud setup (repo: $REPO_DIR) ==="
 
 # ---------------------------------------------------------------------------
-# 4. Deepen the shallow clone so origin/main merge-base exists
+# Neutralize a git-lfs pre-push hook stub when git-lfs is absent
+# ---------------------------------------------------------------------------
+# Cloud container images can carry a stock `git lfs install` pre-push hook
+# stub even though this repo tracks no LFS files (.gitattributes has no
+# filter=lfs entries anywhere) and git-lfs is not installed (gh/git-lfs
+# installs were deliberately removed from this script on 2026-07-02, so
+# git-lfs will reliably stay absent going forward). The stub blocks the first
+# `git push` with "git-lfs not found on your path" even though the push
+# contains no LFS content, forcing a --no-verify retry (LS-7773). Neutralize
+# it here — this script re-runs on every SessionStart (LS-8113), so it also
+# self-heals a session where the stub reappears after a resume. Only the
+# stub is touched: this repo's own .github/hooks/pre-push (installed by
+# `make setup-hooks`) never references git-lfs and is left alone.
+hooks_dir="$(git rev-parse --git-path hooks 2>/dev/null || echo "$REPO_DIR/.git/hooks")"
+# Match the stock `git lfs install` stub's distinctive wording, not just any
+# mention of "git-lfs" — a hook that merely references git-lfs elsewhere
+# (e.g. in a comment) should not be neutralized.
+if [ -f "$hooks_dir/pre-push" ] && ! command -v git-lfs &>/dev/null && grep -qi "configured for git lfs" "$hooks_dir/pre-push" 2>/dev/null; then
+  # -n (no-clobber): never overwrite an existing disabled-stub file. The `if`
+  # guard also means a failed mv (unwritable hooks dir, race, etc.) only warns
+  # here instead of aborting the rest of this script under `set -e`.
+  if mv -n "$hooks_dir/pre-push" "$hooks_dir/pre-push.disabled-lfs-stub" 2>/dev/null; then
+    echo "Neutralized stale git-lfs pre-push hook stub at $hooks_dir/pre-push (git-lfs absent, repo has no LFS files) — moved to pre-push.disabled-lfs-stub"
+  else
+    echo "WARNING: found a git-lfs pre-push hook stub at $hooks_dir/pre-push but could not neutralize it (mv failed — hooks dir may be read-only, or pre-push.disabled-lfs-stub already exists). git push may require --no-verify."
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Deepen the shallow clone so origin/main merge-base exists
 # ---------------------------------------------------------------------------
 # Cloud sessions start with a shallow clone. Without shared history,
 # `git diff origin/main...HEAD` fails with "no merge base", causing make pc
@@ -54,7 +85,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Install Node.js dependencies
+# Install Node.js dependencies
 # ---------------------------------------------------------------------------
 # Required for `make pc` (lint, typecheck, test, build) on code changes.
 # Uses corepack to activate the correct pnpm version, then installs deps.
@@ -92,7 +123,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
+# Export GITHUB_REPO_OWNER / GITHUB_REPO_NAME for the github-server MCP
 # ---------------------------------------------------------------------------
 # In cloud sessions, git remote URLs may be proxy URLs that don't expose the
 # real GitHub owner/repo. These env vars let the MCP server skip remote
