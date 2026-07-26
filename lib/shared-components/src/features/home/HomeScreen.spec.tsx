@@ -255,6 +255,99 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('archived leagues (LS-8633)', () => {
+    it('fires onShowArchived when the show-archived button is pressed', () => {
+      const onShowArchived = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onShowArchived={onShowArchived}
+        />,
+      );
+      fireEvent.click(getByText('Show archived leagues'));
+      expect(onShowArchived).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not render the show-archived button when onShowArchived is absent', () => {
+      const { queryByText } = render(
+        <HomeScreen {...baseProps} leagues={[league]} />,
+      );
+      expect(queryByText('Show archived leagues')).toBeNull();
+    });
+
+    it('shows a loading spinner while archived leagues are being fetched', () => {
+      const { getByText, queryByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          showArchived
+          archivedLoading
+        />,
+      );
+      expect(getByText('Loading archived leagues…')).toBeTruthy();
+      expect(queryByText('No archived leagues.')).toBeNull();
+    });
+
+    it('renders the archived list when archived leagues are present', () => {
+      const archived: HomeLeagueSummary = { ...league, leagueId: 99 };
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          showArchived
+          archivedLeagues={[archived]}
+        />,
+      );
+      expect(getByText('Archived')).toBeTruthy();
+    });
+
+    it('renders an explicit empty state instead of nothing when there are zero archived leagues (LS-8633)', () => {
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          showArchived
+          archivedLoading={false}
+          archivedLeagues={[]}
+        />,
+      );
+      expect(getByText('No archived leagues.')).toBeTruthy();
+    });
+
+    it('fires onHideArchived from the empty state, giving the user a way back (LS-8633)', () => {
+      const onHideArchived = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          showArchived
+          archivedLoading={false}
+          archivedLeagues={[]}
+          onHideArchived={onHideArchived}
+        />,
+      );
+      fireEvent.click(getByText('▾ Archived'));
+      expect(onHideArchived).toHaveBeenCalledTimes(1);
+    });
+
+    it('fires onHideArchived from the header when the archived list is non-empty', () => {
+      const archived: HomeLeagueSummary = { ...league, leagueId: 99 };
+      const onHideArchived = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          showArchived
+          archivedLeagues={[archived]}
+          onHideArchived={onHideArchived}
+        />,
+      );
+      fireEvent.click(getByText('▾ Archived'));
+      expect(onHideArchived).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('top safe-area inset (LS-8625)', () => {
     // The global `tamagui` jest mock strips layout props (including
     // paddingTop) before they reach the DOM, so this only asserts that

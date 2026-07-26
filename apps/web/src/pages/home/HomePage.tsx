@@ -137,6 +137,10 @@ export function HomePage(): React.JSX.Element {
     void fetchArchived();
   }, [fetchArchived]);
 
+  const handleHideArchived = useCallback(() => {
+    setShowArchived(false);
+  }, []);
+
   const summaries = useMemo<HomeLeagueSummary[]>(
     () => summaryData?.getUserLeagueSummaries ?? [],
     [summaryData?.getUserLeagueSummaries],
@@ -222,6 +226,7 @@ export function HomePage(): React.JSX.Element {
           isPremium={isPremium}
           onThisDay={onThisDay}
           onShowArchived={handleShowArchived}
+          onHideArchived={handleHideArchived}
           onRetry={() => void refetchSummaries()}
           onViewLeague={(s) => navigate(leagueDetailRoute(s))}
           onSetLineup={(s) => navigate(leagueDetailRoute(s))}

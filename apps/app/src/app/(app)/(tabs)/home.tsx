@@ -142,6 +142,10 @@ export default function HomeTab() {
     void fetchArchived();
   }, [fetchArchived]);
 
+  const handleHideArchived = useCallback(() => {
+    setShowArchived(false);
+  }, []);
+
   const viewLeague = useCallback(
     (s: HomeLeagueSummary) => {
       const params = { leagueId: String(s.leagueId) };
@@ -227,6 +231,7 @@ export default function HomeTab() {
           error={Boolean(error && !data?.getUserLeagueSummaries)}
           onThisDay={onThisDay}
           onShowArchived={handleShowArchived}
+          onHideArchived={handleHideArchived}
           onRetry={() => void refetch()}
           onViewLeague={viewLeague}
           onSetLineup={viewLeague}

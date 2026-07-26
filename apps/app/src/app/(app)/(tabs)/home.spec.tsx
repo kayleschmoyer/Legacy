@@ -67,6 +67,10 @@ let capturedOnViewSport: ((sport: 'baseball' | 'football') => void) | null =
 let capturedTopInset: number | undefined;
 // Capture the OnThisDayFeed onPlayerPress callback (LS-8627)
 let capturedOnPlayerPress: ((playerId: number) => void) | null = null;
+// Capture archived-toggle callbacks and state so tests can drive them (LS-8633)
+let capturedOnShowArchived: (() => void) | null = null;
+let capturedOnHideArchived: (() => void) | null = null;
+let capturedShowArchived: boolean | undefined;
 
 jest.mock('@legacy-sports/shared-components', () => ({
   HomeScreen: ({
@@ -74,14 +78,23 @@ jest.mock('@legacy-sports/shared-components', () => ({
     testID,
     topInset,
     onThisDay,
+    onShowArchived,
+    onHideArchived,
+    showArchived,
   }: {
     onViewSport: (sport: 'baseball' | 'football') => void;
     testID?: string;
     topInset?: number;
     onThisDay?: React.ReactNode;
+    onShowArchived?: () => void;
+    onHideArchived?: () => void;
+    showArchived?: boolean;
   }) => {
     capturedOnViewSport = onViewSport;
     capturedTopInset = topInset;
+    capturedOnShowArchived = onShowArchived ?? null;
+    capturedOnHideArchived = onHideArchived ?? null;
+    capturedShowArchived = showArchived;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
     return <View testID={testID ?? 'home-screen'}>{onThisDay}</View>;
@@ -158,6 +171,9 @@ describe('HomeTab sport switching (LS-5814)', () => {
     capturedOnViewSport = null;
     capturedTopInset = undefined;
     capturedOnPlayerPress = null;
+    capturedOnShowArchived = null;
+    capturedOnHideArchived = null;
+    capturedShowArchived = undefined;
     mockGetUserLeagueSummaries.mockReturnValue({
       data: { getUserLeagueSummaries: [] },
       loading: false,
@@ -311,5 +327,51 @@ describe('HomeTab OnThisDayFeed player navigation (LS-8627)', () => {
     });
 
     expect(mockPush).not.toHaveBeenCalled();
+  });
+});
+
+describe('HomeTab archived leagues toggle (LS-8633)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    capturedOnShowArchived = null;
+    capturedOnHideArchived = null;
+    capturedShowArchived = undefined;
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: [] },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    mockGetArchivedLazy.mockReturnValue([
+      jest.fn(),
+      { data: null, loading: false },
+    ]);
+    mockGetArchivedCached.mockReturnValue({ data: null });
+  });
+
+  it('starts with showArchived false', () => {
+    render(<HomeTab />);
+    expect(capturedShowArchived).toBe(false);
+  });
+
+  it('sets showArchived to true and fetches when onShowArchived fires', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnShowArchived?.();
+    });
+    expect(capturedShowArchived).toBe(true);
+  });
+
+  it('sets showArchived back to false when onHideArchived fires, so the toggle is not one-way', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnShowArchived?.();
+    });
+    expect(capturedShowArchived).toBe(true);
+
+    void act(() => {
+      capturedOnHideArchived?.();
+    });
+    expect(capturedShowArchived).toBe(false);
   });
 });

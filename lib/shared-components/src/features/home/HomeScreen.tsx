@@ -117,6 +117,8 @@ export interface HomeScreenProps {
   archivedLoading?: boolean;
 
   onShowArchived?: () => void;
+  /** Collapses the archived-leagues section back behind the "show archived" toggle. */
+  onHideArchived?: () => void;
   onRetry?: () => void;
   onViewLeague: (summary: HomeLeagueSummary) => void;
   onSetLineup?: (summary: HomeLeagueSummary) => void;
@@ -1155,6 +1157,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     showArchived = false,
     archivedLoading = false,
     onShowArchived,
+    onHideArchived,
     onRetry,
     onViewLeague,
     onSetLineup,
@@ -1427,50 +1430,82 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                       </Text>
                     </XStack>
                   ) : null
-                ) : archivedLoading ? (
-                  <XStack gap="$2" alignItems="center">
-                    <Spinner size="small" color={BRAND_GOLD_LIGHT} />
-                    <Text
-                      fontFamily={BODY_FONT}
-                      fontSize={13}
-                      color="$textMuted"
-                    >
-                      Loading archived leagues…
-                    </Text>
-                  </XStack>
-                ) : archivedLeagues.length > 0 ? (
+                ) : (
                   <YStack gap="$3">
-                    <Text
-                      fontFamily={DISPLAY_FONT}
-                      fontWeight="700"
-                      fontSize={14}
-                      letterSpacing={1.1}
-                      textTransform="uppercase"
-                      color="$textMuted"
+                    <XStack
+                      testID="home-hide-archived"
+                      accessibilityRole="button"
+                      accessibilityLabel="Hide archived leagues"
+                      onPress={onHideArchived}
+                      alignItems="center"
+                      gap="$2"
+                      cursor={onHideArchived ? 'pointer' : undefined}
+                      tabIndex={onHideArchived ? 0 : undefined}
+                      onKeyDown={
+                        onHideArchived
+                          ? (e: React.KeyboardEvent<HTMLElement>) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                onHideArchived();
+                              }
+                            }
+                          : undefined
+                      }
                     >
-                      Archived
-                    </Text>
-                    <YStack
-                      borderWidth={1}
-                      borderColor="$surfacePanelBorder"
-                      borderRadius={12}
-                      overflow="hidden"
-                      gap={1}
-                      backgroundColor="$surfacePanelBorder"
-                    >
-                      {archivedLeagues.map((s) => (
-                        <LeagueListRow
-                          key={s.leagueId}
-                          summary={s}
-                          onPress={() => onViewLeague(s)}
-                          onMockDraft={
-                            onMockDraft ? () => onMockDraft(s) : undefined
-                          }
-                        />
-                      ))}
-                    </YStack>
+                      <Text
+                        fontFamily={DISPLAY_FONT}
+                        fontWeight="700"
+                        fontSize={14}
+                        letterSpacing={1.1}
+                        textTransform="uppercase"
+                        color="$textMuted"
+                      >
+                        {`${onHideArchived ? '▾ ' : ''}Archived`}
+                      </Text>
+                    </XStack>
+                    {archivedLoading ? (
+                      <XStack gap="$2" alignItems="center">
+                        <Spinner size="small" color={BRAND_GOLD_LIGHT} />
+                        <Text
+                          fontFamily={BODY_FONT}
+                          fontSize={13}
+                          color="$textMuted"
+                        >
+                          Loading archived leagues…
+                        </Text>
+                      </XStack>
+                    ) : archivedLeagues.length > 0 ? (
+                      <YStack
+                        borderWidth={1}
+                        borderColor="$surfacePanelBorder"
+                        borderRadius={12}
+                        overflow="hidden"
+                        gap={1}
+                        backgroundColor="$surfacePanelBorder"
+                      >
+                        {archivedLeagues.map((s) => (
+                          <LeagueListRow
+                            key={s.leagueId}
+                            summary={s}
+                            onPress={() => onViewLeague(s)}
+                            onMockDraft={
+                              onMockDraft ? () => onMockDraft(s) : undefined
+                            }
+                          />
+                        ))}
+                      </YStack>
+                    ) : (
+                      <Text
+                        testID="home-archived-empty"
+                        fontFamily={BODY_FONT}
+                        fontSize={13}
+                        color="$textMuted"
+                      >
+                        No archived leagues.
+                      </Text>
+                    )}
                   </YStack>
-                ) : null}
+                )}
               </YStack>
 
               <YStack gap="$5">
