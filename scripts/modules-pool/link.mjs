@@ -81,7 +81,7 @@ import {
   readlinkSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const POOL_DIRNAME = '.modules-pool';
@@ -343,9 +343,30 @@ function resolveMainRepo(wt, explicit) {
   } catch {
     /* fall through */
   }
+  // Any other git worktree (e.g. `git worktree add /tmp/foo -b branch
+  // origin/main`, LS-8383): derive the main repo from the worktree's own git
+  // metadata instead of pattern-matching the path string. `git rev-parse
+  // --git-common-dir` resolves the shared .git directory regardless of where
+  // the worktree lives on disk — the main repo is that directory's parent.
+  const commonDir = gitCommonDir(wt);
+  if (commonDir && basename(commonDir) === '.git') return dirname(commonDir);
   fail(
     `Cannot auto-detect main repo from:\n  ${wt}\nPass --main-repo=<path> explicitly.`,
   );
+}
+
+function gitCommonDir(wt) {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+      cwd: wt,
+      encoding: 'utf-8',
+      timeout: 10_000,
+      windowsHide: true,
+    }).trim();
+    return out ? resolve(wt, out) : null;
+  } catch {
+    return null;
+  }
 }
 
 function computeHash(lockPath, saltWorktree) {

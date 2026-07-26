@@ -173,6 +173,92 @@ test('--no-salt changes the hash when packageManager is present', () => {
   }
 });
 
+// --- main-repo auto-detection (LS-8383) --------------------------------------
+// resolveMainRepo() has three convention-based checks (native, sibling, main
+// repo itself) plus a fallback for any other git worktree, which must derive
+// the main repo from the worktree's own git metadata rather than requiring
+// --main-repo. These tests exercise real `git worktree add` checkouts so the
+// `git rev-parse --git-common-dir` fallback is proven end to end.
+
+test('auto-detects main repo from an ad-hoc git worktree outside any convention', () => {
+  const root = mkdtempSync(join(tmpdir(), 'mp-git-main-'));
+  const wtParent = mkdtempSync(join(tmpdir(), 'mp-git-wt-'));
+  const wt = join(wtParent, 'ad-hoc-worktree');
+  try {
+    execFileSync('git', ['init', '-q', '-b', 'main', root]);
+    execFileSync('git', [
+      '-C',
+      root,
+      'config',
+      'user.email',
+      'test@example.com',
+    ]);
+    execFileSync('git', ['-C', root, 'config', 'user.name', 'Test']);
+    writeFileSync(join(root, 'README.md'), 'x');
+    execFileSync('git', ['-C', root, 'add', '.']);
+    execFileSync('git', ['-C', root, 'commit', '-q', '-m', 'init']);
+    execFileSync('git', [
+      '-C',
+      root,
+      'worktree',
+      'add',
+      '-q',
+      wt,
+      '-b',
+      'ad-hoc-branch',
+    ]);
+    writeFileSync(join(wt, 'pnpm-lock.yaml'), LOCK_A);
+    writeFileSync(join(wt, 'package.json'), PKG);
+
+    // No --main-repo passed — this is the exact LS-8383 repro shape (a
+    // worktree created outside .claude/worktrees/ and outside the sibling
+    // <repo>.worktrees/ convention). --check performs no filesystem writes so
+    // it exits 1 for "slot not built" rather than attempting a pnpm install,
+    // but it still logs the resolved main-repo path before that check runs.
+    const { status, output } = runLinkExpectFail([
+      `--worktree=${wt}`,
+      '--check',
+    ]);
+    assert.equal(status, 1, '--check exits 1 because no slot is built yet');
+    assert.match(
+      output,
+      new RegExp(
+        `main repo: ${realpathSync(root)}`.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          '\\$&',
+        ),
+      ),
+    );
+    assert.match(output, /slot not built/);
+  } finally {
+    try {
+      execFileSync('git', ['-C', root, 'worktree', 'remove', '--force', wt]);
+    } catch {
+      /* best effort */
+    }
+    rmSync(wtParent, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('still fails actionably when main repo cannot be auto-detected at all', () => {
+  const root = mkdtempSync(join(tmpdir(), 'mp-notgit-'));
+  try {
+    writeFileSync(join(root, 'pnpm-lock.yaml'), LOCK_A);
+    writeFileSync(join(root, 'package.json'), PKG);
+
+    const { status, output } = runLinkExpectFail([
+      `--worktree=${root}`,
+      '--print-hash',
+    ]);
+    assert.equal(status, 1);
+    assert.match(output, /Cannot auto-detect main repo from/);
+    assert.match(output, /--main-repo=<path>/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test(
   'pool hit links worktree → slot and is idempotent',
   { skip: SYMLINK_OK ? false : 'no symlink capability' },
