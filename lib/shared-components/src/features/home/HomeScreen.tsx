@@ -193,6 +193,17 @@ function recordOf(s: HomeLeagueSummary): string {
   return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 }
 
+/**
+ * Coerces a matchup score to a finite number, defaulting to 0. Guards
+ * `.toFixed()` call sites against a non-numeric value reaching the client
+ * (e.g. a malformed cache entry) — such a value would otherwise throw
+ * "TypeError: undefined is not a function" during render (LS-8668).
+ */
+function safeScore(value: number | null | undefined): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 /* ─── Reusable bits ─── */
 
 function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
@@ -426,8 +437,8 @@ function HeroRightPanel({ summary }: { summary: HomeLeagueSummary }) {
   }
 
   if (hasMatchup) {
-    const userScore = summary.userScore ?? 0;
-    const oppScore = summary.opponentScore ?? 0;
+    const userScore = safeScore(summary.userScore);
+    const oppScore = safeScore(summary.opponentScore);
     const isLeading = userScore >= oppScore;
     return panel(
       <XStack alignItems="center" justifyContent="space-between" gap="$4">
@@ -637,8 +648,8 @@ function LeagueListRow({
     scoreLabel = summary.draftMode ?? 'Draft';
     scoreColor = BRAND_SEAM_RED_LIGHT;
   } else if (hasMatchup) {
-    const userScore = summary.userScore ?? 0;
-    const oppScore = summary.opponentScore ?? 0;
+    const userScore = safeScore(summary.userScore);
+    const oppScore = safeScore(summary.opponentScore);
     const isLeading = userScore >= oppScore;
     scoreBig = userScore.toFixed(1);
     scoreLabel = `vs ${oppScore.toFixed(1)}${summary.opponentTeamName ? ` ${summary.opponentTeamName}` : ''}`;

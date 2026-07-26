@@ -144,6 +144,50 @@ describe('HomeScreen', () => {
       );
       expect(getByText('OTD-FEED-MARKER')).toBeTruthy();
     });
+
+    it('renders a secondary league row with a live matchup score without throwing (LS-8668)', () => {
+      const liveMatchupLeague: HomeLeagueSummary = {
+        leagueId: 43,
+        leagueName: 'Second League',
+        sport: 'baseball',
+        leaguePhase: 'active',
+        matchupId: 7,
+        matchupStatus: 'in_progress',
+        userScore: 12.5,
+        opponentScore: 9.25,
+        opponentTeamName: 'Rival FC',
+      };
+      const { getByText } = render(
+        <HomeScreen {...baseProps} leagues={[league, liveMatchupLeague]} />,
+      );
+      expect(getByText('Second League')).toBeTruthy();
+      expect(getByText('12.5')).toBeTruthy();
+    });
+
+    it('falls back to 0.0 instead of throwing when a matchup score is not a finite number (LS-8668)', () => {
+      // Simulates a malformed value reaching the component at runtime (e.g. a
+      // corrupted cache entry) despite the number|null type — the reported
+      // crash was "TypeError: undefined is not a function" from calling
+      // `.toFixed()` on such a value.
+      const malformedScoreLeague: HomeLeagueSummary = {
+        leagueId: 44,
+        leagueName: 'Malformed Score League',
+        sport: 'baseball',
+        leaguePhase: 'active',
+        matchupId: 8,
+        matchupStatus: 'in_progress',
+        userScore: 'DNP' as unknown as number,
+        opponentTeamName: 'Rival FC',
+      };
+      expect(() =>
+        render(
+          <HomeScreen
+            {...baseProps}
+            leagues={[league, malformedScoreLeague]}
+          />,
+        ),
+      ).not.toThrow();
+    });
   });
 
   describe('mock draft CTA', () => {
