@@ -90,14 +90,38 @@ fi
 # Required for `make pc` (lint, typecheck, test, build) on code changes.
 # Uses corepack to activate the correct pnpm version, then installs deps.
 #
-# Fast-path: skip install if node_modules/.bin/tsx is already present and
-# executable. This makes the script safe to re-run on every SessionStart
-# without incurring the full ~60s install cost when deps are already complete.
+# Fast-path: skip install only when BOTH node_modules/.bin/tsx is present and
+# executable AND the structural health assessment below passes. This makes
+# the script safe to re-run on every SessionStart without incurring the full
+# ~60s install cost when deps are already complete.
 # (LS-8113: cloud sessions start with an incomplete node_modules; this script
 # is also registered as a SessionStart hook so it runs on every session start.)
+#
+# tsx-presence alone is NOT sufficient (LS-8363 — a repeat regression of
+# LS-8113): pnpm's interrupted atomic-rename (e.g. a container reaped mid-
+# install) can leave tsx working while OTHER packages — a different one
+# nearly every time (@testing-library/react-native, recharts, react-native,
+# react-native-web, expo-image-picker, @modelcontextprotocol/sdk) — are left
+# as empty shells (a nested node_modules/ dir with no package.json) alongside
+# a `<pkg>_tmp_<pid>` leftover holding the real payload. Chasing that with a
+# growing per-package canary list is whack-a-mole, so
+# scripts/modules-pool/link.mjs's existing structural scanner is reused here
+# (--assess-path/--heal-path, added for this ticket): any `*_tmp_*` dir under
+# node_modules is always leftover cruft, and any package dir missing
+# package.json is a stub — both signatures generalize regardless of which
+# package the next partial install happens to hit. That scanner already
+# backed the worktree node_modules-pool corruption recovery (LS-8546/LS-8548)
+# — this reuses it for cloud's plain (non-pool) node_modules instead of
+# reimplementing the same detection twice.
 TSX_BIN="$REPO_DIR/node_modules/.bin/tsx"
-if [ -f "$TSX_BIN" ] && [ -x "$TSX_BIN" ]; then
-  echo "node_modules/.bin/tsx present — skipping pnpm install (dependencies already complete)"
+
+node_modules_healthy() {
+  [ -f "$TSX_BIN" ] && [ -x "$TSX_BIN" ] \
+    && node scripts/modules-pool/link.mjs --assess-path="$REPO_DIR/node_modules" >/dev/null 2>&1
+}
+
+if node_modules_healthy; then
+  echo "node_modules/.bin/tsx present and structural health check passed — skipping pnpm install"
 else
   if command -v corepack &>/dev/null; then
     corepack enable
@@ -108,14 +132,28 @@ else
   fi
 
   if command -v pnpm &>/dev/null; then
-    echo "node_modules/.bin/tsx absent — installing dependencies (LS-8113)..."
-    pnpm install --frozen-lockfile 2>&1 | tail -5
-    # Verify tsx is now present; warn if still missing so the agent can triage.
-    if [ -f "$TSX_BIN" ] && [ -x "$TSX_BIN" ]; then
-      echo "Dependencies installed — node_modules/.bin/tsx confirmed present"
-    else
-      echo "WARNING: pnpm install completed but node_modules/.bin/tsx is still absent"
-      echo "  MCP stdio servers may not connect. Run 'pnpm install' manually and restart."
+    # A single repair pass is not always enough (LS-8363 comment history: one
+    # session needed a second `make install` before expo-image-picker came
+    # back) — retry once before warning.
+    MAX_ATTEMPTS=2
+    ATTEMPT=1
+    while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
+      echo "node_modules incomplete or unhealthy — repairing (attempt $ATTEMPT/$MAX_ATTEMPTS, LS-8113/LS-8363)..."
+      # Remove any corrupt entries (orphan *_tmp_* dirs, stub package dirs
+      # missing package.json) first, so pnpm treats them as genuinely absent
+      # and re-extracts them, instead of trusting a directory that already
+      # "exists" but is broken.
+      node scripts/modules-pool/link.mjs --heal-path="$REPO_DIR/node_modules" || true
+      pnpm install --frozen-lockfile 2>&1 | tail -5
+      if node_modules_healthy; then
+        echo "Dependencies installed — node_modules/.bin/tsx confirmed present and structural health check passed"
+        break
+      fi
+      ATTEMPT=$((ATTEMPT + 1))
+    done
+    if ! node_modules_healthy; then
+      echo "WARNING: pnpm install completed but node_modules is still not healthy after $MAX_ATTEMPTS attempts"
+      echo "  Run 'node scripts/modules-pool/link.mjs --assess-path=\"$REPO_DIR/node_modules\"' for details, then 'pnpm install' manually and restart."
     fi
   else
     echo "WARNING: pnpm not available — make pc will not work for code changes"

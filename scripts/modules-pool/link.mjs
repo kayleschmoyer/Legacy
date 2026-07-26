@@ -32,6 +32,8 @@
  * Usage:
  *   node scripts/modules-pool/link.mjs [--worktree=<path>] [--main-repo=<path>]
  *                                      [--no-salt] [--print-hash] [--check] [--rebuild]
+ *   node scripts/modules-pool/link.mjs --assess-path=<dir>
+ *   node scripts/modules-pool/link.mjs --heal-path=<dir>
  *
  * --worktree    Absolute path to the worktree. Defaults to cwd.
  * --main-repo   Absolute path to the main repo root (holds .modules-pool). Auto-
@@ -45,6 +47,20 @@
  * --rebuild     Quarantine this lockfile's slot (rename to <hash>.corrupt-<ts>)
  *               even if it passes the health check, then re-materialise. Use to
  *               force recovery from corruption the health check cannot see.
+ * --assess-path=<dir>  Standalone health assessment of an arbitrary node_modules
+ *               directory — no pool, lockfile, or worktree/main-repo resolution
+ *               involved. Prints findings and exits 0 (healthy) / 1 (unhealthy).
+ *               For environments that install straight into a plain node_modules
+ *               (e.g. cloud sessions running `pnpm install` directly — see
+ *               .claude/cloud-setup.sh, LS-8363).
+ * --heal-path=<dir>    Structural-corruption-only pass over an arbitrary
+ *               node_modules directory: removes orphan pnpm `*_tmp_*` staging
+ *               dirs and package dirs missing package.json (the interrupted-
+ *               install signature also checked by --check/--assess-path), then
+ *               exits 0. Does not run pnpm install itself and does not check
+ *               nx/.bin presence — the caller reinstalls afterward so the
+ *               removed entries come back clean instead of pnpm trusting a
+ *               stub directory that already "exists".
  *
  * Corruption recovery is otherwise automatic: an unhealthy slot (orphan pnpm
  * `*_tmp_*` dirs, packages missing package.json — the LS-8546/LS-8548 interrupted-
@@ -82,6 +98,41 @@ const args = Object.fromEntries(
 );
 
 const noFrozenLockfile = Boolean(args['no-frozen-lockfile']);
+
+// ---------------------------------------------------------------------------
+// Standalone assess/heal modes (LS-8363) — no pool, lockfile, or worktree/
+// main-repo resolution. Exit before any of that runs so callers with a plain
+// node_modules (cloud sessions; no .modules-pool involved) can use the same
+// corruption-detection logic the pool path already relies on.
+// ---------------------------------------------------------------------------
+if (args['assess-path']) {
+  const target = resolve(String(args['assess-path']));
+  const result = assessSlot(target);
+  if (result.healthy) {
+    console.log(`[assess] ${target}: healthy`);
+    process.exit(0);
+  }
+  console.log(`[assess] ${target}: UNHEALTHY`);
+  for (const f of result.findings) console.log(`  - ${f}`);
+  process.exit(1);
+}
+
+if (args['heal-path']) {
+  const target = resolve(String(args['heal-path']));
+  const entries = findCorruptEntries(target);
+  if (entries.length === 0) {
+    console.log(`[heal] ${target}: no corrupt entries found.`);
+    process.exit(0);
+  }
+  console.log(
+    `[heal] ${target}: removing ${entries.length} corrupt entr${entries.length === 1 ? 'y' : 'ies'} so the next install rebuilds them cleanly:`,
+  );
+  for (const e of entries) {
+    console.log(`  - ${e.label}: ${e.reason}`);
+    removeDir(e.path);
+  }
+  process.exit(0);
+}
 
 const cwd = process.cwd();
 // --worktree, or (when invoked via `make modules-link WT=…`) the make-exported
@@ -362,72 +413,102 @@ function assessSlot(nm) {
 }
 
 function findCorruption(nm) {
-  // pnpm's interrupted-install staging-dir name pattern: `<name>_tmp_<pid>`.
-  // Anchored to the end so a legitimate package whose name merely contains
-  // `_tmp_<digits>` (e.g. `.pnpm/x_tmp_1@1.0.0`) is not flagged.
-  // (A function-local const: the main flow runs before module-level consts
-  // this far down would be initialised — only function declarations hoist.)
+  return findCorruptEntries(nm).map((e) => `${e.label}: ${e.reason}`);
+}
+
+/**
+ * Structured version of findCorruption — returns `[{ path, label, reason }]`
+ * so callers (e.g. --heal-path) can remove the exact corrupt directory rather
+ * than just print about it. Same detection, same cost characteristics: pnpm's
+ * interrupted-install staging-dir name pattern (`<name>_tmp_<pid>`, anchored
+ * to the end so a legitimate package whose name merely contains `_tmp_<digits>`
+ * is not flagged) plus package dirs missing package.json, scanned at the
+ * top level and one level into @scopes; `.pnpm` children are name-checked only
+ * (a single readdir, no per-entry stats).
+ */
+function findCorruptEntries(nm) {
   const TMP_DIR_RE = /_tmp_\d+$/;
-  const findings = [];
-  let entries;
+  const entries = [];
+  let names;
   try {
-    entries = readdirSync(nm);
+    names = readdirSync(nm);
   } catch (err) {
-    return [`cannot read node_modules: ${String(err.message ?? err)}`];
+    return [
+      {
+        path: nm,
+        label: 'node_modules',
+        reason: `cannot read: ${String(err.message ?? err)}`,
+      },
+    ];
   }
-  for (const name of entries) {
+  for (const name of names) {
     if (name.startsWith('.')) {
       // Dot entries are pnpm-internal (.bin, .pnpm, .modules.yaml, caches).
       // .pnpm can hold thousands of entries — name-scan only, no stats.
       if (name === '.pnpm') {
         for (const sub of safeReaddirNames(join(nm, '.pnpm'))) {
-          if (TMP_DIR_RE.test(sub))
-            findings.push(
-              `.pnpm/${sub}: orphan _tmp_ dir (interrupted install)`,
-            );
+          if (TMP_DIR_RE.test(sub)) {
+            entries.push({
+              path: join(nm, '.pnpm', sub),
+              label: `.pnpm/${sub}`,
+              reason: 'orphan _tmp_ dir (interrupted install)',
+            });
+          }
         }
       }
       continue;
     }
     if (TMP_DIR_RE.test(name)) {
-      findings.push(`${name}: orphan _tmp_ dir (interrupted install)`);
+      entries.push({
+        path: join(nm, name),
+        label: name,
+        reason: 'orphan _tmp_ dir (interrupted install)',
+      });
       continue;
     }
     if (name.startsWith('@')) {
       for (const sub of safeReaddirNames(join(nm, name))) {
+        const subPath = join(nm, name, sub);
         if (TMP_DIR_RE.test(sub)) {
-          findings.push(
-            `${name}/${sub}: orphan _tmp_ dir (interrupted install)`,
-          );
+          entries.push({
+            path: subPath,
+            label: `${name}/${sub}`,
+            reason: 'orphan _tmp_ dir (interrupted install)',
+          });
           continue;
         }
-        checkPackageDir(join(nm, name, sub), `${name}/${sub}`, findings);
+        const bad = checkPackageDirEntry(subPath, `${name}/${sub}`);
+        if (bad) entries.push(bad);
       }
       continue;
     }
-    checkPackageDir(join(nm, name), name, findings);
+    const bad = checkPackageDirEntry(join(nm, name), name);
+    if (bad) entries.push(bad);
   }
-  return findings;
+  return entries;
 }
 
 /**
  * A package entry is corrupt when it is a directory (after following symlinks —
  * hoisted top-level packages are links into .pnpm) without a package.json, or a
- * broken symlink. Plain files (stray READMEs etc.) are ignored.
+ * broken symlink. Plain files (stray READMEs etc.) are ignored (returns null).
  */
-function checkPackageDir(dir, label, findings) {
+function checkPackageDirEntry(dir, label) {
   let st;
   try {
     st = statSync(dir);
   } catch {
-    findings.push(
-      `${label}: broken entry (unresolvable symlink or unreadable)`,
-    );
-    return;
+    return {
+      path: dir,
+      label,
+      reason: 'broken entry (unresolvable symlink or unreadable)',
+    };
   }
-  if (!st.isDirectory()) return;
-  if (!existsSync(join(dir, 'package.json')))
-    findings.push(`${label}: missing package.json`);
+  if (!st.isDirectory()) return null;
+  if (!existsSync(join(dir, 'package.json'))) {
+    return { path: dir, label, reason: 'missing package.json' };
+  }
+  return null;
 }
 
 /**
