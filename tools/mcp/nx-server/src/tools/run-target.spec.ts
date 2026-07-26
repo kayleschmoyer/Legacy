@@ -324,3 +324,50 @@ describe('runTarget', () => {
     expect(jobCallOpts().env).toEqual({ PLAYWRIGHT_GREP: '@regression' });
   });
 });
+
+describe('runTarget shell-metacharacter validation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('allows a --testPathPatterns value containing Expo Router route-group parens', async () => {
+    setupJob();
+    const result = await runTarget({
+      project: 'app',
+      target: 'test',
+      args: [
+        '--testPathPatterns',
+        '(app)/(tabs)/players.spec|(app)/_layout.spec',
+      ],
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockRunJob).toHaveBeenCalled();
+  });
+
+  it('still rejects a token containing a semicolon', async () => {
+    const result = await runTarget({
+      project: 'app',
+      target: 'test',
+      args: ['--testPathPatterns', 'foo;rm -rf /'],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('contains shell metacharacters (;&`${})'),
+    });
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+
+  it('still rejects a token containing a backtick', async () => {
+    const result = await runTarget({
+      project: 'app',
+      target: 'test',
+      args: ['--testPathPatterns', 'foo`whoami`'],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(mockRunJob).not.toHaveBeenCalled();
+  });
+});

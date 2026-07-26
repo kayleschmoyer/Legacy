@@ -3,8 +3,10 @@
  *
  * When `shell: true` is used on Windows, Node.js joins all args into a single
  * string passed to `cmd.exe /d /s /c "..."`. In that context `|`, `<`, and `>`
- * are interpreted as pipe/redirect operators. Wrapping the arg in double-quotes
- * makes them literal: inside `"..."` cmd.exe does not treat `|` as a pipe.
+ * are interpreted as pipe/redirect operators, and `(`/`)` are special inside
+ * constructs like `IF (...)` or `FOR (...)`. Wrapping the arg in double-quotes
+ * makes them literal: inside `"..."` cmd.exe does not treat any of these as
+ * operators.
  *
  * Note: the `^`-escape approach (`^|`) does NOT work here because cmd.exe
  * tokenizes `|` as a pipe at a higher priority than `^`-escape processing,
@@ -16,7 +18,7 @@ export function escapeCmdShellArg(arg: string): string {
   // Whitespace is quoted too: with `shell: true` Node joins args with spaces,
   // so an unquoted arg containing a space would split into two shell words
   // (e.g. a --config= path or the "Mobile Chrome" playwright project).
-  if (/[|<>\s]/.test(arg)) {
+  if (/[|<>()\s]/.test(arg)) {
     return `"${arg}"`;
   }
   return arg;

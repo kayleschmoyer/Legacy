@@ -43,15 +43,22 @@ export function isTargetAllowed(target: string): boolean {
  *
  * On Windows, pnpm is a `.cmd` batch script that requires `shell: true`
  * (cmd.exe). `runCommand` in run-command.ts wraps args containing `|`, `<`,
- * and `>` in double-quotes via `escapeCmdShellArg` so cmd.exe treats them as
- * literals. The remaining characters below are blocked entirely because they
- * have no legitimate use in nx target args and cannot be safely escaped.
+ * `>`, and now `(`/`)` in double-quotes via `escapeCmdShellArg` so cmd.exe
+ * treats them as literals. The remaining characters below are blocked
+ * entirely because they have no legitimate use in nx target args and cannot
+ * be safely escaped.
  *
  * Pipe `|` is intentionally NOT blocked — it is a valid Jest
  * `--testPathPatterns` alternation operator and is double-quote-wrapped by
  * `escapeCmdShellArg` before the command reaches cmd.exe.
+ *
+ * Parens `(`/`)` are intentionally NOT blocked — Expo Router route-group
+ * path segments (e.g. `(app)/(tabs)/`) are valid, common Jest
+ * `--testPathPatterns` characters. Like `|`, they are double-quote-wrapped
+ * by `escapeCmdShellArg` before the command reaches cmd.exe, so a bare
+ * unquoted `(app)` token is not itself an injection vector.
  */
-const SHELL_METACHAR_REGEX = /[;&`$(){}]/;
+const SHELL_METACHAR_REGEX = /[;&`${}]/;
 
 interface RunTargetParams {
   project: string;
@@ -182,7 +189,7 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             content: [
               {
                 type: 'text',
-                text: `Arg "${token}" contains shell metacharacters (;&\`$(){}) which are not allowed. Pass each flag as a separate array element.`,
+                text: `Arg "${token}" contains shell metacharacters (;&\`\${}) which are not allowed. Pass each flag as a separate array element.`,
               },
             ],
             isError: true,
