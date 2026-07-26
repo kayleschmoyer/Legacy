@@ -250,6 +250,73 @@ describe('listReviews (LS-8166)', () => {
       expect(result.isError).toBe(true);
       expect(mockedGraphQL).not.toHaveBeenCalled();
     });
+
+    it('compact: false includes the full review body', async () => {
+      mockedGraphQL.mockResolvedValue({
+        data: {
+          repository: {
+            pr1: {
+              number: 1,
+              reviews: reviewsNodes([reviewNode({ body: 'looks good' })]),
+            },
+          },
+        },
+      });
+
+      const parsed = parse(await listReviews({ prs: [1], compact: false })) as {
+        reviews: Record<string, { body?: string }[]>;
+      };
+
+      expect(parsed.reviews[1][0].body).toBe('looks good');
+    });
+
+    it('compact: true (or omitted) matches the existing shape exactly (no body key)', async () => {
+      mockedGraphQL.mockResolvedValue({
+        data: {
+          repository: {
+            pr1: {
+              number: 1,
+              reviews: reviewsNodes([reviewNode({ login: 'a' })]),
+            },
+          },
+        },
+      });
+
+      const parsed = parse(await listReviews({ prs: [1] })) as {
+        reviews: Record<string, unknown[]>;
+      };
+      expect(parsed.reviews[1]).toEqual([
+        {
+          reviewer: 'a',
+          state: 'APPROVED',
+          submittedAt: '2026-01-01T00:00:00Z',
+          bodyLength: 4,
+          commentCount: 0,
+        },
+      ]);
+    });
+
+    it('truncates a body longer than maxBodyChars with a trailing marker', async () => {
+      const longBody = 'x'.repeat(20000);
+      mockedGraphQL.mockResolvedValue({
+        data: {
+          repository: {
+            pr1: {
+              number: 1,
+              reviews: reviewsNodes([reviewNode({ body: longBody })]),
+            },
+          },
+        },
+      });
+
+      const parsed = parse(await listReviews({ prs: [1], compact: false })) as {
+        reviews: Record<string, { body?: string }[]>;
+      };
+
+      const body = parsed.reviews[1][0].body ?? '';
+      expect(body.length).toBe(10000 + '\n[truncated]'.length);
+      expect(body.endsWith('\n[truncated]')).toBe(true);
+    });
   });
 
   describe('single-PR mode (preserved)', () => {
@@ -280,6 +347,43 @@ describe('listReviews (LS-8166)', () => {
     it('errors when neither `number` nor `prs` is provided', async () => {
       const result = await listReviews({});
       expect(result.isError).toBe(true);
+    });
+
+    it('compact: false includes the raw body text in the Markdown table', async () => {
+      mockedRest
+        .mockResolvedValueOnce([
+          {
+            id: 1,
+            user: { login: 'alice' },
+            state: 'APPROVED',
+            submitted_at: '2026-01-01T00:00:00Z',
+            body: 'a distinctive review body',
+          },
+        ] as unknown as never)
+        .mockResolvedValueOnce([] as unknown as never);
+
+      const text = (await listReviews({ number: 42, compact: false }))
+        .content[0].text;
+
+      expect(text).toContain('a distinctive review body');
+    });
+
+    it('default/compact: true still matches the existing row shape unchanged', async () => {
+      mockedRest
+        .mockResolvedValueOnce([
+          {
+            id: 1,
+            user: { login: 'alice' },
+            state: 'APPROVED',
+            submitted_at: '2026-01-01T00:00:00Z',
+            body: 'lgtm',
+          },
+        ] as unknown as never)
+        .mockResolvedValueOnce([] as unknown as never);
+
+      const text = (await listReviews({ number: 42 })).content[0].text;
+
+      expect(text).toContain('alice|APPROVED|2026-01-01T00:00:00Z|4|0');
     });
   });
 });

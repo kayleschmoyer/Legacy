@@ -39,7 +39,7 @@ The git-heavy tools (`github_rebase_pr`, `github_bulk_rebase`, `github_open_pr`'
 - **github_resolve_threads** — Batch-resolve review threads
 - **github_reply_to_review** — Reply to a review thread (accepts GraphQL `threadId` OR REST `commentId`+`number`)
 - **github_comment_pr** — Post a top-level PR comment
-- **github_list_reviews** — List reviews on a PR
+- **github_list_reviews** — List reviews on a PR. Pass `compact: false` (default `true`) to include each review's full `body` text, truncated to `maxBodyChars` (default 10000) with a `[truncated]` marker
 
 ### Labels
 

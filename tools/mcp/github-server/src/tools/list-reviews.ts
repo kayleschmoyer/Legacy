@@ -17,6 +17,8 @@ interface ListReviewsParams {
   prs?: number[];
   reviewer?: string;
   latestOnly?: boolean;
+  compact?: boolean;
+  maxBodyChars?: number;
 }
 
 interface GitHubReview {
@@ -36,6 +38,15 @@ interface MappedReview {
   submittedAt: string;
   bodyLength: number;
   commentCount: number;
+  body?: string;
+}
+
+const DEFAULT_MAX_BODY_CHARS = 10000;
+
+function truncateBody(body: string, maxChars: number): string {
+  return body.length <= maxChars
+    ? body
+    : `${body.slice(0, maxChars)}\n[truncated]`;
 }
 
 async function fetchReviewCommentCount(
@@ -84,7 +95,10 @@ function applyFilters(
 
 async function listReviewsSingle(
   params: Required<Pick<ListReviewsParams, 'number'>> &
-    Pick<ListReviewsParams, 'reviewer' | 'latestOnly'>,
+    Pick<
+      ListReviewsParams,
+      'reviewer' | 'latestOnly' | 'compact' | 'maxBodyChars'
+    >,
 ): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
@@ -107,22 +121,26 @@ async function listReviewsSingle(
     const totalCounts = await Promise.all(
       reviews.map((r) => fetchReviewCommentCount(path, r.id)),
     );
+    const compact = params.compact !== false;
+    const maxBodyChars = params.maxBodyChars ?? DEFAULT_MAX_BODY_CHARS;
     const allMapped: MappedReview[] = reviews.map((r, i) => ({
       reviewer: r.user?.login ?? 'unknown',
       state: r.state,
       submittedAt: r.submitted_at,
       bodyLength: r.body.length,
       commentCount: totalCounts[i],
+      ...(compact ? {} : { body: truncateBody(r.body, maxBodyChars) }),
     }));
 
     const latestOnly = params.latestOnly !== false;
     const filtered = applyFilters(allMapped, params.reviewer, latestOnly);
 
+    const columns = compact ? REVIEW_COLUMNS : [...REVIEW_COLUMNS, 'body'];
     const header = `_PR #${params.number}, total: ${reviews.length}, returned: ${filtered.length}, latestOnly: ${latestOnly}${params.reviewer ? `, reviewer: ${params.reviewer}` : ''}_`;
     const text =
       filtered.length === 0
         ? `No reviews found for PR #${params.number}.`
-        : `${header}\n\n${markdownTable(filtered, { columns: REVIEW_COLUMNS })}`;
+        : `${header}\n\n${markdownTable(filtered, { columns })}`;
 
     return {
       content: [{ type: 'text', text }],
@@ -191,7 +209,10 @@ function buildBatchQuery(prs: number[]): string {
 
 async function listReviewsBatch(
   params: Required<Pick<ListReviewsParams, 'prs'>> &
-    Pick<ListReviewsParams, 'reviewer' | 'latestOnly'>,
+    Pick<
+      ListReviewsParams,
+      'reviewer' | 'latestOnly' | 'compact' | 'maxBodyChars'
+    >,
 ): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
@@ -203,6 +224,8 @@ async function listReviewsBatch(
 
     const repoData = result.data.repository;
     const latestOnly = params.latestOnly !== false;
+    const compact = params.compact !== false;
+    const maxBodyChars = params.maxBodyChars ?? DEFAULT_MAX_BODY_CHARS;
 
     const reviews: Record<number, MappedReview[]> = {};
     const missing: number[] = [];
@@ -223,6 +246,7 @@ async function listReviewsBatch(
         submittedAt: r.submittedAt,
         bodyLength: r.body.length,
         commentCount: r.comments.totalCount,
+        ...(compact ? {} : { body: truncateBody(r.body, maxBodyChars) }),
       }));
       reviews[prNumber] = applyFilters(mapped, params.reviewer, latestOnly);
     }
@@ -269,6 +293,8 @@ export async function listReviews(
       prs: params.prs,
       reviewer: params.reviewer,
       latestOnly: params.latestOnly,
+      compact: params.compact,
+      maxBodyChars: params.maxBodyChars,
     });
   }
 
@@ -285,6 +311,8 @@ export async function listReviews(
     number: params.number,
     reviewer: params.reviewer,
     latestOnly: params.latestOnly,
+    compact: params.compact,
+    maxBodyChars: params.maxBodyChars,
   });
 }
 

@@ -579,7 +579,7 @@ export function createServer(): McpServer {
   // --- github_list_reviews ---
   server.tool(
     'github_list_reviews',
-    'List reviews on a PR (or many PRs in one batched GraphQL call). Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix). Pass `prs: number[]` (1-50) to fetch reviews for many PRs in one GraphQL round-trip; the response is `{ reviews: { [prNumber]: [...] }, missing: number[], truncated: number[] }`. Batch mode caps reviews at 100 per PR (GraphQL `first` limit); PRs whose totalCount exceeds the cap are listed in `truncated` so callers can fall back to single-PR mode if they need the full history.',
+    "List reviews on a PR (or many PRs in one batched GraphQL call). Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix). Pass `prs: number[]` (1-50) to fetch reviews for many PRs in one GraphQL round-trip; the response is `{ reviews: { [prNumber]: [...] }, missing: number[], truncated: number[] }`. Batch mode caps reviews at 100 per PR (GraphQL `first` limit); PRs whose totalCount exceeds the cap are listed in `truncated` so callers can fall back to single-PR mode if they need the full history. Pass `compact: false` to also get the full review body text (e.g. to read a monolithic bot review's findings) — no extra API call is made; the body is truncated to `maxBodyChars` (default 10000) with a trailing `[truncated]` marker when it exceeds that length.",
     {
       number: z.coerce
         .number()
@@ -607,6 +607,19 @@ export function createServer(): McpServer {
         .default(true)
         .describe(
           'When true (default), return only the most recent review per reviewer. Set false to return all reviews.',
+        ),
+      compact: coercedBoolean
+        .default(true)
+        .describe(
+          "When true (default), reviews omit the `body` field (bodyLength only) — unchanged from prior behavior. Set false to include the full review body text, e.g. to read a monolithic bot review's findings without a `gh api` fallback.",
+        ),
+      maxBodyChars: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(10000)
+        .describe(
+          'Only applies when compact: false. Review bodies longer than this are truncated to this length with a trailing "\\n[truncated]" marker.',
         ),
     },
     async (params) => listReviews(params),
