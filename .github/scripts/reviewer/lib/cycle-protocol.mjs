@@ -1,5 +1,6 @@
 import {
   parseAuthorReply,
+  parseIssueScopedReply,
   isShaInPrHistory,
   FORMAT_ERROR_MESSAGE,
 } from './parse-author-response.mjs';
@@ -62,6 +63,48 @@ export function parseTitlesFromReviewBody(body) {
     ...body.matchAll(/\*\*\[[A-Z]+\]\*\*\s+(.+?)\s+—\s+(?:`|_PR-level_)/g),
   ];
   return matches.map((m) => m[1].trim());
+}
+
+/**
+ * Companion to {@link parseTitlesFromReviewBody}: maps each finding's
+ * `issue-id` (the ULID embedded by `formatReviewBody`/`buildInlineComments`)
+ * to its title and whether it was posted as a PR-level (threadless) finding.
+ *
+ * Used by {@link buildAuthorResponsesSection} to resolve which finding an
+ * issue-id-qualified PR-level reply (see `parseIssueScopedReply`) addresses
+ * (LS-7938).
+ *
+ * @param {string | null | undefined} body
+ * @returns {Map<string, { title: string, isPrLevel: boolean }>}
+ */
+export function parseIssueIdTitleMap(body) {
+  if (!body) return new Map();
+  const matches = [
+    ...body.matchAll(
+      /<!-- issue-id: (\S+) -->\s*\n\*\*\[[A-Z]+\]\*\*\s+(.+?)\s+—\s+(`[^`\n]*`|_PR-level_)/g,
+    ),
+  ];
+  return new Map(
+    matches.map((m) => [
+      m[1],
+      { title: m[2].trim(), isPrLevel: m[3] === '_PR-level_' },
+    ]),
+  );
+}
+
+/**
+ * Titles of findings from a bot review body that were posted as PR-level
+ * (no file/line — `_PR-level_` loc) findings. Used to detect the unambiguous
+ * case (exactly one PR-level finding open) when a `FIX:`/`JUSTIFY:` issue
+ * comment does not cite an issue-id (LS-7938).
+ *
+ * @param {string | null | undefined} body
+ * @returns {string[]}
+ */
+export function parsePrLevelTitles(body) {
+  return [...parseIssueIdTitleMap(body).values()]
+    .filter((f) => f.isPrLevel)
+    .map((f) => f.title);
 }
 
 /**
@@ -498,7 +541,9 @@ function mapBotRootCommentIdToTitle(reviewComments, botLogins) {
  *   1. Author replies to inline review comment threads (non-blocking findings).
  *      Each reply is matched to a finding title extracted from the bot's root comment body.
  *   2. PR-level issue comments posted after the last bot review (blocking findings).
- *      These have no specific thread to match, so they are listed without a title.
+ *      These have no thread to match, so a title is resolved from `lastBotReviewBody`
+ *      instead — via an issue-id-qualified reply, or unambiguously when exactly one
+ *      PR-level finding is open (LS-7938). Otherwise they are listed without a title.
  *
  * MALFORMED replies (unrecognised tokens) are silently skipped and counted.
  * Returns an empty section string when no valid responses are found.
@@ -507,17 +552,22 @@ function mapBotRootCommentIdToTitle(reviewComments, botLogins) {
  * @param {Array<{ id: number, userLogin: string | null, body: string, createdAt: string }>} issueComments
  * @param {string} lastBotReviewAt     ISO 8601 timestamp of the last bot review; comments at or before this time are excluded from both sources
  * @param {Set<string>} botLogins      Login names that belong to the reviewer bot
- * @returns {{ section: string, formatErrors: number, items: Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }> }}
+ * @param {string} [lastBotReviewBody] Body of the last bot review, used to resolve issue-id-qualified
+ *   and unambiguous single-PR-level-finding replies to a real title (LS-7938). Omit/empty to fall
+ *   back to the pre-LS-7938 behavior of always returning `title: null` for PR-level issue comments.
+ * @returns {{ section: string, formatErrors: number, ambiguousPrLevelReplies: number, items: Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }> }}
  */
 export function buildAuthorResponsesSection(
   reviewComments,
   issueComments,
   lastBotReviewAt,
   botLogins,
+  lastBotReviewBody = '',
 ) {
   /** @type {Array<{ title: string | null, parsed: import('./parse-author-response.mjs').ParsedResponse }>} */
   const items = [];
   let formatErrors = 0;
+  let ambiguousPrLevelReplies = 0;
 
   // --- Part 1: inline review thread replies (blocking and non-blocking findings) ---
   const rootIdToTitle = mapBotRootCommentIdToTitle(reviewComments, botLogins);
@@ -537,18 +587,54 @@ export function buildAuthorResponsesSection(
   // Fallback channel for author responses to blocking findings. Blocking findings
   // with file+line also appear as inline threads (captured by Part 1 above);
   // PR-level blocking findings (no file/line) and any issue-comment replies land here.
+  //
+  // PR-level findings have no thread to resolve a title from, so a title is
+  // recovered two ways (LS-7938):
+  //   1. An issue-id-qualified FIX/JUSTIFY reply (`parseIssueScopedReply`) —
+  //      the author cited exactly which finding they addressed.
+  //   2. No issue-id cited, but exactly one PR-level finding is currently
+  //      open — unambiguous by elimination.
+  // Anything else (no issue-id, 2+ open PR-level findings) stays `title: null`
+  // as before, but is now counted in `ambiguousPrLevelReplies` instead of
+  // being silently indistinguishable from "no PR-level findings were open at all".
+  const issueIdToTitle = parseIssueIdTitleMap(lastBotReviewBody);
+  const openPrLevelTitles = parsePrLevelTitles(lastBotReviewBody);
+
   for (const c of issueComments) {
     if (botLogins.has(c.userLogin)) continue;
     if (lastBotReviewAt && c.createdAt <= lastBotReviewAt) continue;
+
+    const scoped = parseIssueScopedReply(c.body);
+    if (scoped) {
+      const resolved = issueIdToTitle.get(scoped.issueId);
+      const parsed =
+        scoped.type === 'FIX'
+          ? { type: 'FIX', sha: scoped.sha }
+          : { type: 'JUSTIFY', rationale: scoped.rationale };
+      items.push({ title: resolved?.title ?? null, parsed });
+      continue;
+    }
+
     const parsed = parseAuthorReply(c.body);
     if (parsed.type === 'MALFORMED') {
       formatErrors++;
       continue;
     }
+    if (parsed.type === 'FIX' || parsed.type === 'JUSTIFY') {
+      if (openPrLevelTitles.length === 1) {
+        items.push({ title: openPrLevelTitles[0], parsed });
+        continue;
+      }
+      if (openPrLevelTitles.length > 1) {
+        ambiguousPrLevelReplies++;
+      }
+    }
     items.push({ title: null, parsed });
   }
 
-  if (items.length === 0) return { section: '', formatErrors, items };
+  if (items.length === 0) {
+    return { section: '', formatErrors, ambiguousPrLevelReplies, items };
+  }
 
   const lines = ['## Author Responses'];
   for (const { title, parsed } of items) {
@@ -563,7 +649,12 @@ export function buildAuthorResponsesSection(
     lines.push(title ? `\n**${title}**: ${responseText}` : `\n${responseText}`);
   }
 
-  return { section: lines.join('\n'), formatErrors, items };
+  return {
+    section: lines.join('\n'),
+    formatErrors,
+    ambiguousPrLevelReplies,
+    items,
+  };
 }
 
 /**

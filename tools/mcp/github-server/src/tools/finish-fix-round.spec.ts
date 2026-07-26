@@ -49,11 +49,29 @@ describe('validateReplies', () => {
     expect(errs.some((e) => /body/.test(e.message))).toBe(true);
   });
 
-  it('rejects missing threadId', () => {
+  it('rejects missing threadId and missing issueId', () => {
     const errs = validateReplies([
       { threadId: '', kind: 'FIX', sha: 'abc123' },
     ]);
-    expect(errs.some((e) => /threadId/.test(e.message))).toBe(true);
+    expect(errs.some((e) => /threadId.*issueId/.test(e.message))).toBe(true);
+  });
+
+  it('rejects both threadId and issueId provided together', () => {
+    const errs = validateReplies([
+      {
+        threadId: 'PRRT_1',
+        issueId: 'ISSUE01',
+        kind: 'FIX',
+        sha: 'abc123',
+      },
+    ]);
+    expect(errs.some((e) => /threadId.*issueId/.test(e.message))).toBe(true);
+  });
+
+  it('accepts issueId (PR-level) in place of threadId', () => {
+    expect(
+      validateReplies([{ issueId: 'ISSUE01', kind: 'FIX', sha: 'abc1234' }]),
+    ).toEqual([]);
   });
 
   it('accepts a well-formed mixed batch', () => {
@@ -62,6 +80,8 @@ describe('validateReplies', () => {
         { threadId: 'PRRT_1', kind: 'FIX', sha: 'abc1234' },
         { threadId: 'PRRT_2', kind: 'JUSTIFY', body: 'not a bug' },
         { threadId: 'PRRT_3', kind: 'CANNOT-COMPLY', body: 'LS-1\nreason' },
+        { issueId: 'ISSUE01', kind: 'FIX', sha: 'def5678' },
+        { issueId: 'ISSUE02', kind: 'JUSTIFY', body: 'out of scope' },
       ]),
     ).toEqual([]);
   });
@@ -104,6 +124,32 @@ describe('buildReplyBody', () => {
         body: 'LS-1\nimpossible',
       }),
     ).toBe('CANNOT-COMPLY: LS-1\nimpossible');
+  });
+
+  it('PR-level FIX (issueId set, no threadId) puts the issue-id on its own line before the sha', () => {
+    expect(
+      buildReplyBody({ issueId: 'ISSUE01', kind: 'FIX', sha: 'abc1234' }),
+    ).toBe('FIX: ISSUE01\nabc1234');
+  });
+
+  it('PR-level JUSTIFY (issueId set, no threadId) puts the issue-id on its own line before the rationale', () => {
+    expect(
+      buildReplyBody({
+        issueId: 'ISSUE01',
+        kind: 'JUSTIFY',
+        body: 'Already covered by an existing test.',
+      }),
+    ).toBe('JUSTIFY: ISSUE01\nAlready covered by an existing test.');
+  });
+
+  it('PR-level CANNOT-COMPLY (issueId set, no threadId) puts the issue-id on its own line before the reason', () => {
+    expect(
+      buildReplyBody({
+        issueId: 'ISSUE01',
+        kind: 'CANNOT-COMPLY',
+        body: 'Generated file, cannot modify.',
+      }),
+    ).toBe('CANNOT-COMPLY: ISSUE01\nGenerated file, cannot modify.');
   });
 });
 
@@ -262,5 +308,57 @@ describe('finishFixRound (integration)', () => {
       (q as string).includes('resolveReviewThread'),
     );
     expect(resolveCall).toBeUndefined();
+  });
+
+  it('posts a PR-level (issueId) reply as a top-level issue comment, not a thread reply', async () => {
+    mockRest.mockResolvedValue({ id: 555 });
+
+    const result = await finishFixRound({
+      prNumber: 42,
+      replies: [{ issueId: 'ISSUE01', kind: 'FIX', sha: 'abc1234' }],
+    });
+
+    const data = parse(
+      result as { content: Array<{ type: string; text: string }> },
+    );
+    expect(data.replied).toBe(1);
+    expect(data.replies[0]).toMatchObject({
+      issueId: 'ISSUE01',
+      kind: 'FIX',
+      body: 'FIX: ISSUE01\nabc1234',
+      success: true,
+      commentId: 555,
+    });
+    expect(data.replies[0].threadId).toBeUndefined();
+
+    // No GraphQL thread reply or resolve mutation — PR-level replies have no thread.
+    expect(mockGraphQL).not.toHaveBeenCalled();
+
+    // Posted as a plain issue comment via REST, distinct from the label POST.
+    expect(mockRest).toHaveBeenCalledWith({
+      method: 'POST',
+      path: '/repos/bkrupa/legacy-sports/issues/42/comments',
+      body: { body: 'FIX: ISSUE01\nabc1234' },
+    });
+    expect(mockRest).toHaveBeenCalledWith({
+      method: 'POST',
+      path: '/repos/bkrupa/legacy-sports/issues/42/labels',
+      body: { labels: ['bot:ready-for-review'] },
+    });
+  });
+
+  it('does not resolve anything for a PR-level FIX reply (no thread exists)', async () => {
+    mockRest.mockResolvedValue({ id: 555 });
+
+    const result = await finishFixRound({
+      prNumber: 42,
+      replies: [{ issueId: 'ISSUE01', kind: 'FIX', sha: 'abc1234' }],
+    });
+
+    const data = parse(
+      result as { content: Array<{ type: string; text: string }> },
+    );
+    expect(data.resolved).toBe(0);
+    expect(data.resolutions).toEqual([]);
   });
 });

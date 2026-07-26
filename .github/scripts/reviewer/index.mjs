@@ -552,9 +552,15 @@ async function main() {
         prIssueComments,
         lastBotReview.submittedAt,
         REVIEWER_BOT_LOGINS,
+        lastBotReview.body ?? '',
       );
       authorResponsesSection = authorResponses.section;
       authorFormatErrors = authorResponses.formatErrors;
+      if (authorResponses.ambiguousPrLevelReplies > 0) {
+        process.stdout.write(
+          `[reviewer] Cycle ${cycle}: ${authorResponses.ambiguousPrLevelReplies} PR-level FIX/JUSTIFY reply(ies) could not be resolved to a finding (no issue-id cited, multiple PR-level findings open) — will not suppress re-raises\n`,
+        );
+      }
 
       // Build sets of FIX'd/JUSTIFY'd/CANNOT-COMPLY'd finding titles for
       // post-LLM validators and prompt guidance.

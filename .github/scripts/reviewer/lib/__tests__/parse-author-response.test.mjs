@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseAuthorReply,
+  parseIssueScopedReply,
   isShaInPrHistory,
   FORMAT_ERROR_MESSAGE,
 } from '../parse-author-response.mjs';
@@ -176,6 +177,80 @@ describe('FORMAT_ERROR_MESSAGE', () => {
       FORMAT_ERROR_MESSAGE,
       'Format error. Expected "FIX: <sha>" or "JUSTIFY: <rationale>". Your reply was treated as unaddressed.',
     );
+  });
+});
+
+describe('parseIssueScopedReply — issue-id-qualified FIX/JUSTIFY for PR-level findings (LS-7938)', () => {
+  it('parses a qualified FIX with issue-id on its own line', () => {
+    assert.deepStrictEqual(
+      parseIssueScopedReply('FIX: 01ABCDEF1234567890ABCDEF12\nabc1234'),
+      { type: 'FIX', issueId: '01ABCDEF1234567890ABCDEF12', sha: 'abc1234' },
+    );
+  });
+
+  it('parses a qualified FIX with a full 40-char SHA', () => {
+    const sha = 'a'.repeat(40);
+    assert.deepStrictEqual(parseIssueScopedReply(`FIX: ISSUE01\n${sha}`), {
+      type: 'FIX',
+      issueId: 'ISSUE01',
+      sha,
+    });
+  });
+
+  it('parses a qualified JUSTIFY with issue-id on its own line', () => {
+    assert.deepStrictEqual(
+      parseIssueScopedReply('JUSTIFY: ISSUE01\nAlready covered by test X.'),
+      {
+        type: 'JUSTIFY',
+        issueId: 'ISSUE01',
+        rationale: 'Already covered by test X.',
+      },
+    );
+  });
+
+  it('parses a multi-line JUSTIFY rationale', () => {
+    const body = 'JUSTIFY: ISSUE01\nLine 1\nLine 2';
+    assert.deepStrictEqual(parseIssueScopedReply(body), {
+      type: 'JUSTIFY',
+      issueId: 'ISSUE01',
+      rationale: 'Line 1\nLine 2',
+    });
+  });
+
+  it('trims the rationale', () => {
+    const result = parseIssueScopedReply('JUSTIFY: ISSUE01\nreason  ');
+    assert.strictEqual(result.rationale, 'reason');
+  });
+
+  it('returns null for the unqualified single-line FIX form (no issue-id)', () => {
+    assert.strictEqual(parseIssueScopedReply('FIX: abc1234'), null);
+  });
+
+  it('returns null for the unqualified single-line JUSTIFY form (no issue-id)', () => {
+    assert.strictEqual(
+      parseIssueScopedReply('JUSTIFY: pre-existing; out of scope'),
+      null,
+    );
+  });
+
+  it('returns null for FIX with an issue-id line but no sha line', () => {
+    assert.strictEqual(parseIssueScopedReply('FIX: ISSUE01'), null);
+  });
+
+  it('returns null for empty/whitespace-only body', () => {
+    assert.strictEqual(parseIssueScopedReply(''), null);
+    assert.strictEqual(parseIssueScopedReply('   \n  '), null);
+  });
+
+  it('returns null for CANNOT-COMPLY (out of scope for this parser)', () => {
+    assert.strictEqual(
+      parseIssueScopedReply('CANNOT-COMPLY: ISSUE01\nreason'),
+      null,
+    );
+  });
+
+  it('returns null for unrecognized text', () => {
+    assert.strictEqual(parseIssueScopedReply('This is a random reply'), null);
   });
 });
 

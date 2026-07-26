@@ -6,7 +6,16 @@ import type { ToolResult } from '../types.js';
 export type ReplyKind = 'FIX' | 'JUSTIFY' | 'CANNOT-COMPLY';
 
 export interface FinishFixRoundReply {
-  threadId: string;
+  /** Inline (file+line) finding — GraphQL review thread ID. Exactly one of `threadId`/`issueId` is required. */
+  threadId?: string;
+  /**
+   * PR-level (threadless) finding — the finding's issue-id (the ULID from the
+   * bot's `<!-- issue-id: ... -->` marker in the review body). Posts a
+   * top-level PR comment in the issue-id-qualified format
+   * `buildAuthorResponsesSection` resolves back to a title, instead of a
+   * GraphQL thread reply (LS-7938). Exactly one of `threadId`/`issueId` is required.
+   */
+  issueId?: string;
   kind: ReplyKind;
   sha?: string;
   body?: string;
@@ -49,9 +58,11 @@ interface ValidationError {
 }
 
 /**
- * Validate every reply spec before any side effect. FIX requires `sha`;
- * JUSTIFY and CANNOT-COMPLY require `body`. Returns the list of validation
- * errors; an empty list means the input is safe to process.
+ * Validate every reply spec before any side effect. Exactly one of
+ * `threadId` (inline finding) / `issueId` (PR-level finding) is required.
+ * FIX requires `sha`; JUSTIFY and CANNOT-COMPLY require `body`. Returns the
+ * list of validation errors; an empty list means the input is safe to
+ * process.
  */
 export function validateReplies(
   replies: FinishFixRoundReply[],
@@ -70,8 +81,17 @@ export function validateReplies(
       errors.push({ index: i, message: 'reply must be an object' });
       continue;
     }
-    if (typeof r.threadId !== 'string' || r.threadId.trim().length === 0) {
-      errors.push({ index: i, message: 'threadId is required (non-empty)' });
+    const hasThreadId =
+      typeof r.threadId === 'string' && r.threadId.trim().length > 0;
+    const hasIssueId =
+      typeof r.issueId === 'string' && r.issueId.trim().length > 0;
+    if (hasThreadId === hasIssueId) {
+      errors.push({
+        index: i,
+        threadId: r.threadId,
+        message:
+          'exactly one of threadId (inline finding) or issueId (PR-level finding) is required',
+      });
     }
     if (!kinds.includes(r.kind)) {
       errors.push({
@@ -107,27 +127,54 @@ export function validateReplies(
  * `FIX: <sha>` with no trailing prose. JUSTIFY and CANNOT-COMPLY use the
  * caller-provided body, prefixed if the body does not already start with
  * the kind token.
+ *
+ * PR-level (threadless) replies — `issueId` set, no `threadId` — are
+ * additionally qualified with the issue-id on its own line so
+ * `buildAuthorResponsesSection`/`parseIssueScopedReply` can resolve which
+ * finding the reply addresses (LS-7938):
+ *
+ *   FIX: <issue-id>
+ *   <sha>
  */
 export function buildReplyBody(reply: FinishFixRoundReply): string {
-  if (reply.kind === 'FIX') {
-    return `FIX: ${reply.sha!.trim()}`;
-  }
+  const prLevel = !reply.threadId && !!reply.issueId;
   const prefix = KIND_PREFIX[reply.kind];
+
+  if (reply.kind === 'FIX') {
+    const sha = reply.sha!.trim();
+    return prLevel ? `${prefix} ${reply.issueId}\n${sha}` : `${prefix} ${sha}`;
+  }
+
   const body = reply.body!.trim();
+  if (prLevel) {
+    // CANNOT-COMPLY already requires an issue-id on its own line regardless
+    // of thread vs PR-level origin (see parseAuthorReply) — JUSTIFY adopts
+    // the same shape for PR-level replies so both are resolvable to a
+    // finding without a thread (LS-7938).
+    return `${prefix} ${reply.issueId}\n${body}`;
+  }
   if (body.startsWith(prefix)) return body;
   return `${prefix} ${body}`;
 }
 
 interface ReplyOutcome {
-  threadId: string;
+  threadId?: string;
+  issueId?: string;
   kind: ReplyKind;
   body: string;
   success: boolean;
   commentNodeId?: string;
+  commentId?: number;
   error?: string;
 }
 
-async function postReply(reply: FinishFixRoundReply): Promise<ReplyOutcome> {
+/**
+ * Post a reply for an inline (threaded) finding — a GraphQL review-thread
+ * reply.
+ */
+async function postThreadReply(
+  reply: FinishFixRoundReply,
+): Promise<ReplyOutcome> {
   const body = buildReplyBody(reply);
   try {
     const res = await githubGraphQL<ReplyMutationResponse>(REPLY_MUTATION, {
@@ -150,6 +197,50 @@ async function postReply(reply: FinishFixRoundReply): Promise<ReplyOutcome> {
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/**
+ * Post a reply for a PR-level (threadless) finding — a top-level issue
+ * comment in the issue-id-qualified format, since there is no review thread
+ * to reply into (LS-7938).
+ */
+async function postIssueCommentReply(
+  reply: FinishFixRoundReply,
+  prNumber: number,
+): Promise<ReplyOutcome> {
+  const body = buildReplyBody(reply);
+  try {
+    const repo = await getRepoOwnerName();
+    const res = await githubRest<{ id: number }>({
+      method: 'POST',
+      path: `/repos/${repo.owner}/${repo.name}/issues/${prNumber}/comments`,
+      body: { body },
+    });
+    return {
+      issueId: reply.issueId,
+      kind: reply.kind,
+      body,
+      success: true,
+      commentId: res.id,
+    };
+  } catch (err) {
+    return {
+      issueId: reply.issueId,
+      kind: reply.kind,
+      body,
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+function postReply(
+  reply: FinishFixRoundReply,
+  prNumber: number,
+): Promise<ReplyOutcome> {
+  return reply.threadId
+    ? postThreadReply(reply)
+    : postIssueCommentReply(reply, prNumber);
 }
 
 function buildBatchResolveMutation(threadIds: string[]): {
@@ -240,15 +331,18 @@ export async function finishFixRound(
   const readyLabel = params.readyLabel ?? 'bot:ready-for-review';
 
   // Post all replies in parallel. Per-thread failures are captured, not thrown.
-  const replyOutcomes = await Promise.all(params.replies.map(postReply));
+  const replyOutcomes = await Promise.all(
+    params.replies.map((r) => postReply(r, params.prNumber)),
+  );
 
   // Only resolve threads where:
   //  1. the reply succeeded, AND
   //  2. the kind is FIX. JUSTIFY and CANNOT-COMPLY must stay open so the
   //     bot (or a human reviewer) can adjudicate them in the next cycle.
+  // PR-level (issueId-based) replies have no thread to resolve.
   const threadIdsToResolve = replyOutcomes
-    .filter((o) => o.success && o.kind === 'FIX')
-    .map((o) => o.threadId);
+    .filter((o) => o.success && o.kind === 'FIX' && o.threadId)
+    .map((o) => o.threadId!);
 
   const resolveOutcomes = await resolveBatch(threadIdsToResolve);
 
@@ -269,7 +363,12 @@ export async function finishFixRound(
 
   const replyErrors = replyOutcomes
     .filter((o) => !o.success)
-    .map((o) => ({ threadId: o.threadId, kind: o.kind, error: o.error! }));
+    .map((o) => ({
+      threadId: o.threadId,
+      issueId: o.issueId,
+      kind: o.kind,
+      error: o.error!,
+    }));
   const resolveErrors = resolveOutcomes
     .filter((r) => r.error || !r.isResolved)
     .map((r) => ({
@@ -279,6 +378,7 @@ export async function finishFixRound(
   const errors: Array<{
     stage: 'reply' | 'resolve' | 'label';
     threadId?: string;
+    issueId?: string;
     kind?: ReplyKind;
     error: string;
   }> = [
@@ -302,11 +402,13 @@ export async function finishFixRound(
           labelApplied,
           readyLabel,
           replies: replyOutcomes.map((o) => ({
-            threadId: o.threadId,
+            ...(o.threadId ? { threadId: o.threadId } : {}),
+            ...(o.issueId ? { issueId: o.issueId } : {}),
             kind: o.kind,
             body: o.body,
             success: o.success,
             ...(o.commentNodeId ? { commentNodeId: o.commentNodeId } : {}),
+            ...(o.commentId ? { commentId: o.commentId } : {}),
             ...(o.error ? { error: o.error } : {}),
           })),
           resolutions: resolveOutcomes,

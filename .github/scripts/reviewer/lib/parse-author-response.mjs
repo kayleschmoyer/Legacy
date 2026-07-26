@@ -79,3 +79,49 @@ export function isShaInPrHistory(sha, prCommitShas) {
     fullSha.toLowerCase().startsWith(normalized),
   );
 }
+
+/**
+ * Parse an issue-id-qualified `FIX:`/`JUSTIFY:` reply to a PR-level
+ * (threadless) finding, posted as a top-level PR (issue) comment.
+ *
+ * PR-level findings have no review thread, so a plain `FIX: <sha>` /
+ * `JUSTIFY: <rationale>` reply cannot be tied back to a specific finding
+ * when more than one is open. This mirrors the `CANNOT-COMPLY: <issue-id>`
+ * convention `parseAuthorReply` already supports — the issue-id sits alone
+ * on the first line, the payload follows on the next line(s):
+ *
+ *   FIX: <issue-id>
+ *   <sha>
+ *
+ *   JUSTIFY: <issue-id>
+ *   <rationale>
+ *
+ * Returns `null` when the body does not match this qualified shape —
+ * callers should fall back to `parseAuthorReply` for the unqualified,
+ * single-line `FIX:`/`JUSTIFY:` form (LS-7938).
+ *
+ * @param {string} body  Raw issue-comment text from the author
+ * @returns {{ type: 'FIX', issueId: string, sha: string } | { type: 'JUSTIFY', issueId: string, rationale: string } | null}
+ */
+export function parseIssueScopedReply(body) {
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+
+  const fixMatch = trimmed.match(
+    /^FIX:\s+(\S+)\s*\n([0-9a-fA-F]{7,40})(?:\s|$)/,
+  );
+  if (fixMatch) {
+    return { type: 'FIX', issueId: fixMatch[1], sha: fixMatch[2] };
+  }
+
+  const justifyMatch = trimmed.match(/^JUSTIFY:\s+(\S+)\s*\n([\s\S]+)$/);
+  if (justifyMatch) {
+    return {
+      type: 'JUSTIFY',
+      issueId: justifyMatch[1],
+      rationale: justifyMatch[2].trim(),
+    };
+  }
+
+  return null;
+}

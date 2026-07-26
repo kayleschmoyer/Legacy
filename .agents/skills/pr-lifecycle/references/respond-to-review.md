@@ -116,6 +116,33 @@ This change requires modifying a generated file that must not be edited manually
 
 > **Never** edit the bot's own comments or threads — the bot reads its thread state to track cycle progression.
 
+### Step 4b — Replying to a PR-level (threadless) finding
+
+Some findings — most commonly "missing tests for X" — have no single file/line to anchor an inline thread to. The bot posts these as `_PR-level_` entries in the main review body instead, each with its own `<!-- issue-id: ULID -->` marker directly above the finding title. Because there is no thread, `github_reply_to_review`/`github_reply_to_review_thread` do not apply here — a plain PR comment is not enough on its own, since the validator that force-strips a re-raised finding (LS-7768/LS-7938) needs to know **which** PR-level finding you are answering.
+
+Use `github_finish_fix_round` with `issueId` in place of `threadId` — copy the ULID from the `<!-- issue-id: ... -->` marker preceding the finding in the bot's review body:
+
+```
+github_finish_fix_round({
+  prNumber: PR#,
+  replies: [
+    { issueId: "01ABCDEF1234567890ABCDEF12", kind: "FIX", sha: "<sha>" },
+    { issueId: "01XYZ...", kind: "JUSTIFY", body: "one-sentence rationale" },
+  ]
+})
+```
+
+This posts a top-level PR comment in the exact issue-id-qualified format the validator parses — `FIX: <issue-id>` / `JUSTIFY: <issue-id>` on the first line, the sha/rationale on the next line(s) — and is force-stripped on re-raise at parity with an inline `FIX:`/`JUSTIFY:` thread reply. There is nothing to resolve (PR-level findings have no thread), so `github_finish_fix_round` skips the resolve step for these entries automatically.
+
+If you cannot find or copy the issue-id (e.g. hand-writing a plain PR comment instead of using the tool), cite it explicitly using the same convention `github_finish_fix_round` emits — the issue-id alone on the line after the `FIX:`/`JUSTIFY:` token:
+
+```
+FIX: 01ABCDEF1234567890ABCDEF12
+abc1234
+```
+
+A reply that omits the issue-id is still evaluated by the LLM, but the validator can only auto-resolve it when **exactly one** PR-level finding is currently open — with two or more open PR-level findings, an unqualified reply cannot be tied to a specific one and will not force-strip a re-raise, so prefer citing the issue-id whenever more than one PR-level finding is on the table.
+
 ### Step 5 — Resolve threads answered with `FIX:`
 
 Collect the `threadId` of every thread you replied to with `FIX:` in Step 4, then resolve them in a single batched call:
@@ -166,5 +193,6 @@ Only stop when `github_view_pr` reports `MERGED`/`CLOSED`, or you have hit a gen
 - **Never apply `bot:ready-for-review` if any thread is still unanswered** — the bot will mandate all skipped threads.
 - **Never edit the bot's review threads** — this breaks cycle-state tracking.
 - **Never put trailing prose after `FIX: <sha>`** — the reply body must be _exactly_ `FIX: <sha>`, nothing after the sha. Trailing text (`FIX: abc123 — replaced all foo()`) trips the bot's format-error path, which posts a corrective reply that GitHub records as an empty-body `COMMENTED` bot review. Those artifacts **inflate the cycle counter** toward `MAX_CYCLE` and accelerate false `needs-human-arbitration` (see [cycle-limit-arbitration-troubleshooting.md](cycle-limit-arbitration-troubleshooting.md)). Prefer `github_finish_fix_round`, which emits the exact format for you.
+- **A `_PR-level_` finding needs `issueId`, not a plain PR comment** — see [Step 4b](#step-4b--replying-to-a-pr-level-threadless-finding). A free-text comment that doesn't cite the finding's issue-id cannot be force-stripped on re-raise unless it is the only PR-level finding currently open.
 - **Cap at Cycle 3** — if after three cycles threads remain unresolved, escalate to a human reviewer rather than applying the label again.
 - **Posting replies is not "done"** — after replying you MUST continue driving the PR to a terminal state (Step 8). A session that stops on an open `JUSTIFY:` or a red CI pipeline is the root cause of "the PR got a review but nothing happened."

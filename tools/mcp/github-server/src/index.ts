@@ -1226,7 +1226,7 @@ export function createServer(): McpServer {
   // --- github_finish_fix_round ---
   server.tool(
     'github_finish_fix_round',
-    'Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies the bot:ready-for-review label that re-triggers the Reviewer Bot cycle. Validates every reply BEFORE any side effect (FIX requires `sha`, JUSTIFY/CANNOT-COMPLY require `body`) — a single invalid entry rejects the whole call. FIX reply body is emitted as exactly `FIX: <sha>` (no trailing prose — the bot is strict). JUSTIFY/CANNOT-COMPLY bodies are prefixed with the kind token if not already present. Partial failures do not block successful replies: failed replies are surfaced in `errors[]` and their threads are NOT resolved. Only FIX threads are resolved — JUSTIFY and CANNOT-COMPLY remain open for bot/human adjudication in the next cycle. Replaces the three-step github_reply_to_review_thread → github_resolve_threads → github_manage_labels(add: bot:ready-for-review) sequence.',
+    'Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies the bot:ready-for-review label that re-triggers the Reviewer Bot cycle. Validates every reply BEFORE any side effect (exactly one of threadId/issueId, FIX requires `sha`, JUSTIFY/CANNOT-COMPLY require `body`) — a single invalid entry rejects the whole call. FIX reply body is emitted as exactly `FIX: <sha>` (no trailing prose — the bot is strict). JUSTIFY/CANNOT-COMPLY bodies are prefixed with the kind token if not already present. Partial failures do not block successful replies: failed replies are surfaced in `errors[]` and their threads are NOT resolved. Only FIX threads are resolved — JUSTIFY and CANNOT-COMPLY remain open for bot/human adjudication in the next cycle. Replaces the three-step github_reply_to_review_thread → github_resolve_threads → github_manage_labels(add: bot:ready-for-review) sequence. For a PR-level (threadless — no file/line) finding, pass issueId instead of threadId: the reply posts as a top-level PR comment in the issue-id-qualified format the Reviewer Bot resolves back to that specific finding (LS-7938) — see .agents/skills/pr-lifecycle/references/respond-to-review.md.',
     {
       prNumber: prNumberField('prNumber').describe('PR number'),
       replies: z
@@ -1236,7 +1236,18 @@ export function createServer(): McpServer {
               .string()
               .trim()
               .min(1)
-              .describe('GraphQL thread node ID (PRRT_...)'),
+              .optional()
+              .describe(
+                'GraphQL thread node ID (PRRT_...) for an inline (file+line) finding. Exactly one of threadId/issueId is required.',
+              ),
+            issueId: z
+              .string()
+              .trim()
+              .min(1)
+              .optional()
+              .describe(
+                'Issue-id (ULID) of a PR-level (threadless — no file/line) finding, from the `<!-- issue-id: ... -->` marker in the bot review body. Posts a top-level PR comment instead of a thread reply. Exactly one of threadId/issueId is required.',
+              ),
             kind: z
               .enum(['FIX', 'JUSTIFY', 'CANNOT-COMPLY'])
               .describe('Reply kind per Author Agent Contract'),

@@ -4,6 +4,8 @@ import {
   CYCLE_ROLES,
   getCycleRole,
   parseTitlesFromReviewBody,
+  parseIssueIdTitleMap,
+  parsePrLevelTitles,
   filterFindingsCycle2,
   filterFindingsCycle3,
   buildCycleRoleSection,
@@ -130,6 +132,107 @@ describe('parseTitlesFromReviewBody', () => {
     // buildInlineComments produces "**[SEVERITY]** title\n\nbody" without " — loc".
     const body = '**[HIGH]** Some inline finding\n\nDetailed explanation.';
     assert.deepStrictEqual(parseTitlesFromReviewBody(body), []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseIssueIdTitleMap / parsePrLevelTitles (LS-7938)
+// ---------------------------------------------------------------------------
+
+const SINGLE_PR_LEVEL_BODY = [
+  '## Changes Required',
+  '',
+  '<!-- issue-id: PRISSUE1 -->',
+  '**[HIGH]** Missing end-to-end tests for the 2FA flow — _PR-level_',
+  '',
+  'Add E2E coverage for enrollment and verification.',
+].join('\n');
+
+const TWO_PR_LEVEL_BODY = [
+  '<!-- issue-id: PRISSUE1 -->',
+  '**[HIGH]** Missing end-to-end tests for the 2FA flow — _PR-level_',
+  '',
+  'body 1',
+  '',
+  '<!-- issue-id: PRISSUE2 -->',
+  '**[MEDIUM]** Missing rate limiting on public API — _PR-level_',
+  '',
+  'body 2',
+].join('\n');
+
+const MIXED_INLINE_AND_PR_LEVEL_BODY = [
+  '<!-- issue-id: X1 -->',
+  '**[HIGH]** SQL injection via unescaped input — `src/a.ts:1`',
+  '',
+  'body',
+  '',
+  '<!-- issue-id: X2 -->',
+  '**[HIGH]** Missing E2E tests for the 2FA flow — _PR-level_',
+  '',
+  'body2',
+].join('\n');
+
+describe('parseIssueIdTitleMap', () => {
+  it('returns an empty map for null/undefined/empty body', () => {
+    assert.strictEqual(parseIssueIdTitleMap(null).size, 0);
+    assert.strictEqual(parseIssueIdTitleMap(undefined).size, 0);
+    assert.strictEqual(parseIssueIdTitleMap('').size, 0);
+  });
+
+  it('maps issue-id to title with isPrLevel=true for a PR-level finding', () => {
+    const map = parseIssueIdTitleMap(SINGLE_PR_LEVEL_BODY);
+    assert.deepStrictEqual(map.get('PRISSUE1'), {
+      title: 'Missing end-to-end tests for the 2FA flow',
+      isPrLevel: true,
+    });
+  });
+
+  it('maps issue-id to title with isPrLevel=false for an inline (file:line) finding', () => {
+    const map = parseIssueIdTitleMap(MIXED_INLINE_AND_PR_LEVEL_BODY);
+    assert.deepStrictEqual(map.get('X1'), {
+      title: 'SQL injection via unescaped input',
+      isPrLevel: false,
+    });
+  });
+
+  it('handles multiple findings in one body', () => {
+    const map = parseIssueIdTitleMap(TWO_PR_LEVEL_BODY);
+    assert.strictEqual(map.size, 2);
+    assert.strictEqual(
+      map.get('PRISSUE1').title,
+      'Missing end-to-end tests for the 2FA flow',
+    );
+    assert.strictEqual(
+      map.get('PRISSUE2').title,
+      'Missing rate limiting on public API',
+    );
+  });
+});
+
+describe('parsePrLevelTitles', () => {
+  it('returns an empty array for null/undefined/empty body', () => {
+    assert.deepStrictEqual(parsePrLevelTitles(null), []);
+    assert.deepStrictEqual(parsePrLevelTitles(undefined), []);
+    assert.deepStrictEqual(parsePrLevelTitles(''), []);
+  });
+
+  it('excludes inline (file:line) findings, keeping only PR-level ones', () => {
+    assert.deepStrictEqual(parsePrLevelTitles(MIXED_INLINE_AND_PR_LEVEL_BODY), [
+      'Missing E2E tests for the 2FA flow',
+    ]);
+  });
+
+  it('returns a single title when exactly one PR-level finding is open', () => {
+    assert.deepStrictEqual(parsePrLevelTitles(SINGLE_PR_LEVEL_BODY), [
+      'Missing end-to-end tests for the 2FA flow',
+    ]);
+  });
+
+  it('returns all titles when multiple PR-level findings are open', () => {
+    assert.deepStrictEqual(parsePrLevelTitles(TWO_PR_LEVEL_BODY), [
+      'Missing end-to-end tests for the 2FA flow',
+      'Missing rate limiting on public API',
+    ]);
   });
 });
 
@@ -1824,7 +1927,9 @@ describe('buildAuthorResponsesSection — exposes items field', () => {
     assert.strictEqual(result.items[0].parsed.sha, 'abc1234');
   });
 
-  it('returns items with null title for PR-level issue comments', () => {
+  it('returns null title for a PR-level issue comment when no review body context is supplied', () => {
+    // Backward-compatible fallback: callers that omit the 5th (lastBotReviewBody)
+    // argument get the pre-LS-7938 behavior — no context to resolve a title from.
     const issueComments = [
       {
         id: 1,
@@ -1842,6 +1947,325 @@ describe('buildAuthorResponsesSection — exposes items field', () => {
     assert.strictEqual(result.items.length, 1);
     assert.strictEqual(result.items[0].title, null);
     assert.strictEqual(result.items[0].parsed.type, 'JUSTIFY');
+    assert.strictEqual(result.ambiguousPrLevelReplies, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAuthorResponsesSection — PR-level title resolution (LS-7938)
+// ---------------------------------------------------------------------------
+
+describe('buildAuthorResponsesSection — PR-level title resolution (LS-7938)', () => {
+  it('resolves the title for an issue-id-qualified FIX reply', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'FIX: PRISSUE1\nabc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      SINGLE_PR_LEVEL_BODY,
+    );
+    assert.strictEqual(result.items.length, 1);
+    assert.strictEqual(
+      result.items[0].title,
+      'Missing end-to-end tests for the 2FA flow',
+    );
+    assert.strictEqual(result.items[0].parsed.type, 'FIX');
+    assert.strictEqual(result.items[0].parsed.sha, 'abc1234');
+    assert.strictEqual(result.ambiguousPrLevelReplies, 0);
+  });
+
+  it('resolves the title for an issue-id-qualified JUSTIFY reply, disambiguating among multiple open findings', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: PRISSUE2\nRate limiting is handled at the gateway.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      TWO_PR_LEVEL_BODY,
+    );
+    assert.strictEqual(result.items.length, 1);
+    assert.strictEqual(
+      result.items[0].title,
+      'Missing rate limiting on public API',
+    );
+    assert.strictEqual(result.items[0].parsed.type, 'JUSTIFY');
+    assert.strictEqual(
+      result.items[0].parsed.rationale,
+      'Rate limiting is handled at the gateway.',
+    );
+    assert.strictEqual(result.ambiguousPrLevelReplies, 0);
+  });
+
+  it('falls back to null title when the cited issue-id is unknown/stale', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'FIX: NOT-A-REAL-ID\nabc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      SINGLE_PR_LEVEL_BODY,
+    );
+    assert.strictEqual(result.items[0].title, null);
+    assert.strictEqual(result.items[0].parsed.type, 'FIX');
+  });
+
+  it('resolves an unqualified FIX/JUSTIFY (no issue-id cited) when exactly one PR-level finding is open', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: already covered by the enrollment E2E test',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      SINGLE_PR_LEVEL_BODY,
+    );
+    assert.strictEqual(result.items.length, 1);
+    assert.strictEqual(
+      result.items[0].title,
+      'Missing end-to-end tests for the 2FA flow',
+    );
+    assert.strictEqual(result.ambiguousPrLevelReplies, 0);
+  });
+
+  it('leaves title null and counts ambiguousPrLevelReplies when no issue-id is cited and multiple PR-level findings are open', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      TWO_PR_LEVEL_BODY,
+    );
+    assert.strictEqual(result.items.length, 1);
+    assert.strictEqual(result.items[0].title, null);
+    assert.strictEqual(result.items[0].parsed.type, 'FIX');
+    // Not silently dropped — explicitly counted so the caller can log it.
+    assert.strictEqual(result.ambiguousPrLevelReplies, 1);
+  });
+
+  it('does not misresolve a title when no PR-level findings are open (inline-only review)', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: not applicable here',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const body =
+      '<!-- issue-id: X1 -->\n**[HIGH]** SQL injection — `src/a.ts:1`\n\nbody';
+    const result = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      body,
+    );
+    assert.strictEqual(result.items[0].title, null);
+    assert.strictEqual(result.ambiguousPrLevelReplies, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// End-to-end: buildAuthorResponsesSection -> buildAuthorResolvedTitles ->
+// filterFindingsCycle2/3 force-strip a PR-level finding at parity with
+// inline findings (LS-7938 AC1/AC2 — reconstructs the PR #5068 scenario).
+// ---------------------------------------------------------------------------
+
+describe('PR-level FIX/JUSTIFY end-to-end force-strip parity (LS-7938)', () => {
+  it('filterFindingsCycle2 strips a PR-level finding resolved via issue-id-qualified FIX, even if the LLM re-raises it', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'FIX: PRISSUE1\nabc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const authorResponses = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      SINGLE_PR_LEVEL_BODY,
+    );
+    const prCommitShas = ['abc1234567890abcdef1234567890abcdef123456'];
+    const { resolvedTitles } = buildAuthorResolvedTitles(
+      authorResponses.items,
+      prCommitShas,
+    );
+    assert.ok(resolvedTitles.has('missing end-to-end tests for the 2fa flow'));
+
+    const reRaised = makeFinding({
+      title: 'Missing end-to-end tests for the 2FA flow',
+      file: null,
+      line: null,
+    });
+    const { kept, stripped } = filterFindingsCycle2(
+      [reRaised],
+      ['Missing end-to-end tests for the 2FA flow'],
+      [],
+      resolvedTitles,
+      new Set(),
+    );
+    assert.strictEqual(kept.length, 0);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('filterFindingsCycle2 strips a PR-level finding resolved via issue-id-qualified JUSTIFY', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'JUSTIFY: PRISSUE1\nCovered by the existing invalid-code test.',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const authorResponses = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      SINGLE_PR_LEVEL_BODY,
+    );
+    const { justifiedTitles } = buildAuthorResolvedTitles(
+      authorResponses.items,
+      [],
+    );
+    assert.ok(justifiedTitles.has('missing end-to-end tests for the 2fa flow'));
+
+    const reRaised = makeFinding({
+      title: 'Missing end-to-end tests for the 2FA flow',
+      file: null,
+      line: null,
+    });
+    const { kept, stripped } = filterFindingsCycle2(
+      [reRaised],
+      ['Missing end-to-end tests for the 2FA flow'],
+      [],
+      new Set(),
+      justifiedTitles,
+    );
+    assert.strictEqual(kept.length, 0);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_justified');
+  });
+
+  it('filterFindingsCycle3 strips a PR-level mandate resolved via issue-id-qualified FIX', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'FIX: PRISSUE1\nabc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const authorResponses = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      SINGLE_PR_LEVEL_BODY,
+    );
+    const prCommitShas = ['abc1234567890abcdef1234567890abcdef123456'];
+    const { resolvedTitles } = buildAuthorResolvedTitles(
+      authorResponses.items,
+      prCommitShas,
+    );
+
+    const reRaised = makeFinding({
+      title: 'Missing end-to-end tests for the 2FA flow',
+      file: null,
+      line: null,
+    });
+    const { kept, stripped } = filterFindingsCycle3(
+      [reRaised],
+      ['Missing end-to-end tests for the 2FA flow'],
+      resolvedTitles,
+    );
+    assert.strictEqual(kept.length, 0);
+    assert.strictEqual(stripped.length, 1);
+    assert.strictEqual(stripped[0].strip_reason, 'author_fixed');
+  });
+
+  it('does not suppress an ambiguous PR-level reply (no issue-id, multiple findings open) — the finding is still re-raised', () => {
+    const issueComments = [
+      {
+        id: 1,
+        userLogin: 'author',
+        body: 'FIX: abc1234',
+        createdAt: AFTER_REVIEW,
+      },
+    ];
+    const authorResponses = buildAuthorResponsesSection(
+      [],
+      issueComments,
+      REVIEW_AT,
+      BOT_LOGINS,
+      TWO_PR_LEVEL_BODY,
+    );
+    assert.strictEqual(authorResponses.ambiguousPrLevelReplies, 1);
+    const prCommitShas = ['abc1234567890abcdef1234567890abcdef123456'];
+    const { resolvedTitles } = buildAuthorResolvedTitles(
+      authorResponses.items,
+      prCommitShas,
+    );
+    assert.strictEqual(resolvedTitles.size, 0);
+
+    const reRaised = makeFinding({
+      title: 'Missing end-to-end tests for the 2FA flow',
+      file: null,
+      line: null,
+    });
+    const { kept, stripped } = filterFindingsCycle2(
+      [reRaised],
+      ['Missing end-to-end tests for the 2FA flow'],
+      [],
+      resolvedTitles,
+      new Set(),
+    );
+    assert.strictEqual(
+      kept.length,
+      1,
+      'ambiguous reply cannot suppress a re-raise',
+    );
+    assert.strictEqual(stripped.length, 0);
   });
 });
 
