@@ -6,6 +6,7 @@
 - **Never commit a migration file without first successfully applying it locally.**
 - **Never edit a previously-landed migration** — write a new one that corrects it.
 - **Always run migrations before `make pc`** — pending migrations cause failures.
+- **Never apply a destructive/renaming migration to the shared dev RDS while any deployed lambda still reads the old shape.** `RENAME COLUMN`, `DROP COLUMN`, a narrowing `ALTER COLUMN ... TYPE`, and `DROP TABLE` are all instantaneous-but-blocking to write — they are not dual-read-safe. Verify deploy-pipeline health (most recent `Deploy` workflow run on `main`) before applying; if it isn't green, stop and escalate rather than apply (LS-7934). See [apply-pr-migrations](../../apply-pr-migrations/SKILL.md#critical-preconditions) for the agent-facing precondition.
 
 ## Steps
 

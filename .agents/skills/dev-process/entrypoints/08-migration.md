@@ -36,6 +36,11 @@ Migrations are the highest-risk normal work. They run once, in production, often
   1. PR 1: add the schema change (forwards-compatible).
   2. PR 2: change the code to use it.
   3. PR 3 (later): remove the old code path.
+- **PR-sequencing alone is necessary but not sufficient for a rename/drop on a table read by deployed lambdas.** The `Verify All Migrations Applied` gate can force PR 1's migration onto the shared dev RDS pre-merge, ahead of PR 2's deploy — if PR 1's migration renames or drops a column outright, that is an outage window between DB cutover and code rollout even with correctly-sequenced PRs (LS-7934). A rename/drop on a live-read table must also be **expand-contract at the SQL statement level**:
+  1. Add the new column; dual-write it alongside the old one.
+  2. Backfill existing rows.
+  3. Ship and confirm deployed the code that reads the new column (PR 2, above).
+  4. Only then, in a later migration, drop/rename the old column.
 - For data migrations: the migration script must be idempotent — safe to re-run if interrupted.
 
 ### Phase 4: Verify
@@ -65,6 +70,7 @@ Migrations are the highest-risk normal work. They run once, in production, often
 - ❌ Schema migration that takes an exclusive lock on a hot table without scheduling. Ask before running.
 - ❌ Editing a previously-landed migration file. Always a new migration.
 - ❌ Data backfill without idempotency. Crashes mid-run leave the system in an indeterminate state.
+- ❌ RENAME/DROP COLUMN in the same migration a not-yet-deployed code change depends on. Add the new column, deploy the code, then drop/rename the old column in a later migration (LS-7934).
 
 ## Related skills
 

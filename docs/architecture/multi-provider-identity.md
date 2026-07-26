@@ -235,7 +235,7 @@ The migration is **expand → backfill → contract**, so each phase ships indep
 
 **Phase 2 — Cut over reads/writes.**
 
-- Rename `users.email` → `users.canonical_email` (single rename migration; update Drizzle schema, generated views, GraphQL `User` type, and all `getUserByEmail` callers).
+- Rename `users.email` → `users.canonical_email`. **This step already landed** as a single in-place `RENAME COLUMN` (`20260610_120000_rename_email_to_canonical_email.ts`), before the rule below existed — it caused an outage window (LS-7934) because a lambda deploy was wedged and still read `users.email` after the rename applied pre-merge. A same-name column rename on a table read by deployed lambdas is **no longer an acceptable pattern**; see the [migration entrypoint](../../.agents/skills/dev-process/entrypoints/08-migration.md#phase-3-implement)'s expand-contract requirement (add column + dual-write, backfill, deploy reading code, then drop/rename old column in a later migration). Update Drizzle schema, generated views, GraphQL `User` type, and all `getUserByEmail` callers.
 - Switch the OAuth proxy to the shared `resolveOrCreateUser` resolver and the generalized link flow.
 - Remove the LS-6660 unconditional email-refresh; replace with rule #3.
 - Add the `setCanonicalEmail` mutation + account-settings UI for choosing canonical email and viewing/unlinking identities.
