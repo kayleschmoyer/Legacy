@@ -85,14 +85,21 @@ Once your Cognito account exists:
 
 > **Connector registration is a one-time owner action.** The connectors are already registered in claude.ai. Developers only need to consent (Step 2), not register. If a connector is missing, ask an Org Owner to re-register it under Org settings → Connectors using each server's API Gateway URL.
 
+### Two separate token paths — don't conflate them
+
+- **Claude Code client-side OAuth** (local CLI/desktop connecting directly to a self-hosted MCP server via Dynamic Client Registration) is implemented and persisted by the Claude Code client itself.
+- **claude.ai connector-layer OAuth** (Track B, used here) is a different system: once a connector is registered and consented, token issuance, storage, and refresh for it are owned entirely by claude.ai's connector infrastructure (redirect URI `claude.ai/api/mcp/auth_callback`; tokens stored server-side per user, per connector) — not by the Claude Code client and not by anything in this repo.
+
+These two systems have different bugs. Citing an issue about one to explain the other's behavior is a category error — see LS-8295.
+
 ### Residual limitation — re-consent on token expiry
 
-Claude Code does **not** auto-refresh MCP OAuth tokens mid-session ([claude-code#58607](https://github.com/anthropics/claude-code/issues/58607)). If a session outlives the OAuth access token lifetime, the hosted MCP servers will stop responding. This affects both local and web Track B sessions. To recover:
+[`claude-code#58607`](https://github.com/anthropics/claude-code/issues/58607) is sometimes cited for "Claude Code doesn't auto-refresh MCP OAuth tokens mid-session." **That citation is inaccurate**: the issue (closed as not planned) is about the Claude Code CLI discarding its DCR `client_id` and refresh token on every process restart, not about a live session failing to refresh a token mid-session — it explicitly notes a session's access token has a 30-day sliding TTL and stays valid without restart. It also describes the client-side OAuth path (self-hosted servers configured in `.mcp.json`), not the claude.ai connector layer these five servers use.
+
+What is verified: if a Track B connector stops responding — whether mid-session or dead at the very start of a fresh session — the underlying cause (claude.ai-side refresh failure vs. a Cognito-side grant invalidation vs. platform flakiness) has not been confirmed against Cognito/CloudTrail/Lambda logs. See [LS-8295](https://bkrupa.atlassian.net/browse/LS-8295) for the doc-citation audit and [LS-8696](https://bkrupa.atlassian.net/browse/LS-8696) for the outstanding AWS-log investigation (requires a local session with AWS SSO). Until root-caused, the only known recovery is:
 
 1. Run `/mcp` in the Claude Code session (local or web).
 2. Re-consent for each affected connector.
-
-This is an upstream platform gap, not a server bug.
 
 ---
 

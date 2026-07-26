@@ -82,6 +82,7 @@ The hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports
 
 - **Tools absent** → surface to the user: prompt them to check Org settings → Connectors in claude.ai, or re-consent via `/mcp`.
 - **Mid-session 401** → OAuth access token expired; prompt the user to re-consent via `/mcp`. Do not retry or fall back.
+- **A connector reports "requires authentication" at session start**, before any tool call could have outlived a token — this is a distinct symptom from mid-session expiry (see LS-8295) and is not explained by the mid-session gap below. Root cause (claude.ai-side refresh failure vs. our-side Cognito grant invalidation vs. platform flakiness) is not yet confirmed — see [LS-8696](https://bkrupa.atlassian.net/browse/LS-8696). Recovery is the same: re-consent via `/mcp`.
 
 ## Recovery Steps
 
@@ -132,7 +133,7 @@ When MCP servers are confirmed missing and recovery is not possible in the curre
 
 ## Mid-Session 401 / Token Expiry (LS-4874)
 
-The hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`, `legacy-sports-db`, `legacy-sports-rollbar`) connect via OAuth custom remote connectors. Claude Code does not auto-refresh MCP OAuth tokens mid-session ([claude-code#58607](https://github.com/anthropics/claude-code/issues/58607)). When the OAuth access token expires, the servers begin returning HTTP 401, which Claude Code's MCP transport may surface as a Zod validation error:
+The hosted servers (`legacy-sports-github`, `legacy-sports-jira`, `legacy-sports-ci`, `legacy-sports-db`, `legacy-sports-rollbar`) connect via OAuth custom remote connectors. Token issuance, storage, and refresh for these connectors are owned by claude.ai's connector layer — a different system from the Claude Code client's own OAuth handling (which only applies to self-hosted MCP servers configured directly in `.mcp.json`). [`claude-code#58607`](https://github.com/anthropics/claude-code/issues/58607) was previously cited here for "no mid-session auto-refresh," but that issue (closed as not planned) is actually about the client discarding its DCR `client_id`/refresh token across CLI restarts, not about a live session's token going unrefreshed — do not cite it for connector-layer behavior (see LS-8295). When the OAuth access token expires, the servers begin returning HTTP 401, which Claude Code's MCP transport may surface as a Zod validation error:
 
 ```
 HTTP 401 ... ZodError: expected string, received undefined
