@@ -93,6 +93,10 @@ const ALLOWED_TARGETS = new Set([
   // through make_run.
   'lint-review-patterns',
   'lint-touch-map',
+  // Read-only drift checks (LS-8549) — AGENTS.md tells agents to verify
+  // generated-file sync with these before committing routing/command changes.
+  'lint-skill-index',
+  'lint-agent-prompts',
   'format',
   'fmt',
   'format-commit',
