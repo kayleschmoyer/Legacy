@@ -66,7 +66,7 @@ Worked example (both from the audit): `.claude/hooks/guard-bash-mcp-first.sh` �
 Two layers, deliberately staged — never conflate them:
 
 - **Config**: `.github/ruleset.json` in-repo. As of 2026-07-02 it requires exactly 4 contexts: `bot-review`, `No Merge Conflicts`, `Verify All Migrations Applied`, `CI Gate` (post-LS-8014; the granular `🚀 CI Pipeline / *` names were removed from the required set).
-- **Live**: applied to GitHub only when a maintainer runs `bash scripts/apply-ruleset.sh`. Until then the live ruleset can lag config, and `check-ruleset.yml` (non-required drift check) reports drift — **expected**, not a bug.
+- **Live**: applied to GitHub by `bash scripts/apply-ruleset.sh`, which keeps the live ruleset in sync with config. The LS-8014 CI Gate cutover was applied live 2026-07-06 and live now matches config (confirmed `docs/dev-process/ground-truth-audit-2026-07-07.md`). Drift is no longer expected — if `check-ruleset.yml` (non-required drift check) reports drift, treat it as a real discrepancy to investigate, not routine lag.
 
 To check live state, do what `check-ruleset.yml` does:
 
@@ -75,7 +75,7 @@ gh api "repos/<owner>/<repo>/rulesets" --jq '.[] | select(.name == "Protect Main
 gh api "repos/<owner>/<repo>/rulesets/<id>"   # inspect required_status_checks
 ```
 
-or read the latest `check-ruleset.yml` run output. As of 2026-07-02 the live cutover state is **UNKNOWN from the repo alone** — assert live required checks only after this probe. Merge-gate semantics home: [pr-lifecycle](../pr-lifecycle/SKILL.md).
+or read the latest `check-ruleset.yml` run output. As of 2026-07-06 live matches config — re-run this probe before asserting required checks, since a later GitHub-UI edit could reintroduce drift. Merge-gate semantics home: [pr-lifecycle](../pr-lifecycle/SKILL.md).
 
 ## 5. "Column/enum X exists in the DB"
 
