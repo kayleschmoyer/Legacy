@@ -37,6 +37,22 @@ name: "Lambda Drift Check"
 #
 # Both alert to Discord. This is read-only — it never mutates SSM, Lambda, or
 # Terraform state.
+# LS-7933: version-drift below now also tracks how long each SSM `/version`
+# parameter has been mismatched against its deployed Description
+# (Parameter.LastModifiedDate) and only alerts + fails the job once that
+# exceeds vars.LAMBDA_FRESHNESS_THRESHOLD_HOURS (repo var, default 2 —
+# ships hardcoded per LS-7933's Out of Scope: adding the repo var itself is
+# an admin action, not required for this to work). This absorbs LS-7933's
+# "stuck (uploaded-but-unapplied) Lambda artifact" alert requirement rather
+# than adding a second, near-duplicate workflow: this job already performs
+# the identical SSM-vs-deployed-Description comparison, on the same
+# workflow_run trigger, with the same read-only plan role and the same
+# Discord channel that ticket's technical approach called for. The
+# threshold also doubles as a false-positive guard for the expected
+# Upload-Lambdas-vs-Apply race already documented in
+# lambda-terraform-apply.yml's Post-Apply Version Verification step: a
+# mismatch caused by a concurrent SSM bump seconds ago will self-heal on the
+# next Apply run before it clears the threshold.
 # =============================================================================
 
 on:
@@ -86,6 +102,8 @@ jobs:
       - name: "Compare deployed description vs SSM version"
         id: check
         shell: bash
+        env:
+          FRESHNESS_THRESHOLD_HOURS: ${{ vars.LAMBDA_FRESHNESS_THRESHOLD_HOURS || '2' }}
         run: |
           # Registry of lambda function-name suffixes and their SSM ssmName
           # segment. Kept in lockstep with upload-lambdas.yml's REGISTRY.
@@ -108,17 +126,23 @@ jobs:
             {"function":"mcp-rollbar","ssmName":"mcp-rollbar"}
           ]'
 
+          NOW_EPOCH=$(date +%s)
           DRIFTED="[]"
           echo "## 🔍 Lambda Version Drift Check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Freshness threshold: ${FRESHNESS_THRESHOLD_HOURS}h (\`vars.LAMBDA_FRESHNESS_THRESHOLD_HOURS\`)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Lambda | SSM Version | Deployed Description | Status |" >> "$GITHUB_STEP_SUMMARY"
           echo "|--------|-------------|----------------------|--------|" >> "$GITHUB_STEP_SUMMARY"
 
           while IFS=$'\t' read -r FUNC SSM_NAME; do
-            EXPECTED=$(aws ssm get-parameter \
+            PARAM_JSON=$(aws ssm get-parameter \
               --name "/legacy-sports/${AWS_STAGE}/lambda/${SSM_NAME}/version" \
               --region "${AWS_REGION}" \
-              --query "Parameter.Value" --output text 2>/dev/null || echo "MISSING")
+              --query "Parameter.{Value:Value,LastModifiedDate:LastModifiedDate}" \
+              --output json 2>/dev/null || echo '{}')
+            EXPECTED=$(echo "$PARAM_JSON" | jq -r '.Value // "MISSING"')
+            LAST_MODIFIED=$(echo "$PARAM_JSON" | jq -r '.LastModifiedDate // empty')
 
             DEPLOYED=$(aws lambda get-function-configuration \
               --function-name "${LAMBDA_PREFIX}-${FUNC}" \
@@ -129,10 +153,24 @@ jobs:
               STATUS="⚠️ unreadable"
               echo "  ⚠️ ${FUNC}: could not read SSM version or deployed description (SSM=$EXPECTED, Deployed=$DEPLOYED)"
             elif [ "$EXPECTED" != "$DEPLOYED" ]; then
-              STATUS="❌ DRIFT"
-              echo "  ❌ ${FUNC}: SSM=$EXPECTED, Deployed=$DEPLOYED"
-              DRIFTED=$(echo "$DRIFTED" | jq -c --arg f "$FUNC" --arg e "$EXPECTED" --arg d "$DEPLOYED" \
-                '. + [{function: $f, expected: $e, deployed: $d}]')
+              # LastModifiedDate is an epoch (with fractional seconds) —
+              # truncate to whole seconds for the elapsed-hours calculation.
+              LAST_MODIFIED_EPOCH="${LAST_MODIFIED%%.*}"
+              if [ -n "$LAST_MODIFIED_EPOCH" ]; then
+                HOURS_PENDING=$(( (NOW_EPOCH - LAST_MODIFIED_EPOCH) / 3600 ))
+              else
+                HOURS_PENDING=0
+              fi
+
+              if [ "$HOURS_PENDING" -ge "$FRESHNESS_THRESHOLD_HOURS" ]; then
+                STATUS="❌ DRIFT (${HOURS_PENDING}h pending)"
+                echo "  ❌ ${FUNC}: SSM=$EXPECTED, Deployed=$DEPLOYED (pending ${HOURS_PENDING}h, threshold ${FRESHNESS_THRESHOLD_HOURS}h)"
+                DRIFTED=$(echo "$DRIFTED" | jq -c --arg f "$FUNC" --arg e "$EXPECTED" --arg d "$DEPLOYED" --arg h "$HOURS_PENDING" \
+                  '. + [{function: $f, expected: $e, deployed: $d, hoursPending: $h}]')
+              else
+                STATUS="⏳ pending (${HOURS_PENDING}h, below ${FRESHNESS_THRESHOLD_HOURS}h threshold)"
+                echo "  ⏳ ${FUNC}: SSM=$EXPECTED, Deployed=$DEPLOYED (pending ${HOURS_PENDING}h, below ${FRESHNESS_THRESHOLD_HOURS}h threshold — likely mid-race with a concurrent upload)"
+              fi
             else
               STATUS="✅ in sync"
               echo "  ✅ ${FUNC}: $EXPECTED"
@@ -150,7 +188,7 @@ jobs:
 
           {
             echo "drift_report<<DRIFT_EOF"
-            echo "$DRIFTED" | jq -r '.[] | "- **\(.function)**: SSM=`\(.expected)`, deployed=`\(.deployed)`"'
+            echo "$DRIFTED" | jq -r '.[] | "- **\(.function)**: SSM=`\(.expected)`, deployed=`\(.deployed)` — pending \(.hoursPending)h"'
             echo "DRIFT_EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -177,6 +215,17 @@ jobs:
             `lambda-terraform-apply.yml` applies cleanly.
 
             [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+      - name: "Fail if stale artifacts found"
+        # LS-7933 AC: fail the job (non-zero exit) so the run shows red for
+        # on-call visibility, mirroring terraform-drift-check.yml's pattern.
+        if: always() && steps.check.outputs.drift_found == 'true'
+        shell: bash
+        env:
+          FRESHNESS_THRESHOLD_HOURS: ${{ vars.LAMBDA_FRESHNESS_THRESHOLD_HOURS || '2' }}
+        run: |
+          echo "::error::Lambda version drift persisted beyond the ${FRESHNESS_THRESHOLD_HOURS}h freshness threshold. See job summary."
+          exit 1
 
   # ---------------------------------------------------------------------------
   # Signal 2 — recent Deploy runs that hit the Verify CI Status skip-chain

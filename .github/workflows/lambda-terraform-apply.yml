@@ -632,6 +632,76 @@ jobs:
             ```
           commits: ${{ steps.deploy-changelog.outputs.commits }}
 
+      # -------------------------------------------------------------------
+      # Repeated-failure escalation (LS-7933): the step above posts an
+      # identical embed on every failed apply, so an on-call engineer can
+      # habituate to it (this is exactly how the LS-7931 4-day apply freeze
+      # went unnoticed). This counts the trailing streak of failed runs of
+      # THIS workflow on main (same gh api .../runs primitive as the "Build
+      # deploy changelog" step above) and posts a second, distinctly-titled,
+      # @here-mentioning alert once the streak reaches
+      # vars.LAMBDA_APPLY_FAILURE_ESCALATION_THRESHOLD (repo var, default 3
+      # — ships hardcoded per this ticket's Out of Scope: adding the repo var
+      # itself is an admin action, not required for this to work).
+      # -------------------------------------------------------------------
+      - name: Count Consecutive Apply Failures
+        id: count-failures
+        if: always() && steps.apply.outcome == 'failure'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          THRESHOLD: ${{ vars.LAMBDA_APPLY_FAILURE_ESCALATION_THRESHOLD || '3' }}
+        run: |
+          echo "threshold=${THRESHOLD}" >> "$GITHUB_OUTPUT"
+
+          # Most recent completed runs of this workflow on main, newest
+          # first, excluding this still-in-progress run.
+          CONCLUSIONS=$(gh api "repos/${{ github.repository }}/actions/workflows/lambda-terraform-apply.yml/runs?branch=main&status=completed&per_page=20" \
+            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].conclusion")
+
+          # Trailing streak of prior failures, plus 1 for this run's failure.
+          STREAK=1
+          while IFS= read -r CONCLUSION; do
+            [ -z "$CONCLUSION" ] && continue
+            if [ "$CONCLUSION" = "failure" ]; then
+              STREAK=$((STREAK + 1))
+            else
+              break
+            fi
+          done <<< "$CONCLUSIONS"
+
+          echo "consecutive_failures=${STREAK}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Consecutive Apply Lambda Infrastructure failures (including this run): ${STREAK} (escalation threshold: ${THRESHOLD})"
+
+          if [ "$STREAK" -ge "$THRESHOLD" ]; then
+            echo "should_escalate=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_escalate=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Discord Deploy Repeated Failure"
+        # should_escalate is true for every run once the streak reaches the
+        # threshold (not just the run where it first crosses it) — the
+        # embed title always includes the current streak count, so each
+        # post is distinguishable from the last rather than a repeat of the
+        # same message.
+        if: always() && steps.apply.outcome == 'failure' && steps.count-failures.outputs.should_escalate == 'true'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: failure
+          title: "Apply Lambda Infrastructure — REPEATED FAILURE (${{ steps.count-failures.outputs.consecutive_failures }}x in a row)"
+          environment: ${{ env.AWS_STAGE }}
+          content: "@here Apply Lambda Infrastructure has now failed ${{ steps.count-failures.outputs.consecutive_failures }} consecutive times on main (escalation threshold: ${{ steps.count-failures.outputs.threshold }})."
+          description: |
+            This is a distinct escalation from the routine failure post above — uploaded Lambda artifacts may be stuck pending apply for an extended period. Investigate immediately.
+
+            Latest error:
+            ```
+            ${{ steps.apply.outputs.apply_error || 'Unknown error — check workflow logs' }}
+            ```
+          commits: ${{ steps.deploy-changelog.outputs.commits }}
+
       - name: Verify Deployment
         if: steps.plan.outputs.has_changes == 'true' && steps.replan.outputs.has_changes != 'false'
         run: |
