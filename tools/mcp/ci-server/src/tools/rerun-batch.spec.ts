@@ -1,15 +1,16 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 
 jest.mock('../github-api.js', () => ({
-  githubPost: jest.fn(),
+  postWithRetryOnAlreadyRunning: jest.fn(),
 }));
 
 import { rerunBatch } from './rerun-batch.js';
 import * as githubApi from '../github-api.js';
 
-const mockGithubPost = githubApi.githubPost as unknown as jest.MockedFunction<
-  (path: string, body?: unknown) => Promise<unknown>
->;
+const mockGithubPost =
+  githubApi.postWithRetryOnAlreadyRunning as unknown as jest.MockedFunction<
+    (path: string, body?: unknown) => Promise<unknown>
+  >;
 
 interface BatchPayload {
   success: boolean;

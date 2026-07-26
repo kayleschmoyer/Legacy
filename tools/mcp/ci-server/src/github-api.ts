@@ -5,7 +5,11 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { readGitRemoteUrl } from './git-config.js';
-import { fetchWithRetry, sanitizeErrorBody } from './http-retry.js';
+import {
+  fetchWithRetry,
+  sanitizeErrorBody,
+  withRetryOnAlreadyRunning,
+} from './http-retry.js';
 
 export { sanitizeErrorBody } from './http-retry.js';
 
@@ -518,4 +522,19 @@ export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
     return (text ? JSON.parse(text) : {}) as T;
   }
   return (await res.json()) as T;
+}
+
+/**
+ * POST wrapper for the GitHub Actions rerun endpoints. Retries with backoff
+ * when GitHub rejects the request with the "already running" 403 race — the
+ * run-level status those endpoints gate on lags the per-job status callers
+ * already checked via ci_view_run_jobs. All other errors (including other
+ * 403s) rethrow on the first attempt, unchanged. See withRetryOnAlreadyRunning
+ * in http-retry.ts for the retry policy itself.
+ */
+export async function postWithRetryOnAlreadyRunning<T>(
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  return withRetryOnAlreadyRunning(() => githubPost<T>(path, body));
 }

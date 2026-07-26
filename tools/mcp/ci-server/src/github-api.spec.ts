@@ -10,7 +10,11 @@ import {
 // http-retry.ts has no import.meta / auth dependencies, so it compiles cleanly
 // under the CommonJS spec tsconfig. We test the retry logic here rather than
 // importing github-api.ts directly (which would fail due to import.meta.url).
-import { fetchWithRetry } from './http-retry.js';
+import {
+  fetchWithRetry,
+  isAlreadyRunningError,
+  withRetryOnAlreadyRunning,
+} from './http-retry.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -155,6 +159,129 @@ describe('fetchWithRetry (githubGetArrayBuffer retry logic)', () => {
 
     const backoffDelays = setSpy.mock.calls.map((c) => c[1]);
     expect(backoffDelays).toContain(30_000);
+
+    setSpy.mockRestore();
+  });
+});
+
+describe('isAlreadyRunningError', () => {
+  it('matches a 403 "already running" message', () => {
+    expect(
+      isAlreadyRunningError(
+        'GitHub API 403: This workflow is already running.',
+      ),
+    ).toBe(true);
+  });
+
+  it('matches a 403 "already in progress" message, case-insensitively', () => {
+    expect(isAlreadyRunningError('GitHub API 403: Already IN PROGRESS')).toBe(
+      true,
+    );
+  });
+
+  it('does not match a non-matching 403 (e.g. permissions)', () => {
+    expect(
+      isAlreadyRunningError(
+        'GitHub API 403: Resource not accessible by integration',
+      ),
+    ).toBe(false);
+  });
+
+  it('does not match an "already running"-shaped message on a different status', () => {
+    expect(
+      isAlreadyRunningError('GitHub API 409: This workflow is already running'),
+    ).toBe(false);
+  });
+});
+
+describe('withRetryOnAlreadyRunning', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('returns the result immediately on first-attempt success (no retry)', async () => {
+    const attemptFn = jest.fn<() => Promise<string>>().mockResolvedValue('ok');
+
+    const resultPromise = withRetryOnAlreadyRunning(attemptFn);
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result).toBe('ok');
+    expect(attemptFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries on an "already running" 403 and succeeds once the run settles', async () => {
+    const attemptFn = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(
+        new Error('GitHub API 403: This workflow is already running.'),
+      )
+      .mockRejectedValueOnce(
+        new Error('GitHub API 403: This workflow is already running.'),
+      )
+      .mockResolvedValueOnce('ok');
+
+    const resultPromise = withRetryOnAlreadyRunning(attemptFn);
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result).toBe('ok');
+    expect(attemptFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry a non-matching error — throws immediately', async () => {
+    const attemptFn = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValue(
+        new Error('GitHub API 403: Resource not accessible by integration'),
+      );
+
+    await expect(withRetryOnAlreadyRunning(attemptFn)).rejects.toThrow(
+      /Resource not accessible by integration/,
+    );
+    expect(attemptFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up after exhausting attempts and surfaces the attempt count', async () => {
+    const attemptFn = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValue(
+        new Error('GitHub API 403: This workflow is already running.'),
+      );
+
+    const assertion = expect(
+      withRetryOnAlreadyRunning(attemptFn),
+    ).rejects.toThrow(/gave up after 3 attempts/);
+
+    await jest.runAllTimersAsync();
+    await assertion;
+
+    expect(attemptFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('backs off ~10s then ~20s between retries', async () => {
+    const setSpy = jest.spyOn(global, 'setTimeout');
+    const attemptFn = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(
+        new Error('GitHub API 403: This workflow is already running.'),
+      )
+      .mockRejectedValueOnce(
+        new Error('GitHub API 403: This workflow is already running.'),
+      )
+      .mockResolvedValueOnce('ok');
+
+    const resultPromise = withRetryOnAlreadyRunning(attemptFn);
+    await jest.runAllTimersAsync();
+    await resultPromise;
+
+    const backoffDelays = setSpy.mock.calls.map((c) => c[1]);
+    expect(backoffDelays).toContain(10_000);
+    expect(backoffDelays).toContain(20_000);
 
     setSpy.mockRestore();
   });

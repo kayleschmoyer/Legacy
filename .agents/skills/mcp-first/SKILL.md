@@ -359,6 +359,8 @@ Use `ci_list_runs`, `ci_view_run`, `ci_get_logs`, `ci_search_logs`, `ci_rerun`, 
 
 **`ci_get_logs` transient 502/503/504 errors**: the log-blob fetch path retries automatically (3 attempts, exponential backoff) as of LS-8218. If `ci_get_logs` still fails after retries, use `get_job_logs` via `legacy-sports-github` as a fallback (see table below).
 
+**`ci_rerun` / `ci_rerun_failed_jobs` / `ci_retry_failed` "already running" 403**: GitHub's workflow-run status (what the rerun endpoints gate on) can lag the per-job status `ci_view_run_jobs` reports, so a rerun can be rejected with a 403 "already running"/"already in progress" even after all jobs look complete. As of LS-8284 this is retried automatically (up to 3 attempts, ~10s/~20s backoff) instead of surfacing the error — no empty-commit workaround needed. If the tool still errors, the message states how many attempts were made; other 403s (e.g. permissions) still fail immediately, unchanged.
+
 **`ci_get_logs` on a job that never started (LS-7910)**: a job that failed before any step executed (runner provisioning failure, hosted-runner billing/spending limit, or a GitHub Actions incident) has no log blob. `ci_get_logs` detects this and returns "Job failed before any step executed -- no logs exist..." instead of a raw Azure Blob Storage 404 — treat that message as the terminal signal (check the run/job conclusion and runner status) rather than retrying the log fetch.
 
 **`ci_get_logs` / `ci_search_logs` on large `workflow_dispatch` runs (LS-8255)**: log fetches are capped at 10 jobs per call with a 20 s deadline. If the response includes `skippedJobs`, narrow scope using `jobName` or `jobId` to fetch specific job logs. Timeout errors include an actionable hint with the same guidance.

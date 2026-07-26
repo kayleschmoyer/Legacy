@@ -1,4 +1,4 @@
-import { githubPost } from '../github-api.js';
+import { postWithRetryOnAlreadyRunning } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface RerunParams {
@@ -30,16 +30,18 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
   try {
     if (params.jobId) {
       // Rerun a specific job
-      await githubPost(`/actions/jobs/${params.jobId}/rerun`);
+      await postWithRetryOnAlreadyRunning(
+        `/actions/jobs/${params.jobId}/rerun`,
+      );
     } else if (params.failedOnly !== false) {
       // Rerun only failed jobs
-      await githubPost(
+      await postWithRetryOnAlreadyRunning(
         `/actions/runs/${params.runId}/rerun-failed-jobs`,
         params.debug ? { enable_debug_logging: true } : undefined,
       );
     } else {
       // Rerun entire run
-      await githubPost(
+      await postWithRetryOnAlreadyRunning(
         `/actions/runs/${params.runId}/rerun`,
         params.debug ? { enable_debug_logging: true } : undefined,
       );

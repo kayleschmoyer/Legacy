@@ -2,7 +2,7 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 
 jest.mock('../github-api.js', () => ({
   githubGet: jest.fn(),
-  githubPost: jest.fn(),
+  postWithRetryOnAlreadyRunning: jest.fn(),
 }));
 
 jest.mock('../logs.js', () => ({
@@ -16,8 +16,8 @@ import * as logsModule from '../logs.js';
 const mockGet = githubApi.githubGet as unknown as jest.MockedFunction<
   (path: string, qs?: Record<string, string>) => Promise<unknown>
 >;
-const mockPost = githubApi.githubPost as jest.MockedFunction<
-  typeof githubApi.githubPost
+const mockPost = githubApi.postWithRetryOnAlreadyRunning as jest.MockedFunction<
+  typeof githubApi.postWithRetryOnAlreadyRunning
 >;
 const mockFetchLogs = logsModule.fetchRunLogsRing as jest.MockedFunction<
   typeof logsModule.fetchRunLogsRing
@@ -242,6 +242,49 @@ describe('retryFailed', () => {
       const result = await retryFailed({ runId: 123 });
       expect(result.isError).toBe(true);
       expect(mockPost).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('already-running 403 surfaced by the retry wrapper', () => {
+    beforeEach(() => {
+      mockGet.mockImplementation(async (path: string) => {
+        if (path === '/actions/runs/999') {
+          return runResponse({ run_attempt: 1 });
+        }
+        if (path === '/actions/runs/999/jobs') {
+          return {
+            total_count: 2,
+            jobs: [job(1, 'build', 'success'), job(2, 'test', 'failure')],
+          };
+        }
+        throw new Error(`unexpected path ${path}`);
+      });
+    });
+
+    it('surfaces a final "gave up after N attempts" error as a tool error', async () => {
+      mockPost.mockRejectedValue(
+        new Error(
+          'GitHub API 403: This workflow is already running. (gave up after 3 attempts waiting for the run to settle)',
+        ),
+      );
+
+      const result = await retryFailed({ runId: 999 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/gave up after 3 attempts/);
+    });
+
+    it('still fails fast on a non-matching 403 (e.g. permissions)', async () => {
+      mockPost.mockRejectedValue(
+        new Error('GitHub API 403: Resource not accessible by integration'),
+      );
+
+      const result = await retryFailed({ runId: 999 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(
+        /Resource not accessible by integration/,
+      );
     });
   });
 });

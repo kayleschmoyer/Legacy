@@ -1,4 +1,4 @@
-import { githubGet, githubPost } from '../github-api.js';
+import { githubGet, postWithRetryOnAlreadyRunning } from '../github-api.js';
 import { fetchRunLogsRing } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
@@ -148,7 +148,9 @@ export async function retryFailed(
       originalLogSnippet = '';
     }
 
-    await githubPost(`/actions/runs/${params.runId}/rerun-failed-jobs`);
+    await postWithRetryOnAlreadyRunning(
+      `/actions/runs/${params.runId}/rerun-failed-jobs`,
+    );
 
     const updatedRun = await githubGet<GitHubWorkflowRun>(
       `/actions/runs/${params.runId}`,
