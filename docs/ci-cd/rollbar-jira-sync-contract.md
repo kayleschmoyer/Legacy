@@ -161,6 +161,14 @@ manual Jira edit is corrected on the next run rather than lost forever.
 
 ## Proposed implementation (follow-up)
 
+> **Status: implemented (LS-8345).** The resolve pass described below ships as
+> [`.github/workflows/rollbar-jira-reconcile.yml`](../../.github/workflows/rollbar-jira-reconcile.yml)
+> with decision logic in
+> [`tools/rollbar-jira-reconcile/`](../../tools/rollbar-jira-reconcile/). It is
+> live but **dry-run until the prerequisites below are provisioned** — until
+> then it only logs proposals to the workflow step summary. The create backstop
+> pass is not implemented (still just a proposal below).
+
 Scoped as follow-up work because it is outward-facing (mutates production Rollbar
 item state) and requires provisioning a write-scoped Rollbar token as a GitHub
 secret — see [Prerequisites](#prerequisites).

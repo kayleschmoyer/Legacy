@@ -1,0 +1,6 @@
+{
+  "name": "legacy-sports-rollbar-jira-reconcile",
+  "private": true,
+  "description": "Rollbar→Jira resolve-on-done reconcile decision engine: given an active Rollbar item's linked Jira ticket status, decide whether to resolve it. Zero runtime dependencies so .github/workflows/rollbar-jira-reconcile.yml can execute it with bare node (no pnpm install).",
+  "main": "src/index.js"
+}

@@ -1,0 +1,459 @@
+name: "Rollbar → Jira Reconcile"
+
+# Resolve-side reconciliation for the Rollbar ↔ Jira sync gap documented in
+# docs/ci-cd/rollbar-jira-sync-contract.md (LS-8344 research, LS-8345
+# follow-up). Rollbar's native Jira integration is create-only: when a
+# linked ticket reaches Done/Closed, nothing tells Rollbar to resolve the
+# item, so it stays `active` forever.
+#
+# This workflow closes that gap with a single reconcile pass, mirroring the
+# shape of jira-status-audit.yml:
+#   1. GET /api/1/items?status=active (Rollbar), paginated.
+#   2. For each item with `integrations_data.jira.issue.key`, read that
+#      Jira issue's status.
+#   3. If Done/Closed, PATCH /api/1/item/{id}/ {"status":"resolved"} (the
+#      rollbar_set_status path from LS-8202), gated on the dry-run repo var.
+#   4. Emit a step-summary table of resolved / proposed / skipped.
+#
+# All decision logic (resolve vs. propose vs. skip) lives in the
+# unit-tested tools/rollbar-jira-reconcile/ package (tools/jira-sync
+# pattern) — this workflow only executes the actions it returns.
+#
+# Idempotent by construction: only `status=active` items are ever listed,
+# so a resolved item never comes back around, and re-running with nothing
+# left to resolve converges to a no-op (AC2). The same reason satisfies
+# AC5 (never reopen a resolved item) — this workflow only ever writes
+# active → resolved, never the reverse.
+#
+# Dry-run by default: writes are gated on the repo var
+# ROLLBAR_JIRA_RECONCILE_AUTO being 'true'. Until then, every item that
+# would be resolved is only logged in the step summary (AC3).
+#
+# Trigger note (schedule-free CI policy, ADR 0010 amendment): this repo has
+# no `schedule:` triggers anywhere — periodic jobs are event-anchored
+# instead (see terraform-lock-watchdog.yml, cross-browser-e2e.yml, etc.).
+# The natural anchor for "a linked Jira ticket became Done" is the same
+# Jira webhook that jira-status-audit.yml already listens to
+# (repository_dispatch: jira-issue-updated, fired by
+# lambdas/github-webhook on every Jira status change). Reusing it here
+# means a resolve pass runs automatically on every ticket transition in the
+# repo — including every Done transition — with the same self-healing
+# property as the status audit (any single delivery re-scans all active
+# items, so a missed webhook is corrected on the next one). workflow_dispatch
+# covers on-demand sweeps and prerequisite verification.
+#
+# Prerequisites (user-provisioned, see docs/ci-cd/rollbar-jira-sync-contract.md):
+#   - Repo secret ROLLBAR_WRITE_TOKEN — a Rollbar project access token with
+#     both read and write scope. Until it's set, the resolve step logs a
+#     warning and no-ops rather than failing the run.
+#   - Repo var ROLLBAR_JIRA_RECONCILE_AUTO (defaults to 'false' — dry-run —
+#     when unset).
+#
+# Authentication: Jira via Atlassian OAuth 2.0 (client credentials grant),
+# same as jira-status-audit.yml. Rollbar via the X-Rollbar-Access-Token
+# header.
+
+on:
+  repository_dispatch:
+    types: [jira-issue-updated]
+  workflow_dispatch:
+
+# Debounce rapid-fire dispatch events (e.g. Jira bulk transitions / retries).
+# Only the most recent event matters — cancel any in-progress run.
+concurrency:
+  group: rollbar-jira-reconcile
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    name: Resolve Rollbar items with a Done/Closed linked ticket
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+
+    steps:
+      # Guard against unauthorized repository_dispatch callers, identical to
+      # jira-status-audit.yml — any collaborator with dispatch access could
+      # otherwise trigger this workflow and gain access to JIRA_CREDENTIALS
+      # and ROLLBAR_WRITE_TOKEN. Scheduled (n/a here) and manual runs are not
+      # subject to this check.
+      - name: Verify dispatch sender
+        if: github.event_name == 'repository_dispatch'
+        env:
+          SENDER: ${{ github.event.sender.login }}
+          ALLOWED: ${{ vars.JIRA_DISPATCH_ALLOWED_SENDERS || 'legacy-sports-review-bot,legacy-sports-review-bot[bot]' }}
+        run: |
+          IFS=',' read -ra ALLOWED_LOGINS <<< "$ALLOWED"
+          for login in "${ALLOWED_LOGINS[@]}"; do
+            login="${login// /}"  # trim whitespace
+            if [[ "$SENDER" == "$login" ]]; then
+              echo "✅ Authorized dispatch sender: $SENDER"
+              exit 0
+            fi
+          done
+          echo "::error::Unauthorized repository_dispatch sender: '$SENDER'. Allowed: $ALLOWED"
+          exit 1
+
+      # Runs only from the default branch (repository_dispatch /
+      # workflow_dispatch), so this checks out the same commit the workflow
+      # file came from — the decision engine and this workflow always move
+      # together.
+      - name: Checkout (workflow context + reconcile engine)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github
+            tools/rollbar-jira-reconcile
+          sparse-checkout-cone-mode: true
+
+      - name: Authenticate with Jira (OAuth 2.0)
+        id: jira-auth
+        env:
+          JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
+        run: |
+          if [[ -z "$JIRA_CREDENTIALS" ]]; then
+            echo "::warning::JIRA_CREDENTIALS not set — skipping reconcile"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CLIENT_ID=$(echo "$JIRA_CREDENTIALS" | jq -r '.client_id')
+          CLIENT_SECRET=$(echo "$JIRA_CREDENTIALS" | jq -r '.client_secret')
+          CLOUD_ID=$(echo "$JIRA_CREDENTIALS" | jq -r '.cloud_id')
+
+          echo "::add-mask::$CLIENT_SECRET"
+          echo "::add-mask::$CLIENT_ID"
+
+          TOKEN_RESPONSE=$(curl -sf \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --data "$(jq -n --arg id "$CLIENT_ID" --arg secret "$CLIENT_SECRET" \
+              '{grant_type:"client_credentials",client_id:$id,client_secret:$secret}')" \
+            "https://auth.atlassian.com/oauth/token" 2>&1) || {
+            echo "::warning::Failed to obtain Jira OAuth token — skipping reconcile"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+          echo "::add-mask::$ACCESS_TOKEN"
+
+          {
+            echo "JIRA_ACCESS_TOKEN=$ACCESS_TOKEN"
+            echo "JIRA_API_BASE=https://api.atlassian.com/ex/jira/$CLOUD_ID"
+          } >> "$GITHUB_ENV"
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "✅ Jira authenticated"
+
+      # -------------------------------------------------------------------
+      # Reusable retry wrappers for the Jira and Rollbar REST APIs.
+      # -------------------------------------------------------------------
+      - name: Define API helpers
+        if: steps.jira-auth.outputs.skip != 'true'
+        run: |
+          cat > /tmp/api-helpers.sh << 'FUNC_EOF'
+          jira_api() {
+            local METHOD="${1:-GET}"
+            local URL="$2"
+            local MAX_RETRIES=3
+            local RETRY_DELAY=2
+            local TMP_BODY
+            TMP_BODY=$(mktemp)
+            # shellcheck disable=SC2064
+            trap "rm -f '$TMP_BODY'" RETURN
+
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              local TMP_ERR
+              TMP_ERR=$(mktemp)
+              local HTTP_CODE
+              HTTP_CODE=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
+                --request "$METHOD" \
+                --header "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
+                --header "Accept: application/json" \
+                --connect-timeout 10 --max-time 30 \
+                "$URL" 2>"$TMP_ERR") || {
+                echo "❌ curl transport error for $URL: $(cat "$TMP_ERR")" >&2
+                rm -f "$TMP_ERR"
+                sleep "$RETRY_DELAY"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              }
+              rm -f "$TMP_ERR"
+
+              local BODY
+              BODY=$(cat "$TMP_BODY")
+
+              if [[ "$HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+                echo "$BODY"
+                return 0
+              fi
+              if [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]]; then
+                echo "❌ Jira auth error (HTTP $HTTP_CODE) — not retrying" >&2
+                echo "$BODY" >&2
+                return 1
+              fi
+              if [[ "$HTTP_CODE" == "429" || "$HTTP_CODE" =~ ^5[0-9][0-9]$ ]]; then
+                echo "⚠️  Jira HTTP $HTTP_CODE. Retry $attempt/$MAX_RETRIES in ${RETRY_DELAY}s..." >&2
+                sleep "$RETRY_DELAY"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              fi
+              echo "❌ Unexpected Jira HTTP $HTTP_CODE" >&2
+              echo "$BODY" >&2
+              return 1
+            done
+            echo "❌ Jira: all $MAX_RETRIES retries exhausted" >&2
+            return 1
+          }
+
+          rollbar_api() {
+            local METHOD="${1:-GET}"
+            local URL="$2"
+            local DATA="${3:-}"
+            local MAX_RETRIES=3
+            local RETRY_DELAY=2
+            local TMP_BODY
+            TMP_BODY=$(mktemp)
+            # shellcheck disable=SC2064
+            trap "rm -f '$TMP_BODY'" RETURN
+
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              local CURL_ARGS=(
+                -sS -o "$TMP_BODY" -w '%{http_code}'
+                --request "$METHOD"
+                --header "X-Rollbar-Access-Token: $ROLLBAR_TOKEN"
+                --header "Accept: application/json"
+                --connect-timeout 10 --max-time 30
+              )
+              if [[ "$METHOD" == "PATCH" && -n "$DATA" ]]; then
+                CURL_ARGS+=(--header "Content-Type: application/json" --data "$DATA")
+              fi
+
+              local TMP_ERR
+              TMP_ERR=$(mktemp)
+              local HTTP_CODE
+              HTTP_CODE=$(curl "${CURL_ARGS[@]}" "$URL" 2>"$TMP_ERR") || {
+                echo "❌ curl transport error for $URL: $(cat "$TMP_ERR")" >&2
+                rm -f "$TMP_ERR"
+                sleep "$RETRY_DELAY"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              }
+              rm -f "$TMP_ERR"
+
+              local BODY
+              BODY=$(cat "$TMP_BODY")
+
+              if [[ "$HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+                echo "$BODY"
+                return 0
+              fi
+              if [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]]; then
+                echo "❌ Rollbar auth error (HTTP $HTTP_CODE) — ROLLBAR_WRITE_TOKEN likely lacks the required scope. Not retrying." >&2
+                echo "$BODY" >&2
+                return 1
+              fi
+              if [[ "$HTTP_CODE" == "429" || "$HTTP_CODE" =~ ^5[0-9][0-9]$ ]]; then
+                echo "⚠️  Rollbar HTTP $HTTP_CODE. Retry $attempt/$MAX_RETRIES in ${RETRY_DELAY}s..." >&2
+                sleep "$RETRY_DELAY"
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                continue
+              fi
+              echo "❌ Unexpected Rollbar HTTP $HTTP_CODE" >&2
+              echo "$BODY" >&2
+              return 1
+            done
+            echo "❌ Rollbar: all $MAX_RETRIES retries exhausted" >&2
+            return 1
+          }
+          FUNC_EOF
+          echo "✅ API retry helpers defined"
+
+      # -------------------------------------------------------------------
+      # Resolve pass: list active Rollbar items, check each linked ticket's
+      # Jira status, resolve (or propose, or skip) per tools/rollbar-jira-
+      # reconcile's decision engine.
+      # -------------------------------------------------------------------
+      - name: Resolve Rollbar items with a Done/Closed linked ticket
+        id: resolve
+        if: steps.jira-auth.outputs.skip != 'true'
+        env:
+          ROLLBAR_TOKEN: ${{ secrets.ROLLBAR_WRITE_TOKEN }}
+          AUTO: ${{ vars.ROLLBAR_JIRA_RECONCILE_AUTO || 'false' }}
+        run: |
+          source /tmp/api-helpers.sh
+
+          if [[ -z "$ROLLBAR_TOKEN" ]]; then
+            echo "::warning::ROLLBAR_WRITE_TOKEN not set — skipping reconcile. See docs/ci-cd/rollbar-jira-sync-contract.md#prerequisites."
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "## 🔄 Rollbar → Jira Reconcile" >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ Skipped — \`ROLLBAR_WRITE_TOKEN\` repo secret is not set." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Fail closed: anything other than the literal 'true' means dry-run.
+          DRY_RUN=true
+          if [[ "$AUTO" == "true" ]]; then
+            DRY_RUN=false
+          fi
+          echo "🔍 Scanning active Rollbar items (dry-run: $DRY_RUN)..."
+
+          RESOLVED=0
+          PROPOSED=0
+          SKIPPED=0
+          NO_LINK=0
+          ERRORS=0
+
+          # Candidate items (linked key + fetched Jira status) queued here as
+          # JSON Lines, decided in a single batched `node` call below instead
+          # of spawning one process per item. Detail-log rows are appended to
+          # a file rather than a growing shell variable.
+          ITEMS_FILE=$(mktemp)
+          DETAIL_FILE=$(mktemp)
+          trap 'rm -f "$ITEMS_FILE" "$DETAIL_FILE"' EXIT
+
+          MAX_PAGES=50
+          PAGE=1
+          CAPPED=false
+          while [[ "$PAGE" -le "$MAX_PAGES" ]]; do
+            RESPONSE=$(rollbar_api GET "https://api.rollbar.com/api/1/items?status=active&per_page=100&page=$PAGE") || {
+              echo "::error::Failed to list Rollbar active items (page $PAGE)"
+              ERRORS=$((ERRORS + 1))
+              break
+            }
+
+            ERR=$(echo "$RESPONSE" | jq -r '.err // 1')
+            if [[ "$ERR" != "0" ]]; then
+              echo "::error::Rollbar API returned err=$ERR: $(echo "$RESPONSE" | jq -r '.message // "unknown error"')"
+              ERRORS=$((ERRORS + 1))
+              break
+            fi
+
+            ITEMS=$(echo "$RESPONSE" | jq -c '.result.items // []')
+            ITEM_COUNT=$(echo "$ITEMS" | jq 'length')
+            if [[ "$ITEM_COUNT" -eq 0 ]]; then
+              break
+            fi
+
+            while read -r ITEM; do
+              ITEM_ID=$(echo "$ITEM" | jq -r '.id')
+              COUNTER=$(echo "$ITEM" | jq -r '.counter')
+              # Neutralize pipes and line breaks so a title can't corrupt the
+              # step-summary Markdown table (or inject extra rows).
+              TITLE=$(echo "$ITEM" | jq -r '.title // "(untitled)"' | tr '|\r\n' '/  ')
+              KEY=$(echo "$ITEM" | jq -r '.integrations_data.jira.issue.key // empty')
+
+              if [[ -z "$KEY" ]]; then
+                NO_LINK=$((NO_LINK + 1))
+                continue
+              fi
+
+              JIRA_RESPONSE=$(jira_api GET "$JIRA_API_BASE/rest/api/3/issue/$KEY?fields=status") || {
+                echo "  ⚠️  item #$COUNTER ($KEY): could not fetch Jira status — skipping"
+                ERRORS=$((ERRORS + 1))
+                continue
+              }
+              JIRA_STATUS=$(echo "$JIRA_RESPONSE" | jq -r '.fields.status.name // empty')
+              if [[ -z "$JIRA_STATUS" ]]; then
+                echo "  ⚠️  item #$COUNTER ($KEY): Jira response had no status — skipping"
+                ERRORS=$((ERRORS + 1))
+                continue
+              fi
+
+              jq -n -c --arg counter "$COUNTER" --arg title "$TITLE" --arg key "$KEY" \
+                --arg itemId "$ITEM_ID" --arg jiraStatus "$JIRA_STATUS" \
+                '{counter: $counter, title: $title, key: $key, itemId: $itemId, jiraStatus: $jiraStatus}' \
+                >> "$ITEMS_FILE"
+            done < <(echo "$ITEMS" | jq -c '.[]')
+
+            if [[ "$ITEM_COUNT" -lt 100 ]]; then
+              break
+            fi
+            PAGE=$((PAGE + 1))
+          done
+
+          if [[ "$PAGE" -gt "$MAX_PAGES" ]]; then
+            CAPPED=true
+            echo "::warning::hit the $MAX_PAGES-page cap — some active items were not scanned this run. Each run starts from page 1, so a future run will re-scan from the top rather than resume; raise MAX_PAGES if this recurs."
+          fi
+
+          # One node process decides every queued item at once.
+          DECISIONS=""
+          if [[ -s "$ITEMS_FILE" ]]; then
+            DECISIONS=$(node tools/rollbar-jira-reconcile/src/cli.js decide-batch --dry-run "$DRY_RUN" < "$ITEMS_FILE") || {
+              echo "::error::decision engine batch call failed"
+              ERRORS=$((ERRORS + $(wc -l < "$ITEMS_FILE")))
+              DECISIONS=""
+            }
+          fi
+
+          if [[ -n "$DECISIONS" ]]; then
+            while IFS= read -r DEC; do
+              COUNTER=$(echo "$DEC" | jq -r '.counter')
+              TITLE=$(echo "$DEC" | jq -r '.title')
+              KEY=$(echo "$DEC" | jq -r '.key')
+              ITEM_ID=$(echo "$DEC" | jq -r '.itemId')
+              JIRA_STATUS=$(echo "$DEC" | jq -r '.jiraStatus')
+              ACTION=$(echo "$DEC" | jq -r '.action')
+
+              case "$ACTION" in
+                resolve)
+                  if rollbar_api PATCH "https://api.rollbar.com/api/1/item/$ITEM_ID/" '{"status":"resolved"}' > /dev/null; then
+                    echo "  ✅ item #$COUNTER ($KEY, $JIRA_STATUS): resolved"
+                    RESOLVED=$((RESOLVED + 1))
+                    echo "| #$COUNTER | $TITLE | $KEY | $JIRA_STATUS | resolved |" >> "$DETAIL_FILE"
+                  else
+                    echo "  ❌ item #$COUNTER ($KEY): resolve PATCH failed"
+                    ERRORS=$((ERRORS + 1))
+                  fi
+                  ;;
+                propose)
+                  echo "  📝 item #$COUNTER ($KEY, $JIRA_STATUS): proposed (dry-run)"
+                  PROPOSED=$((PROPOSED + 1))
+                  echo "| #$COUNTER | $TITLE | $KEY | $JIRA_STATUS | proposed (dry-run) |" >> "$DETAIL_FILE"
+                  ;;
+                skip)
+                  SKIPPED=$((SKIPPED + 1))
+                  ;;
+                *)
+                  # Fail closed: an unexpected/malformed action must be
+                  # counted as an error, never silently dropped.
+                  echo "  ⚠️  item #$COUNTER ($KEY): decision engine returned unexpected action \"$ACTION\" — skipping"
+                  ERRORS=$((ERRORS + 1))
+                  ;;
+              esac
+            done <<< "$DECISIONS"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## 🔄 Rollbar → Jira Reconcile" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Auto-resolve enabled**: $AUTO" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Resolved**: $RESOLVED" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Proposed (dry-run)**: $PROPOSED" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Skipped (linked ticket not Done/Closed)**: $SKIPPED" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **No linked ticket**: $NO_LINK" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$ERRORS" -gt 0 ]]; then
+            echo "- **Errors**: $ERRORS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "$CAPPED" == "true" ]]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ **Page cap hit** ($MAX_PAGES pages) — some active items were not scanned. Raise MAX_PAGES in rollbar-jira-reconcile.yml if this persists." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ -s "$DETAIL_FILE" ]]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Resolved / proposed" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Item | Title | Ticket | Jira status | Action |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|------|-------|--------|-------------|--------|" >> "$GITHUB_STEP_SUMMARY"
+            cat "$DETAIL_FILE" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "✅ No active items have a Done/Closed linked ticket." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ "$ERRORS" -gt 0 ]]; then
+            exit 1
+          fi
