@@ -46,6 +46,8 @@ jest.mock('@legacy-sports/shared-components', () => {
   return {
     AvatarImage: () => React.createElement(View, { testID: 'avatar-image' }),
     AvatarPicker: () => React.createElement(View, { testID: 'avatar-picker' }),
+    formatDisplayName: (username: string): string =>
+      /^[^@]+@[^@]+\.[^@]+$/.test(username) ? username.split('@')[0] : username,
   };
 });
 
@@ -211,6 +213,25 @@ describe('ProfileSettingsScreen', () => {
       expect(
         screen.getAllByText('test@example.com').length,
       ).toBeGreaterThanOrEqual(1);
+    });
+
+    it('strips the email domain from the username when the backend username is an email address', () => {
+      mockUseGetUserByIdQuery.mockReturnValue({
+        data: {
+          user: {
+            ...mockUser,
+            username: 'legacyplaywright@gmail.com',
+            email: 'legacyplaywright@gmail.com',
+          },
+        },
+        refetch: (...args: unknown[]): unknown => mockRefetchUser(...args),
+      });
+      render(<ProfileSettingsScreen />);
+      // Stripped display name appears in the header and the Username field.
+      expect(screen.getAllByText('legacyplaywright').length).toBe(2);
+      // The full email still renders in its own subtitle/Email field spots
+      // (unaffected), but is no longer duplicated into the Username field.
+      expect(screen.getAllByText('legacyplaywright@gmail.com').length).toBe(2);
     });
 
     it('renders the user ID with a # prefix', () => {

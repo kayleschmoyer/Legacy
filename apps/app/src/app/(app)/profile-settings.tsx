@@ -12,7 +12,11 @@ import {
   YStack,
 } from 'tamagui';
 import { useRouter } from 'expo-router';
-import { AvatarImage, AvatarPicker } from '@legacy-sports/shared-components';
+import {
+  AvatarImage,
+  AvatarPicker,
+  formatDisplayName,
+} from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetUserByIdQuery,
@@ -117,6 +121,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
   );
 
   const userName = user?.username ?? currentUser?.username ?? '';
+  const displayName = formatDisplayName(userName);
   const userEmail = user?.email ?? currentUser?.email ?? '';
   const isAdmin =
     user?.accessLevel === 'admin' || (currentUser?.isAdmin ?? false);
@@ -191,7 +196,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               >
                 <AvatarImage
                   url={avatarUrl}
-                  username={userName}
+                  username={displayName}
                   size={72}
                   borderRadius={36}
                 />
@@ -219,7 +224,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                     color: BRAND_GOLD_LIGHT,
                   }}
                 >
-                  {userName}
+                  {displayName}
                 </Text>
                 {userEmail ? (
                   <Paragraph size="$3" color="$colorPress">
@@ -264,7 +269,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                     void handleAvatarSelect(url)
                   }
                   loading={updatingAvatar}
-                  username={userName}
+                  username={displayName}
                 />
               </YStack>
             )}
@@ -317,7 +322,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                 ) : (
                   <XStack flex={1} alignItems="center" gap="$2">
                     <Paragraph size="$4" color="$color" flex={1}>
-                      {userName}
+                      {displayName}
                     </Paragraph>
                     <Button
                       size="$2"
