@@ -3,6 +3,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { auditSessionBash } from './tools/audit-session-bash.js';
 import { autoFix } from './tools/auto-fix.js';
+import { cancelRun } from './tools/cancel-run.js';
+import { cancelRuns } from './tools/cancel-runs.js';
 import { dispatchWorkflow } from './tools/dispatch-workflow.js';
 import { findSession } from './tools/find-session.js';
 import { getLogs } from './tools/get-logs.js';
@@ -215,6 +217,43 @@ export function createServer(): McpServer {
       debug: coercedBoolean.default(false).describe('Enable debug logging'),
     },
     async (params) => rerunBatch(params),
+  );
+
+  server.tool(
+    'ci_cancel_run',
+    'Prefer this over `gh run cancel` via shell. Cancel a single in-flight GitHub Actions run — e.g. killing a stale-SHA dispatch after pushing a follow-up commit, or stopping an expensive live-backend integration run that is no longer needed. ' +
+      'GitHub does not transition the run to `cancelled` synchronously (it passes through `cancel_in_progress` first), so the response reflects the actual post-cancel status from a follow-up fetch, not an assumed value. ' +
+      'Cancelling a run that has already completed returns a clear error rather than throwing. Use ci_cancel_runs to cancel every in-flight run of a workflow on a branch in one call.',
+    {
+      runId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe(
+          'Run ID. Use the "id" field from ci_list_runs output ("databaseId" is an alias for the same value).',
+        ),
+    },
+    async (params) => cancelRun(params),
+  );
+
+  server.tool(
+    'ci_cancel_runs',
+    'Bulk variant of ci_cancel_run: cancel every non-completed (queued/in_progress) run of a workflow on a branch in one call — ' +
+      'e.g. serializing expensive live-backend integration runs so a fresh dispatch never races a stale one on the same branch (LS-7878). ' +
+      'Resolves `workflow` the same way ci_list_runs does (display name, filename, or numeric ID). ' +
+      'Returns the standard partial-failure shape { success, total, succeeded, failed } so one run failing to cancel does not fail the whole call; ' +
+      'returns total: 0 when no in-flight runs are found.',
+    {
+      workflow: z
+        .union([z.string(), z.number().int()])
+        .transform(String)
+        .describe('Workflow filename, display name, or numeric ID'),
+      branch: z
+        .string()
+        .min(1)
+        .describe('Branch name to scope the cancellation to'),
+    },
+    async (params) => cancelRuns(params),
   );
 
   server.tool(

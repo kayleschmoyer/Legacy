@@ -508,7 +508,14 @@ export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
   }
 
   logRateLimit(res, `POST ${path}`);
-  // Some POST endpoints return 201 with a body, others return 204 with no body
+  // Some POST endpoints return 201 with a body, others return 204 with no
+  // body. The run-cancel endpoint returns 202 Accepted with an empty body —
+  // read as text first and only parse as JSON when there is content, so a
+  // blank 202 response doesn't throw on `res.json()`.
   if (res.status === 204) return {} as T;
+  if (res.status === 202) {
+    const text = await res.text();
+    return (text ? JSON.parse(text) : {}) as T;
+  }
   return (await res.json()) as T;
 }

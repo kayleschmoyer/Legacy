@@ -23,7 +23,7 @@ interface GitHubWorkflowsResponse {
  * caller passes a display name, list all workflows and find the matching one
  * by name (case-insensitive), then return its filename.
  */
-async function resolveWorkflowId(workflow: string): Promise<string> {
+export async function resolveWorkflowId(workflow: string): Promise<string> {
   const normalized = workflow.trim();
   if (normalized === '') {
     throw new Error(
