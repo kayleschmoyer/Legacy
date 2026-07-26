@@ -24,6 +24,12 @@ detail, this rule wins.
   and the 3 hosted servers need bearer env vars exported before launch. See
   [docs/dev-process/cursor-setup.md](mdc:docs/dev-process/cursor-setup.md).
 
+## Skill routing
+
+Consult the Skill Routing table in AGENTS.md (the `## Skills` section). Before
+starting work, and again whenever the task moves into a new directory, `Read`
+every skill whose scope matches the files being touched.
+
 ## Safety (never violate)
 
 - **Never commit to `main`.** All work happens on a feature branch / worktree.
