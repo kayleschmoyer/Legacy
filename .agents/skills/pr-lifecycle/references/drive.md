@@ -274,6 +274,21 @@ A `JUSTIFY:` reply does **not** clear `CHANGES_REQUESTED` — it leaves the thre
 3. **Drive to the cycle cap.** Re-apply `bot:ready-for-review` and let the cycle counter advance. At Cycle 3+, reply `CANNOT-COMPLY: <issue-id>` (reason on the next line) on the disputed thread instead of another `JUSTIFY:`.
 4. **Escalate to the maintainer for the override.** A persistent false-positive `CHANGES_REQUESTED` can only be cleared by a human applying `review-bot-override` (you must never apply it yourself — Author Agent Contract §5). Post a comment that quotes the finding, your evidence that it's wrong, and explicitly asks the maintainer to apply `review-bot-override`. **This ask — with the label named — is itself a terminal state** (genuine human-only blocker). Parking on an open JUSTIFY with no such ask is not.
 
+#### AskUserQuestion may be unavailable in webhook-subscribed sessions
+
+**Symptom** (LS-8378): `AskUserQuestion` fails outright with `Tool permission stream closed before response received` — not a timeout, the call never completes. Observed in a session with an active `github-webhook-activity` PR subscription (this event loop) while PR events were arriving concurrently; suspected resource contention on the permission-prompt stream between the webhook event channel and the interactive prompt channel. Not yet root-caused or confirmed reliably reproducible — treat it as a known limitation of autonomous/background-driven sessions (an armed PR watch, a Routine, a dispatched chip) rather than a bug to work around with retries.
+
+**When this can bite**: mid-loop, when you hit a genuine decision only the user can make — e.g. an out-of-scope architectural conflict discovered while fixing CI, an ambiguous review comment, or anything else that would normally warrant `AskUserQuestion`.
+
+**Do not retry `AskUserQuestion` in a loop** — there's no evidence a retry succeeds once the stream has closed, and looping just burns turns waiting on a response that may never arrive.
+
+**Fallback**:
+
+1. Proceed with your best-judgment call and **document the reasoning explicitly** — in the PR body/comment and, if a Jira ticket is linked, a ticket comment.
+2. Post a PR comment naming the decision point, the option you chose, and why, so a human reviewer can override before merge.
+3. If the decision is genuinely blocking (unsafe to proceed either way), treat it as the [Genuine human-only blocker terminal state](#terminal-states-the-only-places-this-loop-may-stop): apply `requires-human-review`, post the explicit question as a comment, and stop — do not keep calling `AskUserQuestion`.
+4. Where available, `send_later` (claude-code-remote MCP) can schedule a check-in with the human instead of blocking indefinitely on a prompt that may never resolve.
+
 #### The CI pipeline must actually have run (not SKIPPED)
 
 A review verdict is meaningless while the merge gate is red. Before you treat a review round as resolved, confirm the real CI ran:
