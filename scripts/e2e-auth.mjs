@@ -31,7 +31,23 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { config as loadDotenv } from 'dotenv';
+
+// Load the repo-root .env before resolveOAuthUrl() (or anything else reading
+// process.env) can run. Resolved relative to this script's own location, not
+// process.cwd(), since a worktree may invoke this file with cwd elsewhere.
+// This runs once at module evaluation, so both the direct-CLI path (main())
+// and the imported path used by global-setup.ts (resolveLocalToken()) pick
+// up the same values. A missing .env file is a no-op for dotenv — only a
+// genuinely unset var after this load is treated as an error, in
+// resolveOAuthUrl() below.
+const REPO_ROOT_ENV_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '.env',
+);
+loadDotenv({ path: REPO_ROOT_ENV_PATH });
 
 /**
  * @typedef {object} TokenCache
@@ -149,13 +165,24 @@ export function cacheToken(jwt, email, expiresInSeconds) {
 
 // ── Device flow ───────────────────────────────────────────────────────────────
 
-/** @returns {string} */
+/**
+ * Resolves the OAuth proxy base URL from the repo-root .env (loaded at
+ * module scope above) or the process environment. Throws rather than
+ * falling back to a placeholder host — a missing var here means the device
+ * flow cannot reach any real proxy, and a hard error naming the exact vars
+ * and .env path checked is more actionable than a silent ENOTFOUND.
+ *
+ * @returns {string}
+ */
 export function resolveOAuthUrl() {
-  return (
-    process.env.VITE_OAUTH_PROXY_URL ||
-    process.env.OAUTH_PROXY_URL ||
-    'https://api.legacysports.dev/oauth'
-  );
+  const url = process.env.VITE_OAUTH_PROXY_URL || process.env.OAUTH_PROXY_URL;
+  if (!url) {
+    throw new Error(
+      `[E2E Auth] Neither VITE_OAUTH_PROXY_URL nor OAUTH_PROXY_URL is set. ` +
+        `Checked ${REPO_ROOT_ENV_PATH} — set one of these vars there (see .env.example).`,
+    );
+  }
+  return url;
 }
 
 /**
