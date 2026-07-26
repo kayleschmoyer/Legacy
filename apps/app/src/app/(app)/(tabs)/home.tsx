@@ -16,8 +16,10 @@ import {
   useGetUserLeagueSummariesQuery,
 } from '@legacy-sports/graphql';
 import { colors } from '@legacy-sports/design-tokens';
+import { LOGGER } from '@legacy-sports/logging';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
+import { toPlayerDetailIdParam } from '../../../common/utilities/RouteUtils';
 import BaseballHomeScreen from '../baseball/index';
 import FootballHomeScreen from '../football/index';
 
@@ -186,12 +188,23 @@ export default function HomeTab() {
 
   const onThisDay = (
     <OnThisDayFeed
-      onPlayerPress={(id) =>
+      onPlayerPress={(id) => {
+        // Validate the id before navigating (LS-8627) — a blind String(id)
+        // coercion let a missing/invalid id reach PlayerDetail, which fails
+        // to parse it and always shows "Player Not Found".
+        const playerId = toPlayerDetailIdParam(id);
+        if (playerId === null) {
+          LOGGER.warn(
+            '[Home] skipping PlayerDetail navigation for invalid player id',
+            { id },
+          );
+          return;
+        }
         router.push({
           pathname: '/PlayerDetail',
-          params: { playerId: String(id), playerName: '' },
-        })
-      }
+          params: { playerId, playerName: '' },
+        });
+      }}
     />
   );
 

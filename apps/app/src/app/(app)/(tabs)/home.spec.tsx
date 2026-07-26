@@ -65,28 +65,39 @@ let capturedOnViewSport: ((sport: 'baseball' | 'football') => void) | null =
   null;
 // Capture topInset so tests can assert it's forwarded from useSafeAreaInsets (LS-8625)
 let capturedTopInset: number | undefined;
+// Capture the OnThisDayFeed onPlayerPress callback (LS-8627)
+let capturedOnPlayerPress: ((playerId: number) => void) | null = null;
 
 jest.mock('@legacy-sports/shared-components', () => ({
   HomeScreen: ({
     onViewSport,
     testID,
     topInset,
+    onThisDay,
   }: {
     onViewSport: (sport: 'baseball' | 'football') => void;
     testID?: string;
     topInset?: number;
+    onThisDay?: React.ReactNode;
   }) => {
     capturedOnViewSport = onViewSport;
     capturedTopInset = topInset;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
-    return <View testID={testID ?? 'home-screen'} />;
+    return <View testID={testID ?? 'home-screen'}>{onThisDay}</View>;
   },
   formatDisplayName: (name: string) => name,
 }));
 
 jest.mock('@legacy-sports/shared-components/leagues', () => ({
-  OnThisDayFeed: () => null,
+  OnThisDayFeed: ({
+    onPlayerPress,
+  }: {
+    onPlayerPress?: (playerId: number) => void;
+  }) => {
+    capturedOnPlayerPress = onPlayerPress ?? null;
+    return null;
+  },
 }));
 
 const mockRefetch = jest.fn();
@@ -146,6 +157,7 @@ describe('HomeTab sport switching (LS-5814)', () => {
     backHandlerHandlers.length = 0;
     capturedOnViewSport = null;
     capturedTopInset = undefined;
+    capturedOnPlayerPress = null;
     mockGetUserLeagueSummaries.mockReturnValue({
       data: { getUserLeagueSummaries: [] },
       loading: false,
@@ -260,5 +272,44 @@ describe('HomeTab sport switching (LS-5814)', () => {
       capturedOnViewSport?.('football');
     });
     expect(screen.getByText('Football Home')).toBeTruthy();
+  });
+});
+
+describe('HomeTab OnThisDayFeed player navigation (LS-8627)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    capturedOnPlayerPress = null;
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: [] },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    mockGetArchivedLazy.mockReturnValue([
+      jest.fn(),
+      { data: null, loading: false },
+    ]);
+    mockGetArchivedCached.mockReturnValue({ data: null });
+  });
+
+  it('navigates to PlayerDetail with a validated string playerId for a valid id', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnPlayerPress?.(7);
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/PlayerDetail',
+      params: { playerId: '7', playerName: '' },
+    });
+  });
+
+  it('skips navigation for an invalid id instead of pushing a bad param', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnPlayerPress?.(0);
+    });
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });
