@@ -172,6 +172,60 @@ describe('background job registry', () => {
     expect(snapshot?.error).toContain('internal timeout');
   }, 25_000);
 
+  it('finalizes a timed-out job as passed when the log already matches successMarker', async () => {
+    // Mirrors the pc-lint/pc-test shape: the command prints its success line,
+    // then the process outlives the timeout (e.g. worker teardown).
+    const markerDir = mkdtempSync(join(tmpdir(), 'mcp-jobs-marker-'));
+    writeFileSync(
+      join(markerDir, 'Makefile'),
+      'fake-nx-pass:\n' +
+        '\t@echo "NX   Successfully ran target lint for 1 projects"\n' +
+        '\t@node -e "setTimeout(function () {}, 5000)"\n',
+    );
+    try {
+      const { jobId } = startJob({
+        command: 'make',
+        args: ['fake-nx-pass'],
+        cwd: markerDir,
+        label: 'fake-nx-pass',
+        timeoutMs: 1_500,
+        successMarker: /Successfully ran target lint/,
+      });
+      const snapshot = await waitForJob(jobId, 20_000);
+      expect(snapshot?.status).toBe('done');
+      expect(snapshot?.exitCode).toBe(0);
+      expect(snapshot?.error).toBeNull();
+      expect(snapshot?.recoveredFromTimeout).toBe(true);
+      expect(snapshot?.log).toContain('Successfully ran target lint');
+
+      // The recovery must survive the SIGTERM-driven close event: give the
+      // close handler time to fire, then re-snapshot.
+      await new Promise((r) => setTimeout(r, 2_000));
+      const after = snapshotJob(jobId);
+      expect(after?.status).toBe('done');
+      expect(after?.exitCode).toBe(0);
+      expect(after?.error).toBeNull();
+    } finally {
+      rmSync(markerDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('keeps the internal-timeout failure when successMarker never appears in the log', async () => {
+    const { jobId } = startJob({
+      command: 'make',
+      args: ['slow'],
+      cwd: workDir,
+      label: 'slow-timeout-no-marker',
+      timeoutMs: 1_500,
+      successMarker: /Successfully ran target/,
+    });
+    const snapshot = await waitForJob(jobId, 20_000);
+    expect(snapshot?.status).toBe('failed');
+    expect(snapshot?.error).toContain('Process killed after');
+    expect(snapshot?.error).toContain('internal timeout');
+    expect(snapshot?.recoveredFromTimeout).toBeUndefined();
+  }, 25_000);
+
   it('reports a disk-recovered job past its deadline as orphaned even if the pid is alive', () => {
     // Simulate a job persisted by a dead server process: not in this process's
     // registry, done:false, a live pid (this test process), expired deadline.

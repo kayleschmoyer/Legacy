@@ -10,6 +10,10 @@ import type { ToolResult } from '../types.js';
 // and killing it forces a retry loop that never converges when one task alone exceeds the
 // cap (LS-8353).
 const PC_CHUNK_TIMEOUT_MS = 30 * 60 * 1000;
+// pc-lint and pc-test routinely cover the whole monorepo (30-40 projects when the
+// affected base pulls in everything), the slowest chunks by far — give them extra
+// headroom over the backstop so a slow-but-succeeding run is never killed (LS-8320).
+const HEAVY_PC_CHUNK_TIMEOUT_MS = 45 * 60 * 1000;
 // Single-call sync budget — stays safely under the ~60s MCP transport timeout in cloud
 // sessions. Chunks that finish inside the budget return their result in one call; slower
 // chunks return a running snapshot with a jobId to poll via nx_job_wait.
@@ -25,6 +29,31 @@ export const PC_CHUNKS = [
   'pc-build',
 ] as const;
 export type PcChunk = (typeof PC_CHUNKS)[number];
+
+// The two chunks whose recipe is a single nx invocation with nothing after it —
+// their nx success line is a trustworthy end-of-work marker, and they are the
+// only chunks observed to outlive the process timeout after nx already passed.
+const HEAVY_PC_CHUNKS: ReadonlySet<PcChunk> = new Set(['pc-lint', 'pc-test']);
+
+/** Process-level timeout for a chunk — heavy full-monorepo chunks get more headroom. */
+export function getTimeoutForChunk(chunk: PcChunk): number {
+  return HEAVY_PC_CHUNKS.has(chunk)
+    ? HEAVY_PC_CHUNK_TIMEOUT_MS
+    : PC_CHUNK_TIMEOUT_MS;
+}
+
+/**
+ * Timeout-recovery marker for a chunk, or undefined for chunks without one.
+ * Only the heavy chunks get a marker: their recipes end at the nx command, so
+ * `NX Successfully ran target <target>` can only mean the chunk's work is
+ * done. Multi-step chunks (e.g. pc-db-prep) must NOT get one — an earlier
+ * step's success line would mask a hang in a later step.
+ */
+export function getSuccessMarkerForChunk(chunk: PcChunk): RegExp | undefined {
+  if (!HEAVY_PC_CHUNKS.has(chunk)) return undefined;
+  const target = chunk === 'pc-lint' ? 'lint' : 'test';
+  return new RegExp(`Successfully ran target ${target}`);
+}
 
 interface RunPcChunkParams {
   chunk: PcChunk;
@@ -42,7 +71,8 @@ export async function runPcChunk(
       args: [params.chunk],
       cwd,
       label: params.chunk,
-      timeoutMs: PC_CHUNK_TIMEOUT_MS,
+      timeoutMs: getTimeoutForChunk(params.chunk),
+      successMarker: getSuccessMarkerForChunk(params.chunk),
       // Blind retries (e.g. after a lost transport) join the in-flight run
       // instead of spawning a duplicate make process.
       idempotencyKey: `pc-chunk:${cwd}:${params.chunk}`,
@@ -93,6 +123,9 @@ export async function runPcChunk(
         text: minifiedJson({
           chunk: params.chunk,
           passed,
+          ...(snapshot.recoveredFromTimeout
+            ? { recoveredFromTimeout: true }
+            : {}),
           ...(snapshot.error ? { error: snapshot.error } : {}),
           output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
         }),

@@ -42,6 +42,11 @@ export interface JobSnapshot {
   error: string | null;
   /** Caller-supplied metadata (e.g. result-formatter kind and its inputs). */
   meta?: Record<string, unknown>;
+  /**
+   * True when the job hit its process-level timeout but was finalized as
+   * passed because its log already matched the caller's successMarker.
+   */
+  recoveredFromTimeout?: boolean;
   /** Last LOG_TAIL_CHARS of output — present on running/orphaned snapshots. */
   logTail?: string;
   /** Full output — present on terminal (done/failed) snapshots. */
@@ -62,6 +67,8 @@ interface JobMeta {
   done: boolean;
   exitCode: number | null;
   error: string | null;
+  /** True when the timeout fired but the log already matched successMarker. */
+  recoveredFromTimeout?: boolean;
   /** Caller-supplied metadata — persisted so a restarted server can still format results. */
   meta?: Record<string, unknown>;
 }
@@ -94,6 +101,16 @@ export interface StartJobOptions {
   shell?: boolean;
   /** Extra environment variables, merged over process.env (PATH preserved). */
   env?: Record<string, string>;
+  /**
+   * Opt-in timeout recovery. When the process-level timeout fires but the
+   * job's log already matches this pattern, the job is finalized as passed
+   * (status 'done', exitCode 0) instead of failed — the kill only reaped a
+   * process that outlived its completed work (e.g. make/nx teardown after
+   * the success line was printed). Only pass a marker that the command
+   * prints strictly at the end of its work: a marker an intermediate step
+   * can print would mask a hang in a later step.
+   */
+  successMarker?: RegExp;
   /**
    * Arbitrary metadata persisted with the job. Used by result formatters
    * (meta.kind) to rebuild a tool-specific result when completion is observed
@@ -243,6 +260,7 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
       done: record.done,
       exitCode: record.exitCode,
       error: record.error,
+      recoveredFromTimeout: record.recoveredFromTimeout,
       meta: record.meta,
     };
     try {
@@ -281,6 +299,7 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
       exitCode: record.exitCode,
       error: record.error,
       ...(record.meta ? { meta: record.meta } : {}),
+      ...(record.recoveredFromTimeout ? { recoveredFromTimeout: true } : {}),
     };
 
     if (record.done) {
@@ -415,10 +434,22 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
     persistMeta(record);
 
     // Enforce a process-level timeout independent of the MCP client transport.
+    let recoveredFromTimeout = false;
     const timer = setTimeout(() => {
       killJobTree(child);
       record.done = true;
-      record.error = `Process killed after ${opts.timeoutMs}ms (internal timeout)`;
+      // The timeout can fire after the command's work already succeeded (the
+      // process outliving its success line, e.g. nx worker teardown). When the
+      // caller opted in with a successMarker and the log already matches it,
+      // finalize as passed instead of failed (LS-8320).
+      if (opts.successMarker?.test(readLog(logPath))) {
+        recoveredFromTimeout = true;
+        record.recoveredFromTimeout = true;
+        record.exitCode = 0;
+        record.error = null;
+      } else {
+        record.error = `Process killed after ${opts.timeoutMs}ms (internal timeout)`;
+      }
       persistMeta(record);
     }, opts.timeoutMs);
 
@@ -431,6 +462,12 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
 
     child.on('close', (code) => {
       clearTimeout(timer);
+      // The kill issued by the recovery branch surfaces here as a non-zero /
+      // null exit — don't let it clobber the recovered success.
+      if (recoveredFromTimeout) {
+        persistMeta(record);
+        return;
+      }
       record.exitCode = code;
       record.done = true;
       if (code !== 0 && !record.error) {

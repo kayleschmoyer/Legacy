@@ -45,6 +45,7 @@ async function snapshotResult(snapshot: JobSnapshot): Promise<ToolResult> {
   };
   if (snapshot.status === 'done' || snapshot.status === 'failed') {
     body.passed = snapshot.status === 'done';
+    if (snapshot.recoveredFromTimeout) body.recoveredFromTimeout = true;
     if (snapshot.error) body.error = snapshot.error;
     body.output = truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS);
   } else {
