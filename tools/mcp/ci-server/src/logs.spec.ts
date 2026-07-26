@@ -5,7 +5,7 @@ jest.mock('./github-api.js', () => ({
   githubGetArrayBuffer: jest.fn(),
 }));
 
-import { fetchRunLogsRing } from './logs.js';
+import { fetchRunLogsRing, JOB_NEVER_STARTED_MESSAGE } from './logs.js';
 import * as githubApi from './github-api.js';
 
 const mockGithubGet = githubApi.githubGet as jest.MockedFunction<
@@ -87,5 +87,105 @@ describe('fetchRunLogsRing', () => {
 
     expect(result.lines).toEqual(['small-job', 'alpha', 'bravo', 'charlie']);
     expect(result.totalLines).toBe(4);
+  });
+
+  it('returns a friendly message for a bare jobId that 404s with no steps executed (LS-7910)', async () => {
+    mockGithubGetArrayBuffer.mockRejectedValue(
+      new Error(
+        'GitHub API 404: <?xml version="1.0" encoding="utf-8"?><Error><Code>BlobNotFound</Code></Error>',
+      ),
+    );
+    mockGithubGet.mockResolvedValue({
+      id: 999,
+      name: 'startup-failure-job',
+      status: 'completed',
+      conclusion: 'startup_failure',
+      steps: [],
+    });
+
+    const result = await fetchRunLogsRing({ jobId: 999 }, 500);
+
+    expect(result).toEqual({
+      lines: [JOB_NEVER_STARTED_MESSAGE],
+      totalLines: 1,
+    });
+    // Job-detail lookup only happens on the 404 path, not on every call.
+    expect(mockGithubGet).toHaveBeenCalledTimes(1);
+    expect(mockGithubGet).toHaveBeenCalledWith(
+      '/actions/jobs/999',
+      undefined,
+      expect.anything(),
+    );
+  });
+
+  it('preserves the raw 404 error for a bare jobId whose job actually ran steps', async () => {
+    mockGithubGetArrayBuffer.mockRejectedValue(
+      new Error(
+        'GitHub API 404: <?xml version="1.0" encoding="utf-8"?><Error><Code>BlobNotFound</Code></Error>',
+      ),
+    );
+    mockGithubGet.mockResolvedValue({
+      id: 1000,
+      name: 'ran-then-lost-logs-job',
+      status: 'completed',
+      conclusion: 'failure',
+      steps: [
+        {
+          name: 'Build',
+          status: 'completed',
+          conclusion: 'failure',
+          number: 1,
+        },
+      ],
+    });
+
+    await expect(fetchRunLogsRing({ jobId: 1000 }, 500)).rejects.toThrow(
+      /^GitHub API 404:/,
+    );
+  });
+
+  it('uses the friendly message for one empty-steps job in a multi-job runId batch, leaving others unaffected', async () => {
+    mockGithubGet.mockResolvedValue({
+      total_count: 2,
+      jobs: [
+        {
+          id: 1,
+          name: 'ok-job',
+          status: 'completed',
+          conclusion: 'failure',
+        },
+        {
+          id: 2,
+          name: 'startup-failure-job',
+          status: 'completed',
+          conclusion: 'startup_failure',
+          steps: [],
+        },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockImplementation(async (path: string) => {
+      if (path === '/actions/jobs/2/logs') {
+        throw new Error(
+          'GitHub API 404: <?xml version="1.0" encoding="utf-8"?><Error><Code>BlobNotFound</Code></Error>',
+        );
+      }
+      return textToArrayBuffer('all good here');
+    });
+
+    const result = await fetchRunLogsRing(
+      { runId: 26392539058, failedOnly: true },
+      500,
+    );
+
+    expect(result.lines).toContain(JOB_NEVER_STARTED_MESSAGE);
+    expect(result.lines).not.toContain('(Log fetch failed for this job)');
+    expect(result.lines).toEqual([
+      'ok-job',
+      'all good here',
+      'startup-failure-job',
+      JOB_NEVER_STARTED_MESSAGE,
+    ]);
+    // Steps were already available from the jobs list — no per-job detail lookup.
+    expect(mockGithubGet).toHaveBeenCalledTimes(1);
   });
 });

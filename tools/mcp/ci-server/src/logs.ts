@@ -39,6 +39,52 @@ interface GitHubJobsResponse {
   jobs: GitHubJob[];
 }
 
+/**
+ * Friendly message for jobs that failed before any step executed (e.g. runner
+ * provisioning failure, hosted-runner billing/spending limit, or a GitHub
+ * Actions incident). GitHub's log-blob endpoint 404s for these jobs since no
+ * log archive was ever produced; without this, callers see a raw Azure Blob
+ * Storage XML 404 body that reads like an MCP bug (LS-7910).
+ */
+export const JOB_NEVER_STARTED_MESSAGE =
+  'Job failed before any step executed -- no logs exist. This usually means runner provisioning failed (self-hosted runner offline, hosted-runner billing/spending limit, or a GitHub Actions incident).';
+
+/** True for the "GitHub API 404: ..." error thrown by githubGetArrayBuffer/githubGet on a 404 response. */
+function isBlobNotFound404(err: unknown): boolean {
+  return err instanceof Error && /^GitHub API 404:/.test(err.message);
+}
+
+/**
+ * Fetch a single job's detail (including its `steps` array) directly by id.
+ * Used only on the 404 log-fetch path to distinguish "job never started" from
+ * a genuine missing-log error, so it costs nothing on the common success path.
+ */
+async function fetchJobDetail(
+  jobId: number,
+  signal?: AbortSignal,
+): Promise<GitHubJob> {
+  return githubGet<GitHubJob>(`/actions/jobs/${jobId}`, undefined, {
+    signal,
+  });
+}
+
+/**
+ * Whether a job whose log fetch just 404'd has an empty (or missing) `steps`
+ * array — i.e. it never started. Swallows job-detail lookup failures (treated
+ * as "has steps" / unknown) so callers fall back to the original 404 error.
+ */
+async function jobNeverStarted(
+  jobId: number,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  try {
+    const job = await fetchJobDetail(jobId, signal);
+    return !job.steps || job.steps.length === 0;
+  } catch {
+    return false;
+  }
+}
+
 /** Maximum number of concurrent log fetches to avoid OOM and rate limiting. */
 const LOG_FETCH_CONCURRENCY = 5;
 
@@ -175,6 +221,12 @@ async function fetchJobLogsBatched(
           const text = await fetchJobLogs(job.id, signal);
           return `${job.name}\n${text}`;
         } catch (err) {
+          if (
+            isBlobNotFound404(err) &&
+            (!job.steps || job.steps.length === 0)
+          ) {
+            return `${job.name}\n${JOB_NEVER_STARTED_MESSAGE}`;
+          }
           const reason = isAbortError(err) ? 'timed out' : 'failed';
           return `${job.name}\n(Log fetch ${reason} for this job)`;
         }
@@ -288,7 +340,18 @@ export async function fetchRunLogsRing(
 ): Promise<{ lines: string[]; totalLines: number; skippedJobs?: number }> {
   // Single job — fetch and trim directly
   if (params.jobId) {
-    const raw = await fetchJobLogs(params.jobId, params.signal);
+    let raw: string;
+    try {
+      raw = await fetchJobLogs(params.jobId, params.signal);
+    } catch (err) {
+      if (
+        isBlobNotFound404(err) &&
+        (await jobNeverStarted(params.jobId, params.signal))
+      ) {
+        return { lines: [JOB_NEVER_STARTED_MESSAGE], totalLines: 1 };
+      }
+      throw err;
+    }
     const allLines = raw.split(/\r?\n/);
     return {
       lines: allLines.length <= maxLines ? allLines : allLines.slice(-maxLines),
@@ -340,6 +403,12 @@ export async function fetchRunLogsRing(
           const text = await fetchJobLogs(job.id, params.signal);
           return { name: job.name, text };
         } catch (err) {
+          if (
+            isBlobNotFound404(err) &&
+            (!job.steps || job.steps.length === 0)
+          ) {
+            return { name: job.name, text: JOB_NEVER_STARTED_MESSAGE };
+          }
           const reason = isAbortError(err) ? 'timed out' : 'failed';
           return {
             name: job.name,
