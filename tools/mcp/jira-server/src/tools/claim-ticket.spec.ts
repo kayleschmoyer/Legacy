@@ -263,7 +263,7 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect((data['warnings'] as string[]).length).toBe(0);
   });
 
-  it('prefers JIRA_ASSIGNEE_EMAIL over JIRA_ASSIGNEE_ACCOUNT_ID', async () => {
+  it('prefers JIRA_ASSIGNEE_ACCOUNT_ID over JIRA_ASSIGNEE_EMAIL', async () => {
     process.env['JIRA_ASSIGNEE_EMAIL'] = 'agent@example.com';
     process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'env-account-id';
 
@@ -287,6 +287,17 @@ describe('claimTicket — auto-assign behaviour', () => {
 
     expect(data['action']).toBe('PROCEED');
 
+    // ACCOUNT_ID must win and /rest/api/3/user/search must never be called —
+    // it structurally 401s under the Lambda's client-credentials scopes
+    // (LS-7891/LS-8302).
+    const userSearchCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) =>
+        opts.method === 'GET' && opts.path === '/rest/api/3/user/search',
+    );
+    expect(userSearchCalls).toHaveLength(0);
+
     const putCalls = (
       mockJiraRequest.mock.calls as Array<
         [{ method: string; path: string; body?: Record<string, unknown> }]
@@ -295,7 +306,7 @@ describe('claimTicket — auto-assign behaviour', () => {
       ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
     );
     expect(putCalls).toHaveLength(1);
-    expect(putCalls[0][0].body).toEqual({ accountId: 'from-email-lookup' });
+    expect(putCalls[0][0].body).toEqual({ accountId: 'env-account-id' });
   });
 
   it('adds a warning and proceeds when /myself fails with a 401 scope error', async () => {

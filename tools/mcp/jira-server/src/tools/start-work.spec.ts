@@ -263,6 +263,52 @@ describe('startWork', () => {
     expect(putAssignee[0][0].body).toEqual({ accountId: '712020:abcd-1234' });
   });
 
+  it('prefers JIRA_ASSIGNEE_ACCOUNT_ID over JIRA_ASSIGNEE_EMAIL', async () => {
+    process.env['JIRA_ASSIGNEE_EMAIL'] = 'agent@example.com';
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'env-account-id';
+
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/user/search') {
+          return Promise.resolve([{ accountId: 'from-email-lookup' }]);
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve(makeIssue());
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await startWork({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['status']).toBe('In Progress');
+
+    // ACCOUNT_ID must win and /rest/api/3/user/search must never be called —
+    // it structurally 401s under the Lambda's client-credentials scopes
+    // (LS-7891/LS-8302).
+    const userSearchCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) =>
+        opts.method === 'GET' && opts.path === '/rest/api/3/user/search',
+    );
+    expect(userSearchCalls).toHaveLength(0);
+
+    const putAssignee = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putAssignee).toHaveLength(1);
+    expect(putAssignee[0][0].body).toEqual({ accountId: 'env-account-id' });
+  });
+
   it('proceeds with a warning when /myself 401s (LS-7891 scope error)', async () => {
     mockJiraRequest.mockImplementation(
       (opts: { method: string; path: string }) => {

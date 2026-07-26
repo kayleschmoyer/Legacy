@@ -9,10 +9,13 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 interface ClaimTicketParams {
   key: string;
   /**
-   * Email of the user to assign the ticket to. Overrides the
-   * `JIRA_ASSIGNEE_EMAIL` env var. When neither is provided, the ticket is
-   * assigned to the `JIRA_ASSIGNEE_ACCOUNT_ID` env var if set, else to the
-   * authenticated service account resolved via `GET /rest/api/3/myself`.
+   * Precedence: explicit `assignee` param > `JIRA_ASSIGNEE_ACCOUNT_ID` env var
+   * (direct, no lookup) > `JIRA_ASSIGNEE_EMAIL` env var (via
+   * `/rest/api/3/user/search`) > the authenticated service account (via
+   * `GET /rest/api/3/myself`). ACCOUNT_ID is checked before EMAIL because
+   * `/rest/api/3/user/search` and `/rest/api/3/myself` both require the
+   * `read:jira-user` scope, which the hosted Lambda's client-credentials
+   * token lacks (LS-7891) and therefore always 401s.
    */
   assignee?: string;
 }
@@ -205,11 +208,17 @@ export async function claimTicket(
     });
 
     // --- Assign the ticket ---
-    // Precedence: explicit `assignee` param > JIRA_ASSIGNEE_EMAIL env var >
-    // JIRA_ASSIGNEE_ACCOUNT_ID env var > the authenticated service account
-    // (self).
-    const assigneeEmail = assignee ?? process.env['JIRA_ASSIGNEE_EMAIL'];
+    // Precedence: explicit `assignee` param > JIRA_ASSIGNEE_ACCOUNT_ID env var
+    // (direct) > JIRA_ASSIGNEE_EMAIL env var (user/search) > the
+    // authenticated service account (self). ACCOUNT_ID is checked before
+    // EMAIL because /rest/api/3/user/search and /rest/api/3/myself both
+    // require the read:jira-user scope, which the hosted Lambda's
+    // client-credentials token (read:jira-work write:jira-work) lacks
+    // (LS-7891) and therefore always 401s.
     const configuredAccountId = process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
+    const assigneeEmail =
+      assignee ??
+      (configuredAccountId ? undefined : process.env['JIRA_ASSIGNEE_EMAIL']);
     try {
       let accountId: string | undefined;
 
@@ -231,10 +240,7 @@ export async function claimTicket(
         }
       } else if (configuredAccountId) {
         // Pre-resolved accountId — assign directly without any user-lookup
-        // API call. Both /rest/api/3/myself and /rest/api/3/user/search
-        // require the read:jira-user scope, which the hosted Lambda's
-        // client-credentials token (read:jira-work write:jira-work) lacks
-        // (LS-7891).
+        // API call.
         accountId = configuredAccountId;
       } else {
         // No email or accountId configured — default to the authenticated
