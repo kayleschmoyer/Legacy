@@ -144,6 +144,52 @@ describe('fetchRunLogsRing', () => {
     );
   });
 
+  it('finds priorityMatcher lines outside the ring-buffered tail window (LS-8391)', async () => {
+    // 10,000-line log where the "failure" marker sits near the front — well
+    // outside a small ring buffer's tail — plus noise lines throughout.
+    const logLines: string[] = [];
+    logLines.push('FAIL src/foo.spec.ts');
+    for (let i = 0; i < 9_999; i++) {
+      logLines.push(`console.error: noise line ${i}`);
+    }
+
+    mockGithubGet.mockResolvedValue({
+      total_count: 1,
+      jobs: [
+        { id: 1, name: 'test-job', status: 'completed', conclusion: 'failure' },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      textToArrayBuffer(logLines.join('\n')),
+    );
+
+    // maxLines=500 means the ring buffer only keeps the *last* 500 lines —
+    // the FAIL marker at the front would never appear in `lines` without
+    // whole-log priority scanning.
+    const result = await fetchRunLogsRing(
+      { runId: 1, failedOnly: true },
+      500,
+      (line) => line.startsWith('FAIL '),
+    );
+
+    expect(result.lines).not.toContain('FAIL src/foo.spec.ts');
+    expect(result.priorityLines).toContain('FAIL src/foo.spec.ts');
+  });
+
+  it('omits priorityLines from the result when no matcher is passed', async () => {
+    mockGithubGet.mockResolvedValue({
+      total_count: 1,
+      jobs: [
+        { id: 1, name: 'test-job', status: 'completed', conclusion: 'failure' },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(textToArrayBuffer('a\nb\nc'));
+
+    const result = await fetchRunLogsRing({ runId: 1, failedOnly: true }, 500);
+
+    expect(result.priorityLines).toBeUndefined();
+  });
+
   it('uses the friendly message for one empty-steps job in a multi-job runId batch, leaving others unaffected', async () => {
     mockGithubGet.mockResolvedValue({
       total_count: 2,

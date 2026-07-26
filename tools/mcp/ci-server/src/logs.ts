@@ -21,6 +21,13 @@ export interface FetchRunLogsParams {
  */
 const MAX_LOG_JOBS = 10;
 
+/**
+ * Cap on priority-matcher lines collected across a whole run's logs (LS-8391).
+ * Bounds memory for a pathological log with an unusually large number of
+ * matches; real jest failure summaries are far smaller than this.
+ */
+const PRIORITY_LINES_CAP = 300;
+
 interface GitHubJob {
   id: number;
   name: string;
@@ -333,11 +340,24 @@ function trimRingBuffer(buffer: string[], maxLines: number): void {
 /**
  * Fetch logs and collect the last `maxLines` lines (ring buffer).
  * Processes logs per-job incrementally to avoid buffering the entire run in memory.
+ *
+ * When `priorityMatcher` is provided, every line of the full log is also
+ * tested against it (independent of the `maxLines` ring-buffer window) and
+ * matches are returned in `priorityLines`, capped at `PRIORITY_LINES_CAP`.
+ * This lets callers surface high-signal lines (e.g. jest failure markers,
+ * LS-8391) that would otherwise be dropped when they fall outside the
+ * ring-buffered tail of a large log.
  */
 export async function fetchRunLogsRing(
   params: FetchRunLogsParams,
   maxLines: number,
-): Promise<{ lines: string[]; totalLines: number; skippedJobs?: number }> {
+  priorityMatcher?: (line: string) => boolean,
+): Promise<{
+  lines: string[];
+  totalLines: number;
+  skippedJobs?: number;
+  priorityLines?: string[];
+}> {
   // Single job — fetch and trim directly
   if (params.jobId) {
     let raw: string;
@@ -356,6 +376,9 @@ export async function fetchRunLogsRing(
     return {
       lines: allLines.length <= maxLines ? allLines : allLines.slice(-maxLines),
       totalLines: allLines.length,
+      priorityLines: priorityMatcher
+        ? allLines.filter(priorityMatcher).slice(0, PRIORITY_LINES_CAP)
+        : undefined,
     };
   }
 
@@ -393,6 +416,7 @@ export async function fetchRunLogsRing(
 
   // Process per-job incrementally: keep a rolling buffer of the last maxLines lines
   const ringBuffer: string[] = [];
+  const priorityLines: string[] = [];
   let totalLines = 0;
 
   for (let i = 0; i < jobs.length; i += LOG_FETCH_CONCURRENCY) {
@@ -425,11 +449,25 @@ export async function fetchRunLogsRing(
       // hundreds of thousands of lines.
       pushLine(ringBuffer, name, maxLines);
       totalLines += 1;
+      if (
+        priorityMatcher &&
+        priorityLines.length < PRIORITY_LINES_CAP &&
+        priorityMatcher(name)
+      ) {
+        priorityLines.push(name);
+      }
 
       const textLines = text.split(/\r?\n/);
       totalLines += textLines.length;
       for (const line of textLines) {
         pushLine(ringBuffer, line, maxLines);
+        if (
+          priorityMatcher &&
+          priorityLines.length < PRIORITY_LINES_CAP &&
+          priorityMatcher(line)
+        ) {
+          priorityLines.push(line);
+        }
       }
     }
   }
@@ -439,5 +477,6 @@ export async function fetchRunLogsRing(
     lines: ringBuffer,
     totalLines,
     skippedJobs: skippedJobs || undefined,
+    priorityLines: priorityMatcher ? priorityLines : undefined,
   };
 }

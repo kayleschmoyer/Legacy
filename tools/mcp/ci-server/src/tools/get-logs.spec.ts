@@ -4,7 +4,7 @@ jest.mock('../logs.js', () => ({
   fetchRunLogsRing: jest.fn(),
 }));
 
-import { getLogs } from './get-logs.js';
+import { getLogs, isJestFailureLine } from './get-logs.js';
 import * as logs from '../logs.js';
 
 const mockFetch = logs.fetchRunLogsRing as jest.MockedFunction<
@@ -138,6 +138,88 @@ describe('getLogs', () => {
       };
       expect(payload.logs['42']).toBeDefined();
       expect(payload.missing).toEqual([]);
+    });
+  });
+
+  describe('isJestFailureLine (LS-8391)', () => {
+    it('matches a plain jest FAIL suite header', () => {
+      expect(isJestFailureLine('FAIL src/foo.spec.ts')).toBe(true);
+    });
+
+    it('matches an ANSI-colored FAIL suite header', () => {
+      expect(
+        isJestFailureLine(
+          '\x1b[41m\x1b[30m FAIL \x1b[39m\x1b[49m src/foo.spec.ts',
+        ),
+      ).toBe(true);
+    });
+
+    it('matches "Tests: N failed" and "Test Suites: N failed" summary lines', () => {
+      expect(isJestFailureLine('Tests:       1 failed, 5 total')).toBe(true);
+      expect(isJestFailureLine('Test Suites: 1 failed, 3 total')).toBe(true);
+    });
+
+    it('matches an individual failing test marker (✕)', () => {
+      expect(isJestFailureLine('  ✕ renders the button (12 ms)')).toBe(true);
+    });
+
+    it('does not match console.error noise or unrelated "FAILED" text', () => {
+      expect(
+        isJestFailureLine(
+          'console.error: Warning: React does not recognize prop X',
+        ),
+      ).toBe(false);
+      expect(isJestFailureLine('Failed to propose trade')).toBe(false);
+      expect(isJestFailureLine('BUILD FAILED')).toBe(false);
+    });
+  });
+
+  describe('errorSummary jest-marker priority (LS-8391)', () => {
+    it('prioritizes jest failure markers over console.error noise when the 200-line cap would otherwise drop them', async () => {
+      // 250 console.error lines (generic ERROR_PATTERNS noise) plus a single
+      // jest failure summary buried past the cap.
+      const noise = Array.from(
+        { length: 250 },
+        (_, i) => `console.error: React does not recognize prop X (${i})`,
+      );
+      mockFetch.mockResolvedValue({
+        lines: noise,
+        totalLines: noise.length,
+        priorityLines: [
+          'FAIL src/foo.spec.ts',
+          'Tests:       1 failed, 5 total',
+        ],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+
+      expect(result.isError).toBeUndefined();
+      const payload = parsePayload(result.content[0].text) as { logs: string };
+      expect(payload.logs).toContain('FAIL src/foo.spec.ts');
+      expect(payload.logs).toContain('Tests:       1 failed, 5 total');
+      // Jest markers appear before the generic noise in the merged summary.
+      expect(payload.logs.indexOf('FAIL src/foo.spec.ts')).toBeLessThan(
+        payload.logs.indexOf('console.error'),
+      );
+    });
+
+    it('passes a priority matcher to fetchRunLogsRing only when errorSummary is set', async () => {
+      mockFetch.mockResolvedValue({ lines: ['x'], totalLines: 1 });
+
+      await getLogs({ runId: 1 });
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.objectContaining({ runId: 1 }),
+        expect.any(Number),
+        undefined,
+      );
+
+      mockFetch.mockClear();
+      await getLogs({ runId: 1, errorSummary: true });
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.objectContaining({ runId: 1 }),
+        expect.any(Number),
+        expect.any(Function),
+      );
     });
   });
 

@@ -33,7 +33,37 @@ const NX_FAILED_SECTION = /^[\s>]*Failed tasks/i;
  */
 const ANSI_ESCAPE_PREFIX = /^\x1b\[/;
 
-function extractErrorSummary(allLines: string[]): string[] {
+/** Matches any ANSI color/style escape sequence, anywhere in a line. */
+const ANSI_ESCAPE_SEQUENCE = /\x1b\[[0-9;]*m/g;
+
+function stripAnsiCodes(line: string): string {
+  return line.replace(ANSI_ESCAPE_SEQUENCE, '');
+}
+
+/**
+ * Jest's own failure markers (LS-8391). errorSummary's generic ERROR_PATTERNS
+ * treats these the same as console.error noise (React prop warnings,
+ * intentional error-path test fixtures), so a busy suite can crowd the real
+ * `FAIL <file>` / `Tests: N failed` lines out of the 200-line cap. These are
+ * matched against the ANSI-stripped line — jest colors "FAIL" and "✕" — and
+ * given priority so they always survive extraction. See isJestFailureLine.
+ */
+const JEST_FAILURE_PATTERNS = [
+  /(?:^|\s)FAIL(?:\s|$)/, // suite failure header, e.g. "FAIL src/foo.spec.ts"
+  /Test Suites:.*failed/i,
+  /Tests:.*failed/i,
+  /(?:^|\s)✕(?:\s|$)/, // individual failing test marker
+];
+
+export function isJestFailureLine(line: string): boolean {
+  const stripped = stripAnsiCodes(line);
+  return JEST_FAILURE_PATTERNS.some((pattern) => pattern.test(stripped));
+}
+
+function extractErrorSummary(
+  allLines: string[],
+  priorityLines: string[] = [],
+): string[] {
   const result: string[] = [];
   const contextLines = 2;
   let inNxFailedSection = false;
@@ -86,7 +116,13 @@ function extractErrorSummary(allLines: string[]): string[] {
       deduped.push(line);
     }
   }
-  return deduped.slice(0, 200);
+
+  // Jest's own failure markers (LS-8391) go first and are guaranteed to
+  // survive the cap, even when the generic-pattern matches above would
+  // otherwise fill the whole 200-line budget with console.error noise.
+  const prioritySeen = new Set(priorityLines);
+  const rest = deduped.filter((line) => !prioritySeen.has(line));
+  return [...priorityLines, ...rest].slice(0, 200);
 }
 
 /** Default hard cap on total output characters to prevent context overflow. */
@@ -160,17 +196,19 @@ async function buildRunPayload(
   const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
   const streamLimit = maxLines > 0 ? maxLines : 10_000;
 
-  const { lines, totalLines, skippedJobs } = await fetchRunLogsRing(
-    {
-      runId,
-      jobId: params.jobId,
-      failedOnly: params.failedOnly,
-      attempt: params.attempt,
-      jobName: params.jobName,
-      signal,
-    },
-    streamLimit,
-  );
+  const { lines, totalLines, skippedJobs, priorityLines } =
+    await fetchRunLogsRing(
+      {
+        runId,
+        jobId: params.jobId,
+        failedOnly: params.failedOnly,
+        attempt: params.attempt,
+        jobName: params.jobName,
+        signal,
+      },
+      streamLimit,
+      params.errorSummary ? isJestFailureLine : undefined,
+    );
 
   const base = {
     runId: runId ?? null,
@@ -181,7 +219,7 @@ async function buildRunPayload(
   };
 
   if (params.errorSummary) {
-    const summary = extractErrorSummary(lines);
+    const summary = extractErrorSummary(lines, priorityLines);
     const { processedLines, charTruncated } = applyCharLimits(
       summary,
       params.truncateLineLength,
