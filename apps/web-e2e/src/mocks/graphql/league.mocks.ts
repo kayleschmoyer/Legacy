@@ -239,7 +239,7 @@ export function leaguePositionsResponse(positions?: MockPosition[]) {
 
 export function userTeamIdResponse(teamId = 1) {
   return {
-    data: { userTeamId: { __typename: 'UserTeamId' as const, teamId } },
+    data: { userTeamId: teamId },
   };
 }
 
