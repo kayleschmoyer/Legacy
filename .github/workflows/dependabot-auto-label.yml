@@ -1,0 +1,53 @@
+name: Dependabot Auto-Label
+
+# LS-8491: rebuild-runner-ami.yml deliberately requires an explicit
+# `rebuild-runner-ami` label — Packer builds cost ~10 min / ~$0.50 each, and we
+# don't want to spend that on every dependency bump automatically (see that
+# workflow's header comment, LS-2429/LS-4946). The LS-8487 CI automation audit
+# flagged one case where the manual step is pure overhead: Dependabot's
+# `playwright-ecosystem` group (dependabot.yml) bumps @playwright/test,
+# playwright, and @nx/playwright in lockstep specifically so they stay in
+# sync — every such PR needs a runner-AMI rebuild, so the label can be
+# applied automatically instead of waiting on a maintainer.
+#
+# Uses dependabot/fetch-metadata to read the PR's dependency-names without
+# checking out the branch or granting any elevated token — labeling only
+# needs `pull-requests: write` on the default GITHUB_TOKEN, unlike
+# dependabot-lockfile-fix.yml / rebuild-runner-ami.yml which push commits and
+# therefore need the Agent Author app token.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+    paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label-playwright-bump:
+    name: Label Playwright bumps for runner-AMI rebuild
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      # `dependency-names` is a comma-separated list of every package this PR
+      # bumps. A plain substring match also catches a rare @nx/playwright-only
+      # bump from the same dependabot.yml group — harmless: rebuild-runner-ami.yml
+      # only commits an update if the resolved playwright-core version actually
+      # changed, so a solo @nx/playwright bump costs one no-op-diff Packer build
+      # rather than a wrong label.
+      - name: Apply rebuild-runner-ami label for Playwright bumps
+        if: contains(steps.metadata.outputs.dependency-names, 'playwright')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr edit "$PR_NUMBER" --add-label rebuild-runner-ami

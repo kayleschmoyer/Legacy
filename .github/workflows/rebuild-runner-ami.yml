@@ -26,14 +26,16 @@
 #   to the new AMI automatically.
 #
 # Triggers:
-#   - pull_request with the label `rebuild-runner-ami` (added manually or by a
-#     future dependabot auto-labeller).
+#   - pull_request with the label `rebuild-runner-ami` (added manually, or
+#     automatically for Dependabot Playwright bumps by
+#     dependabot-auto-label.yml, LS-8491).
 #   - workflow_dispatch with a required PR number input (for manual kick).
 #
 # Why label-triggered and not automatic:
 #   Packer builds take ~10 min and cost ~$0.50 each. We deliberately require an
 #   explicit signal to avoid spending time/money on drafts or experimental PRs.
-#   For dependabot, a future follow-up can auto-label Playwright bump PRs.
+#   Dependabot's Playwright bumps are the one case where that signal is now
+#   automatic (dependabot-auto-label.yml) since every such PR needs a rebuild.
 
 name: Rebuild Runner AMI
 
