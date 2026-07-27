@@ -36,7 +36,7 @@ broken before 2026-07-04). In cloud sandboxes `gh` is usually NOT
 installed, so the GitHub-API artifact download is not a fallback there —
 raw CI logs are the fallback of record. (Canary finding, 2026-07-04.)
 
-## 404s from `ci_get_playwright_report` may be a credentials gap (LS-8546, fixed in code by LS-8322)
+## 404s from `ci_get_playwright_report` may be a credentials gap (LS-8546, fixed in code by LS-8322 and LS-8547)
 
 `bkrupa/legacy-sports-deploys` is **private**. The CI MCP server reads it with
 a token minted from `PREVIEW_APP_PRIVATE_KEY`/`PREVIEW_APP_ID`. LS-8322 wires
@@ -45,9 +45,21 @@ Secrets Manager secret, fetched by `ensureCredentials()` in
 `tools/mcp/ci-server/src/lambda.ts`) — but that fix only takes effect once
 someone with AWS access runs `terraform apply`, seeds the new secret, and
 redeploys the `mcp-ci` Lambda (agents in cloud sessions generally can't do
-this themselves; see the LS-8322 PR body for the exact follow-up steps). Until
-that rollout happens, every hosted/cloud session still uses the fallback
-token, and whether reports fetch depends on what that fallback is:
+this themselves; see the LS-8322 PR body for the exact follow-up steps).
+
+LS-8547 adds a second, lower-effort fallback in `getDeploysToken()`: when
+`PREVIEW_APP_PRIVATE_KEY`/`PREVIEW_APP_ID` are unset, it tries minting a token
+from the **agent-author** GitHub App's own installation on
+`bkrupa/legacy-sports-deploys` — the same key every hosted Lambda and cloud
+agent session already has, no terraform/secret changes needed. **This still
+requires a one-time human action**: someone with GitHub App admin access must
+install the agent-author App (App ID `3158619`) on `bkrupa/legacy-sports-deploys`
+with `Contents: Read`. Until that install happens, the discovery call 404s
+and the code silently falls through to the broad-token fallback below —
+functionally unchanged from before LS-8547.
+
+Until either rollout happens, every hosted/cloud session still uses the
+fallback token, and whether reports fetch depends on what that fallback is:
 
 | Session class                            | Fallback token                                                 | Result                    |
 | ---------------------------------------- | -------------------------------------------------------------- | ------------------------- |

@@ -304,12 +304,12 @@ describe('getLogs', () => {
       const result = await getLogs({ runId: 1, errorSummary: true });
 
       expect(result.isError).toBeUndefined();
-      const payload = parsePayload(result.content[0].text) as { logs: string };
-      expect(payload.logs).toContain('TimeoutError:');
-      expect(payload.logs).toContain('1 failed');
+      const logsText = parseLogs(result.content[0].text);
+      expect(logsText).toContain('TimeoutError:');
+      expect(logsText).toContain('1 failed');
       // Playwright markers appear before the generic wrapper noise in the merged summary.
-      expect(payload.logs.indexOf('TimeoutError:')).toBeLessThan(
-        payload.logs.indexOf('::error::'),
+      expect(logsText.indexOf('TimeoutError:')).toBeLessThan(
+        logsText.indexOf('::error::'),
       );
     });
   });

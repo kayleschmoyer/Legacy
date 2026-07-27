@@ -208,13 +208,94 @@ export function deploysTokenWasFallback(): boolean {
   return lastDeploysTokenWasFallback;
 }
 
+const DEPLOYS_REPO_SLUG = 'bkrupa/legacy-sports-deploys';
+
+/**
+ * Mint an installation-access-token for `repoSlug` by signing an app-level
+ * JWT with `privateKey`/`appId`, discovering that app's installation on the
+ * repo, then exchanging it. Returns null (with a stderr warning) on any
+ * non-2xx response instead of throwing, so callers can fall through to the
+ * next credential source.
+ */
+async function mintInstallationTokenForRepo(
+  privateKey: string,
+  appId: string,
+  repoSlug: string,
+  logLabel: string,
+): Promise<{ token: string; expiresAt?: Date } | null> {
+  const jwt = createAppJWT(privateKey, appId);
+
+  const installRes = await fetch(
+    `${GITHUB_API}/repos/${repoSlug}/installation`,
+    {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'legacy-sports-ci-server',
+      },
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+
+  if (!installRes.ok) {
+    const body = await installRes.text();
+    process.stderr.write(
+      `[ci-server] ${logLabel} installation discovery failed (${installRes.status}): ${sanitizeErrorBody(body)}\n`,
+    );
+    return null;
+  }
+
+  const install = (await installRes.json()) as { id: number };
+  const tokenRes = await fetch(
+    `${GITHUB_API}/app/installations/${install.id}/access_tokens`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'legacy-sports-ci-server',
+      },
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+
+  if (!tokenRes.ok) {
+    const body = await tokenRes.text();
+    process.stderr.write(
+      `[ci-server] ${logLabel} token exchange failed (${tokenRes.status}): ${sanitizeErrorBody(body)}\n`,
+    );
+    return null;
+  }
+
+  const data = (await tokenRes.json()) as {
+    token?: string;
+    expires_at?: string;
+  };
+  if (!data.token) return null;
+
+  return {
+    token: data.token,
+    expiresAt: data.expires_at
+      ? new Date(new Date(data.expires_at).getTime() - 5 * 60 * 1000)
+      : undefined,
+  };
+}
+
 /**
  * Generate or return a cached installation token for `bkrupa/legacy-sports-deploys`.
  *
- * Uses PREVIEW_APP_PRIVATE_KEY + PREVIEW_APP_ID when configured — the same
- * GitHub App the CI deploy workflows use — so the read token is correctly scoped to
- * the deploys repo. Falls back to `getToken()` when those vars are absent (works when
- * GH_TOKEN is a broad PAT with access to both repos).
+ * Credential precedence:
+ *   1. PREVIEW_APP_PRIVATE_KEY + PREVIEW_APP_ID — the dedicated deploy App,
+ *      when its Secrets Manager wiring is provisioned (LS-8322).
+ *   2. AGENT_AUTHOR_APP_PRIVATE_KEY — the agent-author App already available
+ *      in every hosted Lambda and cloud agent session, once a human installs
+ *      it on the deploys repo with Contents: Read (LS-8547 Option 1). This
+ *      is a no-op fallback until that one-time install happens: GitHub 404s
+ *      the installation-discovery call and we fall through to case 3.
+ *   3. `getToken()` — the main token (works when GH_TOKEN is a broad PAT
+ *      with access to both repos, e.g. local `gh` CLI dev).
  */
 export async function getDeploysToken(): Promise<string> {
   const now = new Date();
@@ -232,64 +313,35 @@ export async function getDeploysToken(): Promise<string> {
     const privateKey = rawKey.includes('-----BEGIN')
       ? rawKey
       : rawKey.replace(/\\n/g, '\n');
-    const jwt = createAppJWT(privateKey, appId.trim());
-
-    // Discover the PREVIEW_APP installation on the deploys repo
-    const installRes = await fetch(
-      `${GITHUB_API}/repos/bkrupa/legacy-sports-deploys/installation`,
-      {
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'legacy-sports-ci-server',
-        },
-        signal: AbortSignal.timeout(10_000),
-      },
+    const result = await mintInstallationTokenForRepo(
+      privateKey,
+      appId.trim(),
+      DEPLOYS_REPO_SLUG,
+      'PREVIEW_APP',
     );
+    if (result) {
+      cachedDeploysToken = result.token;
+      cachedDeploysTokenExpiry = result.expiresAt;
+      lastDeploysTokenWasFallback = false;
+      return cachedDeploysToken;
+    }
+  }
 
-    if (!installRes.ok) {
-      const body = await installRes.text();
-      process.stderr.write(
-        `[ci-server] PREVIEW_APP installation discovery failed (${installRes.status}): ${sanitizeErrorBody(body)} — falling back to main token.\n`,
-      );
-    } else {
-      const install = (await installRes.json()) as { id: number };
-      const tokenRes = await fetch(
-        `${GITHUB_API}/app/installations/${install.id}/access_tokens`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${jwt}`,
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'User-Agent': 'legacy-sports-ci-server',
-          },
-          signal: AbortSignal.timeout(10_000),
-        },
-      );
-
-      if (!tokenRes.ok) {
-        const body = await tokenRes.text();
-        process.stderr.write(
-          `[ci-server] PREVIEW_APP token exchange failed (${tokenRes.status}): ${sanitizeErrorBody(body)} — falling back to main token.\n`,
-        );
-      } else {
-        const data = (await tokenRes.json()) as {
-          token: string;
-          expires_at?: string;
-        };
-        if (data.token) {
-          cachedDeploysToken = data.token;
-          if (data.expires_at) {
-            cachedDeploysTokenExpiry = new Date(
-              new Date(data.expires_at).getTime() - 5 * 60 * 1000,
-            );
-          }
-          lastDeploysTokenWasFallback = false;
-          return cachedDeploysToken;
-        }
-      }
+  const agentAuthorKey = getAppPrivateKey();
+  if (agentAuthorKey) {
+    const agentAuthorAppId =
+      process.env['GITHUB_APP_ID']?.trim() || DEFAULT_APP_ID;
+    const result = await mintInstallationTokenForRepo(
+      agentAuthorKey,
+      agentAuthorAppId,
+      DEPLOYS_REPO_SLUG,
+      'agent-author App (deploys repo)',
+    );
+    if (result) {
+      cachedDeploysToken = result.token;
+      cachedDeploysTokenExpiry = result.expiresAt;
+      lastDeploysTokenWasFallback = false;
+      return cachedDeploysToken;
     }
   }
 

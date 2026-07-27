@@ -401,9 +401,10 @@ describe('getDeploysToken (LS-8322)', () => {
     );
   });
 
-  it('falls back to getToken() when PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID are not configured', async () => {
+  it('falls back to getToken() when neither PREVIEW_APP nor AGENT_AUTHOR_APP credentials are configured', async () => {
     delete process.env['PREVIEW_APP_PRIVATE_KEY'];
     delete process.env['PREVIEW_APP_ID'];
+    delete process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'];
     process.env['GH_TOKEN'] = 'ghp_broad_fallback_token';
 
     const mockFetch = jest.fn<typeof fetch>();
@@ -419,18 +420,21 @@ describe('getDeploysToken (LS-8322)', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('falls back to getToken() when PREVIEW_APP installation discovery fails', async () => {
+  it('falls back to the agent-author App when PREVIEW_APP installation discovery fails, then to getToken() if that also fails (LS-8547)', async () => {
     const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-    process.env['PREVIEW_APP_PRIVATE_KEY'] = privateKey
-      .export({ type: 'pkcs1', format: 'pem' })
-      .toString();
+    const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+    process.env['PREVIEW_APP_PRIVATE_KEY'] = pem;
     process.env['PREVIEW_APP_ID'] = '999999';
+    process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = pem;
     process.env['GH_TOKEN'] = 'ghp_broad_fallback_token';
 
     const mockFetch = jest.fn<typeof fetch>();
-    mockFetch.mockResolvedValueOnce(
-      makeJsonResponse(404, { message: 'Not Found' }),
-    );
+    mockFetch
+      // PREVIEW_APP installation discovery — 404
+      .mockResolvedValueOnce(makeJsonResponse(404, { message: 'Not Found' }))
+      // agent-author App installation discovery on the deploys repo — also 404
+      // (not yet installed there — LS-8547's remaining manual step)
+      .mockResolvedValueOnce(makeJsonResponse(404, { message: 'Not Found' }));
     global.fetch = mockFetch as unknown as typeof fetch;
 
     const { getDeploysToken, deploysTokenWasFallback } =
@@ -439,6 +443,45 @@ describe('getDeploysToken (LS-8322)', () => {
 
     expect(token).toBe('ghp_broad_fallback_token');
     expect(deploysTokenWasFallback()).toBe(true);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[1][0]).toContain(
+      '/repos/bkrupa/legacy-sports-deploys/installation',
+    );
+  });
+
+  it('mints a token via the agent-author App installation on the deploys repo when PREVIEW_APP creds are absent but AGENT_AUTHOR_APP_PRIVATE_KEY is set (LS-8547)', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    delete process.env['PREVIEW_APP_PRIVATE_KEY'];
+    delete process.env['PREVIEW_APP_ID'];
+    process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      // GET /repos/bkrupa/legacy-sports-deploys/installation
+      .mockResolvedValueOnce(makeJsonResponse(200, { id: 54321 }))
+      // POST /app/installations/54321/access_tokens
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'agent-author-scoped-token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      );
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { getDeploysToken, deploysTokenWasFallback } =
+      await import('./github-api.js');
+    const token = await getDeploysToken();
+
+    expect(token).toBe('agent-author-scoped-token');
+    expect(deploysTokenWasFallback()).toBe(false);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[0][0]).toContain(
+      '/repos/bkrupa/legacy-sports-deploys/installation',
+    );
+    expect(mockFetch.mock.calls[1][0]).toContain(
+      '/app/installations/54321/access_tokens',
+    );
   });
 });
