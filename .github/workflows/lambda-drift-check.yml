@@ -35,8 +35,9 @@ name: "Lambda Drift Check"
 #      `Verify CI Status` job failure, which is the specific gate whose
 #      failure caused the LS-8426 incident.
 #
-# Both alert to Discord. This is read-only — it never mutates SSM, Lambda, or
-# Terraform state.
+# Both alert to Discord. Signal 1 (version drift) is no longer purely
+# read-only as of LS-8490 below; Signal 2 (skip-chain detection) remains
+# read-only.
 # LS-7933: version-drift below now also tracks how long each SSM `/version`
 # parameter has been mismatched against its deployed Description
 # (Parameter.LastModifiedDate) and only alerts + fails the job once that
@@ -53,6 +54,30 @@ name: "Lambda Drift Check"
 # lambda-terraform-apply.yml's Post-Apply Version Verification step: a
 # mismatch caused by a concurrent SSM bump seconds ago will self-heal on the
 # next Apply run before it clears the threshold.
+#
+# LS-8490: closes the loop on Signal 1. The version-drift job's Discord alert
+# used to end at "Fix: redeploy via workflow_dispatch on upload-lambdas.yml"
+# — a human had to go do that by hand. The auto-redeploy job below now does
+# it automatically: for each lambda past the freshness threshold, it maps
+# the drifted ssmName to its upload-lambdas.yml `project` and dispatches
+# upload-lambdas.yml for it directly (bypassing `nx affected`, since the
+# whole point is the artifact is already built and stuck, not that the
+# source needs rebuilding). Guarded against redeploy loops with an SSM
+# parameter (`.../lambda-drift-check/<ssmName>/auto-redeploy-attempted-version`)
+# recording the drifted version already auto-redeployed once: if the next
+# check still sees that same target version drifted, auto-redeploy is
+# skipped and a distinct "drift persists after auto-redeploy" Discord alert
+# fires instead, so a stuck Terraform apply doesn't get silently re-dispatched
+# forever. A genuinely new drifted version (new upload) always gets its own
+# attempt, since the guard key includes the target version.
+#
+# Since this job's first live exercise is necessarily whenever real drift
+# next occurs, the workflow_dispatch trigger takes a `dry-run` input: run it
+# manually against real (or force-all-induced) drift data and the
+# auto-redeploy job computes and logs its full plan — which lambda(s), which
+# upload-lambdas.yml project, guard-skip vs fresh-attempt — without writing
+# any SSM guard state or dispatching upload-lambdas.yml, so the logic can be
+# validated before the automatic (workflow_run-triggered) path relies on it.
 # =============================================================================
 
 on:
@@ -65,6 +90,16 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      dry-run:
+        description: >-
+          Auto-redeploy: compute the plan against real drift data and log it,
+          without writing guard SSM state or dispatching upload-lambdas.yml.
+          Use to validate the auto-redeploy job's logic safely before
+          trusting the automatic (workflow_run-triggered) path.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
@@ -76,6 +111,11 @@ env:
   AWS_STAGE: dev
   LAMBDA_PREFIX: legacy-sports-dev
   PLAN_ROLE_ARN: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions-plan
+  # Write role — same one upload-lambdas.yml's upload job uses to put the
+  # `/legacy-sports/<stage>/lambda/<name>/version` SSM parameter. Its policy
+  # grants ssm:PutParameter on `/legacy-sports/<environment>/*`, which also
+  # covers the auto-redeploy guard parameters below.
+  WRITE_ROLE_ARN: arn:aws:iam::176661590736:role/legacy-sports-dev-github-actions
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -88,6 +128,7 @@ jobs:
     outputs:
       drift_found: ${{ steps.check.outputs.drift_found }}
       drift_report: ${{ steps.check.outputs.drift_report }}
+      drift_json: ${{ steps.check.outputs.drift_json }}
 
     steps:
       - name: "Checkout"
@@ -191,6 +232,10 @@ jobs:
             echo "$DRIFTED" | jq -r '.[] | "- **\(.function)**: SSM=`\(.expected)`, deployed=`\(.deployed)` — pending \(.hoursPending)h"'
             echo "DRIFT_EOF"
           } >> "$GITHUB_OUTPUT"
+
+          # Machine-readable form for the auto-redeploy job below — same
+          # entries as drift_report, consumed instead of re-parsing markdown.
+          echo "drift_json=$(echo "$DRIFTED" | jq -c '.')" >> "$GITHUB_OUTPUT"
 
       - name: "Discord alert — version drift"
         if: always() && steps.check.outputs.drift_found == 'true'
@@ -323,3 +368,165 @@ jobs:
             **Fix**: identify which lambda project(s) changed in the affected commit(s) and manually redeploy via `workflow_dispatch` on `upload-lambdas.yml`.
 
             [View this check run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+  # ---------------------------------------------------------------------------
+  # Auto-remediation for Signal 1 — dispatch Upload Lambdas for drifted
+  # lambda(s), guarded against redeploy loops (LS-8490)
+  # ---------------------------------------------------------------------------
+  auto-redeploy:
+    name: "Auto-Redeploy Drifted Lambdas"
+    needs: [version-drift]
+    if: always() && needs.version-drift.outputs.drift_found == 'true'
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+      actions: write
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: "Configure AWS credentials (write role — guard state)"
+        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6
+        with:
+          role-to-assume: ${{ env.WRITE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: "Compute redeploy plan (one auto-attempt per drifted version)"
+        id: plan
+        shell: bash
+        env:
+          DRIFT_JSON: ${{ needs.version-drift.outputs.drift_json }}
+          DRY_RUN: ${{ inputs['dry-run'] == true }}
+        run: |
+          # Maps drift-check's ssmName (this file's REGISTRY) to
+          # upload-lambdas.yml's `project` (its REGISTRY / the
+          # workflow_dispatch `lambda` choice). Kept in lockstep with both.
+          declare -A SSM_TO_PROJECT=(
+            [graphql]="db"
+            [stats]="stats-lambda"
+            [draft-processor]="draft-processor"
+            [game-selection]="game-selection"
+            [jira-proxy]="jira-proxy"
+            [oauth-proxy]="oauth-proxy"
+            [rollbar-discord]="rollbar-discord"
+            [stripe-webhook]="stripe-webhook"
+            [image-upload]="image-upload"
+            [websocket]="websocket"
+            [github-webhook]="github-webhook"
+            [mcp-jira]="mcp-jira-server"
+            [mcp-github]="mcp-github-server"
+            [mcp-ci]="mcp-ci-server"
+            [mcp-db]="mcp-db-admin-server"
+            [mcp-rollbar]="mcp-rollbar-server"
+          )
+
+          TO_REDEPLOY="[]"
+          STILL_STALE="[]"
+
+          while IFS=$'\t' read -r FUNC EXPECTED; do
+            [ -z "$FUNC" ] && continue
+            PROJECT="${SSM_TO_PROJECT[$FUNC]:-}"
+            if [ -z "$PROJECT" ]; then
+              echo "::warning::No upload-lambdas.yml project mapping for drifted lambda '${FUNC}' — skipping auto-redeploy, manual dispatch required"
+              continue
+            fi
+
+            # Guard key includes the target version, so a lambda that drifts
+            # again after a later successful upload always gets a fresh
+            # auto-attempt — only a *repeat* of the same still-unresolved
+            # drift is skipped.
+            GUARD_PARAM="/legacy-sports/${AWS_STAGE}/lambda-drift-check/${FUNC}/auto-redeploy-attempted-version"
+            ATTEMPTED=$(aws ssm get-parameter --name "$GUARD_PARAM" --region "${AWS_REGION}" \
+              --query "Parameter.Value" --output text 2>/dev/null || echo "")
+
+            if [ "$ATTEMPTED" = "$EXPECTED" ]; then
+              echo "⏭️  ${FUNC}: already auto-redeployed for version ${EXPECTED}, still drifted — escalating instead of retrying"
+              STILL_STALE=$(echo "$STILL_STALE" | jq -c --arg f "$FUNC" --arg e "$EXPECTED" '. + [{function: $f, expected: $e}]')
+            else
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "🧪 ${FUNC}: DRY RUN — would write guard ${GUARD_PARAM}=${EXPECTED} and dispatch upload-lambdas.yml for project '${PROJECT}' (skipping actual mutation)"
+              else
+                echo "🚀 ${FUNC}: dispatching upload-lambdas.yml for project '${PROJECT}' (target version ${EXPECTED})"
+                # Record the guard BEFORE dispatching so a concurrent/re-run of
+                # this check can't double-dispatch for the same drift.
+                aws ssm put-parameter --name "$GUARD_PARAM" --value "$EXPECTED" --type String --overwrite --region "${AWS_REGION}"
+              fi
+              TO_REDEPLOY=$(echo "$TO_REDEPLOY" | jq -c --arg f "$FUNC" --arg p "$PROJECT" --arg e "$EXPECTED" '. + [{function: $f, project: $p, expected: $e}]')
+            fi
+          done < <(echo "$DRIFT_JSON" | jq -r '.[] | [.function, .expected] | @tsv')
+
+          echo "to_redeploy=$(echo "$TO_REDEPLOY" | jq -c '.')" >> "$GITHUB_OUTPUT"
+          echo "still_stale=$(echo "$STILL_STALE" | jq -c '.')" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+
+      - name: "Dispatch Upload Lambdas for newly drifted lambda(s)"
+        if: fromJson(steps.plan.outputs.to_redeploy)[0] != null && steps.plan.outputs.dry_run != 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          TO_REDEPLOY: ${{ steps.plan.outputs.to_redeploy }}
+        with:
+          script: |
+            const toRedeploy = JSON.parse(process.env.TO_REDEPLOY);
+            for (const { project, function: func } of toRedeploy) {
+              core.info(`Dispatching upload-lambdas.yml for ${func} (project: ${project})`);
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'upload-lambdas.yml',
+                ref: 'main',
+                inputs: { lambda: project },
+              });
+            }
+
+      - name: "Dry-run summary (no mutation, no dispatch)"
+        if: fromJson(steps.plan.outputs.to_redeploy)[0] != null && steps.plan.outputs.dry_run == 'true'
+        shell: bash
+        env:
+          TO_REDEPLOY: ${{ steps.plan.outputs.to_redeploy }}
+        run: |
+          echo "## 🧪 Auto-Redeploy Dry Run" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "No SSM writes or upload-lambdas.yml dispatches were made. Would have dispatched:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "$TO_REDEPLOY" | jq -r '.[] | "- **\(.function)** → project `\(.project)` (target version `\(.expected)`)"' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Discord alert — auto-redeploy dispatched"
+        if: fromJson(steps.plan.outputs.to_redeploy)[0] != null && steps.plan.outputs.dry_run != 'true'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: success
+          title: "Lambda Drift Check — auto-redeploy dispatched"
+          description: |
+            Detected version drift and automatically dispatched
+            `upload-lambdas.yml` for the affected lambda(s) below (one
+            auto-attempt per drifted version —
+            [LS-8490](https://bkrupa.atlassian.net/browse/LS-8490)).
+
+            **Redeployed:**
+            ${{ join(fromJson(steps.plan.outputs.to_redeploy).*.function, ', ') }}
+
+            [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+      - name: "Discord alert — drift persists after auto-redeploy"
+        if: fromJson(steps.plan.outputs.still_stale)[0] != null && steps.plan.outputs.dry_run != 'true'
+        uses: ./.github/actions/discord-notify
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          status: failure
+          title: "Lambda Drift Check — drift persists after auto-redeploy"
+          description: |
+            An automatic `upload-lambdas.yml` redeploy already ran for the
+            drifted version below and the lambda is **still** out of sync.
+            Auto-redeploy is guarded to one attempt per drifted version, so
+            this needs manual investigation — check the `upload-lambdas.yml`
+            and `lambda-terraform-apply.yml` run history for the affected
+            lambda(s).
+
+            **Still stale:**
+            ${{ join(fromJson(steps.plan.outputs.still_stale).*.function, ', ') }}
+
+            [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
