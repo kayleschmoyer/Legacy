@@ -83,7 +83,7 @@ Once your Cognito account exists:
 3. Click **Connect** on each and complete the Cognito OAuth consent flow that opens.
 4. After they are connected, the `mcp__legacy-sports-*` tools appear automatically in your Claude Code sessions — both local (desktop app, CLI, IDE extensions) and web.
 
-> **Connector registration is a one-time owner action.** The connectors are already registered in claude.ai. Developers only need to consent (Step 2), not register. If a connector is missing, ask an Org Owner to re-register it under Org settings → Connectors using each server's API Gateway URL.
+> **Connector registration is a one-time owner action.** Once an Org Owner has registered the connectors (tracked by [LS-5152](https://bkrupa.atlassian.net/browse/LS-5152) — as of this writing still pending), developers only need to consent (Step 2), not register. Registering a connector requires the `mcp_connector` Cognito app client id from Terraform (see Connection Reference below), which exists once [LS-5151](https://bkrupa.atlassian.net/browse/LS-5151) is merged — that alone does not mean the claude.ai-side registration has happened. If a connector is missing, ask an Org Owner to register (or re-register) it under Org settings → Connectors using each server's API Gateway URL.
 
 ### Two separate token paths — don't conflate them
 
