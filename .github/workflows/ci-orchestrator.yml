@@ -265,6 +265,16 @@ jobs:
       # (bot-review, CI Gate — marked _commitStatus in ruleset.json), so the
       # guard evaluates each kind against its own API. Fail-safe direction: on
       # any read error or doubt, re-run CI.
+      #
+      # LS-8682: the `pull_request_review` event payload's `pull_request.head.sha`
+      # can be stale relative to the PR's true current head when a push and an
+      # approval race each other — the payload is a snapshot taken when the event
+      # was generated, not a live read. Evaluating anyActive/allPassed against a
+      # stale SHA can find an *older* run's still-in-flight check runs and report
+      # ci-already-passed=true for a head that no run is actually executing for,
+      # deadlocking the merge queue (no run ever posts CI Gate for the current
+      # head). Mirror ci-gate.js's SHA-currency guard: re-fetch the PR's live
+      # head via the API and evaluate against that, not the payload snapshot.
       - name: "🔍 Check for prior CI success"
         id: check-prior-success
         if: github.event_name == 'pull_request_review'
@@ -273,6 +283,8 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const { owner, repo } = context.repo;
+
             // On pull_request / pull_request_review events, context.sha (GITHUB_SHA)
             // is the ephemeral test-merge commit (refs/pull/N/merge), NOT the PR head.
             // CI check runs are attached to the PR head, so we must look them up by the
@@ -280,8 +292,28 @@ jobs:
             // on every approval (LS-7736). Falls back to context.sha for events with no
             // pull_request payload (e.g. merge_group), though this step only runs on
             // pull_request_review.
-            const sha = context.payload.pull_request?.head?.sha ?? context.sha;
-            const { owner, repo } = context.repo;
+            let sha = context.payload.pull_request?.head?.sha ?? context.sha;
+
+            // LS-8682: the payload SHA above can be stale — re-fetch the PR's live
+            // head and prefer it. This guarantees the checks/statuses looked up
+            // below (and therefore ci-already-passed) always reflect the PR's
+            // actual current head, never a superseded one from a race between a
+            // push and this approval event.
+            const prNumber = context.payload.pull_request?.number;
+            if (prNumber) {
+              try {
+                const { data: livePr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+                if (livePr.head.sha !== sha) {
+                  core.info(
+                    `check-prior-success: event payload SHA (${sha}) is stale — PR #${prNumber}'s ` +
+                      `live head is ${livePr.head.sha}. Evaluating against the live head.`
+                  );
+                  sha = livePr.head.sha;
+                }
+              } catch (err) {
+                core.warning(`check-prior-success: could not verify live PR head (${err.message}) — proceeding with event SHA ${sha}.`);
+              }
+            }
 
             // Load required contexts dynamically from .github/ruleset.json so this
             // guard stays automatically in sync with branch protection config.
