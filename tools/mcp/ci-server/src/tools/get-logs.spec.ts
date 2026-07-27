@@ -11,8 +11,37 @@ const mockFetch = logs.fetchRunLogsRing as jest.MockedFunction<
   typeof logs.fetchRunLogsRing
 >;
 
-function parsePayload(text: string): Record<string, unknown> {
-  return JSON.parse(text) as Record<string, unknown>;
+/** Singular-path response: minified-JSON header line + blank line + raw log text. */
+function parseHeader(text: string): Record<string, unknown> {
+  return JSON.parse(text.split('\n')[0]) as Record<string, unknown>;
+}
+
+function parseLogs(text: string): string {
+  return text.slice(text.indexOf('\n\n') + 2);
+}
+
+/** Batch-path response: header line, then a `=== run <id> ===` section per run. */
+function parseBatchHeader(text: string): {
+  runIds: number[];
+  missing: Array<{ runId: number; reason: string }>;
+} {
+  return JSON.parse(text.split('\n\n')[0]);
+}
+
+function parseBatchRun(
+  text: string,
+  runId: number,
+): { meta: Record<string, unknown>; logs: string } {
+  const marker = `=== run ${runId} ===\n`;
+  const start = text.indexOf(marker) + marker.length;
+  const rest = text.slice(start);
+  const nextMarkerIdx = rest.indexOf('\n\n=== run ');
+  const section = nextMarkerIdx === -1 ? rest : rest.slice(0, nextMarkerIdx);
+  const sepIdx = section.indexOf('\n\n');
+  return {
+    meta: JSON.parse(section.slice(0, sepIdx)),
+    logs: section.slice(sepIdx + 2),
+  };
 }
 
 describe('getLogs', () => {
@@ -21,7 +50,7 @@ describe('getLogs', () => {
   });
 
   describe('singular runId', () => {
-    it('returns a flat per-run payload (back-compat)', async () => {
+    it('returns a metadata header + raw log text (back-compat fields, LS-8504 format)', async () => {
       mockFetch.mockResolvedValue({
         lines: ['line a', 'line b'],
         totalLines: 2,
@@ -30,12 +59,31 @@ describe('getLogs', () => {
       const result = await getLogs({ runId: 123 });
 
       expect(result.isError).toBeUndefined();
-      const payload = parsePayload(result.content[0].text);
-      expect(payload.runId).toBe(123);
-      expect(payload.logs).toBe('line a\nline b');
-      expect(payload.totalLines).toBe(2);
-      // Singular path is not wrapped in { logs: { [runId]: ... } }
-      expect(payload).not.toHaveProperty('missing');
+      const text = result.content[0].text;
+      const header = parseHeader(text);
+      expect(header.runId).toBe(123);
+      expect(header.totalLines).toBe(2);
+      // Singular path is not wrapped in { logs: { [runId]: ... } }.
+      expect(header).not.toHaveProperty('missing');
+      expect(parseLogs(text)).toBe('line a\nline b');
+    });
+
+    it('keeps real newlines in the log text instead of JSON-escaping them (LS-8504)', async () => {
+      const manyLines = Array.from({ length: 50 }, (_, i) => `log line ${i}`);
+      mockFetch.mockResolvedValue({ lines: manyLines, totalLines: 50 });
+
+      const result = await getLogs({ runId: 1 });
+      const text = result.content[0].text;
+
+      // The log content must never appear as a literal backslash-n escape —
+      // that escaping is exactly what breaks grep/chunked Read once this
+      // response is large enough to be persisted to a tool-results file.
+      const logsText = parseLogs(text);
+      expect(logsText).not.toContain('\\n');
+      const physicalLines = logsText.split('\n');
+      expect(physicalLines).toHaveLength(50);
+      expect(physicalLines[0]).toBe('log line 0');
+      expect(physicalLines[49]).toBe('log line 49');
     });
 
     it('errors when neither runId, runIds, nor jobId is provided', async () => {
@@ -53,7 +101,7 @@ describe('getLogs', () => {
   });
 
   describe('batch runIds', () => {
-    it('returns per-run payloads keyed by runId', async () => {
+    it('returns per-run sections keyed by runId', async () => {
       mockFetch.mockImplementation(async (params) => ({
         lines: [`log-for-${params.runId}`],
         totalLines: 1,
@@ -62,15 +110,13 @@ describe('getLogs', () => {
       const result = await getLogs({ runIds: [10, 20, 30] });
 
       expect(result.isError).toBeUndefined();
-      const payload = parsePayload(result.content[0].text) as {
-        logs: Record<string, { runId: number; logs: string }>;
-        missing: unknown[];
-      };
-      expect(Object.keys(payload.logs).sort()).toEqual(['10', '20', '30']);
-      expect(payload.logs['10'].logs).toBe('log-for-10');
-      expect(payload.logs['20'].logs).toBe('log-for-20');
-      expect(payload.logs['30'].logs).toBe('log-for-30');
-      expect(payload.missing).toEqual([]);
+      const text = result.content[0].text;
+      const header = parseBatchHeader(text);
+      expect(header.runIds.slice().sort((a, b) => a - b)).toEqual([10, 20, 30]);
+      expect(header.missing).toEqual([]);
+      expect(parseBatchRun(text, 10).logs).toBe('log-for-10');
+      expect(parseBatchRun(text, 20).logs).toBe('log-for-20');
+      expect(parseBatchRun(text, 30).logs).toBe('log-for-30');
     });
 
     it('isolates a BlobNotFound 404 to missing[] without failing the others', async () => {
@@ -86,14 +132,14 @@ describe('getLogs', () => {
       const result = await getLogs({ runIds: [1, 999, 2] });
 
       expect(result.isError).toBeUndefined();
-      const payload = parsePayload(result.content[0].text) as {
-        logs: Record<string, unknown>;
-        missing: Array<{ runId: number; reason: string }>;
-      };
-      expect(Object.keys(payload.logs).sort()).toEqual(['1', '2']);
-      expect(payload.missing).toHaveLength(1);
-      expect(payload.missing[0].runId).toBe(999);
-      expect(payload.missing[0].reason).toContain('BlobNotFound');
+      const text = result.content[0].text;
+      const header = parseBatchHeader(text);
+      expect(header.runIds.slice().sort((a, b) => a - b)).toEqual([1, 2]);
+      expect(header.missing).toHaveLength(1);
+      expect(header.missing[0].runId).toBe(999);
+      expect(header.missing[0].reason).toContain('BlobNotFound');
+      expect(parseBatchRun(text, 1).logs).toBe('log-for-1');
+      expect(parseBatchRun(text, 2).logs).toBe('log-for-2');
     });
 
     it('caps the batch at 10 runs', async () => {
@@ -129,15 +175,14 @@ describe('getLogs', () => {
       expect(mockFetch).toHaveBeenCalledTimes(8);
     });
 
-    it('returns an empty logs/missing payload structure when all runs succeed', async () => {
+    it('returns an empty missing[] and a run section when all runs succeed', async () => {
       mockFetch.mockResolvedValue({ lines: ['ok'], totalLines: 1 });
       const result = await getLogs({ runIds: [42] });
-      const payload = parsePayload(result.content[0].text) as {
-        logs: Record<string, unknown>;
-        missing: unknown[];
-      };
-      expect(payload.logs['42']).toBeDefined();
-      expect(payload.missing).toEqual([]);
+      const text = result.content[0].text;
+      const header = parseBatchHeader(text);
+      expect(header.runIds).toEqual([42]);
+      expect(header.missing).toEqual([]);
+      expect(parseBatchRun(text, 42).logs).toBe('ok');
     });
   });
 
@@ -194,12 +239,12 @@ describe('getLogs', () => {
       const result = await getLogs({ runId: 1, errorSummary: true });
 
       expect(result.isError).toBeUndefined();
-      const payload = parsePayload(result.content[0].text) as { logs: string };
-      expect(payload.logs).toContain('FAIL src/foo.spec.ts');
-      expect(payload.logs).toContain('Tests:       1 failed, 5 total');
+      const logsText = parseLogs(result.content[0].text);
+      expect(logsText).toContain('FAIL src/foo.spec.ts');
+      expect(logsText).toContain('Tests:       1 failed, 5 total');
       // Jest markers appear before the generic noise in the merged summary.
-      expect(payload.logs.indexOf('FAIL src/foo.spec.ts')).toBeLessThan(
-        payload.logs.indexOf('console.error'),
+      expect(logsText.indexOf('FAIL src/foo.spec.ts')).toBeLessThan(
+        logsText.indexOf('console.error'),
       );
     });
 
@@ -233,9 +278,8 @@ describe('getLogs', () => {
 
       const result = await getLogs({ runId: 1, truncateLineLength: 50 });
       expect(result.isError).toBeUndefined();
-      const payload = parsePayload(result.content[0].text);
-      const logsStr = payload.logs as string;
-      for (const line of logsStr.split('\n')) {
+      const logsText = parseLogs(result.content[0].text);
+      for (const line of logsText.split('\n')) {
         expect(line.length).toBeLessThanOrEqual(
           50 + '...[line truncated]'.length,
         );
@@ -284,8 +328,9 @@ describe('getLogs', () => {
       expect(result.isError).toBeUndefined();
       const text = result.content[0].text;
       expect(text).not.toContain('[truncated at');
-      // Text should be valid JSON
-      expect(() => JSON.parse(text)).not.toThrow();
+      // The header line is still valid JSON.
+      expect(() => parseHeader(text)).not.toThrow();
+      expect(parseLogs(text)).toBe('short line');
     });
   });
 });

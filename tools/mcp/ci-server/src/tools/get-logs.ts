@@ -1,4 +1,5 @@
 import { fetchRunLogsRing } from '../logs.js';
+import { formatBatchLogPayload, formatLogPayload } from '../format.js';
 import type { ToolResult } from '../types.js';
 
 interface GetLogsParams {
@@ -181,16 +182,24 @@ function applyCharLimits(
 /** Deadline for a single ci_get_logs call — leaves ~5 s buffer before Lambda 30 s timeout. */
 const LOG_FETCH_TIMEOUT_MS = 20_000;
 
+/** A run's log result split into scalar metadata and the raw log text. */
+interface RunPayload {
+  meta: Record<string, unknown>;
+  logs: string;
+}
+
 /**
- * Build the per-run log payload (the same JSON object the singular path
- * returns inline). Shared between singular and batch modes so the per-run
- * output shape stays identical.
+ * Build the per-run log payload (metadata + raw log text), shared between
+ * singular and batch modes so the per-run output shape stays identical. The
+ * log text is kept separate from the metadata object — see
+ * `formatLogPayload` (LS-8504) for why it must never be JSON.stringify'd
+ * together with the log content.
  */
 async function buildRunPayload(
   runId: number | undefined,
   params: GetLogsParams,
   signal?: AbortSignal,
-): Promise<Record<string, unknown>> {
+): Promise<RunPayload> {
   const defaultLimit = params.errorSummary ? 10_000 : 500;
   const maxLines = params.maxLines ?? defaultLimit;
   const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
@@ -226,17 +235,19 @@ async function buildRunPayload(
       maxChars,
     );
     return {
-      ...base,
-      errorSummary: true,
-      totalLogLines: totalLines,
-      errorLines: summary.length,
-      charTruncated,
-      ...(skippedJobs
-        ? {
-            skippedJobs,
-            hint: `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
-          }
-        : {}),
+      meta: {
+        ...base,
+        errorSummary: true,
+        totalLogLines: totalLines,
+        errorLines: summary.length,
+        charTruncated,
+        ...(skippedJobs
+          ? {
+              skippedJobs,
+              hint: `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
+            }
+          : {}),
+      },
       logs: processedLines.join('\n'),
     };
   }
@@ -248,17 +259,19 @@ async function buildRunPayload(
   );
 
   return {
-    ...base,
-    truncated: lines.length < totalLines || charTruncated,
-    charTruncated,
-    totalLines,
-    returnedLines: processedLines.length,
-    ...(skippedJobs
-      ? {
-          skippedJobs,
-          hint: `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
-        }
-      : {}),
+    meta: {
+      ...base,
+      truncated: lines.length < totalLines || charTruncated,
+      charTruncated,
+      totalLines,
+      returnedLines: processedLines.length,
+      ...(skippedJobs
+        ? {
+            skippedJobs,
+            hint: `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
+          }
+        : {}),
+    },
     logs: processedLines.join('\n'),
   };
 }
@@ -316,11 +329,15 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
       };
     }
 
-    const logs: Record<string, Record<string, unknown>> = {};
+    const runs: Array<{
+      runId: number;
+      meta: Record<string, unknown>;
+      logs: string;
+    }> = [];
     const missing: Array<{ runId: number; reason: string }> = [];
 
     type Outcome =
-      | { runId: number; payload: Record<string, unknown> }
+      | { runId: number; payload: RunPayload }
       | { runId: number; error: string };
 
     const batchSignal = AbortSignal.timeout(LOG_FETCH_TIMEOUT_MS);
@@ -340,7 +357,11 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
 
     for (const outcome of outcomes) {
       if ('payload' in outcome) {
-        logs[String(outcome.runId)] = outcome.payload;
+        runs.push({
+          runId: outcome.runId,
+          meta: outcome.payload.meta,
+          logs: outcome.payload.logs,
+        });
       } else {
         missing.push({ runId: outcome.runId, reason: outcome.error });
       }
@@ -348,7 +369,7 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
 
     const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
     const batchText = applyHardCharCap(
-      JSON.stringify({ logs, missing }, null, 2),
+      formatBatchLogPayload(missing, runs),
       maxChars,
     );
     return {
@@ -373,13 +394,16 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
     };
   }
 
-  // Singular path — preserve existing response shape (top-level fields, not
-  // wrapped in logs/missing) so existing callers keep working.
+  // Singular path — metadata header + raw log text (LS-8504), not wrapped in
+  // a logs/missing object, so existing single-run callers keep working.
   try {
     const signal = AbortSignal.timeout(LOG_FETCH_TIMEOUT_MS);
     const payload = await buildRunPayload(params.runId, params, signal);
     const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
-    const text = applyHardCharCap(JSON.stringify(payload, null, 2), maxChars);
+    const text = applyHardCharCap(
+      formatLogPayload(payload.meta, payload.logs),
+      maxChars,
+    );
     return { content: [{ type: 'text', text }] };
   } catch (error) {
     const isTimeout =

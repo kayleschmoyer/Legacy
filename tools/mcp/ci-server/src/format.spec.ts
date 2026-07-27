@@ -1,4 +1,6 @@
 import {
+  formatBatchLogPayload,
+  formatLogPayload,
   formatLogSearch,
   formatRunJobs,
   formatRunList,
@@ -291,6 +293,73 @@ describe('formatLogSearch', () => {
     );
 
     expect(out.length).toBeLessThanOrEqual(50_000);
+  });
+});
+
+describe('formatLogPayload (LS-8504)', () => {
+  const meta = { runId: 1, jobId: null, totalLines: 3 };
+
+  it('renders a minified-JSON header line followed by a blank line then the raw log text', () => {
+    const out = formatLogPayload(meta, 'line 1\nline 2\nline 3');
+    const [header, blank, ...rest] = out.split('\n');
+    expect(JSON.parse(header)).toEqual(meta);
+    expect(blank).toBe('');
+    expect(rest).toEqual(['line 1', 'line 2', 'line 3']);
+  });
+
+  it('keeps every log line on its own physical line — never JSON-escapes the log content (the LS-8504 bug)', () => {
+    const logs = Array.from({ length: 500 }, (_, i) => `log line ${i}`).join(
+      '\n',
+    );
+    const out = formatLogPayload(meta, logs);
+    const physicalLines = out.split('\n');
+    // Header + blank + 500 log lines.
+    expect(physicalLines).toHaveLength(502);
+    expect(physicalLines[2]).toBe('log line 0');
+    expect(physicalLines[501]).toBe('log line 499');
+    // The bug: JSON.stringify({ ...meta, logs }) would escape every log
+    // newline to a literal `\n` two-character sequence instead of a real
+    // newline byte. That never happens here.
+    expect(out).not.toContain('\\n');
+  });
+
+  it('a grep-style line search finds the matching physical line, not the whole blob', () => {
+    const logs = ['setup', 'ERROR: something broke', 'teardown'].join('\n');
+    const out = formatLogPayload(meta, logs);
+    const matches = out.split('\n').filter((line) => line.includes('ERROR'));
+    expect(matches).toEqual(['ERROR: something broke']);
+  });
+});
+
+describe('formatBatchLogPayload (LS-8504)', () => {
+  it('renders a header with runIds + missing, then one section per run', () => {
+    const out = formatBatchLogPayload(
+      [{ runId: 99, reason: 'BlobNotFound' }],
+      [
+        { runId: 1, meta: { runId: 1 }, logs: 'log a1\nlog a2' },
+        { runId: 2, meta: { runId: 2 }, logs: 'log b1\nlog b2' },
+      ],
+    );
+
+    const header = out.split('\n\n')[0];
+    expect(JSON.parse(header)).toEqual({
+      runIds: [1, 2],
+      missing: [{ runId: 99, reason: 'BlobNotFound' }],
+    });
+    expect(out).toContain('=== run 1 ===');
+    expect(out).toContain('=== run 2 ===');
+    expect(out).toContain('log a1\nlog a2');
+    expect(out).toContain('log b1\nlog b2');
+    // No JSON-escaped newlines anywhere in the log content.
+    expect(out).not.toContain('\\n');
+  });
+
+  it('omits run sections when every run is missing', () => {
+    const out = formatBatchLogPayload([{ runId: 1, reason: 'boom' }], []);
+    expect(JSON.parse(out)).toEqual({
+      runIds: [],
+      missing: [{ runId: 1, reason: 'boom' }],
+    });
   });
 });
 

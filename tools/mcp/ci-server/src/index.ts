@@ -67,7 +67,7 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_get_logs',
-    'Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job. Defaults to failed-step logs only. Use jobName to filter logs to a specific job by name (case-insensitive substring match) without needing its numeric ID.',
+    'Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job. Defaults to failed-step logs only. Use jobName to filter logs to a specific job by name (case-insensitive substring match) without needing its numeric ID. Response is a minified-JSON metadata line followed by the raw log text with real newlines (not a JSON string field) — if this response is large enough to be persisted to a tool-results/*.txt file, grep and offset/limit-chunked Read both work directly against the log content.',
     {
       runId: z.coerce
         .number()
@@ -81,7 +81,7 @@ export function createServer(): McpServer {
         .max(10)
         .optional()
         .describe(
-          'Batch mode: fetch logs for up to 10 runs in one call (concurrency capped at 3). Response is { logs: { [runId]: <per-run payload> }, missing: [{ runId, reason }] } — runs whose log archives are missing (e.g. BlobNotFound 404 after GitHub log expiry) are isolated to missing[] instead of failing the whole call. Cannot be combined with jobId.',
+          'Batch mode: fetch logs for up to 10 runs in one call (concurrency capped at 3). Response is a minified-JSON header line ({ runIds, missing: [{ runId, reason }] }) followed by one "=== run <id> ===" section per successful run, each with its own metadata line + raw log text — runs whose log archives are missing (e.g. BlobNotFound 404 after GitHub log expiry) are isolated to missing[] instead of failing the whole call. Cannot be combined with jobId.',
         ),
       jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
       jobName: z

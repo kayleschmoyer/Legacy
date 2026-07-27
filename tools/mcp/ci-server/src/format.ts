@@ -241,3 +241,55 @@ function stripJsonlPath(
 export function formatSessionStats(stats: Record<string, unknown>): string {
   return minifiedJson(stripJsonlPath(stats));
 }
+
+// ---------------------------------------------------------------------------
+// ci_get_logs — scalar metadata + a single large multi-line string → minified
+// JSON header followed by raw log text (LS-8504).
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a log-shaped result as a minified-JSON metadata header, blank line,
+ * then the raw log text. Embedding a multi-thousand-line log inside a JSON
+ * string field (the previous behavior — `JSON.stringify({ ...meta, logs })`)
+ * forces every newline in that field to be escaped to the two-character `\n`
+ * sequence, since raw newline bytes are illegal inside a JSON string. That
+ * collapses the whole log to one physical line — which is exactly what
+ * breaks `grep -n` and offset/limit-chunked `Read` against an
+ * overflow-persisted `tool-results/*.txt` file, defeating the tool's own
+ * printed recovery instructions. Keeping the log text outside any JSON
+ * string preserves real newline bytes, so both recovery paths work as
+ * documented once the response is large enough to be persisted to disk.
+ */
+export function formatLogPayload(
+  meta: Record<string, unknown>,
+  logs: string,
+): string {
+  return `${minifiedJson(meta)}\n\n${logs}`;
+}
+
+/** One run's result in a `ci_get_logs({ runIds })` batch call. */
+export interface BatchLogRun {
+  runId: number;
+  meta: Record<string, unknown>;
+  logs: string;
+}
+
+/**
+ * Render a batch `ci_get_logs({ runIds })` result: a minified-JSON header
+ * (the run IDs in scope + any `missing` entries) followed by one
+ * `formatLogPayload`-shaped section per successful run, separated by a
+ * `=== run <id> ===` marker line. Same rationale as {@link formatLogPayload} —
+ * every run's log text stays outside any JSON string so it keeps real
+ * newlines through overflow persistence.
+ */
+export function formatBatchLogPayload(
+  missing: ReadonlyArray<{ runId: number; reason: string }>,
+  runs: readonly BatchLogRun[],
+): string {
+  const header = minifiedJson({ runIds: runs.map((r) => r.runId), missing });
+  const sections = runs.map(
+    (run) =>
+      `\n\n=== run ${run.runId} ===\n${formatLogPayload(run.meta, run.logs)}`,
+  );
+  return header + sections.join('');
+}
