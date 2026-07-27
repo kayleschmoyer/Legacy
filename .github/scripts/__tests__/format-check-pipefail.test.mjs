@@ -22,7 +22,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,17 +36,30 @@ const WORKFLOW = join(here, '..', '..', 'workflows', 'ci-pipeline.yml');
 const FILTER = `(while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\\0' "$f"; done; true)`;
 const BUGGY_FILTER = `(while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\\0' "$f"; done)`;
 
+// LS-8511: `present` used to be a temp file written moments before the bash
+// subprocess `[ -f ]`-tested it, which raced intermittently under CI load
+// (fresh writes aren't guaranteed visible to a just-forked child on every
+// runner/filesystem). Pointing `present` at this already-loaded test file
+// removes the race entirely — it's been on disk since long before the
+// pipeline runs. `absent` still lives in a throwaway dir so its directory
+// exists but the path itself never does, preserving the partial-clone fidelity.
+const PRESENT = fileURLToPath(import.meta.url);
+
+function shQuote(value) {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 function runPipeline({ filter, downstream }) {
   const dir = mkdtempSync(join(tmpdir(), 'ls8207-'));
   try {
-    writeFileSync(join(dir, 'present'), '');
+    const absent = join(dir, 'absent');
     const script = `
       set -o pipefail
-      printf 'present\\0absent\\0' \\
+      printf '%s\\0%s\\0' ${shQuote(PRESENT)} ${shQuote(absent)} \\
         | ${filter} \\
         | xargs -0 -r ${downstream}
     `;
-    return spawnSync('bash', ['-c', script], { cwd: dir, encoding: 'utf8' });
+    return spawnSync('bash', ['-c', script], { encoding: 'utf8' });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
