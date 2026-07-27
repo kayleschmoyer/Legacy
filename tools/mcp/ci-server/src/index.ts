@@ -14,6 +14,7 @@ import { listRuns } from './tools/list-runs.js';
 import { rerun } from './tools/rerun.js';
 import { rerunBatch } from './tools/rerun-batch.js';
 import { retryFailed } from './tools/retry-failed.js';
+import { retryRunnerFlake } from './tools/retry-runner-flake.js';
 import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
 import { viewRun } from './tools/view-run.js';
@@ -280,6 +281,28 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => retryFailed(params),
+  );
+
+  server.tool(
+    'ci_retry_runner_flake',
+    'Single-call detect-and-retry for the recurring self-hosted-runner-shutdown flake: given a PR number, ' +
+      'checks whether the repo\'s own "CI: Runner Flake" label and "runner shutdown" bot comment are present ' +
+      '(applied by ci-orchestrator.yml when a self-hosted runner shuts down mid-run), and if so, extracts the ' +
+      'run ID from the comment and reruns the affected failed job(s) via the same path as ci_retry_failed — ' +
+      'without the caller first fetching or grepping logs to confirm the failure signature. ' +
+      'Returns a clear, non-error informational result (never a silent no-op) when the label or comment is ' +
+      'absent, pointing at ci_retry_failed({ runId }) as the manual fallback. Additive only — does not change ' +
+      'ci_retry_failed or ci_rerun_failed_jobs behavior.',
+    {
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe(
+          'PR number to check for the runner-shutdown flake signal and retry if detected.',
+        ),
+    },
+    async (params) => retryRunnerFlake(params),
   );
 
   server.tool(
