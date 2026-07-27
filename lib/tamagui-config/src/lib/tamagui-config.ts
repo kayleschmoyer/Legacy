@@ -74,6 +74,9 @@ const brandDark = {
   // Dark text for gold/amber-filled surfaces (buttons, chips) — gold is a
   // mid-light hue in both themes, so this stays constant across themes.
   textOnGold: '#1A1206',
+  // Discord's brand blurple — third-party OAuth brand identity, invariant
+  // across our app themes.
+  discordBlurple: '#5865F2',
 
   // Text tiers (semantic — cf. Goal #2 in LS-8525)
   fg1: darkText.fg1,
@@ -205,6 +208,9 @@ const brandLight = {
   textMuted: lightText.fg3,
   textOnAccent: lightText.fgOnAccent,
   textOnGold: '#1A1206',
+  // Discord's brand blurple — third-party OAuth brand identity, invariant
+  // across our app themes.
+  discordBlurple: '#5865F2',
 
   // Text tiers (semantic — cf. Goal #2 in LS-8525)
   fg1: lightText.fg1,

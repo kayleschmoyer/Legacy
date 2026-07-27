@@ -19,7 +19,7 @@ import {
   useMfa,
 } from '@legacy-sports/shared-components/auth';
 import { BrandIcon } from '@legacy-sports/shared-components/icons';
-import { Input, ScrollView, Spinner, styled, Theme } from 'tamagui';
+import { Input, ScrollView, Spinner, styled } from 'tamagui';
 import { Monitor, Moon, Sun } from '@tamagui/lucide-icons';
 import {
   useGetUserByIdQuery,
@@ -35,16 +35,6 @@ import {
   type ThemePreference,
   useThemeContext,
 } from '../../context/ThemeContext';
-import {
-  BG_DARK,
-  BRAND_GOLD,
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY,
-  BRAND_NAVY_LIGHT,
-  BRAND_SEAM_RED,
-  DISCORD_BLURPLE,
-  withAlpha,
-} from '../../constants/colors';
 
 /* ─── Styled Components ─── */
 
@@ -143,7 +133,7 @@ const AvatarCircle = styled(YStack, {
   alignItems: 'center',
   justifyContent: 'center',
   borderWidth: 3,
-  borderColor: BRAND_NAVY_LIGHT,
+  borderColor: '$brandNavyLight',
   flexShrink: 0,
 });
 
@@ -156,15 +146,15 @@ const AccessLevelBadge = styled(XStack, {
   variants: {
     level: {
       admin: {
-        backgroundColor: withAlpha(BRAND_SEAM_RED, 0.15),
-        borderColor: withAlpha(BRAND_SEAM_RED, 0.4),
+        backgroundColor: '$statusDangerBg',
+        borderColor: '$statusDangerBorder',
       },
       user: {
-        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.15),
-        borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.4),
+        backgroundColor: '$accentMuted',
+        borderColor: '$brandNavyLight',
       },
       none: {
-        backgroundColor: withAlpha(BG_DARK, 0.4),
+        backgroundColor: '$statusNeutralBg',
         borderColor: '$glassBorder',
       },
     },
@@ -192,9 +182,9 @@ const ThemeOptionButton = styled(YStack, {
   variants: {
     active: {
       true: {
-        backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.2),
-        borderColor: BRAND_NAVY_LIGHT,
-        hoverStyle: { backgroundColor: withAlpha(BRAND_NAVY_LIGHT, 0.25) },
+        backgroundColor: '$accentMuted',
+        borderColor: '$brandNavyLight',
+        hoverStyle: { backgroundColor: '$surfaceInteractive' },
       },
     },
   } as const,
@@ -216,18 +206,22 @@ const InfoBanner = styled(XStack, {
   padding: '$4',
   borderRadius: '$5',
   borderWidth: 1,
-  borderColor: withAlpha(BRAND_NAVY_LIGHT, 0.35),
-  backgroundColor: withAlpha(BRAND_NAVY, 0.12),
+  borderColor: '$accentMuted',
+  backgroundColor: '$surfaceInteractive',
 });
 
 /* ─── Page Background ─── */
 
 const pageBackgroundStyle: React.CSSProperties = {
   background: `
-    radial-gradient(ellipse at 15% 0%, ${withAlpha(BRAND_NAVY, 0.16)} 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 5%, ${withAlpha(BRAND_GOLD, 0.06)} 0%, transparent 45%)
+    radial-gradient(ellipse at 15% 0%, color-mix(in srgb, var(--brandNavy) 16%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 5%, color-mix(in srgb, var(--brandGold) 6%, transparent) 0%, transparent 45%)
   `,
   backgroundAttachment: 'fixed',
+};
+
+const sectionCardGradientStyle: React.CSSProperties = {
+  background: `linear-gradient(135deg, var(--surfaceCard) 0%, var(--brandNavy) 100%)`,
 };
 
 /* ─── Helpers ─── */
@@ -246,11 +240,11 @@ function getAccessLevelLabel(level: string): string {
 function getAccessBadgeColor(level: string): string {
   switch (level) {
     case 'admin':
-      return BRAND_SEAM_RED;
+      return 'var(--brandSeamRed)';
     case 'user':
-      return BRAND_GOLD_LIGHT;
+      return 'var(--brandGoldLight)';
     default:
-      return '$colorPress';
+      return 'var(--colorPress)';
   }
 }
 
@@ -449,789 +443,763 @@ const ProfileSettingsPage: React.FC = () => {
   }
 
   return (
-    <Theme name="dark">
-      <PageContainer style={pageBackgroundStyle}>
-        <PageMeta
-          title="Profile Settings"
-          description="Manage your Legacy Sports profile, account details, and connected services."
-        />
-        <ScrollView>
-          <ContentContainer>
-            {/* ── Page Header ── */}
-            <PageHeader>
-              <H1
-                style={{
-                  fontSize: 32,
-                  fontWeight: '700',
-                  color: BRAND_GOLD_LIGHT,
-                  letterSpacing: -0.5,
-                }}
-              >
-                Profile Settings
-              </H1>
-              <Paragraph size="$4" color="$colorPress">
-                Manage your account information and preferences.
-              </Paragraph>
-            </PageHeader>
-
-            {/* ── Profile Card ── */}
-            <SectionCard
+    <PageContainer style={pageBackgroundStyle}>
+      <PageMeta
+        title="Profile Settings"
+        description="Manage your Legacy Sports profile, account details, and connected services."
+      />
+      <ScrollView>
+        <ContentContainer>
+          {/* ── Page Header ── */}
+          <PageHeader>
+            <H1
               style={{
-                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
+                fontSize: 32,
+                fontWeight: '700',
+                color: 'var(--brandGoldLight)',
+                letterSpacing: -0.5,
               }}
             >
-              <SectionHeader>
-                <SectionIconBox>
-                  <Paragraph fontSize={16} lineHeight={18}>
-                    <span role="img" aria-label="profile">
-                      👤
-                    </span>
-                  </Paragraph>
-                </SectionIconBox>
-                <YStack flex={1}>
-                  <Paragraph size="$4" color="$color" fontWeight="600">
-                    Profile
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    Your public identity on Legacy Sports
-                  </Paragraph>
-                </YStack>
-              </SectionHeader>
+              Profile Settings
+            </H1>
+            <Paragraph size="$4" color="$colorPress">
+              Manage your account information and preferences.
+            </Paragraph>
+          </PageHeader>
 
-              <SectionBody>
-                {/* Avatar + Name Summary */}
-                <XStack
-                  gap="$5"
-                  alignItems="center"
-                  $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
+          {/* ── Profile Card ── */}
+          <SectionCard style={sectionCardGradientStyle}>
+            <SectionHeader>
+              <SectionIconBox>
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="profile">
+                    👤
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  Profile
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Your public identity on Legacy Sports
+                </Paragraph>
+              </YStack>
+            </SectionHeader>
+
+            <SectionBody>
+              {/* Avatar + Name Summary */}
+              <XStack
+                gap="$5"
+                alignItems="center"
+                $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
+              >
+                <AvatarCircle
+                  style={{
+                    background:
+                      'linear-gradient(135deg, var(--brandNavy) 0%, var(--brandNavyLight) 100%)',
+                  }}
                 >
-                  <AvatarCircle
-                    style={{
-                      background:
-                        'linear-gradient(135deg, #1B3A5C 0%, #2C4A7C 100%)',
-                    }}
-                  >
-                    {userImage && !imageError ? (
-                      <img
-                        src={userImage}
-                        alt={userName}
-                        referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                        }}
-                        onError={() => setImageError(true)}
-                        onLoad={() => setImageError(false)}
-                      />
-                    ) : (
-                      <Paragraph
-                        style={{
-                          fontSize: 32,
-                          fontWeight: '700',
-                          color: 'white',
-                          lineHeight: '1' as unknown as number,
-                        }}
-                      >
-                        {userName.charAt(0).toUpperCase()}
-                      </Paragraph>
-                    )}
-                  </AvatarCircle>
-
-                  <YStack gap="$2" flex={1}>
+                  {userImage && !imageError ? (
+                    <img
+                      src={userImage}
+                      alt={userName}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                      }}
+                      onError={() => setImageError(true)}
+                      onLoad={() => setImageError(false)}
+                    />
+                  ) : (
                     <Paragraph
                       style={{
-                        fontSize: 22,
+                        fontSize: 32,
                         fontWeight: '700',
-                        color: BRAND_GOLD_LIGHT,
+                        color: 'white',
+                        lineHeight: '1' as unknown as number,
                       }}
                     >
-                      {userName}
+                      {userName.charAt(0).toUpperCase()}
                     </Paragraph>
-                    <Paragraph size="$3" color="$colorPress">
-                      {userEmail}
+                  )}
+                </AvatarCircle>
+
+                <YStack gap="$2" flex={1}>
+                  <Paragraph
+                    style={{
+                      fontSize: 22,
+                      fontWeight: '700',
+                      color: 'var(--brandGoldLight)',
+                    }}
+                  >
+                    {userName}
+                  </Paragraph>
+                  <Paragraph size="$3" color="$colorPress">
+                    {userEmail}
+                  </Paragraph>
+                  <AccessLevelBadge level={accessLevel}>
+                    <Paragraph
+                      size="$2"
+                      fontWeight="600"
+                      style={{ color: getAccessBadgeColor(accessLevel) }}
+                    >
+                      {getAccessLevelLabel(accessLevel)}
                     </Paragraph>
-                    <AccessLevelBadge level={accessLevel}>
-                      <Paragraph
-                        size="$2"
-                        fontWeight="600"
-                        style={{ color: getAccessBadgeColor(accessLevel) }}
-                      >
-                        {getAccessLevelLabel(accessLevel)}
-                      </Paragraph>
-                    </AccessLevelBadge>
-                  </YStack>
-                </XStack>
+                  </AccessLevelBadge>
+                </YStack>
+              </XStack>
 
-                <Separator />
+              <Separator />
 
-                {/* Fields */}
-                <YStack gap="$3">
-                  <FieldRow>
-                    <FieldLabel id="profile-username-label">
-                      Username
-                    </FieldLabel>
-                    {isEditingUsername ? (
-                      <YStack flex={1} gap="$2">
-                        <XStack gap="$2" alignItems="center" flex={1}>
-                          <Input
-                            id="profile-username-input"
-                            aria-labelledby="profile-username-label"
-                            aria-label="Username"
-                            value={editedUsername}
-                            onChangeText={setEditedUsername}
-                            maxLength={50}
-                            autoFocus
-                            flex={1}
-                            size="$4"
-                            aria-invalid={usernameError ? 'true' : 'false'}
-                            borderColor={
-                              usernameError ? BRAND_SEAM_RED : '$glassBorder'
-                            }
-                            onKeyPress={(e: {
-                              nativeEvent: { key: string };
-                            }) => {
-                              if (e.nativeEvent.key === 'Enter')
-                                handleUsernameSave();
-                              if (e.nativeEvent.key === 'Escape')
-                                handleUsernameCancel();
-                            }}
-                          />
-                          <EditButton
-                            onPress={handleUsernameSave}
-                            disabled={usernameLoading}
-                            opacity={usernameLoading ? 0.6 : 1}
-                          >
-                            <Paragraph size="$2" fontWeight="600" color="white">
-                              {usernameLoading ? '...' : 'Save'}
-                            </Paragraph>
-                          </EditButton>
-                          <EditButton
-                            onPress={handleUsernameCancel}
-                            disabled={usernameLoading}
-                            opacity={usernameLoading ? 0.6 : 1}
-                            style={{ backgroundColor: withAlpha(BG_DARK, 0.6) }}
-                          >
-                            <Paragraph
-                              size="$2"
-                              fontWeight="600"
-                              color="$colorPress"
-                            >
-                              Cancel
-                            </Paragraph>
-                          </EditButton>
-                        </XStack>
-                        {usernameError && (
+              {/* Fields */}
+              <YStack gap="$3">
+                <FieldRow>
+                  <FieldLabel id="profile-username-label">Username</FieldLabel>
+                  {isEditingUsername ? (
+                    <YStack flex={1} gap="$2">
+                      <XStack gap="$2" alignItems="center" flex={1}>
+                        <Input
+                          id="profile-username-input"
+                          aria-labelledby="profile-username-label"
+                          aria-label="Username"
+                          value={editedUsername}
+                          onChangeText={setEditedUsername}
+                          maxLength={50}
+                          autoFocus
+                          flex={1}
+                          size="$4"
+                          aria-invalid={usernameError ? 'true' : 'false'}
+                          borderColor={
+                            usernameError ? '$brandSeamRed' : '$glassBorder'
+                          }
+                          onKeyPress={(e: { nativeEvent: { key: string } }) => {
+                            if (e.nativeEvent.key === 'Enter')
+                              handleUsernameSave();
+                            if (e.nativeEvent.key === 'Escape')
+                              handleUsernameCancel();
+                          }}
+                        />
+                        <EditButton
+                          onPress={handleUsernameSave}
+                          disabled={usernameLoading}
+                          opacity={usernameLoading ? 0.6 : 1}
+                        >
+                          <Paragraph size="$2" fontWeight="600" color="white">
+                            {usernameLoading ? '...' : 'Save'}
+                          </Paragraph>
+                        </EditButton>
+                        <EditButton
+                          onPress={handleUsernameCancel}
+                          disabled={usernameLoading}
+                          opacity={usernameLoading ? 0.6 : 1}
+                          backgroundColor="$surfaceSubtle"
+                        >
                           <Paragraph
                             size="$2"
-                            style={{ color: BRAND_SEAM_RED }}
+                            fontWeight="600"
+                            color="$colorPress"
                           >
-                            {usernameError}
-                          </Paragraph>
-                        )}
-                      </YStack>
-                    ) : (
-                      <XStack flex={1} alignItems="center" gap="$3">
-                        <FieldValue>{dbUsername}</FieldValue>
-                        <EditButton onPress={handleUsernameEdit}>
-                          <Paragraph size="$2" fontWeight="600" color="white">
-                            Edit
+                            Cancel
                           </Paragraph>
                         </EditButton>
                       </XStack>
-                    )}
-                  </FieldRow>
-                  <FieldRow>
-                    <FieldLabel>Email</FieldLabel>
-                    <FieldValue>{userEmail}</FieldValue>
-                  </FieldRow>
-                  <FieldRow>
-                    <FieldLabel>Access Level</FieldLabel>
-                    <FieldValue>{getAccessLevelLabel(accessLevel)}</FieldValue>
-                  </FieldRow>
-                  <FieldRow>
-                    <FieldLabel>User ID</FieldLabel>
-                    <FieldValue color="$colorPress">#{user.id}</FieldValue>
-                  </FieldRow>
-                </YStack>
-
-                {/* Read-only notice */}
-                <InfoBanner>
-                  <Paragraph
-                    fontSize={16}
-                    lineHeight={18}
-                    style={{ flexShrink: 0 }}
-                  >
-                    <span role="img" aria-label="info">
-                      ℹ️
-                    </span>
-                  </Paragraph>
-                  <Paragraph size="$3" color="$colorPress" flex={1}>
-                    You can change your username above. Email and profile photo
-                    are managed through your Google account.
-                    {auth.config.discordClientId
-                      ? ' Link Discord in the Connected Accounts section below for an additional sign-in option.'
-                      : null}
-                  </Paragraph>
-                </InfoBanner>
-              </SectionBody>
-            </SectionCard>
-
-            {/* ── App Avatar ── */}
-            <SectionCard
-              style={{
-                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-              }}
-            >
-              <SectionHeader>
-                <SectionIconBox>
-                  <Paragraph fontSize={16} lineHeight={18}>
-                    <span role="img" aria-label="avatar">
-                      🏅
-                    </span>
-                  </Paragraph>
-                </SectionIconBox>
-                <YStack flex={1}>
-                  <Paragraph size="$4" color="$color" fontWeight="600">
-                    App Avatar
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    Choose a custom avatar displayed in chat and league views
-                  </Paragraph>
-                </YStack>
-              </SectionHeader>
-              <SectionBody>
-                <AvatarPicker
-                  variant="user"
-                  currentUrl={currentAvatarUrl}
-                  username={userName}
-                  onSelect={handleAvatarSelect}
-                  loading={avatarLoading}
-                />
-              </SectionBody>
-            </SectionCard>
-
-            {/* ── Appearance ── */}
-            <SectionCard
-              data-testid="profile-appearance-section"
-              style={{
-                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-              }}
-            >
-              <SectionHeader>
-                <SectionIconBox>
-                  <Paragraph fontSize={16} lineHeight={18}>
-                    <span role="img" aria-label="appearance">
-                      🎨
-                    </span>
-                  </Paragraph>
-                </SectionIconBox>
-                <YStack flex={1}>
-                  <Paragraph size="$4" color="$color" fontWeight="600">
-                    Appearance
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    Choose how Legacy Sports looks on this device
-                  </Paragraph>
-                </YStack>
-              </SectionHeader>
-
-              <SectionBody>
-                <YStack gap="$3" role="radiogroup" aria-label="Theme">
-                  <Paragraph size="$3" color="$colorPress" fontWeight="500">
-                    Theme
-                  </Paragraph>
-                  <XStack gap="$3" $sm={{ gap: '$2' }}>
-                    {THEME_OPTIONS.map(({ value, label, Icon }, index) => {
-                      const isActive = themePreference === value;
-                      // ARIA radiogroup roving tabindex: only the checked radio
-                      // is in the tab order; arrow keys move between options
-                      // and update selection. If no option is checked
-                      // (unlikely — theme always has a value), the first
-                      // option is the tab stop so the group is reachable.
-                      const activeIndex = THEME_OPTIONS.findIndex(
-                        (o) => o.value === themePreference,
-                      );
-                      const isTabStop =
-                        activeIndex === -1 ? index === 0 : isActive;
-                      return (
-                        <ThemeOptionButton
-                          key={value}
-                          ref={(el: HTMLDivElement | null) => {
-                            themeOptionRefs.current[index] = el;
-                          }}
-                          active={isActive}
-                          role="radio"
-                          tabIndex={isTabStop ? 0 : -1}
-                          aria-checked={isActive}
-                          aria-label={`${label} theme`}
-                          data-testid={`profile-theme-${value}`}
-                          onPress={() => setThemePreference(value)}
-                          onKeyDown={(
-                            e: React.KeyboardEvent<HTMLDivElement>,
-                          ) => {
-                            if (e.repeat) return;
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              setThemePreference(value);
-                              return;
-                            }
-                            let nextIndex: number | null = null;
-                            if (
-                              e.key === 'ArrowRight' ||
-                              e.key === 'ArrowDown'
-                            ) {
-                              nextIndex = (index + 1) % THEME_OPTIONS.length;
-                            } else if (
-                              e.key === 'ArrowLeft' ||
-                              e.key === 'ArrowUp'
-                            ) {
-                              nextIndex =
-                                (index - 1 + THEME_OPTIONS.length) %
-                                THEME_OPTIONS.length;
-                            } else if (e.key === 'Home') {
-                              nextIndex = 0;
-                            } else if (e.key === 'End') {
-                              nextIndex = THEME_OPTIONS.length - 1;
-                            }
-                            if (nextIndex !== null) {
-                              e.preventDefault();
-                              const nextOption = THEME_OPTIONS[nextIndex];
-                              setThemePreference(nextOption.value);
-                              themeOptionRefs.current[nextIndex]?.focus();
-                            }
-                          }}
+                      {usernameError && (
+                        <Paragraph
+                          size="$2"
+                          style={{ color: 'var(--brandSeamRed)' }}
                         >
-                          <Icon
-                            size={20}
-                            color={isActive ? '$brandNavy' : '$colorPress'}
-                          />
-                          <Paragraph
-                            size="$2"
-                            color={isActive ? '$brandNavy' : '$colorPress'}
-                            fontWeight={isActive ? '600' : '400'}
-                          >
-                            {label}
-                          </Paragraph>
-                        </ThemeOptionButton>
-                      );
-                    })}
-                  </XStack>
-                </YStack>
-              </SectionBody>
-            </SectionCard>
-
-            {/* ── Account Security ── */}
-            <SectionCard
-              style={{
-                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-              }}
-            >
-              <SectionHeader>
-                <SectionIconBox>
-                  <Paragraph fontSize={16} lineHeight={18}>
-                    <span role="img" aria-label="security">
-                      🔒
-                    </span>
-                  </Paragraph>
-                </SectionIconBox>
-                <YStack flex={1}>
-                  <Paragraph size="$4" color="$color" fontWeight="600">
-                    Account &amp; Security
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    Authentication method and session details
-                  </Paragraph>
-                </YStack>
-              </SectionHeader>
-
-              <SectionBody>
-                <YStack gap="$3">
-                  <FieldRow>
-                    <FieldLabel>Sign-in Method</FieldLabel>
-                    <XStack alignItems="center" gap="$2">
-                      <Paragraph fontSize={16} lineHeight={18}>
-                        <span role="img" aria-label="Google">
-                          🌐
-                        </span>
-                      </Paragraph>
-                      <FieldValue>Google OAuth</FieldValue>
+                          {usernameError}
+                        </Paragraph>
+                      )}
+                    </YStack>
+                  ) : (
+                    <XStack flex={1} alignItems="center" gap="$3">
+                      <FieldValue>{dbUsername}</FieldValue>
+                      <EditButton onPress={handleUsernameEdit}>
+                        <Paragraph size="$2" fontWeight="600" color="white">
+                          Edit
+                        </Paragraph>
+                      </EditButton>
                     </XStack>
-                  </FieldRow>
-                  <FieldRow>
-                    <FieldLabel>Session</FieldLabel>
-                    <XStack alignItems="center" gap="$2">
-                      <YStack
-                        width={8}
-                        height={8}
-                        borderRadius={4}
-                        style={{ backgroundColor: '#22c55e' }}
-                      />
-                      <FieldValue>Active</FieldValue>
-                    </XStack>
-                  </FieldRow>
-                </YStack>
-              </SectionBody>
-            </SectionCard>
+                  )}
+                </FieldRow>
+                <FieldRow>
+                  <FieldLabel>Email</FieldLabel>
+                  <FieldValue>{userEmail}</FieldValue>
+                </FieldRow>
+                <FieldRow>
+                  <FieldLabel>Access Level</FieldLabel>
+                  <FieldValue>{getAccessLevelLabel(accessLevel)}</FieldValue>
+                </FieldRow>
+                <FieldRow>
+                  <FieldLabel>User ID</FieldLabel>
+                  <FieldValue color="$colorPress">#{user.id}</FieldValue>
+                </FieldRow>
+              </YStack>
 
-            {/* ── Two-Factor Authentication ── */}
-            <SectionCard
-              data-testid="profile-2fa-section"
-              style={{
-                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-              }}
-            >
-              <SectionHeader>
-                <SectionIconBox>
-                  <Paragraph fontSize={16} lineHeight={18}>
-                    <span role="img" aria-label="two-factor authentication">
-                      🛡️
-                    </span>
-                  </Paragraph>
-                </SectionIconBox>
-                <YStack flex={1}>
-                  <Paragraph size="$4" color="$color" fontWeight="600">
-                    Two-Factor Authentication
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    Add an extra layer of security to your account
-                  </Paragraph>
-                </YStack>
-              </SectionHeader>
+              {/* Read-only notice */}
+              <InfoBanner>
+                <Paragraph
+                  fontSize={16}
+                  lineHeight={18}
+                  style={{ flexShrink: 0 }}
+                >
+                  <span role="img" aria-label="info">
+                    ℹ️
+                  </span>
+                </Paragraph>
+                <Paragraph size="$3" color="$colorPress" flex={1}>
+                  You can change your username above. Email and profile photo
+                  are managed through your Google account.
+                  {auth.config.discordClientId
+                    ? ' Link Discord in the Connected Accounts section below for an additional sign-in option.'
+                    : null}
+                </Paragraph>
+              </InfoBanner>
+            </SectionBody>
+          </SectionCard>
 
-              <SectionBody>
-                <TwoFactorSection mfa={mfa} />
-              </SectionBody>
-            </SectionCard>
+          {/* ── App Avatar ── */}
+          <SectionCard style={sectionCardGradientStyle}>
+            <SectionHeader>
+              <SectionIconBox>
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="avatar">
+                    🏅
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  App Avatar
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Choose a custom avatar displayed in chat and league views
+                </Paragraph>
+              </YStack>
+            </SectionHeader>
+            <SectionBody>
+              <AvatarPicker
+                variant="user"
+                currentUrl={currentAvatarUrl}
+                username={userName}
+                onSelect={handleAvatarSelect}
+                loading={avatarLoading}
+              />
+            </SectionBody>
+          </SectionCard>
 
-            {/* ── Linked Identities ── */}
-            <SectionCard
-              data-testid="profile-linked-identities-section"
-              style={{
-                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${BRAND_NAVY} 100%)`,
-              }}
-            >
-              <SectionHeader>
-                <SectionIconBox>
-                  <Paragraph fontSize={16} lineHeight={18}>
-                    <span role="img" aria-label="linked accounts">
-                      🔗
-                    </span>
-                  </Paragraph>
-                </SectionIconBox>
-                <YStack flex={1}>
-                  <Paragraph size="$4" color="$color" fontWeight="600">
-                    Linked Identities
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    Manage your connected sign-in providers and canonical email
-                  </Paragraph>
-                </YStack>
-              </SectionHeader>
+          {/* ── Appearance ── */}
+          <SectionCard
+            data-testid="profile-appearance-section"
+            style={sectionCardGradientStyle}
+          >
+            <SectionHeader>
+              <SectionIconBox>
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="appearance">
+                    🎨
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  Appearance
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Choose how Legacy Sports looks on this device
+                </Paragraph>
+              </YStack>
+            </SectionHeader>
 
-              <SectionBody>
-                {identitiesLoading ? (
-                  <XStack
-                    justifyContent="center"
-                    paddingVertical="$4"
-                    alignItems="center"
-                    gap="$2"
-                  >
-                    <Spinner size="small" color="$colorPress" />
-                    <Paragraph size="$3" color="$colorPress">
-                      Loading…
+            <SectionBody>
+              <YStack gap="$3" role="radiogroup" aria-label="Theme">
+                <Paragraph size="$3" color="$colorPress" fontWeight="500">
+                  Theme
+                </Paragraph>
+                <XStack gap="$3" $sm={{ gap: '$2' }}>
+                  {THEME_OPTIONS.map(({ value, label, Icon }, index) => {
+                    const isActive = themePreference === value;
+                    // ARIA radiogroup roving tabindex: only the checked radio
+                    // is in the tab order; arrow keys move between options
+                    // and update selection. If no option is checked
+                    // (unlikely — theme always has a value), the first
+                    // option is the tab stop so the group is reachable.
+                    const activeIndex = THEME_OPTIONS.findIndex(
+                      (o) => o.value === themePreference,
+                    );
+                    const isTabStop =
+                      activeIndex === -1 ? index === 0 : isActive;
+                    return (
+                      <ThemeOptionButton
+                        key={value}
+                        ref={(el: HTMLDivElement | null) => {
+                          themeOptionRefs.current[index] = el;
+                        }}
+                        active={isActive}
+                        role="radio"
+                        tabIndex={isTabStop ? 0 : -1}
+                        aria-checked={isActive}
+                        aria-label={`${label} theme`}
+                        data-testid={`profile-theme-${value}`}
+                        onPress={() => setThemePreference(value)}
+                        onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+                          if (e.repeat) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setThemePreference(value);
+                            return;
+                          }
+                          let nextIndex: number | null = null;
+                          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                            nextIndex = (index + 1) % THEME_OPTIONS.length;
+                          } else if (
+                            e.key === 'ArrowLeft' ||
+                            e.key === 'ArrowUp'
+                          ) {
+                            nextIndex =
+                              (index - 1 + THEME_OPTIONS.length) %
+                              THEME_OPTIONS.length;
+                          } else if (e.key === 'Home') {
+                            nextIndex = 0;
+                          } else if (e.key === 'End') {
+                            nextIndex = THEME_OPTIONS.length - 1;
+                          }
+                          if (nextIndex !== null) {
+                            e.preventDefault();
+                            const nextOption = THEME_OPTIONS[nextIndex];
+                            setThemePreference(nextOption.value);
+                            themeOptionRefs.current[nextIndex]?.focus();
+                          }
+                        }}
+                      >
+                        <Icon
+                          size={20}
+                          color={isActive ? '$brandNavy' : '$colorPress'}
+                        />
+                        <Paragraph
+                          size="$2"
+                          color={isActive ? '$brandNavy' : '$colorPress'}
+                          fontWeight={isActive ? '600' : '400'}
+                        >
+                          {label}
+                        </Paragraph>
+                      </ThemeOptionButton>
+                    );
+                  })}
+                </XStack>
+              </YStack>
+            </SectionBody>
+          </SectionCard>
+
+          {/* ── Account Security ── */}
+          <SectionCard style={sectionCardGradientStyle}>
+            <SectionHeader>
+              <SectionIconBox>
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="security">
+                    🔒
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  Account &amp; Security
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Authentication method and session details
+                </Paragraph>
+              </YStack>
+            </SectionHeader>
+
+            <SectionBody>
+              <YStack gap="$3">
+                <FieldRow>
+                  <FieldLabel>Sign-in Method</FieldLabel>
+                  <XStack alignItems="center" gap="$2">
+                    <Paragraph fontSize={16} lineHeight={18}>
+                      <span role="img" aria-label="Google">
+                        🌐
+                      </span>
                     </Paragraph>
+                    <FieldValue>Google OAuth</FieldValue>
                   </XStack>
-                ) : identities.length === 0 ? (
+                </FieldRow>
+                <FieldRow>
+                  <FieldLabel>Session</FieldLabel>
+                  <XStack alignItems="center" gap="$2">
+                    <YStack
+                      width={8}
+                      height={8}
+                      borderRadius={4}
+                      backgroundColor="$statusSuccessFg"
+                    />
+                    <FieldValue>Active</FieldValue>
+                  </XStack>
+                </FieldRow>
+              </YStack>
+            </SectionBody>
+          </SectionCard>
+
+          {/* ── Two-Factor Authentication ── */}
+          <SectionCard
+            data-testid="profile-2fa-section"
+            style={sectionCardGradientStyle}
+          >
+            <SectionHeader>
+              <SectionIconBox>
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="two-factor authentication">
+                    🛡️
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  Two-Factor Authentication
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Add an extra layer of security to your account
+                </Paragraph>
+              </YStack>
+            </SectionHeader>
+
+            <SectionBody>
+              <TwoFactorSection mfa={mfa} />
+            </SectionBody>
+          </SectionCard>
+
+          {/* ── Linked Identities ── */}
+          <SectionCard
+            data-testid="profile-linked-identities-section"
+            style={sectionCardGradientStyle}
+          >
+            <SectionHeader>
+              <SectionIconBox>
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="linked accounts">
+                    🔗
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph size="$4" color="$color" fontWeight="600">
+                  Linked Identities
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Manage your connected sign-in providers and canonical email
+                </Paragraph>
+              </YStack>
+            </SectionHeader>
+
+            <SectionBody>
+              {identitiesLoading ? (
+                <XStack
+                  justifyContent="center"
+                  paddingVertical="$4"
+                  alignItems="center"
+                  gap="$2"
+                >
+                  <Spinner size="small" color="$colorPress" />
                   <Paragraph size="$3" color="$colorPress">
-                    No linked providers found.
+                    Loading…
                   </Paragraph>
-                ) : (
-                  <YStack gap="$3">
-                    {identities.map((identity) => {
-                      const isCanonical =
-                        identity.providerEmail !== null &&
-                        identity.providerEmail === canonicalEmail;
-                      const canSetCanonical =
-                        identity.providerEmailVerified &&
-                        identity.providerEmail !== null &&
-                        !isCanonical;
-                      const providerLabel =
-                        identity.provider.charAt(0).toUpperCase() +
-                        identity.provider.slice(1);
-                      const isUnlinkLoading =
-                        unlinkLoadingProvider === identity.provider;
+                </XStack>
+              ) : identities.length === 0 ? (
+                <Paragraph size="$3" color="$colorPress">
+                  No linked providers found.
+                </Paragraph>
+              ) : (
+                <YStack gap="$3">
+                  {identities.map((identity) => {
+                    const isCanonical =
+                      identity.providerEmail !== null &&
+                      identity.providerEmail === canonicalEmail;
+                    const canSetCanonical =
+                      identity.providerEmailVerified &&
+                      identity.providerEmail !== null &&
+                      !isCanonical;
+                    const providerLabel =
+                      identity.provider.charAt(0).toUpperCase() +
+                      identity.provider.slice(1);
+                    const isUnlinkLoading =
+                      unlinkLoadingProvider === identity.provider;
 
-                      return (
-                        <XStack
-                          key={identity.id}
-                          alignItems="center"
-                          justifyContent="space-between"
-                          gap="$4"
-                          paddingVertical="$2"
-                          $sm={{
-                            flexDirection: 'column',
-                            alignItems: 'flex-start',
-                          }}
-                        >
-                          <XStack alignItems="center" gap="$3" flex={1}>
-                            {identity.provider === 'discord' ? (
-                              <BrandIcon name="discord" size={24} />
-                            ) : (
-                              <Paragraph fontSize={22} lineHeight={24}>
-                                {identity.provider === 'google'
-                                  ? '🌐'
-                                  : identity.provider === 'apple'
-                                    ? '🍎'
-                                    : '🔑'}
-                              </Paragraph>
-                            )}
-                            <YStack gap="$0.5">
-                              <XStack alignItems="center" gap="$2">
-                                <Paragraph
-                                  size="$4"
-                                  color="$color"
-                                  fontWeight="500"
-                                >
-                                  {providerLabel}
-                                </Paragraph>
-                                {isCanonical ? (
-                                  <XStack
-                                    paddingHorizontal="$2"
-                                    paddingVertical="$0.5"
-                                    borderRadius="$10"
-                                    style={{
-                                      backgroundColor: withAlpha(
-                                        BRAND_GOLD,
-                                        0.18,
-                                      ),
-                                      borderWidth: 1,
-                                      borderColor: withAlpha(BRAND_GOLD, 0.45),
-                                    }}
-                                  >
-                                    <Paragraph
-                                      size="$1"
-                                      fontWeight="600"
-                                      style={{ color: BRAND_GOLD_LIGHT }}
-                                    >
-                                      Primary email
-                                    </Paragraph>
-                                  </XStack>
-                                ) : null}
-                              </XStack>
-                              <Paragraph size="$3" color="$colorPress">
-                                {identity.providerEmail ?? 'No email'}
-                                {identity.providerEmail &&
-                                !identity.providerEmailVerified
-                                  ? ' (unverified)'
-                                  : null}
-                              </Paragraph>
-                            </YStack>
-                          </XStack>
-
-                          <XStack gap="$2" alignItems="center">
-                            {canSetCanonical ? (
-                              <EditButton
-                                onPress={() =>
-                                  void handleSetCanonicalEmail(identity.id)
-                                }
-                                disabled={canonicalEmailLoading}
-                                opacity={canonicalEmailLoading ? 0.6 : 1}
-                                data-testid={`set-canonical-email-${identity.id}`}
+                    return (
+                      <XStack
+                        key={identity.id}
+                        alignItems="center"
+                        justifyContent="space-between"
+                        gap="$4"
+                        paddingVertical="$2"
+                        $sm={{
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                        }}
+                      >
+                        <XStack alignItems="center" gap="$3" flex={1}>
+                          {identity.provider === 'discord' ? (
+                            <BrandIcon name="discord" size={24} />
+                          ) : (
+                            <Paragraph fontSize={22} lineHeight={24}>
+                              {identity.provider === 'google'
+                                ? '🌐'
+                                : identity.provider === 'apple'
+                                  ? '🍎'
+                                  : '🔑'}
+                            </Paragraph>
+                          )}
+                          <YStack gap="$0.5">
+                            <XStack alignItems="center" gap="$2">
+                              <Paragraph
+                                size="$4"
+                                color="$color"
+                                fontWeight="500"
                               >
+                                {providerLabel}
+                              </Paragraph>
+                              {isCanonical ? (
+                                <XStack
+                                  paddingHorizontal="$2"
+                                  paddingVertical="$0.5"
+                                  borderRadius="$10"
+                                  style={{
+                                    backgroundColor:
+                                      'color-mix(in srgb, var(--brandGold) 18%, transparent)',
+                                    borderWidth: 1,
+                                    borderColor:
+                                      'color-mix(in srgb, var(--brandGold) 45%, transparent)',
+                                  }}
+                                >
+                                  <Paragraph
+                                    size="$1"
+                                    fontWeight="600"
+                                    style={{ color: 'var(--brandGoldLight)' }}
+                                  >
+                                    Primary email
+                                  </Paragraph>
+                                </XStack>
+                              ) : null}
+                            </XStack>
+                            <Paragraph size="$3" color="$colorPress">
+                              {identity.providerEmail ?? 'No email'}
+                              {identity.providerEmail &&
+                              !identity.providerEmailVerified
+                                ? ' (unverified)'
+                                : null}
+                            </Paragraph>
+                          </YStack>
+                        </XStack>
+
+                        <XStack gap="$2" alignItems="center">
+                          {canSetCanonical ? (
+                            <EditButton
+                              onPress={() =>
+                                void handleSetCanonicalEmail(identity.id)
+                              }
+                              disabled={canonicalEmailLoading}
+                              opacity={canonicalEmailLoading ? 0.6 : 1}
+                              data-testid={`set-canonical-email-${identity.id}`}
+                            >
+                              <Paragraph
+                                size="$2"
+                                fontWeight="600"
+                                color="white"
+                              >
+                                {canonicalEmailLoading ? '…' : 'Set as primary'}
+                              </Paragraph>
+                            </EditButton>
+                          ) : null}
+                          {identity.provider !== 'local' ? (
+                            <EditButton
+                              onPress={() =>
+                                void handleUnlinkProvider(
+                                  identity.provider as
+                                    | 'discord'
+                                    | 'google'
+                                    | 'apple',
+                                )
+                              }
+                              disabled={isUnlinkLoading}
+                              opacity={isUnlinkLoading ? 0.6 : 1}
+                              backgroundColor="$brandSeamRed"
+                              data-testid={`unlink-provider-${identity.provider}`}
+                            >
+                              {isUnlinkLoading ? (
+                                <Spinner size="small" color="white" />
+                              ) : (
                                 <Paragraph
                                   size="$2"
                                   fontWeight="600"
                                   color="white"
                                 >
-                                  {canonicalEmailLoading
-                                    ? '…'
-                                    : 'Set as primary'}
+                                  Disconnect
                                 </Paragraph>
-                              </EditButton>
-                            ) : null}
-                            {identity.provider !== 'local' ? (
-                              <EditButton
-                                onPress={() =>
-                                  void handleUnlinkProvider(
-                                    identity.provider as
-                                      | 'discord'
-                                      | 'google'
-                                      | 'apple',
-                                  )
-                                }
-                                disabled={isUnlinkLoading}
-                                opacity={isUnlinkLoading ? 0.6 : 1}
-                                style={{
-                                  backgroundColor: withAlpha(
-                                    BRAND_SEAM_RED,
-                                    0.8,
-                                  ),
-                                }}
-                                data-testid={`unlink-provider-${identity.provider}`}
-                              >
-                                {isUnlinkLoading ? (
-                                  <Spinner size="small" color="white" />
-                                ) : (
-                                  <Paragraph
-                                    size="$2"
-                                    fontWeight="600"
-                                    color="white"
-                                  >
-                                    Disconnect
-                                  </Paragraph>
-                                )}
-                              </EditButton>
-                            ) : null}
-                          </XStack>
+                              )}
+                            </EditButton>
+                          ) : null}
                         </XStack>
-                      );
-                    })}
-                  </YStack>
-                )}
-
-                {canonicalEmailError ? (
-                  <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
-                    {canonicalEmailError}
-                  </Paragraph>
-                ) : null}
-                {unlinkError ? (
-                  <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
-                    {unlinkError}
-                  </Paragraph>
-                ) : null}
-
-                {/* Legacy Discord connect button when no identities loaded yet */}
-                {auth.config.discordClientId &&
-                !identities.some((i) => i.provider === 'discord') ? (
-                  <YStack
-                    gap="$3"
-                    paddingTop={identities.length > 0 ? '$3' : '$0'}
-                  >
-                    {identities.length > 0 ? <Separator /> : null}
-                    <XStack
-                      alignItems="center"
-                      justifyContent="space-between"
-                      gap="$4"
-                      $sm={{
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                      }}
-                    >
-                      <XStack alignItems="center" gap="$3" flex={1}>
-                        <BrandIcon name="discord" size={24} />
-                        <YStack gap="$0.5">
-                          <Paragraph size="$4" color="$color" fontWeight="500">
-                            Discord
-                          </Paragraph>
-                          <Paragraph size="$3" color="$colorPress">
-                            Not connected
-                          </Paragraph>
-                        </YStack>
                       </XStack>
-                      <EditButton
-                        onPress={handleConnectDiscord}
-                        style={{ backgroundColor: DISCORD_BLURPLE }}
-                      >
-                        <Paragraph size="$2" fontWeight="600" color="white">
-                          Connect Discord
-                        </Paragraph>
-                      </EditButton>
-                    </XStack>
-                    {discordError ? (
-                      <Paragraph size="$2" style={{ color: BRAND_SEAM_RED }}>
-                        {discordError}
-                      </Paragraph>
-                    ) : null}
-                  </YStack>
-                ) : null}
-              </SectionBody>
-            </SectionCard>
+                    );
+                  })}
+                </YStack>
+              )}
 
-            {/* ── Danger Zone ── */}
-            <SectionCard
+              {canonicalEmailError ? (
+                <Paragraph size="$2" style={{ color: 'var(--brandSeamRed)' }}>
+                  {canonicalEmailError}
+                </Paragraph>
+              ) : null}
+              {unlinkError ? (
+                <Paragraph size="$2" style={{ color: 'var(--brandSeamRed)' }}>
+                  {unlinkError}
+                </Paragraph>
+              ) : null}
+
+              {/* Legacy Discord connect button when no identities loaded yet */}
+              {auth.config.discordClientId &&
+              !identities.some((i) => i.provider === 'discord') ? (
+                <YStack
+                  gap="$3"
+                  paddingTop={identities.length > 0 ? '$3' : '$0'}
+                >
+                  {identities.length > 0 ? <Separator /> : null}
+                  <XStack
+                    alignItems="center"
+                    justifyContent="space-between"
+                    gap="$4"
+                    $sm={{
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <XStack alignItems="center" gap="$3" flex={1}>
+                      <BrandIcon name="discord" size={24} />
+                      <YStack gap="$0.5">
+                        <Paragraph size="$4" color="$color" fontWeight="500">
+                          Discord
+                        </Paragraph>
+                        <Paragraph size="$3" color="$colorPress">
+                          Not connected
+                        </Paragraph>
+                      </YStack>
+                    </XStack>
+                    <EditButton
+                      onPress={handleConnectDiscord}
+                      backgroundColor="$discordBlurple"
+                    >
+                      <Paragraph size="$2" fontWeight="600" color="white">
+                        Connect Discord
+                      </Paragraph>
+                    </EditButton>
+                  </XStack>
+                  {discordError ? (
+                    <Paragraph
+                      size="$2"
+                      style={{ color: 'var(--brandSeamRed)' }}
+                    >
+                      {discordError}
+                    </Paragraph>
+                  ) : null}
+                </YStack>
+              ) : null}
+            </SectionBody>
+          </SectionCard>
+
+          {/* ── Danger Zone ── */}
+          <SectionCard
+            style={{
+              background:
+                'linear-gradient(135deg, var(--surfaceCard) 0%, color-mix(in srgb, var(--brandSeamRed) 12%, transparent) 100%)',
+              borderColor:
+                'color-mix(in srgb, var(--brandSeamRed) 25%, transparent)',
+            }}
+          >
+            <SectionHeader
               style={{
-                background: `linear-gradient(135deg, ${BG_DARK} 0%, ${withAlpha(BRAND_SEAM_RED, 0.12)} 100%)`,
-                borderColor: withAlpha(BRAND_SEAM_RED, 0.25),
+                borderBottomColor:
+                  'color-mix(in srgb, var(--brandSeamRed) 20%, transparent)',
               }}
             >
-              <SectionHeader
-                style={{ borderBottomColor: withAlpha(BRAND_SEAM_RED, 0.2) }}
+              <SectionIconBox
+                style={{
+                  backgroundColor:
+                    'color-mix(in srgb, var(--brandSeamRed) 12%, transparent)',
+                }}
               >
-                <SectionIconBox
-                  style={{ backgroundColor: withAlpha(BRAND_SEAM_RED, 0.12) }}
+                <Paragraph fontSize={16} lineHeight={18}>
+                  <span role="img" aria-label="sign out">
+                    🚪
+                  </span>
+                </Paragraph>
+              </SectionIconBox>
+              <YStack flex={1}>
+                <Paragraph
+                  size="$4"
+                  fontWeight="600"
+                  style={{ color: 'var(--brandSeamRed)' }}
                 >
-                  <Paragraph fontSize={16} lineHeight={18}>
-                    <span role="img" aria-label="sign out">
-                      🚪
-                    </span>
+                  Session
+                </Paragraph>
+                <Paragraph size="$2" color="$colorPress">
+                  Sign out of your account
+                </Paragraph>
+              </YStack>
+            </SectionHeader>
+
+            <SectionBody>
+              <XStack
+                alignItems="center"
+                justifyContent="space-between"
+                gap="$4"
+                $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
+              >
+                <YStack gap="$1" flex={1}>
+                  <Paragraph size="$4" color="$color" fontWeight="500">
+                    Sign out
                   </Paragraph>
-                </SectionIconBox>
-                <YStack flex={1}>
-                  <Paragraph
-                    size="$4"
-                    fontWeight="600"
-                    style={{ color: BRAND_SEAM_RED }}
-                  >
-                    Session
-                  </Paragraph>
-                  <Paragraph size="$2" color="$colorPress">
-                    Sign out of your account
+                  <Paragraph size="$3" color="$colorPress">
+                    You will be signed out of your Legacy Sports account and
+                    redirected to the login page.
                   </Paragraph>
                 </YStack>
-              </SectionHeader>
-
-              <SectionBody>
-                <XStack
-                  alignItems="center"
-                  justifyContent="space-between"
-                  gap="$4"
-                  $sm={{ flexDirection: 'column', alignItems: 'flex-start' }}
-                >
-                  <YStack gap="$1" flex={1}>
-                    <Paragraph size="$4" color="$color" fontWeight="500">
-                      Sign out
-                    </Paragraph>
-                    <Paragraph size="$3" color="$colorPress">
-                      You will be signed out of your Legacy Sports account and
-                      redirected to the login page.
-                    </Paragraph>
-                  </YStack>
-                  <SignOutButton
-                    role="button"
-                    tabIndex={0}
-                    onPress={() => {
+                <SignOutButton
+                  role="button"
+                  tabIndex={0}
+                  onPress={() => {
+                    void auth.logout?.();
+                  }}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+                    if (e.repeat) {
+                      return;
+                    }
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.key === ' ') {
+                        e.preventDefault();
+                      }
                       void auth.logout?.();
-                    }}
-                    onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
-                      if (e.repeat) {
-                        return;
-                      }
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        if (e.key === ' ') {
-                          e.preventDefault();
-                        }
-                        void auth.logout?.();
-                      }
-                    }}
+                    }
+                  }}
+                >
+                  <Paragraph
+                    size="$3"
+                    fontWeight="600"
+                    style={{ color: 'white' }}
                   >
-                    <Paragraph
-                      size="$3"
-                      fontWeight="600"
-                      style={{ color: 'white' }}
-                    >
-                      Sign Out
-                    </Paragraph>
-                  </SignOutButton>
-                </XStack>
-              </SectionBody>
-            </SectionCard>
-          </ContentContainer>
-        </ScrollView>
-      </PageContainer>
-    </Theme>
+                    Sign Out
+                  </Paragraph>
+                </SignOutButton>
+              </XStack>
+            </SectionBody>
+          </SectionCard>
+        </ContentContainer>
+      </ScrollView>
+    </PageContainer>
   );
 };
 
@@ -1242,7 +1210,7 @@ const SignOutButton = styled(YStack, {
   cursor: 'pointer',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: BRAND_SEAM_RED,
+  backgroundColor: '$brandSeamRed',
   hoverStyle: {
     opacity: 0.85,
   },
@@ -1260,7 +1228,7 @@ const EditButtonBase = styled(YStack, {
   cursor: 'pointer',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: BRAND_NAVY_LIGHT,
+  backgroundColor: '$brandNavyLight',
   hoverStyle: {
     opacity: 0.85,
   },
