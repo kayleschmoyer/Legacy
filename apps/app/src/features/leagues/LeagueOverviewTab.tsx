@@ -1,11 +1,19 @@
 import React from 'react';
 import { Alert, ScrollView } from 'react-native';
-import { Button, Card, Text, XStack, YStack } from 'tamagui';
+import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   LeagueActivityFeed,
   LeagueScoringSummary,
   OnThisDayFeed,
+  PanelCard,
 } from '@legacy-sports/shared-components';
+import {
+  BRAND_GOLD,
+  BRAND_GOLD_LIGHT,
+  BRAND_SEAM_RED,
+  BRAND_SEAM_RED_LIGHT,
+  withAlpha,
+} from '@legacy-sports/shared-components/utils';
 import { Sport } from '@legacy-sports/graphql';
 import { LeagueDuesPaymentStatus } from '../commissioner/LeagueDuesPaymentStatus';
 import type { ScoringSettings } from '../../common/scoring';
@@ -51,6 +59,96 @@ interface LeagueOverviewTabProps {
   onPlayerPress: (playerId: number) => void;
 }
 
+// ─── Section — a single bordered "glass" surface with a title/sub header,
+// matching the panel language already established by LeagueDetailShell and
+// HomeScreen (PanelCard). Every overview block renders through this so the
+// tab reads as one coherent page instead of a stack of mismatched cards
+// (LS-8439). ─────────────────────────────────────────────────────────────
+function OverviewSection({
+  title,
+  sub,
+  right,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <PanelCard>
+      <YStack gap="$3">
+        <XStack justifyContent="space-between" alignItems="flex-start" gap="$3">
+          <YStack flex={1} gap="$1" minWidth={0}>
+            <Text
+              fontFamily="$heading"
+              fontWeight="800"
+              fontSize={17}
+              color="$color"
+            >
+              {title}
+            </Text>
+            {sub ? (
+              <Text fontFamily="$body" fontSize={13} color="$textMuted">
+                {sub}
+              </Text>
+            ) : null}
+          </YStack>
+          {right}
+        </XStack>
+        {children}
+      </YStack>
+    </PanelCard>
+  );
+}
+
+// ─── Banner — accent-colored strip for time-sensitive callouts (draft live,
+// commissioner announcements). Uses the brand seam-red / gold tokens instead
+// of generic Tamagui `$yellow*` scale so it reads as part of the same design
+// system as the rest of the shell, not a disconnected default-theme alert. ──
+function OverviewBanner({
+  kind,
+  title,
+  sub,
+  actions,
+}: {
+  kind: 'live' | 'gold';
+  title: string;
+  sub: string;
+  actions?: React.ReactNode;
+}): React.JSX.Element {
+  const accent = kind === 'live' ? BRAND_SEAM_RED : BRAND_GOLD;
+  const accentLight = kind === 'live' ? BRAND_SEAM_RED_LIGHT : BRAND_GOLD_LIGHT;
+  return (
+    <XStack
+      backgroundColor={withAlpha(accent, 0.1)}
+      borderWidth={1}
+      borderColor={withAlpha(accent, 0.4)}
+      borderRadius="$5"
+      padding="$3"
+      gap="$3"
+      alignItems="center"
+    >
+      <YStack flex={1} gap="$1" minWidth={0}>
+        <Text
+          fontFamily="$heading"
+          fontWeight="700"
+          fontSize={13}
+          letterSpacing={0.8}
+          textTransform="uppercase"
+          color={accentLight}
+        >
+          {title}
+        </Text>
+        <Text fontFamily="$body" fontSize={13} color="$textMuted">
+          {sub}
+        </Text>
+      </YStack>
+      {actions}
+    </XStack>
+  );
+}
+
 export function LeagueOverviewTab({
   league,
   leagueId,
@@ -90,162 +188,157 @@ export function LeagueOverviewTab({
 
   return (
     <ScrollView>
-      <YStack padding="$3" space="$3">
+      <YStack padding="$3" gap="$5">
         {/* Draft Live Banner */}
         {isDrafting ? (
-          <Card backgroundColor="$yellow2" borderColor="$yellow7" padding="$3">
-            <XStack space="$2" alignItems="center">
-              <YStack flex={1}>
-                <Text fontSize="$4" fontWeight="700" color="$yellow11">
-                  Draft Is Live
-                </Text>
-                <Text fontSize="$2" color="$yellow10">
-                  Join the draft room to make your picks.
-                </Text>
-              </YStack>
+          <OverviewBanner
+            kind="live"
+            title="Draft Is Live"
+            sub="Join the draft room to make your picks."
+            actions={
               <Button
                 size="$3"
-                backgroundColor="$yellow9"
+                backgroundColor={BRAND_SEAM_RED}
                 color="white"
                 onPress={onJoinDraft}
               >
                 Join Draft
               </Button>
-            </XStack>
-          </Card>
+            }
+          />
         ) : null}
 
         {/* Commissioner Announcement */}
         {league.lmNotes ? (
-          <Card backgroundColor="$yellow2" borderColor="$yellow6" padding="$3">
-            <YStack space="$1">
-              <Text
-                fontSize="$2"
-                fontWeight="700"
-                color="$yellow10"
-                textTransform="uppercase"
-                letterSpacing={1}
-              >
-                Commissioner Announcement
-              </Text>
-              <Text fontSize="$3" color="$yellow11">
-                {league.lmNotes}
-              </Text>
-            </YStack>
-          </Card>
+          <OverviewBanner
+            kind="gold"
+            title="Commissioner Announcement"
+            sub={league.lmNotes}
+          />
         ) : null}
 
-        {/* Snapshot Stats */}
-        <Card backgroundColor="$gray2" borderColor="$gray6" padding="$3">
+        {/* Snapshot Stats — one unified stat strip (hairline-divided columns)
+            instead of a standalone gray card, matching the web `ls-snapshot`
+            treatment. */}
+        <PanelCard padding="$0" overflow="hidden">
           <XStack flexWrap="wrap">
-            {stats.map((stat) => (
+            {stats.map((stat, idx) => (
               <YStack
                 key={stat.label}
                 width="33.33%"
-                paddingVertical="$2"
+                paddingVertical="$4"
+                paddingHorizontal="$2"
                 alignItems="center"
+                gap="$1"
+                borderRightWidth={
+                  idx % 3 === 2 || idx === stats.length - 1 ? 0 : 1
+                }
+                borderColor="$surfacePanelBorder"
               >
-                <Text fontSize="$5" fontWeight="800" color="$color">
+                <Text
+                  fontFamily="$heading"
+                  fontWeight="800"
+                  fontSize={22}
+                  color="$color"
+                  fontVariant={['tabular-nums']}
+                >
                   {stat.value}
                 </Text>
                 <Text
-                  fontSize="$1"
-                  color="$gray10"
+                  fontFamily="$heading"
+                  fontWeight="700"
+                  fontSize={10}
+                  letterSpacing={1.1}
                   textTransform="uppercase"
-                  letterSpacing={1}
+                  color="$textMuted"
+                  textAlign="center"
                 >
                   {stat.label}
                 </Text>
               </YStack>
             ))}
           </XStack>
-        </Card>
+        </PanelCard>
 
         {/* Quick Standings */}
         {rankedStandings.length > 0 ? (
-          <YStack space="$2">
-            <XStack justifyContent="space-between" alignItems="center">
-              <YStack>
-                <Text fontSize="$4" fontWeight="700">
-                  Standings
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  Top {Math.min(6, rankedStandings.length)}
-                  {league.currentWeekNumber
-                    ? ` · Week ${league.currentWeekNumber}`
-                    : ''}
-                </Text>
-              </YStack>
+          <OverviewSection
+            title="Standings"
+            sub={`Top ${Math.min(6, rankedStandings.length)}${
+              league.currentWeekNumber
+                ? ` · Week ${league.currentWeekNumber}`
+                : ''
+            }`}
+            right={
               <Button size="$2" chromeless onPress={onViewAllStandings}>
                 <Text fontSize="$2" color="$brandGoldLight">
                   View All →
                 </Text>
               </Button>
-            </XStack>
-            <Card backgroundColor="$gray2" borderColor="$gray6" padding="$2">
-              <YStack>
-                {rankedStandings.slice(0, 6).map((row) => (
-                  <XStack
-                    key={row.teamId ?? row.rank}
-                    paddingVertical="$2"
-                    paddingHorizontal="$2"
-                    alignItems="center"
-                    space="$2"
-                    backgroundColor={
-                      row.isMine ? '$surfaceInteractive' : 'transparent'
-                    }
-                    borderRadius="$2"
+            }
+          >
+            <YStack gap="$1">
+              {rankedStandings.slice(0, 6).map((row) => (
+                <XStack
+                  key={row.teamId ?? row.rank}
+                  paddingVertical="$2"
+                  paddingHorizontal="$2"
+                  alignItems="center"
+                  gap="$2"
+                  backgroundColor={
+                    row.isMine ? '$surfaceInteractive' : 'transparent'
+                  }
+                  borderRadius="$3"
+                >
+                  <Text
+                    fontSize="$2"
+                    fontWeight="700"
+                    color="$gray10"
+                    width={20}
+                    textAlign="center"
                   >
-                    <Text
-                      fontSize="$2"
-                      fontWeight="700"
-                      color="$gray10"
-                      width={20}
-                      textAlign="center"
-                    >
-                      {row.rank}
-                    </Text>
-                    <Text
-                      fontSize="$3"
-                      flex={1}
-                      fontWeight={row.isMine ? '700' : '400'}
-                      color="$color"
-                    >
-                      {row.name}
-                    </Text>
-                    <Text
-                      fontSize="$2"
-                      color="$gray11"
-                      fontVariant={['tabular-nums']}
-                    >
-                      {row.record}
-                    </Text>
-                  </XStack>
-                ))}
-              </YStack>
-            </Card>
+                    {row.rank}
+                  </Text>
+                  <Text
+                    fontSize="$3"
+                    flex={1}
+                    fontWeight={row.isMine ? '700' : '400'}
+                    color="$color"
+                  >
+                    {row.name}
+                  </Text>
+                  <Text
+                    fontSize="$2"
+                    color="$gray11"
+                    fontVariant={['tabular-nums']}
+                  >
+                    {row.record}
+                  </Text>
+                </XStack>
+              ))}
+            </YStack>
             {rankedStandings.length > 6 ? (
-              <Text fontSize="$2" color="$gray10" textAlign="center">
+              <Text fontSize="$2" color="$textMuted" textAlign="center">
                 + {rankedStandings.length - 6} more teams
               </Text>
             ) : null}
-          </YStack>
+          </OverviewSection>
         ) : null}
 
         {/* Scoring Summary — parity with web v2 Overview. Baseball only; the
             football screen omits the (baseball-specific) scoring props. */}
         {scoringSettings ? (
-          <YStack space="$2">
-            <Text fontSize="$5" fontWeight="600">
-              Scoring Rules
-            </Text>
+          <OverviewSection
+            title="Scoring Rules"
+            sub="How points are calculated"
+          >
             <LeagueScoringSummary
               loading={scoringLoading ?? false}
               error={scoringError ?? null}
               profileName={scoringProfileName ?? 'Default'}
               settings={scoringSettings}
             />
-          </YStack>
+          </OverviewSection>
         ) : null}
 
         {/* League Chat is intentionally retained as its own native full-screen
@@ -256,7 +349,8 @@ export function LeagueOverviewTab({
             keyboard handling. Web embeds chat because it has no separate tab;
             native already exposes Chat from the league tab bar. (LS-7812) */}
 
-        {/* League Dues Payment Status */}
+        {/* League Dues Payment Status — already renders its own bordered
+            surface, so it is not re-wrapped in an OverviewSection here. */}
         <LeagueDuesPaymentStatus
           leagueId={leagueId}
           isCommissioner={isCommissioner}
@@ -265,72 +359,66 @@ export function LeagueOverviewTab({
         />
 
         {/* Activity Feed */}
-        <YStack>
-          <Text fontSize="$5" fontWeight="600" marginBottom="$2">
-            Recent Activity
-          </Text>
+        <OverviewSection
+          title="Recent Activity"
+          sub="Trades, waivers, matchups, commissioner actions"
+        >
           <LeagueActivityFeed leagueId={leagueId} limit={15} />
-        </YStack>
+        </OverviewSection>
 
-        {/* On This Day */}
+        {/* On This Day — already renders its own bordered surface + header,
+            so it is not re-wrapped in an OverviewSection here. */}
         <OnThisDayFeed onPlayerPress={onPlayerPress} />
 
         {/* Invite (commissioner only) */}
         {isCommissioner ? (
-          <Card
-            backgroundColor="$surfaceSubtle"
-            borderColor="$outlineSubtle"
-            padding="$3"
+          <OverviewSection
+            title="Invite Friends"
+            sub="Share your league with new managers"
+            right={
+              <Button
+                size="$3"
+                backgroundColor="$brandNavyLight"
+                color="white"
+                onPress={onInviteShare}
+              >
+                Share
+              </Button>
+            }
           >
-            <YStack space="$3">
-              <XStack justifyContent="space-between" alignItems="center">
-                <YStack flex={1}>
-                  <Text fontSize="$4" fontWeight="600">
-                    Invite Friends
-                  </Text>
-                  <Text fontSize="$2" color="$gray11">
-                    Share your league with new managers
-                  </Text>
-                </YStack>
-                <Button
-                  size="$3"
-                  backgroundColor="$brandNavyLight"
-                  color="white"
-                  onPress={onInviteShare}
+            {inviteCode ? (
+              <YStack gap="$2">
+                <Text
+                  fontFamily="$heading"
+                  fontWeight="700"
+                  fontSize={10}
+                  textTransform="uppercase"
+                  letterSpacing={1.1}
+                  color="$textMuted"
                 >
-                  Share
-                </Button>
-              </XStack>
-              {inviteCode ? (
-                <YStack space="$2">
+                  Invite Code
+                </Text>
+                <YStack
+                  backgroundColor="$surfaceCard"
+                  borderWidth={1}
+                  borderColor="$glassBorder"
+                  borderRadius="$4"
+                  padding="$3"
+                  alignItems="center"
+                >
                   <Text
-                    fontSize="$2"
-                    color="$gray10"
-                    fontWeight="600"
-                    textTransform="uppercase"
-                    letterSpacing={1}
+                    fontSize="$6"
+                    fontWeight="800"
+                    letterSpacing={4}
+                    fontFamily="$mono"
+                    color="$color"
                   >
-                    Invite Code
+                    {inviteCode}
                   </Text>
-                  <Card
-                    backgroundColor="$gray2"
-                    padding="$3"
-                    bordered
-                    alignItems="center"
-                  >
-                    <Text
-                      fontSize="$6"
-                      fontWeight="800"
-                      letterSpacing={4}
-                      fontFamily="$mono"
-                    >
-                      {inviteCode}
-                    </Text>
-                  </Card>
                 </YStack>
-              ) : null}
-            </YStack>
-          </Card>
+              </YStack>
+            ) : null}
+          </OverviewSection>
         ) : null}
       </YStack>
     </ScrollView>
