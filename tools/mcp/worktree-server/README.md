@@ -26,6 +26,20 @@ Run a shell command in the active (or specified) worktree. Refuses to execute in
 | `worktree`      | string  | No       | Ticket key. Uses active worktree if omitted. |
 | `allowMainRepo` | boolean | No       | Override: allow running in the main repo.    |
 
+`worktree_run` enforces a fixed 120s process-level cap. For ad-hoc commands that legitimately run longer (e.g. an untargeted full-suite `jest` run with no dedicated nx target), use `worktree_run_long` instead.
+
+### `worktree_run_long`
+
+Like `worktree_run`, but with a caller-adjustable process-level timeout instead of the fixed 120s cap. Use for long (>120s) ad-hoc commands that have no dedicated nx target to run through `nx_run`'s job/wait support — especially when the command needs to run in a worktree other than the active one. Uses the same background job/poll pattern (`worktree_job_wait` / `worktree_job_status`) as `worktree_run`.
+
+| Parameter        | Type    | Required | Description                                               |
+| ---------------- | ------- | -------- | --------------------------------------------------------- |
+| `command`        | string  | Yes      | Shell command to execute                                  |
+| `worktree`       | string  | No       | Ticket key. Uses active worktree if omitted.              |
+| `allowMainRepo`  | boolean | No       | Override: allow running in the main repo.                 |
+| `tailLines`      | integer | No       | Cap output to the last N lines.                           |
+| `timeoutSeconds` | number  | No       | Process-level timeout in seconds (default 600, max 3600). |
+
 ### `worktree_guard`
 
 Check whether a path is inside the main repo and warn if worktrees are active.

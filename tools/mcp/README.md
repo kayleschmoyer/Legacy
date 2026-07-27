@@ -85,7 +85,8 @@ Git worktree management for parallel ticket work:
 
 - **worktree_list** — List active worktrees with symlink status and branch info
 - **worktree_set** — Set the active worktree for subsequent commands
-- **worktree_run** — Run a shell command in the active worktree
+- **worktree_run** — Run a shell command in the active worktree (120s process-level cap)
+- **worktree_run_long** — Run a long (>120s) ad-hoc command in a specific worktree, with a caller-adjustable timeout and the same job/poll pattern as `worktree_run`
 - **worktree_guard** — Check whether a path is inside the main repo (warns if worktrees are active)
 - **worktree_rebase** — Fetch origin and rebase the active worktree branch onto its parent (via `twig rebase`)
 - **worktree_stabilize** — Run post-rebase stabilization: `make install`, regenerate schema, and run codegen on affected projects

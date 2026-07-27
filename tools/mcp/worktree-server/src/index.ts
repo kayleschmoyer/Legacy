@@ -902,6 +902,16 @@ const JOB_SYNC_BUDGET_MS = 45_000;
 /** Process-level cap for worktree_run commands (pre-existing 120s ceiling). */
 const WORKTREE_RUN_TIMEOUT_MS = 120_000;
 
+/**
+ * Default / max process-level timeout for worktree_run_long (LS-8602). Unlike
+ * worktree_run's fixed 120s cap, this is caller-adjustable per call — needed
+ * for ad-hoc full-suite runs (e.g. untargeted `jest`) that legitimately run
+ * 2-10+ minutes and have no dedicated nx target to run them through nx_run's
+ * proper job/wait support.
+ */
+const WORKTREE_RUN_LONG_DEFAULT_TIMEOUT_MS = 600_000; // 10 min
+const WORKTREE_RUN_LONG_MAX_TIMEOUT_MS = 3_600_000; // 60 min
+
 type ToolResult = {
   content: Array<{ type: 'text'; text: string }>;
   isError?: boolean;
@@ -1013,7 +1023,8 @@ function formatWorktreeRunSnapshot(snapshot: JobSnapshot): ToolResult {
  */
 function formatJobSnapshotResult(snapshot: JobSnapshot): ToolResult {
   if (
-    snapshot.meta?.['kind'] === 'worktree_run' &&
+    (snapshot.meta?.['kind'] === 'worktree_run' ||
+      snapshot.meta?.['kind'] === 'worktree_run_long') &&
     (snapshot.status === 'done' || snapshot.status === 'failed')
   ) {
     return formatWorktreeRunSnapshot(snapshot);
@@ -1058,6 +1069,124 @@ function jobNotFound(jobId: string): ToolResult {
     ],
     isError: true,
   };
+}
+
+/**
+ * Resolve + validate the target directory for a worktree_run-style command:
+ * resolves the worktree (or falls back to the active worktree / main repo),
+ * refuses the main repo while worktrees exist unless overridden, and checks
+ * for a broken node_modules symlink. Shared by worktree_run and
+ * worktree_run_long (LS-8602) so the safety guards can't drift between them.
+ */
+function resolveWorktreeRunTarget(
+  worktree: string | undefined,
+  allowMainRepo: boolean | undefined,
+  command: string,
+): { targetDir: string } | { error: ToolResult } {
+  let targetDir: string;
+
+  if (worktree) {
+    const resolved = resolveWorktreePath(worktree);
+    if ('error' in resolved) {
+      return {
+        error: {
+          content: [{ type: 'text', text: resolved.error }],
+          isError: true,
+        },
+      };
+    }
+    targetDir = resolved.path;
+  } else if (activeWorktree) {
+    targetDir = activeWorktree;
+  } else {
+    const wts = getWorktrees();
+    if (wts.length > 0 && !allowMainRepo) {
+      return {
+        error: {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Refused: no active worktree set and ${wts.length} worktree(s) exist.\n` +
+                'Running commands in the main repo while worktrees are active is dangerous.\n' +
+                'Use worktree_set first, pass the worktree parameter, or set allowMainRepo=true.\n\n' +
+                `Available: ${wts.map((w) => w.key).join(', ')}`,
+            },
+          ],
+          isError: true,
+        },
+      };
+    }
+    targetDir = MAIN_REPO;
+  }
+
+  // Guard: refuse main-repo execution when worktrees exist
+  if (resolve(targetDir) === resolve(MAIN_REPO) && !allowMainRepo) {
+    const wts = getWorktrees();
+    if (wts.length > 0) {
+      return {
+        error: {
+          content: [
+            {
+              type: 'text',
+              text:
+                `Refused: cannot run in main repo (${MAIN_REPO}) while ` +
+                `${wts.length} worktree(s) are active. Set allowMainRepo=true to override.`,
+            },
+          ],
+          isError: true,
+        },
+      };
+    }
+  }
+
+  if (!existsSync(targetDir)) {
+    return {
+      error: {
+        content: [
+          { type: 'text', text: `Directory does not exist: ${targetDir}` },
+        ],
+        isError: true,
+      },
+    };
+  }
+
+  // Detect broken node_modules symlink before running — prevents confusing
+  // ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL / "Command not found" cascades.
+  // Exception: a repair invocation of link.mjs itself must be allowed through
+  // even with a broken symlink — otherwise this guard and the repair command
+  // deadlock each other (the guard refuses everything, including the one
+  // command that would fix what it's refusing over).
+  const isModulesPoolRepair = /scripts[/\\]modules-pool[/\\]link\.mjs/.test(
+    command,
+  );
+  const nmPath = join(targetDir, 'node_modules');
+  if (!isModulesPoolRepair) {
+    try {
+      lstatSync(nmPath); // throws if entry absent entirely
+      if (!existsSync(nmPath)) {
+        // lstat succeeded (entry exists) but existsSync returned false → broken symlink
+        return {
+          error: {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `node_modules symlink is broken in ${targetDir} — the symlink entry exists but its target is missing.\n` +
+                  'Run `node scripts/modules-pool/link.mjs` from the worktree root to repair it, then retry.',
+              },
+            ],
+            isError: true,
+          },
+        };
+      }
+    } catch {
+      // node_modules is simply absent (not a symlink at all); let the command
+      // run and fail naturally — absence may be intentional for non-Node dirs.
+    }
+  }
+
+  return { targetDir };
 }
 
 /** Read ~/.netrc (or ~/_netrc on Windows) and check for a machine entry. */
@@ -1539,6 +1668,48 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             minimum: 0,
             description:
               'Cap output to the last N lines. Use 0 for no truncation. A header showing the omitted line count is prepended.',
+          },
+        },
+        required: ['command'],
+      },
+    },
+    {
+      name: 'worktree_run_long',
+      description:
+        'Run an ad-hoc command in a specific worktree without the 120s process-level cap that ' +
+        'worktree_run enforces. Use this for long (>120s) untargeted commands that have no ' +
+        'dedicated nx target — e.g. a full, unfiltered `npx jest --no-coverage` run (not the ' +
+        "project's configured test target, which may filter to changed files only) — especially " +
+        "when the command needs to run in a worktree other than the caller's active one. Prefer " +
+        'worktree_run for short commands and nx_run_pc_chunk / make_run / nx_run for commands ' +
+        "that map to a project's configured target; reach for this tool only when neither fits. " +
+        'Same background job/poll pattern as worktree_run: a command finishing within ~45s ' +
+        'returns its output inline; a longer command returns { status: "running", jobId } to ' +
+        'poll via worktree_job_wait({ jobId }) / worktree_job_status — do NOT re-run the command ' +
+        'while a job is in progress (LS-8602).',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          command: { type: 'string', description: 'Shell command' },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+          allowMainRepo: { type: 'boolean', description: 'Allow main repo' },
+          tailLines: {
+            type: 'integer',
+            minimum: 0,
+            description:
+              'Cap output to the last N lines. Use 0 for no truncation. A header showing the omitted line count is prepended.',
+          },
+          timeoutSeconds: {
+            type: 'number',
+            exclusiveMinimum: 0,
+            maximum: WORKTREE_RUN_LONG_MAX_TIMEOUT_MS / 1000,
+            description:
+              `Process-level timeout in seconds (default ${WORKTREE_RUN_LONG_DEFAULT_TIMEOUT_MS / 1000}, ` +
+              `max ${WORKTREE_RUN_LONG_MAX_TIMEOUT_MS / 1000}).`,
           },
         },
         required: ['command'],
@@ -5820,110 +5991,27 @@ const handleCallTool = async (
         };
       }
 
-      let targetDir: string;
-
-      if (worktree) {
-        const resolved = resolveWorktreePath(worktree);
-        if ('error' in resolved) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: resolved.error,
-              },
-            ],
-            isError: true,
-          };
-        }
-        targetDir = resolved.path;
-      } else if (activeWorktree) {
-        targetDir = activeWorktree;
-      } else {
-        const wts = getWorktrees();
-        if (wts.length > 0 && !allowMainRepo) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text:
-                  `Refused: no active worktree set and ${wts.length} worktree(s) exist.\n` +
-                  'Running commands in the main repo while worktrees are active is dangerous.\n' +
-                  'Use worktree_set first, pass the worktree parameter, or set allowMainRepo=true.\n\n' +
-                  `Available: ${wts.map((w) => w.key).join(', ')}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-        targetDir = MAIN_REPO;
-      }
-
-      // Guard: refuse main-repo execution when worktrees exist
-      if (resolve(targetDir) === resolve(MAIN_REPO) && !allowMainRepo) {
-        const wts = getWorktrees();
-        if (wts.length > 0) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text:
-                  `Refused: cannot run in main repo (${MAIN_REPO}) while ` +
-                  `${wts.length} worktree(s) are active. Set allowMainRepo=true to override.`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      }
-
-      if (!existsSync(targetDir)) {
-        return {
-          content: [
-            { type: 'text', text: `Directory does not exist: ${targetDir}` },
-          ],
-          isError: true,
-        };
-      }
-
-      // Detect broken node_modules symlink before running — prevents confusing
-      // ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL / "Command not found" cascades.
-      // Exception: a repair invocation of link.mjs itself must be allowed through
-      // even with a broken symlink — otherwise this guard and the repair command
-      // deadlock each other (the guard refuses everything, including the one
-      // command that would fix what it's refusing over).
-      const isModulesPoolRepair = /scripts[/\\]modules-pool[/\\]link\.mjs/.test(
+      const resolvedTarget = resolveWorktreeRunTarget(
+        worktree,
+        allowMainRepo,
         command,
       );
-      const nmPath = join(targetDir, 'node_modules');
-      if (!isModulesPoolRepair) {
-        try {
-          lstatSync(nmPath); // throws if entry absent entirely
-          if (!existsSync(nmPath)) {
-            // lstat succeeded (entry exists) but existsSync returned false → broken symlink
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text:
-                    `node_modules symlink is broken in ${targetDir} — the symlink entry exists but its target is missing.\n` +
-                    'Run `node scripts/modules-pool/link.mjs` from the worktree root to repair it, then retry.',
-                },
-              ],
-              isError: true,
-            };
-          }
-        } catch {
-          // node_modules is simply absent (not a symlink at all); let the command
-          // run and fail naturally — absence may be intentional for non-Node dirs.
-        }
-      }
+      if ('error' in resolvedTarget) return resolvedTarget.error;
+      const targetDir = resolvedTarget.targetDir;
 
       // Run through the background-job registry with a bounded sync budget:
       // fast commands return their full result inline exactly as before; a
       // command still running after JOB_SYNC_BUDGET_MS returns
       // { status: "running", jobId } to poll via worktree_job_wait instead of
       // blocking into the ~60s cloud MCP transport timeout (LS-8559). The
-      // pre-existing 120s process-level cap still applies to the command.
+      // pre-existing 120s process-level cap still applies to the command —
+      // use worktree_run_long (LS-8602) for ad-hoc commands that legitimately
+      // run longer than that.
+      //
+      // Intentional shell execution, not an injection vector: this is an
+      // arbitrary-shell-command tool by design (same contract as the Bash
+      // tool) — the caller is the trusted agent session, not an untrusted
+      // network client.
       const shell =
         process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
       const isCmdShell =
@@ -5945,6 +6033,107 @@ const handleCallTool = async (
           timeoutMs: WORKTREE_RUN_TIMEOUT_MS,
           meta: {
             kind: 'worktree_run',
+            command,
+            ...(tailLines !== undefined ? { tailLines } : {}),
+          },
+        },
+        JOB_SYNC_BUDGET_MS,
+      );
+      return formatWorktreeRunSnapshot(snapshot);
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_run_long
+    // -----------------------------------------------------------------------
+    case 'worktree_run_long': {
+      const { command, worktree, allowMainRepo, tailLines, timeoutSeconds } =
+        args as {
+          command: string;
+          worktree?: string;
+          allowMainRepo?: boolean;
+          tailLines?: number;
+          timeoutSeconds?: number;
+        };
+
+      if (
+        tailLines !== undefined &&
+        (!Number.isInteger(tailLines) || tailLines < 0)
+      ) {
+        return {
+          content: [
+            { type: 'text', text: 'tailLines must be a non-negative integer' },
+          ],
+          isError: true,
+        };
+      }
+
+      let timeoutMs = WORKTREE_RUN_LONG_DEFAULT_TIMEOUT_MS;
+      if (timeoutSeconds !== undefined) {
+        if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'timeoutSeconds must be a positive number',
+              },
+            ],
+            isError: true,
+          };
+        }
+        if (timeoutSeconds * 1000 > WORKTREE_RUN_LONG_MAX_TIMEOUT_MS) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text:
+                  `timeoutSeconds must be at most ${WORKTREE_RUN_LONG_MAX_TIMEOUT_MS / 1000} ` +
+                  `(${WORKTREE_RUN_LONG_MAX_TIMEOUT_MS / 60_000} min).`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        timeoutMs = timeoutSeconds * 1000;
+      }
+
+      const resolvedTarget = resolveWorktreeRunTarget(
+        worktree,
+        allowMainRepo,
+        command,
+      );
+      if ('error' in resolvedTarget) return resolvedTarget.error;
+      const targetDir = resolvedTarget.targetDir;
+
+      // Same background-job / bounded-sync-budget pattern as worktree_run
+      // (LS-8559), but the process-level timeout is caller-adjustable instead
+      // of the fixed 120s cap — for ad-hoc commands with no dedicated nx
+      // target (e.g. an untargeted full-suite `jest` run) that legitimately
+      // run longer (LS-8602). Still job-backed, so polling via
+      // worktree_job_wait / worktree_job_status works exactly the same way.
+      //
+      // Intentional shell execution, not an injection vector: `command` is an
+      // arbitrary-shell-command tool by design (same contract as the
+      // pre-existing worktree_run above and the Bash tool itself) — the
+      // caller is the trusted agent session, not an untrusted network client,
+      // and shell features (pipes, &&, globbing) are the whole point. Argv
+      // splitting would break the feature, not add a security boundary.
+      const shell =
+        process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
+      const isCmdShell =
+        process.platform === 'win32' && shell.toLowerCase().endsWith('cmd.exe');
+      const shellArgs = isCmdShell
+        ? ['/d', '/s', '/c', command]
+        : ['-c', command];
+
+      const snapshot = await runJobWithBudget(
+        {
+          command: shell,
+          args: shellArgs,
+          cwd: targetDir,
+          label: command.length > 80 ? `${command.slice(0, 77)}...` : command,
+          timeoutMs,
+          meta: {
+            kind: 'worktree_run_long',
             command,
             ...(tailLines !== undefined ? { tailLines } : {}),
           },
