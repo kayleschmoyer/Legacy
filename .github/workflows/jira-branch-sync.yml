@@ -385,8 +385,14 @@ jobs:
               '.transitions[] | select(.name == $t or .to.name == $t) | .id' | head -1)
 
             if [[ -z "$TRANSITION_ID" ]]; then
+              # LS-8441: this used to `continue` without recording a failure,
+              # so the job reported success even though the ticket never
+              # moved — the exact "CI green, Jira unchanged" symptom that
+              # forced a manual jira_transition after merge. Treat a missing
+              # transition the same as any other failure to transition.
               echo "⚠️  Transition '$TARGET' is not available for $TICKET."
               echo "Available: $(echo "$RESPONSE" | jq -r '[.transitions[] | "\(.name)→\(.to.name)"] | join(", ")')"
+              FAILED_TICKETS="$FAILED_TICKETS $TICKET"
               continue
             fi
 
