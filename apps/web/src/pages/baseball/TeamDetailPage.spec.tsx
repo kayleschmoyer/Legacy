@@ -908,6 +908,12 @@ describe('TeamDetailPage – decoupled loading states (LS-6048)', () => {
 });
 
 // ── Analytics tracking (LS-7686 / LS-8581) ───────────────────────────────────
+//
+// trackTeamViewed is mocked below, so these tests cover TeamDetailPage's call
+// site only (args, timing, and the lack of a component-level dedupe ref). The
+// real sessionStorage-based dedupe inside trackTeamViewed itself (LS-6050,
+// `isTeamViewedDeduped`) is exercised unmocked in
+// apps/web/src/utils/analytics.spec.ts.
 
 describe('TeamDetailPage – analytics tracking (LS-7686)', () => {
   const graphql = jest.requireMock<{
@@ -964,7 +970,13 @@ describe('TeamDetailPage – analytics tracking (LS-7686)', () => {
     expect(mockTrackTeamViewed).not.toHaveBeenCalled();
   });
 
-  it('fires again when leagueId changes between renders for the same team — documents that no dedupe ref exists today (unlike MatchupDetailPage)', () => {
+  it('fires again when leagueId changes between renders for the same team — documents that no component-level dedupe ref exists today (unlike MatchupDetailPage)', () => {
+    // trackTeamViewed is mocked in this file (see the jest.mock above), so
+    // this only exercises TeamDetailPage's own call site — it says nothing
+    // about analytics.ts's real isTeamViewedDeduped sessionStorage guard
+    // (LS-6050), which is unit-tested separately in analytics.spec.ts and
+    // would not suppress this case anyway, since (1, 100) and (1, 200) are
+    // different dedupe keys.
     const { rerender } = render(<TeamDetailPage />);
     expect(mockTrackTeamViewed).toHaveBeenCalledTimes(1);
     expect(mockTrackTeamViewed).toHaveBeenLastCalledWith(1, 100);
