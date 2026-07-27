@@ -51,13 +51,21 @@ const firstLine = command.split('\n')[0];
 // Bypass: agent has confirmed inline execution is safe
 if (/(?:^|[\s])#\s*bg-ok/.test(firstLine)) process.exit(0);
 
+// Strip quoted string contents before matching, so a read-only command that merely
+// mentions a chunk name inside a string argument (e.g. `ps aux | grep 'make pc-format'`,
+// `grep -E 'prettier|make pc-format'`) doesn't look like an actual invocation. A quoted
+// pipe character would otherwise satisfy the nx anchor below too.
+const unquoted = firstLine
+  .replace(/"(?:[^"\\]|\\.)*"/g, '')
+  .replace(/'[^']*'/g, '');
+
 // Patterns known to run longer than the ~120s Bash tool timeout.
 // Only the batch operations (affected, run-many) are blocked, not quick nx queries
 // like `nx show project` or `nx list`.
 const LONG_RUNNING =
-  /pnpm\s+exec\s+nx\s+(affected|run-many|run-affected)\b|(?:^|[;&|\s])nx\s+(affected|run-many)\b|make\s+pc-\w+/;
+  /pnpm\s+exec\s+nx\s+(affected|run-many|run-affected)\b|(?:^|[;&|\s])nx\s+(affected|run-many)\b|(?:^|[;&|\s])make\s+pc-\w+/;
 
-if (!LONG_RUNNING.test(firstLine)) process.exit(0);
+if (!LONG_RUNNING.test(unquoted)) process.exit(0);
 
 const snippet = firstLine.trim().slice(0, 150);
 
