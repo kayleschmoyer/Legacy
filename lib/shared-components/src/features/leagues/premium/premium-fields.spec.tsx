@@ -2,6 +2,7 @@ import React from 'react';
 import { EraFilterGrid } from './EraFilterGrid';
 import { FaabBudgetField, WaiverSystemField } from './WaiverFields';
 import { SalaryCapField } from './SalaryCapField';
+import { RosterContinuityField } from './RosterContinuityField';
 import { CustomEraRange } from './CustomEraRange';
 import { FREE_ERA_IDS_BY_SPORT } from './constants';
 import { fireEvent, render } from '../../../test-utils';
@@ -441,6 +442,218 @@ describe('premium league-create fields (LS-5174)', () => {
           'Suggested: $30,000,000 based on your 30-man roster (10 teams)',
         ),
       ).toBeTruthy();
+    });
+  });
+
+  describe('RosterContinuityField (LS-8672)', () => {
+    const baseProps = {
+      rosterContinuity: 'redraft' as const,
+      onRosterContinuityChange: jest.fn(),
+      selectionMethod: 'standard' as const,
+      onKeeperCountChange: jest.fn(),
+      onCostModelChange: jest.fn(),
+      onMaxConsecutiveKeepsChange: jest.fn(),
+      rookieExempt: false,
+      onRookieExemptChange: jest.fn(),
+      onUpgrade: jest.fn(),
+    };
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('renders the Redraft/Keeper toggle', () => {
+      const { getByText } = render(
+        <RosterContinuityField {...baseProps} isPremium={false} />,
+      );
+      expect(getByText('Redraft')).toBeTruthy();
+      expect(getByText('Keeper')).toBeTruthy();
+    });
+
+    it('does not render keeper sub-fields when rosterContinuity is redraft', () => {
+      const { queryByPlaceholderText } = render(
+        <RosterContinuityField {...baseProps} isPremium />,
+      );
+      expect(queryByPlaceholderText('e.g. 3')).toBeNull();
+    });
+
+    it('enables Keeper mode for premium users', () => {
+      const onRosterContinuityChange = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          onRosterContinuityChange={onRosterContinuityChange}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Keeper'));
+      expect(onRosterContinuityChange).toHaveBeenCalledWith('keeper');
+    });
+
+    it('shows keeper sub-fields once rosterContinuity is keeper', () => {
+      const { getByPlaceholderText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          isPremium
+        />,
+      );
+      expect(getByPlaceholderText('e.g. 3')).toBeTruthy();
+      expect(getByPlaceholderText('Unlimited')).toBeTruthy();
+    });
+
+    // LS-6114-style hard disable: PremiumGate only blocks pointer events on
+    // the wrapper, so the toggle itself must also be disabled for free users
+    // — mirrors SalaryCapField's precedent (the same PillToggle + onUpgrade
+    // wiring); no activation path (click, keyboard, programmatic) can flip
+    // the toggle or invoke onUpgrade once it's hard-disabled.
+    it('disables the toggle for free users so no activation path reaches it', () => {
+      const onRosterContinuityChange = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          onRosterContinuityChange={onRosterContinuityChange}
+          onUpgrade={onUpgrade}
+          isPremium={false}
+        />,
+      );
+      fireEvent.click(getByText('Keeper'));
+      expect(onRosterContinuityChange).not.toHaveBeenCalled();
+      expect(onUpgrade).not.toHaveBeenCalled();
+    });
+
+    it('does not let a premium user enable Keeper mode when selectionMethod is random', () => {
+      const onRosterContinuityChange = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          onRosterContinuityChange={onRosterContinuityChange}
+          selectionMethod="random"
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Keeper'));
+      expect(onRosterContinuityChange).not.toHaveBeenCalled();
+    });
+
+    it('hides keeper sub-fields when a stale keeper league is stranded on selectionMethod random', () => {
+      const { queryByPlaceholderText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          selectionMethod="random"
+          isPremium
+        />,
+      );
+      expect(queryByPlaceholderText('e.g. 3')).toBeNull();
+    });
+
+    it('turns Keeper mode back off without routing through onUpgrade', () => {
+      const onRosterContinuityChange = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          onRosterContinuityChange={onRosterContinuityChange}
+          onUpgrade={onUpgrade}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Redraft'));
+      expect(onRosterContinuityChange).toHaveBeenCalledWith('redraft');
+      expect(onUpgrade).not.toHaveBeenCalled();
+    });
+
+    it('enters a keeper count', () => {
+      const onKeeperCountChange = jest.fn();
+      const { getByPlaceholderText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          onKeeperCountChange={onKeeperCountChange}
+          isPremium
+        />,
+      );
+      fireEvent.change(getByPlaceholderText('e.g. 3'), {
+        target: { value: '3' },
+      });
+      expect(onKeeperCountChange).toHaveBeenCalledWith(3);
+    });
+
+    it('surfaces a keeper count validation error', () => {
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          isPremium
+          keeperCountError="Keeper count must be between 1 and 10."
+        />,
+      );
+      expect(getByText('Keeper count must be between 1 and 10.')).toBeTruthy();
+    });
+
+    it('only offers the cost model matching the selected selectionMethod (standard)', () => {
+      const onCostModelChange = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          selectionMethod="standard"
+          onCostModelChange={onCostModelChange}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Round Penalty'));
+      expect(onCostModelChange).toHaveBeenCalledWith('round-penalty');
+      fireEvent.click(getByText('Auction Budget'));
+      expect(onCostModelChange).not.toHaveBeenCalledWith('auction-budget');
+    });
+
+    it('only offers the cost model matching the selected selectionMethod (auction)', () => {
+      const onCostModelChange = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          selectionMethod="auction"
+          onCostModelChange={onCostModelChange}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Auction Budget'));
+      expect(onCostModelChange).toHaveBeenCalledWith('auction-budget');
+      fireEvent.click(getByText('Round Penalty'));
+      expect(onCostModelChange).not.toHaveBeenCalledWith('round-penalty');
+    });
+
+    it('enters max consecutive keeps', () => {
+      const onMaxConsecutiveKeepsChange = jest.fn();
+      const { getByPlaceholderText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          onMaxConsecutiveKeepsChange={onMaxConsecutiveKeepsChange}
+          isPremium
+        />,
+      );
+      fireEvent.change(getByPlaceholderText('Unlimited'), {
+        target: { value: '2' },
+      });
+      expect(onMaxConsecutiveKeepsChange).toHaveBeenCalledWith(2);
+    });
+
+    it('toggles rookie exempt', () => {
+      const onRookieExemptChange = jest.fn();
+      const { getByText } = render(
+        <RosterContinuityField
+          {...baseProps}
+          rosterContinuity="keeper"
+          onRookieExemptChange={onRookieExemptChange}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Yes'));
+      expect(onRookieExemptChange).toHaveBeenCalledWith(true);
     });
   });
 

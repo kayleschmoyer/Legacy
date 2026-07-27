@@ -148,6 +148,16 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('create-league-faab-budget-custom-input');
   }
 
+  /** The keeper-count input (Draft Settings, visible once Keeper mode is on). */
+  get keeperCountInput(): UIElement {
+    return this.driver.byTestId('create-league-keeper-count-input');
+  }
+
+  /** The max-consecutive-keeps input (Draft Settings, visible once Keeper mode is on). */
+  get keeperMaxConsecutiveInput(): UIElement {
+    return this.driver.byTestId('create-league-keeper-max-consecutive-input');
+  }
+
   /**
    * The "Number of Teams" field (Basic Settings). Scopes team-count option
    * buttons so their labels don't collide with the Number of Divisions
@@ -416,6 +426,11 @@ export class LeaguePage extends BaseScreen {
   /** Type an amount into the FAAB custom-budget input (only visible in Custom mode). */
   async fillFaabBudgetAmount(amount: number): Promise<void> {
     await this.faabBudgetCustomInput.fill(String(amount));
+  }
+
+  /** Type a count into the keeper-count input (only visible once Keeper mode is on). */
+  async fillKeeperCount(count: number): Promise<void> {
+    await this.keeperCountInput.fill(String(count));
   }
 
   /** Click the {@link premiumGate}'s "Upgrade to Premium" CTA. */

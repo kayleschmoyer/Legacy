@@ -1687,6 +1687,9 @@ describe('VALIDATION_ERROR_SECTION coverage (LS-6090)', () => {
     minSalary: 0,
     salaryEscalationPct: 150,
     salaryDecayPct: 150,
+    rosterContinuity: 'keeper',
+    keeperCount: undefined,
+    maxConsecutiveKeeps: 0,
   };
 
   it('produces at least one error for every key VALIDATION_ERROR_SECTION maps', () => {

@@ -46,6 +46,10 @@ import {
   FAAB_BUDGET_MIN,
   FaabBudgetField,
   FREE_ERA_IDS_BY_SPORT,
+  KEEPER_COUNT_MAX,
+  KEEPER_COUNT_MIN,
+  type KeeperCostModel,
+  RosterContinuityField,
   SalaryCapField,
   WaiverSystemField,
 } from '@legacy-sports/shared-components/leagues';
@@ -53,6 +57,7 @@ import {
   GetUserLeagues,
   GetUserLeaguesQuery,
   DefensiveFormat as GqlDefensiveFormat,
+  RosterContinuity as GqlRosterContinuity,
   Sport,
   useCreateLeagueAndTeamsMutation,
   useGetUserLeaguesQuery,
@@ -230,6 +235,13 @@ export interface CreateLeagueFormData {
   auctionBudget: number;
   auctionMinBid: number;
   pickTimeLimitSeconds: number;
+  // Keeper draft mode (LS-8672). rosterContinuity gates the fields below —
+  // only meaningful (and sent to the server) when 'keeper'.
+  rosterContinuity: 'redraft' | 'keeper';
+  keeperCount?: number;
+  keeperCostModel?: KeeperCostModel;
+  maxConsecutiveKeeps?: number;
+  rookieExempt: boolean;
   // Football-only (LS-4158)
   scoringFormat: ScoringFormat;
   defensiveFormat: DefensiveFormat;
@@ -445,6 +457,11 @@ const LEAGUE_FORM_MESSAGES = {
   minSalaryTooLow: 'Minimum salary must be at least 1.',
   salaryEscalationPctOutOfRange: 'Salary escalation % must be 0–100.',
   salaryDecayPctOutOfRange: 'Salary decay % must be 0–100.',
+  keeperCountRequired: 'Keeper count is required.',
+  keeperCountOutOfRange: (min: number, max: number) =>
+    `Keeper count must be between ${min} and ${max}.`,
+  maxConsecutiveKeepsTooLow:
+    'Max consecutive keeps must be at least 1 when set (leave blank for unlimited).',
   submitFallback:
     'Unable to save league. Your settings are still filled in — try again or come back later.',
 } as const;
@@ -584,6 +601,20 @@ export function validateFormFull(
       f.faabBudgetDefault > FAAB_BUDGET_MAX)
   )
     errs.faabBudget = `FAAB budget must be ${FAAB_BUDGET_MIN}–${FAAB_BUDGET_MAX}.`;
+  if (f.rosterContinuity === 'keeper') {
+    if (f.keeperCount === undefined)
+      errs.keeperCount = LEAGUE_FORM_MESSAGES.keeperCountRequired;
+    else if (
+      f.keeperCount < KEEPER_COUNT_MIN ||
+      f.keeperCount > KEEPER_COUNT_MAX
+    )
+      errs.keeperCount = LEAGUE_FORM_MESSAGES.keeperCountOutOfRange(
+        KEEPER_COUNT_MIN,
+        KEEPER_COUNT_MAX,
+      );
+    if (f.maxConsecutiveKeeps !== undefined && f.maxConsecutiveKeeps < 1)
+      errs.maxConsecutiveKeeps = LEAGUE_FORM_MESSAGES.maxConsecutiveKeepsTooLow;
+  }
   return errs;
 }
 
@@ -601,6 +632,8 @@ export const VALIDATION_ERROR_SECTION: Record<string, string> = {
   draftDate: 'draft',
   auctionBudget: 'draft',
   auctionMinBid: 'draft',
+  keeperCount: 'draft',
+  maxConsecutiveKeeps: 'draft',
   faabBudget: 'waiver-budget',
   salaryCap: 'waiver-budget',
   salaryFloor: 'waiver-budget',
@@ -1247,6 +1280,13 @@ function SummarySidePanel({
           {f.salaryCapEnabled && (
             <SummaryRow label="Cap" value={`$${f.salaryCap ?? 0}M`} gold />
           )}
+          {f.rosterContinuity === 'keeper' && (
+            <SummaryRow
+              label="Keeper"
+              value={`${f.keeperCount ?? '?'} players`}
+              gold
+            />
+          )}
         </YStack>
       </Card>
 
@@ -1321,6 +1361,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
   const [showHofUpgradeModal, setShowHofUpgradeModal] = useState(false);
   const [showAuctionUpgradeModal, setShowAuctionUpgradeModal] = useState(false);
+  const [showKeeperUpgradeModal, setShowKeeperUpgradeModal] = useState(false);
   const [showLeagueLimitModal, setShowLeagueLimitModal] = useState(false);
   const [createdLeague, setCreatedLeague] = useState<{
     id: number;
@@ -1431,6 +1472,11 @@ export function LeagueCreatePage(): React.JSX.Element {
       auctionBudget: 200,
       auctionMinBid: 1,
       pickTimeLimitSeconds: 120,
+      rosterContinuity: 'redraft',
+      keeperCount: undefined,
+      keeperCostModel: undefined,
+      maxConsecutiveKeeps: undefined,
+      rookieExempt: false,
       scoringFormat: initialScoringFormat,
       defensiveFormat: 'dst',
     };
@@ -1654,6 +1700,44 @@ export function LeagueCreatePage(): React.JSX.Element {
       ) {
         next.schedulingStrategy = 'round-robin';
       }
+      // ── Keeper / roster-continuity consistency (LS-8672) ─────────────────
+      // Keeper mode is only valid with selectionMethod 'standard' or
+      // 'auction' (mirrors validateKeeperConfig in mutations.ts). If a
+      // selection-method change — direct, or forced by switching to
+      // automated draft mode above — leaves an already-configured keeper
+      // league stranded on 'random', reset it to Redraft instead of
+      // submitting an invalid combination.
+      if (
+        next.selectionMethod === 'random' &&
+        next.rosterContinuity === 'keeper'
+      ) {
+        next.rosterContinuity = 'redraft';
+        next.keeperCount = undefined;
+        next.keeperCostModel = undefined;
+        next.maxConsecutiveKeeps = undefined;
+        next.rookieExempt = false;
+        setKeeperResetNotice(
+          'Keeper mode requires Standard or Auction selection method — reset to Redraft.',
+        );
+      } else if (
+        field === 'rosterContinuity' &&
+        next.rosterContinuity === 'redraft'
+      ) {
+        next.keeperCount = undefined;
+        next.keeperCostModel = undefined;
+        next.maxConsecutiveKeeps = undefined;
+        next.rookieExempt = false;
+        setKeeperResetNotice(null);
+      } else if (next.rosterContinuity === 'keeper') {
+        const requiredCostModel: KeeperCostModel =
+          next.selectionMethod === 'auction'
+            ? 'auction-budget'
+            : 'round-penalty';
+        if (next.keeperCostModel !== requiredCostModel) {
+          next.keeperCostModel = requiredCostModel;
+        }
+        setKeeperResetNotice(null);
+      }
       return next;
     });
   };
@@ -1688,6 +1772,9 @@ export function LeagueCreatePage(): React.JSX.Element {
     string | null
   >(null);
   const [divisionResetNotice, setDivisionResetNotice] = useState<string | null>(
+    null,
+  );
+  const [keeperResetNotice, setKeeperResetNotice] = useState<string | null>(
     null,
   );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1924,6 +2011,21 @@ export function LeagueCreatePage(): React.JSX.Element {
             pickTimeLimitSeconds:
               formData.draftMode === 'live'
                 ? formData.pickTimeLimitSeconds
+                : undefined,
+            rosterContinuity:
+              formData.rosterContinuity === 'keeper'
+                ? GqlRosterContinuity.Keeper
+                : undefined,
+            keeperSettings:
+              formData.rosterContinuity === 'keeper' &&
+              formData.keeperCount !== undefined &&
+              formData.keeperCostModel !== undefined
+                ? {
+                    keeperCount: formData.keeperCount,
+                    costModel: formData.keeperCostModel,
+                    maxConsecutiveKeeps: formData.maxConsecutiveKeeps,
+                    rookieExempt: formData.rookieExempt,
+                  }
                 : undefined,
             gamesPerMatchup: formData.gamesPerMatchup,
             // Idempotency key (LS-6063) — lets the server recognize a
@@ -2903,6 +3005,9 @@ export function LeagueCreatePage(): React.JSX.Element {
                         );
                         return opt ? ` · ${opt.label}/pick` : '';
                       })()}
+                    {formData.rosterContinuity === 'keeper'
+                      ? ` · Keeper (${formData.keeperCount ?? '?'})`
+                      : ''}
                   </span>
                 }
                 open={openSections.has('draft')}
@@ -3005,6 +3110,41 @@ export function LeagueCreatePage(): React.JSX.Element {
                           size="$2"
                           variant="outlined"
                           onPress={() => setSelectionResetNotice(null)}
+                        >
+                          Dismiss
+                        </Button>
+                      </XStack>
+                    </div>
+                  )}
+
+                  {/* Keeper mode reset notice (LS-8672) */}
+                  {keeperResetNotice && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <XStack
+                        role="status"
+                        aria-live="polite"
+                        gap="$3"
+                        alignItems="center"
+                        backgroundColor={withAlpha(AMBER, 0.1)}
+                        borderWidth={1}
+                        borderColor={withAlpha(AMBER, 0.4)}
+                        borderRadius="$4"
+                        padding="$3"
+                        data-testid="keeper-reset-notice"
+                      >
+                        <AlertCircle size={16} color={AMBER} flexShrink={0} />
+                        <Text
+                          fontFamily="$body"
+                          fontSize={13}
+                          color="$color11"
+                          flex={1}
+                        >
+                          {keeperResetNotice}
+                        </Text>
+                        <Button
+                          size="$2"
+                          variant="outlined"
+                          onPress={() => setKeeperResetNotice(null)}
                         >
                           Dismiss
                         </Button>
@@ -3178,6 +3318,49 @@ export function LeagueCreatePage(): React.JSX.Element {
                         </FieldRow>
                       </>
                     )}
+
+                  {/* Roster Continuity / Keeper mode — full width (LS-8672) */}
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <PremiumGate
+                      isPremium={isPremium}
+                      featureName="Roster Continuity"
+                      featureDescription="Run a keeper league — commissioners choose how many players each team retains season-over-season, and how kept players are costed."
+                    >
+                      <RosterContinuityField
+                        rosterContinuity={formData.rosterContinuity}
+                        onRosterContinuityChange={(v) =>
+                          handleInputChange('rosterContinuity', v)
+                        }
+                        selectionMethod={formData.selectionMethod}
+                        keeperCount={formData.keeperCount}
+                        onKeeperCountChange={(v) =>
+                          handleInputChange('keeperCount', v)
+                        }
+                        keeperCountError={validationErrors.keeperCount}
+                        costModel={formData.keeperCostModel}
+                        onCostModelChange={(v) =>
+                          handleInputChange('keeperCostModel', v)
+                        }
+                        maxConsecutiveKeeps={formData.maxConsecutiveKeeps}
+                        onMaxConsecutiveKeepsChange={(v) =>
+                          handleInputChange('maxConsecutiveKeeps', v)
+                        }
+                        maxConsecutiveKeepsError={
+                          validationErrors.maxConsecutiveKeeps
+                        }
+                        rookieExempt={formData.rookieExempt}
+                        onRookieExemptChange={(v) =>
+                          handleInputChange('rookieExempt', v)
+                        }
+                        isPremium={!!isPremium && !premiumLoading}
+                        disabled={isFormDisabled}
+                        onUpgrade={() => {
+                          trackPremiumFeatureClick('Roster Continuity');
+                          setShowKeeperUpgradeModal(true);
+                        }}
+                      />
+                    </PremiumGate>
+                  </div>
                 </div>
               </CollapsibleSection>
 
@@ -3663,6 +3846,12 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowAuctionUpgradeModal}
         featureName="Auction Draft"
         featureDescription="Run a live auction where managers bid on players from a shared budget — the most competitive draft format for serious leagues."
+      />
+      <UpgradeModal
+        open={showKeeperUpgradeModal}
+        onOpenChange={setShowKeeperUpgradeModal}
+        featureName="Roster Continuity"
+        featureDescription="Run a keeper league — commissioners choose how many players each team retains season-over-season, and how kept players are costed."
       />
       <UpgradeModal
         open={showLeagueLimitModal}

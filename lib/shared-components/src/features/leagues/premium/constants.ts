@@ -119,3 +119,32 @@ export const WAIVER_TYPE_OPTIONS: ReadonlyArray<{
   { label: 'Standard', value: 'standard' },
   { label: 'FAAB  ·  Premium', value: 'faab' },
 ];
+
+// Keeper cost model + roster-continuity constants (LS-8672). Kept in sync
+// with KEEPER_COUNT_MIN / KEEPER_COUNT_MAX / VALID_KEEPER_COST_MODELS in
+// lambdas/db/src/schema/leagues/mutations.ts (LS-8671).
+
+/** Cost model applied to kept players. Hyphenated values match the server's
+ *  validated-string convention (not a GraphQL enum — see mutations.ts). */
+export type KeeperCostModel = 'round-penalty' | 'auction-budget';
+
+export const KEEPER_COUNT_MIN = 1;
+export const KEEPER_COUNT_MAX = 10;
+
+/** Keeper cost model options, each paired with the selectionMethod it requires. */
+export const KEEPER_COST_MODEL_OPTIONS: ReadonlyArray<{
+  label: string;
+  value: KeeperCostModel;
+  requiresSelectionMethod: 'standard' | 'auction';
+}> = [
+  {
+    label: 'Round Penalty',
+    value: 'round-penalty',
+    requiresSelectionMethod: 'standard',
+  },
+  {
+    label: 'Auction Budget',
+    value: 'auction-budget',
+    requiresSelectionMethod: 'auction',
+  },
+];
