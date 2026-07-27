@@ -469,7 +469,7 @@ For searching arbitrary log groups (including `/aws/apigateway/...` access logs)
 
 ## Browser Operations
 
-Use `browser_dev_start` to start a dev server, `browser_navigate` + `browser_screenshot` to capture UI state, and `browser_screenshot_upload` to get GitHub-hosted image URLs for PR bodies. `browser_dev_start` waits at most 45s for readiness and never blocks into the ~60s MCP transport limit (LS-8561): on a slow startup it returns `ready: false` with the pid/port — poll `browser_dev_status` until the port shows `listening: true` before navigating. Always call `browser_cleanup` before ending a workflow. See `.agents/skills/pr-lifecycle/references/agent-screenshots.md` for the full workflow.
+Use `browser_dev_start` to start a dev server, `browser_navigate` + `browser_screenshot` to capture UI state, and `browser_screenshot_upload` to get GitHub-hosted image URLs for PR bodies. `browser_dev_start` waits at most 45s for readiness and never blocks into the ~60s MCP transport limit (LS-8561): on a slow startup it returns `ready: false` with the pid/port — poll `browser_dev_status` until the port shows `listening: true` before navigating. It defaults to `nx serve web` but accepts a `target` param (nx `"project:target"`, e.g. `"shared-components:storybook"`) to start any other nx dev server instead (LS-8665) — never fall back to a manual `Bash`+`curl`+sleep-poll loop for this. Always call `browser_cleanup` before ending a workflow. See `.agents/skills/pr-lifecycle/references/agent-screenshots.md` for the full workflow.
 
 ## Related Skills
 

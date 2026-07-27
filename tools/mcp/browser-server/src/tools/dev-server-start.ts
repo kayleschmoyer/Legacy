@@ -27,10 +27,42 @@ export function clampReadinessWait(timeoutMs?: number): number {
   return Math.min(timeoutMs ?? READINESS_WAIT_MAX_MS, READINESS_WAIT_MAX_MS);
 }
 
+/** Default nx project:target — preserves the original `nx serve web` behavior. */
+export const DEFAULT_TARGET = 'web:serve';
+
+/** `project:target`, each segment alphanumeric/dash/underscore — matches nx project and target naming rules. */
+const TARGET_PATTERN = /^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$/;
+
+/** Reject anything that isn't a bare `project:target` token before it reaches a shell:true spawn. */
+export function isValidTarget(target: string): boolean {
+  return TARGET_PATTERN.test(target);
+}
+
+/**
+ * Build the nx CLI args for a given target. The default target keeps the
+ * exact historical invocation (`nx serve web --port=N`); any other target
+ * runs via the generic `nx run <target> --port=N` form (LS-8665) so callers
+ * can start non-web dev servers (e.g. `shared-components:storybook`).
+ */
+export function buildNxArgs(target: string, port: number): string[] {
+  if (target === DEFAULT_TARGET) {
+    return ['serve', 'web', `--port=${port}`];
+  }
+  return ['run', target, `--port=${port}`];
+}
+
 export interface DevServerStartParams {
   worktreePath: string;
   port?: number;
   timeoutMs?: number;
+  /**
+   * nx `project:target` to run instead of the default `'web:serve'`, e.g.
+   * `'shared-components:storybook'`. The target's executor must accept a
+   * `--port` flag; readiness is still probed via TCP connect on `port`
+   * (LS-8665), so any target that binds to `port` works without further
+   * configuration.
+   */
+  target?: string;
 }
 
 /**
@@ -166,6 +198,17 @@ export async function devServerStart(
 ): Promise<ToolResult> {
   const { worktreePath } = params;
   const readinessWaitMs = clampReadinessWait(params.timeoutMs);
+  const target = params.target ?? DEFAULT_TARGET;
+
+  if (!isValidTarget(target)) {
+    return jsonResult(
+      {
+        ok: false,
+        error: `Invalid target "${target}": expected the nx "project:target" form (e.g. "shared-components:storybook").`,
+      },
+      true,
+    );
+  }
 
   // Validate worktree path exists
   if (!existsSync(worktreePath)) {
@@ -217,16 +260,18 @@ export async function devServerStart(
   const outputTail = new OutputTail(OUTPUT_TAIL_BYTES);
 
   try {
-    // Start Vite/React dev server via nx serve web --port=<port>.
+    // Start the target's dev server via `nx <args> --port=<port>` (LS-8665
+    // generalized this beyond the original hardcoded `nx serve web`).
     // We invoke the nx binary directly (rather than `make dev-web`) because the
-    // Makefile target does not forward PORT and nx's @nx/vite:dev-server executor
-    // ignores the PORT env var — the port must be passed as a --port CLI flag.
+    // Makefile target does not forward PORT and nx's dev-server executors
+    // ignore the PORT env var — the port must be passed as a --port CLI flag.
     const isWindows = process.platform === 'win32';
+    const nxArgs = buildNxArgs(target, port);
 
     // stdout AND stderr are piped so we can (a) include the tail in error
     // diagnostics and (b) keep the OS pipe buffer from filling and stalling
     // the child. The output is consumed by `attachOutputCapture` below.
-    const child = spawn(nxExecutable, ['serve', 'web', `--port=${port}`], {
+    const child = spawn(nxExecutable, nxArgs, {
       cwd: worktreePath,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: !isWindows,
@@ -251,6 +296,7 @@ export async function devServerStart(
       worktreePath,
       pid: child.pid,
       startedAt: new Date().toISOString(),
+      target,
     });
 
     // Detach the child so it outlives this tool call
@@ -269,6 +315,7 @@ export async function devServerStart(
       port,
       pid: child.pid,
       worktreePath,
+      target,
       url: `http://localhost:${port}`,
       ...(outcome === 'starting'
         ? {

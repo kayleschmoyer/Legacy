@@ -148,7 +148,7 @@ Makefile target execution with whitelisted targets, appropriate timeouts, and wo
 
 Agent-driven browser debugging and screenshot capture:
 
-- **browser_dev_start** — Start the Vite dev server in a worktree (port 4300-4399 auto-allocation); waits ≤45s for readiness, then returns `ready: false` for callers to poll `browser_dev_status`
+- **browser_dev_start** — Start an nx dev server in a worktree (port 4300-4399 auto-allocation); defaults to `web:serve` but accepts any `target` (nx `project:target`, e.g. `shared-components:storybook`); waits ≤45s for readiness, then returns `ready: false` for callers to poll `browser_dev_status`
 - **browser_dev_stop** — Stop a tracked dev server by port, worktree path, or all
 - **browser_dev_status** — List running dev servers and browser state (managed rows include a live `listening` probe)
 - **browser_navigate** — Open a URL in headless Chromium with snapshot-prep CSS injection

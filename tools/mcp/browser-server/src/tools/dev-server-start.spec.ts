@@ -6,8 +6,11 @@ import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 
 import {
+  DEFAULT_TARGET,
   READINESS_WAIT_MAX_MS,
+  buildNxArgs,
   clampReadinessWait,
+  isValidTarget,
   probeLoopback,
   resolveNxExecutable,
   waitForReadyOrExit,
@@ -55,6 +58,45 @@ describe('clampReadinessWait', () => {
 
   it('never exceeds the ~60s MCP transport limit', () => {
     expect(READINESS_WAIT_MAX_MS).toBeLessThan(60_000);
+  });
+});
+
+describe('isValidTarget', () => {
+  it('accepts a well-formed project:target token', () => {
+    expect(isValidTarget('web:serve')).toBe(true);
+    expect(isValidTarget('shared-components:storybook')).toBe(true);
+    expect(isValidTarget('my_project:my-target')).toBe(true);
+  });
+
+  it('rejects tokens without a project:target shape', () => {
+    expect(isValidTarget('web')).toBe(false);
+    expect(isValidTarget('web:serve:extra')).toBe(false);
+    expect(isValidTarget('')).toBe(false);
+  });
+
+  it('rejects shell metacharacters (defense before a shell:true spawn)', () => {
+    expect(isValidTarget('web:serve; rm -rf /')).toBe(false);
+    expect(isValidTarget('web:serve && echo pwned')).toBe(false);
+    expect(isValidTarget('web:serve`whoami`')).toBe(false);
+    expect(isValidTarget('web:serve $(whoami)')).toBe(false);
+  });
+});
+
+describe('buildNxArgs', () => {
+  it('preserves the exact historical invocation for the default target', () => {
+    expect(buildNxArgs(DEFAULT_TARGET, 4300)).toEqual([
+      'serve',
+      'web',
+      '--port=4300',
+    ]);
+  });
+
+  it('builds a generic `nx run <target> --port=<port>` for other targets', () => {
+    expect(buildNxArgs('shared-components:storybook', 4301)).toEqual([
+      'run',
+      'shared-components:storybook',
+      '--port=4301',
+    ]);
   });
 });
 

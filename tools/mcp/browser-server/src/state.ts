@@ -5,6 +5,8 @@ export interface DevServer {
   worktreePath: string;
   pid: number;
   startedAt: string;
+  /** nx project:target that was run, e.g. 'web:serve' or 'shared-components:storybook'. */
+  target: string;
 }
 
 export interface BrowserState {

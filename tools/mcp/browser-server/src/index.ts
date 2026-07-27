@@ -17,7 +17,7 @@ const server = new McpServer({
 // Tool 1: browser_dev_start
 server.tool(
   'browser_dev_start',
-  'Start a Vite/React dev server (nx serve web) in a worktree directory. Allocates a port from 4300-4399 automatically unless specified. The server runs in the background and is tracked for the duration of this MCP session. Waits up to 45s for readiness, then returns without blocking: on a slow startup the result has ready: false — poll browser_dev_status until the port shows listening: true. Use browser_dev_stop or browser_cleanup to shut it down.',
+  'Start an nx dev server in a worktree directory — defaults to the web app (nx serve web) but accepts any nx "project:target" via the target param (e.g. "shared-components:storybook"). Allocates a port from 4300-4399 automatically unless specified. The server runs in the background and is tracked for the duration of this MCP session. Waits up to 45s for readiness, then returns without blocking: on a slow startup the result has ready: false — poll browser_dev_status until the port shows listening: true. Use browser_dev_stop or browser_cleanup to shut it down.',
   {
     worktreePath: z
       .string()
@@ -40,6 +40,12 @@ server.tool(
       .optional()
       .describe(
         'Readiness wait budget (ms). Default and maximum: 45000 (45s) — larger values are clamped so the call always returns before the ~60s MCP transport limit. When the budget elapses the call still succeeds with ready: false; poll browser_dev_status for readiness.',
+      ),
+    target: z
+      .string()
+      .optional()
+      .describe(
+        'nx "project:target" to run instead of the default "web:serve", e.g. "shared-components:storybook". Runs via `nx run <target> --port=<port>`, so the target\'s executor must accept a --port flag; readiness is still probed by TCP-connecting to that port, so no further configuration is needed.',
       ),
   },
   async (params) => devServerStart(params),
