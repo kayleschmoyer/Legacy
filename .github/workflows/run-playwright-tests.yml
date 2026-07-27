@@ -215,6 +215,12 @@ jobs:
     steps:
       - id: set
         shell: bash
+        env:
+          # Script-injection hardening (LS-8503): test-file is a free-text
+          # workflow_dispatch input; pass it via env var and reference
+          # $TEST_FILE_INPUT below rather than interpolating
+          # ${{ inputs.test-file }} directly into the run: block.
+          TEST_FILE_INPUT: ${{ inputs['test-file'] }}
         run: |
           # ---------------------------------------------------------------
           # Integration concurrency ceiling (LS-7866 → LS-7867).
@@ -316,7 +322,7 @@ jobs:
               # handful of quick specs, so always one shard / one worker.
               TOTAL=1
             fi
-            if [ "$SUITE" = "integration" ] && [ -n "${{ inputs.test-file }}" ]; then
+            if [ "$SUITE" = "integration" ] && [ -n "$TEST_FILE_INPUT" ]; then
               # A manually-named spec subset (LS-7883) isn't split by the
               # weighted partitioner — force a single shard, mirroring the
               # shared-live special case above.
@@ -345,6 +351,9 @@ jobs:
       - name: "Compute notification params"
         id: params
         shell: bash
+        env:
+          # Script-injection hardening (LS-8503): see prepare/set step above.
+          TEST_FILE_INPUT: ${{ inputs['test-file'] }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             echo "title=Nightly Playwright Suite" >> "$GITHUB_OUTPUT"
@@ -376,7 +385,7 @@ jobs:
             RETRIES="${{ inputs.retries || '2' }}"
             GREP="${{ inputs['test-grep'] || '(all)' }}"
             GREP_INV="${{ inputs['test-grep-invert'] || '(none)' }}"
-            FILE="${{ inputs['test-file'] }}"
+            FILE="$TEST_FILE_INPUT"
             echo "title=Manual Playwright Suite" >> "$GITHUB_OUTPUT"
             {
               echo 'description<<EOF_PLAYWRIGHT_NOTIFY'
@@ -618,6 +627,12 @@ jobs:
         shell: bash
         env:
           CI: "true"
+          # Script-injection hardening (LS-8503): test-file is a free-text
+          # workflow_dispatch input; pass it via env var and reference
+          # $TEST_FILE_INPUT below rather than interpolating
+          # ${{ inputs.test-file }} directly into the run: block (GitHub's
+          # recommended mitigation for workflow_dispatch script injection).
+          TEST_FILE_INPUT: ${{ inputs['test-file'] }}
           # Hermetic e2e tests mock every network call with route.fulfill()
           # (there is no backend in CI), so the JWT signature is never
           # validated. The tests use a hardcoded dev secret baked into the
@@ -703,8 +718,8 @@ jobs:
 
           # Specific test file (manual dispatch only)
           TEST_FILE=""
-          if [ "$IS_NIGHTLY_LIKE" != "true" ] && [ -n "${{ inputs.test-file }}" ]; then
-            TEST_FILE="${{ inputs.test-file }}"
+          if [ "$IS_NIGHTLY_LIKE" != "true" ] && [ -n "$TEST_FILE_INPUT" ]; then
+            TEST_FILE="$TEST_FILE_INPUT"
           fi
 
           # Sharding.
@@ -1347,6 +1362,9 @@ jobs:
       - name: "Resolve Status"
         id: status
         shell: bash
+        env:
+          # Script-injection hardening (LS-8503): see prepare/set step above.
+          TEST_FILE_INPUT: ${{ inputs['test-file'] }}
         run: |
           TESTS_RESULT="${{ needs.run-tests.result }}"
 
@@ -1377,7 +1395,7 @@ jobs:
             RETRIES="${{ inputs.retries || '2' }}"
             GREP="${{ inputs['test-grep'] || '(all)' }}"
             GREP_INV="${{ inputs['test-grep-invert'] || '(none)' }}"
-            FILE="${{ inputs['test-file'] }}"
+            FILE="$TEST_FILE_INPUT"
             SUMMARY_LINE1="**Suite:** ${SUITE} · **Browser:** ${BROWSER}"
             SUMMARY_LINE2="**Shards:** ${SHARDS} · **Workers:** ${WORKERS} · **Retries:** ${RETRIES}"
             SUMMARY_LINE3="**Grep:** ${GREP} · **Exclude:** ${GREP_INV} · **File:** ${FILE:-all files}"
