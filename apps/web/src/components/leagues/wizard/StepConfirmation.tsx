@@ -1,14 +1,6 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
 import { AlertCircle } from '@tamagui/lucide-icons';
-import {
-  BRAND_GOLD,
-  BRAND_SEAM_RED,
-  PANEL_BORDER,
-  SURFACE_CARD,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
-} from '../../../constants/colors';
 import type { WizardState } from '../CreateLeagueWizard';
 
 interface StepConfirmationProps {
@@ -23,14 +15,14 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     <XStack
       padding="$3"
       borderBottomWidth={1}
-      borderColor={PANEL_BORDER}
+      borderColor="$surfacePanelBorder"
       alignItems="center"
       justifyContent="space-between"
     >
-      <Text fontSize={13} color={TEXT_MUTED}>
+      <Text fontSize={13} color="$textMuted">
         {label}
       </Text>
-      <Text fontSize={13} fontWeight="600" color={TEXT_PRIMARY}>
+      <Text fontSize={13} fontWeight="600" color="$color">
         {value}
       </Text>
     </XStack>
@@ -59,20 +51,20 @@ export function StepConfirmation({
           fontSize={22}
           fontWeight="700"
           fontFamily="$heading"
-          color={TEXT_PRIMARY}
+          color="$color"
         >
           Confirm Your League
         </Text>
-        <Text fontSize={14} color={TEXT_MUTED}>
+        <Text fontSize={14} color="$textMuted">
           Review your settings and create your league.
         </Text>
       </YStack>
 
       <YStack
-        backgroundColor={SURFACE_CARD}
+        backgroundColor="$surfaceCard"
         borderRadius="$3"
         borderWidth={1}
-        borderColor={PANEL_BORDER}
+        borderColor="$surfacePanelBorder"
         overflow="hidden"
       >
         <SummaryRow
@@ -98,14 +90,14 @@ export function StepConfirmation({
             <XStack
               padding="$3"
               borderBottomWidth={1}
-              borderColor={PANEL_BORDER}
+              borderColor="$surfacePanelBorder"
               flexDirection="column"
               gap="$1"
             >
-              <Text fontSize={13} color={TEXT_MUTED}>
+              <Text fontSize={13} color="$textMuted">
                 Roster Slots
               </Text>
-              <Text fontSize={12} fontWeight="600" color={TEXT_PRIMARY}>
+              <Text fontSize={12} fontWeight="600" color="$color">
                 {formatRosterSlots(state.rosterSlots)}
               </Text>
             </XStack>
@@ -123,7 +115,7 @@ export function StepConfirmation({
           gap="$2"
           alignItems="flex-start"
         >
-          <AlertCircle size={16} color={BRAND_SEAM_RED} marginTop={2} />
+          <AlertCircle size={16} color="$brandSeamRed" marginTop={2} />
           <Text fontSize={13} color="$red11" flex={1}>
             {error}
           </Text>
@@ -133,7 +125,7 @@ export function StepConfirmation({
       <XStack
         pressStyle={{ opacity: 0.85, scale: 0.99 }}
         onPress={loading ? undefined : onSubmit}
-        backgroundColor={loading ? PANEL_BORDER : BRAND_GOLD}
+        backgroundColor={loading ? '$surfacePanelBorder' : '$brandGold'}
         borderRadius="$3"
         padding="$4"
         alignItems="center"
@@ -145,7 +137,7 @@ export function StepConfirmation({
           fontSize={15}
           fontWeight="700"
           fontFamily="$heading"
-          color={loading ? TEXT_MUTED : '#1B1208'}
+          color={loading ? '$textMuted' : '$textOnGold'}
         >
           {loading ? 'Creating League…' : 'Create League'}
         </Text>
