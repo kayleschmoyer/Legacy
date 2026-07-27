@@ -16,3 +16,5 @@ describe('App E2E Tests', () => {
     console.log('✅ app-e2e: Jest test environment is properly configured.');
   });
 });
+
+export {};

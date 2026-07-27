@@ -84,6 +84,13 @@
       }
     },
     {
+      "files": ["*.spec.ts"],
+      "plugins": ["eslint-plugin-import"],
+      "rules": {
+        "import/unambiguous": "error"
+      }
+    },
+    {
       "files": ["*.ts", "*.tsx"],
       "excludedFiles": ["**/graphql.generated.ts"],
       "rules": {

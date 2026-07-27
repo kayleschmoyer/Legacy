@@ -3,3 +3,5 @@ describe('Db Client', () => {
     expect(true).toBe(true);
   });
 });
+
+export {};

@@ -3,3 +3,5 @@ describe('load-career-stats', () => {
     expect(true).toBe(true);
   });
 });
+
+export {};

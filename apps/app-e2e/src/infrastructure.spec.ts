@@ -27,3 +27,5 @@ describe('App E2E Infrastructure', () => {
     expect(jest.setTimeout).toBeDefined();
   });
 });
+
+export {};

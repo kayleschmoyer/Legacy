@@ -3,3 +3,5 @@ describe('Players', () => {
     expect(true).toBe(true);
   });
 });
+
+export {};

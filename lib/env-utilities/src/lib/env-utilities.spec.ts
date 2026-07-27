@@ -3,3 +3,5 @@ describe('envUtilities', () => {
     expect(true).toBe(true);
   });
 });
+
+export {};
