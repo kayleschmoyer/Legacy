@@ -11,6 +11,24 @@
     almost always a zero-commit leftover, not merged work). Tickets that have
     children are never transitioned here — the rollup pass derives their
     status from their children.
+
+    Shared policy with .github/workflows/jira-branch-sync.yml and
+    jira-status-audit.yml (LS-8583 — see scripts/lib/jira-rollup.ps1 for the
+    mirrored helpers and full rationale):
+      - Leaf-ticket transitions (this per-ticket pass) are forward-only,
+        full stop — mirroring jira-status-audit.yml's periodic guard call,
+        under which jira-branch-sync's one narrow downgrade (In Review ->
+        In Progress on a specific PR action) never applies.
+      - Parent/epic rollup is deliberately bidirectional — mirroring
+        jira-status-audit.yml's epic audit, which explicitly demotes a Done
+        epic when a child reopens — but only once children are ALL In Review
+        or Done does a parent reach "In Review" (LS-4683; a lone Done child
+        is never "active work" on its own).
+      - Ticket-key selection for agent branches (claude/*) is marker-first
+        (the PR body's <!-- jira-link --> block), falling back to the PR
+        title then the branch name — matching tools/jira-sync exactly, so a
+        PR title mentioning an unrelated ticket (e.g. "port of LS-5910")
+        never gets swept in.
 .PARAMETER DryRun
     Show what would be done without making any changes
 .PARAMETER AutoUpdate
@@ -61,7 +79,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Pure rollup helpers (Get-RolledUpStatus, Get-TransitionPath, $JiraWorkflowOrder).
+# Pure rollup + shared-policy helpers (Get-RolledUpStatus, Get-TransitionPath,
+# Test-ForwardOnlyTransition, Get-DeclaredTicketKey, Get-JiraTicketKeys,
+# $JiraWorkflowOrder) -- see that file's header for the LS-8583 parity notes.
 . (Join-Path $PSScriptRoot "lib/jira-rollup.ps1")
 
 # Color functions for better output
@@ -347,10 +367,19 @@ foreach ($branch in $branches) {
     }
 }
 
-# For agent branches, resolve the ticket key from the pre-fetched PR map
-# (title + body) instead of issuing one gh call per branch.
+# For agent branches, resolve the declared ticket key from the pre-fetched PR
+# map (marker-first, matching tools/jira-sync -- see Get-DeclaredTicketKey in
+# scripts/lib/jira-rollup.ps1) instead of issuing one gh call per branch.
+#
+# LS-8583: this used to sweep ALL title keys plus a body closing-keyword scan
+# that included "completes" (not a real GitHub keyword -- the previous
+# "matching GHA logic" comment was stale) and could associate a PR with every
+# ticket its title merely mentioned (e.g. "port of LS-5910" pulling in a
+# foreign, unrelated ticket). Get-DeclaredTicketKey resolves exactly the one
+# ticket a PR declares: its <!-- jira-link --> marker primary, falling back
+# to the first title key, then the first branch-name key.
 if ($agentBranches.Count -gt 0 -and $ghAvailable) {
-    Write-Info "Resolving ticket keys for $($agentBranches.Count) agent branch(es) from PR map..."
+    Write-Info "Resolving ticket keys for $($agentBranches.Count) agent branch(es) via marker-first key selection..."
 
     foreach ($branch in $agentBranches) {
         if (-not $prMap.ContainsKey($branch)) {
@@ -359,32 +388,20 @@ if ($agentBranches.Count -gt 0 -and $ghAvailable) {
         }
 
         $pr = $prMap[$branch]
+        $ticketKey = Get-DeclaredTicketKey -Title $pr.title -Body $pr.body -Branch $branch
 
-        # Extract all LS-#### keys from PR title (all matches) and body
-        # (only matches preceded by a closing keyword, matching GHA logic).
-        $titleKeys = [regex]::Matches($pr.title, 'LS-\d+', 'IgnoreCase') |
-                     ForEach-Object { $_.Value.ToUpper() }
-
-        $bodyKeys = @()
-        if ($pr.body) {
-            $bodyKeys = [regex]::Matches(
-                $pr.body,
-                '(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|complete[sd]?)\s+(LS-\d+)',
-                'IgnoreCase'
-            ) | ForEach-Object { $_.Groups[1].Value.ToUpper() }
+        if (-not $ticketKey) {
+            if ($ShowAll) { Write-Info "Agent branch $branch -> no declared ticket (no jira-link marker, title key, or branch key)" }
+            continue
         }
 
-        $keys = @($titleKeys) + @($bodyKeys) | Select-Object -Unique
-
-        foreach ($ticketKey in $keys) {
-            if (-not $branchTickets.ContainsKey($ticketKey)) {
-                $branchTickets[$ticketKey] = @()
-            }
-            if ($branchTickets[$ticketKey] -notcontains $branch) {
-                $branchTickets[$ticketKey] += $branch
-            }
-            Write-Info "Agent branch $branch -> $ticketKey (PR #$($pr.number))"
+        if (-not $branchTickets.ContainsKey($ticketKey)) {
+            $branchTickets[$ticketKey] = @()
         }
+        if ($branchTickets[$ticketKey] -notcontains $branch) {
+            $branchTickets[$ticketKey] += $branch
+        }
+        Write-Info "Agent branch $branch -> $ticketKey (PR #$($pr.number))"
     }
 }
 
@@ -595,7 +612,22 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
         elseif ($activeBranches.Count -gt 0 -and $status -in @("In Progress", "In Review")) {
             $recommendation = "[OK] In sync"
         }
-        
+
+        # Shared monotonic policy (LS-8583): leaf-ticket transitions in this
+        # script's periodic reconciliation are forward-only, full stop --
+        # mirroring jira-status-audit.yml's periodic guard call, under which
+        # jira-branch-sync's one narrow downgrade (In Review -> In Progress on
+        # a specific PR action) never applies. See Test-ForwardOnlyTransition
+        # in scripts/lib/jira-rollup.ps1 for the full rationale. The priority
+        # chain above never proposes a backward move today, so this is a
+        # defensive parity guard against future regressions, not a live fix.
+        if ($shouldUpdate -and $targetStatus -and -not (Test-ForwardOnlyTransition -Current $status -Target $targetStatus)) {
+            Write-Warning "Refusing to transition $ticketKey from '$status' to '$targetStatus' -- backward move violates the shared monotonic policy; manual review needed"
+            $recommendation = "Guard refused: '$status' -> '$targetStatus' is a backward move (shared monotonic policy) -- manual review needed"
+            $shouldUpdate = $false
+            $targetStatus = ""
+        }
+
         # Parent guard (LS-8582): a ticket with children is never transitioned
         # from branch/PR evidence -- its status is derived from its children in
         # the rollup pass. Only pay the children lookup when it matters: a
@@ -681,6 +713,14 @@ foreach ($ticketKey in $branchTickets.Keys | Sort-Object) {
 # status is reconciled here from its children -- at every level of the hierarchy
 # (Task -> Story -> Epic -> Initiative). Reconciliation is bidirectional: a parent
 # advances when a child starts and regresses when a child reopens.
+#
+# This is a deliberate policy decision (LS-8583), not an oversight: it mirrors
+# jira-status-audit.yml's own epic-rollup audit, which explicitly demotes a
+# Done epic back to In Progress/In Review when a child is reopened (LS-4683)
+# -- see that workflow's "Epic audit" step comment. Get-RolledUpStatus
+# (scripts/lib/jira-rollup.ps1) derives the exact same tiers that workflow's
+# bash uses, so a demotion only ever fires when children have genuinely
+# regressed, never from a stale/incorrect derivation.
 
 $script:rollupResults = @()
 

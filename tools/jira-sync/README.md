@@ -30,6 +30,16 @@ unit-tested:
 - **`src/cli.js`** — `plan` / `guard` / `audit` / `audit-action`
   subcommands emitting JSON for the workflows to parse with jq.
 
+## PowerShell parity (LS-8583)
+
+`scripts/sync-jira-status.ps1` and `scripts/lib/jira-rollup.ps1` run the same
+Jira sync as a periodic, non-GHA nightly script and mirror this package's
+rules in PowerShell (marker-first key selection, the LS-4683 epic-rollup
+tiers, and the forward-only leaf-ticket policy jira-status-audit.yml applies
+in its own periodic context). There is no shared runtime between the two —
+add a matching PowerShell test case in `scripts/__tests__/jira-rollup.test.ps1`
+for every spec case here that changes a mirrored contract.
+
 ## Why plain CommonJS with zero dependencies
 
 The sync workflow runs on every push to `claude/**` / `LS-*` branches with a
