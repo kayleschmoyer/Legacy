@@ -9,15 +9,20 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return -- mock factory spreads */
 import React, { forwardRef as mockForwardRef } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { TeamDetailPage } from './TeamDetailPage';
 
 // ── Router ──────────────────────────────────────────────────────────────────
 
 const mockNavigate = jest.fn();
+// LS-8586: a jest.fn() (rather than a static arrow) so the invalid-teamId
+// test can override the route param for a single render via
+// mockReturnValueOnce without disturbing every other test's default '1'.
+const mockUseParams = jest.fn(() => ({ teamId: '1' }));
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
-  useParams: () => ({ teamId: '1' }),
+  useParams: () => mockUseParams(),
 }));
 
 // ── Analytics / CSRF ─────────────────────────────────────────────────────────
@@ -1230,6 +1235,166 @@ describe('TeamDetailPage – assistant manager permissions (LS-6051)', () => {
 
     expect(
       screen.getByText(/viewing this team as a visitor/i),
+    ).toBeInTheDocument();
+  });
+});
+
+// ── Team Settings visibility gating (LS-8586 / BTD-012 follow-up) ──────────
+//
+// TeamDetailPage renders the "Team Settings" section when
+// `(isGM || isCommissioner)` (TeamDetailPage.tsx around the
+// userPermissionLevel/isOwner block). isCommissioner is a role-only check
+// (no ownership requirement); isGM additionally requires isOwner — the
+// viewer's membership row for *this* team's leagueId, not just any
+// membership across the league.
+
+describe('TeamDetailPage – Team Settings visibility gating (LS-8586)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
+    mockRefetchMembers.mockResolvedValue({});
+  });
+
+  function mockViewerMembership(permissionLevel: string, teamId: number) {
+    const graphql = jest.requireMock<{
+      useGetViewerMembershipQuery: jest.Mock;
+    }>('@legacy-sports/graphql');
+    graphql.useGetViewerMembershipQuery.mockReturnValue({
+      data: { viewerMembership: { teamId, permissionLevel } },
+      loading: false,
+      error: undefined,
+    });
+  }
+
+  it('AC1: a visitor (not GM, not commissioner) does not see the "Team Settings" section', () => {
+    // GM of a different team (teamId 999 vs. the viewed team's id 1) — not
+    // the owner here, and not a commissioner, so isGM and isCommissioner are
+    // both false.
+    mockViewerMembership('general_manager', 999);
+
+    render(<TeamDetailPage />);
+
+    expect(screen.queryByText('Team Settings')).not.toBeInTheDocument();
+  });
+
+  it('AC2: a commissioner who is not the team owner does see the "Team Settings" section', () => {
+    // isCommissioner is a role-only check with no isOwner requirement, so a
+    // commissioner viewing a team they don't own still sees Team Settings.
+    mockViewerMembership('commissioner', 999);
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByText('Team Settings')).toBeInTheDocument();
+  });
+
+  it('AC3: an assistant_manager viewer of a different team is treated as non-owner and does not see "Team Settings" (documents current isGM logic)', () => {
+    // isGM requires isOwner (userMembershipTeamId === teamIdNum) even for
+    // assistant_manager — an assistant_manager of another team fails the
+    // ownership check the same way a general_manager of another team does,
+    // and is not a commissioner either, so Team Settings stays hidden.
+    mockViewerMembership('assistant_manager', 999);
+
+    render(<TeamDetailPage />);
+
+    expect(screen.queryByText('Team Settings')).not.toBeInTheDocument();
+  });
+});
+
+// ── Error / not-found states (LS-8586 / BTD-012 follow-up) ─────────────────
+
+describe('TeamDetailPage – error and not-found states (LS-8586)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateBranding.mockResolvedValue({});
+    mockRefetchTeamById.mockResolvedValue({});
+    mockRefetchMembers.mockResolvedValue({});
+
+    // Reset the team-members query to its default resolved shape so each
+    // test's override (error / route param) is the only thing that varies.
+    const graphql = jest.requireMock<{ useGetTeamMembersQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetTeamMembersQuery.mockReturnValue({
+      data: {
+        teamMembers: [
+          {
+            id: 10,
+            leagueId: 100,
+            player: { firstName: 'Test', lastName: 'Player' },
+            positionId: null,
+          },
+        ],
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetchMembers,
+    });
+  });
+
+  it('AC4: renders "Team not found" when the team members query returns a NOT_FOUND GraphQL error', () => {
+    const graphql = jest.requireMock<{ useGetTeamMembersQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetTeamMembersQuery.mockReturnValueOnce({
+      data: undefined,
+      loading: false,
+      error: new CombinedGraphQLErrors({
+        errors: [
+          { message: 'Team not found', extensions: { code: 'NOT_FOUND' } },
+        ],
+      }),
+      refetch: mockRefetchMembers,
+    });
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByText('Team not found')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This team doesn't exist or you may not have access to it.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('AC4: renders "Error loading team" for a non-NOT_FOUND GraphQL error', () => {
+    const graphql = jest.requireMock<{ useGetTeamMembersQuery: jest.Mock }>(
+      '@legacy-sports/graphql',
+    );
+    graphql.useGetTeamMembersQuery.mockReturnValueOnce({
+      data: undefined,
+      loading: false,
+      error: new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'Internal server error',
+            extensions: { code: 'INTERNAL_SERVER_ERROR' },
+          },
+        ],
+      }),
+      refetch: mockRefetchMembers,
+    });
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByText('Error loading team')).toBeInTheDocument();
+    expect(
+      screen.getByText('Something went wrong. Please try refreshing the page.'),
+    ).toBeInTheDocument();
+  });
+
+  it('AC5: renders "Team not found" for an invalid (non-numeric) teamId route param', () => {
+    // Overrides useParams for exactly this render; every other test in the
+    // file keeps the default '1' from the module-level mock.
+    mockUseParams.mockReturnValueOnce({ teamId: 'abc' });
+
+    render(<TeamDetailPage />);
+
+    expect(screen.getByText('Team not found')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The team you're looking for doesn't exist or the link is invalid.",
+      ),
     ).toBeInTheDocument();
   });
 });
