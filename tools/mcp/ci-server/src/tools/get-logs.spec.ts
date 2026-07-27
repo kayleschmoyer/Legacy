@@ -4,7 +4,12 @@ jest.mock('../logs.js', () => ({
   fetchRunLogsRing: jest.fn(),
 }));
 
-import { getLogs, isJestFailureLine } from './get-logs.js';
+import {
+  getLogs,
+  isJestFailureLine,
+  isPlaywrightFailureLine,
+  isTestFailureLine,
+} from './get-logs.js';
 import * as logs from '../logs.js';
 
 const mockFetch = logs.fetchRunLogsRing as jest.MockedFunction<
@@ -216,6 +221,96 @@ describe('getLogs', () => {
       ).toBe(false);
       expect(isJestFailureLine('Failed to propose trade')).toBe(false);
       expect(isJestFailureLine('BUILD FAILED')).toBe(false);
+    });
+  });
+
+  describe('isPlaywrightFailureLine (LS-8405)', () => {
+    it('matches the list-reporter failing test marker (✘)', () => {
+      expect(
+        isPlaywrightFailureLine(
+          '  1) [chromium] › login.spec.ts:12:5 › logs in ✘ (2.1s)',
+        ),
+      ).toBe(true);
+    });
+
+    it('matches TimeoutError, Error: expect(, and Error Context: lines', () => {
+      expect(
+        isPlaywrightFailureLine(
+          'TimeoutError: locator.click: Timeout 30000ms exceeded.',
+        ),
+      ).toBe(true);
+      expect(
+        isPlaywrightFailureLine('Error: expect(locator).toBeVisible() failed'),
+      ).toBe(true);
+      expect(
+        isPlaywrightFailureLine(
+          'Error Context: apps/web-e2e/test-results/login-spec-ts/error-context.md',
+        ),
+      ).toBe(true);
+    });
+
+    it('matches the end-of-run "N failed" summary line', () => {
+      expect(isPlaywrightFailureLine('  1 failed')).toBe(true);
+      expect(isPlaywrightFailureLine('2 failed, 18 passed (45s)')).toBe(true);
+    });
+
+    it('does not match composite-action wrapper status lines', () => {
+      expect(isPlaywrightFailureLine('❌ Critical E2E tests failed')).toBe(
+        false,
+      );
+      expect(
+        isPlaywrightFailureLine(
+          '⚠️ Playwright browser installation failed — attempting fallback without --with-deps',
+        ),
+      ).toBe(false);
+      expect(
+        isPlaywrightFailureLine(
+          '💥 E2E tests failed - critical user paths may be broken',
+        ),
+      ).toBe(false);
+      expect(isPlaywrightFailureLine('::error::E2E tests failed (3/10).')).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('isTestFailureLine (LS-8405)', () => {
+    it('matches either a jest or a playwright failure marker', () => {
+      expect(isTestFailureLine('FAIL src/foo.spec.ts')).toBe(true);
+      expect(isTestFailureLine('TimeoutError: boom')).toBe(true);
+      expect(isTestFailureLine('console.log("hello")')).toBe(false);
+    });
+  });
+
+  describe('errorSummary playwright-marker priority (LS-8405)', () => {
+    it('prioritizes Playwright failure markers over composite-action wrapper noise when the 200-line cap would otherwise drop them', async () => {
+      // Composite-action wrapper noise (LS-8405): status/echo lines that match
+      // the generic ERROR_PATTERNS scan but carry no test-failure detail.
+      const noise = Array.from(
+        { length: 250 },
+        (_, i) =>
+          `::error::E2E tests failed (${i}/10). Critical user functionality may be broken.`,
+      );
+      mockFetch.mockResolvedValue({
+        lines: noise,
+        totalLines: noise.length,
+        priorityLines: [
+          '  1) [chromium] › login.spec.ts:12:5 › logs in ✘ (2.1s)',
+          'TimeoutError: locator.click: Timeout 30000ms exceeded.',
+          '  1 failed',
+        ],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+
+      expect(result.isError).toBeUndefined();
+      const payload = parsePayload(result.content[0].text) as { logs: string };
+      expect(payload.logs).toContain('TimeoutError:');
+      expect(payload.logs).toContain('1 failed');
+      // Playwright markers appear before the generic wrapper noise in the merged summary.
+      expect(payload.logs.indexOf('TimeoutError:')).toBeLessThan(
+        payload.logs.indexOf('::error::'),
+      );
     });
   });
 

@@ -61,6 +61,34 @@ export function isJestFailureLine(line: string): boolean {
   return JEST_FAILURE_PATTERNS.some((pattern) => pattern.test(stripped));
 }
 
+/**
+ * Playwright's own failure markers (LS-8405). The E2E job runs Playwright
+ * inside a composite-action bash script whose own status/echo lines (e.g.
+ * "⚠️ Playwright browser installation failed", "❌ Critical E2E tests
+ * failed", "::error::...") also match the generic ERROR_PATTERNS scan and
+ * can crowd the real per-test failure output (spec file, TimeoutError,
+ * failed assertion) out of the 200-line cap. Matched against the
+ * ANSI-stripped line and given priority so they always survive extraction,
+ * same mechanism as isJestFailureLine.
+ */
+const PLAYWRIGHT_FAILURE_PATTERNS = [
+  /✘/, // Playwright list-reporter failing test marker
+  /TimeoutError:/,
+  /Error: expect\(/,
+  /Error Context:/,
+  /(?:^|\s)\d+ failed\b/, // end-of-run summary line, e.g. "  1 failed"
+];
+
+export function isPlaywrightFailureLine(line: string): boolean {
+  const stripped = stripAnsiCodes(line);
+  return PLAYWRIGHT_FAILURE_PATTERNS.some((pattern) => pattern.test(stripped));
+}
+
+/** Priority matcher combining Jest (LS-8391) and Playwright (LS-8405) failure markers. */
+export function isTestFailureLine(line: string): boolean {
+  return isJestFailureLine(line) || isPlaywrightFailureLine(line);
+}
+
 function extractErrorSummary(
   allLines: string[],
   priorityLines: string[] = [],
@@ -216,7 +244,7 @@ async function buildRunPayload(
         signal,
       },
       streamLimit,
-      params.errorSummary ? isJestFailureLine : undefined,
+      params.errorSummary ? isTestFailureLine : undefined,
     );
 
   const base = {
