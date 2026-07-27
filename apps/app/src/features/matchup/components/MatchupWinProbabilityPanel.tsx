@@ -220,7 +220,8 @@ function CategoryRow({
  *
  * Mirrors the web MatchupWinProbabilityPanel. Reuses the GetMatchupPlayers query
  * (shared with the lineup editor) so Apollo can serve it from cache. Only rendered
- * for scheduled / in-progress matchups with available projections.
+ * for scheduled / in-progress matchups; scheduled matchups with no projections
+ * yet (pre-season) show a fallback card instead of rendering nothing.
  */
 export function MatchupWinProbabilityPanel({
   matchup,
@@ -260,129 +261,181 @@ export function MatchupWinProbabilityPanel({
     );
   }, [matchup?.team2Id, teamsData]);
 
-  const { team1Category, team2Category, winProb } = useMemo(() => {
-    const empty: CategoryScores = {
-      batting: 0,
-      pitching: 0,
-      fielding: 0,
-      total: 0,
-    };
+  const { team1Category, team2Category, winProb, isPreSeasonEmpty } =
+    useMemo(() => {
+      const empty: CategoryScores = {
+        batting: 0,
+        pitching: 0,
+        fielding: 0,
+        total: 0,
+      };
 
-    if (!playersData?.getMatchupPlayers || !scoringSettings || !matchup) {
-      return { team1Category: empty, team2Category: empty, winProb: null };
-    }
-
-    const players = playersData.getMatchupPlayers;
-    const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
-
-    // Per-category actual scores for a single game
-    const gameCategoryScores = (
-      game: NonNullable<AppMatchupPlayerFragment['games']>[number],
-    ) => ({
-      batting: game.battingGame
-        ? computeScoring(
-            mapBattingStats(game.battingGame),
-            scoringSettings.batting ?? {},
-          )
-        : 0,
-      pitching: game.pitchingGame
-        ? computeScoring(
-            mapPitchingStats(game.pitchingGame),
-            scoringSettings.pitching ?? {},
-          )
-        : 0,
-      fielding: game.fieldingGame
-        ? computeScoring(
-            mapFieldingStats(game.fieldingGame),
-            scoringSettings.fielding ?? {},
-          )
-        : 0,
-    });
-
-    type Cat = { batting: number; pitching: number; fielding: number };
-    const t1: Cat = { batting: 0, pitching: 0, fielding: 0 };
-    const t2: Cat = { batting: 0, pitching: 0, fielding: 0 };
-
-    players.forEach((player) => {
-      // Skip benched players
-      if (player.positionId === null) return;
-
-      const totalGames = player.numberOfGames ?? gamesPerMatchup;
-      const gamesPlayed = player.games?.length ?? 0;
-      const remaining = Math.max(0, totalGames - gamesPlayed);
-
-      // Sum actual per-category scores from played games
-      const actual: Cat = { batting: 0, pitching: 0, fielding: 0 };
-      (player.games ?? []).forEach((game) => {
-        const gs = gameCategoryScores(game);
-        actual.batting += gs.batting;
-        actual.pitching += gs.pitching;
-        actual.fielding += gs.fielding;
-      });
-
-      // Project per-game rates from season stats for remaining games
-      let perGame: {
-        battingPerGame: number;
-        pitchingPerGame: number;
-        fieldingPerGame: number;
-      } | null = null;
-
-      if (remaining > 0) {
-        const seasonStats = mapMatchupPlayerToSeasonStats(player);
-        if (seasonStats) {
-          try {
-            const proj = calculateMatchupProjection(
-              seasonStats,
-              scoringSettings,
-            );
-            perGame = {
-              battingPerGame: proj.battingPerGame,
-              pitchingPerGame: proj.pitchingPerGame,
-              fieldingPerGame: proj.fieldingPerGame,
-            };
-          } catch (err) {
-            // Fall through – perGame remains null; actual scores only. Surface
-            // the failure so a broken projection isn't silently hidden.
-            LOGGER.error(
-              `Win probability projection failed for player ${player.playerId}:`,
-              err instanceof Error ? err : new Error(String(err)),
-            );
-          }
-        }
+      if (!playersData?.getMatchupPlayers || !scoringSettings || !matchup) {
+        return {
+          team1Category: empty,
+          team2Category: empty,
+          winProb: null,
+          isPreSeasonEmpty: false,
+        };
       }
 
-      const projBatting =
-        actual.batting + (perGame?.battingPerGame ?? 0) * remaining;
-      const projPitching =
-        actual.pitching + (perGame?.pitchingPerGame ?? 0) * remaining;
-      const projFielding =
-        actual.fielding + (perGame?.fieldingPerGame ?? 0) * remaining;
+      const players = playersData.getMatchupPlayers;
+      const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
 
-      const target = player.teamId === matchup.team1Id ? t1 : t2;
-      target.batting += projBatting;
-      target.pitching += projPitching;
-      target.fielding += projFielding;
-    });
+      // Per-category actual scores for a single game
+      const gameCategoryScores = (
+        game: NonNullable<AppMatchupPlayerFragment['games']>[number],
+      ) => ({
+        batting: game.battingGame
+          ? computeScoring(
+              mapBattingStats(game.battingGame),
+              scoringSettings.batting ?? {},
+            )
+          : 0,
+        pitching: game.pitchingGame
+          ? computeScoring(
+              mapPitchingStats(game.pitchingGame),
+              scoringSettings.pitching ?? {},
+            )
+          : 0,
+        fielding: game.fieldingGame
+          ? computeScoring(
+              mapFieldingStats(game.fieldingGame),
+              scoringSettings.fielding ?? {},
+            )
+          : 0,
+      });
 
-    const team1Total = t1.batting + t1.pitching + t1.fielding;
-    const team2Total = t2.batting + t2.pitching + t2.fielding;
+      type Cat = { batting: number; pitching: number; fielding: number };
+      const t1: Cat = { batting: 0, pitching: 0, fielding: 0 };
+      const t2: Cat = { batting: 0, pitching: 0, fielding: 0 };
 
-    // Only run simulation when we have meaningful projections
-    if (team1Total === 0 && team2Total === 0) {
-      return { team1Category: empty, team2Category: empty, winProb: null };
+      players.forEach((player) => {
+        // Skip benched players
+        if (player.positionId === null) return;
+
+        const totalGames = player.numberOfGames ?? gamesPerMatchup;
+        const gamesPlayed = player.games?.length ?? 0;
+        const remaining = Math.max(0, totalGames - gamesPlayed);
+
+        // Sum actual per-category scores from played games
+        const actual: Cat = { batting: 0, pitching: 0, fielding: 0 };
+        (player.games ?? []).forEach((game) => {
+          const gs = gameCategoryScores(game);
+          actual.batting += gs.batting;
+          actual.pitching += gs.pitching;
+          actual.fielding += gs.fielding;
+        });
+
+        // Project per-game rates from season stats for remaining games
+        let perGame: {
+          battingPerGame: number;
+          pitchingPerGame: number;
+          fieldingPerGame: number;
+        } | null = null;
+
+        if (remaining > 0) {
+          const seasonStats = mapMatchupPlayerToSeasonStats(player);
+          if (seasonStats) {
+            try {
+              const proj = calculateMatchupProjection(
+                seasonStats,
+                scoringSettings,
+              );
+              perGame = {
+                battingPerGame: proj.battingPerGame,
+                pitchingPerGame: proj.pitchingPerGame,
+                fieldingPerGame: proj.fieldingPerGame,
+              };
+            } catch (err) {
+              // Fall through – perGame remains null; actual scores only. Surface
+              // the failure so a broken projection isn't silently hidden.
+              LOGGER.error(
+                `Win probability projection failed for player ${player.playerId}:`,
+                err instanceof Error ? err : new Error(String(err)),
+              );
+            }
+          }
+        }
+
+        const projBatting =
+          actual.batting + (perGame?.battingPerGame ?? 0) * remaining;
+        const projPitching =
+          actual.pitching + (perGame?.pitchingPerGame ?? 0) * remaining;
+        const projFielding =
+          actual.fielding + (perGame?.fieldingPerGame ?? 0) * remaining;
+
+        const target = player.teamId === matchup.team1Id ? t1 : t2;
+        target.batting += projBatting;
+        target.pitching += projPitching;
+        target.fielding += projFielding;
+      });
+
+      const team1Total = t1.batting + t1.pitching + t1.fielding;
+      const team2Total = t2.batting + t2.pitching + t2.fielding;
+
+      // Only run simulation when we have meaningful projections
+      if (team1Total === 0 && team2Total === 0) {
+        return {
+          team1Category: empty,
+          team2Category: empty,
+          winProb: null,
+          isPreSeasonEmpty: true,
+        };
+      }
+
+      const wp = calculateMatchupWinProbability(team1Total, team2Total);
+
+      return {
+        team1Category: { ...t1, total: team1Total },
+        team2Category: { ...t2, total: team2Total },
+        winProb: wp,
+        isPreSeasonEmpty: false,
+      };
+    }, [playersData, scoringSettings, matchup]);
+
+  // Only show for non-final matchups
+  if (!matchup || matchup.status === MatchupStatus.Completed) {
+    return null;
+  }
+
+  // Pre-season fallback: no games played yet and no projections available
+  // (e.g. no stats history for any rostered player) — show an explicit
+  // placeholder instead of silently rendering nothing (LS-8471, mirrors the
+  // web fix in LS-5909).
+  if (!winProb) {
+    if (isPreSeasonEmpty && matchup.status === MatchupStatus.Scheduled) {
+      return (
+        <Card
+          testID="win-probability-panel-pre-season"
+          overflow="hidden"
+          borderRadius="$6"
+          borderWidth={1}
+          borderColor="$gray6"
+          width="100%"
+        >
+          <XStack
+            alignItems="center"
+            gap="$2"
+            paddingHorizontal="$5"
+            paddingVertical="$3"
+            backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+            borderBottomWidth={1}
+            borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+          >
+            <Target size={16} color={BRAND_GOLD_LIGHT} />
+            <Text fontSize="$4" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+              Win Probability
+            </Text>
+          </XStack>
+          <YStack padding="$5">
+            <Text fontSize="$3" color="$gray11" textAlign="center">
+              Win probability will appear once games are scheduled.
+            </Text>
+          </YStack>
+        </Card>
+      );
     }
-
-    const wp = calculateMatchupWinProbability(team1Total, team2Total);
-
-    return {
-      team1Category: { ...t1, total: team1Total },
-      team2Category: { ...t2, total: team2Total },
-      winProb: wp,
-    };
-  }, [playersData, scoringSettings, matchup]);
-
-  // Only show for non-final matchups with available projections
-  if (!matchup || matchup.status === MatchupStatus.Completed || !winProb) {
     return null;
   }
 

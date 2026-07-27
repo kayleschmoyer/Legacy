@@ -102,6 +102,7 @@ jest.mock('../../../common/scoring', () => ({
 
 const SCHEDULED = 'SCHEDULED';
 const COMPLETED = 'COMPLETED';
+const IN_PROGRESS = 'IN_PROGRESS';
 
 interface TestMatchup {
   id: string;
@@ -242,16 +243,61 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(screen.queryByText('Win Probability')).toBeNull();
   });
 
-  it('renders nothing when there are no projection-eligible players', () => {
+  // AC1 — a Scheduled matchup with 0 computed win-prob totals shows the
+  // pre-season fallback card instead of rendering nothing (LS-8471).
+  it('renders the pre-season fallback for a scheduled matchup with no projection-eligible players', () => {
     primeProjectionMocks();
-    // No projections → both team totals are zero → no simulation, no panel.
+    // No projections → both team totals are zero → no simulation runs.
     mockUseGetMatchupPlayersQuery.mockReturnValue({
       data: { getMatchupPlayers: [] },
     });
 
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
 
+    expect(screen.getByText('Win Probability')).toBeTruthy();
+    expect(
+      screen.getByText('Win probability will appear once games are scheduled.'),
+    ).toBeTruthy();
+    expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
+  });
+
+  // AC2 — other null-winProb cases (data still loading) are unaffected and
+  // continue to render nothing, even for a Scheduled matchup.
+  it('renders nothing for a scheduled matchup while player data is still loading', () => {
+    primeProjectionMocks();
+    mockUseGetMatchupPlayersQuery.mockReturnValue({ data: undefined });
+
+    render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
+
     expect(screen.queryByText('Win Probability')).toBeNull();
+    expect(
+      screen.queryByText(
+        'Win probability will appear once games are scheduled.',
+      ),
+    ).toBeNull();
+    expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
+  });
+
+  // AC2 — the pre-season fallback is scoped to Scheduled matchups only; a
+  // zero-total in-progress matchup still renders nothing.
+  it('renders nothing when totals are 0 for a non-scheduled, non-completed matchup', () => {
+    primeProjectionMocks();
+    mockUseGetMatchupPlayersQuery.mockReturnValue({
+      data: { getMatchupPlayers: [] },
+    });
+
+    render(
+      <MatchupWinProbabilityPanel
+        matchup={makeMatchup({ status: IN_PROGRESS })}
+      />,
+    );
+
+    expect(screen.queryByText('Win Probability')).toBeNull();
+    expect(
+      screen.queryByText(
+        'Win probability will appear once games are scheduled.',
+      ),
+    ).toBeNull();
     expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
   });
 
@@ -263,11 +309,12 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(screen.queryByText('Win Probability')).toBeNull();
   });
 
-  it('logs and falls back to actual scores when projection calculation throws', () => {
+  it('falls back to the pre-season card (no throw) when projection calculation throws', () => {
     primeProjectionMocks();
     // Projection throws for every player → perGame stays null. With no played
-    // games the actual totals are zero, so no simulation runs and nothing renders
-    // — but the error must be surfaced rather than silently swallowed.
+    // games the actual totals are zero, so no simulation runs and the
+    // pre-season fallback renders instead of the full panel — but the error
+    // must still be surfaced rather than silently swallowed.
     mockCalculateMatchupProjection.mockImplementation(() => {
       throw new Error('bad scoring config');
     });
@@ -275,7 +322,9 @@ describe('MatchupWinProbabilityPanel', () => {
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
 
     expect(mockLoggerError).toHaveBeenCalled();
-    expect(screen.queryByText('Win Probability')).toBeNull();
+    expect(
+      screen.getByText('Win probability will appear once games are scheduled.'),
+    ).toBeTruthy();
     expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
   });
 
