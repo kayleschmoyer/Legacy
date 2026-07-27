@@ -105,6 +105,58 @@ builder.queryField('myIdentities', (t) =>
   }),
 );
 
+// 'email' is accepted as a backward-compat alias for GraphQL clients and is
+// remapped to 'canonicalEmail' after validation.
+const ALLOWED_USERS_ORDER_BY = [
+  'id',
+  'email',
+  'canonicalEmail',
+  'username',
+] as const;
+type UsersOrderBy = (typeof ALLOWED_USERS_ORDER_BY)[number];
+
+const ALLOWED_ORDER_DIRECTIONS = ['asc', 'desc'] as const;
+type OrderDirection = (typeof ALLOWED_ORDER_DIRECTIONS)[number];
+
+const ALLOWED_ACCESS_LEVEL_FILTERS = ['none', 'admin'] as const;
+type AccessLevelFilter = (typeof ALLOWED_ACCESS_LEVEL_FILTERS)[number];
+
+function validateUsersOrderBy(
+  value: string | null | undefined,
+): UsersOrderBy | undefined {
+  if (value == null) return undefined;
+  if (!(ALLOWED_USERS_ORDER_BY as readonly string[]).includes(value)) {
+    throw UserInputError(
+      `Invalid orderBy: ${value}. Must be one of ${ALLOWED_USERS_ORDER_BY.join(', ')}`,
+    );
+  }
+  return value as UsersOrderBy;
+}
+
+function validateOrderDirection(
+  value: string | null | undefined,
+): OrderDirection | undefined {
+  if (value == null) return undefined;
+  if (!(ALLOWED_ORDER_DIRECTIONS as readonly string[]).includes(value)) {
+    throw UserInputError(
+      `Invalid orderDirection: ${value}. Must be one of ${ALLOWED_ORDER_DIRECTIONS.join(', ')}`,
+    );
+  }
+  return value as OrderDirection;
+}
+
+function validateAccessLevelFilter(
+  value: string | null | undefined,
+): AccessLevelFilter | undefined {
+  if (value == null) return undefined;
+  if (!(ALLOWED_ACCESS_LEVEL_FILTERS as readonly string[]).includes(value)) {
+    throw UserInputError(
+      `Invalid accessLevel: ${value}. Must be one of ${ALLOWED_ACCESS_LEVEL_FILTERS.join(', ')}`,
+    );
+  }
+  return value as AccessLevelFilter;
+}
+
 // Add users query to the Query type
 builder.queryField('users', (t) =>
   t.field({
@@ -124,19 +176,10 @@ builder.queryField('users', (t) =>
         throw ForbiddenError('Admin access required to list all users');
       }
 
-      const rawOrderBy = args.orderBy as
-        | 'id'
-        | 'email'
-        | 'canonicalEmail'
-        | 'username'
-        | undefined;
-      // 'email' is kept as a backward-compat alias for GraphQL clients
+      const rawOrderBy = validateUsersOrderBy(args.orderBy);
       const orderBy = rawOrderBy === 'email' ? 'canonicalEmail' : rawOrderBy;
-      const orderDirection = args.orderDirection as 'asc' | 'desc' | undefined;
-      const accessLevelFilter = args.accessLevel as
-        | 'none'
-        | 'admin'
-        | undefined;
+      const orderDirection = validateOrderDirection(args.orderDirection);
+      const accessLevelFilter = validateAccessLevelFilter(args.accessLevel);
 
       const users = await dbService.users.getUsers({
         limit: args.limit || undefined,
@@ -149,7 +192,9 @@ builder.queryField('users', (t) =>
           : undefined,
       });
 
-      LOGGER.error('Admin user list viewed', {
+      // Audit log for a routine admin view — logged at info so it isn't
+      // forwarded to Rollbar as a production error (LS-8653).
+      LOGGER.info('Admin user list viewed', {
         audit: true,
         actor: { id: Number(user.id) },
         resultCount: users.length,
@@ -182,10 +227,7 @@ builder.queryField('usersCount', (t) =>
         throw ForbiddenError('Admin access required to count users');
       }
 
-      const accessLevelFilter = args.accessLevel as
-        | 'none'
-        | 'admin'
-        | undefined;
+      const accessLevelFilter = validateAccessLevelFilter(args.accessLevel);
 
       const count = await dbService.users.countUsers({
         searchTerm: args.search || undefined,
@@ -194,8 +236,8 @@ builder.queryField('usersCount', (t) =>
           : undefined,
       });
 
-      // Audit log: routine admin view, not a security-sensitive action —
-      // logged at info level so it isn't forwarded to Rollbar as an error.
+      // Audit log for a routine admin view — logged at info so it isn't
+      // forwarded to Rollbar as a production error (LS-8653).
       LOGGER.info('Admin user count viewed', {
         audit: true,
         actor: { id: Number(user.id) },

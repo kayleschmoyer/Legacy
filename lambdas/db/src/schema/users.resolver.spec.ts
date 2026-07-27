@@ -739,6 +739,319 @@ describe('cleanupLeakedTestUsers mutation', () => {
   });
 });
 
+describe('users / usersCount queries (LS-8653)', () => {
+  let schema: GraphQLSchema;
+  let mockGetUsers: jest.Mock;
+  let mockCountUsers: jest.Mock;
+  let mockLogger: {
+    info: jest.Mock;
+    debug: jest.Mock;
+    warn: jest.Mock;
+    error: jest.Mock;
+  };
+  let mockContext: {
+    user: {
+      id: number;
+      email: string;
+      username: string;
+      isAdmin: boolean;
+    } | null;
+  };
+
+  beforeEach(() => {
+    jest.resetModules();
+
+    mockGetUsers = jest.fn().mockResolvedValue([]);
+    mockCountUsers = jest.fn().mockResolvedValue(0);
+    mockLogger = {
+      info: jest.fn(),
+      debug: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    };
+
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      ...jest.requireActual('@legacy-sports/utils/node'),
+      getDbOptions: jest.fn(() => ({})),
+    }));
+
+    jest.doMock('@legacy-sports/logging', () => ({
+      LOGGER: mockLogger,
+    }));
+
+    jest.doMock('jsonwebtoken', () => ({
+      sign: jest.fn(),
+      verify: jest.fn(),
+      decode: jest.fn(),
+    }));
+
+    jest.doMock('../server/context', () => ({
+      getJwtSecret: jest.fn().mockResolvedValue('test-jwt-secret'),
+    }));
+
+    jest.doMock('@legacy-sports/db-client', () => ({
+      createDatabaseService: jest.fn(() => ({
+        users: {
+          getUserById: jest.fn(),
+          getUsers: mockGetUsers,
+          countUsers: mockCountUsers,
+        },
+        statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
+      })),
+      runWithPublicClient: jest.fn(),
+      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
+      PublicSchema: {
+        leagues: {
+          id: 'id',
+          name: 'name',
+          currentWeek: 'cw',
+          currentMatchup: 'cm',
+        },
+        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+        leagueMembers: {
+          leagueId: 'l',
+          userId: 'u',
+          teamId: 't',
+          permissionLevel: 'p',
+        },
+        teamMembers: {
+          id: 'id',
+          teamId: 't',
+          leagueId: 'l',
+          playerId: 'p',
+          positionId: 'pos',
+        },
+        players: { id: 'id', firstName: 'fn', lastName: 'ln', brefId: 'b' },
+        matchups: {
+          id: 'id',
+          leagueId: 'l',
+          weekNumber: 'w',
+          status: 's',
+          team1Id: 't1',
+          team2Id: 't2',
+        },
+        matchupPlayers: {
+          id: 'id',
+          matchupId: 'm',
+          playerId: 'p',
+          teamId: 't',
+        },
+        leagueWeekPlayerSeasons: {
+          playerId: 'p',
+          season: 's',
+          leagueId: 'l',
+          weekNumber: 'w',
+        },
+        leagueSeasonAwards: {
+          id: 'id',
+          leagueId: 'l',
+          season: 's',
+          playerId: 'p',
+          awardType: 'a',
+          notes: 'n',
+          createdAt: 'c',
+          updatedAt: 'u',
+        },
+        leagueActivityLog: {
+          id: 'id',
+          leagueId: 'l',
+          eventType: 'e',
+          occurredAt: 'o',
+        },
+        leagueActivityEventType: { enumValues: [] },
+        // requireAdmin (LS-#4781) re-verifies admin access against the DB via
+        // context.db.select({ accessLevel: PublicSchema.users.accessLevel }).
+        users: { id: 'id', accessLevel: 'accessLevel' },
+      },
+      InternalSchema: {
+        usersInAppInternal: { id: 'id', subscriptionTier: 's' },
+      },
+      PublicDb: {},
+    }));
+
+    jest.doMock('../services/standings-service', () => ({
+      StandingsService: {
+        getHeadToHead: jest.fn(),
+        getSeasonSummary: jest.fn(),
+        getStandings: jest.fn(),
+        getMatchupStats: jest.fn(),
+      },
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
+    const schemaModule = require('../schema') as { schema: GraphQLSchema };
+    schema = schemaModule.schema;
+
+    mockContext = {
+      user: {
+        id: 1,
+        email: 'admin@example.com',
+        username: 'admin',
+        isAdmin: true,
+      },
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function getResolver(fieldName: 'users' | 'usersCount') {
+    const queryType = schema.getQueryType();
+    const field = queryType?.getFields()[fieldName];
+    if (!field?.resolve) {
+      throw new Error(`${fieldName} resolver not found`);
+    }
+    return field.resolve;
+  }
+
+  it('rejects non-admin users for the users query', async () => {
+    const resolve = getResolver('users');
+    await expect(
+      resolve(
+        {},
+        {},
+        { user: { id: 2, email: 'u@e.com', username: 'u', isAdmin: false } },
+        undefined as never,
+      ),
+    ).rejects.toThrow('Admin access required');
+  });
+
+  it('logs the admin user list view at info level, not error, so it is not forwarded to Rollbar', async () => {
+    mockGetUsers.mockResolvedValue([
+      {
+        id: 5,
+        canonicalEmail: 'user@example.com',
+        username: 'user',
+        accessLevel: 'none',
+      },
+    ]);
+    const resolve = getResolver('users');
+
+    await resolve({}, {}, mockContext, undefined as never);
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Admin user list viewed',
+      expect.objectContaining({
+        audit: true,
+        actor: { id: 1 },
+        resultCount: 1,
+      }),
+    );
+    expect(mockLogger.error).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-admin users for the usersCount query', async () => {
+    const resolve = getResolver('usersCount');
+    await expect(
+      resolve(
+        {},
+        {},
+        { user: { id: 2, email: 'u@e.com', username: 'u', isAdmin: false } },
+        undefined as never,
+      ),
+    ).rejects.toThrow('Admin access required');
+  });
+
+  it('logs the admin user count view at info level, not error, so it is not forwarded to Rollbar', async () => {
+    mockCountUsers.mockResolvedValue(42);
+    const resolve = getResolver('usersCount');
+
+    await resolve({}, {}, mockContext, undefined as never);
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Admin user count viewed',
+      expect.objectContaining({
+        audit: true,
+        actor: { id: 1 },
+        count: 42,
+      }),
+    );
+    expect(mockLogger.error).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid orderBy value for the users query', async () => {
+    const resolve = getResolver('users');
+
+    await expect(
+      resolve(
+        {},
+        { orderBy: 'DROP TABLE users' },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toThrow('Invalid orderBy: DROP TABLE users');
+    expect(mockGetUsers).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid orderDirection value for the users query', async () => {
+    const resolve = getResolver('users');
+
+    await expect(
+      resolve(
+        {},
+        { orderDirection: 'sideways' },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toThrow('Invalid orderDirection: sideways');
+    expect(mockGetUsers).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid accessLevel value for the users query', async () => {
+    const resolve = getResolver('users');
+
+    await expect(
+      resolve(
+        {},
+        { accessLevel: 'superadmin' },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toThrow('Invalid accessLevel: superadmin');
+    expect(mockGetUsers).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid accessLevel value for the usersCount query', async () => {
+    const resolve = getResolver('usersCount');
+
+    await expect(
+      resolve(
+        {},
+        { accessLevel: 'superadmin' },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toThrow('Invalid accessLevel: superadmin');
+    expect(mockCountUsers).not.toHaveBeenCalled();
+  });
+
+  it('accepts the "email" backward-compat alias for orderBy', async () => {
+    mockGetUsers.mockResolvedValue([]);
+    const resolve = getResolver('users');
+
+    await resolve({}, { orderBy: 'email' }, mockContext, undefined as never);
+
+    expect(mockGetUsers).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: 'canonicalEmail' }),
+    );
+  });
+});
+
 describe('updateUserTheme mutation', () => {
   let schema: GraphQLSchema;
   let mockContext: {
