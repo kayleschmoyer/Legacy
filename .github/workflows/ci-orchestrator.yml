@@ -383,18 +383,27 @@ jobs:
               // still-executing CI run is visible ONLY through the granular
               // check runs — never through a required context. The prefix must
               // match the orchestrator's ci-pipeline job name ("🚀 CI Pipeline").
+              //
+              // LS-8402: anyActive must be scoped to CI_PIPELINE_PREFIX only.
+              // It previously also treated any in-flight *required* check-run
+              // context (checkRunContexts.some(name => activeNames.has(name)))
+              // as evidence the pipeline was running. But checkRunContexts also
+              // includes checks unrelated to the CI Pipeline job — e.g. "Verify
+              // All Migrations Applied" — so an unrelated required check still
+              // being in_progress on the same SHA was misread as "CI Pipeline is
+              // running", setting ci-already-passed=true and silently skipping
+              // the actual CI Pipeline job even though it never ran for this SHA
+              // (confirmed repeatedly: LS-6112/PR#6002, LS-6029/PR#6252,
+              // LS-8390/PR#6324). Only the CI-pipeline-prefixed check runs are
+              // valid evidence that the pipeline itself is in flight.
               const CI_PIPELINE_PREFIX = '🚀 CI Pipeline /';
-              const anyActive =
-                checkRunContexts.some(name => activeNames.has(name)) ||
-                [...activeNames].some(name => name.startsWith(CI_PIPELINE_PREFIX));
+              const anyActive = [...activeNames].some(name => name.startsWith(CI_PIPELINE_PREFIX));
 
               if (allPassed) {
                 core.info(`All required contexts already green for SHA ${sha} — skipping CI re-run.`);
                 core.setOutput('ci-already-passed', 'true');
               } else if (anyActive) {
-                const active = [...activeNames].filter(
-                  name => checkRunContexts.includes(name) || name.startsWith(CI_PIPELINE_PREFIX)
-                );
+                const active = [...activeNames].filter(name => name.startsWith(CI_PIPELINE_PREFIX));
                 core.info(`CI already running for SHA ${sha} (${active.join(', ')}) — skipping re-run to avoid a duplicate pipeline.`);
                 core.setOutput('ci-already-passed', 'true');
               } else {
