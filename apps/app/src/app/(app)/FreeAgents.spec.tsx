@@ -16,7 +16,6 @@ let mockClaim: jest.Mock;
 
 // Prevent expo-router's native EventEmitter from crashing Jest.
 jest.mock('expo-router', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.requireActual must use require-style import inside jest.mock factory
   jest.requireActual<typeof import('react-native')>('react-native');
   return {
     Redirect: () => null,

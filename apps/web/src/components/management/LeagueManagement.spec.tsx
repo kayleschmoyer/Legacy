@@ -178,6 +178,7 @@ describe('LeagueManagement', () => {
     });
 
     expect(mockMutation).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion, not an unbound call
     expect(window.alert).toHaveBeenCalledWith(
       expect.stringContaining('Deleted 3 leagues'),
     );

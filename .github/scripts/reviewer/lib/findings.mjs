@@ -44,7 +44,7 @@ export function parseFindingsFromText(text) {
   // extract embedded ```/```json blocks. Fence normalization is handled here in
   // parseFindingsFromText for all provider output; providers such as Gemini
   // return raw model text and are not responsible for normalizing fenced JSON.
-  let candidate = normalizeJsonFence(text.trim());
+  const candidate = normalizeJsonFence(text.trim());
 
   // Attempt 1: the candidate is exactly a JSON array or {"findings":[...]} object.
   let parsed = _tryParseJsonArray(candidate);

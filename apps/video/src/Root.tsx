@@ -1,10 +1,10 @@
 import { Composition } from 'remotion';
 import { TutorialVideo } from './TutorialVideo';
 import {
-  VIDEO_FPS,
   VIDEO_DURATION_FRAMES,
-  VIDEO_WIDTH,
+  VIDEO_FPS,
   VIDEO_HEIGHT,
+  VIDEO_WIDTH,
 } from './theme';
 
 export const Root = () => {

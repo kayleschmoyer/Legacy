@@ -15,7 +15,6 @@
 
 import { CONFIG_KEYS } from './registry';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { CONFIG_KEY_ALIASES } = require('../../plugins/config-aliases') as {
   CONFIG_KEY_ALIASES: [string, string][];
 };

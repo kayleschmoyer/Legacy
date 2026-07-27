@@ -117,7 +117,6 @@ function AuthenticatedContent(): React.JSX.Element {
   const { data: currentUser } = useCurrentUserInfo();
 
   return (
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Apollo's StoreValue type includes `any`, making ApolloClient<NormalizedCacheObject> flagged; same pattern as tamaguiConfig on L142
     <ApolloProvider client={client.apolloClient}>
       {currentUser?.id && currentUser.id > 0 ? (
         <AnalyticsIdentify userId={currentUser.id} />

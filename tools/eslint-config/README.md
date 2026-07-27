@@ -16,60 +16,67 @@ This package provides standardized ESLint configurations for different project t
 
 ### In Project ESLint Files
 
-Replace your existing `.eslintrc.json` with the appropriate configuration:
+This package exports ESLint 9 flat config arrays. Import the fragment you
+need in your project's `eslint.config.mjs` and spread it into your own
+config array:
 
 #### For React Applications/Components
 
-```json
-{
-  "extends": ["../../tools/eslint-config/react"]
-}
+```js
+import react from '../../tools/eslint-config/react.mjs';
+
+export default [...react];
 ```
 
 #### For Lambda Functions
 
-```json
-{
-  "extends": ["../../tools/eslint-config/lambda"]
-}
+```js
+import lambda from '../../tools/eslint-config/lambda.mjs';
+
+export default [...lambda];
 ```
 
 #### For Shared Libraries
 
-```json
-{
-  "extends": ["../../tools/eslint-config/library"]
-}
+```js
+import library from '../../tools/eslint-config/library.mjs';
+
+export default [...library];
 ```
 
 #### For E2E Test Projects
 
-```json
-{
-  "extends": ["../../tools/eslint-config/e2e"]
-}
+```js
+import e2e from '../../tools/eslint-config/e2e.mjs';
+
+export default [...e2e];
 ```
 
 #### For Basic TypeScript Projects
 
-```json
-{
-  "extends": ["../../tools/eslint-config/base"]
-}
+```js
+import base from '../../tools/eslint-config/base.mjs';
+
+export default [...base];
 ```
 
 ### Custom Project Overrides
 
-You can add project-specific rules while still using the unified base:
+You can add project-specific rules while still using the unified base by
+appending your own config objects after the spread:
 
-```json
-{
-  "extends": ["../../tools/eslint-config/react"],
-  "rules": {
-    "react/jsx-sort-props": "off",
-    "custom-rule": "error"
-  }
-}
+```js
+import react from '../../tools/eslint-config/react.mjs';
+
+export default [
+  ...react,
+  {
+    rules: {
+      'react/jsx-sort-props': 'off',
+      'custom-rule': 'error',
+    },
+  },
+];
 ```
 
 ## 📊 Configuration Details
@@ -142,12 +149,12 @@ You can add project-specific rules while still using the unified base:
    - E2E tests → `e2e`
    - Other TypeScript → `base`
 
-3. **Update .eslintrc.json**:
+3. **Create eslint.config.mjs**:
 
-   ```json
-   {
-     "extends": ["../../tools/eslint-config/[TYPE]"]
-   }
+   ```js
+   import config from '../../tools/eslint-config/[type].mjs';
+
+   export default [...config];
    ```
 
 4. **Test the new configuration**:
@@ -174,23 +181,25 @@ If the new configuration introduces lint errors:
 
 ### Adding Project-Specific Rules
 
-```json
-{
-  "extends": ["../../tools/eslint-config/react"],
-  "rules": {
-    // Override specific rules for this project
-    "react/jsx-sort-props": "off"
+```js
+import react from '../../tools/eslint-config/react.mjs';
+
+export default [
+  ...react,
+  {
+    rules: {
+      // Override specific rules for this project
+      'react/jsx-sort-props': 'off',
+    },
   },
-  "overrides": [
-    {
-      "files": ["*.stories.tsx"],
-      "rules": {
-        // Storybook files get different rules
-        "@typescript-eslint/no-explicit-any": "off"
-      }
-    }
-  ]
-}
+  {
+    files: ['**/*.stories.tsx'],
+    rules: {
+      // Storybook files get different rules
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+];
 ```
 
 ### Proposing Configuration Changes

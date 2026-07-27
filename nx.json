@@ -14,7 +14,7 @@
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
       "default",
-      "!{projectRoot}/.eslintrc.json",
+      "!{projectRoot}/eslint.config.mjs",
       "!{projectRoot}/eslint.config.js",
       "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
       "!{projectRoot}/tsconfig.spec.json",
@@ -41,7 +41,22 @@
       "options": {
         "targetName": "lint"
       },
-      "exclude": ["package.json"]
+      "exclude": [
+        "package.json",
+        "tools/mcp/aws-server/**",
+        "tools/mcp/browser-server/**",
+        "tools/mcp/ci-server/**",
+        "tools/mcp/db-admin-server/**",
+        "tools/mcp/dev-process-server/**",
+        "tools/mcp/github-server/**",
+        "tools/mcp/jira-server/**",
+        "tools/mcp/local-git-server/**",
+        "tools/mcp/make-server/**",
+        "tools/mcp/nx-server/**",
+        "tools/mcp/rollbar-server/**",
+        "tools/jira-sync/**",
+        "tools/rollbar-jira-reconcile/**"
+      ]
     },
     {
       "plugin": "@nx/storybook/plugin",
@@ -129,7 +144,7 @@
       "cache": true,
       "inputs": [
         "default",
-        "{workspaceRoot}/.eslintrc.json",
+        "{workspaceRoot}/eslint.config.mjs",
         "{workspaceRoot}/tools/eslint-rules/**/*",
         {
           "externalDependencies": ["eslint"]

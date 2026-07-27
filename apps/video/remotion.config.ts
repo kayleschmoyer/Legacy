@@ -1,5 +1,5 @@
 import { Config } from '@remotion/cli/config';
-import { statSync, readdirSync, existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 Config.setVideoImageFormat('jpeg');

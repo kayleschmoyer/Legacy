@@ -139,7 +139,6 @@ export async function getHeadToHeadRecord(
       and(
         eq(Schema.matchups.leagueId, leagueId),
         eq(Schema.matchups.status, 'completed'),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
         or(
           and(
             eq(Schema.matchups.team1Id, team1Id),
@@ -149,7 +148,7 @@ export async function getHeadToHeadRecord(
             eq(Schema.matchups.team1Id, team2Id),
             eq(Schema.matchups.team2Id, team1Id),
           ),
-        ), // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
+        ),
       ),
     );
 
@@ -657,11 +656,10 @@ export async function getRecentMatchupsForTeam(
     .from(Schema.matchups)
     .where(
       and(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
         or(
           eq(Schema.matchups.team1Id, teamId),
           eq(Schema.matchups.team2Id, teamId),
-        ), // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
+        ),
         eq(Schema.matchups.status, 'completed'),
       ),
     )
@@ -702,11 +700,10 @@ export async function getWinStreakMatchupsForTeam(
     .from(Schema.matchups)
     .where(
       and(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Drizzle `or` typing limitation with multiple conditions
         or(
           eq(Schema.matchups.team1Id, teamId),
           eq(Schema.matchups.team2Id, teamId),
-        ), // eslint-disable-line @typescript-eslint/no-explicit-any -- Drizzle or() typing limitation
+        ),
         eq(Schema.matchups.status, 'completed'),
       ),
     )

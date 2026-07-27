@@ -1,0 +1,240 @@
+import baseConfig from '../../eslint.config.mjs';
+
+// LS-4458 spec-file lint rules. Defined once and shared across overrides
+// because ESLint legacy config does NOT merge `no-restricted-syntax` across
+// matching overrides — the latter override fully replaces the rule, so the
+// only way to apply both LS-4461 (integration-only) and LS-4458 (all spec
+// files) selectors to integration spec files is to expand them inline in
+// each override block. Using `eslint.config.mjs` (over JSON) lets us keep
+// one source of truth for the selector list.
+const ls4458SpecRules = [
+  {
+    selector:
+      "IfStatement > AwaitExpression.test CallExpression[callee.property.name='isVisible']",
+    message:
+      'Do not branch on `if (await locator.isVisible())` in spec files — it silently passes when the element is hidden. Use a strict `await expect(locator).toBeVisible()` assertion, fix the precondition so the element always renders, or extract the polling into a helper outside spec/. See LS-4458.',
+  },
+  {
+    selector:
+      "IfStatement > UnaryExpression[operator='!'] > AwaitExpression.argument CallExpression[callee.property.name='isVisible']",
+    message:
+      'Do not branch on `if (!(await locator.isVisible()))` in spec files. Use a strict `await expect(locator).not.toBeVisible()` assertion or a deterministic precondition. See LS-4458.',
+  },
+  {
+    selector:
+      "IfStatement > AwaitExpression.test CallExpression[callee.object.callee.property.name='isVisible']",
+    message:
+      'Do not branch on `if (await locator.isVisible().catch(...))` in spec files. Use a strict assertion or fix the precondition race. Extract polling/cleanup into a helper outside spec/ if conditional execution is genuinely required. See LS-4458.',
+  },
+  {
+    selector:
+      "CallExpression[callee.object.name='test'][callee.property.name='skip'][arguments.0.value=true]",
+    message:
+      "Do not call `test.skip(true, ...)` at runtime — it silently passes regardless of the assertion's intent. Use `test.fixme(...)` with a Jira link, or fix the precondition so the test always runs. See LS-4458.",
+  },
+];
+
+// LS-4456 ban hard sleeps and `networkidle` waits from low-level page objects
+// and helpers. `page.waitForTimeout` bakes flake into every caller; Playwright
+// officially discourages `waitForLoadState('networkidle')` and Apollo polling /
+// WebSocket heartbeats defeat it on most routes.
+const ls4456PageObjectRules = [
+  {
+    selector:
+      "CallExpression[callee.type='MemberExpression'][callee.property.name='waitForTimeout']",
+    message:
+      'LS-4456: page.waitForTimeout is banned in page objects and helpers — it bakes flake into every caller. Use expect(testid).toBeVisible(), page.waitForResponse(operationName), or expect.poll on a stable signal.',
+  },
+  {
+    selector:
+      "CallExpression[callee.type='MemberExpression'][callee.property.name='waitForLoadState'][arguments.0.value='networkidle']",
+    message:
+      "LS-4456: waitForLoadState('networkidle') is banned in page objects and helpers — Playwright officially discourages it and Apollo polling/WebSockets defeat it. Gate on a visible test id instead.",
+  },
+];
+
+// LS-8096 ban selector-based queries in spec files — enforces the semantic
+// Page Object Model from ADR-0015. Selectors are allowed only in the page
+// object layer (base/, components/, pages/); spec files call semantic verbs
+// (e.g. `draftPage.pick(player)`) so a selector change touches one POM file,
+// not every spec.
+const ls8096NoSelectorsInSpecsRules = [
+  {
+    selector: "CallExpression[callee.property.name='getByTestId']",
+    message:
+      'LS-8096: getByTestId is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb (e.g. `draftPage.pick(player)`). See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='getByRole']",
+    message:
+      'LS-8096: getByRole is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb. See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='getByPlaceholder']",
+    message:
+      'LS-8096: getByPlaceholder is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb. See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='getByText']",
+    message:
+      'LS-8096: getByText is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb. See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+  {
+    selector: "CallExpression[callee.property.name='locator']",
+    message:
+      'LS-8096: locator() is banned in spec files (semantic POM, ADR-0015). Move the selector into a Page Object under base/, components/, or pages/, and expose a semantic verb. See .agents/skills/testing/SKILL.md → Semantic Page Object Model.',
+  },
+];
+
+const ls4461IntegrationRules = [
+  {
+    selector:
+      "CallExpression[callee.object.property.name='request'][callee.property.name='post']",
+    message:
+      'LS-4461: integration tests must not call `page.request.post(...)` for GraphQL. Use `gqlFetch` / `gqlFetchEnvelope` from `../helpers/gql-fetch` so backend `errors[]` are surfaced instead of masked as downstream timeouts.',
+  },
+  {
+    selector: "CallExpression[callee.name='fetch']",
+    message:
+      'LS-4461: integration tests must not call `fetch(...)` directly. Use `gqlFetch` / `gqlFetchEnvelope` from `../helpers/gql-fetch` (which handles the GraphQL URL, auth header, and error unpacking).',
+  },
+];
+
+// LS-8096 basename list, converted to `**/<basename>` — bare basenames
+// (no `/`) only matched at any depth under eslintrc's minimatch semantics;
+// flat config requires the explicit `**/` prefix to preserve that behavior.
+const ls8096MigratedSpecFiles = [
+  'create-league-form-validation.spec.ts',
+  'draft-selection-workflow.spec.ts',
+  'free-agents-pickup.spec.ts',
+  'join-league.spec.ts',
+  'league-creation-advanced.spec.ts',
+  'league-creation-football.spec.ts',
+  'league-detail-tabs.spec.ts',
+  'league-discovery-search.dual.spec.ts',
+  'league-discovery.spec.ts',
+  'mobile-responsive-nav.spec.ts',
+  'navigation.spec.ts',
+  'player-brefid-route.spec.ts',
+  'player-compare-search.dual.spec.ts',
+  'player-comparison-best-indicator.spec.ts',
+  'player-comparison-career-achievements.spec.ts',
+  'player-comparison-color-chips.spec.ts',
+  'player-comparison-empty-minimum-states.spec.ts',
+  'player-comparison-fantasy-scoring.spec.ts',
+  'player-comparison-stats-charts.spec.ts',
+  'player-comparison.spec.ts',
+  'player-detail-bio-career-arc.spec.ts',
+  'player-detail-modal.spec.ts',
+  'player-detail-season-pitching.spec.ts',
+  'player-stats-mocked.spec.ts',
+  'player-stats-search.dual.spec.ts',
+  'player-stats.spec.ts',
+  // LS-8456 Phase B — trades / waivers / free-agents / notifications / settings
+  'notification-dropdown-navigation.spec.ts',
+  'notifications-hub.spec.ts',
+  'notifications-page.spec.ts',
+  'preferences.spec.ts',
+  'profile-settings.spec.ts',
+  'submit-new-trade.spec.ts',
+  'trade-block.spec.ts',
+  'trading-center.spec.ts',
+  'user-preferences.spec.ts',
+  'waiver-claims.spec.ts',
+].map((basename) => `**/${basename}`);
+
+export default [
+  ...baseConfig,
+  {
+    files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
+    languageOptions: {
+      parserOptions: {
+        project: ['apps/web-e2e/tsconfig.*?.json'],
+      },
+    },
+    rules: {},
+  },
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    rules: {
+      'no-empty-pattern': ['error', { allowObjectPatternsAsParameters: true }],
+    },
+  },
+  {
+    files: ['**/*.js', '**/*.jsx'],
+    rules: {},
+  },
+  {
+    files: ['**/src/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
+      'no-console': 'off',
+    },
+  },
+  {
+    // Integration suite: enforce both LS-4461 (no raw HTTP) and LS-4458
+    // (no conditional UI guards). Expanded inline because the LS-4458
+    // override below would otherwise override-replace these selectors.
+    files: [
+      '**/src/integration/tests/**/*.ts',
+      '**/src/integration/fixtures/**/*.ts',
+      '**/src/integration/*.ts',
+    ],
+    ignores: [
+      '**/src/integration/global-setup.ts',
+      '**/src/integration/global-teardown.ts',
+      '**/src/integration/tests/google-oauth.integration.spec.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...ls4461IntegrationRules,
+        ...ls4458SpecRules,
+      ],
+    },
+  },
+  {
+    // Hermetic spec suite: enforce LS-4458 only. LS-4461 does not apply —
+    // hermetic specs use `page.route` mocking instead of `gqlFetch`.
+    files: ['**/src/tests/**/*.spec.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...ls4458SpecRules],
+    },
+  },
+  {
+    // LS-4456 page objects + helpers: ban hard sleeps and `networkidle`.
+    // Disjoint from the integration/hermetic spec overrides above —
+    // `pages/**` and `**/helpers/**` do not overlap with `tests/`,
+    // `fixtures/`, or `src/integration/*.ts`, so the legacy-config
+    // "last-override-wins" replacement of `no-restricted-syntax` does not
+    // affect those suites.
+    files: ['**/src/pages/**/*.ts', '**/src/**/helpers/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...ls4456PageObjectRules],
+    },
+  },
+  {
+    // LS-8096: ban selector-based queries in migrated hermetic specs.
+    // Scoped via **basename globs** (distinct override key) and listed
+    // LAST so it wins the legacy-config "last-override-wins" merge for
+    // `no-restricted-syntax` on these files (per LS-7947 clobber hazard).
+    // Because the earlier `src/tests/**/*.spec.ts` override would
+    // otherwise replace this rule list, we re-spread the LS-4458 rules
+    // here so all checks remain active on the matched specs. As more
+    // specs are migrated to the semantic POM (ADR-0015), add their
+    // basename to this list; once every spec under `src/tests/` is
+    // migrated, widen `files` to `src/tests/**/*.spec.ts` and delete
+    // the per-file list.
+    files: ls8096MigratedSpecFiles,
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...ls4458SpecRules,
+        ...ls8096NoSelectorsInSpecsRules,
+      ],
+    },
+  },
+  {
+    ignores: ['**/test-jwt-utils.ts'],
+  },
+];

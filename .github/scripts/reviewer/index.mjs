@@ -835,7 +835,9 @@ async function main() {
     );
     try {
       setCommitStatus(sha, 'failure', 'Review failed: prompt build error');
-    } catch (_) {}
+    } catch {
+      // best-effort status update; already exiting due to the prompt-build failure above
+    }
     process.exit(0);
   }
 

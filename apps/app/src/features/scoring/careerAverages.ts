@@ -111,7 +111,6 @@ function normalizePlayerIds(
 export function useCareerAverageStats(
   playerIds?: readonly number[] | null,
 ): CareerAverageStatsResult {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   const client = useApolloClient();
   const [records, setRecords] = useState<Map<number, PlayerCareerStats>>(
     () => new Map(),
@@ -144,7 +143,6 @@ export function useCareerAverageStats(
 
     void Promise.all(
       missingIds.map(async (playerId) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         const response = await client.query<
           GetPlayerCareerStatsQuery,
           GetPlayerCareerStatsQueryVariables
@@ -155,7 +153,6 @@ export function useCareerAverageStats(
           context: { fetchOptions: { signal: controller.signal } },
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         return { playerId, data: response.data };
       }),
     )
@@ -169,7 +166,6 @@ export function useCareerAverageStats(
 
           for (const { playerId, data } of results) {
             if (data !== undefined) {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
               next.set(playerId, transformCareerStats(data));
             }
           }

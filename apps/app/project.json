@@ -30,22 +30,22 @@
     "build-android": {
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
+      "cache": true,
+      "outputs": ["{projectRoot}/android/app/build/outputs/apk"],
       "options": {
         "command": "npx expo prebuild --platform android --no-install && cd android && ./gradlew assembleRelease --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan",
         "cwd": "apps/app"
-      },
-      "cache": true,
-      "outputs": ["{projectRoot}/android/app/build/outputs/apk"]
+      }
     },
     "build-android-debug": {
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
+      "cache": true,
+      "outputs": ["{projectRoot}/android/app/build/outputs/apk"],
       "options": {
         "command": "npx expo prebuild --platform android --no-install && cd android && ./gradlew assembleDebug --no-daemon --stacktrace --no-parallel --max-workers=2 --build-cache --no-scan",
         "cwd": "apps/app"
-      },
-      "cache": true,
-      "outputs": ["{projectRoot}/android/app/build/outputs/apk"]
+      }
     },
     "test-android": {
       "executor": "nx:run-commands",
@@ -120,7 +120,12 @@
       }
     },
     "typecheck": {
-      "dependsOn": [{ "projects": ["graphql"], "target": "codegen" }],
+      "dependsOn": [
+        {
+          "projects": ["graphql"],
+          "target": "codegen"
+        }
+      ],
       "options": {
         "command": "tsc --noEmit -p tsconfig.app.json",
         "cwd": "apps/app"

@@ -57,11 +57,11 @@ jest.mock('@legacy-sports/aws-utils', () => ({
 
 // ── Import after mocks ─────────────────────────────────────────────────────
 
-import { handler } from './index';
+import { runWithPublicClient } from '@legacy-sports/db-client';
 import { classifyImageForNsfw } from './cloudflare';
 import { uploadImageToS3 } from './storage';
 import { getAuthenticatedUserId } from './auth';
-import { runWithPublicClient } from '@legacy-sports/db-client';
+import { handler } from './index';
 
 const mockClassify = classifyImageForNsfw as jest.MockedFunction<
   typeof classifyImageForNsfw

@@ -3,10 +3,20 @@ import type { AppConfig } from './types';
 import { CONFIG_KEYS } from './registry';
 import { validateConfig } from './validation';
 
+// Routes casts through `unknown` behind a generic function boundary.
+// typescript-eslint's no-unnecessary-type-assertion false-positives on direct
+// `x as T` casts from an `any`-valued source (e.g. expo-constants' `extra?:
+// { [k: string]: any }`) — it treats the assertion as a no-op because `any`
+// is already assignable to anything. Crossing a generic call breaks that
+// analysis, matching the LS-8615 typescript-eslint v8 migration fix pattern.
+function castUnknown<T>(value: unknown): T {
+  return value as T;
+}
+
 export function buildNativeConfig(): AppConfig {
-  const extra = Constants.expoConfig?.extra as
-    | Record<string, string | undefined>
-    | undefined;
+  const extra = castUnknown<Record<string, string | undefined> | undefined>(
+    Constants.expoConfig?.extra,
+  );
 
   const values = {
     statsApiUrl:
@@ -50,12 +60,9 @@ export function buildNativeConfig(): AppConfig {
 
   // Validate all native-required keys together so one error lists everything missing,
   // rather than surfacing one missing key at a time per consumer.
-  const missingNative = (
-    Object.entries(CONFIG_KEYS) as [
-      string,
-      (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS],
-    ][]
-  )
+  const missingNative = castUnknown<
+    [string, (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS]][]
+  >(Object.entries(CONFIG_KEYS))
     .filter(
       ([key, entry]) =>
         'nativeRequired' in entry &&

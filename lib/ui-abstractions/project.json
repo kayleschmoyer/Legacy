@@ -3,6 +3,13 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lib/ui-abstractions/src",
   "projectType": "library",
+  "tags": [
+    "platform:shared",
+    "scope:lib",
+    "scope:shared",
+    "type:ui",
+    "type:util"
+  ],
   "targets": {
     "typecheck": {},
     "lint": {
@@ -11,12 +18,5 @@
         "maxWarnings": 0
       }
     }
-  },
-  "tags": [
-    "platform:shared",
-    "scope:lib",
-    "scope:shared",
-    "type:ui",
-    "type:util"
-  ]
+  }
 }

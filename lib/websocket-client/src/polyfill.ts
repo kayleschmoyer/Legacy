@@ -15,7 +15,7 @@ const isNode = typeof window === 'undefined';
 if (isNode && typeof globalThis.WebSocket === 'undefined') {
   try {
     // Dynamically import ws package for Node.js
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-assignment
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
     const WebSocketImpl = require('ws');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
     (globalThis as any).WebSocket = WebSocketImpl;

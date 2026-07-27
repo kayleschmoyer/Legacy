@@ -2,8 +2,8 @@ import React from 'react';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
-  FONT_DISPLAY,
   FONT_BODY,
+  FONT_DISPLAY,
   FONT_MONO,
   PANEL_BORDER,
   POS_CATCHER,

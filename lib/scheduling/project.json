@@ -3,6 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "lib/scheduling/src",
   "projectType": "library",
+  "tags": ["platform:shared", "scope:lib", "type:business"],
   "targets": {
     "typecheck": {},
     "lint": {
@@ -13,6 +14,5 @@
         "maxWarnings": 0
       }
     }
-  },
-  "tags": ["platform:shared", "scope:lib", "type:business"]
+  }
 }

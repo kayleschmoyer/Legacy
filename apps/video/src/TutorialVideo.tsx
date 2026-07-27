@@ -2,7 +2,7 @@ import { AbsoluteFill, Sequence } from 'remotion';
 import { loadFont as loadBigShoulders } from '@remotion/google-fonts/BigShoulders';
 import { loadFont as loadLiterata } from '@remotion/google-fonts/Literata';
 import { loadFont as loadRobotoMono } from '@remotion/google-fonts/RobotoMono';
-import { SCENES, BG_DARK } from './theme';
+import { BG_DARK, SCENES } from './theme';
 
 import { TitleScene } from './scenes/TitleScene';
 import { DifferentiatorScene } from './scenes/DifferentiatorScene';

@@ -47,7 +47,7 @@ function parseTestResults(
     const suiteMap = new Map<string, TestResult[]>();
 
     // Recursive function to process nested suites and specs
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, no-inner-declarations
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function processSuite(suite: any, parentName = ''): void {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       const suiteName = suite.title || 'Unnamed Suite';

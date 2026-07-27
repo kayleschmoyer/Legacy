@@ -11,12 +11,12 @@ import {
   BRAND_GOLD,
   BRAND_GOLD_DARK,
   BRAND_GOLD_LIGHT,
+  easeOutQuart,
   FONT_BODY,
   FONT_DISPLAY,
   FONT_MONO,
   TEXT_MUTED,
   TEXT_PRIMARY,
-  easeOutQuart,
 } from '../theme';
 
 const STATS = [
