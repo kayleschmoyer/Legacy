@@ -1441,23 +1441,17 @@ FootballPlayerRef.implement({
 
         return {
           playerId,
-          passing: passing.map((r) => ({ ...r, rating: toFloat(r.rating) })),
-          rushing: rushing.map((r) => ({
-            ...r,
-            ydsPerAtt: toFloat(r.ydsPerAtt),
-          })),
-          receiving: receiving.map((r) => ({
-            ...r,
-            ydsPerRec: toFloat(r.ydsPerRec),
-          })),
-          kicking: kicking.map((r) => ({
-            ...r,
-            fgPct: toFloat(r.fgPct),
-          })),
-          defense: defense.map((r) => ({
-            ...r,
-            sacks: toFloat(r.sacks),
-          })),
+          // passing.rating, rushing.ydsPerAtt, receiving.ydsPerRec,
+          // kicking.fgPct, and defense.sacks are `double precision`/`integer`
+          // physical columns (LS-8573) — Drizzle already returns them as
+          // `number`, so no toFloat() conversion is needed here.
+          passing,
+          rushing,
+          receiving,
+          kicking,
+          defense,
+          // footballSeasonDefenseIdp.sacks is unaffected by LS-8573 (still a
+          // physical `numeric` column) — Drizzle returns it as a string.
           idp: idp.map((r) => ({ ...r, sacks: toFloat(r.sacks) })),
         };
       },
@@ -1516,18 +1510,18 @@ FootballPlayerRef.implement({
 
         return {
           playerId,
-          passing: p ? { ...p, rating: toFloat(p.rating) } : null,
+          // careerFootballPassing.rating and careerFootballDefense.{sacks,
+          // ptsAllowedPerG,ydsAllowedPerG} are `double precision` physical
+          // columns (LS-8573) — Drizzle already returns them as `number`, so
+          // no toFloat() conversion is needed here.
+          passing: p ?? null,
           rushing: ru ?? null,
           receiving: re ?? null,
           kicking: k ?? null,
-          defense: d
-            ? {
-                ...d,
-                sacks: toFloat(d.sacks),
-                ptsAllowedPerG: toFloat(d.ptsAllowedPerG),
-                ydsAllowedPerG: toFloat(d.ydsAllowedPerG),
-              }
-            : null,
+          defense: d ?? null,
+          // careerFootballDefenseIdp.sacks is unaffected by LS-8573 (still a
+          // physical `numeric` column via the underlying view) — Drizzle
+          // returns it as a string.
           idp: idp ? { ...idp, sacks: toFloat(idp.sacks) } : null,
         };
       },

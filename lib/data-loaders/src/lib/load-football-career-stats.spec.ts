@@ -426,7 +426,7 @@ describe('loadFootballCareerStats — stat-group routing', () => {
         yds: 4200,
         td: 32,
         int: 10,
-        rating: '97.5',
+        rating: 97.5,
       },
     ]);
     // Career aggregate is still written alongside the season rows.

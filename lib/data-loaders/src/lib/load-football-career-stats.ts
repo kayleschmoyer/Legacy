@@ -90,7 +90,7 @@ function aggregatePassingSeasons(
     int: intCareer,
     sacked,
     sackYds,
-    rating: rating !== null ? String(rating) : null,
+    rating,
   };
 }
 
@@ -214,7 +214,7 @@ function aggregateDefenseSeasons(
   return {
     playerId,
     g,
-    sacks: sacks !== null ? String(sacks) : null,
+    sacks,
     int: intCareer,
     fumRec: fumblesRec,
     defTd,
@@ -688,7 +688,7 @@ async function loadFootballCareerStatsInner(
         yds: s.yds,
         td: s.td,
         int: s.int,
-        rating: s.rating !== null ? String(s.rating) : null,
+        rating: s.rating,
       });
     }
     if (totals.rushing) {

@@ -315,26 +315,35 @@ export const gameFootballDefenseIdp = pgTable(
 );
 
 // ── Football season stat tables (LS-247) ────────────────────────────────────
+//
+// Column types below are re-derived from the winning (non-no-op) migration,
+// 20260524_000000_create_football_season_stats.ts, not from
+// 20260524_100200_create_football_season_stats_tables.ts — the latter's
+// `CREATE TABLE IF NOT EXISTS` runs against tables the earlier migration
+// already created and is a silent no-op (LS-8573). Migrations are immutable
+// once applied (the CI migration-immutability check enforces this), so that
+// file is intentionally left unannotated; treat it as dead, not authoritative
+// — re-derive column types from information_schema.columns, not from it.
 
 export const footballSeasonPassing = pgTable(
   'football_season_passing',
   {
     playerId: integer('player_id').notNull(),
-    season: smallint('season').notNull(),
-    team: varchar('team', { length: 10 }).notNull(),
-    g: smallint('g'),
-    gs: smallint('gs'),
-    cmp: smallint('cmp'),
-    att: smallint('att'),
+    season: integer('season').notNull(),
+    team: varchar('team', { length: 50 }).notNull(),
+    g: integer('g'),
+    gs: integer('gs'),
+    cmp: integer('cmp'),
+    att: integer('att'),
     yds: integer('yds'),
-    td: smallint('td'),
-    int: smallint('int'),
-    firstDowns: smallint('first_downs'),
-    sacked: smallint('sacked'),
-    sackYds: smallint('sack_yds'),
-    lng: smallint('lng'),
-    rating: numeric('rating', { precision: 5, scale: 1 }),
-    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+    td: integer('td'),
+    int: integer('int'),
+    firstDowns: integer('first_downs'),
+    sacked: integer('sacked'),
+    sackYds: integer('sack_yds'),
+    lng: integer('lng'),
+    rating: doublePrecision('rating'),
+    pfrRowId: varchar('pfr_row_id', { length: 50 }).notNull(),
   },
   (table) => ({
     pk: primaryKey({
@@ -360,18 +369,18 @@ export const footballSeasonRushing = pgTable(
   'football_season_rushing',
   {
     playerId: integer('player_id').notNull(),
-    season: smallint('season').notNull(),
-    team: varchar('team', { length: 10 }).notNull(),
-    g: smallint('g'),
-    gs: smallint('gs'),
-    att: smallint('att'),
+    season: integer('season').notNull(),
+    team: varchar('team', { length: 50 }).notNull(),
+    g: integer('g'),
+    gs: integer('gs'),
+    att: integer('att'),
     yds: integer('yds'),
-    td: smallint('td'),
-    lng: smallint('lng'),
-    firstDowns: smallint('first_downs'),
-    fumbles: smallint('fumbles'),
-    ydsPerAtt: numeric('yds_per_att', { precision: 4, scale: 1 }),
-    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+    td: integer('td'),
+    lng: integer('lng'),
+    firstDowns: integer('first_downs'),
+    fumbles: integer('fumbles'),
+    ydsPerAtt: doublePrecision('yds_per_att'),
+    pfrRowId: varchar('pfr_row_id', { length: 50 }).notNull(),
   },
   (table) => ({
     pk: primaryKey({
@@ -397,19 +406,19 @@ export const footballSeasonReceiving = pgTable(
   'football_season_receiving',
   {
     playerId: integer('player_id').notNull(),
-    season: smallint('season').notNull(),
-    team: varchar('team', { length: 10 }).notNull(),
-    g: smallint('g'),
-    gs: smallint('gs'),
-    rec: smallint('rec'),
-    tgt: smallint('tgt'),
+    season: integer('season').notNull(),
+    team: varchar('team', { length: 50 }).notNull(),
+    g: integer('g'),
+    gs: integer('gs'),
+    rec: integer('rec'),
+    tgt: integer('tgt'),
     yds: integer('yds'),
-    td: smallint('td'),
-    lng: smallint('lng'),
-    firstDowns: smallint('first_downs'),
-    fumbles: smallint('fumbles'),
-    ydsPerRec: numeric('yds_per_rec', { precision: 4, scale: 1 }),
-    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+    td: integer('td'),
+    lng: integer('lng'),
+    firstDowns: integer('first_downs'),
+    fumbles: integer('fumbles'),
+    ydsPerRec: doublePrecision('yds_per_rec'),
+    pfrRowId: varchar('pfr_row_id', { length: 50 }).notNull(),
   },
   (table) => ({
     pk: primaryKey({
@@ -435,26 +444,26 @@ export const footballSeasonKicking = pgTable(
   'football_season_kicking',
   {
     playerId: integer('player_id').notNull(),
-    season: smallint('season').notNull(),
-    team: varchar('team', { length: 10 }).notNull(),
-    g: smallint('g'),
-    fgm: smallint('fgm'),
-    fga: smallint('fga'),
-    fgPct: numeric('fg_pct', { precision: 4, scale: 1 }),
-    fg019m: smallint('fg_0_19m'),
-    fg019a: smallint('fg_0_19a'),
-    fg2029m: smallint('fg_20_29m'),
-    fg2029a: smallint('fg_20_29a'),
-    fg3039m: smallint('fg_30_39m'),
-    fg3039a: smallint('fg_30_39a'),
-    fg4049m: smallint('fg_40_49m'),
-    fg4049a: smallint('fg_40_49a'),
-    fg50m: smallint('fg_50m'),
-    fg50a: smallint('fg_50a'),
-    xpm: smallint('xpm'),
-    xpa: smallint('xpa'),
-    lng: smallint('lng'),
-    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+    season: integer('season').notNull(),
+    team: varchar('team', { length: 50 }).notNull(),
+    g: integer('g'),
+    fgm: integer('fgm'),
+    fga: integer('fga'),
+    fgPct: doublePrecision('fg_pct'),
+    fg019m: integer('fg_0_19m'),
+    fg019a: integer('fg_0_19a'),
+    fg2029m: integer('fg_20_29m'),
+    fg2029a: integer('fg_20_29a'),
+    fg3039m: integer('fg_30_39m'),
+    fg3039a: integer('fg_30_39a'),
+    fg4049m: integer('fg_40_49m'),
+    fg4049a: integer('fg_40_49a'),
+    fg50m: integer('fg_50m'),
+    fg50a: integer('fg_50a'),
+    xpm: integer('xpm'),
+    xpa: integer('xpa'),
+    lng: integer('lng'),
+    pfrRowId: varchar('pfr_row_id', { length: 50 }).notNull(),
   },
   (table) => ({
     pk: primaryKey({
@@ -480,22 +489,26 @@ export const footballSeasonDefense = pgTable(
   'football_season_defense',
   {
     playerId: integer('player_id').notNull(),
-    season: smallint('season').notNull(),
-    team: varchar('team', { length: 10 }).notNull(),
-    g: smallint('g'),
-    sacks: numeric('sacks', { precision: 5, scale: 1 }),
-    int: smallint('int'),
+    season: integer('season').notNull(),
+    team: varchar('team', { length: 50 }).notNull(),
+    g: integer('g'),
+    // Physical column is `integer`, not `numeric` — half-sack precision
+    // (e.g. 4.5) is not representable at the season grain and is dropped on
+    // insert. Documented as intended (LS-8573): the DB is authoritative and
+    // this ticket does not migrate the column to numeric.
+    sacks: integer('sacks'),
+    int: integer('int'),
     // Physical column is `fumbles_rec` (PFR's native stat name) — created by
     // 20260524_000000_create_football_season_stats.ts, which wins over the later
     // no-op `CREATE TABLE IF NOT EXISTS` in 20260524_100200 that used `fum_rec`.
-    fumRec: smallint('fumbles_rec'),
-    defTd: smallint('def_td'),
-    safeties: smallint('safeties'),
-    ptsAllowed: smallint('pts_allowed'),
+    fumRec: integer('fumbles_rec'),
+    defTd: integer('def_td'),
+    safeties: integer('safeties'),
+    ptsAllowed: integer('pts_allowed'),
     ydsAllowed: integer('yds_allowed'),
     passYdsAllowed: integer('pass_yds_allowed'),
     rushYdsAllowed: integer('rush_yds_allowed'),
-    pfrRowId: varchar('pfr_row_id', { length: 30 }).notNull(),
+    pfrRowId: varchar('pfr_row_id', { length: 50 }).notNull(),
   },
   (table) => ({
     pk: primaryKey({
@@ -559,20 +572,24 @@ export const footballSeasonDefenseIdp = pgTable(
 );
 
 // ── Football career stat tables (LS-250) ────────────────────────────────────
+//
+// Same dead-migration situation as the season tables above: column types are
+// re-derived from the winning 20260524_000000_create_career_football_tables.ts,
+// not from the no-op 20260524_100400_create_career_football_tables.ts (LS-8573).
 
 export const careerFootballPassing = pgTable(
   'career_football_passing',
   {
     playerId: integer('player_id').primaryKey().notNull(),
-    g: smallint('g'),
-    cmp: smallint('cmp'),
-    att: smallint('att'),
+    g: integer('g'),
+    cmp: integer('cmp'),
+    att: integer('att'),
     yds: integer('yds'),
-    td: smallint('td'),
-    int: smallint('int'),
-    sacked: smallint('sacked'),
-    sackYds: smallint('sack_yds'),
-    rating: numeric('rating', { precision: 5, scale: 1 }),
+    td: integer('td'),
+    int: integer('int'),
+    sacked: integer('sacked'),
+    sackYds: integer('sack_yds'),
+    rating: doublePrecision('rating'),
   },
   (table) => ({
     playerIdFk: foreignKey({
@@ -587,12 +604,12 @@ export const careerFootballRushing = pgTable(
   'career_football_rushing',
   {
     playerId: integer('player_id').primaryKey().notNull(),
-    g: smallint('g'),
-    att: smallint('att'),
+    g: integer('g'),
+    att: integer('att'),
     yds: integer('yds'),
-    td: smallint('td'),
-    lng: smallint('lng'),
-    fumbles: smallint('fumbles'),
+    td: integer('td'),
+    lng: integer('lng'),
+    fumbles: integer('fumbles'),
   },
   (table) => ({
     playerIdFk: foreignKey({
@@ -607,13 +624,13 @@ export const careerFootballReceiving = pgTable(
   'career_football_receiving',
   {
     playerId: integer('player_id').primaryKey().notNull(),
-    g: smallint('g'),
-    rec: smallint('rec'),
-    tgt: smallint('tgt'),
+    g: integer('g'),
+    rec: integer('rec'),
+    tgt: integer('tgt'),
     yds: integer('yds'),
-    td: smallint('td'),
-    lng: smallint('lng'),
-    fumbles: smallint('fumbles'),
+    td: integer('td'),
+    lng: integer('lng'),
+    fumbles: integer('fumbles'),
   },
   (table) => ({
     playerIdFk: foreignKey({
@@ -628,22 +645,22 @@ export const careerFootballKicking = pgTable(
   'career_football_kicking',
   {
     playerId: integer('player_id').primaryKey().notNull(),
-    g: smallint('g'),
-    fgm: smallint('fgm'),
-    fga: smallint('fga'),
-    fg019m: smallint('fg_0_19m'),
-    fg019a: smallint('fg_0_19a'),
-    fg2029m: smallint('fg_20_29m'),
-    fg2029a: smallint('fg_20_29a'),
-    fg3039m: smallint('fg_30_39m'),
-    fg3039a: smallint('fg_30_39a'),
-    fg4049m: smallint('fg_40_49m'),
-    fg4049a: smallint('fg_40_49a'),
-    fg50m: smallint('fg_50m'),
-    fg50a: smallint('fg_50a'),
-    xpm: smallint('xpm'),
-    xpa: smallint('xpa'),
-    lng: smallint('lng'),
+    g: integer('g'),
+    fgm: integer('fgm'),
+    fga: integer('fga'),
+    fg019m: integer('fg_0_19m'),
+    fg019a: integer('fg_0_19a'),
+    fg2029m: integer('fg_20_29m'),
+    fg2029a: integer('fg_20_29a'),
+    fg3039m: integer('fg_30_39m'),
+    fg3039a: integer('fg_30_39a'),
+    fg4049m: integer('fg_40_49m'),
+    fg4049a: integer('fg_40_49a'),
+    fg50m: integer('fg_50m'),
+    fg50a: integer('fg_50a'),
+    xpm: integer('xpm'),
+    xpa: integer('xpa'),
+    lng: integer('lng'),
   },
   (table) => ({
     playerIdFk: foreignKey({
@@ -658,16 +675,21 @@ export const careerFootballDefense = pgTable(
   'career_football_defense',
   {
     playerId: integer('player_id').primaryKey().notNull(),
-    g: smallint('g'),
-    sacks: numeric('sacks', { precision: 5, scale: 1 }),
-    int: smallint('int'),
+    g: integer('g'),
+    // Physical column is `double precision`, unlike the `integer` season-level
+    // sacks column — it can hold fractional totals, but since
+    // footballSeasonDefense.sacks is already integer-truncated per-season,
+    // half-sacks are lost before they ever reach this aggregate. Documented as
+    // intended (LS-8573); no migration to numeric on either table.
+    sacks: doublePrecision('sacks'),
+    int: integer('int'),
     // Physical column is `fumbles_rec` — see the note on footballSeasonDefense;
     // 20260524_000000_create_career_football_tables.ts wins over 20260524_100400.
-    fumRec: smallint('fumbles_rec'),
-    defTd: smallint('def_td'),
-    safeties: smallint('safeties'),
-    ptsAllowedPerG: numeric('pts_allowed_per_g', { precision: 5, scale: 2 }),
-    ydsAllowedPerG: numeric('yds_allowed_per_g', { precision: 6, scale: 2 }),
+    fumRec: integer('fumbles_rec'),
+    defTd: integer('def_td'),
+    safeties: integer('safeties'),
+    ptsAllowedPerG: doublePrecision('pts_allowed_per_g'),
+    ydsAllowedPerG: doublePrecision('yds_allowed_per_g'),
   },
   (table) => ({
     playerIdFk: foreignKey({
