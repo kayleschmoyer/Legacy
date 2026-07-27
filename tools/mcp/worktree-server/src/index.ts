@@ -49,6 +49,7 @@ import {
 import { rebaseOntoMain } from './rebase-onto-main';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitish } from './resolve-commitish';
+import { resolveMainRepoPath } from './resolve-main-repo';
 import {
   type BranchEntry,
   formatBranchList,
@@ -66,22 +67,7 @@ import {
 // Constants & state
 // ---------------------------------------------------------------------------
 
-/** Resolve the main repo root (works from both main repo and worktrees). */
-function getMainRepoPath(): string {
-  const gitCommonDir = execSync('git rev-parse --git-common-dir', {
-    encoding: 'utf-8',
-    timeout: 5_000,
-    windowsHide: true,
-  }).trim();
-  // In the main repo this returns ".git"; in a worktree it returns the absolute
-  // path to the main repo's .git directory.
-  if (gitCommonDir === '.git') {
-    return process.cwd();
-  }
-  return resolve(gitCommonDir, '..');
-}
-
-const MAIN_REPO = getMainRepoPath();
+const MAIN_REPO = resolveMainRepoPath();
 // Use Node as a cross-platform no-op editor so Git never blocks on an editor
 // prompt during agent-driven rebases or commit flows.
 const NOOP_GIT_EDITOR_CMD = 'node -e "process.exit(0)"';
