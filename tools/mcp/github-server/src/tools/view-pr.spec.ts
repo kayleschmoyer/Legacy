@@ -121,6 +121,82 @@ describe('viewPR — compact default', () => {
   });
 });
 
+describe('viewPR — checksSummary dedup (LS-8667)', () => {
+  it('dedupes stale/cancelled reruns to the latest run per check name', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          commits: {
+            totalCount: 3,
+            nodes: [
+              {
+                commit: {
+                  statusCheckRollup: {
+                    contexts: {
+                      nodes: [
+                        // Earlier cancelled attempt, superseded by a later success.
+                        {
+                          __typename: 'CheckRun',
+                          name: 'Jira Link Check',
+                          status: 'COMPLETED',
+                          conclusion: 'CANCELLED',
+                          startedAt: '2026-01-02T09:00:00Z',
+                          completedAt: '2026-01-02T09:01:00Z',
+                        },
+                        {
+                          __typename: 'CheckRun',
+                          name: 'Jira Link Check',
+                          status: 'COMPLETED',
+                          conclusion: 'SUCCESS',
+                          startedAt: '2026-01-02T09:05:00Z',
+                          completedAt: '2026-01-02T09:06:00Z',
+                        },
+                        // Duplicate rows with the same name and conclusion.
+                        {
+                          __typename: 'CheckRun',
+                          name: 'Resolve Runner Label',
+                          status: 'COMPLETED',
+                          conclusion: 'SUCCESS',
+                          startedAt: '2026-01-02T09:00:00Z',
+                          completedAt: '2026-01-02T09:01:00Z',
+                        },
+                        {
+                          __typename: 'CheckRun',
+                          name: 'Resolve Runner Label',
+                          status: 'COMPLETED',
+                          conclusion: 'SUCCESS',
+                          startedAt: '2026-01-02T09:00:00Z',
+                          completedAt: '2026-01-02T09:01:00Z',
+                        },
+                        {
+                          __typename: 'CheckRun',
+                          name: 'build',
+                          status: 'COMPLETED',
+                          conclusion: 'SUCCESS',
+                          startedAt: '2026-01-02T09:00:00Z',
+                          completedAt: '2026-01-02T09:01:00Z',
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(parsed.checksSummary.total).toBe(3);
+    expect(parsed.checksSummary.passed).toBe(3);
+    expect(parsed.checksSummary.failed).toBe(0);
+    expect(parsed.checksSummary.failedNames).toEqual([]);
+  });
+});
+
 describe('viewPR — fields opt-in', () => {
   it('includes body when fields:["body"] passed', async () => {
     mockedGraphQL.mockResolvedValue(gqlResponse(makePR()));
