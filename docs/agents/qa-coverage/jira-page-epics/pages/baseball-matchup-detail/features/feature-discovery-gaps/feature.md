@@ -35,9 +35,9 @@ page-doc source).
 
 ## Existing Feature Stories (already in QA inventory)
 
-This page's `features/` directory in fact already has **eight** feature docs — four more
+This page's `features/` directory in fact already has **nine** feature docs — five more
 than the "four existing feature docs" cited in the original LS-7595 report, which was
-written before the other four were added:
+written before the other five were added:
 
 | Feature                            | Jira    | Covers                                                                    | Layout slot(s)                      |
 | ---------------------------------- | ------- | ------------------------------------------------------------------------- | ----------------------------------- |
@@ -49,21 +49,23 @@ written before the other four were added:
 | Matchup Information Card           | LS-5352 | Start/end time display                                                    | Matchup information (fixed)         |
 | Roster Comparison                  | LS-5357 | Read-only side-by-side roster comparison                                  | `rosterComparison`                  |
 | Loading / Error / Not Found States | LS-5356 | Pre-layout spinner, error, and not-found states                           | (rendered before layout mounts)     |
+| Matchup Roster Editor              | LS-8469 | Ownership/status-gated lineup swap/move editor with pre-flight lock       | `rosterEditor`                      |
 
 ## GAP Findings
 
 | ID      | Ticket  | Summary                                                                           | Severity | Platform | Status |
 | ------- | ------- | --------------------------------------------------------------------------------- | -------- | -------- | ------ |
 | GAP-001 | LS-8468 | AI Matchup Recap panel (`recapPanel` slot) undocumented as its own feature        | Medium   | All      | To Do  |
-| GAP-002 | LS-8469 | Matchup Roster Editor panel (`rosterEditor` slot) undocumented as its own feature | Medium   | All      | To Do  |
+| GAP-002 | LS-8469 | Matchup Roster Editor panel (`rosterEditor` slot) undocumented as its own feature | Medium   | All      | Done   |
 
-Walking the remaining `MatchupDetailLayout` slots against the eight existing feature
+Walking the remaining `MatchupDetailLayout` slots against the nine existing feature
 docs above: `header`, `scoreboard`, `winProbabilityPanel`, `GamesRemaining`, matchup
-information, and `rosterComparison` are all already covered (table above). The two
-slots with no owning doc are `recapPanel` (GAP-001) and `rosterEditor` (GAP-002) — both
-filed as Jira bugs under the parent epic (LS-5260) and linked to this bucket Story.
+information, `rosterComparison`, and now `rosterEditor` are all covered (table above).
+The one slot still with no owning doc is `recapPanel` (GAP-001) — filed as a Jira bug
+under the parent epic (LS-5260) and linked to this bucket Story.
 
-No further gaps were found beyond GAP-001 and GAP-002.
+GAP-002 was resolved by filing `matchup-roster-editor/feature.md` (LS-8469). No further
+gaps were found beyond GAP-001 and GAP-002.
 
 ## Related
 
