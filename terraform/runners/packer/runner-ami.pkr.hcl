@@ -139,6 +139,9 @@ variable "ssh_source_cidr" {
 # the filter block in github-runners.tf and the drift-check workflow.
 #
 # Rebuild history (most recent first):
+# - LS-8500 — bake webkit + firefox (previously only chromium was baked,
+#   blocking the Mobile Safari (LS-8457) and desktop WebKit (LS-8458)
+#   scheduled Playwright projects at the AMI-baked-browsers tripwire).
 # - LS-4957 — carry the LS-4949 pnpm fix (standalone binary, no corepack)
 #   into a freshly baked AMI. LS-4949 itself only changed this Packer file;
 #   without a rebuild, runners kept booting from the pre-LS-4949 AMI with
@@ -277,7 +280,7 @@ build {
     ]
   }
 
-  # Playwright: system dependencies + Chromium browser binary + global CLI
+  # Playwright: system dependencies + Chromium/WebKit/Firefox browser binaries + global CLI
   #
   # IMPORTANT: playwright_version must be kept in sync with the @playwright/test
   # version declared in the root package.json. CI enforces this via the
@@ -291,7 +294,7 @@ build {
   # unreliable `playwright install --dry-run` approach.
   provisioner "shell" {
     inline = [
-      "sudo npx --yes playwright@${var.playwright_version} install-deps chromium",
+      "sudo npx --yes playwright@${var.playwright_version} install-deps chromium webkit firefox",
       "sudo mkdir -p /opt/playwright-browsers",
       "sudo chmod 755 /opt/playwright-browsers",
       "sudo env PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers npx --yes playwright@${var.playwright_version} install chromium",
@@ -301,11 +304,20 @@ build {
       # back to a runtime install. This line is belt-and-suspenders: cheap insurance
       # against future Playwright releases regressing the bundled behavior. (LS-2429)
       "sudo env PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers npx --yes playwright@${var.playwright_version} install chromium-headless-shell",
+      # webkit + firefox (LS-8500): scheduled CI has only ever run chromium, so
+      # these were never baked, and any job resolving BROWSER_ENGINE=webkit or
+      # =firefox failed at the "Verify AMI-baked Playwright browsers" tripwire
+      # in run-playwright-tests.yml before running a single test. Baking them
+      # here — rather than a runtime `playwright install` in the CI job — is
+      # required: a runtime install races unattended-upgrades for the dpkg
+      # lock on the live fleet (see the tripwire comment in that workflow).
+      "sudo env PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers npx --yes playwright@${var.playwright_version} install webkit firefox",
       "sudo chmod -R a+rX /opt/playwright-browsers",
       # Debug: dump the installed browser directories into the Packer build log
-      # so future AMI builds have verifiable evidence that both chromium-<rev>
-      # and chromium_headless_shell-<rev> directories exist. If this regresses
-      # again, the Packer log is the first place to look.
+      # so future AMI builds have verifiable evidence that chromium-<rev>,
+      # chromium_headless_shell-<rev>, webkit-<rev>, and firefox-<rev>
+      # directories all exist. If this regresses again, the Packer log is the
+      # first place to look.
       "ls -la /opt/playwright-browsers/",
       "sudo npm install -g playwright@${var.playwright_version}",
       # Export PLAYWRIGHT_BROWSERS_PATH for login shells
