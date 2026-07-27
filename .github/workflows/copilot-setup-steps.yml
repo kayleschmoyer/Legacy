@@ -24,7 +24,7 @@ name: Copilot Setup Steps
 #   MCP_MACHINE_CLIENT_ID         — Cognito client_credentials client id   (SSM /…/mcp/cognito/machine-client-id)
 #   MCP_MACHINE_CLIENT_SECRET     — Cognito client_credentials secret       (Secrets Manager <env>/mcp-machine-client-secret)
 #   MCP_AUTH_COGNITO_DOMAIN       — Cognito hosted-UI domain (token endpoint base)
-#   MCP_JIRA_URL / MCP_GITHUB_URL / MCP_CI_URL / MCP_DB_URL — the API Gateway invoke URLs
+#   MCP_JIRA_URL / MCP_GITHUB_URL / MCP_CI_URL / MCP_DB_URL / MCP_ROLLBAR_URL — the API Gateway invoke URLs
 #
 # GitHub Copilot Coding Agent runs the `copilot-setup-steps` job by name before
 # every task regardless of triggers. `workflow_dispatch` is added only so the
@@ -135,12 +135,14 @@ jobs:
           MCP_GITHUB_URL: ${{ secrets.MCP_GITHUB_URL }}
           MCP_CI_URL: ${{ secrets.MCP_CI_URL }}
           MCP_DB_URL: ${{ secrets.MCP_DB_URL }}
+          MCP_ROLLBAR_URL: ${{ secrets.MCP_ROLLBAR_URL }}
         run: |
           {
             echo "MCP_JIRA_URL=${MCP_JIRA_URL}"
             echo "MCP_GITHUB_URL=${MCP_GITHUB_URL}"
             echo "MCP_CI_URL=${MCP_CI_URL}"
             echo "MCP_DB_URL=${MCP_DB_URL}"
+            echo "MCP_ROLLBAR_URL=${MCP_ROLLBAR_URL}"
           } >> "$GITHUB_ENV"
 
       # JIRA_ASSIGNEE_EMAIL: when set, jira_claim_ticket auto-assigns claimed

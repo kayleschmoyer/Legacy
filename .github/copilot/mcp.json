@@ -76,15 +76,9 @@
       ]
     },
     "legacy-sports-rollbar": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        ".github/copilot/hooks/mcp-bootstrap.mjs",
-        "node",
-        "--import",
-        "tsx",
-        "tools/mcp/rollbar-server/src/index.ts"
-      ]
+      "type": "http",
+      "url": "$MCP_ROLLBAR_URL",
+      "headers": { "Authorization": "Bearer $MCP_ROLLBAR_BEARER" }
     }
   }
 }
