@@ -14,6 +14,7 @@ This complements the project's reporting integration (`lib/rollbar` for error re
 - **rollbar_list_occurrences** — List recent occurrences (instances) of an item, each with a truncated message summary.
 - **rollbar_top_active_items** — The dashboard "top active items" view, each with its summed recent occurrence count.
 - **rollbar_set_status** — Set an item's status (`active` / `resolved` / `muted` / `archived`) by `id` or `counter`. Requires a token with the `write` scope; returns a clear scope hint on HTTP 401/403.
+- **rollbar_graphql_introspect_type** — Introspect a type's fields on a deployed GraphQL endpoint (`env: "dev"|"prod"`), replacing hand-rolled `curl` introspection during schema-mismatch RCA (e.g. "Cannot query field X on type Y" Rollbar errors). Pass `compareEnv` to diff field names between two environments in one call. No Rollbar token required — hits the public GraphQL endpoint directly.
 
 ## Deployment
 

@@ -169,6 +169,7 @@ Read-only access to Rollbar error tracking data (the read complement to `lib/rol
 - **rollbar_get_item** — Fetch one item by internal id or by its per-project counter
 - **rollbar_list_occurrences** — List recent occurrences of an item, each with a truncated message summary
 - **rollbar_top_active_items** — The "top active items" view with summed recent occurrence counts
+- **rollbar_graphql_introspect_type** — Introspect a type's fields on a deployed GraphQL endpoint (`env: "dev"|"prod"`), optionally diffing against a second environment; replaces hand-rolled `curl` introspection during schema-mismatch RCA
 
 Requires `ROLLBAR_READ_ACCESS_TOKEN` (a Rollbar `read`-scope project access token) in `.env.local` for the stdio form. Also available as a **hosted OAuth connector** (`legacy-sports-rollbar`, LS-8142) with the token held server-side — see `.agents/skills/mcp-first/SKILL.md` and `docs/dev-process/mcp-connector-access.md`. See `tools/mcp/rollbar-server/README.md`.
 

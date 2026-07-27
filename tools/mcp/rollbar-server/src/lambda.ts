@@ -6,14 +6,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
 import {
-  MCP_SCOPE,
   authenticateMcpRequest,
   handleOAuthMetadataRequest,
+  MCP_SCOPE,
 } from '@legacy-sports/mcp-bearer-auth';
 import { ROLLBAR_READ_TOKEN_ENV, tryGetRollbarToken } from './auth.js';
 import { listItems } from './tools/list-items.js';
 import { getItem } from './tools/get-item.js';
 import { getOccurrence } from './tools/get-occurrence.js';
+import { graphqlIntrospectType } from './tools/graphql-introspect-type.js';
 import { listOccurrences } from './tools/list-occurrences.js';
 import { setStatus } from './tools/set-status.js';
 import { topActiveItems } from './tools/top-active-items.js';
@@ -171,6 +172,32 @@ function createMcpServer(): McpServer {
         .describe('Filter by environment, e.g. "production"'),
     },
     async (params) => topActiveItems(params),
+  );
+
+  server.tool(
+    'rollbar_graphql_introspect_type',
+    "Introspect a single type's fields on a deployed GraphQL endpoint's schema — the MCP-native replacement for hand-rolling " +
+      '`curl -X POST <endpoint> -d \'{"query":"{__type(name:\\"X\\"){fields{name}}}"}\'` during schema-mismatch RCA. ' +
+      'Use this for the "Cannot query field X on type Y" class of Rollbar errors caused by client/server deploy lag. ' +
+      'Pass `compareEnv` to also introspect a second environment and get the field-name differences between them in one call. ' +
+      'Returns `type: null` (not an error) when the type does not exist on that schema, and surfaces GraphQL application errors ' +
+      '(e.g. introspection disabled) in an `errors` field rather than failing the call. READ-ONLY.',
+    {
+      env: z
+        .enum(['dev', 'prod'])
+        .describe('Deployed environment to introspect'),
+      typeName: z
+        .string()
+        .min(1)
+        .describe('GraphQL type name to introspect, e.g. "TradeOfferPlayer"'),
+      compareEnv: z
+        .enum(['dev', 'prod'])
+        .optional()
+        .describe(
+          'Optional second environment to introspect and diff field names against (e.g. env: "prod", compareEnv: "dev" to check for deploy lag)',
+        ),
+    },
+    async (params) => graphqlIntrospectType(params),
   );
 
   return server;
