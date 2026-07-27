@@ -51,6 +51,7 @@ import { listPRInlineComments } from './tools/list-pr-inline-comments.js';
 import { listReviewComments } from './tools/list-review-comments.js';
 import { getFileContent } from './tools/get-file-content.js';
 import { getBranchProtection } from './tools/get-branch-protection.js';
+import { awaitRef } from './tools/await-ref.js';
 import {
   resolveActionSha,
   resolveActionShas,
@@ -1776,6 +1777,43 @@ export function createServer(): McpServer {
         .describe('Branch name to query (default: "main").'),
     },
     async (params) => getBranchProtection(params),
+  );
+
+  // --- github_await_ref ---
+  server.tool(
+    'github_await_ref',
+    'Bounded wait for a git ref to change SHA or be deleted — a transport-safe replacement for `git ls-remote | sleep` polling loops. Each call polls the ref for up to maxWaitSeconds (capped at 55s to survive the MCP transport timeout) and returns a { status: "changed" | "deleted" | "unchanged" } snapshot. On "unchanged", re-invoke with the same params (per the returned hint) to keep waiting — never an error while the condition is unmet.',
+    {
+      ref: z
+        .string()
+        .trim()
+        .min(1)
+        .describe(
+          'Ref to await, e.g. "refs/heads/main", "heads/main", or bare "main" (defaults to a branch ref).',
+        ),
+      changedFrom: z
+        .string()
+        .trim()
+        .optional()
+        .describe(
+          'Baseline SHA to diff against — waits until the ref SHA differs from this.',
+        ),
+      deleted: coercedBoolean
+        .optional()
+        .describe(
+          'When true, waits for the ref to stop existing rather than to change SHA.',
+        ),
+      maxWaitSeconds: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(55)
+        .optional()
+        .describe(
+          'Per-call wait budget in seconds, capped at 55 (default 55).',
+        ),
+    },
+    async (params) => awaitRef(params),
   );
 
   // --- github_resolve_action_sha ---

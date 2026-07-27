@@ -66,6 +66,7 @@ The git-heavy tools (`github_rebase_pr`, `github_bulk_rebase`, `github_open_pr`'
 ### Repo & Infrastructure
 
 - **github_get_repo_info** — Get repo owner, name, default branch, and URL
+- **github_await_ref** — Bounded wait for a git ref to change SHA or be deleted, replacing `git ls-remote | sleep` polling loops
 - **github_list_runners** — List self-hosted runners (requires the "Administration: Read" GitHub App permission on `/actions/runners`)
 - **github_webhook_list** — List repository webhooks
 - **github_webhook_update** — Update a webhook
