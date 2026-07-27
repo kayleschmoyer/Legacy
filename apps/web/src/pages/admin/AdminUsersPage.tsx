@@ -718,7 +718,7 @@ export default function AdminUsersPage() {
                             setPendingToggle(null);
                             void handleToggleRole(userId, currentLevel);
                           }}
-                          disabled={updating}
+                          disabled={updating || isImpersonating}
                           icon={updating ? <Spinner /> : undefined}
                         >
                           {willRevoke ? 'Revoke admin' : 'Make admin'}

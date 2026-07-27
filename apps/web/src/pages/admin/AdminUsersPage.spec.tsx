@@ -91,7 +91,11 @@ jest.mock('tamagui', () => ({
 const mockImpersonateUser = jest.fn();
 const mockUseAuth = jest.fn<
   {
-    user: { id: number; accessLevel: string };
+    user: {
+      id: number;
+      accessLevel: string;
+      impersonatedBy?: { username: string };
+    };
     isLoading: boolean;
     isAuthenticated: boolean;
     impersonateUser: jest.Mock;
@@ -152,12 +156,17 @@ const USERS = [
   { id: 3, email: 'bob@example.com', username: 'bob', accessLevel: 'none' },
 ];
 
-function setupMocks(overrides?: { impersonateUser?: jest.Mock }) {
+function setupMocks(overrides?: {
+  impersonateUser?: jest.Mock;
+  impersonatedBy?: { username: string };
+}) {
   mockNavigate.mockReset();
   mockLoggerError.mockReset();
   mockImpersonateUser.mockReset().mockResolvedValue(undefined);
   mockUseAuth.mockReturnValue({
-    user: ADMIN_USER,
+    user: overrides?.impersonatedBy
+      ? { ...ADMIN_USER, impersonatedBy: overrides.impersonatedBy }
+      : ADMIN_USER,
     isLoading: false,
     isAuthenticated: true,
     impersonateUser: overrides?.impersonateUser ?? mockImpersonateUser,
@@ -320,5 +329,22 @@ describe('AdminUsersPage — impersonation', () => {
       );
     });
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('disables the role-toggle confirm button while impersonating', async () => {
+    setupMocks({ impersonatedBy: { username: 'admin' } });
+    renderPage();
+
+    const [toggleButton] = screen.getAllByRole('button', {
+      name: /make admin/i,
+    });
+    await userEvent.click(toggleButton);
+
+    const dialog = screen.getByTestId('dialog');
+    const confirmButton = within(dialog).getByRole('button', {
+      name: /^make admin$/i,
+    });
+
+    expect(confirmButton).toBeDisabled();
   });
 });
