@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Card, Spinner, Text, XStack } from 'tamagui';
+import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   type MatchupPlayerData,
   MatchupRosterEditorView,
@@ -20,7 +20,11 @@ import {
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
 } from '@legacy-sports/graphql';
-import { BRAND_NAVY_LIGHT } from '../../constants/colors';
+import {
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+} from '../../constants/colors';
 import {
   useSwapMatchupPlayerPositions,
   useUpdateMatchupPlayerPosition,
@@ -239,6 +243,17 @@ export function MatchupRosterEditor({
     [updatePosition, refetchPlayers, ensureMatchupStillScheduled],
   );
 
+  const handleRetry = useCallback(async () => {
+    try {
+      await refetchPlayers();
+    } catch (error) {
+      LOGGER.error(
+        'Failed to refetch matchup players on retry',
+        error instanceof Error ? error : String(error),
+      );
+    }
+  }, [refetchPlayers]);
+
   // ── Guard states ────────────────────────────────────────────────────────
 
   if (
@@ -266,7 +281,30 @@ export function MatchupRosterEditor({
   }
 
   if (players.length === 0) {
-    return null;
+    return (
+      <Card
+        padding="$4"
+        borderWidth={1}
+        borderColor="$surfacePanelBorder"
+        backgroundColor="$background"
+        borderRadius="$6"
+      >
+        <YStack alignItems="center" gap="$3">
+          <Text color="$gray11" textAlign="center">
+            No roster found for this matchup. Contact your commissioner.
+          </Text>
+          <Button
+            backgroundColor={BRAND_NAVY_LIGHT}
+            color="white"
+            pressStyle={{ backgroundColor: BRAND_NAVY_DARK }}
+            hoverStyle={{ backgroundColor: BRAND_NAVY }}
+            onPress={handleRetry}
+          >
+            Retry
+          </Button>
+        </YStack>
+      </Card>
+    );
   }
 
   return (

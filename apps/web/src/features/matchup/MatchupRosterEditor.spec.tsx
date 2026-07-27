@@ -16,7 +16,7 @@
  * over the network once that window has elapsed.
  */
 import React from 'react';
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MatchupRosterEditorView } from '@legacy-sports/shared-components/roster';
 import { type MatchupFragment, MatchupStatus } from '@legacy-sports/graphql';
 import {
@@ -128,6 +128,73 @@ const positionsResponse = {
 const scheduledStatusResponse = {
   data: { getMatchupById: { ...matchup, status: MatchupStatus.Scheduled } },
 };
+
+describe('MatchupRosterEditor — empty roster state (LS-5898)', () => {
+  const fetchMatchupStatus = jest.fn();
+  const emptyPlayersResponse = {
+    data: { getMatchupPlayers: [] },
+    loading: false,
+    refetch: jest.fn().mockResolvedValue(undefined),
+  };
+
+  beforeEach(() => {
+    fetchMatchupStatus.mockClear();
+    emptyPlayersResponse.refetch.mockClear();
+    viewPropsRef.current = null;
+
+    (useGetMatchupByIdLazyQuery as jest.Mock).mockReturnValue([
+      fetchMatchupStatus,
+      {},
+    ]);
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue(
+      emptyPlayersResponse,
+    );
+    (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue(
+      positionsResponse,
+    );
+    (useSwapMatchupPlayerPositions as jest.Mock).mockReturnValue({
+      swapPositions: jest.fn(),
+      loading: false,
+    });
+    (useUpdateMatchupPlayerPosition as jest.Mock).mockReturnValue({
+      updatePosition: jest.fn(),
+      loading: false,
+    });
+  });
+
+  it('renders an explanatory empty-state card instead of null when there are no players', () => {
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        'No roster found for this matchup. Contact your commissioner.',
+      ),
+    ).toBeInTheDocument();
+    expect(viewPropsRef.current).toBeNull();
+  });
+
+  it('refetches players when the retry button is pressed', () => {
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Retry'));
+
+    expect(emptyPlayersResponse.refetch).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('MatchupRosterEditor — locked-prop race (LS-4037)', () => {
   const swapPositions = jest.fn().mockResolvedValue(undefined);
