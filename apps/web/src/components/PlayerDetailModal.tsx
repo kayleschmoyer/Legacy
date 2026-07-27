@@ -29,6 +29,7 @@ import {
   ipToOuts,
   outsToBaseballIP,
 } from '../lib/scoring/ipUtils';
+import { getPositionColor } from '@legacy-sports/shared-components';
 import {
   BG_DARK,
   BRAND_GOLD,
@@ -36,7 +37,6 @@ import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
-  getPositionColor,
   STATS_BORDER,
   SURFACE_CARD,
   SURFACE_PANEL,

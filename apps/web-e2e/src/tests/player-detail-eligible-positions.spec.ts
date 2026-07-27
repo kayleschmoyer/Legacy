@@ -402,10 +402,10 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
 
-    // OF maps to POS_OUTFIELD (#2D6A4F = rgb(45, 106, 79))
+    // OF maps to POS_OUTFIELD (#64748B = rgb(100, 116, 139), LS-8584)
     await expect(playersPage.detail.getPlayerPositionBadge('OF')).toHaveCSS(
       'background-color',
-      'rgb(45, 106, 79)',
+      'rgb(100, 116, 139)',
     );
   });
 
@@ -441,7 +441,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     // toHaveCSS so the test doesn't race against paint.
     await expect(playersPage.detail.getPlayerPositionBadge('OF')).toHaveCSS(
       'background-color',
-      'rgb(45, 106, 79)',
+      'rgb(100, 116, 139)',
     );
     await expect(playersPage.detail.getPlayerPositionBadge('CF')).toHaveCSS(
       'background-color',

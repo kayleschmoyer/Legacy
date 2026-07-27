@@ -49,82 +49,9 @@ export const BRAND_GOLD_PRESS = '#A8894A';
 export const BRAND_GOLD_LIGHT = '#D4BB78';
 export const BRAND_GOLD_DARK = '#A68B3E';
 
-// ─── Position Colors ───────────────────────────────────────
-
-/** Sport scope for position color lookups. Mirrors the `sport_kind` enum
- *  introduced by the sport-toggle initiative (ADR 0011). */
-export type Sport = 'baseball' | 'football';
-
-// Baseball position tokens.
-export const POS_PITCHER = '#C41E3A';
-export const POS_CATCHER = '#7C8794';
-export const POS_INFIELD = '#8B6F47';
-export const POS_OUTFIELD = '#2D6A4F';
-export const POS_UTILITY = '#C5A55A';
-
-// Football position tokens — mirrors the football theme block in the
-// Draft Board mockup (`draft.html` ~lines 2700–2846, ADR 0011 §3).
-export const POS_QB = BRAND_SEAM_RED; // seam red
-export const POS_RB = '#8B6F47'; // dirt brown
-export const POS_WR = '#2D6A4F'; // turf green
-export const POS_TE = '#7C8794'; // steel
-export const POS_K = BRAND_GOLD; // heritage gold
-export const POS_DEF = '#4A6FA5'; // navy blue (legacy / catch-all)
-export const POS_FLEX = '#C49A6C'; // muted gold
-// IDP defensive sub-position tokens — each visually distinct.
-export const POS_DST = BRAND_SEAM_RED; // seam red (team defense unit)
-export const POS_DL = '#C25A2A'; // burnt orange-red (defensive line)
-export const POS_LB = '#9B7A3D'; // amber-brown (linebackers)
-export const POS_DB = '#6B3FA0'; // deep purple (defensive backs)
-
-/** Position → color map for all football positions including defensive designations. */
-export const FOOTBALL_POSITION_COLORS: Record<string, string> = {
-  QB: POS_QB,
-  RB: POS_RB,
-  WR: POS_WR,
-  TE: POS_TE,
-  FLEX: POS_FLEX,
-  K: POS_K,
-  DST: POS_DST,
-  DL: POS_DL,
-  LB: POS_LB,
-  DB: POS_DB,
-};
-
-export function getFootballPositionColor(
-  pos: string | null | undefined,
-): string {
-  return (pos && FOOTBALL_POSITION_COLORS[pos]) ?? BRAND_NAVY;
-}
-
-export const POSITION_COLORS: Record<Sport, Record<string, string>> = {
-  baseball: {
-    C: POS_CATCHER,
-    '1B': POS_INFIELD,
-    '2B': POS_INFIELD,
-    '3B': POS_INFIELD,
-    SS: POS_INFIELD,
-    OF: POS_OUTFIELD,
-    P: POS_PITCHER,
-  },
-  football: {
-    QB: POS_QB,
-    RB: POS_RB,
-    WR: POS_WR,
-    TE: POS_TE,
-    K: POS_K,
-    DEF: POS_DEF,
-    FLEX: POS_FLEX,
-    DST: POS_DST,
-    DL: POS_DL,
-    LB: POS_LB,
-    DB: POS_DB,
-  },
-};
-
-export function getPositionColor(sport: Sport, position: string): string {
-  return POSITION_COLORS[sport][position] ?? POS_UTILITY;
-}
+// Position colors live in `@legacy-sports/shared-components` (LS-8578,
+// LS-8584) — import `getPositionColor`/`POSITION_COLORS` from there instead
+// of duplicating a local palette here.
 
 // ─── Text ──────────────────────────────────────────────────
 

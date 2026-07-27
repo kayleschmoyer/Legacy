@@ -1,9 +1,9 @@
 import React from 'react';
 import { ScrollView, styled, Text, XStack, YStack } from 'tamagui';
+import { getPositionColor } from '@legacy-sports/shared-components';
 import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
-  FOOTBALL_POSITION_COLORS,
   OUTLINE_SUBTLE,
   SURFACE_CARD,
   TEXT_MUTED,
@@ -179,7 +179,7 @@ export function FootballPositionFilter({ selected, onToggle, onClear }: Props) {
               pos,
               i + 1,
               selected.includes(pos),
-              FOOTBALL_POSITION_COLORS[pos],
+              getPositionColor('football', pos),
             ),
           )}
         </XStack>

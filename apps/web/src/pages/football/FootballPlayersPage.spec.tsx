@@ -69,6 +69,11 @@ jest.mock('@legacy-sports/shared-components/football', () => ({
   FootballPlayerCard: jest.fn(),
 }));
 
+jest.mock('@legacy-sports/shared-components', () => ({
+  BRAND_NAVY: '#navy',
+  getPositionColor: () => '#position',
+}));
+
 jest.mock('../../components/football/FootballPlayerSort', () => ({
   FootballPlayerSort: () => null,
 }));

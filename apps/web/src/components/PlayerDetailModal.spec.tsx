@@ -65,7 +65,6 @@ jest.mock('../constants/colors', () => ({
   BRAND_NAVY: '#navy',
   BRAND_NAVY_LIGHT: '#navyl',
   BRAND_SEAM_RED: '#red',
-  getPositionColor: () => '#position',
   STATS_BORDER: '#border',
   SURFACE_CARD: '#card',
   SURFACE_PANEL: '#panel',
@@ -75,6 +74,10 @@ jest.mock('../constants/colors', () => ({
   TEXT_TERTIARY: '#tertiary',
   WHITE: '#fff',
   withAlpha: (color: string, _alpha: number) => color,
+}));
+
+jest.mock('@legacy-sports/shared-components', () => ({
+  getPositionColor: () => '#position',
 }));
 
 jest.mock('@tanstack/react-virtual', () => ({

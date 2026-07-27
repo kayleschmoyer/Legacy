@@ -9,6 +9,7 @@ import {
   Star,
   X,
 } from '@tamagui/lucide-icons';
+import { BRAND_NAVY, getPositionColor } from '@legacy-sports/shared-components';
 import { FootballPlayerCard } from '@legacy-sports/shared-components/football';
 import type { FootballPlayerCardStats } from '@legacy-sports/shared-components/football';
 import {
@@ -33,7 +34,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useHasEntitlement, useIsPremium } from '../../hooks/useIsPremium';
-import { getFootballPositionColor, withAlpha } from '../../constants/colors';
+import { withAlpha } from '../../constants/colors';
 import { FONT_BODY, FONT_DISPLAY } from '../../constants/typography';
 
 type PlayerListItem = NonNullable<
@@ -305,7 +306,9 @@ function TableRow({
   const pos = player?.position;
   const isDst = player?.isDst ?? false;
   const posLabel = isDst ? 'DST' : pos;
-  const posColor = getFootballPositionColor(posLabel);
+  const posColor = posLabel
+    ? getPositionColor('football', posLabel)
+    : BRAND_NAVY;
   const keyStat = getKeyStat(pos, isDst, player?.careerStats ?? null);
 
   const fullName =
