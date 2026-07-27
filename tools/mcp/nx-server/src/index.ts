@@ -9,6 +9,10 @@ import { jobList, jobStatus, jobWait } from './tools/job-tools.js';
 import { runAffected } from './tools/run-affected.js';
 import { runE2ESpecs } from './tools/run-e2e-specs.js';
 import { runPcChunk, PC_CHUNKS } from './tools/run-pc-chunk.js';
+import {
+  runPrettier,
+  MAX_FILES as PRETTIER_MAX_FILES,
+} from './tools/run-prettier.js';
 import { runTarget } from './tools/run-target.js';
 import { showProject } from './tools/show-project.js';
 import { showProjects } from './tools/show-projects.js';
@@ -290,6 +294,38 @@ server.tool(
       ),
   },
   async (params) => runPcChunk(params),
+);
+
+// --- nx_run_prettier ---
+server.tool(
+  'nx_run_prettier',
+  'Prefer this over raw `pnpm exec prettier --check/--write <files>` via shell, and over ' +
+    'nx_run_pc_chunk({ chunk: "pc-format" }) when you only need a small, explicit file list ' +
+    '(e.g. fixing Prettier drift in 1-3 files after a rebase). Runs prettier --check or --write ' +
+    'against exactly the given files — never the whole repo diff — so it carries none of ' +
+    "pc-format's auto-amend-already-pushed-commit risk (LS-8367) or full per-file-listing " +
+    `overflow risk (LS-8423). Capped at ${PRETTIER_MAX_FILES} files — for broader formatting use ` +
+    'nx_run_pc_chunk({ chunk: "pc-format" }) instead.',
+  {
+    files: z
+      .array(z.string())
+      .min(1)
+      .describe(
+        'File paths (relative to worktreePath/repo root, or absolute) to check or format.',
+      ),
+    mode: z
+      .enum(['check', 'write'])
+      .default('check')
+      .describe(
+        '"check" reports formatting issues without modifying files (default); "write" reformats in place.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Worktree path (default: repo root)'),
+  },
+  async (params) => runPrettier(params),
 );
 
 // --- nx_job_status ---

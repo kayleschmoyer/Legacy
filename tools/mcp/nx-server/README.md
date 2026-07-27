@@ -9,6 +9,7 @@ Nx build system intelligence for AI agents — project discovery, affected analy
 - **nx_affected** — Show which projects are affected by current changes
 - **nx_run** — Run an Nx target on a specific project
 - **nx_run_affected** — Run a target on all affected projects
+- **nx_run_prettier** — Run `prettier --check`/`--write` against an explicit, small file list (capped at 50 files) without the whole-repo side effects of `nx_run_pc_chunk({ chunk: 'pc-format' })`
 - **nx_dep_graph** — Query dependency relationships between projects
 - **nx_install_package** — Symlink-aware package installation with lock file, duplicate detection, and @types/ companion check
 - **nx_check_package_health** — Scan workspace for nested node_modules, wildcard ranges, missing overrides, and missing @types/ companions
