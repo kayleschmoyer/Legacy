@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { readGitRemoteUrl } from './git-config.js';
 import {
   fetchWithRetry,
+  HttpStatusError,
   sanitizeErrorBody,
   withRetryOnAlreadyRunning,
 } from './http-retry.js';
@@ -128,6 +129,81 @@ async function generateGitHubAppToken(): Promise<{
 // ---------------------------------------------------------------------------
 
 /**
+ * Check whether a token still authenticates against the GitHub API.
+ *
+ * Mirrors `github-server/src/auth.ts`'s `validateToken` — only a definitive
+ * 401 counts as invalid; rate limits, 5xx, and network errors assume the
+ * token is still good so a transient blip doesn't discard a valid credential.
+ * A 403 without an exhausted rate limit may be a GitHub App installation
+ * token (`ghs_*`), which 403s on `GET /user` because it represents an app,
+ * not a user — that case falls back to a repo-scoped endpoint both token
+ * types can access.
+ */
+async function validateToken(token: string): Promise<boolean> {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
+  try {
+    const res = await fetch(`${GITHUB_API}/user`, {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+
+    if (res.ok) return true;
+    if (res.status === 401) return false;
+    if (
+      res.status === 429 ||
+      (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0')
+    ) {
+      return true;
+    }
+    if (res.status >= 500) return true;
+
+    if (res.status === 403) {
+      try {
+        const slug = await getRepoSlug();
+        const repoRes = await fetch(`${GITHUB_API}/repos/${slug}`, {
+          headers,
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (repoRes.ok) return true;
+        if (repoRes.status === 401) return false;
+        if (
+          repoRes.status === 429 ||
+          (repoRes.status === 403 &&
+            repoRes.headers.get('x-ratelimit-remaining') === '0')
+        ) {
+          return true;
+        }
+        if (repoRes.status >= 500) return true;
+        return false;
+      } catch (err) {
+        process.stderr.write(
+          `Warning: could not validate app token against repo endpoint (${err instanceof Error ? err.message : err}); assuming valid.\n`,
+        );
+        return true;
+      }
+    }
+
+    return false;
+  } catch (err) {
+    const reason =
+      err instanceof DOMException && err.name === 'TimeoutError'
+        ? 'timeout'
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    process.stderr.write(
+      `Warning: ${reason} during token validation; assuming token is valid.\n`,
+    );
+    return true;
+  }
+}
+
+/**
  * Resolve the GitHub token, returning the token and its expiry if known.
  *
  * Precedence when multiple env vars are set:
@@ -138,13 +214,26 @@ async function generateGitHubAppToken(): Promise<{
  *
  * Env values are trimmed; whitespace-only is treated as unset so that empty
  * GITHUB_TOKEN doesn't silently shadow a valid GH_TOKEN (and vice versa).
+ *
+ * The env token is validated before use (LS-8551): unlike
+ * `github-server/src/auth.ts`, this used to trust GH_TOKEN/GITHUB_TOKEN
+ * unconditionally, so a stale/expired env token permanently broke every
+ * ci_* tool call for the life of the process — even when a working
+ * GitHub App key or `gh` CLI session was available as a fallback. An
+ * invalid env token now falls through to the next source instead.
  */
 async function resolveToken(): Promise<{ token: string; expiresAt?: Date }> {
   const envToken =
     process.env.GH_TOKEN?.trim() ||
     process.env.GITHUB_TOKEN?.trim() ||
     undefined;
-  if (envToken) return { token: envToken };
+  if (envToken) {
+    if (await validateToken(envToken)) return { token: envToken };
+    process.stderr.write(
+      'Warning: GH_TOKEN/GITHUB_TOKEN is set but invalid (401 Bad credentials) — ' +
+        'falling back to GitHub App auth / gh CLI (LS-8551).\n',
+    );
+  }
 
   // Try GitHub App token (cloud environments with AGENT_AUTHOR_APP_PRIVATE_KEY)
   try {
@@ -415,6 +504,18 @@ async function ensureAuth(): Promise<{ token: string; slug: string }> {
 }
 
 /**
+ * Clear the cached token so the next `ensureAuth()` call re-resolves from
+ * scratch via `resolveToken()`. Used by `fetchAuthed`/`githubGetArrayBuffer`
+ * to self-heal when a token that validated fine at resolution time (or an
+ * App token that was never validated) is later rejected mid-session with a
+ * 401 — mirrors `github-server`'s `invalidateToken` (LS-8551).
+ */
+function invalidateToken(): void {
+  cachedToken = undefined;
+  cachedTokenExpiry = undefined;
+}
+
+/**
  * Log GitHub rate-limit headers for observability.
  * Writes to stderr to avoid polluting MCP stdout (JSON protocol).
  */
@@ -438,24 +539,45 @@ export function buildHeaders(token: string): Record<string, string> {
   };
 }
 
+/**
+ * Fetch with the current auth token, retrying once with a freshly-resolved
+ * token if the first attempt comes back 401. `resolveToken()` already
+ * validates env tokens up front (LS-8551), but this covers the remaining gap:
+ * a token that was valid when resolved (or an App/gh-cli token, neither of
+ * which is pre-validated) but gets revoked or expires mid-session. Mirrors
+ * `github-server/src/github-api.ts`'s `doRest` 401-retry behavior.
+ */
+async function fetchAuthed(
+  buildUrl: (slug: string) => string,
+  buildInit: (token: string) => RequestInit,
+): Promise<Response> {
+  const { token, slug } = await ensureAuth();
+  const res = await fetch(buildUrl(slug), buildInit(token));
+  if (res.status !== 401) return res;
+
+  invalidateToken();
+  const retry = await ensureAuth();
+  return fetch(buildUrl(retry.slug), buildInit(retry.token));
+}
+
 /** Make a GET request to the GitHub REST API, returning parsed JSON. */
 export async function githubGet<T>(
   path: string,
   params?: Record<string, string>,
   options?: { signal?: AbortSignal },
 ): Promise<T> {
-  const { token, slug } = await ensureAuth();
-  const url = new URL(`${GITHUB_API}/repos/${slug}${path}`);
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== '') url.searchParams.set(k, v);
-    }
-  }
-
-  const res = await fetch(url.toString(), {
-    headers: buildHeaders(token),
-    signal: options?.signal,
-  });
+  const res = await fetchAuthed(
+    (slug) => {
+      const url = new URL(`${GITHUB_API}/repos/${slug}${path}`);
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          if (v !== undefined && v !== '') url.searchParams.set(k, v);
+        }
+      }
+      return url.toString();
+    },
+    (token) => ({ headers: buildHeaders(token), signal: options?.signal }),
+  );
 
   if (!res.ok) {
     const body = await res.text();
@@ -471,15 +593,15 @@ export async function githubGet<T>(
  * Used for endpoints that return raw content (e.g., job logs).
  */
 export async function githubGetText(path: string): Promise<string> {
-  const { token, slug } = await ensureAuth();
-  const url = `${GITHUB_API}/repos/${slug}${path}`;
-
-  const res = await fetch(url, {
-    headers: {
-      ...buildHeaders(token),
-      Accept: 'application/vnd.github+json',
-    },
-  });
+  const res = await fetchAuthed(
+    (slug) => `${GITHUB_API}/repos/${slug}${path}`,
+    (token) => ({
+      headers: {
+        ...buildHeaders(token),
+        Accept: 'application/vnd.github+json',
+      },
+    }),
+  );
 
   if (!res.ok) {
     const body = await res.text();
@@ -497,40 +619,53 @@ export async function githubGetText(path: string): Promise<string> {
  * Retries up to 3 times with exponential backoff on transient 5xx gateway
  * errors (502/503/504) and on 410 (a job-log archive not yet available for
  * download moments after the job completed, LS-8435).
+ *
+ * Also retries once on 401 with a freshly-resolved token (LS-8551) —
+ * `fetchWithRetry` doesn't treat 401 as retriable (it's not transient in the
+ * general case), so that self-heal is applied here rather than inside it.
  */
 export async function githubGetArrayBuffer(
   path: string,
   options?: { signal?: AbortSignal },
 ): Promise<ArrayBuffer> {
   const { token, slug } = await ensureAuth();
-  const url = `${GITHUB_API}/repos/${slug}${path}`;
-  return fetchWithRetry(
-    url,
-    {
-      headers: {
-        ...buildHeaders(token),
-        Accept: 'application/vnd.github+json',
+  const fetchOnce = (t: string, s: string) =>
+    fetchWithRetry(
+      `${GITHUB_API}/repos/${s}${path}`,
+      {
+        headers: {
+          ...buildHeaders(t),
+          Accept: 'application/vnd.github+json',
+        },
+        signal: options?.signal,
       },
-      signal: options?.signal,
-    },
-    logRateLimit,
-    `GET ${path} (arraybuffer)`,
-  );
+      logRateLimit,
+      `GET ${path} (arraybuffer)`,
+    );
+
+  try {
+    return await fetchOnce(token, slug);
+  } catch (err) {
+    if (!(err instanceof HttpStatusError) || err.status !== 401) throw err;
+    invalidateToken();
+    const retry = await ensureAuth();
+    return fetchOnce(retry.token, retry.slug);
+  }
 }
 
 /** Make a PUT request to the GitHub REST API. Used for state-toggling endpoints (e.g. workflow enable/disable). */
 export async function githubPut<T>(path: string, body?: unknown): Promise<T> {
-  const { token, slug } = await ensureAuth();
-  const url = `${GITHUB_API}/repos/${slug}${path}`;
-
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      ...buildHeaders(token),
-      'Content-Type': 'application/json',
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const res = await fetchAuthed(
+    (slug) => `${GITHUB_API}/repos/${slug}${path}`,
+    (token) => ({
+      method: 'PUT',
+      headers: {
+        ...buildHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
+  );
 
   if (!res.ok) {
     const text = await res.text();
@@ -545,17 +680,17 @@ export async function githubPut<T>(path: string, body?: unknown): Promise<T> {
 
 /** Make a POST request to the GitHub REST API. */
 export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
-  const { token, slug } = await ensureAuth();
-  const url = `${GITHUB_API}/repos/${slug}${path}`;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      ...buildHeaders(token),
-      'Content-Type': 'application/json',
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const res = await fetchAuthed(
+    (slug) => `${GITHUB_API}/repos/${slug}${path}`,
+    (token) => ({
+      method: 'POST',
+      headers: {
+        ...buildHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
+  );
 
   if (!res.ok) {
     const text = await res.text();

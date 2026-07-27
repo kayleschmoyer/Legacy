@@ -341,6 +341,7 @@ function makeJsonResponse(status: number, body: unknown): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: { get: () => null },
     json: jest.fn<() => Promise<unknown>>().mockResolvedValue(body),
     text: jest
       .fn<() => Promise<string>>()
@@ -408,6 +409,11 @@ describe('getDeploysToken (LS-8322)', () => {
     process.env['GH_TOKEN'] = 'ghp_broad_fallback_token';
 
     const mockFetch = jest.fn<typeof fetch>();
+    // resolveToken() validates GH_TOKEN via GET /user before trusting it
+    // (LS-8551) — queue a 200 so the fallback token is accepted as-is.
+    mockFetch.mockResolvedValueOnce(
+      makeJsonResponse(200, { login: 'someone' }),
+    );
     global.fetch = mockFetch as unknown as typeof fetch;
 
     const { getDeploysToken, deploysTokenWasFallback } =
@@ -416,8 +422,7 @@ describe('getDeploysToken (LS-8322)', () => {
 
     expect(token).toBe('ghp_broad_fallback_token');
     expect(deploysTokenWasFallback()).toBe(true);
-    // GH_TOKEN short-circuits resolveToken() — no network calls needed.
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to the agent-author App when PREVIEW_APP installation discovery fails, then to getToken() if that also fails (LS-8547)', async () => {
@@ -434,7 +439,10 @@ describe('getDeploysToken (LS-8322)', () => {
       .mockResolvedValueOnce(makeJsonResponse(404, { message: 'Not Found' }))
       // agent-author App installation discovery on the deploys repo — also 404
       // (not yet installed there — LS-8547's remaining manual step)
-      .mockResolvedValueOnce(makeJsonResponse(404, { message: 'Not Found' }));
+      .mockResolvedValueOnce(makeJsonResponse(404, { message: 'Not Found' }))
+      // falls to getToken() -> resolveToken() validates GH_TOKEN via GET /user
+      // (LS-8551) before trusting it as the final fallback.
+      .mockResolvedValueOnce(makeJsonResponse(200, { login: 'someone' }));
     global.fetch = mockFetch as unknown as typeof fetch;
 
     const { getDeploysToken, deploysTokenWasFallback } =
@@ -443,7 +451,7 @@ describe('getDeploysToken (LS-8322)', () => {
 
     expect(token).toBe('ghp_broad_fallback_token');
     expect(deploysTokenWasFallback()).toBe(true);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(mockFetch.mock.calls[1][0]).toContain(
       '/repos/bkrupa/legacy-sports-deploys/installation',
     );
@@ -483,5 +491,197 @@ describe('getDeploysToken (LS-8322)', () => {
     expect(mockFetch.mock.calls[1][0]).toContain(
       '/app/installations/54321/access_tokens',
     );
+  });
+
+  it('falls back to getToken() when PREVIEW_APP installation discovery fails', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env['PREVIEW_APP_PRIVATE_KEY'] = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+    process.env['PREVIEW_APP_ID'] = '999999';
+    process.env['GH_TOKEN'] = 'ghp_broad_fallback_token';
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      .mockResolvedValueOnce(makeJsonResponse(404, { message: 'Not Found' }))
+      // resolveToken() validates GH_TOKEN via GET /user before trusting it
+      // (LS-8551) as part of the getToken() fallback below.
+      .mockResolvedValueOnce(makeJsonResponse(200, { login: 'someone' }));
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { getDeploysToken, deploysTokenWasFallback } =
+      await import('./github-api.js');
+    const token = await getDeploysToken();
+
+    expect(token).toBe('ghp_broad_fallback_token');
+    expect(deploysTokenWasFallback()).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token self-healing (LS-8551)
+//
+// legacy-sports-ci-local (the stdio server run locally) shares this module
+// with the deployed Lambda. Before this fix, a stale GH_TOKEN/GITHUB_TOKEN
+// env var was trusted unconditionally and cached for the process lifetime,
+// so every ci_* tool call (e.g. ci_search_logs) failed with a hard 401 "Bad
+// credentials" for the rest of the session — even when a working GitHub App
+// key was available. These tests cover the two fixes: (1) resolveToken()
+// validates an env token before trusting it and falls through when it's
+// invalid, and (2) the request helpers invalidate-and-retry once on a 401
+// that only surfaces on the real API call (e.g. a token revoked mid-session).
+// ---------------------------------------------------------------------------
+
+const SELF_HEAL_ENV_KEYS = [
+  ...ENV_KEYS,
+  'GITHUB_REPOSITORY',
+  'GITHUB_APP_ID',
+  'GITHUB_INSTALLATION_ID',
+] as const;
+
+describe('token self-healing (LS-8551)', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+  const savedFetch = global.fetch;
+  let appPrivateKeyPem: string;
+
+  beforeEach(() => {
+    for (const key of SELF_HEAL_ENV_KEYS) savedEnv[key] = process.env[key];
+    for (const key of SELF_HEAL_ENV_KEYS) delete process.env[key];
+    process.env['GITHUB_REPOSITORY'] = 'owner/repo';
+    jest.resetModules();
+
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    appPrivateKeyPem = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+  });
+
+  afterEach(() => {
+    for (const key of SELF_HEAL_ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    global.fetch = savedFetch;
+  });
+
+  it('githubGet succeeds on the happy path with a valid env token (regression check)', async () => {
+    process.env['GH_TOKEN'] = 'ghp_valid_token';
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      // resolveToken() validates GH_TOKEN via GET /user
+      .mockResolvedValueOnce(makeJsonResponse(200, { login: 'someone' }))
+      // the actual GET request
+      .mockResolvedValueOnce(makeJsonResponse(200, { ok: true }));
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { githubGet } = await import('./github-api.js');
+    const result = await githubGet('/actions/runs/1');
+
+    expect(result).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[1][1]?.headers).toMatchObject({
+      Authorization: 'Bearer ghp_valid_token',
+    });
+  });
+
+  it('getToken() falls through to a GitHub App token when GH_TOKEN is set but invalid', async () => {
+    process.env['GH_TOKEN'] = 'ghp_stale_token';
+    process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = appPrivateKeyPem;
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      // resolveToken() validates GH_TOKEN via GET /user — rejected
+      .mockResolvedValueOnce(
+        makeJsonResponse(401, { message: 'Bad credentials' }),
+      )
+      // falls through to minting a GitHub App installation token
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'ghs_app_token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      );
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { getToken } = await import('./github-api.js');
+    const token = await getToken();
+
+    expect(token).toBe('ghs_app_token');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('githubGet retries once with a freshly-minted token when the API call itself 401s', async () => {
+    process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = appPrivateKeyPem;
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      // 1. mint the initial App token
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'ghs_first',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      )
+      // 2. the real GET call is rejected — token went stale mid-session
+      .mockResolvedValueOnce(
+        makeJsonResponse(401, { message: 'Bad credentials' }),
+      )
+      // 3. self-heal: mint a fresh App token after invalidating the cache
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'ghs_second',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      )
+      // 4. retry succeeds with the fresh token
+      .mockResolvedValueOnce(makeJsonResponse(200, { ok: true }));
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { githubGet } = await import('./github-api.js');
+    const result = await githubGet('/actions/runs/1');
+
+    expect(result).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch.mock.calls[3][1]?.headers).toMatchObject({
+      Authorization: 'Bearer ghs_second',
+    });
+  });
+
+  it('githubGetArrayBuffer retries once on a typed 401 from fetchWithRetry, not a message-string match', async () => {
+    process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = appPrivateKeyPem;
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      // 1. mint the initial App token
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'ghs_first',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      )
+      // 2. the arraybuffer GET is rejected — fetchWithRetry throws a typed
+      //    HttpStatusError(401, ...), not just an Error with a matching message
+      .mockResolvedValueOnce(makeResponse(401, '{"message":"Bad credentials"}'))
+      // 3. self-heal: mint a fresh App token after invalidating the cache
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'ghs_second',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      )
+      // 4. retry succeeds with the fresh token
+      .mockResolvedValueOnce(makeResponse(200));
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    const { githubGetArrayBuffer } = await import('./github-api.js');
+    const result = await githubGetArrayBuffer('/actions/jobs/1/logs');
+
+    expect(result).toBeInstanceOf(ArrayBuffer);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch.mock.calls[3][1]?.headers).toMatchObject({
+      Authorization: 'Bearer ghs_second',
+    });
   });
 });

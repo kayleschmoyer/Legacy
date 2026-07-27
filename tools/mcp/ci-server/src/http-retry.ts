@@ -14,6 +14,22 @@ const ALREADY_RUNNING_STATUS = /^GitHub API 403\b/;
 const ALREADY_RUNNING_TEXT = /already running|already in progress/i;
 
 /**
+ * An HTTP error carrying the response status as a typed property, so callers
+ * can branch on `error.status` instead of pattern-matching the message
+ * string (LS-8551 review follow-up — a message-format change would silently
+ * break a string check).
+ */
+export class HttpStatusError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'HttpStatusError';
+  }
+}
+
+/**
  * True when a GitHub API error message is the "workflow is already running"
  * 403 race: the run-level status POST /rerun* gates on lags the per-job
  * status ci_view_run_jobs reports, so a request can be rejected even after
@@ -76,7 +92,8 @@ export async function fetchWithRetry(
       const body = await res.text();
       const suffix =
         attempt > 1 ? ` (attempt ${attempt}/${LOG_BLOB_MAX_ATTEMPTS})` : '';
-      throw new Error(
+      throw new HttpStatusError(
+        res.status,
         `GitHub API ${res.status}${suffix}: ${sanitizeErrorBody(body)}`,
       );
     }
@@ -89,7 +106,8 @@ export async function fetchWithRetry(
   }
 
   // Unreachable but satisfies TypeScript
-  throw new Error(
+  throw new HttpStatusError(
+    lastStatus,
     `GitHub API ${lastStatus}: log-blob fetch failed after ${LOG_BLOB_MAX_ATTEMPTS} attempts`,
   );
 }
