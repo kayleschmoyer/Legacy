@@ -741,6 +741,7 @@ function grepContent(
 function rebaseContinueStep(
   cwd: string,
   files?: string[],
+  env: Record<string, string> = NON_INTERACTIVE_GIT_ENV,
 ): {
   completed: boolean;
   conflicted: string[];
@@ -764,10 +765,14 @@ function rebaseContinueStep(
     runGit(['add', '-A'], cwd);
   }
 
-  // Continue rebase — may throw if new conflicts arise
+  // Continue rebase — may throw if new conflicts arise.
+  // `env` carries the caller's rerere.enabled override (see LS-8112 /
+  // LS-8593): each `--continue` step is its own git process, so the
+  // disableRerere override from the original rebase invocation must be
+  // re-applied here too, not just on the first `git rebase` call.
   runGit(['rebase', '--continue'], cwd, {
     timeout: 120_000,
-    env: NON_INTERACTIVE_GIT_ENV,
+    env,
   });
 
   // Check if rebase is still in progress
@@ -5040,6 +5045,19 @@ const handleCallTool = async (
       const cwd = target.path;
       const log: string[] = [`[cwd: ${cwd}]`];
 
+      // Build rebase env once — optionally disable rerere to avoid bad
+      // rr-cache replays. Declared outside the try/catch below so both the
+      // initial rebase and the catch block's auto-continue loop (which runs
+      // its own `git rebase --continue` processes) can reuse it (LS-8593).
+      const rebaseEnv: Record<string, string> = {
+        ...NON_INTERACTIVE_GIT_ENV,
+      };
+      if (disableRerere) {
+        rebaseEnv['GIT_CONFIG_COUNT'] = '1';
+        rebaseEnv['GIT_CONFIG_KEY_0'] = 'rerere.enabled';
+        rebaseEnv['GIT_CONFIG_VALUE_0'] = 'false';
+      }
+
       // Agent-safe: prevent Git from opening an editor
       try {
         if (abort && skip) {
@@ -5161,16 +5179,6 @@ const handleCallTool = async (
           const reason =
             fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
           log.push(`(warning: could not update origin/main — ${reason})`);
-        }
-
-        // Build rebase env — optionally disable rerere to avoid bad rr-cache replays
-        const rebaseEnv: Record<string, string> = {
-          ...NON_INTERACTIVE_GIT_ENV,
-        };
-        if (disableRerere) {
-          rebaseEnv['GIT_CONFIG_COUNT'] = '1';
-          rebaseEnv['GIT_CONFIG_KEY_0'] = 'rerere.enabled';
-          rebaseEnv['GIT_CONFIG_VALUE_0'] = 'false';
         }
 
         // Rebase: use explicit base if provided, otherwise try twig, fall back to origin/main
@@ -5453,7 +5461,7 @@ const handleCallTool = async (
               }
 
               try {
-                const step = rebaseContinueStep(cwd);
+                const step = rebaseContinueStep(cwd, undefined, rebaseEnv);
 
                 if (step.completed) {
                   return rebaseCompleteResponse(
