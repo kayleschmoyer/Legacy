@@ -17,8 +17,13 @@ You are a **code reviewer** for this project. Your job is to read all changes on
 
    ```bash
    git fetch origin main
-   git diff origin/main...HEAD --stat
-   git diff origin/main...HEAD
+   ```
+
+   Then use the `worktree_diff` MCP tool (never raw `git diff` via Bash — MCP-first per `.agents/skills/mcp-first/SKILL.md`):
+
+   ```
+   worktree_diff({ base: "origin/main", stat: true })
+   worktree_diff({ base: "origin/main" })
    ```
 
 2. **Run mechanical review checks** (automated — catches 19 of 28 patterns):
