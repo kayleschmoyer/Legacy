@@ -201,6 +201,29 @@ export function getCareerPitchingOrderByClause(
 }
 
 /**
+ * SQL expression computing a single game batting performance's fantasy
+ * score. Mirrors `DEFAULT_BATTING_SCORING` from
+ * lib/scoring/src/baseball/DefaultScoring.ts. The weights are inlined
+ * rather than imported for the same reason as
+ * `getCareerPitchingOrderByClause` above — `@legacy-sports/scoring`
+ * depends on `@legacy-sports/db-client`, so importing it back here would
+ * create a dependency cycle.
+ */
+export function getGameBattingFantasyScoreSql(): SQL<number> {
+  return sql<number>`(COALESCE(${PublicSchema.gameBatting.hr}, 0) * 4 + COALESCE(${PublicSchema.gameBatting.triples}, 0) * 3 + COALESCE(${PublicSchema.gameBatting.doubles}, 0) * 2 + COALESCE(${PublicSchema.gameBatting.h}, 0) * 1 + COALESCE(${PublicSchema.gameBatting.rbi}, 0) * 1 + COALESCE(${PublicSchema.gameBatting.r}, 0) * 1 + COALESCE(${PublicSchema.gameBatting.hbp}, 0) * 1 + COALESCE(${PublicSchema.gameBatting.sb}, 0) * 2 + COALESCE(${PublicSchema.gameBatting.cs}, 0) * -1 + COALESCE(${PublicSchema.gameBatting.so}, 0) * -0.5)`;
+}
+
+/**
+ * SQL expression computing a single game pitching performance's fantasy
+ * score. Mirrors `DEFAULT_PITCHING_SCORING` from
+ * lib/scoring/src/baseball/DefaultScoring.ts — see
+ * `getGameBattingFantasyScoreSql` above for why the weights are inlined.
+ */
+export function getGamePitchingFantasyScoreSql(): SQL<number> {
+  return sql<number>`(COALESCE(${PublicSchema.gamePitching.w}, 0) * 5 + COALESCE(${PublicSchema.gamePitching.sv}, 0) * 5 + COALESCE(${PublicSchema.gamePitching.so}, 0) * 1 + COALESCE(${PublicSchema.gamePitching.outsRecorded}, 0) * 1 + COALESCE(${PublicSchema.gamePitching.bb}, 0) * -1 + COALESCE(${PublicSchema.gamePitching.h}, 0) * -1 + COALESCE(${PublicSchema.gamePitching.er}, 0) * -2 + COALESCE(${PublicSchema.gamePitching.l}, 0) * -2)`;
+}
+
+/**
  * Statistics service functions for database operations on career statistics
  */
 export class StatisticsService {
@@ -824,6 +847,12 @@ export class StatisticsService {
    *   - Batting:  ≥ 1 HR, ≥ 3 hits, or ≥ 4 RBI
    *   - Pitching: ≥ 10 K, ≥ 7 IP with 0 ER, or a save recorded
    *
+   * Batting and pitching candidates are each ranked by fantasy score (see
+   * `getGameBattingFantasyScoreSql` / `getGamePitchingFantasyScoreSql`) and
+   * then merged into a single fantasy-score-ranked list, so the most
+   * impressive performances on the date — not just the most recent ones —
+   * are the ones returned first (LS-8670).
+   *
    * @param month - Calendar month, 1-indexed (e.g. 3 for March)
    * @param day   - Calendar day, 1-indexed (e.g. 1 for the 1st)
    * @param limit - Maximum rows to return (defaults to 15)
@@ -836,6 +865,8 @@ export class StatisticsService {
     return runWithPublicClient(this.options, async (db) => {
       const mStr = String(month).padStart(2, '0');
       const dStr = String(day).padStart(2, '0');
+      const battingScore = getGameBattingFantasyScoreSql();
+      const pitchingScore = getGamePitchingFantasyScoreSql();
 
       // --- Notable batting ---
       const battingRows = await db
@@ -854,6 +885,7 @@ export class StatisticsService {
           firstName: PublicSchema.players.firstName,
           lastName: PublicSchema.players.lastName,
           brefId: PublicSchema.players.brefId,
+          fantasyScore: battingScore,
         })
         .from(PublicSchema.gameBatting)
         .innerJoin(
@@ -871,11 +903,7 @@ export class StatisticsService {
             ),
           ),
         )
-        .orderBy(
-          desc(PublicSchema.gameBatting.season),
-          desc(sql`COALESCE(${PublicSchema.gameBatting.hr}, 0)`),
-          desc(sql`COALESCE(${PublicSchema.gameBatting.rbi}, 0)`),
-        )
+        .orderBy(desc(battingScore), desc(PublicSchema.gameBatting.season))
         .limit(limit)
         .execute();
 
@@ -895,6 +923,7 @@ export class StatisticsService {
           firstName: PublicSchema.players.firstName,
           lastName: PublicSchema.players.lastName,
           brefId: PublicSchema.players.brefId,
+          fantasyScore: pitchingScore,
         })
         .from(PublicSchema.gamePitching)
         .innerJoin(
@@ -912,64 +941,71 @@ export class StatisticsService {
             ),
           ),
         )
-        .orderBy(
-          desc(PublicSchema.gamePitching.season),
-          desc(sql`COALESCE(${PublicSchema.gamePitching.so}, 0)`),
-        )
-        .limit(Math.ceil(limit / 3))
+        .orderBy(desc(pitchingScore), desc(PublicSchema.gamePitching.season))
+        .limit(limit)
         .execute();
 
-      const batting: OnThisDayEntry[] = battingRows.map((row) => ({
-        entryType: 'batting' as const,
-        playerId: row.playerId,
-        firstName: row.firstName,
-        lastName: row.lastName,
-        brefId: row.brefId,
-        season: row.season,
-        gameIdentifier: row.gameIdentifier,
-        hr: row.hr ?? null,
-        rbi: row.rbi ?? null,
-        hits: row.h ?? null,
-        doubles: row.doubles ?? null,
-        triples: row.triples ?? null,
-        atBats: row.ab ?? null,
-        baseOnBalls: row.bb ?? null,
-        runs: row.r ?? null,
-        strikeouts: null,
-        inningsPitched: null,
-        earnedRuns: null,
-        saves: null,
-        wins: null,
-        hitsAllowed: null,
-        walksAllowed: null,
-      }));
+      const batting: (OnThisDayEntry & { fantasyScore: number })[] =
+        battingRows.map((row) => ({
+          entryType: 'batting' as const,
+          playerId: row.playerId,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          brefId: row.brefId,
+          season: row.season,
+          gameIdentifier: row.gameIdentifier,
+          hr: row.hr ?? null,
+          rbi: row.rbi ?? null,
+          hits: row.h ?? null,
+          doubles: row.doubles ?? null,
+          triples: row.triples ?? null,
+          atBats: row.ab ?? null,
+          baseOnBalls: row.bb ?? null,
+          runs: row.r ?? null,
+          strikeouts: null,
+          inningsPitched: null,
+          earnedRuns: null,
+          saves: null,
+          wins: null,
+          hitsAllowed: null,
+          walksAllowed: null,
+          fantasyScore: row.fantasyScore,
+        }));
 
-      const pitching: OnThisDayEntry[] = pitchingRows.map((row) => ({
-        entryType: 'pitching' as const,
-        playerId: row.playerId,
-        firstName: row.firstName,
-        lastName: row.lastName,
-        brefId: row.brefId,
-        season: row.season,
-        gameIdentifier: row.gameIdentifier,
-        strikeouts: row.so ?? null,
-        inningsPitched: row.ip ?? null,
-        earnedRuns: row.er ?? null,
-        saves: row.sv ?? null,
-        wins: row.w ?? null,
-        hitsAllowed: row.h ?? null,
-        walksAllowed: row.bb ?? null,
-        hr: null,
-        rbi: null,
-        hits: null,
-        doubles: null,
-        triples: null,
-        atBats: null,
-        baseOnBalls: null,
-        runs: null,
-      }));
+      const pitching: (OnThisDayEntry & { fantasyScore: number })[] =
+        pitchingRows.map((row) => ({
+          entryType: 'pitching' as const,
+          playerId: row.playerId,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          brefId: row.brefId,
+          season: row.season,
+          gameIdentifier: row.gameIdentifier,
+          strikeouts: row.so ?? null,
+          inningsPitched: row.ip ?? null,
+          earnedRuns: row.er ?? null,
+          saves: row.sv ?? null,
+          wins: row.w ?? null,
+          hitsAllowed: row.h ?? null,
+          walksAllowed: row.bb ?? null,
+          hr: null,
+          rbi: null,
+          hits: null,
+          doubles: null,
+          triples: null,
+          atBats: null,
+          baseOnBalls: null,
+          runs: null,
+          fantasyScore: row.fantasyScore,
+        }));
 
-      return [...batting, ...pitching];
+      // Merge both categories and rank by fantasy score so the top of the
+      // returned list is always the most impressive performances on this
+      // calendar date, regardless of whether they were batting or pitching.
+      return [...batting, ...pitching]
+        .sort((a, b) => b.fantasyScore - a.fantasyScore)
+        .slice(0, limit)
+        .map(({ fantasyScore: _fantasyScore, ...entry }) => entry);
     });
   }
 

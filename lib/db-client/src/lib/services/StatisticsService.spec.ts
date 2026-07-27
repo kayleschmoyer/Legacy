@@ -1,5 +1,9 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { getCareerPitchingOrderByClause } from './StatisticsService';
+import {
+  getCareerPitchingOrderByClause,
+  getGameBattingFantasyScoreSql,
+  getGamePitchingFantasyScoreSql,
+} from './StatisticsService';
 
 const dialect = new PgDialect();
 
@@ -95,5 +99,63 @@ describe('getCareerPitchingOrderByClause', () => {
       expect(sql).toMatch(/\* 5/); // w/sv weight still present in numerator
       expect(sql).toMatch(/DESC NULLS LAST$/);
     });
+  });
+});
+
+describe('getGameBattingFantasyScoreSql — LS-8670', () => {
+  function render(): string {
+    return dialect.sqlToQuery(getGameBattingFantasyScoreSql()).sql;
+  }
+
+  it('combines every DEFAULT_BATTING_SCORING column into a single expression', () => {
+    const sql = render();
+
+    expect(sql).toMatch(/"game_batting"\."hr"/);
+    expect(sql).toMatch(/"game_batting"\."triples"/);
+    expect(sql).toMatch(/"game_batting"\."doubles"/);
+    expect(sql).toMatch(/"game_batting"\."h"/);
+    expect(sql).toMatch(/"game_batting"\."rbi"/);
+    expect(sql).toMatch(/"game_batting"\."r"/);
+    expect(sql).toMatch(/"game_batting"\."hbp"/);
+    expect(sql).toMatch(/"game_batting"\."sb"/);
+    expect(sql).toMatch(/"game_batting"\."cs"/);
+    expect(sql).toMatch(/"game_batting"\."so"/);
+  });
+
+  it('applies the DEFAULT_BATTING_SCORING weights', () => {
+    const sql = render();
+
+    expect(sql).toMatch(/\* 4/); // hr
+    expect(sql).toMatch(/\* 3/); // triples
+    expect(sql).toMatch(/\* 2/); // doubles & sb
+    expect(sql).toMatch(/\* -1/); // cs
+    expect(sql).toMatch(/\* -0\.5/); // so
+  });
+});
+
+describe('getGamePitchingFantasyScoreSql — LS-8670', () => {
+  function render(): string {
+    return dialect.sqlToQuery(getGamePitchingFantasyScoreSql()).sql;
+  }
+
+  it('combines every DEFAULT_PITCHING_SCORING column into a single expression', () => {
+    const sql = render();
+
+    expect(sql).toMatch(/"game_pitching"\."w"/);
+    expect(sql).toMatch(/"game_pitching"\."sv"/);
+    expect(sql).toMatch(/"game_pitching"\."so"/);
+    expect(sql).toMatch(/"game_pitching"\."outs_recorded"/);
+    expect(sql).toMatch(/"game_pitching"\."bb"/);
+    expect(sql).toMatch(/"game_pitching"\."h"/);
+    expect(sql).toMatch(/"game_pitching"\."er"/);
+    expect(sql).toMatch(/"game_pitching"\."l"/);
+  });
+
+  it('applies the DEFAULT_PITCHING_SCORING weights', () => {
+    const sql = render();
+
+    expect(sql).toMatch(/\* 5/); // w & sv
+    expect(sql).toMatch(/\* -2/); // er & l
+    expect(sql).toMatch(/\* -1/); // bb & h
   });
 });

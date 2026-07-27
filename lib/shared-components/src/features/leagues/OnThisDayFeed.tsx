@@ -166,6 +166,14 @@ function pitchingSummary(entry: Entry): string {
 const POOL_LIMIT = 50;
 /** Number of items displayed in the widget after random selection. */
 const DISPLAY_LIMIT = 3;
+/**
+ * The server returns `onThisDay` entries ranked by fantasy score (highest
+ * first — LS-8670). Random-sampling from only the front of that ranked
+ * pool, rather than the full POOL_LIMIT, keeps the widget's rotation
+ * feature while ensuring every entry it can surface is a genuinely
+ * impressive performance.
+ */
+const PRIORITY_POOL_LIMIT = 12;
 
 /**
  * Unbiased Fisher–Yates random sample.
@@ -244,14 +252,16 @@ export function OnThisDayFeed({
   const events = useMemo(() => eventsData?.onThisDayEvents ?? [], [eventsData]);
 
   // Randomly select DISPLAY_LIMIT items from each section so the widget stays
-  // concise and shows different highlights on each visit.
-  const displayedEntries = useMemo(
-    () =>
-      entries.length <= DISPLAY_LIMIT
-        ? [...entries]
-        : fisherYatesSample(entries, DISPLAY_LIMIT),
-    [entries],
-  );
+  // concise and shows different highlights on each visit. `entries` is
+  // ranked by fantasy score, so sampling only the top of that ranking
+  // (rather than the full pool) keeps the rotation limited to the most
+  // impressive performances (LS-8670).
+  const displayedEntries = useMemo(() => {
+    const priorityPool = entries.slice(0, PRIORITY_POOL_LIMIT);
+    return priorityPool.length <= DISPLAY_LIMIT
+      ? priorityPool
+      : fisherYatesSample(priorityPool, DISPLAY_LIMIT);
+  }, [entries]);
   const displayedEvents = useMemo(
     () =>
       events.length <= DISPLAY_LIMIT
