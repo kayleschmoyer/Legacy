@@ -4,7 +4,7 @@ Date: 2026-07-02
 
 ## Status
 
-Proposed (builds on [0015 — Semantic Page Object Model](0015-semantic-page-objects.md))
+Accepted (builds on [0015 — Semantic Page Object Model](0015-semantic-page-objects.md))
 
 ## Context
 
@@ -143,7 +143,7 @@ no identity, no data setup, **and no platform branches**. Where web and native
 flows genuinely diverge, provide two implementations of one screen interface
 behind a fixture — do not `if (platform)` inside a screen.
 
-## Native rollout blueprint (deferred — not in this change)
+## Native rollout blueprint (implemented — see below)
 
 The Appium driver lands only when mobile e2e is a committed, watched suite
 (the ADR-0016 discussion was explicit that an unexercised second driver is
@@ -164,6 +164,14 @@ dead weight). When it does:
    `platform` dimension becomes a second option fixture mirroring `backend`.
 4. Emulator provisioning in CI is the real cost center; prove one flow
    (login → league list) on a scheduled, watched job before generalizing.
+
+**Implemented by:** `AppiumNativeDriver`
+(`apps/web-e2e/src/driver/appium-native.driver.ts`, LS-8447), the per-worker
+mock server ([ADR-0017](0017-native-graphql-mock-server.md), LS-8448), the
+`platform: 'native'` fixture seam (LS-8449), and the scheduled, watched
+login → league-list emulator job
+(`.github/workflows/e2e-native-android.yml`,
+`apps/web-e2e/src/driver/native-emulator-ci.md`, LS-8450).
 
 ## Rollout
 

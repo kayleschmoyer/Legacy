@@ -4,7 +4,7 @@ Date: 2026-07-19
 
 ## Status
 
-Proposed (builds on [0016 — Test dependency injection](0016-test-dependency-injection.md))
+Accepted (builds on [0016 — Test dependency injection](0016-test-dependency-injection.md))
 
 ## Context
 
@@ -112,6 +112,13 @@ REALTIME_LIVE_ONLY_REASON)`. The skip carries a reason; it is never silent. When
 the server later speaks the WS protocol, the gate flips in one place.
 
 ## Rollout
+
+**Status: steps 1–2 shipped** (LS-8448, LS-8450) — `GraphQLMockServer`,
+`NativeMockTestData`, the `nativeMockServer` fixture, and the watched
+login → league-list emulator job are live in
+`.github/workflows/e2e-native-android.yml`; see
+[ADR-0016's native rollout blueprint](0016-test-dependency-injection.md#native-rollout-blueprint-implemented--see-below)
+for the full implementing-ticket list.
 
 1. **This change**: `GraphQLMockServer` + `NativeMockTestData`, the
    `nativeMockServer` worker fixture + `adb reverse` wiring, `playwright.native.
