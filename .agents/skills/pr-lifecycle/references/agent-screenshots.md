@@ -4,6 +4,47 @@
 
 Use the `legacy-sports-browser` MCP server to capture screenshots of UI changes and embed them in PR bodies.
 
+## Known gap: slow connect in Claude Code Remote / direct-branch sessions (LS-8539)
+
+In a Claude Code Remote session that works directly on a branch checkout (not a `.claude/worktrees/<name>/` launcher worktree, not a sibling worktree), `legacy-sports-browser` can appear in the initial "still connecting" list and stay there for **several minutes** — much longer than sibling stdio servers. Root cause: it launches via the same `mcp-bootstrap.mjs` → `tsx` path as every other stdio server, and if `node_modules` exists but `tsx` hasn't finished being written by an in-progress install yet, the server races an incomplete install instead of getting auto-repaired. It is **not** architecturally worktree-only — it does connect, just unreliably slowly in this session type.
+
+**Do not conclude it's unavailable from one early check.** Before falling back:
+
+1. Continue with other early-session orientation work (ticket read, planning, non-UI code recon).
+2. Retry `ToolSearch(query: "browser_dev_start")` periodically — give it a few minutes, not one shot.
+3. Only fall back once it's genuinely still absent after real elapsed time, not immediately at session start.
+
+### Same-repo fallback (when it truly never connects)
+
+Chromium is pre-installed and the dev server can be driven directly, without the MCP server:
+
+```bash
+# 1. Start the dev server in the background
+pnpm exec nx run web:dev &
+
+# 2. Drive the pre-installed Chromium with a one-off Playwright script,
+#    run from the REPO ROOT so module resolution finds playwright:
+node -e "
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const page = await browser.newPage();
+  await page.goto('http://localhost:<port>/affected-page');
+  await page.screenshot({ path: '.screenshots/feature-before.png' });
+  await browser.close();
+})();
+"
+```
+
+Upload screenshots manually (e.g. via `github_create_pull_request`/`create_or_update_file` to attach, or embed as a draft-release asset by hand) since `browser_screenshot_upload` is unavailable without the MCP server.
+
+### Auth-required routes
+
+Every app route requires login (`EnhancedAuthGuard`). If the session has no cached e2e auth token (`~/.legacy-sports/e2e-token.json` absent — only the human user can mint one via `make e2e-auth`, see AGENTS.md), neither the MCP tools nor the fallback script above can get past the sign-in redirect. In that case:
+
+- Skip screenshots rather than capturing the sign-in redirect as if it were the feature.
+- Disclose the limitation explicitly in the PR body's `## Screenshots` (or `## Verification`) section — e.g. "No before/after screenshots: this session has no cached e2e auth token, so authenticated routes are unreachable. See `make e2e-auth` in AGENTS.md."
+
 ## When to Take Screenshots
 
 Any PR that touches `.tsx`, `.jsx`, `.css`, `.module.css`, Tamagui styles, or adds a new route/page/component should include screenshots in the `## Screenshots` section.

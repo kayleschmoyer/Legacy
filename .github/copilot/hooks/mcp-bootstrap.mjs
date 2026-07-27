@@ -37,13 +37,31 @@ const parentDir = path.dirname(cwd);
 const parentName = path.basename(parentDir);
 
 /**
- * Returns true if node_modules exists and resolves to a directory.
+ * Returns true if node_modules exists AND the tsx binary this script is
+ * about to `--import` actually resolves inside it.
+ *
+ * A node_modules directory can exist while still being mid-install (e.g. a
+ * cloud session where node_modules was created but `pnpm install` hasn't
+ * finished writing node_modules/.bin yet) — checking directory existence
+ * alone treated that state as healthy and skipped the auto-repair install
+ * below, so the real MCP server launch raced an incomplete install instead
+ * of triggering a repair. legacy-sports-browser and legacy-sports-ci-local
+ * were observed hitting exactly this: node_modules existed but tsx did not,
+ * so they raced startup instead of getting repaired, and connected several
+ * minutes later than sibling stdio servers (LS-8539).
  * Uses lstatSync so broken symlinks are detected (statSync would throw).
  */
 function isNodeModulesHealthy(nmPath) {
   try {
     fs.lstatSync(nmPath); // throws if absent
-    return fs.statSync(nmPath).isDirectory(); // follows symlinks
+    if (!fs.statSync(nmPath).isDirectory()) return false; // follows symlinks
+  } catch {
+    return false;
+  }
+  const tsxBin = path.join(nmPath, '.bin', 'tsx');
+  try {
+    fs.lstatSync(tsxBin); // throws if absent; detects broken symlinks too
+    return fs.statSync(tsxBin).isFile(); // follows symlinks
   } catch {
     return false;
   }
@@ -87,7 +105,7 @@ if (!isLocalWorktree) {
   const nmPath = path.join(cwd, 'node_modules');
   if (!isNodeModulesHealthy(nmPath)) {
     process.stderr.write(
-      `[mcp-bootstrap] node_modules not found at ${nmPath} — running corepack pnpm install --frozen-lockfile\n`,
+      `[mcp-bootstrap] node_modules missing or incomplete at ${nmPath} (tsx not resolvable) — running corepack pnpm install --frozen-lockfile\n`,
     );
     try {
       execFileSync('corepack', ['pnpm', 'install', '--frozen-lockfile'], {
