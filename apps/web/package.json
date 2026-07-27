@@ -5,6 +5,7 @@
   "dependencies": {
     "@legacy-sports/analytics": "workspace:*",
     "@legacy-sports/app-config": "workspace:*",
+    "@legacy-sports/design-tokens": "workspace:*",
     "@legacy-sports/graphql": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/rollbar": "workspace:*",

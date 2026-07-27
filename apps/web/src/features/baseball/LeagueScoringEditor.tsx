@@ -27,7 +27,6 @@ import {
   BRAND_NAVY_LIGHT,
   GRADIENT_BUTTON_PRIMARY,
   GREEN,
-  INDIGO,
   ORANGE,
   withAlpha,
 } from '../../constants/colors';
@@ -686,7 +685,7 @@ export function LeagueScoringEditor(
                 borderRadius="$10"
                 flexShrink={0}
                 style={{
-                  background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.25)}, ${withAlpha(INDIGO, 0.2)})`,
+                  background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.25)}, ${withAlpha(BRAND_GOLD_LIGHT, 0.2)})`,
                 }}
               >
                 <Text fontSize={9} fontWeight="700" color={BRAND_GOLD_LIGHT}>

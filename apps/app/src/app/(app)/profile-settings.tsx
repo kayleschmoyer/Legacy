@@ -23,15 +23,12 @@ import {
   useUpdateUserAvatarMutation,
   useUpdateUsernameMutation,
 } from '@legacy-sports/graphql';
+import { brand } from '@legacy-sports/design-tokens';
 import {
   useAuthHandlers,
   useCurrentUserInfo,
 } from '../../common/auth/AuthHooks';
 import { useSubscription } from '../../features/subscription';
-
-const BRAND_GOLD_LIGHT = '#C5A55A';
-const BRAND_NAVY_LIGHT = '#2C4A7C';
-const BRAND_SEAM_RED = '#C41E3A';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,50}$/;
 
@@ -141,7 +138,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
             style={{
               fontSize: 32,
               fontWeight: '700',
-              color: BRAND_GOLD_LIGHT,
+              color: brand.goldLight,
             }}
           >
             Profile Settings
@@ -207,7 +204,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                   width={24}
                   height={24}
                   borderRadius={12}
-                  backgroundColor={BRAND_NAVY_LIGHT}
+                  backgroundColor={brand.navyLight}
                   alignItems="center"
                   justifyContent="center"
                   borderWidth={2}
@@ -221,7 +218,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                   style={{
                     fontSize: 20,
                     fontWeight: '700',
-                    color: BRAND_GOLD_LIGHT,
+                    color: brand.goldLight,
                   }}
                 >
                   {displayName}
@@ -238,7 +235,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                   borderRadius="$10"
                   borderWidth={1}
                   alignSelf="flex-start"
-                  borderColor={isAdmin ? BRAND_SEAM_RED : BRAND_NAVY_LIGHT}
+                  borderColor={isAdmin ? brand.seamRed : brand.navyLight}
                   backgroundColor={
                     isAdmin ? 'rgba(196,30,58,0.1)' : 'rgba(44,74,124,0.1)'
                   }
@@ -246,7 +243,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                   <Paragraph
                     size="$2"
                     fontWeight="600"
-                    color={isAdmin ? BRAND_SEAM_RED : BRAND_GOLD_LIGHT}
+                    color={isAdmin ? brand.seamRed : brand.goldLight}
                   >
                     {getAccessLevelLabel(isAdmin ? 'admin' : 'user')}
                   </Paragraph>
@@ -327,7 +324,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                     <Button
                       size="$2"
                       chromeless
-                      color={BRAND_NAVY_LIGHT}
+                      color={brand.navyLight}
                       onPress={handleStartEditUsername}
                     >
                       Edit
@@ -456,7 +453,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
         <YStack
           borderRadius="$6"
           borderWidth={1}
-          borderColor={isPremium ? `${BRAND_GOLD_LIGHT}4D` : '$borderColor'}
+          borderColor={isPremium ? `${brand.goldLight}4D` : '$borderColor'}
           overflow="hidden"
         >
           <XStack
@@ -477,7 +474,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               borderRadius="$4"
               alignItems="center"
               justifyContent="center"
-              backgroundColor={isPremium ? `${BRAND_GOLD_LIGHT}33` : '$color2'}
+              backgroundColor={isPremium ? `${brand.goldLight}33` : '$color2'}
             >
               <Text fontSize={16}>{isPremium ? '\u2B50' : '\u{1F48E}'}</Text>
             </YStack>
@@ -501,7 +498,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
         <YStack
           borderRadius="$6"
           borderWidth={1}
-          borderColor={`${BRAND_SEAM_RED}40`}
+          borderColor={`${brand.seamRed}40`}
           overflow="hidden"
         >
           <XStack
@@ -510,7 +507,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
             alignItems="center"
             gap="$3"
             borderBottomWidth={1}
-            borderBottomColor={`${BRAND_SEAM_RED}30`}
+            borderBottomColor={`${brand.seamRed}30`}
           >
             <YStack
               width={36}
@@ -518,12 +515,12 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
               borderRadius="$4"
               alignItems="center"
               justifyContent="center"
-              backgroundColor={`${BRAND_SEAM_RED}1A`}
+              backgroundColor={`${brand.seamRed}1A`}
             >
               <Text fontSize={16}>{'\u{1F6AA}'}</Text>
             </YStack>
             <YStack flex={1}>
-              <Paragraph size="$4" fontWeight="600" color={BRAND_SEAM_RED}>
+              <Paragraph size="$4" fontWeight="600" color={brand.seamRed}>
                 Session
               </Paragraph>
               <Paragraph size="$2" color="$colorPress">
@@ -543,7 +540,7 @@ export default function ProfileSettingsScreen(): React.JSX.Element {
                 </Paragraph>
               </YStack>
               <Button
-                backgroundColor={BRAND_SEAM_RED}
+                backgroundColor={brand.seamRed}
                 color="white"
                 onPress={handleLogout}
                 disabled={loggingOut}

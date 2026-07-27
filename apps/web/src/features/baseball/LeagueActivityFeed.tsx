@@ -213,11 +213,11 @@ export function eventToActivityItem(event: {
       return {
         id: String(event.id),
         type: 'waiver',
-        icon: <UserCheck size={16} color="rgb(168, 85, 247)" />,
+        icon: <UserCheck size={16} color="rgb(44, 74, 124)" />,
         title: 'Waiver claim processed',
         detail: `${actor} claimed ${playerName} off waivers.`,
         isoDate,
-        accentColor: '$purple11',
+        accentColor: '$brandNavyLight',
         linkTo: `/leagues/${lid}/waivers`,
       };
     }

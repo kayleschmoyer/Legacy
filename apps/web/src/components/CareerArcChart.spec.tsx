@@ -24,6 +24,7 @@ jest.mock('recharts', () => {
 });
 
 jest.mock('../constants/colors', () => ({
+  BLUE_LIGHT: '#bluel',
   BRAND_GOLD: '#gold',
   BRAND_GOLD_LIGHT: '#goldl',
   BRAND_NAVY_LIGHT: '#navyl',
@@ -33,7 +34,6 @@ jest.mock('../constants/colors', () => ({
   OVERLAY_BLACK_40: '#overlay',
   SURFACE_CARD: '#card',
   TEXT_MUTED: '#muted',
-  VIOLET_LIGHT: '#violet',
   WHITE: '#fff',
   withAlpha: (color: string) => color,
 }));

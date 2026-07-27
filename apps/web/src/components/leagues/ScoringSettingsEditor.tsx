@@ -37,13 +37,14 @@ import {
 } from '@legacy-sports/graphql';
 import {
   BLACK,
+  BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
   GRADIENT_BUTTON_PRIMARY,
   GREEN,
-  INDIGO,
   ORANGE,
+  SLATE_400,
   withAlpha,
 } from '../../constants/colors';
 
@@ -54,10 +55,10 @@ const GROUP_ACCENT_COLOR: Record<string, string> = {
   batting: BRAND_NAVY_LIGHT,
   pitching: GREEN,
   fielding: ORANGE,
-  passing: '#8B5CF6',
+  passing: BRAND_GOLD,
   rushing: '#14B8A6',
   receiving: '#F59E0B',
-  kicking: '#EC4899',
+  kicking: SLATE_400,
   defense: '#EF4444',
   idp: '#EF4444',
 };
@@ -66,10 +67,10 @@ const GROUP_GRADIENT_FROM: Record<string, string> = {
   batting: withAlpha(BRAND_NAVY_LIGHT, 0.18),
   pitching: withAlpha(GREEN, 0.18),
   fielding: withAlpha(ORANGE, 0.18),
-  passing: withAlpha('#8B5CF6', 0.18),
+  passing: withAlpha(BRAND_GOLD, 0.18),
   rushing: withAlpha('#14B8A6', 0.18),
   receiving: withAlpha('#F59E0B', 0.18),
-  kicking: withAlpha('#EC4899', 0.18),
+  kicking: withAlpha(SLATE_400, 0.18),
   defense: withAlpha('#EF4444', 0.18),
   idp: withAlpha('#EF4444', 0.18),
 };
@@ -368,7 +369,7 @@ export function ScoringSettingsEditor(
                 borderRadius="$10"
                 flexShrink={0}
                 style={{
-                  background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.25)}, ${withAlpha(INDIGO, 0.2)})`,
+                  background: `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.25)}, ${withAlpha(BRAND_GOLD_LIGHT, 0.2)})`,
                 }}
               >
                 <Text fontSize={9} fontWeight="700" color={BRAND_GOLD_LIGHT}>

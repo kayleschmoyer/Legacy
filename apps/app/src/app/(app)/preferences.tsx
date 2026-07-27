@@ -18,13 +18,12 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { brand } from '@legacy-sports/design-tokens';
 import { useThemeContext } from '../../context/ThemeContext';
 import { AUTHORIZED_CONTEXT } from '../../common/auth/AuthorizedUserContext';
 import { useDeviceLoggingPreference } from '../../features/device-logs/useDeviceLoggingPreference';
 import { shareCurrentLogFile } from '../../features/device-logs/deviceLogs';
 
-const BRAND_GOLD_LIGHT = '#C5A55A';
-const BRAND_NAVY_LIGHT = '#2C4A7C';
 const STORAGE_KEY = 'ls_user_preferences';
 
 /* ─── Types ─── */
@@ -132,7 +131,7 @@ function PrefToggle({
         size="$4"
         checked={value}
         onCheckedChange={onChange}
-        backgroundColor={value ? BRAND_NAVY_LIGHT : '$color5'}
+        backgroundColor={value ? brand.navyLight : '$color5'}
         testID={testID}
       >
         <Switch.Thumb animation="quick" />
@@ -168,9 +167,9 @@ function ChipGroup<T extends string>({
           paddingVertical="$2"
           borderRadius="$4"
           borderWidth={1}
-          borderColor={value === opt.value ? BRAND_NAVY_LIGHT : '$borderColor'}
+          borderColor={value === opt.value ? brand.navyLight : '$borderColor'}
           backgroundColor={
-            value === opt.value ? `${BRAND_NAVY_LIGHT}40` : '$color2'
+            value === opt.value ? `${brand.navyLight}40` : '$color2'
           }
           onPress={() => onChange(opt.value)}
           pressStyle={{ opacity: 0.8 }}
@@ -178,7 +177,7 @@ function ChipGroup<T extends string>({
           <Paragraph
             size="$3"
             fontWeight="500"
-            color={value === opt.value ? BRAND_GOLD_LIGHT : '$color'}
+            color={value === opt.value ? brand.goldLight : '$color'}
           >
             {opt.label}
           </Paragraph>
@@ -352,7 +351,7 @@ export default function PreferencesScreen(): React.JSX.Element {
             style={{
               fontSize: 32,
               fontWeight: '700',
-              color: BRAND_GOLD_LIGHT,
+              color: brand.goldLight,
             }}
           >
             Preferences
@@ -371,8 +370,8 @@ export default function PreferencesScreen(): React.JSX.Element {
             padding="$3"
             borderRadius="$5"
             borderWidth={1}
-            borderColor={`${BRAND_NAVY_LIGHT}66`}
-            backgroundColor={`${BRAND_NAVY_LIGHT}26`}
+            borderColor={`${brand.navyLight}66`}
+            backgroundColor={`${brand.navyLight}26`}
           >
             <Text fontSize={14}>✅</Text>
             <Paragraph size="$3" color="$colorPress">

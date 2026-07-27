@@ -15,7 +15,6 @@ import {
   BRAND_NAVY_LIGHT,
   GREEN,
   ORANGE,
-  PURPLE,
   SLATE_400,
   STATUS_DANGER,
   withAlpha,
@@ -321,15 +320,15 @@ export function SystemMessageCard({
           hoverStyle={
             onNavigate
               ? {
-                  borderColor: withAlpha(PURPLE, 0.5),
-                  backgroundColor: withAlpha(PURPLE, 0.12),
+                  borderColor: withAlpha(BRAND_GOLD_LIGHT, 0.5),
+                  backgroundColor: withAlpha(BRAND_GOLD_LIGHT, 0.12),
                 }
               : {}
           }
           onPress={onNavigate ? () => onNavigate('commissioner') : undefined}
           style={{
-            backgroundColor: withAlpha(PURPLE, 0.08),
-            borderColor: withAlpha(PURPLE, 0.25),
+            backgroundColor: withAlpha(BRAND_GOLD_LIGHT, 0.08),
+            borderColor: withAlpha(BRAND_GOLD_LIGHT, 0.25),
           }}
         >
           {/* Header */}
@@ -339,9 +338,9 @@ export function SystemMessageCard({
             alignItems="center"
             gap="$2"
             borderBottomWidth={1}
-            style={{ borderBottomColor: withAlpha(PURPLE, 0.25) }}
+            style={{ borderBottomColor: withAlpha(BRAND_GOLD_LIGHT, 0.25) }}
           >
-            <Settings size={16} color="var(--purple10)" />
+            <Settings size={16} color="var(--brandGoldLight)" />
             <Text fontSize="$3" fontWeight="600" color="$color" flex={1}>
               Draft Settings Updated
             </Text>
@@ -349,9 +348,9 @@ export function SystemMessageCard({
               paddingHorizontal="$2"
               paddingVertical="$1"
               borderRadius="$2"
-              style={{ backgroundColor: withAlpha(PURPLE, 0.18) }}
+              style={{ backgroundColor: withAlpha(BRAND_GOLD_LIGHT, 0.18) }}
             >
-              <Text fontSize="$1" fontWeight="700" color="$purple10">
+              <Text fontSize="$1" fontWeight="700" color="$brandGoldLight">
                 Draft
               </Text>
             </XStack>
@@ -381,9 +380,11 @@ export function SystemMessageCard({
                     paddingHorizontal="$2"
                     paddingVertical="$0.5"
                     borderRadius="$2"
-                    style={{ backgroundColor: withAlpha(PURPLE, 0.12) }}
+                    style={{
+                      backgroundColor: withAlpha(BRAND_GOLD_LIGHT, 0.12),
+                    }}
                   >
-                    <Text fontSize="$1" color="$purple10">
+                    <Text fontSize="$1" color="$brandGoldLight">
                       {c}
                     </Text>
                   </XStack>
@@ -391,7 +392,7 @@ export function SystemMessageCard({
               </XStack>
             )}
             {onNavigate && (
-              <Text fontSize="$2" color="$purple10" fontWeight="500">
+              <Text fontSize="$2" color="$brandGoldLight" fontWeight="500">
                 View in Commissioner →
               </Text>
             )}

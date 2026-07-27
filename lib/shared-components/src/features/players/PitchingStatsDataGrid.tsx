@@ -34,12 +34,13 @@ import { resolveVisibleColumns } from './columnVisibility';
 import { formatPositionsPlayed } from './services/CareerStatsService';
 import { StatsGridHeaderCell } from './shell/StatsGridHeaderCell';
 import { StatsGridPagination } from './shell/StatsGridPagination';
+import {
+  BRAND_GOLD_LIGHT,
+  BRAND_NAVY,
+  BRAND_NAVY_DARK,
+  BRAND_NAVY_LIGHT,
+} from '../../utils/colors';
 
-// ─── Brand color constants (mirror apps/web/src/constants/colors.ts) ──────────
-const BRAND_NAVY = '#1B3A5C';
-const BRAND_NAVY_LIGHT = '#2C4A7C';
-const BRAND_NAVY_DARK = '#143050';
-const BRAND_GOLD_LIGHT = '#D4BB78';
 const TEXT_HIGH_CONTRAST = '#F5F7FA';
 const TEXT_MUTED = '#9CAAC5';
 const BG_PAGE = '#0A0F1A';

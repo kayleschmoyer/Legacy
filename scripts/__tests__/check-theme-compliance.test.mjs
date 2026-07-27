@@ -101,6 +101,53 @@ test('one line can carry multiple violation classes', () => {
 test('CLASSES enumerates all classifier outputs', () => {
   assert.deepEqual(
     CLASSES.slice().sort(),
-    ['blueToken', 'rawHex', 'rawRgba', 'themeBlue'].sort(),
+    ['blueToken', 'rawHex', 'rawRgba', 'themeBlue', 'brandRedeclare'].sort(),
+  );
+});
+
+// --- brandRedeclare (LS-8526) ------------------------------------------------
+
+test('brandRedeclare: local BRAND_* hex re-declarations count outside the canonical files', () => {
+  assert.deepEqual(
+    classifyLine("const BRAND_NAVY = '#1B3A5C';", 'apps/app/src/foo.tsx'),
+    ['rawHex', 'brandRedeclare'],
+  );
+  assert.deepEqual(
+    classifyLine(
+      "export const BRAND_GOLD_LIGHT = '#D4BB78';",
+      'lib/shared-components/src/features/draft/Foo.tsx',
+    ),
+    ['rawHex', 'brandRedeclare'],
+  );
+});
+
+test('brandRedeclare: the two canonical re-export shims are exempt', () => {
+  assert.deepEqual(
+    classifyLine(
+      "export const BRAND_NAVY = '#1B3A5C';",
+      'apps/web/src/constants/colors.ts',
+    ),
+    ['rawHex'],
+  );
+  assert.deepEqual(
+    classifyLine(
+      "export const BRAND_GOLD = '#C5A55A';",
+      'lib/shared-components/src/utils/colors.ts',
+    ),
+    ['rawHex'],
+  );
+});
+
+test('brandRedeclare: no file path (unknown context) still flags the pattern', () => {
+  assert.deepEqual(classifyLine("const BRAND_NAVY = '#1B3A5C';"), [
+    'rawHex',
+    'brandRedeclare',
+  ]);
+});
+
+test('brandRedeclare: non-BRAND_* consts do not count', () => {
+  assert.deepEqual(
+    classifyLine("const TEXT_MUTED = '#9CAAC5';", 'apps/app/src/foo.tsx'),
+    ['rawHex'],
   );
 });

@@ -95,35 +95,49 @@ export const positions = {
   utility: '#C5A55A',
 } as const;
 
-// Roster-list position badge accents (players.tsx) — distinct from the
-// `positions` panel accents above; same value in both themes.
+// Roster-list position badge accents (players.tsx, PlayersScreen, elite-draft,
+// PositionBadge, ...) — the authoritative per-position palette (LS-8578:
+// promoted from elite-draft's palette by product decision), distinct from the
+// `positions` panel-category accents above. Same value in both themes.
+// LS-8526: unified here as the single source — web, shared-components, and
+// native all previously carried independently-drifted copies of this table.
 export const baseballPositionBadges = {
-  P: '#C41E3A',
-  C: '#E67E22',
-  '1B': '#27AE60',
-  '2B': '#27AE60',
-  '3B': '#27AE60',
-  SS: '#27AE60',
-  OF: '#4A90D9',
-  DH: '#9B59B6',
-  RP: '#C41E3A',
-  SP: '#C41E3A',
+  P: '#4A708B', // steel blue
+  C: '#C41E3A', // seam red
+  '1B': '#B5651D', // warm amber
+  '2B': '#C5A55A', // heritage gold
+  '3B': '#2D6A4F', // forest green
+  SS: '#2C4A7C', // navy light
+  OF: '#64748B', // slate
+  DH: '#8B2635', // burgundy
+  RP: '#2E7D6E', // forest teal
+  SP: '#4A708B', // steel blue
 } as const;
 
 export const footballPositionBadges = {
-  QB: '#4A90D9',
-  RB: '#27AE60',
-  WR: '#9B59B6',
-  TE: '#E67E22',
-  FLEX: '#C49A6C',
-  K: '#95A5A6',
-  DST: '#C41E3A',
-  DL: '#C25A2A',
-  LB: '#9B7A3D',
-  DB: '#6B3FA0',
-  SUPERFLEX: '#D4AF37',
-  IDP: '#5B7FA6',
+  QB: '#C41E3A', // seam red
+  RB: '#8B6F47', // dirt brown
+  WR: '#2D6A4F', // turf green
+  TE: '#7C8794', // steel
+  FLEX: '#C49A6C', // muted gold
+  K: '#C5A55A', // heritage gold
+  DST: '#C41E3A', // seam red (team defense unit)
+  DL: '#C25A2A', // burnt orange-red (defensive line)
+  LB: '#9B7A3D', // amber-brown (linebackers)
+  DB: '#1B3A5C', // brand navy (defensive backs) — was purple #6B3FA0, LS-8526
+  SUPERFLEX: '#D4AF37', // gold variant — any-position flex
+  IDP: '#5B7FA6', // steel blue — individual defensive player umbrella
 } as const;
+
+/** Resolve a per-position badge accent; falls back to `positions.utility`. */
+export function getPositionColor(
+  sport: 'baseball' | 'football',
+  position: string,
+): string {
+  const table: Record<string, string> =
+    sport === 'baseball' ? baseballPositionBadges : footballPositionBadges;
+  return table[position] ?? positions.utility;
+}
 
 // Light-theme position colors are desaturated for AA contrast on white
 // surfaces (mirrors the brandGoldOverride pattern below for `utility`).

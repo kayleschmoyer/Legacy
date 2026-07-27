@@ -14,6 +14,7 @@ import {
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
+import { brand } from '@legacy-sports/design-tokens';
 import { useLeagueScoringSettings } from '../../../common/scoring';
 import {
   mapBattingStats,
@@ -23,13 +24,9 @@ import {
 } from '../../../common/scoring/mapGraphQLToScoringFormat';
 
 // ── Brand colors ───────────────────────────────────────────────────────────────
-// Mobile has no central colors module — components define brand constants inline
-// (see help.tsx, PremiumGate.tsx). These mirror apps/web/src/constants/colors.ts
-// so the panel matches the web matchup detail page.
+// `brand` (imported above from @legacy-sports/design-tokens) is the canonical
+// source so this panel can't drift from the web matchup detail page (LS-8526).
 
-const BRAND_NAVY_LIGHT = '#2C4A7C';
-const BRAND_SEAM_RED = '#C41E3A';
-const BRAND_GOLD_LIGHT = '#D4BB78';
 const MUTED_ICON = '#8A94A6';
 
 /** rgba() string from a #rrggbb hex and an alpha in [0, 1]. */
@@ -83,7 +80,7 @@ function ProbabilityBar({
           <Text
             fontSize={40}
             fontWeight="900"
-            color={BRAND_NAVY_LIGHT}
+            color={brand.navyLight}
             lineHeight={44}
           >
             {t1Pct}%
@@ -113,7 +110,7 @@ function ProbabilityBar({
           <Text
             fontSize={40}
             fontWeight="900"
-            color={BRAND_SEAM_RED}
+            color={brand.seamRed}
             lineHeight={44}
           >
             {t2Pct}%
@@ -131,13 +128,13 @@ function ProbabilityBar({
         <YStack
           height="100%"
           width={`${t1Pct}%`}
-          backgroundColor={BRAND_NAVY_LIGHT}
+          backgroundColor={brand.navyLight}
           animation="quick"
         />
         <YStack
           height="100%"
           flex={1}
-          backgroundColor={BRAND_SEAM_RED}
+          backgroundColor={brand.seamRed}
           animation="quick"
         />
       </XStack>
@@ -165,7 +162,7 @@ function CategoryRow({
         <Text
           fontSize="$2"
           fontWeight="700"
-          color={team1Leading ? BRAND_NAVY_LIGHT : '$gray11'}
+          color={team1Leading ? brand.navyLight : '$gray11'}
         >
           {team1Score.toFixed(1)}
         </Text>
@@ -175,7 +172,7 @@ function CategoryRow({
         <Text
           fontSize="$2"
           fontWeight="700"
-          color={team2Leading ? BRAND_SEAM_RED : '$gray11'}
+          color={team2Leading ? brand.seamRed : '$gray11'}
         >
           {team2Score.toFixed(1)}
         </Text>
@@ -191,7 +188,7 @@ function CategoryRow({
           height="100%"
           width={`${team1Pct * 100}%`}
           backgroundColor={
-            team1Leading ? withAlpha(BRAND_NAVY_LIGHT, 0.8) : '$gray6'
+            team1Leading ? withAlpha(brand.navyLight, 0.8) : '$gray6'
           }
           animation="quick"
         />
@@ -199,7 +196,7 @@ function CategoryRow({
           height="100%"
           flex={1}
           backgroundColor={
-            team2Leading ? withAlpha(BRAND_SEAM_RED, 0.8) : '$gray6'
+            team2Leading ? withAlpha(brand.seamRed, 0.8) : '$gray6'
           }
           animation="quick"
         />
@@ -419,12 +416,12 @@ export function MatchupWinProbabilityPanel({
             gap="$2"
             paddingHorizontal="$5"
             paddingVertical="$3"
-            backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+            backgroundColor={withAlpha(brand.navyLight, 0.12)}
             borderBottomWidth={1}
-            borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+            borderBottomColor={withAlpha(brand.navyLight, 0.35)}
           >
-            <Target size={16} color={BRAND_GOLD_LIGHT} />
-            <Text fontSize="$4" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+            <Target size={16} color={brand.goldLight} />
+            <Text fontSize="$4" fontWeight="700" color={brand.goldLight}>
               Win Probability
             </Text>
           </XStack>
@@ -454,12 +451,12 @@ export function MatchupWinProbabilityPanel({
         gap="$2"
         paddingHorizontal="$5"
         paddingVertical="$3"
-        backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+        backgroundColor={withAlpha(brand.navyLight, 0.12)}
         borderBottomWidth={1}
-        borderBottomColor={withAlpha(BRAND_NAVY_LIGHT, 0.35)}
+        borderBottomColor={withAlpha(brand.navyLight, 0.35)}
       >
-        <Target size={16} color={BRAND_GOLD_LIGHT} />
-        <Text fontSize="$4" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+        <Target size={16} color={brand.goldLight} />
+        <Text fontSize="$4" fontWeight="700" color={brand.goldLight}>
           Win Probability
         </Text>
       </XStack>
@@ -494,13 +491,13 @@ export function MatchupWinProbabilityPanel({
           </XStack>
 
           <XStack justifyContent="space-between" alignItems="center">
-            <Text fontSize="$6" fontWeight="900" color={BRAND_NAVY_LIGHT}>
+            <Text fontSize="$6" fontWeight="900" color={brand.navyLight}>
               {winProb.team1ProjectedScore.toFixed(2)}
             </Text>
             <Text fontSize="$3" color="$gray11">
               vs
             </Text>
-            <Text fontSize="$6" fontWeight="900" color={BRAND_SEAM_RED}>
+            <Text fontSize="$6" fontWeight="900" color={brand.seamRed}>
               {winProb.team2ProjectedScore.toFixed(2)}
             </Text>
           </XStack>

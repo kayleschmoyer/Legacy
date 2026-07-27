@@ -14,6 +14,7 @@ import { formatDraftDate } from '@legacy-sports/utils';
 import { formatEraDescriptor, formatEraYears } from './homeSummaryFormatters';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
 import {
+  AMBER_WARM,
   BG_DARK,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -24,18 +25,14 @@ import {
   GREEN,
   GREEN_DEEP,
   GREEN_LIGHTER,
+  SCORE_LOSS,
+  TEXT_TERTIARY,
   WHITE,
   withAlpha,
 } from '../../utils/colors';
 
 // Re-export the shared display-name formatter so app wrappers can reuse it.
 export { formatDisplayName } from './homeSummaryFormatters';
-
-/* ─── Home-only color constants (mirror apps/web/src/constants/colors) ─── */
-
-const TEXT_TERTIARY = '#6C80BA';
-const SCORE_LOSS = '#E07A8C';
-const AMBER_WARM = '#E3B870';
 
 /* ─── Typography helpers (web uses Heritage fonts; native falls back) ─── */
 

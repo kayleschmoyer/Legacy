@@ -9,9 +9,7 @@ import {
 import React, { useState } from 'react';
 import { Linking, ScrollView } from 'react-native';
 import { H1, H3, Separator, Text, XStack, YStack } from 'tamagui';
-
-const BRAND_GOLD = '#C5A55A';
-const BRAND_NAVY_LIGHT = '#2C4A7C';
+import { brand } from '@legacy-sports/design-tokens';
 
 /* ─── FAQ data (imported from @legacy-sports/utils) ─── */
 
@@ -41,7 +39,7 @@ function FaqItem({ question, answer }: FaqItemProps) {
         <Text fontWeight="600" color="$color" flex={1} fontSize="$4">
           {question}
         </Text>
-        <Text fontSize="$5" color={BRAND_GOLD}>
+        <Text fontSize="$5" color={brand.gold}>
           {open ? '▴' : '▾'}
         </Text>
       </XStack>
@@ -76,7 +74,7 @@ export default function HelpScreen(): React.JSX.Element {
       >
         {/* Page Header */}
         <YStack gap="$2" paddingVertical="$4">
-          <H1 color={BRAND_GOLD}>🆘 Help & Support</H1>
+          <H1 color={brand.gold}>🆘 Help & Support</H1>
           <Text color="$colorPress" fontSize="$5" lineHeight={28}>
             Find answers to common questions and learn how to get the most out
             of Legacy Sports.
@@ -198,9 +196,9 @@ export default function HelpScreen(): React.JSX.Element {
                   alignItems="center"
                   justifyContent="center"
                   flexShrink={0}
-                  backgroundColor={BRAND_NAVY_LIGHT}
+                  backgroundColor={brand.navyLight}
                 >
-                  <Text color={BRAND_GOLD} fontWeight="700" fontSize="$3">
+                  <Text color={brand.gold} fontWeight="700" fontSize="$3">
                     {step}
                   </Text>
                 </YStack>
@@ -270,12 +268,12 @@ export default function HelpScreen(): React.JSX.Element {
                     borderRadius="$4"
                     alignItems="center"
                     justifyContent="center"
-                    backgroundColor={BRAND_NAVY_LIGHT}
+                    backgroundColor={brand.navyLight}
                   >
                     <Text fontSize={20}>{item.icon}</Text>
                   </YStack>
                   <YStack flex={1} gap="$1">
-                    <Text fontWeight="700" color={BRAND_GOLD} fontSize="$4">
+                    <Text fontWeight="700" color={brand.gold} fontSize="$4">
                       {item.title}
                     </Text>
                     <Text color="$colorPress" fontSize="$3">
@@ -303,7 +301,7 @@ export default function HelpScreen(): React.JSX.Element {
                 For account access problems or missed draft notifications, join
                 our{' '}
                 <Text
-                  color={BRAND_GOLD}
+                  color={brand.gold}
                   onPress={() => void Linking.openURL(DISCORD_URL)}
                 >
                   Discord server

@@ -8,40 +8,49 @@
  * (gradients, box-shadows, transitions) or when a Tamagui token mapping
  * does not exist for a particular value.
  *
- * These values mirror lib/tamagui-config -- keep them in sync.
+ * LS-8526: brand and position values are re-exported from
+ * `@legacy-sports/design-tokens` — the single canonical source — instead of
+ * being duplicated here. Do not re-declare `BRAND_*`/`POS_*` locally
+ * elsewhere; import from here or from `@legacy-sports/design-tokens` directly.
  */
+
+import {
+  baseballPositionBadges,
+  brand,
+  darkSurface,
+  footballPositionBadges,
+  getPositionColor as getPositionColorToken,
+  positions,
+  withAlpha as withAlphaToken,
+} from '@legacy-sports/design-tokens';
 
 // -- Utility --------------------------------------------------------
 
 /** Convert a hex color to an rgba() string at the given alpha. */
-export function withAlpha(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+export const withAlpha = withAlphaToken;
 
 // -- Backgrounds & Surfaces ------------------------------------------
 
-export const BG_DARK = '#0A0F1A';
-export const SURFACE_SUBTLE = '#0D1526';
-export const SURFACE_PANEL = '#111B2F';
-export const SURFACE_CARD = '#16223A';
-export const OUTLINE_SUBTLE = '#1C2740';
-export const PANEL_BORDER = '#1F2D48';
+export const BG_DARK = darkSurface.bg;
+export const SURFACE_SUBTLE = darkSurface.surfaceSubtle;
+export const SURFACE_PANEL = darkSurface.surfacePanel;
+export const SURFACE_CARD = darkSurface.surfaceCard;
+export const OUTLINE_SUBTLE = darkSurface.outlineSubtle;
+export const PANEL_BORDER = darkSurface.panelBorder;
 
 // -- Brand Heritage --------------------------------------------------
 
-export const BRAND_NAVY = '#1B3A5C';
-export const BRAND_NAVY_LIGHT = '#2C4A7C';
-export const BRAND_NAVY_DARK = '#143050';
-export const BRAND_SEAM_RED = '#C41E3A';
-export const BRAND_SEAM_RED_DARK = '#8B1A2B';
-export const BRAND_SEAM_RED_LIGHT = '#E63950';
-export const BRAND_GOLD = '#C5A55A';
+export const BRAND_NAVY = brand.navy;
+export const BRAND_NAVY_LIGHT = brand.navyLight;
+export const BRAND_NAVY_DARK = brand.navyDark;
+export const BRAND_SEAM_RED = brand.seamRed;
+export const BRAND_SEAM_RED_DARK = brand.seamRedDark;
+export const BRAND_SEAM_RED_LIGHT = brand.seamRedLight;
+export const BRAND_GOLD = brand.gold;
+/** Press/active state for gold surfaces — no design-tokens equivalent yet. */
 export const BRAND_GOLD_PRESS = '#A8894A';
-export const BRAND_GOLD_LIGHT = '#D4BB78';
-export const BRAND_GOLD_DARK = '#A68B3E';
+export const BRAND_GOLD_LIGHT = brand.goldLight;
+export const BRAND_GOLD_DARK = brand.goldDark;
 
 // -- Position Colors -------------------------------------------------
 
@@ -50,69 +59,55 @@ export const BRAND_GOLD_DARK = '#A68B3E';
 export type Sport = 'baseball' | 'football';
 
 // Baseball position tokens (LS-8578: promoted from elite-draft's palette,
-// the authoritative source per product decision — canonical's prior muted
-// palette is retired).
-export const POS_CATCHER = BRAND_SEAM_RED;
-export const POS_FIRST_BASE = '#B5651D'; // warm amber
-export const POS_SECOND_BASE = BRAND_GOLD;
-export const POS_THIRD_BASE = '#2D6A4F'; // forest green
-export const POS_SHORTSTOP = BRAND_NAVY_LIGHT;
-export const POS_OUTFIELD = '#64748B'; // slate
-export const POS_PITCHER = '#4A708B'; // steel blue
-export const POS_STARTING_PITCHER = '#4A708B'; // steel blue
-export const POS_RELIEF_PITCHER = '#2E7D6E'; // forest teal
-export const POS_DESIGNATED_HITTER = '#8B2635'; // burgundy
-export const POS_UTILITY = '#C5A55A';
+// the authoritative source per product decision) — unified into
+// `@legacy-sports/design-tokens` `baseballPositionBadges` under LS-8526.
+export const POS_CATCHER = baseballPositionBadges.C;
+export const POS_FIRST_BASE = baseballPositionBadges['1B'];
+export const POS_SECOND_BASE = baseballPositionBadges['2B'];
+export const POS_THIRD_BASE = baseballPositionBadges['3B'];
+export const POS_SHORTSTOP = baseballPositionBadges.SS;
+export const POS_OUTFIELD = baseballPositionBadges.OF;
+export const POS_PITCHER = baseballPositionBadges.P;
+export const POS_STARTING_PITCHER = baseballPositionBadges.SP;
+export const POS_RELIEF_PITCHER = baseballPositionBadges.RP;
+export const POS_DESIGNATED_HITTER = baseballPositionBadges.DH;
+export const POS_UTILITY = positions.utility;
 /** Generic "infield" category color for position-group filters (e.g. an IF
  *  filter tab covering 1B/2B/3B/SS) — distinct from the per-position hex
- *  values in POSITION_COLORS, which now vary per infield position. */
-export const POS_INFIELD = '#8B6F47';
+ *  values in POSITION_COLORS, which vary per infield position. */
+export const POS_INFIELD = positions.infield;
 
 // Football position tokens — mirrors the football theme block in the
 // Draft Board mockup (`draft.html` ~lines 2700–2846, ADR 0011 §3).
-export const POS_QB = BRAND_SEAM_RED; // seam red
-export const POS_RB = '#8B6F47'; // dirt brown
-export const POS_WR = '#2D6A4F'; // turf green
-export const POS_TE = '#7C8794'; // steel
-export const POS_K = BRAND_GOLD; // heritage gold
-export const POS_DEF = '#4A6FA5'; // navy blue (legacy / catch-all)
-export const POS_FLEX = '#C49A6C'; // muted gold
+export const POS_QB = footballPositionBadges.QB;
+export const POS_RB = footballPositionBadges.RB;
+export const POS_WR = footballPositionBadges.WR;
+export const POS_TE = footballPositionBadges.TE;
+export const POS_K = footballPositionBadges.K;
+/** Legacy/catch-all "DEF" position — distinct from DST (team defense unit);
+ *  no per-position badge equivalent in the canonical table. */
+export const POS_DEF = '#4A6FA5';
+export const POS_FLEX = footballPositionBadges.FLEX;
 // IDP defensive sub-position tokens — each visually distinct.
-export const POS_DST = BRAND_SEAM_RED; // seam red (team defense unit)
-export const POS_DL = '#C25A2A'; // burnt orange-red (defensive line)
-export const POS_LB = '#9B7A3D'; // amber-brown (linebackers)
-export const POS_DB = '#6B3FA0'; // deep purple (defensive backs)
+export const POS_DST = footballPositionBadges.DST;
+export const POS_DL = footballPositionBadges.DL;
+export const POS_LB = footballPositionBadges.LB;
+export const POS_DB = footballPositionBadges.DB;
+
+const FOOTBALL_POSITIONS_SHARED: Record<string, string> = {
+  ...footballPositionBadges,
+  DEF: POS_DEF,
+};
 
 export const POSITION_COLORS: Record<Sport, Record<string, string>> = {
-  baseball: {
-    C: POS_CATCHER,
-    '1B': POS_FIRST_BASE,
-    '2B': POS_SECOND_BASE,
-    '3B': POS_THIRD_BASE,
-    SS: POS_SHORTSTOP,
-    OF: POS_OUTFIELD,
-    P: POS_PITCHER,
-    SP: POS_STARTING_PITCHER,
-    RP: POS_RELIEF_PITCHER,
-    DH: POS_DESIGNATED_HITTER,
-  },
-  football: {
-    QB: POS_QB,
-    RB: POS_RB,
-    WR: POS_WR,
-    TE: POS_TE,
-    K: POS_K,
-    DEF: POS_DEF,
-    FLEX: POS_FLEX,
-    DST: POS_DST,
-    DL: POS_DL,
-    LB: POS_LB,
-    DB: POS_DB,
-  },
+  baseball: baseballPositionBadges,
+  football: FOOTBALL_POSITIONS_SHARED,
 };
 
 export function getPositionColor(sport: Sport, position: string): string {
-  return POSITION_COLORS[sport][position] ?? POS_UTILITY;
+  return (
+    POSITION_COLORS[sport][position] ?? getPositionColorToken(sport, position)
+  );
 }
 
 // -- Text ------------------------------------------------------------
@@ -127,6 +122,15 @@ export const TEXT_SECONDARY = '#8A9BB5';
 /** Editorial-shell neutral foreground (FG3) — eyebrow/lede/meta text on dark
  * canvases. Shared across the Players/Stats redesign slices. */
 export const TEXT_NEUTRAL_FG3 = '#9CAAC5';
+/** Tertiary text — further muted, de-emphasized content. */
+export const TEXT_TERTIARY = '#6C80BA';
+
+// -- Score / Status Colors ---------------------------------------------
+
+/** Loss accent — score highlighting for losing matchup side. */
+export const SCORE_LOSS = '#E07A8C';
+/** Warm amber text — "coming soon" labels and soft warning states. */
+export const AMBER_WARM = '#E3B870';
 
 // -- Blues (primary accent / links) -----------------------------------
 
@@ -160,16 +164,6 @@ export const AMBER_DARK = '#D97706';
 export const ORANGE = '#F97316';
 export const YELLOW = '#EAB308';
 
-// -- Violets / AI Feature Accents ------------------------------------
-
-export const VIOLET = '#8B5CF6';
-export const VIOLET_LIGHT = '#A78BFA';
-export const VIOLET_DARK = '#7C3AED';
-export const INDIGO = '#6366F1';
-export const PURPLE = '#A855F7';
-export const PURPLE_LIGHT = '#C084FC';
-export const PINK = '#EC4899';
-
 // -- Slate / Muted ---------------------------------------------------
 
 export const SLATE_500 = '#64748B';
@@ -191,13 +185,14 @@ export const WHITE = '#FFFFFF';
 export const BLACK = '#000000';
 
 // -- Pre-built CSS Gradients -----------------------------------------
+// LS-8526: brand-banned violet/purple/pink/indigo stops removed — see
+// .agents/skills/ui/references/brand-colors.md "Never Do".
 
 export const GRADIENT_ACCENT_GREEN = `linear-gradient(90deg, ${GREEN}, ${GREEN_LIGHT}, transparent)`;
 export const GRADIENT_ACCENT_NAVY = `linear-gradient(90deg, ${BRAND_NAVY}, ${BRAND_NAVY_LIGHT}, transparent)`;
 export const GRADIENT_ACCENT_AMBER = `linear-gradient(90deg, ${AMBER}, ${AMBER_LIGHT}, transparent)`;
-export const GRADIENT_ACCENT_PURPLE = `linear-gradient(90deg, ${PURPLE}, ${PURPLE_LIGHT}, transparent)`;
 export const GRADIENT_ACCENT_GRAY = `linear-gradient(90deg, ${GRAY}, ${GRAY_LIGHT}, transparent)`;
-export const GRADIENT_ACCENT_BRAND = `linear-gradient(90deg, ${BLUE}, ${VIOLET}, ${PINK})`;
+export const GRADIENT_ACCENT_BRAND = `linear-gradient(90deg, ${BRAND_NAVY_LIGHT}, ${BRAND_GOLD_LIGHT}, transparent)`;
 
 export const GRADIENT_BOARD_BG = `linear-gradient(135deg, ${BG_DARK} 0%, ${SURFACE_PANEL} 50%, ${BRAND_NAVY} 100%)`;
 export const GRADIENT_SEAM_RED = `linear-gradient(135deg, ${BRAND_SEAM_RED} 0%, ${BRAND_SEAM_RED_DARK} 100%)`;
@@ -207,9 +202,9 @@ export const GRADIENT_WARNING = `linear-gradient(135deg, ${AMBER} 0%, ${AMBER_DA
 export const GRADIENT_NAVY = `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`;
 export const GRADIENT_GOLD = `linear-gradient(135deg, ${BRAND_GOLD} 0%, ${BRAND_GOLD_PRESS} 100%)`;
 export const GRADIENT_WHITE_CARD = `linear-gradient(135deg, ${WHITE} 0%, ${SLATE_100} 100%)`;
-export const GRADIENT_BUTTON_PRIMARY = `linear-gradient(135deg, ${BLUE}, ${INDIGO})`;
+export const GRADIENT_BUTTON_PRIMARY = `linear-gradient(135deg, ${BRAND_NAVY_LIGHT}, ${BRAND_NAVY})`;
 export const GRADIENT_BUTTON_SAVE = `linear-gradient(135deg, ${BLUE}, ${BLUE_DEEP})`;
-export const GRADIENT_AVATAR = `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${VIOLET} 100%)`;
+export const GRADIENT_AVATAR = `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_GOLD} 100%)`;
 
 // -- Semi-transparent Overlays ----------------------------------------
 

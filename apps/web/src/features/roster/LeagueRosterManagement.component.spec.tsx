@@ -43,7 +43,6 @@ jest.mock('../../constants/colors', () => ({
   GREEN: '#22c55e',
   RED: '#ef4444',
   SURFACE_SUBTLE: '#subtle',
-  VIOLET: '#7c3aed',
   withAlpha: (color: string) => color,
 }));
 

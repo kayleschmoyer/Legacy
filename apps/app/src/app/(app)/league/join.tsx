@@ -347,9 +347,13 @@ export default function JoinLeagueScreen(): React.JSX.Element {
         </Card>
 
         {/* How It Works */}
-        <Card backgroundColor="$purple2" borderColor="$purple6" padding="$4">
+        <Card
+          backgroundColor="$surfaceInteractive"
+          borderColor="$outlineSubtle"
+          padding="$4"
+        >
           <YStack space="$2">
-            <H2 size="$5" color="$purple11">
+            <H2 size="$5" color="$brandGoldLight">
               💡 How It Works
             </H2>
             <Text color="$gray11" fontSize="$3">

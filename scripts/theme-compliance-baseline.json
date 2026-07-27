@@ -1,20 +1,23 @@
 {
   "apps/web": {
-    "rawHex": 186,
-    "rawRgba": 102,
+    "rawHex": 158,
+    "rawRgba": 101,
     "blueToken": 0,
-    "themeBlue": 0
+    "themeBlue": 0,
+    "brandRedeclare": 0
   },
   "apps/app": {
-    "rawHex": 32,
+    "rawHex": 11,
     "rawRgba": 10,
     "blueToken": 0,
-    "themeBlue": 0
+    "themeBlue": 0,
+    "brandRedeclare": 0
   },
   "lib/shared-components": {
-    "rawHex": 460,
-    "rawRgba": 442,
+    "rawHex": 413,
+    "rawRgba": 440,
     "blueToken": 0,
-    "themeBlue": 0
+    "themeBlue": 0,
+    "brandRedeclare": 0
   }
 }

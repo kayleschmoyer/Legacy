@@ -11,10 +11,9 @@ import {
   useGetMyMockDraftUsageQuery,
   useInitializeMockDraftMutation,
 } from '@legacy-sports/graphql';
+import { brand } from '@legacy-sports/design-tokens';
 import { useSubscription } from '../../../features/subscription/useSubscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
-
-const BRAND_GOLD = '#B8962E';
 
 /**
  * GrowthBook flag key that gates the football sport option (ADR 0011 §4,
@@ -47,12 +46,12 @@ function PremiumUpsell(): React.JSX.Element {
       backgroundColor="$gray2"
       borderRadius="$4"
       borderWidth={1}
-      borderColor={`${BRAND_GOLD}73`}
+      borderColor={`${brand.gold}73`}
       padding="$4"
       space="$2"
       marginBottom="$5"
     >
-      <Text color={BRAND_GOLD} fontSize="$5" fontWeight="bold">
+      <Text color={brand.gold} fontSize="$5" fontWeight="bold">
         Free plan: 2 mock drafts per week
       </Text>
       <Text color="$gray11" fontSize="$3">
@@ -60,7 +59,7 @@ function PremiumUpsell(): React.JSX.Element {
         practice.
       </Text>
       <Button
-        backgroundColor={BRAND_GOLD}
+        backgroundColor={brand.gold}
         borderRadius="$4"
         marginTop="$2"
         onPress={onUpgrade}
@@ -108,17 +107,17 @@ function LimitReachedScreen({
           backgroundColor="$gray2"
           borderRadius="$4"
           borderWidth={1}
-          borderColor={`${BRAND_GOLD}73`}
+          borderColor={`${brand.gold}73`}
           padding="$5"
           space="$4"
           width="100%"
           maxWidth={480}
           alignItems="center"
         >
-          <Lock size={32} color={BRAND_GOLD} />
+          <Lock size={32} color={brand.gold} />
           <YStack space="$1" alignItems="center">
             <Text
-              color={BRAND_GOLD}
+              color={brand.gold}
               fontSize="$6"
               fontWeight="bold"
               textAlign="center"
@@ -136,7 +135,7 @@ function LimitReachedScreen({
           <XStack space="$3" width="100%">
             <Button
               flex={1}
-              backgroundColor={BRAND_GOLD}
+              backgroundColor={brand.gold}
               borderRadius="$4"
               onPress={onUpgrade}
               pressStyle={{ opacity: 0.85 }}

@@ -1,9 +1,8 @@
 import React from 'react';
 import { Spinner, YStack } from 'tamagui';
+import { brand } from '@legacy-sports/design-tokens';
 import { PremiumGate } from './PremiumGate';
 import { useSubscription } from './useSubscription';
-
-const BRAND_GOLD = '#B8962E';
 
 export interface PremiumScreenOptions {
   /** Feature name used for analytics and upgrade prompt copy. */
@@ -48,7 +47,7 @@ export function withPremiumScreen<P extends object>(
           justifyContent="center"
           backgroundColor="$background"
         >
-          <Spinner size="large" color={BRAND_GOLD} />
+          <Spinner size="large" color={brand.gold} />
         </YStack>
       );
     }

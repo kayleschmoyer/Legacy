@@ -16,8 +16,7 @@ import { type NotificationHistoryItem } from '@legacy-sports/graphql';
 import { NotificationList } from './components/NotificationList';
 import { NotificationSettings } from './components/NotificationSettings';
 import { useNotifications } from './hooks/useNotifications';
-
-const BRAND_GOLD_LIGHT = '#C5A55A';
+import { BRAND_GOLD_LIGHT } from '../../utils/colors';
 
 export interface NotificationsScreenProps {
   userId: number;

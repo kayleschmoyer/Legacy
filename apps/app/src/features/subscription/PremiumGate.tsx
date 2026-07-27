@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
+import { brand } from '@legacy-sports/design-tokens';
 import { useStripePrices } from './useStripePrices';
 import {
   trackPremiumFeatureBlocked,
@@ -33,10 +34,6 @@ export interface PremiumGateProps {
   /** Content to tease (dimmed) for free users or render normally for premium. */
   children: React.ReactNode;
 }
-
-const BRAND_GOLD = '#B8962E';
-const BRAND_GOLD_LIGHT = '#C5A55A';
-const BRAND_NAVY = '#1A2A4A';
 
 /**
  * PremiumGate — Gatekeeps premium-only UI sections on mobile.
@@ -141,14 +138,14 @@ function PremiumGateOverlay({
         bottom={0}
         alignItems="center"
         justifyContent="center"
-        backgroundColor={`${BRAND_NAVY}CC`}
+        backgroundColor={`${brand.navy}CC`}
       >
         <YStack
           alignItems="center"
           gap="$3"
           backgroundColor="$background"
           borderWidth={1}
-          borderColor={`${BRAND_GOLD}73`}
+          borderColor={`${brand.gold}73`}
           borderRadius="$5"
           paddingHorizontal="$6"
           paddingVertical="$5"
@@ -156,7 +153,7 @@ function PremiumGateOverlay({
           <Text fontSize={28}>🔒</Text>
           <YStack alignItems="center" gap="$1">
             <Text
-              color={BRAND_GOLD}
+              color={brand.gold}
               fontSize="$5"
               fontWeight="bold"
               textAlign="center"
@@ -175,8 +172,8 @@ function PremiumGateOverlay({
           </YStack>
           <Button
             onPress={handleUpgradePress}
-            backgroundColor={BRAND_GOLD}
-            color={BRAND_NAVY}
+            backgroundColor={brand.gold}
+            color={brand.navy}
             fontWeight="bold"
             pressStyle={{ opacity: 0.85, scale: 0.97 }}
             borderRadius="$4"
@@ -185,11 +182,11 @@ function PremiumGateOverlay({
             onPressIn={() => setPressed(true)}
             onPressOut={() => setPressed(false)}
           >
-            <Text color={BRAND_NAVY} fontWeight="bold">
+            <Text color={brand.navy} fontWeight="bold">
               Upgrade to Premium
             </Text>
           </Button>
-          <Text fontSize="$2" color={BRAND_GOLD_LIGHT} textAlign="center">
+          <Text fontSize="$2" color={brand.goldLight} textAlign="center">
             From {annualMonthlyEquivalent}/mo
           </Text>
         </YStack>

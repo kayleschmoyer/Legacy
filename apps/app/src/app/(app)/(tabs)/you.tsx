@@ -8,12 +8,10 @@ import {
   useDisableDeviceTokenMutation,
   useGetUnreadNotificationCountQuery,
 } from '@legacy-sports/graphql';
+import { brand } from '@legacy-sports/design-tokens';
 import { useAuthHandlers } from '../../../common/auth/AuthHooks';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 import { getEasProjectId } from '../../../features/notifications/getEasProjectId';
-
-const BRAND_GOLD = '#C5A55A';
-const BRAND_SEAM_RED = '#C41E3A';
 
 interface MenuRowProps {
   icon: string;
@@ -55,7 +53,7 @@ function MenuRow({
       </YStack>
       <Paragraph
         size="$4"
-        color={danger ? BRAND_SEAM_RED : '$color'}
+        color={danger ? brand.seamRed : '$color'}
         fontWeight="500"
         flex={1}
       >
@@ -130,7 +128,7 @@ export default function YouTab(): React.JSX.Element {
           paddingBottom="$4"
           gap="$1"
         >
-          <Text style={{ fontSize: 28, fontWeight: '700', color: BRAND_GOLD }}>
+          <Text style={{ fontSize: 28, fontWeight: '700', color: brand.gold }}>
             You
           </Text>
           <Paragraph size="$3" color="$colorPress">

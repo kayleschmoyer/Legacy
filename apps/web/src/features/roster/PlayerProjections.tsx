@@ -5,7 +5,6 @@ import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   SURFACE_SUBTLE,
-  VIOLET,
   withAlpha,
 } from '../../constants/colors';
 
@@ -99,7 +98,7 @@ export function PlayerProjections({
         height={2}
         width="100%"
         style={{
-          background: `linear-gradient(90deg, ${BRAND_NAVY_LIGHT}, ${VIOLET}, transparent)`,
+          background: `linear-gradient(90deg, ${BRAND_NAVY_LIGHT}, ${BRAND_GOLD_LIGHT}, transparent)`,
         }}
       />
       {/* Title bar */}

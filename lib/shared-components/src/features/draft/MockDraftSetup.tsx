@@ -17,23 +17,13 @@
 import React from 'react';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { FootballMockPoolPreview } from './FootballMockPoolPreview';
-
-// ─── Brand accents (mirror the canonical web palette) ────────────────────────
-// Inlined rather than imported from the web app so the component stays
-// self-contained and consumable by native, which has no access to
-// `apps/web/src/constants/colors`.
-const BRAND_SEAM_RED = '#C41E3A';
-const BRAND_GOLD = '#C5A55A';
-const EMERALD = '#059669';
-const BRAND_NAVY_LIGHT = '#2C4A7C';
-
-/** Convert a hex color to an rgba() string at the given alpha. */
-function withAlpha(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+import {
+  BRAND_GOLD,
+  BRAND_NAVY_LIGHT,
+  BRAND_SEAM_RED,
+  EMERALD,
+  withAlpha,
+} from '../../utils/colors';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

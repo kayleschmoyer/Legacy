@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import type { GetPlayerCareerArcQuery } from '@legacy-sports/graphql';
 import {
+  BLUE_LIGHT,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -22,7 +23,6 @@ import {
   OVERLAY_BLACK_40,
   SURFACE_CARD,
   TEXT_MUTED,
-  VIOLET_LIGHT,
   WHITE,
   withAlpha,
 } from '../constants/colors';
@@ -68,7 +68,7 @@ export interface CareerArcChartProps {
 const AWARD_LABELS: Record<string, { label: string; color: string }> = {
   AS: { label: 'All-Star', color: BRAND_GOLD_LIGHT },
   MVP: { label: 'MVP', color: BRAND_SEAM_RED },
-  CYA: { label: 'Cy Young', color: VIOLET_LIGHT },
+  CYA: { label: 'Cy Young', color: BLUE_LIGHT },
   GG: { label: 'Gold Glove', color: EMERALD_LIGHT },
   SS: { label: 'Silver Slugger', color: BRAND_GOLD },
   ROY: { label: 'ROY', color: BRAND_NAVY_LIGHT },

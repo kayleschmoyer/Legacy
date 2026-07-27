@@ -169,9 +169,9 @@ function statusBadge(status: string): {
       };
     case 'vetoed':
       return {
-        bg: '$purple3',
-        border: '$purple7',
-        text: '$purple11',
+        bg: '$statusAccentBg',
+        border: '$statusAccentBorder',
+        text: '$statusAccentFg',
         label: 'Vetoed',
       };
     case 'expired':
@@ -319,7 +319,7 @@ function TradeOfferCard({
       : trade.status === 'accepted'
         ? '$green9'
         : trade.status === 'vetoed'
-          ? '$purple9'
+          ? '$statusAccentFg'
           : '$gray9';
 
   return (
@@ -705,8 +705,8 @@ function TradeOfferCard({
           {isCommissioner && trade.status === 'accepted' && (
             <Button
               size="$2"
-              backgroundColor="$purple4"
-              borderColor="$purple7"
+              backgroundColor="$statusAccentBg"
+              borderColor="$statusAccentBorder"
               borderWidth={1}
               data-testid={`trade-veto-${trade.id}`}
               onPress={() => {
@@ -714,9 +714,9 @@ function TradeOfferCard({
                 onVeto?.(trade.id);
               }}
               disabled={isLoading || trade.id == null}
-              icon={<Shield size={12} color="$purple11" />}
+              icon={<Shield size={12} color="$statusAccentFg" />}
             >
-              <Text fontSize="$2" color="$purple11" fontWeight="600">
+              <Text fontSize="$2" color="$statusAccentFg" fontWeight="600">
                 Veto
               </Text>
             </Button>

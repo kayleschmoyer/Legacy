@@ -513,13 +513,13 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
 
       {/* Info Card */}
       <Card
-        backgroundColor="$purple2"
-        borderColor="$purple6"
+        backgroundColor="$surfaceInteractive"
+        borderColor="$outlineSubtle"
         padding="$4"
         width="100%"
       >
         <YStack space="$2">
-          <H2 size="$5" color="$purple11">
+          <H2 size="$5" color="$brandGoldLight">
             <span role="img" aria-label="lightbulb">
               💡
             </span>{' '}

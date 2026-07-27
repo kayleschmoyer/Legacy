@@ -26,7 +26,6 @@ import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   GREEN,
-  PURPLE,
   STATUS_DANGER,
   WHITE,
   withAlpha,
@@ -166,7 +165,7 @@ export function PendingTradeOffers({
         borderColor={
           variant === 'incoming'
             ? withAlpha(BRAND_NAVY_LIGHT, 0.35)
-            : withAlpha(PURPLE, 0.25)
+            : withAlpha(BRAND_GOLD_LIGHT, 0.25)
         }
         borderRadius="$4"
         padding="$3"
@@ -177,7 +176,7 @@ export function PendingTradeOffers({
             {variant === 'incoming' ? (
               <ArrowLeftRight size={14} color={BRAND_NAVY_LIGHT} />
             ) : (
-              <Send size={14} color="$purple10" />
+              <Send size={14} color="$brandGoldLight" />
             )}
             <Text fontSize="$2" fontWeight="700" color="$color">
               {variant === 'incoming' ? 'From' : 'To'}: {counterpartName}
@@ -352,7 +351,7 @@ export function PendingTradeOffers({
 
       {outgoing.length > 0 && (
         <YStack gap="$2">
-          <Text fontSize="$2" fontWeight="700" color="$purple10">
+          <Text fontSize="$2" fontWeight="700" color="$brandGoldLight">
             Outgoing ({outgoing.length})
           </Text>
           {outgoing.map((o) => renderOffer(o, 'outgoing'))}

@@ -17,11 +17,20 @@
 //   blueToken — $blue1–$blue12 Tamagui tokens (generic Tailwind blue; banned
 //               by the brand — use $brandNavy*/$brandGold* tokens).
 //   themeBlue — theme="blue" prop (same ban).
+//   brandRedeclare — local `const BRAND_* = '#...'` re-declaration outside
+//               the two canonical files (LS-8526). Import BRAND_* from
+//               `apps/web/src/constants/colors.ts` / `lib/shared-components/
+//               src/utils/colors.ts` (or `@legacy-sports/design-tokens`
+//               directly) instead of copy-pasting the literal — that's what
+//               drifted eight independent palette copies out of sync.
 //
 // Scanned projects: apps/web/src, apps/app/src, lib/shared-components/src
 // (.ts/.tsx only; specs/stories/tests excluded — see EXCLUDE_FILE below).
 // lib/design-tokens and lib/tamagui-config are the sanctioned palette homes
 // and are not scanned. nflTeams.ts holds third-party team brand data.
+// apps/web/src/constants/colors.ts and lib/shared-components/src/utils/
+// colors.ts are exempt from brandRedeclare only (they're the canonical
+// re-export shims) — every other class still applies to them.
 //
 // Usage:
 //   node scripts/check-theme-compliance.mjs            # check against baseline
@@ -43,10 +52,26 @@ export const PROJECTS = [
   { name: 'lib/shared-components', dir: 'lib/shared-components/src' },
 ];
 
-export const CLASSES = ['rawHex', 'rawRgba', 'blueToken', 'themeBlue'];
+export const CLASSES = [
+  'rawHex',
+  'rawRgba',
+  'blueToken',
+  'themeBlue',
+  'brandRedeclare',
+];
 
 // Files that legitimately hold raw color values (third-party brand data).
 const ALLOWLIST = new Set(['lib/shared-components/src/constants/nflTeams.ts']);
+
+// The two canonical re-export shims (LS-8526) — the only files allowed to
+// declare `const BRAND_* = '#...'` literals.
+const CANONICAL_BRAND_FILES = new Set([
+  'apps/web/src/constants/colors.ts',
+  'lib/shared-components/src/utils/colors.ts',
+]);
+
+const BRAND_REDECLARE_RE =
+  /^\s*(export\s+)?(const|let)\s+BRAND_[A-Z0-9_]+\s*(:\s*string)?\s*=\s*['"`]#[0-9a-fA-F]{3,8}['"`]/;
 
 const EXCLUDE_FILE =
   /\.(spec|stories|test)\.[jt]sx?$|(^|[\\/])(__tests__|test-setup)[\\/.]/;
@@ -68,7 +93,7 @@ export function stripComments(line) {
  * (so issue references like "#6112" in strings of prose don't match, while
  * '#fff' does).
  */
-export function classifyLine(line) {
+export function classifyLine(line, filePath) {
   const code = stripComments(line);
   if (!code) return [];
   const found = [];
@@ -81,6 +106,12 @@ export function classifyLine(line) {
   if (/\brgba?\(/.test(code)) found.push('rawRgba');
   if (/\$blue\d{1,2}\b/.test(code)) found.push('blueToken');
   if (/\btheme\s*[:=]\s*["']blue["']/.test(code)) found.push('themeBlue');
+  if (
+    BRAND_REDECLARE_RE.test(code) &&
+    !(filePath && CANONICAL_BRAND_FILES.has(filePath))
+  ) {
+    found.push('brandRedeclare');
+  }
   return found;
 }
 
@@ -104,7 +135,7 @@ export function scanProject(projectDir, rootDir = root) {
     if (EXCLUDE_FILE.test(rel) || ALLOWLIST.has(rel)) continue;
     let fileTotal = 0;
     for (const line of readFileSync(file, 'utf8').split('\n')) {
-      for (const cls of classifyLine(line)) {
+      for (const cls of classifyLine(line, rel)) {
         counts[cls] += 1;
         fileTotal += 1;
       }

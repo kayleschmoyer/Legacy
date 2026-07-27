@@ -10,6 +10,7 @@ import {
   YStack,
 } from 'tamagui';
 import { useStepUpGate } from '@legacy-sports/shared-components/auth';
+import { brand } from '@legacy-sports/design-tokens';
 import {
   useBillingPortalSession,
   useCheckoutSession,
@@ -30,11 +31,6 @@ const BILLING_PORTAL_RETURN_URL = `${APP_SCHEME}://subscription/portal-return`;
 // Apple subscription management deep link.
 const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
-const BRAND_GOLD = '#B8962E';
-const BRAND_GOLD_LIGHT = '#C5A55A';
-const BRAND_NAVY_LIGHT = '#2C4A7C';
-const BRAND_SEAM_RED = '#C41E3A';
-
 function tierLabel(tier: string | null): string {
   switch (tier) {
     case 'premium':
@@ -54,7 +50,7 @@ function statusBadgeColor(status: string | null): string {
     case 'trialing':
       return 'rgb(34,197,94)';
     case 'past_due':
-      return BRAND_SEAM_RED;
+      return brand.seamRed;
     case 'canceled':
     case 'inactive':
       return '$color10';
@@ -102,20 +98,20 @@ function BillingToggle({
         flex={1}
         alignItems="center"
         paddingVertical="$2"
-        backgroundColor={value === 'monthly' ? BRAND_GOLD : '$background'}
+        backgroundColor={value === 'monthly' ? brand.gold : '$background'}
         onPress={() => onChange('monthly')}
         pressStyle={{ opacity: 0.85 }}
       >
         <Text
           fontWeight={value === 'monthly' ? '600' : '400'}
-          color={value === 'monthly' ? BRAND_NAVY_LIGHT : '$color'}
+          color={value === 'monthly' ? brand.navyLight : '$color'}
           fontSize="$3"
         >
           Monthly
         </Text>
         <Text
           fontSize="$2"
-          color={value === 'monthly' ? BRAND_NAVY_LIGHT : '$colorSubtle'}
+          color={value === 'monthly' ? brand.navyLight : '$colorSubtle'}
         >
           {monthlyPriceDisplay}/mo
         </Text>
@@ -124,20 +120,20 @@ function BillingToggle({
         flex={1}
         alignItems="center"
         paddingVertical="$2"
-        backgroundColor={value === 'annual' ? BRAND_GOLD : '$background'}
+        backgroundColor={value === 'annual' ? brand.gold : '$background'}
         onPress={() => onChange('annual')}
         pressStyle={{ opacity: 0.85 }}
       >
         <XStack alignItems="center" gap="$1">
           <Text
             fontWeight={value === 'annual' ? '600' : '400'}
-            color={value === 'annual' ? BRAND_NAVY_LIGHT : '$color'}
+            color={value === 'annual' ? brand.navyLight : '$color'}
             fontSize="$3"
           >
             Annual
           </Text>
           <YStack
-            backgroundColor={value === 'annual' ? BRAND_NAVY_LIGHT : BRAND_GOLD}
+            backgroundColor={value === 'annual' ? brand.navyLight : brand.gold}
             borderRadius="$2"
             paddingHorizontal="$1"
           >
@@ -148,7 +144,7 @@ function BillingToggle({
         </XStack>
         <Text
           fontSize="$2"
-          color={value === 'annual' ? BRAND_NAVY_LIGHT : '$colorSubtle'}
+          color={value === 'annual' ? brand.navyLight : '$colorSubtle'}
         >
           {annualMonthlyEquivalent}/mo
         </Text>
@@ -368,7 +364,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
               style={{
                 fontSize: 32,
                 fontWeight: '700',
-                color: BRAND_GOLD_LIGHT,
+                color: brand.goldLight,
               }}
             >
               Subscription & Billing
@@ -415,7 +411,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
 
             <YStack padding="$5" gap="$4">
               <XStack alignItems="center" justifyContent="space-between">
-                <Text fontSize="$5" fontWeight="700" color={BRAND_GOLD_LIGHT}>
+                <Text fontSize="$5" fontWeight="700" color={brand.goldLight}>
                   {tierLabel(tier)}
                 </Text>
                 {subscription?.status ? (
@@ -471,11 +467,11 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                   padding="$3"
                   borderRadius="$4"
                   borderWidth={1}
-                  borderColor={`${BRAND_SEAM_RED}44`}
-                  backgroundColor={`${BRAND_SEAM_RED}1A`}
+                  borderColor={`${brand.seamRed}44`}
+                  backgroundColor={`${brand.seamRed}1A`}
                 >
                   <Text fontSize={14}>⚠️</Text>
-                  <Paragraph size="$3" color={BRAND_SEAM_RED} flex={1}>
+                  <Paragraph size="$3" color={brand.seamRed} flex={1}>
                     Your subscription is set to cancel at the end of the current
                     billing period.
                   </Paragraph>
@@ -489,11 +485,11 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                   padding="$3"
                   borderRadius="$4"
                   borderWidth={1}
-                  borderColor={`${BRAND_SEAM_RED}44`}
-                  backgroundColor={`${BRAND_SEAM_RED}1A`}
+                  borderColor={`${brand.seamRed}44`}
+                  backgroundColor={`${brand.seamRed}1A`}
                 >
                   <Text fontSize={14}>⚠️</Text>
-                  <Paragraph size="$3" color={BRAND_SEAM_RED} flex={1}>
+                  <Paragraph size="$3" color={brand.seamRed} flex={1}>
                     Payment issue detected. Access continues until{' '}
                     {formatDate(subscription.gracePeriodEndsAt)}. Please update
                     your payment method.
@@ -520,7 +516,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
             <YStack
               borderRadius="$6"
               borderWidth={1}
-              borderColor={`${BRAND_GOLD}4D`}
+              borderColor={`${brand.gold}4D`}
               overflow="hidden"
             >
               <XStack
@@ -529,8 +525,8 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 alignItems="center"
                 gap="$3"
                 borderBottomWidth={1}
-                borderBottomColor={`${BRAND_GOLD}33`}
-                backgroundColor={`${BRAND_GOLD}14`}
+                borderBottomColor={`${brand.gold}33`}
+                backgroundColor={`${brand.gold}14`}
               >
                 <YStack
                   width={36}
@@ -538,12 +534,12 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                   borderRadius="$4"
                   alignItems="center"
                   justifyContent="center"
-                  backgroundColor={`${BRAND_GOLD}33`}
+                  backgroundColor={`${brand.gold}33`}
                 >
                   <Text fontSize={16}>⭐</Text>
                 </YStack>
                 <YStack flex={1}>
-                  <Paragraph size="$4" color={BRAND_GOLD} fontWeight="600">
+                  <Paragraph size="$4" color={brand.gold} fontWeight="600">
                     Upgrade to Premium
                   </Paragraph>
                   <Paragraph size="$2" color="$colorPress">
@@ -563,7 +559,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
 
                 {billingCycle === 'annual' ? (
                   <YStack alignItems="center" gap="$1">
-                    <Text fontSize="$7" fontWeight="700" color={BRAND_GOLD}>
+                    <Text fontSize="$7" fontWeight="700" color={brand.gold}>
                       {annualPriceDisplay}
                       <Text fontSize="$4" fontWeight="400" color="$colorSubtle">
                         /yr
@@ -575,7 +571,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                   </YStack>
                 ) : (
                   <YStack alignItems="center">
-                    <Text fontSize="$7" fontWeight="700" color={BRAND_GOLD}>
+                    <Text fontSize="$7" fontWeight="700" color={brand.gold}>
                       {monthlyPriceDisplay}
                       <Text fontSize="$4" fontWeight="400" color="$colorSubtle">
                         /mo
@@ -587,11 +583,11 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 <Button
                   disabled={isLoading}
                   onPress={handleUpgrade}
-                  backgroundColor={BRAND_GOLD}
+                  backgroundColor={brand.gold}
                   borderRadius="$4"
                   pressStyle={{ opacity: 0.85, scale: 0.98 }}
                 >
-                  <Text color={BRAND_NAVY_LIGHT} fontWeight="700" fontSize="$4">
+                  <Text color={brand.navyLight} fontWeight="700" fontSize="$4">
                     {checkoutLoading
                       ? 'Opening…'
                       : `Upgrade — ${billingCycle === 'annual' ? annualPriceDisplay + '/yr' : monthlyPriceDisplay + '/mo'}`}
@@ -656,7 +652,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                   width={80}
                   textAlign="center"
                   fontSize="$3"
-                  color={BRAND_GOLD}
+                  color={brand.gold}
                   fontWeight="600"
                 >
                   Premium
@@ -680,7 +676,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                       width={80}
                       textAlign="center"
                       fontSize="$4"
-                      color={BRAND_GOLD}
+                      color={brand.gold}
                     >
                       {feature.premium ? '✓' : '—'}
                     </Text>

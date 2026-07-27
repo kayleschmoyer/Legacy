@@ -35,7 +35,6 @@ import {
   GREEN,
   RED,
   SURFACE_SUBTLE,
-  VIOLET,
   withAlpha,
 } from '../../constants/colors';
 import {
@@ -459,7 +458,7 @@ function RosterRow({
 
   // Gradient backgrounds for eligible/swap-target rows
   const rowGradient = isSelected
-    ? `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.18)} 0%, ${withAlpha(VIOLET, 0.1)} 100%)`
+    ? `linear-gradient(135deg, ${withAlpha(BRAND_NAVY_LIGHT, 0.18)} 0%, ${withAlpha(BRAND_GOLD_LIGHT, 0.1)} 100%)`
     : isSwapTarget
       ? `linear-gradient(135deg, ${withAlpha(GREEN, 0.22)} 0%, ${withAlpha(BRAND_NAVY_LIGHT, 0.1)} 100%)`
       : canAccept && !hasPlayer
