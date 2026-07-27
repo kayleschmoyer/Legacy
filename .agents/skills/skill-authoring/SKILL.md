@@ -65,6 +65,8 @@ The `description` field powers auto-discovery — write it as a trigger, not a s
 
 Frontmatter is the **single home for routing facts** (rule 1 below): `description` is the load-when trigger, `metadata.scope` the path globs the skill applies to. [`INDEX.md`](../INDEX.md) — the routing table agents read at task start — is **generated** from this frontmatter by `scripts/generate-skill-index.mjs`. After any frontmatter change (or adding/removing a skill), run `make sync-skill-index` and commit the regenerated index; `make lint-skills` errors on a missing `metadata.scope`, and CI's custom-checks job fails on index drift. Deprecated tombstone skills additionally set `metadata.deprecated: 'true'`, which moves them to the index's trailing pointer list. Design record: [docs/dev-process/skill-routing.md](../../../docs/dev-process/skill-routing.md).
 
+**Creating, renaming, or deleting a skill also invalidates the generated agent-prompt mirrors.** `scripts/sync-agent-prompts.mjs` resolves `Skill(skill: "...")` references in `.claude/commands/*.md` against the filesystem: once a referenced `SKILL.md` exists on disk, the mirrored text for every command that references it changes, even though no command file was edited. If any slash command references this skill (grep `.claude/commands/*.md` for `skill: "<name>"`), also run `make sync-agent-prompts` and commit the regenerated mirrors before opening the PR — CI's custom-checks job fails on drift the same way it does for `INDEX.md`. See [docs/dev-process/llm-environments.md § Slash commands](../../../docs/dev-process/llm-environments.md#slash-commands-single-source-of-truth) for how the mirroring works.
+
 Recommended sections (in order):
 
 1. **One-paragraph purpose** — what the skill covers and when it applies.

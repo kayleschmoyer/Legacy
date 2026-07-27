@@ -132,6 +132,8 @@ To change routing: edit the skill's frontmatter, run `make sync-skill-index`, an
 
 `.claude/commands/*.md` is the **single source of truth** for every slash command. Equivalent files for the other agent environments — Copilot (`.github/prompts/*.prompt.md`), Cursor (`.cursor/commands/`), OpenCode (`.opencode/commands/`), and Codex (`.codex/prompts/`) — are **generated** by `scripts/sync-agent-prompts.mjs`. To change a command: edit the canonical file, run `make sync-agent-prompts`, and commit the regenerated mirrors (CI's `custom-checks` job fails on drift; check locally with `make lint-agent-prompts`). Restrict a command to specific environments with the `agents:` frontmatter key (e.g. `agents: 'claude'`). Full details: [docs/dev-process/llm-environments.md § Slash commands](docs/dev-process/llm-environments.md#slash-commands-single-source-of-truth).
 
+Mirror regeneration is triggered by **skill file existence changes, not only by `.claude/commands/` edits** — `sync-agent-prompts.mjs` resolves `Skill(skill: "...")` references against the filesystem, so creating, renaming, or deleting a skill under `.agents/skills/` changes the generated mirror text for every command that references it. See `.agents/skills/skill-authoring/SKILL.md` for the required `make sync-agent-prompts` step when authoring skills.
+
 ## MCP Servers
 
 See `.agents/skills/mcp-first/SKILL.md` for the full server list, per-server tool mapping, and load-order notes. Always prefer MCP tools over shell commands.
