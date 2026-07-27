@@ -26,7 +26,11 @@ Is `mcp__legacy-sports-nx__nx_run_pc_chunk` present?
 │     → COPILOT CODING AGENT
 │
 └─ NO
-      → DEFAULT (DEGRADED) CC WEB — no custom MCP servers at all
+      ├─ `mcp__Claude_Code_Remote__*` tools present (e.g. `create_trigger`, `list_repos`, `send_later`) alongside hosted `legacy-sports-{jira,github,ci}` connectors
+      │     → CLAUDE CODE REMOTE (CCR) — see [below](#claude-code-remote-ccr)
+      │
+      └─ No custom MCP servers of any kind
+            → DEFAULT (DEGRADED) CC WEB
 ```
 
 Secondary confirmation for default CC web: `jira_*` tools absent, `Glob`/`Grep` may be absent (probe with `ToolSearch("select:Glob,Grep")`), no Docker socket, no `gh` CLI. Three diagnostic probes (LS-4358 + two reprobes) confirmed default CC web ignores project `.mcp.json` (stdio servers never load) and `.devcontainer/devcontainer.json` entirely.
@@ -140,6 +144,18 @@ Use verbatim when thread resolution is required:
 
 For a structured handoff artifact instead of a chat message, follow [cloud-teleport](../cloud-teleport/SKILL.md). LS-4377 (wiring this stop into a slash command) is still OPEN.
 
+## Claude Code Remote (CCR)
+
+A fourth configuration, distinct from the three in [Step 0](#step-0-identify-your-platform): the managed remote execution product described in this session's own system prompt ("Your current remote execution environment"), reached via a dedicated `mcp__Claude_Code_Remote__*` server (`create_trigger`, `list_repos`, `add_repo`, `send_later`, `subscribe_pr_activity`, etc.) — **not** the `ccd_session` server that hosted "chip dispatch" sessions use. Identify it by: `mcp__Claude_Code_Remote__*` tools present; `mcp__ccd_session__spawn_task` and `nx_run_pc_chunk` both absent (confirm with `ToolSearch`); hosted `legacy-sports-{jira,github,ci}` connectors and built-in `mcp__github__*` present (same as Connector CC web). Only the chip-dispatch gap below is verified for CCR — everything else in this file (spine bindings, validation, Jira transition IDs) is unconfirmed here. In particular, do **not** assume Connector CC web's `nx_run_pc_chunk` validation binding — that tool is absent by definition in CCR (see the Step 0 check above); until verified, the safer assumption is Default CC web's degraded validation path (Bash `make pc-<chunk>` in background, one chunk at a time). Verify each capability against the tools actually present in your session rather than assuming any platform's full binding, and update this section with what you find.
+
+### Chip dispatch substitute (LS-8510)
+
+[work-ticket leaf-mode step 4](../work-ticket/references/leaf-mode.md) requires spawning a chip via `mcp__ccd_session__spawn_task` whenever a follow-up ticket is filed mid-implementation. That tool does not exist in CCR sessions and `ToolSearch` cannot locate it (confirmed LS-8510) — a platform capability gap in this product surface, not a repo bug to route around.
+
+**Current compliant behavior**: file the follow-up ticket and add a one-line note (description or `jira_add_comment`) that it needs manual pickup — do not stop the current ticket to work it. leaf-mode.md step 4 branches to this fallback for CCR sessions; it satisfies the "MANDATORY" contract without a dispatch primitive.
+
+**OPEN — untested substitute**: `mcp__Claude_Code_Remote__create_trigger({ name, prompt, create_new_session_on_fire: true, run_once_at: "<a minute or two from now, RFC3339>" })` spawns a fresh session in this environment once, then self-disables (`ended_reason: "run_once_fired"`) — structurally close to a one-shot `spawn_task`. It has **not** been verified end-to-end as a chip-dispatch substitute (does the fresh session pick up `prompt` the same way a chip's `prompt` does? does it need `environment_id` passed explicitly?). Firing one has a real side effect — a new billed session — so don't test it blind mid-ticket. Do not treat it as load-bearing until someone verifies it and updates this section plus the leaf-mode.md branch to prefer it over the file-only fallback.
+
 ## Container timeout resilience
 
 Cloud containers can be reaped mid-run — most often during validation. The spine's ordering already absorbs this: branch pushed → draft PR → checkpoint comment → **then** validate, so a reap during a `pc-*` chunk loses nothing. The gate that still holds: **all seven chunks green before mark-ready** — a draft PR existing earlier is inert (CI and the Reviewer Bot are gated on `draft == false`).
@@ -229,7 +245,7 @@ When a task needs AWS credentials, real database access, Terraform, or thread re
 
 ## Provenance and maintenance
 
-Rewritten 2026-07-02 from the Phase-1 skills audit (cloud-agent-mode rebind): cut from ~687 lines to a per-platform decision tree; folded in the 2026-07-02 owner ruling on degraded-mode validation (Bash `make pc-<chunk>` background-only); fixed internal contradictions (SigV4 retirement vs Quirk-2 wording, Copilot worktree availability, ScheduleWakeup fossil). Prior LS provenance retained in-line: LS-7906 (pc chunks), LS-4358 (degraded probes), LS-5089/5093/5095/5096 (connector/auth model), LS-3715 (`getJiraIssue`), LS-2079 (pagination), LS-3040 (log proxy), LS-8113/LS-8209 (cloud-setup), LS-4377 (stop-point wiring, OPEN), LS-8378 (`AskUserQuestion` stream-closed failure in webhook-subscribed sessions, Quirk 5). 2026-07-26 (LS-8384): documented the persistent-container phantom typecheck/lint failure mode (symptom + workaround only — root cause of the underlying node_modules drift remains unidentified). 2026-07-27 (LS-8400): broadened Quirk 5 — the stream-closed failure reproduces without a webhook subscription and hit a second, unrelated tool (LS-8381, `delete_trigger`, closed `Won't Do`), confirming a shared core-harness root cause rather than a webhook-specific or single-server issue; not fixable in this repo, documentation-only update.
+Rewritten 2026-07-02 from the Phase-1 skills audit (cloud-agent-mode rebind): cut from ~687 lines to a per-platform decision tree; folded in the 2026-07-02 owner ruling on degraded-mode validation (Bash `make pc-<chunk>` background-only); fixed internal contradictions (SigV4 retirement vs Quirk-2 wording, Copilot worktree availability, ScheduleWakeup fossil). Prior LS provenance retained in-line: LS-7906 (pc chunks), LS-4358 (degraded probes), LS-5089/5093/5095/5096 (connector/auth model), LS-3715 (`getJiraIssue`), LS-2079 (pagination), LS-3040 (log proxy), LS-8113/LS-8209 (cloud-setup), LS-4377 (stop-point wiring, OPEN), LS-8378 (`AskUserQuestion` stream-closed failure in webhook-subscribed sessions, Quirk 5). 2026-07-26 (LS-8384): documented the persistent-container phantom typecheck/lint failure mode (symptom + workaround only — root cause of the underlying node_modules drift remains unidentified). 2026-07-27 (LS-8400): broadened Quirk 5 — the stream-closed failure reproduces without a webhook subscription and hit a second, unrelated tool (LS-8381, `delete_trigger`, closed `Won't Do`), confirming a shared core-harness root cause rather than a webhook-specific or single-server issue; not fixable in this repo, documentation-only update. 2026-07-27 (LS-8510): added the Claude Code Remote (CCR) platform to Step 0 and documented its chip-dispatch gap — `mcp__ccd_session__spawn_task` does not exist in CCR sessions; leaf-mode.md step 4 now branches to a file-and-note-for-manual-pickup fallback, with `create_trigger({ create_new_session_on_fire: true, run_once_at })` recorded as an unverified future substitute. Documentation-only; no dispatch primitive was wired or tested live.
 
 Re-verification commands for volatile facts:
 
