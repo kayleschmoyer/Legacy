@@ -213,7 +213,10 @@ server.tool(
   'jira_edit_ticket',
   'Update fields on a ticket. Provide at least one field.',
   {
-    key: z.string().describe('Ticket key'),
+    key: z
+      .string()
+      .regex(/^[A-Z][A-Z0-9_]+-\d+$/)
+      .describe('Ticket key'),
     summary: z.string().optional().describe('New summary/title'),
     description: z.string().optional().describe('New description'),
     type: z
@@ -225,6 +228,14 @@ server.tool(
       .regex(/^(?:current|\d+)$/)
       .optional()
       .describe('"current" for active sprint, or numeric sprint ID'),
+    addLabels: z
+      .array(z.string())
+      .optional()
+      .describe('Labels to add (additive — existing labels are preserved)'),
+    removeLabels: z
+      .array(z.string())
+      .optional()
+      .describe('Labels to remove (additive — other labels are preserved)'),
   },
   async (params) => editTicket(params),
 );

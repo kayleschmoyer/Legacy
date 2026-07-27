@@ -162,7 +162,7 @@ export function createMcpServer(): McpServer {
     'jira_edit_ticket',
     'Update fields on a ticket.',
     {
-      key: z.string(),
+      key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
       summary: z.string().optional(),
       description: z.string().optional(),
       type: z.enum(['Task', 'Bug', 'Story', 'Epic']).optional(),
@@ -170,6 +170,8 @@ export function createMcpServer(): McpServer {
         .string()
         .regex(/^(?:current|\d+)$/)
         .optional(),
+      addLabels: z.array(z.string()).optional(),
+      removeLabels: z.array(z.string()).optional(),
     },
     async (p) => editTicket(p),
   );
