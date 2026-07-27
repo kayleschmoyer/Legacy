@@ -495,7 +495,7 @@ export function AdminPage(): React.JSX.Element | null {
 
   useEffect(() => {
     if (currentUserId !== 0) {
-      LOGGER.error('Admin panel opened', {
+      LOGGER.info('Admin panel opened', {
         audit: true,
         actor: { id: currentUserId },
       });
