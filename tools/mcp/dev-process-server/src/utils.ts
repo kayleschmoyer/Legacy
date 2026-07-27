@@ -33,6 +33,15 @@ export function isSafeFilePath(filePath: string): boolean {
   return !filePath.split(/[\\/]/).some((seg) => seg === '..');
 }
 
+/**
+ * Resolve the GitHub token from the environment. GH_TOKEN takes precedence
+ * to match the resolution order used by every other MCP server in the repo
+ * (worktree-server, ci-server, github-server) — see LS-8637.
+ */
+export function resolveGitHubToken(): string | undefined {
+  return process.env['GH_TOKEN'] || process.env['GITHUB_TOKEN'];
+}
+
 // ---------------------------------------------------------------------------
 // Test plan parsing
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import {
   isSafeGitRef,
   parseTestPlanCases,
   resolveChecked,
+  resolveGitHubToken,
 } from './utils';
 
 const ROOT = '/repo';
@@ -198,5 +199,39 @@ Some setup notes.
     const cases = parseTestPlanCases(content);
     expect(cases).toHaveLength(1);
     expect(cases[0]!.text).toBe('Direct case without a Cases sub-section');
+  });
+});
+
+describe('resolveGitHubToken', () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+    delete process.env['GH_TOKEN'];
+    delete process.env['GITHUB_TOKEN'];
+  });
+
+  afterAll(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it('resolves GH_TOKEN when only GH_TOKEN is set (no GITHUB_TOKEN)', () => {
+    process.env['GH_TOKEN'] = 'gh-token-value';
+    expect(resolveGitHubToken()).toBe('gh-token-value');
+  });
+
+  it('falls back to GITHUB_TOKEN when GH_TOKEN is unset', () => {
+    process.env['GITHUB_TOKEN'] = 'github-token-value';
+    expect(resolveGitHubToken()).toBe('github-token-value');
+  });
+
+  it('prefers GH_TOKEN over GITHUB_TOKEN when both are set', () => {
+    process.env['GH_TOKEN'] = 'gh-token-value';
+    process.env['GITHUB_TOKEN'] = 'github-token-value';
+    expect(resolveGitHubToken()).toBe('gh-token-value');
+  });
+
+  it('returns undefined when neither is set', () => {
+    expect(resolveGitHubToken()).toBeUndefined();
   });
 });

@@ -18,6 +18,7 @@ import {
   isSafeGitRef,
   parseTestPlanCases,
   resolveChecked,
+  resolveGitHubToken,
   type TestCase,
 } from './utils.js';
 import {
@@ -55,7 +56,7 @@ interface GitHubConfig {
 }
 
 function getGitHubConfig(): GitHubConfig | null {
-  const token = process.env['GITHUB_TOKEN'];
+  const token = resolveGitHubToken();
   if (!token) return null;
   try {
     const remoteUrl = execFileSync('git', ['remote', 'get-url', 'origin'], {
@@ -856,8 +857,8 @@ server.tool(
       const ghConfig = getGitHubConfig();
       if (!ghConfig) {
         return err(
-          'GITHUB_TOKEN not set — cannot fetch PR body. ' +
-            'Provide path instead, or set GITHUB_TOKEN.',
+          'GH_TOKEN/GITHUB_TOKEN not set — cannot fetch PR body. ' +
+            'Provide path instead, or set GH_TOKEN or GITHUB_TOKEN.',
         );
       }
       const prData = (await ghFetch(
@@ -925,7 +926,7 @@ server.tool(
     } else if (pr) {
       const ghConfig = getGitHubConfig();
       if (!ghConfig) {
-        return err('GITHUB_TOKEN not set — cannot fetch PR body.');
+        return err('GH_TOKEN/GITHUB_TOKEN not set — cannot fetch PR body.');
       }
       const prData = (await ghFetch(
         ghConfig,
@@ -1206,7 +1207,7 @@ server.tool(
 
 server.tool(
   'continuation_post',
-  'Post a structured continuation plan as a PR comment (requires GITHUB_TOKEN). ' +
+  'Post a structured continuation plan as a PR comment (requires GH_TOKEN or GITHUB_TOKEN). ' +
     'Returns the formatted body and, if posted, the comment URL.',
   {
     pr: z.number().int().positive().describe('GitHub PR number'),
@@ -1255,7 +1256,8 @@ server.tool(
     if (!ghConfig) {
       return ok({
         posted: false,
-        reason: 'GITHUB_TOKEN not set — copy the body and post manually',
+        reason:
+          'GH_TOKEN/GITHUB_TOKEN not set — copy the body and post manually',
         body,
       });
     }
@@ -1288,7 +1290,7 @@ server.tool(
 server.tool(
   'continuation_status',
   'Return the most recent continuation plan for a PR. ' +
-    'Reads from GitHub PR comments (requires GITHUB_TOKEN). ' +
+    'Reads from GitHub PR comments (requires GH_TOKEN or GITHUB_TOKEN). ' +
     'Returns { found, body, commentUrl, commentId }.',
   {
     pr: z.number().int().positive().describe('GitHub PR number'),
@@ -1299,7 +1301,7 @@ server.tool(
       return ok({
         found: false,
         pr,
-        reason: 'GITHUB_TOKEN not set — cannot fetch PR comments.',
+        reason: 'GH_TOKEN/GITHUB_TOKEN not set — cannot fetch PR comments.',
       });
     }
 
