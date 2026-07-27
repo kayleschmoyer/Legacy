@@ -81,6 +81,13 @@ interface RunTargetParams {
  * e.g. ["--testPathPatterns", "FileA", "FileB"] → ["--testPathPatterns", "FileA|FileB"]
  * e.g. ["--testPathPatterns=FileA", "FileB"]    → ["--testPathPatterns=FileA|FileB"]
  *
+ * A value that already arrives as a single pre-joined pipe-separated token
+ * (e.g. ["--testPathPatterns", "FileA|FileB"]) needs no coalescing here — it
+ * is already one token — but it still gets quoted correctly downstream:
+ * `pnpmJobSpec` (nx-job.ts) maps `escapeCmdShellArg` over *every* arg in the
+ * final pnpm/nx invocation on Windows, coalesced or not (see LS-8498, which
+ * verified this end-to-end rather than assuming quoting only happens here).
+ *
  * Exported for unit testing.
  */
 export function coalesceWindowsTestPathPatterns(tokens: string[]): string[] {

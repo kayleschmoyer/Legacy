@@ -325,6 +325,99 @@ describe('runTarget', () => {
   });
 });
 
+// --- Windows spawn shape: pre-joined pipe values (LS-8498, LS-7580 gap) ---
+//
+// LS-7580 fixed cmd.exe pipe-interpretation for the *coalescing* path
+// (["--testPathPatterns", "a", "b"] -> joined into "a|b"). LS-8498 reported
+// that a value which already arrives as a single pre-joined pipe-separated
+// string (["--testPathPatterns", "a|b"]) reproduced the same unescaped-pipe
+// failure. It doesn't: `pnpmJobSpec` (nx-job.ts) applies `escapeCmdShellArg`
+// to every arg unconditionally on win32, regardless of how the pipe got
+// there. These tests pin that down end-to-end so the job runner never again
+// receives an unquoted pipe-bearing token on Windows.
+describe('Windows spawn shape (LS-8498)', () => {
+  const originalPlatform = process.platform;
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('quotes a single pre-joined pipe-separated array element on Windows', async () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+      configurable: true,
+    });
+    setupJob();
+
+    await runTarget({
+      project: 'db',
+      target: 'test',
+      args: ['--testPathPatterns', 'delete-resilience|matchup-loaders'],
+    });
+
+    expect(jobCallArgs()).toContain('"delete-resilience|matchup-loaders"');
+    expect(jobCallOpts().shell).toBe(true);
+  });
+
+  it('quotes a pre-joined pipe value in equals-form on Windows', async () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+      configurable: true,
+    });
+    setupJob();
+
+    await runTarget({
+      project: 'db',
+      target: 'test',
+      args: ['--testPathPatterns=delete-resilience|matchup-loaders'],
+    });
+
+    expect(jobCallArgs()).toContain(
+      '"--testPathPatterns=delete-resilience|matchup-loaders"',
+    );
+  });
+
+  it('quotes a pre-joined pipe value passed as a single whitespace-split string on Windows', async () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+      configurable: true,
+    });
+    setupJob();
+
+    await runTarget({
+      project: 'db',
+      target: 'test',
+      args: '--testPathPatterns delete-resilience|matchup-loaders',
+    });
+
+    expect(jobCallArgs()).toContain('"delete-resilience|matchup-loaders"');
+  });
+
+  it('leaves the pre-joined pipe value unquoted (shell:false) on non-Windows platforms', async () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'linux',
+      configurable: true,
+    });
+    setupJob();
+
+    await runTarget({
+      project: 'db',
+      target: 'test',
+      args: ['--testPathPatterns', 'delete-resilience|matchup-loaders'],
+    });
+
+    expect(jobCallArgs()).toContain('delete-resilience|matchup-loaders');
+    expect(jobCallOpts().shell).toBe(false);
+  });
+});
+
 describe('runTarget shell-metacharacter validation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
