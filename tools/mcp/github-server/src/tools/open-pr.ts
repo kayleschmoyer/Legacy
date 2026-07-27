@@ -13,6 +13,7 @@ import { runWithSyncBudget } from '../jobs.js';
 import type { JobLogger } from '../jobs.js';
 import {
   ensureJiraLinkMarker,
+  ensureTitleHasPrimaryKey,
   extractPrimaryKey,
   isValidPrimary,
 } from './jira-link.js';
@@ -229,8 +230,11 @@ async function openPRWorker(
     );
   }
 
-  // Build PR body with jira-link marker
+  // Build PR title + body with the jira-link marker. The CI Jira Link Check
+  // requires the primary key to appear in the title itself (LS-8679) — the
+  // marker alone (body-only) isn't sufficient.
   const primary = params.jiraKey ?? extractPrimaryKey(params.title) ?? 'none';
+  const title = ensureTitleHasPrimaryKey(params.title, primary);
   const prBody = ensureJiraLinkMarker(params.body, { primary, related: [] });
 
   try {
@@ -242,7 +246,7 @@ async function openPRWorker(
       method: 'POST',
       path: `/repos/${repo.owner}/${repo.name}/pulls`,
       body: {
-        title: params.title,
+        title,
         body: prBody,
         head: `${repo.owner}:${head}`,
         base,

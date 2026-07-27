@@ -2,6 +2,7 @@ import {
   buildJiraLinkBlock,
   buildJiraLinkComment,
   ensureJiraLinkMarker,
+  ensureTitleHasPrimaryKey,
   extractPrimaryKey,
   hasJiraLinkMarker,
   isValidPrimary,
@@ -178,6 +179,38 @@ describe('jira-link marker (LS-7895)', () => {
       const body =
         '<!-- jira-link\nprimary: LS-1\n-->\n\nMentions `<!-- jira-link -->` in prose.';
       expect(hasJiraLinkMarker(body)).toBe(true);
+    });
+  });
+
+  describe('ensureTitleHasPrimaryKey (LS-8679)', () => {
+    it('prepends the primary key when the title lacks it', () => {
+      expect(
+        ensureTitleHasPrimaryKey('fix(web): validate JWT payload', 'LS-8537'),
+      ).toBe('LS-8537 fix(web): validate JWT payload');
+    });
+
+    it('is a no-op when the title already starts with the primary key', () => {
+      expect(
+        ensureTitleHasPrimaryKey(
+          'LS-8537 fix(web): validate JWT payload',
+          'LS-8537',
+        ),
+      ).toBe('LS-8537 fix(web): validate JWT payload');
+    });
+
+    it('is a no-op when the primary key appears anywhere in the title (satisfies jira-link-check.mjs)', () => {
+      expect(
+        ensureTitleHasPrimaryKey(
+          'fix(web): LS-8537 validate JWT payload',
+          'LS-8537',
+        ),
+      ).toBe('fix(web): LS-8537 validate JWT payload');
+    });
+
+    it('is a no-op when primary is "none"', () => {
+      expect(ensureTitleHasPrimaryKey('chore(deps): bump lodash', 'none')).toBe(
+        'chore(deps): bump lodash',
+      );
     });
   });
 

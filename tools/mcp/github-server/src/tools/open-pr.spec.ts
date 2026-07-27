@@ -217,4 +217,62 @@ describe('openPR', () => {
       expect(result.content[0].text).toMatch(/Invalid jiraKey/);
     });
   });
+
+  describe('jiraKey title prefixing (LS-8679)', () => {
+    it('prefixes the PR title with jiraKey when the title lacks it', async () => {
+      makeExecFileSuccess('feature-branch');
+      await openPR({
+        title: 'fix(web): validate JWT payload',
+        body: 'body',
+        head: 'feature-branch',
+        jiraKey: 'LS-8537',
+        draft: true,
+        push: false,
+      });
+      expect(mockGithubRest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            title: 'LS-8537 fix(web): validate JWT payload',
+          }),
+        }),
+      );
+    });
+
+    it('does not double-prefix when the title already starts with jiraKey', async () => {
+      makeExecFileSuccess('feature-branch');
+      await openPR({
+        title: 'LS-8537 fix(web): validate JWT payload',
+        body: 'body',
+        head: 'feature-branch',
+        jiraKey: 'LS-8537',
+        draft: true,
+        push: false,
+      });
+      expect(mockGithubRest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            title: 'LS-8537 fix(web): validate JWT payload',
+          }),
+        }),
+      );
+    });
+
+    it('leaves the title untouched when jiraKey is not provided', async () => {
+      makeExecFileSuccess('feature-branch');
+      await openPR({
+        title: 'chore(deps): bump lodash',
+        body: 'body',
+        head: 'feature-branch',
+        draft: true,
+        push: false,
+      });
+      expect(mockGithubRest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            title: 'chore(deps): bump lodash',
+          }),
+        }),
+      );
+    });
+  });
 });

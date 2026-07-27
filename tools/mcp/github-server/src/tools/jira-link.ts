@@ -24,6 +24,22 @@ export function extractPrimaryKey(text: string): string | null {
   return match ? match[0] : null;
 }
 
+/**
+ * Prepend the primary Jira key to a PR title when it isn't already present.
+ * Mirrors the title check in `.github/scripts/jira-link-check.mjs`, which
+ * requires the primary key to appear anywhere in the title — not opinionated
+ * about a strict prefix, but a leading "LS-#### " is the repo convention.
+ */
+export function ensureTitleHasPrimaryKey(
+  title: string,
+  primary: string,
+): string {
+  if (primary === 'none') return title;
+  const titleKeys: string[] = title.match(/\bLS-\d+\b/g) ?? [];
+  if (titleKeys.includes(primary)) return title;
+  return `${primary} ${title}`;
+}
+
 export function hasJiraLinkMarker(body: string): boolean {
   const scannableBody = body
     .replace(/```[\s\S]*?```/g, '')
