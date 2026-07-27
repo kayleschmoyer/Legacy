@@ -13,6 +13,7 @@ import {
 import type { TokenSource } from './auth.js';
 import type { ToolResult } from './types.js';
 import { closePR } from './tools/close-pr.js';
+import { reopenPR } from './tools/reopen-pr.js';
 import { createLabel } from './tools/create-label.js';
 import { getRepoInfo } from './tools/get-repo-info.js';
 import { getReviewThreads } from './tools/get-review-threads.js';
@@ -367,6 +368,22 @@ export function createServer(): McpServer {
       comment: z.string().trim().min(1).optional().describe('Closing comment'),
     },
     async (params) => closePR(params),
+  );
+
+  // --- github_reopen_pr ---
+  server.tool(
+    'github_reopen_pr',
+    'Reopen a closed PR with optional comment.',
+    {
+      number: z.coerce.number().int().positive().describe('PR number'),
+      comment: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Reopening comment'),
+    },
+    async (params) => reopenPR(params),
   );
 
   // --- github_create_label ---
