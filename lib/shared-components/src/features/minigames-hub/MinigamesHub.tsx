@@ -6,6 +6,14 @@ import {
   useGetSeasonDraftGamesQuery,
 } from '@legacy-sports/graphql';
 import {
+  GAME_TEMPLATES,
+  type MinigameId,
+  type MinigamesHubProps,
+  type MinigameStat,
+  type MinigameTemplate,
+  statFor,
+} from './MinigamesHub.shared';
+import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -15,15 +23,7 @@ import {
   withAlpha,
 } from '../../utils/colors';
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
-export type MinigameId = 'season-draft' | 'disclosure' | 'twenty-questions';
-
-export interface MinigamesHubProps {
-  onNavigate: (gameId: MinigameId) => void;
-  /** Override the narrow-viewport detection — pass the result of useWindowDimensions on native. */
-  isNarrow?: boolean;
-}
+export type { MinigameId, MinigamesHubProps };
 
 // Narrow-viewport breakpoint: at <=720px the hero stacks and cards become
 // single-column so copy and CTAs remain readable/tappable on phones.
@@ -251,50 +251,14 @@ const ArrowRight: React.FC = () => (
 
 // ── Game card ──────────────────────────────────────────────────────────────
 
-interface GameDef {
-  id: MinigameId;
-  title: string;
-  tag: string;
-  desc: string;
-  accent: 'navy' | 'seam';
+type GameDef = MinigameTemplate & {
   icon: React.ReactNode;
-  stat: { label: string; value: string };
-  meta: string[];
-  cta: string;
-}
+  stat: MinigameStat;
+};
 
-const GAME_TEMPLATES: Omit<GameDef, 'stat'>[] = [
-  {
-    id: 'season-draft',
-    title: 'Season Draft',
-    tag: 'Multiplayer · 2–6 players',
-    desc: 'Draft hitters or pitchers across eras. Pick the right season, fill your roster, rack up the counting stats. Last one standing with the biggest number wins.',
-    accent: 'navy',
-    icon: <DraftIcon />,
-    meta: ['Pick your stat: HR · SO · RBI · W', 'Season or Career-w/-Team'],
-    cta: 'Enter Lobby',
-  },
-  {
-    id: 'disclosure',
-    title: 'Who Am I?',
-    tag: 'Solo · 2–3 min',
-    desc: 'Clues drop one at a time — birthplace, era, quirks, milestones. Name the player with the fewest clues revealed for a higher score.',
-    accent: 'seam',
-    icon: <StatsIcon />,
-    meta: ['7 clues per player', 'Hall of Famers to deep cuts'],
-    cta: 'Play Now',
-  },
-  {
-    id: 'twenty-questions',
-    title: '20 Questions',
-    tag: 'Solo · 3–5 min',
-    desc: 'Ask up to 20 yes/no questions to identify the mystery player. Fewer questions = more tokens. Pick your difficulty and start swinging.',
-    accent: 'navy',
-    icon: <StatsIcon />,
-    meta: ['Up to 20 questions', 'Easy · Medium · Hard'],
-    cta: 'Play Now',
-  },
-];
+function iconFor(kind: MinigameTemplate['iconKind']): React.ReactNode {
+  return kind === 'draft' ? <DraftIcon /> : <StatsIcon />;
+}
 
 const GameCard: React.FC<{
   game: GameDef;
@@ -578,26 +542,10 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({
   const bestScore = bestScoreData?.disclosureGameBestScore ?? null;
   const dbStats = minigamesStatsData?.minigamesStats;
 
-  const statFor = (id: MinigameId): GameDef['stat'] => {
-    switch (id) {
-      case 'season-draft':
-        return {
-          label: 'Games Active',
-          value: activeGamesCount !== null ? String(activeGamesCount) : '—',
-        };
-      case 'disclosure':
-        return {
-          label: 'Your Best',
-          value: bestScore !== null ? String(bestScore) : '—',
-        };
-      case 'twenty-questions':
-        return { label: 'Questions', value: '20' };
-    }
-  };
-
   const games: GameDef[] = GAME_TEMPLATES.map((template) => ({
     ...template,
-    stat: statFor(template.id),
+    icon: iconFor(template.iconKind),
+    stat: statFor(template.id, { activeGamesCount, bestScore }),
   }));
 
   const heroStats: Array<{ n: string; l: string } | null> = [
