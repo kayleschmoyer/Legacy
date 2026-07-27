@@ -253,3 +253,23 @@ describe('LeagueSettingsControl — safe defaults for required matchup props (LS
     expect(screen.getByLabelText('SP starts per matchup')).toHaveValue('1');
   });
 });
+
+/**
+ * Regression guard for LS-8655: production Rollbar report (item
+ * Legacy-Sports/200) of the identical "TypeError: Cannot convert undefined
+ * value to object" crash inside LeagueSettingsControl on Android, filed the
+ * same day as — and matching the exact stack trace of — LS-8656 and LS-8660.
+ * Investigation found both known root causes for this error signature
+ * already fixed on main (LS-8656's missing prop defaults, LS-8660's
+ * unbounded button grid); this test closes the one untested gap — a caller
+ * that omits every optional prop, including `sport` itself — to confirm no
+ * third cause remains.
+ */
+describe('LeagueSettingsControl — renders with every optional prop omitted (LS-8655)', () => {
+  it('renders without throwing when no optional props are passed at all', () => {
+    expect(() => render(<LeagueSettingsControl leagueId={1} />)).not.toThrow();
+
+    expect(screen.getByLabelText('Games per matchup')).toHaveValue('1');
+    expect(screen.getByLabelText('SP starts per matchup')).toHaveValue('1');
+  });
+});
