@@ -31,6 +31,7 @@ import {
   sep,
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
+import { checkJiraAuth } from './auth-checks';
 import { scanStagedForConflictMarkers } from './conflict-markers';
 import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
 import {
@@ -11680,27 +11681,12 @@ const handleCallTool = async (
             ? 'netrc'
             : undefined;
 
-      // Jira: basic (JIRA_EMAIL + JIRA_API_TOKEN) or OAuth (JIRA_CLIENT_ID + JIRA_CLIENT_SECRET + JIRA_CLOUD_ID) or netrc
-      const jiraBasic = !!(
-        process.env.JIRA_EMAIL && process.env.JIRA_API_TOKEN
-      );
-      const jiraOAuth = !!(
-        process.env.JIRA_CLIENT_ID &&
-        process.env.JIRA_CLIENT_SECRET &&
-        process.env.JIRA_CLOUD_ID
-      );
-      const jiraNetrc =
-        checkNetrc('atlassian.net') ||
-        checkNetrc('bkrupa.atlassian.net') ||
-        checkNetrc('id.atlassian.com');
-      const jiraOk = jiraBasic || jiraOAuth || jiraNetrc;
-      const jiraMethod = jiraBasic
-        ? 'env:basic'
-        : jiraOAuth
-          ? 'env:oauth'
-          : jiraNetrc
-            ? 'netrc'
-            : undefined;
+      // Jira: see checkJiraAuth() for why the hosted machine-credential /
+      // Copilot bearer paths need their own env-var check alongside the
+      // direct basic/OAuth/netrc credential shapes.
+      const jiraCheck = checkJiraAuth(process.env, checkNetrc);
+      const jiraOk = jiraCheck.ok;
+      const jiraMethod = jiraCheck.method;
 
       // AWS: verify SSO session is active via sts get-caller-identity
       const awsProfile = process.env.AWS_PROFILE ?? 'default';
