@@ -217,6 +217,8 @@ These are the specific built-in tool substitutions agents should reach for autom
 
 **Glob limitation on Windows worktrees**: `Glob` with `path=` set to an absolute Windows worktree path may silently return empty results due to symlink traversal issues. Fall back to `worktree_ls_tree({ ref: "HEAD", path: "<dir>" })` (Git-tracked files only) or `worktree_run(command: "dir <dir>")`.
 
+**Glob/ripgrep timeout on cloud/Linux sessions (LS-8420)**: the same symlink-traversal quirk shows up as a different symptom off Windows — `Glob` on a **single, exact, already-known file path** (e.g. `Glob(pattern: ".agents/skills/work-ticket/SKILL.md")`) can fail with `Ripgrep search timed out after 20 seconds`, even though the pattern is not a broad `**/*.ext` search. This repo's `node_modules/` (pool-linked, worktree `node_modules` is a directory symlink into `.modules-pool/<hash>/`) accounts for the vast majority of files on disk, and `.gitignore`/`.claudeignore`/`.rgignore` all exclude it — but that exclusion is not a substitute for avoiding the tree walk in the first place. **When the exact path is already known (not a pattern to discover), use `Read(file_path: "<path>")` directly instead of `Glob`** — `Read` opens the path without walking the tree, so it can't hit this budget. Reserve `Glob` for genuine pattern discovery (`**/*.ext`, `**/*name*`).
+
 ## Nx Targets
 
 Prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For affected targets, prefer `nx_run_affected` over `pnpm exec nx affected -t <target>`. Fall back to shell commands only when the MCP server is unavailable.

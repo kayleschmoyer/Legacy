@@ -1,0 +1,38 @@
+# .rgignore — ripgrep's own native ignore format (read unconditionally by
+# ripgrep-based search, independent of .gitignore/.claudeignore detection).
+#
+# LS-8420: single-known-exact-path Glob() calls were observed timing out at
+# the harness's 20s ripgrep budget in this monorepo, even though .gitignore
+# and .claudeignore already exclude node_modules/ and .modules-pool/. The
+# `Glob limitation on Windows worktrees` note in
+# .agents/skills/mcp-first/SKILL.md documents the same underlying
+# symlink-traversal quirk producing a different symptom (silent empty
+# results) on Windows. Whatever code path skips gitignore-style detection
+# (e.g. because it isn't reading git-repo config, or is resolving a worktree's
+# node_modules symlink before applying name-based ignore rules) still reads
+# .rgignore, since it is ripgrep's own convention and not a VCS integration.
+# This file exists purely as defense-in-depth against that gap — keep it in
+# sync with the heavy-directory entries in .gitignore / .claudeignore.
+
+# Dependencies & generated output — the dominant source of file count in
+# this repo (node_modules alone is ~95% of all files on disk).
+node_modules/
+.modules-pool/
+dist/
+build/
+.next/
+.expo/
+.tamagui/
+coverage/
+.nx/cache
+.nx/workspace-data
+.turbo/
+.vite/
+
+# Ephemeral worktrees (each one symlinks node_modules into .modules-pool/).
+.claude/worktrees/
+.twig/
+
+# VCS and lockfile noise
+.git/
+pnpm-lock.yaml
