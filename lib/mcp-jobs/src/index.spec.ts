@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   unlinkSync,
   writeFileSync,
@@ -255,6 +256,102 @@ describe('background job registry', () => {
       expect(snapshot?.hint).toContain('exceeded its process timeout');
     } finally {
       unlinkSync(metaPath);
+    }
+  });
+
+  it('writes an exit-code sidecar file when a job completes', async () => {
+    const { jobId } = startJob({
+      command: 'make',
+      args: ['noop'],
+      cwd: workDir,
+      label: 'sidecar-noop',
+      timeoutMs: 30_000,
+    });
+    await waitForJob(jobId, 20_000);
+    const sidecarPath = join(tmpdir(), TEST_DIR_NAME, `${jobId}.exit`);
+    expect(readFileSync(sidecarPath, 'utf-8').trim()).toBe('0');
+  }, 25_000);
+
+  it('writes a non-zero exit-code sidecar file when a job fails', async () => {
+    const { jobId } = startJob({
+      command: 'make',
+      args: ['__no_such_target__'],
+      cwd: workDir,
+      label: 'sidecar-fail',
+      timeoutMs: 30_000,
+    });
+    await waitForJob(jobId, 20_000);
+    const sidecarPath = join(tmpdir(), TEST_DIR_NAME, `${jobId}.exit`);
+    expect(readFileSync(sidecarPath, 'utf-8').trim()).not.toBe('0');
+  }, 25_000);
+
+  it("recovers a done result from the exit-code sidecar for a job outside this process's in-memory registry (simulates a server restart, LS-8358)", () => {
+    const jobId = `test-restart-done-${process.pid}`;
+    const jobsDir = join(tmpdir(), TEST_DIR_NAME);
+    mkdirSync(jobsDir, { recursive: true });
+    const metaPath = join(jobsDir, `${jobId}.json`);
+    const exitPath = join(jobsDir, `${jobId}.exit`);
+    // done:false mirrors a job whose spawning server process died before its
+    // close handler could persist the terminal state.
+    writeFileSync(
+      metaPath,
+      JSON.stringify({
+        jobId,
+        pid: 999_999_999,
+        label: 'restart-sim-done',
+        cwd: workDir,
+        command: 'make',
+        args: ['noop'],
+        startTime: Date.now() - 2_000,
+        timeoutMs: 30_000,
+        done: false,
+        exitCode: null,
+        error: null,
+      }),
+    );
+    writeFileSync(exitPath, '0');
+    try {
+      const snapshot = snapshotJob(jobId);
+      expect(snapshot?.status).toBe('done');
+      expect(snapshot?.exitCode).toBe(0);
+      expect(snapshot?.error).toBeNull();
+    } finally {
+      unlinkSync(metaPath);
+      unlinkSync(exitPath);
+    }
+  });
+
+  it("recovers a failed result from the exit-code sidecar for a job outside this process's in-memory registry (LS-8358)", () => {
+    const jobId = `test-restart-failed-${process.pid}`;
+    const jobsDir = join(tmpdir(), TEST_DIR_NAME);
+    mkdirSync(jobsDir, { recursive: true });
+    const metaPath = join(jobsDir, `${jobId}.json`);
+    const exitPath = join(jobsDir, `${jobId}.exit`);
+    writeFileSync(
+      metaPath,
+      JSON.stringify({
+        jobId,
+        pid: 999_999_999,
+        label: 'restart-sim-failed',
+        cwd: workDir,
+        command: 'make',
+        args: ['__no_such_target__'],
+        startTime: Date.now() - 2_000,
+        timeoutMs: 30_000,
+        done: false,
+        exitCode: null,
+        error: null,
+      }),
+    );
+    writeFileSync(exitPath, '2');
+    try {
+      const snapshot = snapshotJob(jobId);
+      expect(snapshot?.status).toBe('failed');
+      expect(snapshot?.exitCode).toBe(2);
+      expect(snapshot?.error).toContain('exited with code 2');
+    } finally {
+      unlinkSync(metaPath);
+      unlinkSync(exitPath);
     }
   });
 

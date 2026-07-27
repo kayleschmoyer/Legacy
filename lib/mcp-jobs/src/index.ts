@@ -11,6 +11,60 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// Materialized into each server's jobsDir() on first use (see
+// `ensureWrapperScript`) rather than shipped as sibling files resolved via
+// `import.meta.url` — this package's test config (ts-jest, CommonJS output)
+// cannot parse `import.meta` regardless of tsconfig module target, and a
+// source-relative path would differ between running from `src` (tsx) and any
+// future compiled output anyway. Writing a small script string to a tmpdir
+// path is the same pattern this file already uses for job logs/metadata.
+
+/**
+ * POSIX wrapper (see `lib/mcp-jobs/README.md`): runs a command and records its
+ * exit code to a sidecar file, independent of whether the spawning MCP server
+ * process is still alive when the command finishes (LS-8358). Invoked as
+ * `sh run-with-exit-sidecar.sh <exitCodePath> <command> [args...]`. Args are
+ * forwarded via `"$@"` (not text-interpolated), so no escaping is needed
+ * regardless of their content.
+ */
+const SH_WRAPPER_SCRIPT = `#!/bin/sh
+exit_path="$1"
+shift
+"$@"
+code=$?
+printf '%s' "$code" > "$exit_path"
+exit "$code"
+`;
+
+/**
+ * Windows wrapper: same contract as the sh wrapper above, invoked as
+ * `powershell -File run-with-exit-sidecar.ps1 <exitCodePath> <command> [args...]`.
+ * Args after `-File` arrive as a true array (`ValueFromRemainingArguments`),
+ * not text-interpolated, so no escaping is needed regardless of their content.
+ */
+const PS_WRAPPER_SCRIPT = `param(
+  [Parameter(Mandatory = $true, Position = 0)]
+  [string]$ExitCodePath,
+
+  [Parameter(Mandatory = $true, Position = 1, ValueFromRemainingArguments = $true)]
+  [string[]]$CommandAndArgs
+)
+
+$command = $CommandAndArgs[0]
+$commandArgs = @()
+if ($CommandAndArgs.Count -gt 1) {
+  $commandArgs = $CommandAndArgs[1..($CommandAndArgs.Count - 1)]
+}
+
+& $command @commandArgs
+$code = $LASTEXITCODE
+if ($null -eq $code) {
+  $code = 0
+}
+Set-Content -LiteralPath $ExitCodePath -Value $code -NoNewline
+exit $code
+`;
+
 // Shared background-job runner for our in-repo MCP servers (`tools/mcp/*`).
 //
 // Cloud Claude Code sessions enforce a ~60s MCP transport timeout on every
@@ -247,6 +301,100 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
     return join(jobsDir(), `${jobId}.json`);
   }
 
+  /**
+   * Sidecar written by the OS-level wrapper process on exit (see
+   * `wrapForExitSidecar`) — independent of whether *this* server process is
+   * still alive to catch the child's `close` event. Recovers the true
+   * pass/fail outcome of a job orphaned by an MCP server restart (LS-8358).
+   */
+  function exitPathFor(jobId: string): string {
+    return join(jobsDir(), `${jobId}.exit`);
+  }
+
+  function readExitSidecar(jobId: string): number | null {
+    try {
+      const raw = readFileSync(exitPathFor(jobId), 'utf-8').trim();
+      // Guard the write race: the wrapper's `>` redirect truncates the file
+      // before printf/Set-Content writes the code, so a read in that instant
+      // sees an empty file. `Number('')` is 0, not NaN — without this check
+      // that would misreport a still-running job as a successful exit.
+      if (raw === '') return null;
+      const code = Number(raw);
+      return Number.isInteger(code) ? code : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Materialize the platform trampoline script into this runner's jobsDir()
+   * (idempotent — only written if missing) and return its path. Written per
+   * runner rather than shared repo-wide since jobsDir() is namespaced per
+   * server and each server's tmpdir may be cleared independently.
+   */
+  function ensureWrapperScript(): string {
+    const isWindows = process.platform === 'win32';
+    const path = join(
+      jobsDir(),
+      isWindows ? 'run-with-exit-sidecar.ps1' : 'run-with-exit-sidecar.sh',
+    );
+    if (!existsSync(path)) {
+      writeFileSync(path, isWindows ? PS_WRAPPER_SCRIPT : SH_WRAPPER_SCRIPT);
+    }
+    return path;
+  }
+
+  /**
+   * Build the actual spawn target for a job. Non-shell jobs (the common
+   * case) are routed through a platform trampoline (`sh` / `powershell.exe`)
+   * that writes `exitPathFor(jobId)` when the wrapped command exits — a real
+   * OS-level parent-child relationship, not a Node event handler, so the
+   * terminal exit code is captured even if this server process dies first.
+   * Args are forwarded as an argv array (never text-joined), so no extra
+   * escaping is introduced.
+   *
+   * Jobs opted into `shell: true` (Windows npm-wrapper `.cmd` commands whose
+   * args are pre-escaped by the caller for cmd.exe's text-join semantics, or
+   * commands relying on shell metacharacter interpretation) keep today's
+   * direct Node `shell:true` spawn unchanged — wrapping them would require
+   * re-deriving that escaping, which risks silently corrupting arguments.
+   * These jobs still work correctly when the server process survives to see
+   * the `close` event; only the cross-restart-recovery improvement below
+   * does not extend to them.
+   */
+  function wrapForExitSidecar(
+    opts: StartJobOptions,
+    exitPath: string,
+  ): { command: string; args: string[]; shell: boolean } {
+    if (opts.shell) {
+      return { command: opts.command, args: opts.args, shell: true };
+    }
+    const wrapperPath = ensureWrapperScript();
+    if (process.platform === 'win32') {
+      return {
+        command: 'powershell.exe',
+        args: [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          wrapperPath,
+          exitPath,
+          opts.command,
+          ...opts.args,
+        ],
+        shell: false,
+      };
+    }
+    return {
+      command: '/bin/sh',
+      args: [wrapperPath, exitPath, opts.command, ...opts.args],
+      shell: false,
+    };
+  }
+
   function persistMeta(record: JobRecord): void {
     const meta: JobMeta = {
       jobId: record.jobId,
@@ -312,14 +460,28 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
     }
 
     // Not marked done. For in-memory jobs the close handler will flip the flag;
-    // for disk-recovered jobs from a dead server, completion is never recorded —
-    // if the pid has exited, report the job as orphaned so the caller inspects
-    // the log instead of waiting forever. A recovered job also has no timeout
-    // timer (it died with the old server), and isPidAlive can hit a recycled
-    // pid — so a job past its own process deadline is orphaned too, even if the
-    // pid still reads as alive.
+    // for disk-recovered jobs from a dead server, completion is never recorded
+    // by that mechanism — but the exit-sidecar wrapper (see
+    // `wrapForExitSidecar`) records the real outcome independent of the dead
+    // process, so check it first and resolve pass/fail from it instead of
+    // reporting the job orphaned (LS-8358). Only jobs spawned via the
+    // trampoline (opts.shell falsy) have a sidecar; others fall through to
+    // the existing orphan heuristics below.
     const inMemory = jobRegistry.has(jobId);
     if (!inMemory) {
+      const sidecarExitCode = readExitSidecar(jobId);
+      if (sidecarExitCode !== null) {
+        const failed = sidecarExitCode !== 0;
+        return {
+          ...base,
+          exitCode: sidecarExitCode,
+          error: failed
+            ? `${record.label} exited with code ${sidecarExitCode}`
+            : null,
+          status: failed ? 'failed' : 'done',
+          log: readLog(record.logPath),
+        };
+      }
       const deadlinePassed =
         record.timeoutMs !== undefined &&
         Date.now() - record.startTime > record.timeoutMs;
@@ -375,6 +537,8 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
     const jobId = newJobId();
     const logPath = logPathFor(jobId);
     const metaPath = metaPathFor(jobId);
+    const exitPath = exitPathFor(jobId);
+    const spawnTarget = wrapForExitSidecar(opts, exitPath);
     // Open for write, NOT append: MSYS/Git-Bash children (e.g. make recipes
     // running under sh.exe on Windows) fail writing to an inherited
     // append-mode handle ("echo: write error: Bad file descriptor"). The log
@@ -383,11 +547,11 @@ export function createJobRunner(config: JobRunnerConfig): JobRunner {
 
     const child = (() => {
       try {
-        return spawn(opts.command, opts.args, {
+        return spawn(spawnTarget.command, spawnTarget.args, {
           cwd: opts.cwd,
           stdio: ['ignore', fd, fd],
           windowsHide: true,
-          shell: opts.shell ?? false,
+          shell: spawnTarget.shell,
           ...(opts.env
             ? {
                 env: {

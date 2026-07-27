@@ -20,8 +20,20 @@ One battle-tested implementation of:
 - **Disk-persisted metadata** — job metadata lives next to the log file under
   the OS tmpdir, so a restarted MCP server can still report on jobs it did not
   spawn.
-- **Orphan detection** — disk-recovered jobs whose pid has exited (or whose
-  process deadline passed) are reported as `orphaned` instead of waiting forever.
+- **Exit-code sidecar** — non-`shell` jobs run through a platform trampoline
+  (`sh` / `powershell.exe`, materialized into the job's tmpdir on first use —
+  see `ensureWrapperScript` in `src/index.ts`) that writes the wrapped
+  command's real exit code to `<jobId>.exit` when it exits. Because
+  the trampoline is a genuine OS-level parent of the command (not a Node
+  `close` event handler), a disk-recovered job resolves to its true `done` /
+  `failed` outcome from this sidecar even if the MCP server process that
+  spawned it died first — instead of reporting `orphaned` with an
+  unrecoverable outcome (LS-8358). Jobs opted into `shell: true` (Windows
+  npm-wrapper `.cmd` commands with pre-escaped args) keep the direct Node
+  shell spawn and do not get this cross-restart recovery.
+- **Orphan detection** — disk-recovered jobs with no exit-code sidecar whose
+  pid has exited (or whose process deadline passed) are reported as
+  `orphaned` instead of waiting forever.
 - **Idempotency joining** — `idempotencyKey` re-joins an in-flight job instead
   of spawning a duplicate.
 
