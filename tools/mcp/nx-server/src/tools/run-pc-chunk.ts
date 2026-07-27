@@ -1,7 +1,11 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { runJobWithBudget } from '../jobs.js';
 import { getRepoRoot } from '../run-command.js';
-import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
+import {
+  MAX_OUTPUT_CHARS,
+  buildCompactOutput,
+  truncateOutput,
+} from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
 // 30-minute process timeout — a runaway backstop only, NOT a transport guard (that is the
@@ -58,6 +62,7 @@ export function getSuccessMarkerForChunk(chunk: PcChunk): RegExp | undefined {
 interface RunPcChunkParams {
   chunk: PcChunk;
   worktreePath?: string;
+  verbose?: boolean;
 }
 
 export async function runPcChunk(
@@ -116,6 +121,7 @@ export async function runPcChunk(
   }
 
   const passed = snapshot.status === 'done';
+  const log = snapshot.log ?? '';
   return {
     content: [
       {
@@ -127,7 +133,9 @@ export async function runPcChunk(
             ? { recoveredFromTimeout: true }
             : {}),
           ...(snapshot.error ? { error: snapshot.error } : {}),
-          output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
+          output: params.verbose
+            ? truncateOutput(log, MAX_OUTPUT_CHARS)
+            : buildCompactOutput(log, MAX_OUTPUT_CHARS),
         }),
       },
     ],

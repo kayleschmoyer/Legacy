@@ -278,6 +278,16 @@ server.tool(
       .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
       .optional()
       .describe('Worktree path (default: repo root)'),
+    verbose: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, include the full raw output (up to 30k chars) in the response instead of the ' +
+          'default compact summary. Default false: prettier per-file listings (pc-format) are collapsed ' +
+          'to a count, and the step body (e.g. eslint output for pc-lint) is truncated to 20 lines with a ' +
+          'note to run the step directly for the rest. Use verbose: true only when you need the complete ' +
+          'output for debugging.',
+      ),
   },
   async (params) => runPcChunk(params),
 );
