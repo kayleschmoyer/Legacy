@@ -353,9 +353,9 @@ validate: ## Validate package.json and workspace dependencies
 	pnpm run validate
 
 # Testing
-test: ## Run tests on changed files
+test: ## Run tests on changed files. Pass MAXWORKERS=N to cap Jest worker parallelism (e.g. MAXWORKERS=2) on memory-constrained machines
 	@$(call echo_blue,Running tests on changed files...)
-	pnpm exec nx affected -t test
+	pnpm exec nx affected -t test $(if $(MAXWORKERS),-- --maxWorkers=$(MAXWORKERS),)
 
 test-all: ## Run all tests
 	@$(call echo_blue,Running all tests...)
@@ -939,7 +939,14 @@ _PC_SCHEMA_CMD = pnpm exec nx run db:print-schema
 _PC_TYPECHECK_CMD = pnpm exec nx affected -t typecheck --base=$(NX_BASE)
 _PC_LINT_CMD = pnpm exec nx affected -t lint --fix --base=$(NX_BASE)
 _PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
-_PC_TEST_CMD = pnpm exec nx affected -t test --base=$(NX_BASE)
+# MAXWORKERS caps Jest worker parallelism (--maxWorkers) across every affected
+# project's test run, forwarded to nx via the trailing `-- --maxWorkers=N`
+# passthrough. Unset by default (full parallelism). On memory-constrained
+# machines, full parallelism across several projects can OOM-crash Node with
+# "Fatal process out of memory: Zone" + "spawn UNKNOWN" in jest-worker — that
+# signature means retry with `make pc-test MAXWORKERS=2` (or `make test
+# MAXWORKERS=2`), not that the changes under test regressed (LS-8666).
+_PC_TEST_CMD = pnpm exec nx affected -t test --base=$(NX_BASE) $(if $(MAXWORKERS),-- --maxWorkers=$(MAXWORKERS),)
 _PC_BUILD_CMD = pnpm exec nx affected -t build --base=$(NX_BASE)
 
 # Formatting step (prettier + auto-commit of formatter rewrites as a new commit).
@@ -1035,7 +1042,7 @@ pc-workflows: ## pc step 7: GitHub workflow validation
 	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && $(_PC_WORKFLOWS_CMD),@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
 
 pc-test: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
-pc-test: ## pc step 8: test affected projects
+pc-test: ## pc step 8: test affected projects. Pass MAXWORKERS=N to cap Jest worker parallelism (avoids OOM on memory-constrained machines)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
 
 pc-build: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))

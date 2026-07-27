@@ -64,6 +64,53 @@ describe('runTarget — variable injection guard', () => {
   });
 });
 
+describe('runTarget — maxWorkers (LS-8666)', () => {
+  let workDir: string;
+
+  beforeAll(() => {
+    workDir = mkdtempSync(join(tmpdir(), 'make-rt-maxworkers-test-'));
+    writeFileSync(
+      join(workDir, 'Makefile'),
+      'kill-stale:\n\t@echo "MAXWORKERS=$(MAXWORKERS)"\n',
+    );
+  });
+
+  afterAll(() => {
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  it('rejects a non-positive maxWorkers', async () => {
+    const result = await runTarget({
+      target: 'kill-stale',
+      worktreePath: workDir,
+      maxWorkers: 0,
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid maxWorkers');
+  });
+
+  it('rejects a non-integer maxWorkers', async () => {
+    const result = await runTarget({
+      target: 'kill-stale',
+      worktreePath: workDir,
+      maxWorkers: 1.5,
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid maxWorkers');
+  });
+
+  it('forwards maxWorkers as a MAXWORKERS make variable', async () => {
+    const result = await runTarget({
+      target: 'kill-stale',
+      worktreePath: workDir,
+      maxWorkers: 2,
+    });
+    expect(result.isError).toBeFalsy();
+    const body = payload(result);
+    expect(body.output).toContain('MAXWORKERS=2');
+  }, 20_000);
+});
+
 describe('runTarget — runInBackground: true', () => {
   let workDir: string;
 

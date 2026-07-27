@@ -10,6 +10,7 @@ import {
   getSuccessMarkerForChunk,
   getTimeoutForChunk,
   PC_CHUNKS,
+  runPcChunk,
 } from './run-pc-chunk.js';
 import type { PcChunk } from './run-pc-chunk.js';
 
@@ -69,5 +70,19 @@ describe('getSuccessMarkerForChunk', () => {
     for (const chunk of LIGHT_CHUNKS) {
       expect(getSuccessMarkerForChunk(chunk)).toBeUndefined();
     }
+  });
+});
+
+describe('runPcChunk — maxWorkers validation (LS-8666)', () => {
+  it('rejects a non-positive maxWorkers before starting a job', async () => {
+    const result = await runPcChunk({ chunk: 'pc-test', maxWorkers: 0 });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid maxWorkers');
+  });
+
+  it('rejects a non-integer maxWorkers before starting a job', async () => {
+    const result = await runPcChunk({ chunk: 'pc-test', maxWorkers: 1.5 });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid maxWorkers');
   });
 });

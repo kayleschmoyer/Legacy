@@ -66,6 +66,18 @@ Preconditions and recovery:
 
 Before any pc run: check migration status first (AGENTS.md Tier-2; commands in [database](../database/SKILL.md)).
 
+### pc-test OOM on memory-constrained machines (LS-8666)
+
+`pc-test` / `make test` run `nx affected -t test` across every affected project at full Jest worker parallelism. On a memory-constrained machine this can OOM-crash Node — the failure signature is `Fatal process out of memory: Zone` plus `spawn UNKNOWN` inside a `jest-worker` stack trace, often with a handful of spurious failures in totally unrelated spec files (a crashed worker's queue got reassigned). **That signature means retry with fewer Jest workers, not that the code under test regressed.**
+
+Cap Jest worker parallelism with `MAXWORKERS`/`maxWorkers` (forwarded as `-- --maxWorkers=<n>` to the underlying `nx affected -t test`):
+
+- `make pc-test MAXWORKERS=2` / `make test MAXWORKERS=2`
+- `make_run({ target: "pc-test", maxWorkers: 2 })` / `make_run({ target: "test", maxWorkers: 2 })`
+- `nx_run_pc_chunk({ chunk: "pc-test", maxWorkers: 2 })`
+
+No effect on non-test targets/chunks.
+
 ## Codegen
 
 ```bash

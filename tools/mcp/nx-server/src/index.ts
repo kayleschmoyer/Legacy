@@ -292,6 +292,19 @@ server.tool(
           'note to run the step directly for the rest. Use verbose: true only when you need the complete ' +
           'output for debugging.',
       ),
+    maxWorkers: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Cap Jest worker parallelism for the pc-test chunk by passing MAXWORKERS=<n>, which the pc-test ' +
+          'recipe forwards to `nx affected -t test` as `-- --maxWorkers=<n>`. Use on memory-constrained ' +
+          'machines to avoid "Fatal process out of memory: Zone" crashes (with "spawn UNKNOWN" in ' +
+          'jest-worker) from full-parallelism Jest workers across every affected project — that failure ' +
+          'signature means retry pc-test with a lower maxWorkers, not that the code under test regressed. ' +
+          'E.g. maxWorkers: 2. Ignored by chunks other than pc-test.',
+      ),
   },
   async (params) => runPcChunk(params),
 );

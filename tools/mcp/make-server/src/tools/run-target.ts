@@ -150,6 +150,7 @@ interface RunTargetParams {
   timeoutMs?: number;
   runInBackground?: boolean;
   verbose?: boolean;
+  maxWorkers?: number;
 }
 
 export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
@@ -187,6 +188,25 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       };
     }
     args.push(...validation.parts);
+  }
+
+  // Caps Jest worker parallelism (--maxWorkers) for test-bearing targets
+  // (pc, pre-commit, pc-test, test) — forwarded as a MAXWORKERS make variable,
+  // which the Makefile's test recipes append to `nx affected -t test` as
+  // `-- --maxWorkers=<n>`. Ignored by targets that don't reference MAXWORKERS.
+  if (params.maxWorkers !== undefined) {
+    if (!Number.isInteger(params.maxWorkers) || params.maxWorkers < 1) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Invalid maxWorkers: "${params.maxWorkers}". Must be a positive integer.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    args.push(`MAXWORKERS=${params.maxWorkers}`);
   }
 
   // Longer timeout for heavy targets

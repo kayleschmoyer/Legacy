@@ -63,6 +63,7 @@ interface RunPcChunkParams {
   chunk: PcChunk;
   worktreePath?: string;
   verbose?: boolean;
+  maxWorkers?: number;
 }
 
 export async function runPcChunk(
@@ -70,17 +71,37 @@ export async function runPcChunk(
 ): Promise<ToolResult> {
   const cwd = params.worktreePath || getRepoRoot();
 
+  // Caps Jest worker parallelism (--maxWorkers) for the pc-test chunk —
+  // forwarded as a MAXWORKERS make variable, which the Makefile's pc-test
+  // recipe appends to `nx affected -t test` as `-- --maxWorkers=<n>`.
+  // Ignored by every other chunk.
+  const args: string[] = [params.chunk];
+  if (params.maxWorkers !== undefined) {
+    if (!Number.isInteger(params.maxWorkers) || params.maxWorkers < 1) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Invalid maxWorkers: "${params.maxWorkers}". Must be a positive integer.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    args.push(`MAXWORKERS=${params.maxWorkers}`);
+  }
+
   const snapshot = await runJobWithBudget(
     {
       command: 'make',
-      args: [params.chunk],
+      args,
       cwd,
       label: params.chunk,
       timeoutMs: getTimeoutForChunk(params.chunk),
       successMarker: getSuccessMarkerForChunk(params.chunk),
       // Blind retries (e.g. after a lost transport) join the in-flight run
       // instead of spawning a duplicate make process.
-      idempotencyKey: `pc-chunk:${cwd}:${params.chunk}`,
+      idempotencyKey: `pc-chunk:${cwd}:${params.chunk}${params.maxWorkers !== undefined ? `:mw${params.maxWorkers}` : ''}`,
     },
     SYNC_BUDGET_MS,
   );

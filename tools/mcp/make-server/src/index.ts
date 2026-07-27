@@ -48,6 +48,18 @@ server.tool(
       .string()
       .optional()
       .describe('Make variables, e.g. "DRYRUN=1 FORCE=1"'),
+    maxWorkers: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Cap Jest worker parallelism for test-bearing targets (pc, pre-commit, pc-test, test) by passing MAXWORKERS=<n>, ' +
+          'which those targets forward to `nx affected -t test` as `-- --maxWorkers=<n>`. Use on memory-constrained ' +
+          'machines to avoid "Fatal process out of memory: Zone" crashes (with "spawn UNKNOWN" in jest-worker) from ' +
+          'full-parallelism Jest workers across every affected project — that failure signature means retry with a ' +
+          'lower maxWorkers, not that the code under test regressed. E.g. maxWorkers: 2. No effect on non-test targets.',
+      ),
     timeoutMs: z
       .number()
       .int()
