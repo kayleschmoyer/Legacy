@@ -194,7 +194,9 @@ builder.queryField('usersCount', (t) =>
           : undefined,
       });
 
-      LOGGER.error('Admin user count viewed', {
+      // Audit log: routine admin view, not a security-sensitive action —
+      // logged at info level so it isn't forwarded to Rollbar as an error.
+      LOGGER.info('Admin user count viewed', {
         audit: true,
         actor: { id: Number(user.id) },
         count,

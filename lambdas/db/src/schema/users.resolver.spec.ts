@@ -26,6 +26,7 @@ describe('impersonateUser mutation', () => {
     db: typeof mockDb;
   };
   let mockGetUserById: jest.Mock;
+  let mockCountUsers: jest.Mock;
   let mockSign: jest.Mock;
   let mockLogger: {
     info: jest.Mock;
@@ -47,6 +48,7 @@ describe('impersonateUser mutation', () => {
     };
 
     mockGetUserById = jest.fn();
+    mockCountUsers = jest.fn();
     mockSign = jest.fn().mockReturnValue('mock-jwt-token');
     mockLogger = {
       info: jest.fn(),
@@ -78,6 +80,7 @@ describe('impersonateUser mutation', () => {
       createDatabaseService: jest.fn(() => ({
         users: {
           getUserById: mockGetUserById,
+          countUsers: mockCountUsers,
         },
         statistics: { getOnThisDay: jest.fn(), getOnThisDayEvents: jest.fn() },
       })),
@@ -372,6 +375,37 @@ describe('impersonateUser mutation', () => {
     );
 
     expect(result).toMatchObject({ id: 8, subscriptionTier: null });
+  });
+
+  // LS-8652: `usersCount` audit-logged routine admin views via LOGGER.error,
+  // which forwards them to Rollbar as production errors even though nothing
+  // failed. Only genuinely security-sensitive events (e.g. impersonation)
+  // should log at error level.
+  function getUsersCountResolver() {
+    const queryType = schema.getQueryType();
+    const field = queryType?.getFields().usersCount;
+    if (!field?.resolve) {
+      throw new Error('usersCount resolver not found');
+    }
+    return field.resolve;
+  }
+
+  it('usersCount query logs its audit event at info level, not error', async () => {
+    mockCountUsers.mockResolvedValue(42);
+    const resolve = getUsersCountResolver();
+
+    const result = await resolve({}, {}, mockContext, undefined as never);
+
+    expect(result).toBe(42);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Admin user count viewed',
+      expect.objectContaining({
+        audit: true,
+        actor: { id: 1 },
+        count: 42,
+      }),
+    );
+    expect(mockLogger.error).not.toHaveBeenCalled();
   });
 });
 
