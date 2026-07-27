@@ -147,6 +147,18 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 2. Push it with `worktree_push()` — it already bakes in `--force-with-lease` and refuses only `main`. Pushing a corrected commit on your **own** unmerged draft-PR branch is the same risk tier as any other feature-branch force-push (see [When to Ask the User](#when-to-ask-the-user)): **inform, then proceed** — note it in the PR/checkpoint comment, do not stop and wait for explicit sign-off.
 3. If the branch has also diverged from `main` (conflicts), resolve those first per Scenario 3, then do the author fix as the last step before the final push so you only force-push once.
 
+## Scenario 12: Auto-Mode Classifier Denies a Routine Same-Session Action (LS-8407, LS-8411)
+
+**Symptom**: a harness-level tool call (e.g. `github_manage_labels` adding `agent-in-progress` to a PR) is denied with `Permission for this action was denied by the Claude Code auto mode classifier`, and the stated reason is factually wrong for this session — e.g. it claims the agent didn't create an item it created moments earlier in the same run, or it cites an unrelated prior denial (a blocked `git reset`/`checkout`) as grounds for blocking a completely unrelated read-only call.
+
+**This is not a repo bug.** The auto-mode classifier is part of the Claude Code harness itself — no file in this repository implements or configures it, and `.claude/settings.json#permissions` (tool allow/deny lists) does not influence its reasoning. Nothing here can be edited to fix the classifier's logic.
+
+**Decision tree**:
+
+1. Retry the exact same call once. Both observed instances (LS-8407: label add on a self-created PR; LS-8411: a read-only `github_get_check_runs` call) succeeded on retry, with the second attempt's own denial/allow reason citing a "Stage 2 classifier error — blocking based on stage 1 assessment (usually transient)". Treat the first denial as likely transient before escalating.
+2. If the retry also denies the call with the same or a similarly nonsensical reason: do not silently skip the step (e.g. do not drop the `agent-in-progress` label and move on) and do not spend a turn re-litigating the classifier's stated reasoning with yourself. Surface it to the user in one line — the tool call, the denial reason, and that this is a known harness-level false positive (LS-8407/LS-8411) — then proceed with the rest of the workflow; the label/action can be applied manually or on a later pass.
+3. File or reference an MCP-gap ticket only if one doesn't already exist for this subsystem (check `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` descendants) — LS-8407 and LS-8411 already cover the two known symptoms. Report new symptoms via product feedback, since the fix is outside this repo's reach.
+
 ## When to Ask the User
 
 Use this heuristic when the scenarios above don't cover your situation:
