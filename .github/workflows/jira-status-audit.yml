@@ -13,10 +13,13 @@ name: "Jira Status Audit"
 # never permitted; anything the guard refuses gets the jira-mismatch
 # label plus a comment stating the proposed action.
 #
-# Dry-run by default: auto-repair writes are gated on the repo var
-# JIRA_AUDIT_AUTO_REPAIR being 'true'. Until then, allowed repairs are
-# labeled with the proposed action instead of applied (per the RFC open
-# question — flip the var after a clean week of dry-run proposals).
+# Auto-repair writes are gated on the repo var JIRA_AUDIT_AUTO_REPAIR being
+# 'true'; anything else (including unset) is dry-run — allowed repairs are
+# labeled with the proposed action instead of applied. The RFC's open
+# question (flip the var after a clean dry-run period) was resolved GO on
+# LS-8300: the dry-run period showed no false positives, and the monotonic
+# guard bounds auto-repair to forward-only moves regardless of the flag
+# (see state-machine.js), so enabling it cannot cause a backward transition.
 #
 # Epic audit: applies rollup logic (same as jira-branch-sync.yml) to all
 # epics — recalculates expected status from children and transitions.

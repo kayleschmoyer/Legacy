@@ -225,5 +225,8 @@ commit sweep), which is the desired end-state even if later phases stall.
 - Does the merge-queue retarget flow (`merge-when-ready`) emit
   `closed`+`merged` with the marker intact in all cases, or do queue-created
   temporary PRs need an exemption in `Jira Link Check`?
-- Should the audit's auto-repair be gated behind a dry-run period (label-only
-  with proposed action) before enabling writes?
+- ~~Should the audit's auto-repair be gated behind a dry-run period
+  (label-only with proposed action) before enabling writes?~~ Resolved GO on
+  LS-8300: the dry-run period produced no false positives and the monotonic
+  guard bounds auto-repair to forward-only moves regardless of the flag, so
+  `JIRA_AUDIT_AUTO_REPAIR` was enabled.
