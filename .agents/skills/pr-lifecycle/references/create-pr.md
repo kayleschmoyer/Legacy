@@ -26,6 +26,8 @@ Then create the draft PR (see [Command](#command) below) and apply `agent-in-pro
 
 ## Command
 
+> **⚠️ MCP tool string parameters are not shell-evaluated.** Unlike the Bash tool's `git commit -m "$(cat <<'EOF' ... EOF)"` heredoc convention, an MCP tool call is a plain JSON call — there is no shell to expand `$(...)` or backticks. Passing `body: "$(cat /tmp/pr-body.md)"` to `github_create_pr`/`create_pull_request` (or `commentBody` to a Jira comment tool) lands as the literal string `$(cat /tmp/pr-body.md)`, not the file's contents (LS-8591, caught while opening the draft PR for LS-6031). If you assembled the body in a scratch file via `Write`/`Edit`, `Read` it back and inline the actual text into the `body` param instead. This is cheap to catch: after creating a PR from a scratch-file body, re-read it once (`pull_request_read`/`jira_view`) to confirm the content landed correctly before moving on.
+
 Tool selection is homed in the [PR-creation tool routing table](../SKILL.md#pr-creation-tool-routing-one-home--link-here-do-not-restate) — the flow below shows the local `github_create_pr` (local-git stdio) path. **Always create as draft** to prevent sweep/review agents from racing with the creating agent:
 
 ```
