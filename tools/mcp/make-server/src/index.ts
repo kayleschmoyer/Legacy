@@ -6,6 +6,7 @@ import { join, resolve, relative, isAbsolute } from 'node:path';
 import { existsSync } from 'node:fs';
 import { runCommand, getRepoRoot } from './run-command.js';
 import { runTarget } from './tools/run-target.js';
+import { runCustomChecks } from './tools/run-custom-checks.js';
 import { validatePR } from './tools/validate-pr.js';
 import { makeRunStatus, makeRunWait } from './tools/make-run-bg.js';
 import { worktreeCreate } from './tools/worktree-create.js';
@@ -615,6 +616,38 @@ server.tool(
       repoRoot,
     });
   },
+);
+
+// --- ci_run_custom_checks ---
+server.tool(
+  'ci_run_custom_checks',
+  "Discover and run this repo's own `.github/checks/*.sh` custom-check scripts locally — the same scripts the 🚀 CI Pipeline / custom-checks job runs " +
+    '(ci-failure-capture-tests.sh, format-check-pipefail-tests.sh, integration-select-tests.sh, etc.). Each script is a cheap, self-contained `node --test` ' +
+    'runner with no external deps. Prefer this over raw `bash .github/checks/<name>.sh` or `node --test <path>` via shell — it discovers every script ' +
+    'automatically and reports pass/fail per script in one call, instead of stopping at the first failure the way the CI step does. ' +
+    'Running the relevant check before pushing catches failures (e.g. a missing e2e-surface-map.json entry) that would otherwise cost a CI round-trip. ' +
+    'Pass `scripts` to run a named subset (e.g. ["integration-select-tests"] — the .sh suffix is optional); omit it to run every discovered script.',
+  {
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Worktree or repo root (default: repo root)'),
+    scripts: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Named subset of check scripts to run, by basename (e.g. "integration-select-tests" or "integration-select-tests.sh"). ' +
+          'Omit to run every script under .github/checks/*.sh. Unknown names return an error listing the available scripts.',
+      ),
+    timeoutMs: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Per-script timeout in milliseconds (default: 120000).'),
+  },
+  async (params) => runCustomChecks(params),
 );
 
 // --- make_ping ---
