@@ -264,9 +264,10 @@ jobs:
             let log = '';
             try { log = fs.readFileSync(process.env.MIGRATION_LOG, 'utf8'); } catch {}
             const { summary, excerpt } = distill({ tool: 'generic', text: log, runUrl });
+            const headSha = context.payload.pull_request?.head?.sha || context.sha;
 
             const content = [
-              statusHeading('Migrations', 'fail', summary || 'unapplied migrations'),
+              statusHeading('Migrations', 'fail', summary || 'unapplied migrations', headSha),
               '',
               detailsBlock({
                 check: 'migrations',

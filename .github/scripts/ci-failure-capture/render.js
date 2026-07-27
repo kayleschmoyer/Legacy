@@ -12,7 +12,23 @@
 
 const STATUS_ICON = { pass: '✅', fail: '❌', skip: '⏭️' };
 
-function statusHeading(title, status, summary) {
+/**
+ * Truncate a full commit SHA to the short form shown in GitHub's UI.
+ */
+function shortSha(sha) {
+  return String(sha).slice(0, 7);
+}
+
+/**
+ * @param {string} title
+ * @param {'pass'|'fail'|'skip'} status
+ * @param {string} [summary]
+ * @param {string} [sha]  commit SHA this report is for, shown inline so a
+ *   reader can tell — without cross-referencing the linked run — whether an
+ *   in-place comment edit still reflects the PR's current HEAD or a
+ *   superseded commit (LS-8403).
+ */
+function statusHeading(title, status, summary, sha) {
   const icon = STATUS_ICON[status] || '•';
   const tail =
     status === 'pass'
@@ -20,7 +36,8 @@ function statusHeading(title, status, summary) {
       : status === 'skip'
         ? 'skipped'
         : summary || 'failed';
-  return `### ${title} — ${icon} ${tail}`;
+  const commitSuffix = sha ? ` (commit ${shortSha(sha)})` : '';
+  return `### ${title} — ${icon} ${tail}${commitSuffix}`;
 }
 
 /**
@@ -54,4 +71,10 @@ function fixLine(fixHint, runUrl) {
   return parts.join(' · ');
 }
 
-module.exports = { statusHeading, detailsBlock, fixLine, STATUS_ICON };
+module.exports = {
+  statusHeading,
+  detailsBlock,
+  fixLine,
+  shortSha,
+  STATUS_ICON,
+};

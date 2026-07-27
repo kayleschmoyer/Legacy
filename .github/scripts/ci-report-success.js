@@ -26,8 +26,9 @@ module.exports = async ({ github, context, core }) => {
   if (!prNumber) return { skipped: true };
 
   const note = durationNote(process.env.WORKFLOW_DURATION);
+  const headSha = process.env.HEAD_SHA || '';
   const content = [
-    statusHeading('CI Pipeline', 'pass'),
+    statusHeading('CI Pipeline', 'pass', undefined, headSha),
     note ? `\n${note}` : '',
   ]
     .join('')

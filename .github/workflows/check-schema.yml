@@ -331,7 +331,8 @@ jobs:
             }
 
             const summary = drift ? 'schema.graphql out of sync' : 'codegen failed';
-            const parts = [statusHeading('GraphQL Schema', 'fail', summary), ''];
+            const headSha = context.payload.pull_request?.head?.sha || context.sha;
+            const parts = [statusHeading('GraphQL Schema', 'fail', summary, headSha), ''];
 
             if (drift) {
               let diff = '';

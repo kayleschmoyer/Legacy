@@ -84,6 +84,7 @@ module.exports = async ({ github, context, core }) => {
   const stepResults = parseJsonEnv('STEP_RESULTS');
   const excerpts = parseJsonEnv('FAILURE_EXCERPTS');
   const runId = process.env.RUN_ID;
+  const headSha = process.env.HEAD_SHA || '';
   const repoUrl = context.payload.repository.html_url;
   const runUrl = runId ? `${repoUrl}/actions/runs/${runId}` : '';
 
@@ -96,7 +97,7 @@ module.exports = async ({ github, context, core }) => {
       ? `${failedSteps.length} check${failedSteps.length === 1 ? '' : 's'} failed`
       : 'failed';
 
-  const parts = [statusHeading('CI Pipeline', 'fail', summary), ''];
+  const parts = [statusHeading('CI Pipeline', 'fail', summary, headSha), ''];
 
   const table = buildStepTable(stepResults);
   if (table) parts.push(table, '');

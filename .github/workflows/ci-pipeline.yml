@@ -1104,6 +1104,7 @@ jobs:
           failure-excerpts: ${{ steps.excerpts.outputs.json }}
           workflow-duration: ${{ steps.collect-results.outputs.workflow-duration }}
           run-id: ${{ github.run_id }}
+          head-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           quality-gates-subsections: |
             {
               "migration-immutability": "${{ needs.custom-checks.result }}",

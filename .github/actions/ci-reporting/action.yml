@@ -37,6 +37,9 @@ inputs:
   run-id:
     description: "GitHub Actions run ID"
     required: false
+  head-sha:
+    description: "PR head commit SHA this report is for, shown in the comment heading so a reader can tell whether an in-place edit still reflects the current HEAD (LS-8403)"
+    required: false
   quality-gates-subsections:
     description: "JSON object with quality gates subsection results (formatting, lint, typecheck, test)"
     required: false
@@ -134,6 +137,7 @@ runs:
         EXECUTION_MODE: ${{ inputs.execution-mode }}
         OPTIMAL_AGENTS: ${{ inputs.optimal-agents }}
         RUN_ID: ${{ inputs.run-id }}
+        HEAD_SHA: ${{ inputs.head-sha }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -150,6 +154,7 @@ runs:
         EXECUTION_MODE: ${{ inputs.execution-mode }}
         OPTIMAL_AGENTS: ${{ inputs.optimal-agents }}
         WORKFLOW_DURATION: ${{ inputs.workflow-duration }}
+        HEAD_SHA: ${{ inputs.head-sha }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
