@@ -55,6 +55,10 @@ import {
   getMalformedInlineReplies,
 } from './lib/cycle-protocol.mjs';
 import { FORMAT_ERROR_MESSAGE } from './lib/parse-author-response.mjs';
+import {
+  resolveCitedEvidence,
+  formatEvidenceResolutionSection,
+} from './lib/evidence-resolver.mjs';
 import { createFallbackProvider } from './lib/fallback.mjs';
 import { verifyReferencedPaths } from './lib/ref-verifier.mjs';
 import {
@@ -545,6 +549,7 @@ async function main() {
   // post-LLM validator output below (LS-8337) — populated here so the bot
   // gets a chance to accept or refute-with-reason before any escalation.
   let cannotComplyEntries = [];
+  let evidenceResolutionSection = '';
   if (cycle >= 2 && lastBotReview) {
     try {
       const authorResponses = buildAuthorResponsesSection(
@@ -589,6 +594,30 @@ async function main() {
           `[reviewer] Cycle ${cycle}: ${cannotComplyTitles.size} finding(s) with CANNOT-COMPLY: reply — bot will accept or refute-with-reason\n`,
         );
       }
+
+      // Resolve any PR number / commit SHA / CI run ID the author cited in a
+      // JUSTIFY/CANNOT-COMPLY rationale against GitHub, so the LLM treats a
+      // verified citation as fact instead of dismissing it as unverifiable
+      // (LS-8336). Non-fatal — a bad citation or gh failure never blocks the
+      // review; the citation is simply omitted from the section.
+      try {
+        const resolvedCitations = resolveCitedEvidence(
+          authorResponses.items,
+          prAllCommits,
+        );
+        evidenceResolutionSection =
+          formatEvidenceResolutionSection(resolvedCitations);
+        if (resolvedCitations.length > 0) {
+          process.stdout.write(
+            `[reviewer] Cycle ${cycle}: evidence resolver resolved ${resolvedCitations.length} cited reference(s)\n`,
+          );
+        }
+      } catch (err) {
+        process.stderr.write(
+          `[reviewer] Evidence resolver failed (non-fatal): ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+
       if (authorResponsesSection) {
         process.stdout.write(
           `[reviewer] Cycle ${cycle}: author response(s) found — injecting into user prompt\n`,
@@ -776,6 +805,7 @@ async function main() {
       integrationResultsSection,
       fullFileContextSection,
       baseBranchCiSection,
+      evidenceResolutionSection,
     );
   } catch (err) {
     process.stderr.write(

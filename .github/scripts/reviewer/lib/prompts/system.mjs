@@ -107,6 +107,11 @@ export function buildSystemPrompt(cycleRoleSection = '') {
  *   `formatBaseBranchCiSection()` listing checks/jobs currently failing on the base branch.
  *   Injected so the LLM classifies a failure that is already red on the base branch as
  *   pre-existing (non-blocking) rather than a regression introduced by this PR (LS-8312).
+ * @param {string} [evidenceResolutionSection]  Pre-formatted "cited evidence resolution"
+ *   section from `formatEvidenceResolutionSection()` — independently verified facts about
+ *   PR numbers, commit SHAs, and CI run IDs the author cited in JUSTIFY/CANNOT-COMPLY
+ *   replies. Injected so the LLM treats resolved citations as verified rather than
+ *   dismissing them as unverifiable (LS-8336).
  * @returns {string}
  */
 export function buildUserPrompt(
@@ -116,6 +121,7 @@ export function buildUserPrompt(
   integrationResultsSection = '',
   fullFileContextSection = '',
   baseBranchCiSection = '',
+  evidenceResolutionSection = '',
 ) {
   const { title, body, headRefName, baseRefName, diff } = ctx;
 
@@ -168,6 +174,14 @@ export function buildUserPrompt(
   // formatter (LS-8312).
   const baseCiBlock = baseBranchCiSection ? `\n\n${baseBranchCiSection}` : '';
 
+  // Inject independently-resolved cited evidence (PR numbers, commit SHAs, CI
+  // run IDs) so the LLM treats a verified citation as fact rather than
+  // dismissing it as unverifiable. Already wrapped in safety markers by the
+  // formatter (LS-8336).
+  const evidenceBlock = evidenceResolutionSection
+    ? `\n\n${evidenceResolutionSection}`
+    : '';
+
   return `## Pull Request: ${title}
 
 **Branch**: \`${headRefName}\` → \`${baseRefName}\`
@@ -179,7 +193,7 @@ ${body?.trim() || '_No description provided._'}
 
 \`\`\`diff
 ${diff?.trim() || '_No diff available._'}
-\`\`\`${fullFileBlock}${baseCiBlock}${authorBlock}${refBlock}${integrationBlock}
+\`\`\`${fullFileBlock}${baseCiBlock}${evidenceBlock}${authorBlock}${refBlock}${integrationBlock}
 
 Review this pull request according to your instructions. Apply the self-critique pass, then respond with ONLY valid JSON in this exact format — no prose, no markdown fences:
 
