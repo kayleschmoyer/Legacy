@@ -75,6 +75,7 @@ import {
   formatBaseBranchCiSection,
 } from './lib/base-branch-ci.mjs';
 import { filterStaleMissingArtifactFindings } from './lib/head-artifacts.mjs';
+import { reclassifyAffirmationFindings } from './lib/affirmation-guard.mjs';
 
 // Cap on the current-HEAD file context injected into the review prompt (LS-7768).
 // Keeps a large PR from blowing the prompt size; the diff is always included in
@@ -114,6 +115,27 @@ function formatStrippedLog(stripped) {
     return `"${escapeWorkflowCommandValue(truncated)}" (${f.strip_reason})`;
   });
   const overflow = stripped.length - STRIP_LOG_MAX_FINDINGS;
+  return overflow > 0
+    ? `${preview.join(', ')} +${overflow} more`
+    : preview.join(', ');
+}
+
+/**
+ * Format a truncated summary of reclassified (affirmation-polarity) findings
+ * for annotation log output, mirroring formatStrippedLog's truncation rules.
+ *
+ * @param {import('./lib/affirmation-guard.mjs').ReclassifiedFinding[]} reclassified
+ * @returns {string}
+ */
+function formatReclassifiedLog(reclassified) {
+  const preview = reclassified.slice(0, STRIP_LOG_MAX_FINDINGS).map((f) => {
+    const truncated =
+      f.title.length > STRIP_LOG_MAX_TITLE_LEN
+        ? `${f.title.slice(0, STRIP_LOG_MAX_TITLE_LEN)}…`
+        : f.title;
+    return `"${escapeWorkflowCommandValue(truncated)}" (${f.from_severity} → observation)`;
+  });
+  const overflow = reclassified.length - STRIP_LOG_MAX_FINDINGS;
   return overflow > 0
     ? `${preview.join(', ')} +${overflow} more`
     : preview.join(', ');
@@ -1094,8 +1116,23 @@ async function main() {
     );
   }
 
+  // Affirmation/defect polarity guard (LS-8576): reclassify findings whose
+  // language is pure praise ("directly addresses…", "excellent refactor")
+  // to `observation` severity regardless of the severity the model assigned.
+  // Runs before gateFindingsBySeverity on every cycle so a review that is
+  // 100% affirmations always gates to zero blocking findings — i.e. always
+  // verdicts APPROVED, never "Changes Required".
+  const affirmationGuard = reclassifyAffirmationFindings(
+    headArtifactFilter.kept,
+  );
+  if (affirmationGuard.reclassified.length > 0) {
+    process.stdout.write(
+      `::warning::[reviewer] Affirmation guard: reclassified ${affirmationGuard.reclassified.length} finding(s) to observation severity — ${formatReclassifiedLog(affirmationGuard.reclassified)}\n`,
+    );
+  }
+
   // Apply cycle-specific post-LLM validator (T22).
-  let filteredFindings = headArtifactFilter.kept;
+  let filteredFindings = affirmationGuard.kept;
   let strippedFindings = headArtifactFilter.stripped;
   if (cycle === 2) {
     const { kept, stripped } = filterFindingsCycle2(
