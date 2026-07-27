@@ -1,9 +1,18 @@
 import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
-// Hard per-call ceiling: cloud sessions kill any MCP call at ~60s (transport
-// timeout). Longer waits are re-armed by the caller re-invoking this tool.
-const MAX_WAIT_SECONDS = 55;
+// Hard per-call ceiling. This server runs on a Lambda whose configured
+// timeout is 30s (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout,
+// terraform/main/variables.tf), which is the real constraint — NOT the
+// client-side ~60s MCP transport timeout a prior version of this constant
+// assumed. A wait longer than the Lambda's own timeout gets the whole
+// invocation SIGKILLed by AWS before it can return a response, which the
+// caller sees as a raw "Service Unavailable" transport error rather than the
+// clean { status: "in_progress", hint } snapshot below (LS-8429). 20s leaves
+// headroom under the 30s hard limit for the credential-fetch/auth work that
+// runs before this function is even invoked. Longer waits are re-armed by
+// the caller re-invoking this tool.
+const MAX_WAIT_SECONDS = 20;
 const POLL_INTERVAL_MS = 5000;
 
 interface WaitRunParams {

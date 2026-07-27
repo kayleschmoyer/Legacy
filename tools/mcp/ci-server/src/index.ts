@@ -498,7 +498,7 @@ export function createServer(): McpServer {
   server.tool(
     'ci_dispatch_workflow',
     'Trigger a GitHub Actions workflow_dispatch event. Accepts workflow file name (e.g. "deploy.yml") or numeric ID, plus optional ref and input parameters. ' +
-      'Set waitForCompletion: true to wait for the run (bounded at ~55s per call to stay under the MCP transport timeout): fast runs return the final conclusion in one call; ' +
+      "Set waitForCompletion: true to wait for the run (bounded at ~20s per call to stay under this Lambda-hosted server's own 30s execution timeout): fast runs return the final conclusion in one call; " +
       'longer runs return { status: "in_progress", runId } — continue with ci_wait_run({ runId }), never by re-dispatching. ' +
       'This is the MCP-native alternative to `gh run watch` for non-PR dispatched runs — avoids the shell fallback and session-resume watcher-death problem. ' +
       'When waitForCompletion is false (default), the tool returns immediately and the agent must use ci_list_runs then ci_view_run to track the run. ' +
@@ -534,7 +534,7 @@ export function createServer(): McpServer {
       waitForCompletion: coercedBoolean
         .default(false)
         .describe(
-          'When true, polls the triggered run for up to ~55s and returns ' +
+          'When true, polls the triggered run for up to ~20s and returns ' +
             '{ status: "completed", conclusion, ... } if it finishes, or ' +
             '{ status: "in_progress", runId, hint } if not — continue waiting with ci_wait_run({ runId }). ' +
             'Use this instead of `gh run watch` for non-PR workflow_dispatch runs. Default: false.',
@@ -546,8 +546,9 @@ export function createServer(): McpServer {
         .max(3600)
         .default(600)
         .describe(
-          'Deprecated — the per-call wait is always clamped to ~55s (the MCP transport ' +
-            'deadline). Kept for backward compatibility; longer waits are re-armed via ci_wait_run.',
+          'Deprecated — the per-call wait is always clamped to ~20s (this Lambda-hosted ' +
+            "server's own execution timeout, not the MCP transport deadline). Kept for " +
+            'backward compatibility; longer waits are re-armed via ci_wait_run.',
         ),
     },
     async (params) => dispatchWorkflow(params),
@@ -555,20 +556,21 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_wait_run',
-    'Wait for a workflow run to complete, bounded at 55s per call (stays under the MCP ' +
-      'transport timeout). Returns { status: "completed", conclusion } when the run finishes, ' +
-      'or a { status: "in_progress", hint } snapshot (never an error) if it has not — ' +
-      're-invoke to continue waiting. Use after ci_dispatch_workflow returns in_progress, ' +
-      'or after a session resume to re-attach to a run without re-dispatching.',
+    'Wait for a workflow run to complete, bounded at 20s per call (stays under this ' +
+      'Lambda-hosted server\'s own 30s execution timeout). Returns { status: "completed", ' +
+      'conclusion } when the run finishes, or a { status: "in_progress", hint } snapshot ' +
+      '(never an error) if it has not — re-invoke to continue waiting. Use after ' +
+      'ci_dispatch_workflow returns in_progress, or after a session resume to re-attach to a ' +
+      'run without re-dispatching.',
     {
       runId: z.coerce.number().int().positive().describe('Run ID'),
       maxWaitSeconds: z.coerce
         .number()
         .int()
         .positive()
-        .max(55)
+        .max(20)
         .optional()
-        .describe('Max wait per call in seconds (default and cap: 55)'),
+        .describe('Max wait per call in seconds (default and cap: 20)'),
     },
     async (params) => waitRun(params),
   );

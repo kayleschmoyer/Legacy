@@ -2,12 +2,24 @@ import { githubGet, githubPost } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 import { waitRunHint } from './wait-run.js';
 
-// Hard per-call ceiling: cloud sessions kill any MCP call at ~60s (transport
-// timeout), losing the result. No single call may block longer than this —
-// longer waits are re-armed by the caller via ci_wait_run.
-const TRANSPORT_SAFE_WAIT_MS = 55_000;
+// Hard per-call ceiling. This server runs on a Lambda whose configured
+// timeout is 30s (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout,
+// terraform/main/variables.tf), which is the real constraint — NOT the
+// client-side ~60s MCP transport timeout a prior version of this constant
+// assumed. A wait longer than the Lambda's own timeout gets the whole
+// invocation SIGKILLed by AWS before it can return a response, which the
+// caller sees as a raw "Service Unavailable" transport error instead of a
+// clean { status: "in_progress", hint } snapshot (LS-8429). 20s leaves
+// headroom under the 30s hard limit for the credential-fetch/auth work that
+// runs before this function is even invoked. Longer waits are re-armed by
+// the caller via ci_wait_run.
+const TRANSPORT_SAFE_WAIT_MS = 20_000;
 const FIND_RUN_POLL_INTERVAL_MS = 3000;
-const FIND_RUN_MAX_ATTEMPTS = 10;
+// Worst case (attempts - 1) * FIND_RUN_POLL_INTERVAL_MS must stay well under
+// TRANSPORT_SAFE_WAIT_MS — findNewRun runs BEFORE pollUntilComplete and isn't
+// itself deadline-aware, so an unbounded attempt count here could exhaust the
+// Lambda's timeout on its own before ever reaching the completion poll.
+const FIND_RUN_MAX_ATTEMPTS = 4;
 const COMPLETION_POLL_INTERVAL_MS = 5000;
 
 interface GitHubWorkflowRun {
@@ -193,8 +205,7 @@ export async function dispatchWorkflow(
                 workflow,
                 ref,
                 dispatched: true,
-                error:
-                  'Could not locate the triggered run within 30 seconds. The dispatch succeeded — use ci_list_runs to find it and ci_view_run to track its status.',
+                error: `Could not locate the triggered run within ${Math.round(((FIND_RUN_MAX_ATTEMPTS - 1) * FIND_RUN_POLL_INTERVAL_MS) / 1000)} seconds. The dispatch succeeded — use ci_list_runs to find it and ci_view_run to track its status.`,
               },
               null,
               2,
