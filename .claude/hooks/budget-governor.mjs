@@ -15,13 +15,16 @@
  *   count >= HARD               non-checkpoint tools are BLOCKED (exit 2); the
  *                               agent is directed to checkpoint: commit, push,
  *                               update the PR/tasks, and summarise state.
- *                               Checkpoint-safe tools (git commit/push, worktree_*,
- *                               github_*, jira_*, Task*, Skill, AskUserQuestion)
- *                               stay allowed so wrapping up is always possible.
+ *                               Checkpoint-safe tools (git commit/push/status/
+ *                               diff/log/rev-parse, git rebase|merge --abort,
+ *                               worktree_*, github_*, jira_*, Atlassian MCP
+ *                               tools, Task*, Skill, AskUserQuestion) stay
+ *                               allowed so wrapping up — or safely bailing out
+ *                               of a stuck rebase/merge — is always possible.
  *
  * Loop safety: after MAX_BLOCKS blocked calls the governor disarms itself for
  * the rest of the session (advisory only) — an agent is never trapped.
- * Bash bypass marker: `# budget-ok: <reason>`.
+ * Bash bypass marker: `# budget-ok: <reason>` anywhere in the command.
  *
  * Config (env): LS_BUDGET_SOFT_CALLS (default 250), LS_BUDGET_HARD_CALLS
  * (default 500), LS_BUDGET_WARN_EVERY (default 50). Set LS_BUDGET_HARD_CALLS=0
@@ -70,19 +73,25 @@ const elapsedMin = Math.round((Date.now() - state.firstTs) / 60000);
 /** Tools that must stay available so the agent can always checkpoint and stop. */
 function isCheckpointSafe() {
   if (
-    /^(mcp__legacy-sports-github__|mcp__worktree__|mcp__legacy-sports-jira__|TaskUpdate$|TaskCreate$|TaskGet$|TaskList$|Skill$|AskUserQuestion$|ExitPlanMode$)/.test(
+    /^(mcp__legacy-sports-github__|mcp__worktree__|mcp__legacy-sports-jira__|mcp__Atlassian__|TaskUpdate$|TaskCreate$|TaskGet$|TaskList$|Skill$|AskUserQuestion$|ExitPlanMode$)/.test(
       tool,
     )
   ) {
     return true;
   }
   if (tool === 'Bash') {
-    const firstLine = String(input.tool_input?.command ?? '').split('\n')[0];
+    const command = String(input.tool_input?.command ?? '');
+    const firstLine = command.split('\n')[0];
     if (
-      /^\s*git\s+(add|commit|push|status|diff|log|rev-parse)\b/.test(firstLine)
+      /^\s*git\s+(add|commit|push|status|diff|log|rev-parse)\b/.test(
+        firstLine,
+      ) ||
+      /^\s*git\s+(rebase|merge)\s+--abort\b/.test(firstLine)
     )
       return true;
-    if (/(^|[\s])#\s*budget-ok/.test(firstLine)) return true;
+    // Scan the whole command (not just the first line) so a marker on a
+    // trailing comment line still disarms the block for this call.
+    if (/(^|[\s])#\s*budget-ok\b/.test(command)) return true;
   }
   return false;
 }
@@ -96,15 +105,17 @@ if (HARD > 0 && state.count >= HARD && !state.disarmed && !isCheckpointSafe()) {
     state.disarmed = true;
     stdout =
       `[BUDGET DISARMED] Hard budget enforcement bypassed after ${MAX_BLOCKS} blocked calls. ` +
+      `This ${tool} call is what disarmed it. ` +
       `Continuing advisory-only — but this session (${state.count} calls, ~${elapsedMin} min) needs human review.\n`;
   } else {
     stdout =
       `[BUDGET EXCEEDED] ${state.count} tool calls — past the hard budget of ${HARD}.\n\n` +
       `This tool call is blocked. Checkpoint NOW instead of continuing:\n` +
-      `  1. Commit and push whatever is complete (git commit/push and worktree_*/github_* tools remain allowed).\n` +
+      `  1. Commit and push whatever is complete (git commit/push/status/diff/log/rev-parse, ` +
+      `git rebase/merge --abort, and worktree_*/github_*/jira_*/Atlassian MCP tools remain allowed).\n` +
       `  2. Update the PR and tracking tasks with honest state — done, remaining, blocked.\n` +
       `  3. Summarise where you are and stop; do not open new lines of work.\n\n` +
-      `If ONE specific call is essential to checkpointing, Bash commands may carry \`# budget-ok: <reason>\`.\n` +
+      `If ONE specific Bash call is essential to checkpointing, add \`# budget-ok: <reason>\` anywhere in the command.\n` +
       `(Block ${state.blocks} of ${MAX_BLOCKS} — after that the governor disarms and flags the session for review.)\n`;
     exitCode = 2;
   }
