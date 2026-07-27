@@ -45,6 +45,20 @@ export class StandingsPage extends BaseScreen {
     return this.driver.byText(value);
   }
 
+  /** The full table row for a team, scoped by its display name. */
+  row(teamName: string): UIElement {
+    return this.driver.byRole('row').filterByText(teamName);
+  }
+
+  /**
+   * The "You" tag on the current user's team row (unique — at most one row is
+   * tagged). Scoped to a table cell so it doesn't collide with unrelated "You"
+   * text elsewhere on the page (e.g. the mobile bottom nav's "You" profile link).
+   */
+  youTag(): UIElement {
+    return this.driver.byRole('cell').filterByText('You');
+  }
+
   // ── Assertions ───────────────────────────────────────────────────
 
   /** Assert the page did not crash into the global error boundary. */

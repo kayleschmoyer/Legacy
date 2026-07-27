@@ -278,3 +278,19 @@ export const CurrentUserLongTeamName: Story = {
     currentUserTeamId: 2,
   },
 };
+
+/**
+ * A team name long enough to wrap to two lines (narrow the Storybook
+ * viewport to reproduce) — the "You" tag must stay clear of the W/L columns
+ * when this happens (LS-8659).
+ */
+export const CurrentUserWrappingTeamName: Story = {
+  args: {
+    standings: mockStandings.map((s) =>
+      s.teamId === '2'
+        ? { ...s, teamName: 'Diamond Dynasty Wildcats of Doom' }
+        : s,
+    ),
+    currentUserTeamId: 2,
+  },
+};

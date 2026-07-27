@@ -245,6 +245,24 @@ describe('StandingsTable', () => {
     expect(youChips.length).toBe(1);
   });
 
+  it('renders the full team name (wrap, not ellipsis-truncate) alongside the "You" chip for long names', () => {
+    const longName = 'Diamond Dynasty Wildcats of Doom';
+    const { getByText, getAllByText } = render(
+      <StandingsTable
+        standings={[
+          ...mockStandings,
+          makeTeam({ teamId: '4', teamName: longName }),
+        ]}
+        currentUserTeamId={4}
+      />,
+    );
+    // The full name renders (numberOfLines allows wrapping to two lines
+    // instead of collapsing to an ellipsis), and the "You" chip still shows
+    // exactly once alongside it — LS-8659.
+    expect(getByText(longName)).toBeTruthy();
+    expect(getAllByText('You').length).toBe(1);
+  });
+
   it('does not show "You" chip when currentUserTeamId is null', () => {
     const { queryByText } = render(
       <StandingsTable standings={mockStandings} currentUserTeamId={null} />,

@@ -226,7 +226,7 @@ function StandingsRow({
               : {})}
             flex={1}
             minWidth={0}
-            numberOfLines={1}
+            numberOfLines={2}
             fontSize="$3"
             fontWeight="600"
             color={isCurrentUser ? BRAND_GOLD_LIGHT : undefined}
@@ -251,12 +251,24 @@ function StandingsRow({
           {hovered && pressable ? <Eye size={14} color="$gray10" /> : null}
         </XStack>
       </YStack>
-      <YStack tag="td" role="cell" width={44} alignItems="center">
+      <YStack
+        tag="td"
+        role="cell"
+        width={44}
+        alignItems="center"
+        justifyContent="center"
+      >
         <Text fontSize="$3" color="$green10" fontWeight="bold">
           {standing.wins ?? 0}
         </Text>
       </YStack>
-      <YStack tag="td" role="cell" width={44} alignItems="center">
+      <YStack
+        tag="td"
+        role="cell"
+        width={44}
+        alignItems="center"
+        justifyContent="center"
+      >
         <Text fontSize="$3" color="$red10" fontWeight="bold">
           {standing.losses ?? 0}
         </Text>
@@ -266,6 +278,7 @@ function StandingsRow({
         role="cell"
         width={44}
         alignItems="center"
+        justifyContent="center"
         display="none"
         $gtSm={{ display: 'flex' }}
       >
@@ -276,6 +289,7 @@ function StandingsRow({
         role="cell"
         width={60}
         alignItems="center"
+        justifyContent="center"
         display="none"
         $gtSm={{ display: 'flex' }}
       >
@@ -288,6 +302,7 @@ function StandingsRow({
         role="cell"
         width={80}
         alignItems="center"
+        justifyContent="center"
         display="none"
         $gtMd={{ display: 'flex' }}
       >
@@ -298,6 +313,7 @@ function StandingsRow({
         role="cell"
         width={80}
         alignItems="center"
+        justifyContent="center"
         display="none"
         $gtMd={{ display: 'flex' }}
       >
@@ -308,6 +324,7 @@ function StandingsRow({
         role="cell"
         width={70}
         alignItems="center"
+        justifyContent="center"
         display="none"
         $gtMd={{ display: 'flex' }}
       >
@@ -321,6 +338,7 @@ function StandingsRow({
           role="cell"
           width={60}
           alignItems="center"
+          justifyContent="center"
           display="none"
           $gtMd={{ display: 'flex' }}
         >
