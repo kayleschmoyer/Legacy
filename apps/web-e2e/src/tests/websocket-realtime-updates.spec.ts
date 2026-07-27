@@ -383,7 +383,13 @@ test.describe('WebSocket – notification resilience @regression', () => {
     );
 
     // Page should remain functional
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
   });
 
   test('page handles malformed WebSocket message gracefully', async ({
@@ -401,7 +407,13 @@ test.describe('WebSocket – notification resilience @regression', () => {
     route.send('this is not valid JSON {{{');
 
     // Page should remain functional
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
   });
 
   test('page handles empty notification data gracefully', async ({ page }) => {
@@ -417,7 +429,13 @@ test.describe('WebSocket – notification resilience @regression', () => {
     route.send(JSON.stringify({ type: 'notification', data: {} }));
 
     // Page should remain functional
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
   });
 });
 
@@ -498,7 +516,13 @@ test.describe('WebSocket – multiple notifications @regression', () => {
     await refetchPromise;
 
     // Page should still be functional
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
@@ -536,7 +560,13 @@ test.describe('WebSocket – multiple notifications @regression', () => {
     );
 
     // Page should remain stable after processing presence events
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
@@ -592,7 +622,13 @@ test.describe('WebSocket – draft status transition @regression', () => {
     await page.waitForLoadState('load');
 
     // Verify league page loaded
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
 
     const route = await ws.waitForConnection();
 
@@ -654,7 +690,13 @@ test.describe('WebSocket – trade/waiver notifications @regression', () => {
       }),
     );
 
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
@@ -680,7 +722,13 @@ test.describe('WebSocket – trade/waiver notifications @regression', () => {
       }),
     );
 
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
@@ -717,7 +765,13 @@ test.describe('WebSocket – chat message notification @regression', () => {
     );
 
     // Page should remain stable
-    await expect(page.getByText('WebSocket Test League').first()).toBeVisible();
+    // Filter to the visible occurrence — the chip renders in both the
+    // desktop-nav and mobile-header slots, and `.first()` deterministically
+    // resolves to the desktop slot, hidden at the Mobile Chrome viewport
+    // (LS-8501, LS-8595).
+    await expect(
+      page.getByText('WebSocket Test League').filter({ visible: true }).first(),
+    ).toBeVisible();
     await expect(page.locator('body')).not.toContainText(
       'Unexpected Application Error',
     );
