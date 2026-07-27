@@ -105,6 +105,34 @@ describe('fetchWithRetry (githubGetArrayBuffer retry logic)', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
+  it('retries on 410 and succeeds once the log archive becomes available (LS-8435)', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(410, '{"message":"Server Error"}'))
+      .mockResolvedValueOnce(makeResponse(200));
+
+    const resultPromise = fetchWithRetry(FAKE_URL, FAKE_OPTS, noopLog, 'test');
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result).toBeInstanceOf(ArrayBuffer);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws after MAX_ATTEMPTS exhausted on a persistent 410, message includes attempt count', async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse(410, '{"message":"Server Error"}'),
+    );
+
+    const assertion = expect(
+      fetchWithRetry(FAKE_URL, FAKE_OPTS, noopLog, 'test'),
+    ).rejects.toThrow(/GitHub API 410.*attempt 3\/3/);
+
+    await jest.runAllTimersAsync();
+    await assertion;
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
   it('throws after MAX_ATTEMPTS exhausted, message includes attempt count', async () => {
     mockFetch.mockResolvedValue(makeResponse(502, 'bad gateway'));
 

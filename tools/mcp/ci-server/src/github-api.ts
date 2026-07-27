@@ -442,7 +442,9 @@ export async function githubGetText(path: string): Promise<string> {
  * Make a GET request to the GitHub REST API, returning the response as an ArrayBuffer.
  * Used for binary endpoints like Actions log downloads that return ZIP archives.
  * Follows redirects automatically (e.g., 302 from job log endpoints).
- * Retries up to 3 times with exponential backoff on transient 5xx gateway errors (502/503/504).
+ * Retries up to 3 times with exponential backoff on transient 5xx gateway
+ * errors (502/503/504) and on 410 (a job-log archive not yet available for
+ * download moments after the job completed, LS-8435).
  */
 export async function githubGetArrayBuffer(
   path: string,
