@@ -188,6 +188,19 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     // page navigates to the new league.
     await leaguePage.continueToLeague();
 
+    // LS-8474: this is the one test in the file whose setup changes
+    // schedulingStrategy away from its 'divisional' default, which unmounts
+    // the "Advanced Scheduling" PremiumGate section a few steps earlier —
+    // the extra teardown work is the only structural difference from the
+    // sibling roster-size/player-pool tests below, which never fail here.
+    // The mutation itself is fully mocked (no server round-trip), so the
+    // SPA route change is otherwise near-instant; under CI's 4-worker
+    // parallel load this occasionally lands just past the suite-wide 3s
+    // `expect.timeout`, while it always passes in isolation locally.
+    // Wait for the navigation explicitly with a more generous budget rather
+    // than loosening the global timeout for the rest of the suite; the
+    // assertion below still pins the exact destination.
+    await page.waitForURL(/\/baseball\/league\/\d+/, { timeout: 15000 });
     await expect(page).toHaveURL(/\/baseball\/league\/\d+/);
   });
 
