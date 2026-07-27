@@ -149,6 +149,7 @@ ticket (documentation-only) — see Open Questions on the parent spec.
 ## Related
 
 - **Epic:** LS-5260 — QA coverage for `baseball-matchup-detail`
+- **Originating gap ticket:** LS-8468 (GAP-001)
 - **Implementation ref:** `docs/agents/pages/baseball/league/detail/matchups/detail.md`
 - **Sibling:** `win-probability-panel/feature.md` — same page, same gating
   pattern (`PremiumGate` + `useHasEntitlement`), but implemented per-platform
