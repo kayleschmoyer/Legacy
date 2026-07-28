@@ -226,7 +226,7 @@ export class LiveTestData implements TestData {
   }
 
   comparablePlayer(): Promise<SeededPlayerPool> {
-    // Precedent live search target (player-search-stats-ui Phase 4, LS-754).
+    // Precedent live search target (player-compare-search.dual.spec.ts, LS-754).
     return Promise.resolve({ fullName: 'Barry Bonds', searchTerm: 'Bonds' });
   }
 }
