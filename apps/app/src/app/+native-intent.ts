@@ -15,6 +15,11 @@ import { LOGGER } from '@legacy-sports/logging';
  * the league page reads `initialTab` from query params instead, so we rewrite
  * to the flat league route with `initialTab=trades`.
  *
+ * Stripe return links (`legacysports://subscription/success|cancel|
+ * portal-return`, set by `SubscriptionSettingsScreen`) have no matching file
+ * route — the subscription screen lives at `/subscription-settings` — so they
+ * are rewritten to that route with a `checkout` query param.
+ *
  * `redirectSystemPath` runs for every inbound deep link — both the custom
  * scheme (`legacysports://...`) and universal/app links
  * (`https://legacy-fantasy.com/...`, declared in `app.json`). All other paths
@@ -53,6 +58,31 @@ export function redirectSystemPath({
         ? `${existingQuery}&initialTab=trades`
         : 'initialTab=trades';
       return `${base}?${query}`;
+    }
+
+    // Match the Stripe checkout / billing-portal return links.
+    //
+    // On native, `redirectSystemPath` receives the raw URL rather than a path,
+    // so for `legacysports://subscription/success` the `subscription` segment
+    // is the URL *host* and there is no leading slash to anchor on — hence
+    // `(?:^|\/)` rather than `^\/`. Expo Router resolves that URL to the route
+    // path `subscription/success`, which matches no file route, so before this
+    // rewrite every buyer returning from Stripe landed on the unmatched-route
+    // screen instead of their subscription settings.
+    const checkoutReturnMatch = pathname.match(
+      /(?:^|\/)subscription\/(success|cancel|portal-return)\/?$/,
+    );
+    if (checkoutReturnMatch) {
+      // `cancel` is normalized to `canceled` to match the web query param
+      // (`apps/web` SubscriptionPage `?checkout=canceled`).
+      const status =
+        checkoutReturnMatch[1] === 'cancel'
+          ? 'canceled'
+          : checkoutReturnMatch[1];
+      const query = existingQuery
+        ? `${existingQuery}&checkout=${status}`
+        : `checkout=${status}`;
+      return `/subscription-settings?${query}`;
     }
 
     // Match `/trade-center` deep links — passes leagueId and tradeOfferId

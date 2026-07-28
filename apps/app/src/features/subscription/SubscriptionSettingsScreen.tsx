@@ -9,6 +9,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { useLocalSearchParams } from 'expo-router';
 import { useStepUpGate } from '@legacy-sports/shared-components/auth';
 import { brand } from '@legacy-sports/design-tokens';
 import {
@@ -16,7 +17,12 @@ import {
   useCheckoutSession,
   useSubscription,
 } from './useSubscription';
-import { BillingCycle, PREMIUM_FEATURES } from './constants';
+import {
+  ACTIVATION_MAX_POLLS,
+  ACTIVATION_POLL_INTERVAL_MS,
+  BillingCycle,
+  PREMIUM_FEATURES,
+} from './constants';
 import { useStripePrices } from './useStripePrices';
 import { useIAP } from './useIAP';
 import { StepUpModal } from './StepUpModal';
@@ -159,6 +165,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
     isPremium,
     tier,
     loading: subLoading,
+    refetch,
   } = useSubscription();
   const [createCheckoutSession, { loading: checkoutLoading }] =
     useCheckoutSession();
@@ -188,6 +195,55 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
   const restoreInitiated = useRef(false);
 
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
+
+  // `checkout` is set by the `+native-intent` rewrite of the Stripe return deep
+  // links (`legacysports://subscription/success|cancel|portal-return`).
+  const { checkout } = useLocalSearchParams<{ checkout?: string }>();
+
+  // Post-checkout activation window: the Stripe webhook that flips the tier to
+  // premium lands seconds after the redirect, so poll instead of rendering the
+  // stale "Free" plan the first query returns.
+  const [activating, setActivating] = useState(false);
+  const [pollAttempt, setPollAttempt] = useState(0);
+  // The param survives re-renders, so guard against restarting the window (or
+  // re-refetching) every time this screen re-renders.
+  const checkoutHandled = useRef(false);
+
+  useEffect(() => {
+    if (checkoutHandled.current) return;
+    if (checkout === 'success') {
+      checkoutHandled.current = true;
+      setActivating(true);
+      setPollAttempt(0);
+      void refetch();
+    } else if (checkout === 'portal-return') {
+      // Returning from the billing portal: the plan may have changed there, so
+      // refetch once. No activation window — nothing is pending server-side.
+      checkoutHandled.current = true;
+      void refetch();
+    }
+  }, [checkout, refetch]);
+
+  useEffect(() => {
+    if (!activating) return;
+    // The webhook landed — close the window and show the premium plan.
+    if (isPremium) {
+      setActivating(false);
+      return;
+    }
+    // Retry budget exhausted: stop polling and fall back to the normal view
+    // rather than spinning forever.
+    if (pollAttempt >= ACTIVATION_MAX_POLLS) {
+      setActivating(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void refetch();
+      // Bumping the attempt re-runs this effect, which schedules the next poll.
+      setPollAttempt((attempt) => attempt + 1);
+    }, ACTIVATION_POLL_INTERVAL_MS);
+    return () => clearTimeout(timer);
+  }, [activating, isPremium, pollAttempt, refetch]);
 
   useEffect(() => {
     if (restoreSubscribed && restoreInitiated.current) {
@@ -412,7 +468,7 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
             <YStack padding="$5" gap="$4">
               <XStack alignItems="center" justifyContent="space-between">
                 <Text fontSize="$5" fontWeight="700" color={brand.goldLight}>
-                  {tierLabel(tier)}
+                  {activating ? 'Activating…' : tierLabel(tier)}
                 </Text>
                 {subscription?.status ? (
                   <XStack
@@ -497,6 +553,24 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
                 </XStack>
               ) : null}
 
+              {activating ? (
+                <XStack
+                  alignItems="flex-start"
+                  gap="$3"
+                  padding="$3"
+                  borderRadius="$4"
+                  borderWidth={1}
+                  borderColor={`${brand.gold}44`}
+                  backgroundColor={`${brand.gold}1A`}
+                >
+                  <Text fontSize={14}>⏳</Text>
+                  <Paragraph size="$3" color={brand.gold} flex={1}>
+                    Payment received. Activating your Premium membership — this
+                    usually takes a few seconds.
+                  </Paragraph>
+                </XStack>
+              ) : null}
+
               {/* Action buttons */}
               {isPremium ? (
                 <Button
@@ -511,8 +585,9 @@ export default function SubscriptionSettingsScreen(): React.JSX.Element {
             </YStack>
           </YStack>
 
-          {/* Upgrade Section (free users only) */}
-          {!isPremium ? (
+          {/* Upgrade Section (free users only) — hidden during the activation
+              window so a buyer who just paid is not prompted to pay again. */}
+          {!isPremium && !activating ? (
             <YStack
               borderRadius="$6"
               borderWidth={1}

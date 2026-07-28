@@ -152,6 +152,69 @@ describe('redirectSystemPath', () => {
     ).toBe('/trade-center-history');
   });
 
+  // On native, `redirectSystemPath` receives the raw deep-link URL, so the
+  // Stripe return links arrive as `legacysports://subscription/<status>` with
+  // `subscription` as the URL host. Expo Router resolves that to the route path
+  // `subscription/success`, which matches no file route — the unmatched-route
+  // screen the buyer used to land on after paying.
+  it('rewrites the raw scheme checkout success URL to subscription settings', () => {
+    expect(
+      redirectSystemPath({
+        path: 'legacysports://subscription/success',
+        initial: true,
+      }),
+    ).toBe('/subscription-settings?checkout=success');
+  });
+
+  it('normalizes the cancel return to checkout=canceled, matching web', () => {
+    expect(
+      redirectSystemPath({
+        path: 'legacysports://subscription/cancel',
+        initial: false,
+      }),
+    ).toBe('/subscription-settings?checkout=canceled');
+  });
+
+  it('rewrites the billing portal return URL', () => {
+    expect(
+      redirectSystemPath({
+        path: 'legacysports://subscription/portal-return',
+        initial: false,
+      }),
+    ).toBe('/subscription-settings?checkout=portal-return');
+  });
+
+  it('rewrites the path form of the checkout return, with a trailing slash', () => {
+    expect(
+      redirectSystemPath({ path: '/subscription/success/', initial: true }),
+    ).toBe('/subscription-settings?checkout=success');
+  });
+
+  it('preserves existing query params on a checkout return', () => {
+    expect(
+      redirectSystemPath({
+        path: 'legacysports://subscription/success?session_id=cs_test_123',
+        initial: true,
+      }),
+    ).toBe('/subscription-settings?session_id=cs_test_123&checkout=success');
+  });
+
+  it('passes through unrelated subscription paths unchanged', () => {
+    expect(
+      redirectSystemPath({ path: '/subscription-settings', initial: true }),
+    ).toBe('/subscription-settings');
+    expect(
+      redirectSystemPath({ path: '/subscription/unknown', initial: true }),
+    ).toBe('/subscription/unknown');
+    // The segment must be exactly `subscription`, not merely end with it.
+    expect(
+      redirectSystemPath({
+        path: '/legacy-subscription/success',
+        initial: true,
+      }),
+    ).toBe('/legacy-subscription/success');
+  });
+
   it('returns the original path and logs when rewriting throws', () => {
     // A malformed percent-encoding makes decodeURIComponent throw, exercising
     // the try/catch fallback: the original path is returned and the error logged.

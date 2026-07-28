@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -10,6 +11,7 @@ import type { Text as RNText, View as RNView } from 'react-native';
 
 // ── Component under test ─────────────────────────────────────────────────────
 import SubscriptionSettingsScreen from './SubscriptionSettingsScreen';
+import { ACTIVATION_MAX_POLLS, ACTIVATION_POLL_INTERVAL_MS } from './constants';
 
 // ── Mock type helpers ────────────────────────────────────────────────────────
 type RNComponents = {
@@ -18,6 +20,11 @@ type RNComponents = {
 };
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
+
+let mockSearchParams: { checkout?: string } = {};
+jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => mockSearchParams,
+}));
 
 const mockRequireStepUp = jest.fn();
 const mockOnStepUpVerified = jest.fn();
@@ -136,14 +143,20 @@ jest.mock('./useIAP', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const mockRefetch = jest.fn();
+
 function resetMocks() {
+  mockSearchParams = {};
   mockIsStepUpPrompting = false;
   mockRequireStepUp.mockReset();
+  mockRefetch.mockReset();
+  mockRefetch.mockResolvedValue(undefined);
   mockUseSubscription.mockReturnValue({
     subscription: null,
     isPremium: true,
     tier: 'monthly',
     loading: false,
+    refetch: mockRefetch,
   });
   mockUseCheckoutSession.mockReturnValue([jest.fn(), { loading: false }]);
   mockUseBillingPortalSession.mockReturnValue([jest.fn(), { loading: false }]);
@@ -240,6 +253,7 @@ describe('SubscriptionSettingsScreen — plan tier label (LS-5199)', () => {
       isPremium: true,
       tier: 'premium',
       loading: false,
+      refetch: mockRefetch,
     });
 
     render(<SubscriptionSettingsScreen />);
@@ -256,6 +270,7 @@ describe('SubscriptionSettingsScreen — plan tier label (LS-5199)', () => {
       isPremium: false,
       tier: 'free',
       loading: false,
+      refetch: mockRefetch,
     });
 
     render(<SubscriptionSettingsScreen />);
@@ -279,6 +294,7 @@ describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
       isPremium: false,
       tier: 'free',
       loading: false,
+      refetch: mockRefetch,
     });
     const mockCreateCheckout = jest.fn();
     mockUseCheckoutSession.mockReturnValue([
@@ -323,5 +339,123 @@ describe('SubscriptionSettingsScreen — step-up gate (LS-5029)', () => {
     render(<SubscriptionSettingsScreen />);
 
     expect(screen.queryByTestId('step-up-modal')).toBeNull();
+  });
+});
+
+// The Stripe return deep link (`legacysports://subscription/success`) is
+// rewritten by `+native-intent` to `/subscription-settings?checkout=success`.
+// This screen owns what happens after that landing.
+describe('SubscriptionSettingsScreen — Stripe checkout return', () => {
+  const FREE_SUBSCRIPTION = {
+    subscription: null,
+    isPremium: false,
+    tier: 'free',
+    loading: false,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetMocks();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('shows the activation state and refetches on a successful checkout return', () => {
+    mockUseSubscription.mockReturnValue({
+      ...FREE_SUBSCRIPTION,
+      refetch: mockRefetch,
+    });
+    mockSearchParams = { checkout: 'success' };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Activating your Premium membership/)).toBeTruthy();
+    expect(screen.getByText('Activating…')).toBeTruthy();
+    // A buyer who just paid must not be shown the upgrade CTA again while the
+    // webhook is still in flight.
+    expect(screen.queryByText(/^Upgrade —/)).toBeNull();
+  });
+
+  it('keeps polling until the webhook flips the tier, then stops', () => {
+    jest.useFakeTimers();
+    mockUseSubscription.mockReturnValue({
+      ...FREE_SUBSCRIPTION,
+      refetch: mockRefetch,
+    });
+    mockSearchParams = { checkout: 'success' };
+
+    const { rerender } = render(<SubscriptionSettingsScreen />);
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+
+    void act(() => {
+      jest.advanceTimersByTime(ACTIVATION_POLL_INTERVAL_MS);
+    });
+    expect(mockRefetch).toHaveBeenCalledTimes(2);
+
+    // The webhook lands: the query now reports premium.
+    mockUseSubscription.mockReturnValue({
+      subscription: { status: 'active' },
+      isPremium: true,
+      tier: 'premium',
+      loading: false,
+      refetch: mockRefetch,
+    });
+    rerender(<SubscriptionSettingsScreen />);
+
+    expect(screen.queryByText(/Activating your Premium membership/)).toBeNull();
+
+    void act(() => {
+      jest.advanceTimersByTime(ACTIVATION_POLL_INTERVAL_MS * 5);
+    });
+    expect(mockRefetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after the retry budget rather than polling forever', () => {
+    jest.useFakeTimers();
+    mockUseSubscription.mockReturnValue({
+      ...FREE_SUBSCRIPTION,
+      refetch: mockRefetch,
+    });
+    mockSearchParams = { checkout: 'success' };
+
+    render(<SubscriptionSettingsScreen />);
+
+    for (let i = 0; i < ACTIVATION_MAX_POLLS + 2; i++) {
+      void act(() => {
+        jest.advanceTimersByTime(ACTIVATION_POLL_INTERVAL_MS);
+      });
+    }
+
+    // One immediate refetch on landing plus the full retry budget, no more.
+    expect(mockRefetch).toHaveBeenCalledTimes(ACTIVATION_MAX_POLLS + 1);
+    expect(screen.queryByText(/Activating your Premium membership/)).toBeNull();
+    // Falls back to the normal free-tier view so the user can retry.
+    expect(screen.getByText(/^Upgrade —/)).toBeTruthy();
+  });
+
+  it('refetches once on a billing portal return without an activation window', () => {
+    mockSearchParams = { checkout: 'portal-return' };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/Activating your Premium membership/)).toBeNull();
+  });
+
+  it('does nothing on a canceled checkout beyond landing on the screen', () => {
+    mockUseSubscription.mockReturnValue({
+      ...FREE_SUBSCRIPTION,
+      refetch: mockRefetch,
+    });
+    mockSearchParams = { checkout: 'canceled' };
+
+    render(<SubscriptionSettingsScreen />);
+
+    expect(mockRefetch).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Activating your Premium membership/)).toBeNull();
+    expect(screen.getByText(/^Upgrade —/)).toBeTruthy();
   });
 });
