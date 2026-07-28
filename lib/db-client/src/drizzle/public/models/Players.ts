@@ -26,12 +26,6 @@ export const players = pgTable(
     lastName: text('last_name').notNull(),
     brefId: varchar('bref_id', { length: 10 }).notNull(),
     statsLastFetchedAt: timestamp('stats_last_fetched_at'),
-    // Timestamp injury data was last refreshed from the upstream provider
-    // (LS-6251 / FPD-027). Nullable — NULL means never synced. Drives the
-    // "last updated" freshness badge on the football player detail page.
-    injuriesLastSyncedAt: timestamp('injuries_last_synced_at', {
-      withTimezone: true,
-    }),
     // Career achievement counts — populated by the data loader from bref award_summary
     allStarSelections: integer('all_star_selections').notNull().default(0),
     goldGloves: integer('gold_gloves').notNull().default(0),
@@ -61,10 +55,8 @@ export const players = pgTable(
     position: playerPosition('position'),
     // NFL jersey number for display (LS-6236). Nullable — DST and unmapped players have null.
     jerseyNumber: integer('jersey_number'),
-    // Injury status and news for football players (LS-5436). Populated by the
-    // injury data pipeline; null until a feed is connected.
-    injuryStatus: text('injury_status'),
-    injuryDesignation: text('injury_designation'),
+    // News for football players (LS-5436). Populated by the news pipeline;
+    // null until a feed is connected.
     news: text('news'),
     // Premium advanced-search filter fields for football players (LS-6489 /
     // FPL-008). Populated by a projections/ADP data pipeline; null until a feed

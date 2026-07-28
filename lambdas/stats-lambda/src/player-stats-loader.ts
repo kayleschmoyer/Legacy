@@ -38,7 +38,6 @@ export async function loadPlayerGameStats(
     brefId: string;
     mlbPlayerId: number | null;
     statsLastFetchedAt: Date;
-    injuriesLastSyncedAt: Date | null;
     allStarSelections: number;
     goldGloves: number;
     silverSluggers: number;
@@ -56,8 +55,6 @@ export async function loadPlayerGameStats(
     nflTeam: string | null;
     position: Player['position'];
     jerseyNumber: number | null;
-    injuryStatus: string | null;
-    injuryDesignation: string | null;
     news: string | null;
     projectedFantasyPoints: number | null;
     adpRank: number | null;
@@ -68,7 +65,6 @@ export async function loadPlayerGameStats(
     brefId,
     mlbPlayerId: null,
     statsLastFetchedAt: new Date(),
-    injuriesLastSyncedAt: null,
     allStarSelections: 0,
     goldGloves: 0,
     silverSluggers: 0,
@@ -86,8 +82,6 @@ export async function loadPlayerGameStats(
     nflTeam: null,
     position: null,
     jerseyNumber: null,
-    injuryStatus: null,
-    injuryDesignation: null,
     news: null,
     projectedFantasyPoints: null,
     adpRank: null,

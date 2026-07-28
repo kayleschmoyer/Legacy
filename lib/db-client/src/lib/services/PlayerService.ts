@@ -71,10 +71,7 @@ interface ScoringResultRow {
   nfl_team: string | null;
   position: string | null;
   jersey_number: number | null;
-  injuries_last_synced_at: string | null;
-  // Football injury/news columns (LS-5436)
-  injury_status: string | null;
-  injury_designation: string | null;
+  // Football news column (LS-5436)
   news: string | null;
   // Football premium advanced-search filter columns (LS-6489)
   projected_fantasy_points: number | null;
@@ -612,8 +609,7 @@ export class PlayerService {
             p.hall_of_fame, p.rookie_of_the_year, p.total_games, p.mlb_player_id,
             p.bat_hand, p.throw_hand,
             p.sport, p.pfr_id, p.is_dst, p.nfl_team, p.position, p.jersey_number,
-            p.injuries_last_synced_at,
-            p.injury_status, p.injury_designation, p.news,
+            p.news,
             p.projected_fantasy_points, p.adp_rank,
             ${battingScoreExpr} AS batting_score,
             ${pitchingScoreExpr} AS pitching_score,
@@ -664,11 +660,6 @@ export class PlayerService {
           nflTeam: row.nfl_team ?? null,
           position: toPlayerPosition(row.position),
           jerseyNumber: row.jersey_number ?? null,
-          injuriesLastSyncedAt: row.injuries_last_synced_at
-            ? new Date(row.injuries_last_synced_at)
-            : null,
-          injuryStatus: row.injury_status ?? null,
-          injuryDesignation: row.injury_designation ?? null,
           news: row.news ?? null,
           projectedFantasyPoints: row.projected_fantasy_points ?? null,
           adpRank: row.adp_rank ?? null,
