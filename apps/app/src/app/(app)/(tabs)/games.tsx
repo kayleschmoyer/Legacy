@@ -1,139 +1,152 @@
-import React from 'react';
-import { ScrollView } from 'react-native';
-import { Text, XStack, YStack } from 'tamagui';
+import React, { useEffect, useMemo } from 'react';
 import { useRouter } from 'expo-router';
+import {
+  type GameRoomResumeGame,
+  GameRoomScreen,
+  type MinigameId,
+} from '@legacy-sports/shared-components';
+import {
+  SeasonDraftGameStatus,
+  useGetDisclosureGameBestScoreQuery,
+  useGetSeasonDraftGamesQuery,
+} from '@legacy-sports/graphql';
+import { LOGGER } from '@legacy-sports/logging';
 import { trackMinigameTap } from '../../../utils/analytics';
 
-const BG_DEEP_NAVY = '#0A0F1A';
+/**
+ * The Games tab renders `GameRoomScreen` from `lib/shared-components` — the
+ * "Quick-play Ledger" layout (LS-8800) — wired to mobile's GraphQL data layer
+ * and expo-router navigation. The shared component is presentational, so all
+ * query wiring, analytics and routing live here (the split LS-8795 used for
+ * the Leagues tab).
+ *
+ * Two of the design's stats have no backing query yet — the 20 Questions token
+ * balance (LS-8802) and the "Your Numbers" strip (LS-8803). They pass `null`,
+ * which the shared component renders as `—`, matching the existing hub's
+ * loading convention.
+ */
 
-type GameEntry = {
-  id: string;
-  title: string;
-  tag: string;
-  description: string;
-  route: string;
-  cta: string;
+const ROUTES: Record<MinigameId, string> = {
+  'season-draft': '/season-draft',
+  disclosure: '/disclosure-game',
+  'twenty-questions': '/games/twenty-questions',
 };
 
-const GAMES: GameEntry[] = [
-  {
-    id: 'season-draft',
-    title: 'Season Draft',
-    tag: 'Multiplayer · 2–6 players',
-    description:
-      'Draft hitters or pitchers across eras. Pick the right season, fill your roster, rack up the counting stats.',
-    route: '/season-draft',
-    cta: 'Enter Lobby',
-  },
-  {
-    id: 'disclosure',
-    title: 'Who Am I?',
-    tag: 'Solo · 2–3 min',
-    description:
-      'Clues drop one at a time — birthplace, era, quirks, milestones. Name the player with the fewest clues revealed.',
-    route: '/disclosure-game',
-    cta: 'Play Now',
-  },
-  {
-    id: 'twenty-questions',
-    title: '20 Questions',
-    tag: 'Solo · 3–5 min',
-    description:
-      'Ask up to 20 yes/no questions to identify the mystery player. Fewer questions means more tokens.',
-    route: '/games/twenty-questions',
-    cta: 'Play Now',
-  },
-];
-
-function GameCard({ game }: { game: GameEntry }) {
+export default function GamesTab() {
   const router = useRouter();
 
-  function handlePress() {
-    trackMinigameTap(game.id);
-    router.push(game.route);
+  const {
+    data: sdGamesData,
+    loading: sdLoading,
+    error: sdError,
+  } = useGetSeasonDraftGamesQuery();
+  const {
+    data: bestScoreData,
+    loading: bestScoreLoading,
+    error: bestScoreError,
+  } = useGetDisclosureGameBestScoreQuery();
+
+  // Errors are non-fatal — every stat falls back to '—' — but log them so a
+  // broken query doesn't silently disappear from Rollbar/Discord.
+  useEffect(() => {
+    if (sdError) {
+      LOGGER.error('GamesTab: seasonDraftGames query failed:', sdError);
+    }
+  }, [sdError]);
+  useEffect(() => {
+    if (bestScoreError) {
+      LOGGER.error(
+        'GamesTab: disclosureGameBestScore query failed:',
+        bestScoreError,
+      );
+    }
+  }, [bestScoreError]);
+
+  const games = useMemo(
+    () => sdGamesData?.seasonDraftGames ?? [],
+    [sdGamesData?.seasonDraftGames],
+  );
+
+  // Show '—' while loading or if the query errored; show '0' for a successful
+  // empty result so the user can tell "still loading" from "no games".
+  const activeGamesCount =
+    sdLoading || sdError
+      ? null
+      : games.filter(
+          (g) =>
+            g.status === SeasonDraftGameStatus.Setup ||
+            g.status === SeasonDraftGameStatus.Drafting,
+        ).length;
+
+  const bestScore =
+    bestScoreLoading || bestScoreError
+      ? null
+      : (bestScoreData?.disclosureGameBestScore ?? null);
+
+  // The banner is for the one game actually waiting on the user. A game in
+  // Setup has no turn to take, so only Drafting qualifies.
+  const resumeGame = useMemo<GameRoomResumeGame | null>(() => {
+    const game = games.find(
+      (g) => g.isMyTurn === true && g.status === SeasonDraftGameStatus.Drafting,
+    );
+    if (game === undefined || game.id === null || game.id === undefined) {
+      return null;
+    }
+
+    const playerCount = game.playerCount ?? null;
+    const picksMade = game.picksMade ?? null;
+    const totalPicks = game.totalPicks ?? null;
+
+    // Every manager fills the same number of roster slots, so a round is one
+    // pick per manager. Guard the division: a game with no players or no
+    // slots yields no round line rather than NaN.
+    let round: number | null = null;
+    let totalRounds: number | null = null;
+    if (
+      playerCount !== null &&
+      playerCount > 0 &&
+      picksMade !== null &&
+      totalPicks !== null &&
+      totalPicks > 0
+    ) {
+      totalRounds = Math.ceil(totalPicks / playerCount);
+      round = Math.min(Math.floor(picksMade / playerCount) + 1, totalRounds);
+    }
+
+    return {
+      gameId: game.id,
+      gameName: game.name ?? 'Season Draft',
+      round,
+      totalRounds,
+      playerCount,
+    };
+  }, [games]);
+
+  function handleSelectGame(id: MinigameId) {
+    trackMinigameTap(id);
+    router.push(ROUTES[id]);
+  }
+
+  function handleResumeGame(game: GameRoomResumeGame) {
+    trackMinigameTap('season-draft');
+    router.push({
+      pathname: '/season-draft/[gameId]',
+      params: { gameId: String(game.gameId) },
+    });
   }
 
   return (
-    <YStack
-      onPress={handlePress}
-      backgroundColor="$color2"
-      borderRadius="$4"
-      padding="$4"
-      borderWidth={1}
-      borderColor="$glassBorder"
-      gap="$2"
-      pressStyle={{ opacity: 0.8, borderColor: '$brandGold' }}
-      testID={`games-entry-${game.id}`}
-      accessibilityRole="button"
-      accessibilityLabel={`${game.title} — ${game.tag}`}
-    >
-      <Text
-        fontSize="$2"
-        letterSpacing={1}
-        textTransform="uppercase"
-        color="$textMuted"
-      >
-        {game.tag}
-      </Text>
-      <Text fontSize="$8" fontWeight="800" letterSpacing={-0.5} color="$color">
-        {game.title}
-      </Text>
-      <Text fontSize="$3" lineHeight="$5" color="$textMuted">
-        {game.description}
-      </Text>
-      <XStack marginTop="$2">
-        <Text
-          fontSize="$2"
-          letterSpacing={1}
-          textTransform="uppercase"
-          fontWeight="700"
-          color="$brandGold"
-        >
-          {game.cta} →
-        </Text>
-      </XStack>
-    </YStack>
-  );
-}
-
-export default function GamesTab() {
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: BG_DEEP_NAVY }}
-      contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
-      testID="games-tab-screen"
-    >
-      <YStack gap="$2" marginBottom="$5">
-        <Text
-          fontSize="$2"
-          letterSpacing={2}
-          textTransform="uppercase"
-          fontWeight="700"
-          color="$brandGold"
-        >
-          Minigames
-        </Text>
-        <Text
-          fontSize="$8"
-          fontWeight="800"
-          letterSpacing={-0.5}
-          lineHeight="$8"
-          color="$color"
-        >
-          {`The game doesn't stop\nwhen the season does.`}
-        </Text>
-        <Text fontSize="$4" lineHeight="$6" color="$textMuted">
-          Quick-draft showdowns and trivia built on 150 years of archived
-          statistics.
-        </Text>
-      </YStack>
-
-      <YStack gap="$3">
-        {GAMES.map((game) => (
-          <GameCard key={game.id} game={game} />
-        ))}
-      </YStack>
-    </ScrollView>
+    <GameRoomScreen
+      activeGamesCount={activeGamesCount}
+      bestScore={bestScore}
+      // No query exposes a 20 Questions token balance yet (LS-8802).
+      tokens={null}
+      resumeGame={resumeGame}
+      // No query exposes per-user minigame totals yet (LS-8803).
+      personalStats={{ draftsWon: null, dayStreak: null, gamesPlayed: null }}
+      onSelectGame={handleSelectGame}
+      onResumeGame={handleResumeGame}
+    />
   );
 }
 
