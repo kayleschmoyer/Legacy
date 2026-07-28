@@ -13,6 +13,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 
 import { Draft } from '../types';
 import { enableAutoPickForUnmanagedTeams } from '../helpers';
+import { cancelPendingDraftSlotTradesForLeague } from '../../draft-slot-trades/helpers';
 import { builder } from '../../builder';
 import {
   AuthenticationError,
@@ -211,6 +212,10 @@ builder.mutationField('initializeDraft', (t) =>
               draftOrder: index + 1,
             })),
           );
+
+          // The draft is now starting — any still-pending draft slot trades
+          // (proposed/accepted/approved) can never execute (LS-8676 AC4).
+          await cancelPendingDraftSlotTradesForLeague(tx, leagueId);
 
           // ── Branch: Live vs Automated ───────────────────────────────
           if (draftMode === 'live') {

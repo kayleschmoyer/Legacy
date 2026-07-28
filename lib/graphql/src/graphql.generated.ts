@@ -736,6 +736,20 @@ export type DraftRecommendationStat = {
   value?: Maybe<Scalars['String']['output']>;
 };
 
+/** A proposal to swap two teams’ draft pick slots before the draft starts */
+export type DraftSlotTrade = {
+  __typename?: 'DraftSlotTrade';
+  counterpartTeamId?: Maybe<Scalars['Int']['output']>;
+  counterpartTeamName?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  proposerTeamId?: Maybe<Scalars['Int']['output']>;
+  proposerTeamName?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
 /** Auto-pick status for a team in a draft */
 export type DraftTeamAutoPickStatus = {
   __typename?: 'DraftTeamAutoPickStatus';
@@ -1819,6 +1833,8 @@ export type Mutation = {
   addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   adminRegenerateLeagueSchedule?: Maybe<AdvanceLeagueWeekResponse>;
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
+  /** Commissioner-only: approve an accepted draft slot trade and atomically swap the two teams’ draft slots. */
+  approveDraftSlotTrade?: Maybe<DraftSlotTrade>;
   /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
   /** Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback. */
@@ -1920,6 +1936,8 @@ export type Mutation = {
   /** Forfeit the current pick if its deadline has passed. The current player loses one roster slot (penalty for running out of time) and the turn advances. Idempotent — safe for any participant to nudge when their countdown hits zero. */
   processExpiredSeasonDraftPick?: Maybe<Scalars['Boolean']['output']>;
   processWaiverClaims?: Maybe<ProcessWaiverClaimsResult>;
+  /** Propose swapping your draft slot with another team’s, before the draft starts. */
+  proposeDraftSlotTrade?: Maybe<DraftSlotTrade>;
   /** Propose a trade to another team. Provide the players you are offering and the players you want in return. */
   proposeTrade?: Maybe<TradeOffer>;
   randomizeDraftOrder?: Maybe<Draft>;
@@ -1945,6 +1963,8 @@ export type Mutation = {
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
   requestDataExport?: Maybe<DataRequest>;
+  /** Accept or decline a proposed draft slot trade, as the counterpart team. */
+  respondDraftSlotTrade?: Maybe<DraftSlotTrade>;
   /** Restore Apple IAP purchases and sync the subscription tier. Pass the JWS-signed transaction string for the most recent active purchase returned by StoreKit 2 restoreCompletedTransactions. */
   restoreApplePurchases?: Maybe<Scalars['Boolean']['output']>;
   /** Restore Google Play subscriptions and sync the subscription tier. Pass the purchaseToken for the most recent active purchase returned by react-native-iap getAvailablePurchases on Android. */
@@ -2056,6 +2076,10 @@ export type MutationAdminRegenerateLeagueScheduleArgs = {
 
 export type MutationAdvancePlayoffBracketArgs = {
   bracketId: Scalars['Int']['input'];
+};
+
+export type MutationApproveDraftSlotTradeArgs = {
+  tradeId: Scalars['Int']['input'];
 };
 
 export type MutationAutoAdvanceMatchupsArgs = {
@@ -2358,6 +2382,11 @@ export type MutationProcessWaiverClaimsArgs = {
   leagueId?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type MutationProposeDraftSlotTradeArgs = {
+  counterpartTeamId: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
+};
+
 export type MutationProposeTradeArgs = {
   expiresInDays?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
@@ -2411,6 +2440,11 @@ export type MutationRenewLeagueArgs = {
 export type MutationReorderDraftQueueArgs = {
   draftId: Scalars['Int']['input'];
   playerIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationRespondDraftSlotTradeArgs = {
+  accept: Scalars['Boolean']['input'];
+  tradeId: Scalars['Int']['input'];
 };
 
 export type MutationRestoreApplePurchasesArgs = {
@@ -3067,6 +3101,7 @@ export type Query = {
   league?: Maybe<League>;
   /** Paginated activity timeline for a league, newest first. Optionally filter by one or more event types. */
   leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
+  leagueDraftSlotTrades?: Maybe<Array<DraftSlotTrade>>;
   /** Get dues settings for a league. Requires league membership. */
   leagueDuesSettings?: Maybe<LeagueDuesSettings>;
   /** Get payment status for all league members. Requires league membership. */
@@ -3500,6 +3535,10 @@ export type QueryLeagueActivityArgs = {
   eventTypes?: InputMaybe<Array<LeagueActivityEventType>>;
   leagueId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryLeagueDraftSlotTradesArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryLeagueDuesSettingsArgs = {

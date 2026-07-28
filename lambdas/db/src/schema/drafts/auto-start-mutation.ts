@@ -24,6 +24,7 @@ import { shuffleArray } from '@legacy-sports/utils';
 import { and, eq, lte } from 'drizzle-orm';
 
 import { enableAutoPickForUnmanagedTeams } from './helpers';
+import { cancelPendingDraftSlotTradesForLeague } from '../draft-slot-trades/helpers';
 import { builder } from '../builder';
 
 // ── Response Type ────────────────────────────────────────────────────────────
@@ -202,6 +203,11 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
                 .update(PublicSchema.leagues)
                 .set({ draftStatus: 'in-progress' })
                 .where(eq(PublicSchema.leagues.id, leagueId));
+
+              // The draft is now starting — any still-pending draft slot
+              // trades (proposed/accepted/approved) can never execute
+              // (LS-8676 AC4).
+              await cancelPendingDraftSlotTradesForLeague(tx, leagueId);
             });
 
             // Send WebSocket notification
