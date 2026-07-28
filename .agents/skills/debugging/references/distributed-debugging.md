@@ -61,16 +61,17 @@ All lambdas ──► WebSocket Notifications ──► lambdas/websocket/ ─�
 
 ### EventBridge Rules
 
-| Rule (prefix `legacy-sports-dev-`) | Schedule              | Target Mutation         |
-| ---------------------------------- | --------------------- | ----------------------- |
-| `auto-process-draft-picks`         | `rate(1 minute)`      | `autoProcessDraftPicks` |
-| `auto-select-games`                | `cron(0 5 * * ? *)`   | `autoSelectGames`       |
-| `auto-advance-matchups`            | `cron(0 8 ? * SUN *)` | `autoAdvanceMatchups`   |
-| `process-waiver-claims`            | `cron(0 7 * * ? *)`   | `processWaiverClaims`   |
+| Rule (prefix `legacy-sports-dev-`) | Schedule              | Target Mutation            |
+| ---------------------------------- | --------------------- | -------------------------- |
+| `auto-process-draft-picks`         | `rate(1 minute)`      | `autoProcessDraftPicks`    |
+| `auto-start-scheduled-drafts`      | `rate(1 minute)`      | `autoStartScheduledDrafts` |
+| `auto-select-games`                | `cron(0 5 * * ? *)`   | `autoSelectGames`          |
+| `auto-advance-matchups`            | `cron(0 8 ? * SUN *)` | `autoAdvanceMatchups`      |
+| `process-waiver-claims`            | `cron(0 7 * * ? *)`   | `processWaiverClaims`      |
 
 Rule names and schedules live in `terraform/main/eventbridge.tf` (there are more rules than this table — Discord alerts, dues reminders, etc.; read the file for the full set). EventBridge rules invoke the GraphQL Lambda **directly** (not via API Gateway), authenticated with `x-system-api-key`.
 
-> **OPEN — dangling schedule**: the `autoStartScheduledDrafts` mutation (`lambdas/db/src/schema/drafts/auto-start-mutation.ts`) says "triggered every minute by EventBridge", but no rule in `terraform/main/eventbridge.tf` invokes it. Before assuming it fires, check the live rules: `aws events list-rules --name-prefix legacy-sports-dev` (MCP: none yet — shell only). If a scheduled draft never auto-started, this gap is the first suspect.
+> **RESOLVED (LS-8309)**: the `autoStartScheduledDrafts` mutation (`lambdas/db/src/schema/drafts/auto-start-mutation.ts`) is now wired to the `auto-start-scheduled-drafts` rule above, mirroring `auto-process-draft-picks`. The resolver guards against a rollout mass-start: drafts whose `scheduled_at` is more than `STALE_SCHEDULE_THRESHOLD_MS` (15 min) in the past are skipped as stale backlog and reported via the mutation's `errors` field rather than auto-started. Verify live state with `aws events list-rules --name-prefix legacy-sports-dev` (MCP: none yet — shell only).
 
 ---
 
@@ -169,16 +170,16 @@ For a given failure, trace the **entire chain** from trigger to completion. Don'
 
 Once you know which Lambda and which code path failed, **read the source code** to understand the bug:
 
-| Lambda                | Entry Point                                                      | Key Logic                                           |
-| --------------------- | ---------------------------------------------------------------- | --------------------------------------------------- |
-| Draft Processor       | `lambdas/draft-processor/src/index.ts`                           | `processDraftMessage()`                             |
-| Game Selection        | `lambdas/game-selection/src/handlers/select-game.ts`             | `selectGamesForMatchup()`                           |
-| Stats Lambda (game)   | `lambdas/stats-lambda/src/load-game.ts`                          | `loadPlayerGameStats()`                             |
-| Stats Lambda (career) | `lambdas/stats-lambda/src/load-career.ts`                        | `loadCareerStats()`                                 |
-| Scheduled mutations   | `lambdas/db/src/schema/drafts/scheduled-mutations.ts`            | `autoProcessDraftPicks`, `autoStartScheduledDrafts` |
-| Game scheduling       | `lambdas/db/src/schema/matchups/scheduled-mutations.ts`          | `autoSelectGames`, `autoAdvanceMatchups`            |
-| WebSocket             | `lambdas/websocket/src/index.ts`                                 | Route handlers                                      |
-| Notification service  | `lib/aws-utils/src/notification/WebSocketNotificationService.ts` | `broadcastToLeague()`, `broadcastToMatchup()`       |
+| Lambda                | Entry Point                                                                     | Key Logic                                           |
+| --------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Draft Processor       | `lambdas/draft-processor/src/index.ts`                                          | `processDraftMessage()`                             |
+| Game Selection        | `lambdas/game-selection/src/handlers/select-game.ts`                            | `selectGamesForMatchup()`                           |
+| Stats Lambda (game)   | `lambdas/stats-lambda/src/load-game.ts`                                         | `loadPlayerGameStats()`                             |
+| Stats Lambda (career) | `lambdas/stats-lambda/src/load-career.ts`                                       | `loadCareerStats()`                                 |
+| Scheduled mutations   | `lambdas/db/src/schema/drafts/scheduled-mutations.ts`, `auto-start-mutation.ts` | `autoProcessDraftPicks`, `autoStartScheduledDrafts` |
+| Game scheduling       | `lambdas/db/src/schema/matchups/scheduled-mutations.ts`                         | `autoSelectGames`, `autoAdvanceMatchups`            |
+| WebSocket             | `lambdas/websocket/src/index.ts`                                                | Route handlers                                      |
+| Notification service  | `lib/aws-utils/src/notification/WebSocketNotificationService.ts`                | `broadcastToLeague()`, `broadcastToMatchup()`       |
 
 ### Step 6: Fix the Code, Then Recover the Data
 

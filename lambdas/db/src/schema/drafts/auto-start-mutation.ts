@@ -1,10 +1,9 @@
 /**
  * Draft domain — scheduled mutation for auto-starting drafts at their scheduled time.
  *
- * ⚠ No EventBridge rule invokes this mutation: terraform/main/eventbridge.tf
- * defines a rule/target only for `autoProcessDraftPicks` (LS-8309 tracks the
- * wire-or-retire decision — adding a rule would immediately auto-start any
- * draft whose scheduled_at is already in the past). Live check:
+ * LS-8309: wired to `terraform/main/eventbridge.tf`'s
+ * `auto_start_scheduled_drafts` rule (rate(1 minute), mirroring
+ * `auto_process_draft_picks`). Live check:
  * `aws events list-rules --name-prefix legacy-sports-dev`.
  *
  * When invoked, finds all live drafts with `scheduled_at <= now` and
@@ -14,6 +13,13 @@
  *  2. Set draftStartedAt, initial pick deadline
  *  3. Update league draft_status → 'in-progress'
  *  4. Send DRAFT_STARTED WebSocket notification
+ *
+ * Guarded rollout (LS-8309): drafts whose `scheduled_at` is more than
+ * `STALE_SCHEDULE_THRESHOLD_MS` in the past are treated as stale backlog
+ * rather than auto-started — see `STALE_SCHEDULE_THRESHOLD_MS` below. This
+ * prevents every long-dormant scheduled draft from mass-starting in the same
+ * invocation the first time the rule goes live in an environment that has
+ * been silently accumulating past-due `scheduled_at` rows.
  *
  * Authorization: system-only (system request or admin).
  */
@@ -26,6 +32,21 @@ import { and, eq, lte } from 'drizzle-orm';
 import { enableAutoPickForUnmanagedTeams } from './helpers';
 import { cancelPendingDraftSlotTradesForLeague } from '../draft-slot-trades/helpers';
 import { builder } from '../builder';
+
+// ── Guarded rollout (LS-8309) ────────────────────────────────────────────────
+
+/**
+ * Drafts whose `scheduled_at` is more than this far in the past are skipped
+ * as stale backlog (reported via `result.errors`) instead of auto-started.
+ *
+ * Rationale: the EventBridge rule polls every minute, so under normal
+ * operation a due draft is picked up within a minute of its scheduled time.
+ * A draft overdue by more than this threshold got there because no invoker
+ * existed yet (LS-8309) or because auto-start silently failed for a while —
+ * either way it should not be lumped into an unattended mass-start the
+ * moment the rule (re)starts polling; it needs a human to look at it.
+ */
+export const STALE_SCHEDULE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
 
 // ── Response Type ────────────────────────────────────────────────────────────
 
@@ -56,9 +77,8 @@ builder.objectType(AutoStartScheduledDraftsResult, {
  * whose associated league has `draft_status = 'not-started'`, then starts each
  * one as a live draft.
  *
- * Designed for an every-minute EventBridge schedule alongside
- * `autoProcessDraftPicks`, but no such rule is wired as of 2026-07-03 —
- * see the header comment and LS-8309.
+ * Runs on an every-minute EventBridge schedule alongside `autoProcessDraftPicks`
+ * (LS-8309) — see the header comment for the guarded-rollout staleness cutoff.
  */
 builder.mutationField('autoStartScheduledDrafts', (t) =>
   t.field({
@@ -116,13 +136,47 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
           return result;
         }
 
+        // Guarded rollout (LS-8309): separate drafts that are merely due from
+        // those that are stale backlog (overdue by more than the threshold).
+        // Only the former auto-start; the latter are reported for manual
+        // triage so a long-dormant backlog can't mass-start in one invocation.
+        const staleCutoff = new Date(
+          now.getTime() - STALE_SCHEDULE_THRESHOLD_MS,
+        );
+        const draftsToStart = scheduledDrafts.filter(
+          (d) => d.scheduledAt && d.scheduledAt >= staleCutoff,
+        );
+        const staleDrafts = scheduledDrafts.filter(
+          (d) => !d.scheduledAt || d.scheduledAt < staleCutoff,
+        );
+
+        for (const stale of staleDrafts) {
+          const overdueMs = now.getTime() - (stale.scheduledAt?.getTime() ?? 0);
+          LOGGER.warn(
+            `[autoStartScheduledDrafts] Draft ${stale.draftId} is stale backlog — skipping auto-start`,
+            { draftId: stale.draftId, leagueId: stale.leagueId, overdueMs },
+          );
+          result.errors.push(
+            `Draft ${stale.draftId}: scheduled_at is more than ${
+              STALE_SCHEDULE_THRESHOLD_MS / 60_000
+            } minutes overdue — skipped as stale backlog, needs manual review`,
+          );
+        }
+
+        if (draftsToStart.length === 0) {
+          LOGGER.info(
+            '[autoStartScheduledDrafts] No non-stale scheduled drafts due to start',
+          );
+          return result;
+        }
+
         LOGGER.info(
-          `[autoStartScheduledDrafts] Found ${scheduledDrafts.length} draft(s) to start`,
+          `[autoStartScheduledDrafts] Found ${draftsToStart.length} draft(s) to start`,
         );
 
         const notificationService = context.notificationService;
 
-        for (const draft of scheduledDrafts) {
+        for (const draft of draftsToStart) {
           const { draftId, leagueId } = draft;
           try {
             // Get all teams in the league

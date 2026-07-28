@@ -214,6 +214,53 @@ resource "aws_lambda_permission" "auto_process_draft_picks_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.auto_process_draft_picks.arn
 }
 
+# ── Scheduled Draft Auto-Start (LS-8309) ────────────────────────────
+# Starts drafts whose commissioner-set scheduled_at time has arrived.
+# Runs every minute (the minimum EventBridge rate), same cadence as
+# auto_process_draft_picks above. The resolver itself guards against a
+# mass-start surprise on rollout: any draft whose scheduled_at is more than
+# STALE_SCHEDULE_THRESHOLD_MS (15 min) in the past is skipped as stale
+# backlog and reported via the mutation's `errors` field rather than
+# auto-started (lambdas/db/src/schema/drafts/auto-start-mutation.ts).
+
+resource "aws_cloudwatch_event_rule" "auto_start_scheduled_drafts" {
+  name                = "${local.name_prefix}-auto-start-scheduled-drafts"
+  description         = "Start scheduled drafts whose scheduled_at has arrived, every minute"
+  schedule_expression = "rate(1 minute)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "auto_start_scheduled_drafts" {
+  rule      = aws_cloudwatch_event_rule.auto_start_scheduled_drafts.name
+  target_id = "auto-start-scheduled-drafts"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { autoStartScheduledDrafts { draftsStarted errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "auto_start_scheduled_drafts_eventbridge" {
+  statement_id  = "AllowEventBridgeAutoStartScheduledDrafts"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.auto_start_scheduled_drafts.arn
+}
+
 # ── Discord Score Alerts ───────────────────────────────────────────
 # Posts matchup score summaries and close-game alerts to league Discord channels.
 # Runs every 4 hours during active seasons. Short-circuits quickly when no
