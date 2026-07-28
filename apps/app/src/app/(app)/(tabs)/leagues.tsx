@@ -143,7 +143,9 @@ export default function LeaguesTab() {
             return (
               <Card
                 testID={`league-row-${leagueId}`}
-                backgroundColor="$gray2"
+                backgroundColor="$surfacePanel"
+                borderColor="$surfacePanelBorder"
+                borderWidth={1}
                 borderRadius="$4"
                 padding="$4"
                 marginBottom="$3"
