@@ -1,30 +1,37 @@
 import { useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
-import { Alert, FlatList } from 'react-native';
-import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ChevronRight, Plus, Trophy } from '@tamagui/lucide-icons';
+import { useCallback, useMemo } from 'react';
+import { Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Sport, useGetUserLeaguesQuery } from '@legacy-sports/graphql';
+import type { HomeLeagueSummary } from '@legacy-sports/shared-components';
+import { LeaguesLedgerScreen } from '@legacy-sports/shared-components/leagues';
+import { useGetUserLeagueSummariesQuery } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 
-function sportBadge(sport: string | null | undefined): string {
-  return sport === 'football' ? '🏈' : '⚾';
-}
-
-function sportLabel(sport: string | null | undefined): string {
-  if (sport === 'football') return 'Football';
-  return 'Baseball';
-}
-
+/**
+ * The Leagues tab renders the shared "Clubhouse Ledger" screen from
+ * `lib/shared-components` (LS-8795) — a dense standings table of every league
+ * the user manages — wired to mobile's GraphQL data layer and expo-router
+ * navigation. UI is shared across platforms (shared-components-first).
+ *
+ * Data comes from `getUserLeagueSummaries`, the same query the Home tab uses:
+ * the plain `userLeagues` query returns only id/name/sport, which cannot fill
+ * the ledger's record, rank, live-matchup, and draft columns.
+ */
 export default function LeaguesTab() {
   const router = useRouter();
+  const { top: topInset } = useSafeAreaInsets();
   const userInfo = useAuthorizedUserInfo();
 
-  const { data, loading } = useGetUserLeaguesQuery({
+  const { data, loading } = useGetUserLeagueSummariesQuery({
+    fetchPolicy: 'cache-and-network',
     skip: !userInfo?.id,
   });
 
-  const leagues = data?.userLeagues ?? [];
+  const leagues = useMemo<HomeLeagueSummary[]>(
+    () => data?.getUserLeagueSummaries ?? [],
+    [data?.getUserLeagueSummaries],
+  );
 
   const showAddActions = useCallback(() => {
     Alert.alert('Add League', '', [
@@ -44,142 +51,32 @@ export default function LeaguesTab() {
     ]);
   }, [router]);
 
-  if (loading) {
-    return (
-      <YStack
-        flex={1}
-        alignItems="center"
-        justifyContent="center"
-        backgroundColor="$background"
-      >
-        <Spinner size="large" />
-      </YStack>
-    );
-  }
+  const viewLeague = useCallback(
+    (summary: HomeLeagueSummary) => {
+      if (summary.leagueId == null) return;
+      const params = { leagueId: String(summary.leagueId) };
+      if (summary.sport === 'football') {
+        router.push({ pathname: '/football/league/[leagueId]', params });
+      } else {
+        router.push({ pathname: '/baseball/league/[leagueId]', params });
+      }
+    },
+    [router],
+  );
 
   return (
-    <YStack flex={1} backgroundColor="$background">
-      {/* Screen header */}
-      <XStack
-        paddingHorizontal="$4"
-        paddingTop="$6"
-        paddingBottom="$3"
-        alignItems="center"
-        justifyContent="space-between"
-      >
-        <Text fontSize="$8" fontWeight="700" color="$color">
-          Leagues
-        </Text>
-        <XStack
-          testID="leagues-add-button"
-          onPress={showAddActions}
-          tabIndex={0}
-          onKeyDown={(e: React.KeyboardEvent) => {
-            if (e.key === 'Enter' || e.key === ' ') showAddActions();
-          }}
-          backgroundColor="$brandNavyLight"
-          borderRadius="$10"
-          width={36}
-          height={36}
-          alignItems="center"
-          justifyContent="center"
-          pressStyle={{ opacity: 0.7 }}
-          accessibilityRole="button"
-          accessibilityLabel="Browse, join, or create a league"
-        >
-          <Plus size={20} color="white" />
-        </XStack>
-      </XStack>
-
-      {leagues.length === 0 ? (
-        <YStack
-          flex={1}
-          alignItems="center"
-          justifyContent="center"
-          gap="$4"
-          padding="$8"
-        >
-          <Trophy size={48} color="$gray8" />
-          <Text fontSize="$5" color="$gray10" textAlign="center">
-            You are not in any leagues yet.
-          </Text>
-          <Button
-            testID="leagues-browse-cta"
-            backgroundColor="$brandNavyLight"
-            borderRadius="$4"
-            onPress={() => router.navigate('/league-discovery')}
-            accessibilityRole="button"
-          >
-            <Text color="white" fontWeight="600">
-              Browse Leagues
-            </Text>
-          </Button>
-        </YStack>
-      ) : (
-        <FlatList
-          testID="leagues-list"
-          data={leagues}
-          keyExtractor={(item, idx) =>
-            item.id != null ? String(item.id) : `league-${idx}`
-          }
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-          renderItem={({ item }) => {
-            if (item.id == null) return null;
-            const leagueId = item.id;
-            const viewLeague = () => {
-              const params = { leagueId: String(leagueId) };
-              if (item.sport === Sport.Football) {
-                router.push({
-                  pathname: '/football/league/[leagueId]',
-                  params,
-                });
-              } else {
-                router.push({
-                  pathname: '/baseball/league/[leagueId]',
-                  params,
-                });
-              }
-            };
-            return (
-              <Card
-                testID={`league-row-${leagueId}`}
-                backgroundColor="$surfacePanel"
-                borderColor="$surfacePanelBorder"
-                borderWidth={1}
-                borderRadius="$4"
-                padding="$4"
-                marginBottom="$3"
-                pressStyle={{ opacity: 0.7, scale: 0.99 }}
-                onPress={viewLeague}
-                tabIndex={0}
-                onKeyDown={(e: React.KeyboardEvent) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    viewLeague();
-                  }
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Open league ${item.name ?? 'Unnamed'}`}
-              >
-                <XStack alignItems="center" justifyContent="space-between">
-                  <XStack alignItems="center" gap="$3">
-                    <Text fontSize="$7">{sportBadge(item.sport)}</Text>
-                    <YStack gap="$0.5">
-                      <Text fontSize="$4" fontWeight="600" color="$color">
-                        {item.name ?? 'Unnamed League'}
-                      </Text>
-                      <Text fontSize="$2" color="$gray10">
-                        {sportLabel(item.sport)}
-                      </Text>
-                    </YStack>
-                  </XStack>
-                  <ChevronRight size={18} color="$gray9" />
-                </XStack>
-              </Card>
-            );
-          }}
-        />
-      )}
-    </YStack>
+    <LeaguesLedgerScreen
+      leagues={leagues}
+      // cache-and-network re-runs on every focus; only show the spinner when
+      // there is nothing cached to render, so returning to the tab does not
+      // flash an empty screen over good data.
+      loading={loading && leagues.length === 0}
+      topInset={topInset}
+      onViewLeague={viewLeague}
+      onCreateLeague={() => router.navigate('/league/create')}
+      onJoinOrBrowse={showAddActions}
+      onBrowseLeagues={() => router.navigate('/league-discovery')}
+    />
   );
 }
 

@@ -12,6 +12,14 @@ import {
 import type { GestureResponderEvent } from 'react-native';
 import { formatDraftDate } from '@legacy-sports/utils';
 import { formatEraDescriptor, formatEraYears } from './homeSummaryFormatters';
+import {
+  deriveHomeUserStats,
+  type HomeLeagueSummary,
+  type HomeUserStats,
+  recordOf,
+  safeScore,
+  sortByUrgency,
+} from './leagueSummaryStats';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
 import {
   AMBER_WARM,
@@ -34,6 +42,11 @@ import {
 // Re-export the shared display-name formatter so app wrappers can reuse it.
 export { formatDisplayName } from './homeSummaryFormatters';
 
+// The league-summary types moved to `leagueSummaryStats` (LS-8795) so the
+// Leagues ledger can consume them without importing this component module.
+// Re-exported here to keep `@legacy-sports/shared-components` imports stable.
+export type { HomeLeagueSummary, HomeUserStats } from './leagueSummaryStats';
+
 /* ─── Typography helpers (web uses Heritage fonts; native falls back) ─── */
 
 const DISPLAY_FONT = isWeb
@@ -42,49 +55,6 @@ const DISPLAY_FONT = isWeb
 const BODY_FONT = isWeb ? 'Literata, Georgia, serif' : undefined;
 
 /* ─── Public types ─── */
-
-/**
- * Presentational league-summary shape consumed by the dashboard. Structurally
- * compatible with each app's `UserLeagueSummary` GraphQL fragment so web and
- * mobile can pass their own generated arrays directly.
- */
-export interface HomeLeagueSummary {
-  leagueId?: number | null;
-  leagueName?: string | null;
-  sport?: string | null;
-  leaguePhase?: string | null;
-  seasonNumber?: number | null;
-  draftStatus?: string | null;
-  draftScheduledAt?: string | null;
-  draftMode?: string | null;
-  selectionMethod?: string | null;
-  teamCount?: number | null;
-  wins?: number | null;
-  losses?: number | null;
-  ties?: number | null;
-  rank?: number | null;
-  totalTeams?: number | null;
-  pointsFor?: number | null;
-  currentWeekNumber?: number | null;
-  totalMatchups?: number | null;
-  matchupId?: number | null;
-  matchupStatus?: string | null;
-  matchupEndTime?: string | null;
-  userScore?: number | null;
-  opponentScore?: number | null;
-  opponentTeamName?: string | null;
-  eraFilter?: string | null;
-  customEraStartYear?: number | null;
-  customEraEndYear?: number | null;
-  isCommissioner?: boolean | null;
-}
-
-/** Aggregate stats shown in the returning-user header. Derived from `leagues` when omitted. */
-export interface HomeUserStats {
-  leagueCount: number;
-  aggregateRecord?: string | null;
-  firstPlaceCount?: number;
-}
 
 export interface HomeScreenProps {
   /** Display name for the greeting (already formatted). */
@@ -169,39 +139,6 @@ const SPORTS: SportConfig[] = [
     available: false,
   },
 ];
-
-/* ─── Urgency sort ─── */
-
-function urgencyKey(s: HomeLeagueSummary): number {
-  if (s.draftStatus === 'in-progress') return 0;
-  if (s.leaguePhase === 'active') return 1;
-  if (s.leaguePhase === 'pre-draft') return 2;
-  return 3;
-}
-
-function sortByUrgency(summaries: HomeLeagueSummary[]): HomeLeagueSummary[] {
-  return [...summaries].sort((a, b) => urgencyKey(a) - urgencyKey(b));
-}
-
-/* ─── Small helpers ─── */
-
-function recordOf(s: HomeLeagueSummary): string {
-  const wins = s.wins ?? 0;
-  const losses = s.losses ?? 0;
-  const ties = s.ties ?? 0;
-  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
-}
-
-/**
- * Coerces a matchup score to a finite number, defaulting to 0. Guards
- * `.toFixed()` call sites against a non-numeric value reaching the client
- * (e.g. a malformed cache entry) — such a value would otherwise throw
- * "TypeError: undefined is not a function" during render (LS-8668).
- */
-function safeScore(value: number | null | undefined): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
 
 /* ─── Reusable bits ─── */
 
@@ -1185,24 +1122,10 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     [defaultSport],
   );
 
-  const derivedStats = useMemo<HomeUserStats>(() => {
-    if (userStats) return userStats;
-    const active = sortedSummaries.filter((s) => s.leaguePhase === 'active');
-    const wins = active.reduce((a, s) => a + (s.wins ?? 0), 0);
-    const losses = active.reduce((a, s) => a + (s.losses ?? 0), 0);
-    const ties = active.reduce((a, s) => a + (s.ties ?? 0), 0);
-    const aggregateRecord =
-      active.length > 0
-        ? ties > 0
-          ? `${wins}-${losses}-${ties}`
-          : `${wins}-${losses}`
-        : null;
-    return {
-      leagueCount: sortedSummaries.length,
-      aggregateRecord,
-      firstPlaceCount: sortedSummaries.filter((s) => s.rank === 1).length,
-    };
-  }, [userStats, sortedSummaries]);
+  const derivedStats = useMemo<HomeUserStats>(
+    () => userStats ?? deriveHomeUserStats(sortedSummaries),
+    [userStats, sortedSummaries],
+  );
 
   /* ── Loading ── */
   if (loading) {

@@ -36,6 +36,8 @@ export const SURFACE_SUBTLE = darkSurface.surfaceSubtle;
 export const SURFACE_PANEL = darkSurface.surfacePanel;
 export const SURFACE_CARD = darkSurface.surfaceCard;
 export const OUTLINE_SUBTLE = darkSurface.outlineSubtle;
+/** Strongest dark-surface outline — editorial button/rule borders on `$background`. */
+export const OUTLINE_STRONG = darkSurface.outlineStrong;
 export const PANEL_BORDER = darkSurface.panelBorder;
 
 // -- Brand Heritage --------------------------------------------------
