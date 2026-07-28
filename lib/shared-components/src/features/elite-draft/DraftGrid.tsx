@@ -5,7 +5,8 @@ import {
   type DraftPlayer,
   type LeagueTeam,
 } from './types';
-import { normalizeDraftPosition, normalizeTeamId } from './utils';
+import { getPositionColor, normalizeTeamId } from './utils';
+import type { SportKind } from '../../config/sports';
 
 // ---------------------------------------------------------------------------
 // Draft Grid Sub-component (team columns view)
@@ -18,6 +19,7 @@ export function DraftGrid({
   myTeamId,
   statsLookup,
   maxRounds,
+  sport,
   autoPickTeamIds = new Set<string>(),
   onlineTeamIds = new Set<string>(),
 }: {
@@ -27,6 +29,11 @@ export function DraftGrid({
   myTeamId: number | null;
   statsLookup: Map<number, DraftPlayer>;
   maxRounds: number;
+  /** Active league sport — drives the position-color stripe (LS-8784).
+   *  Required, not defaulted: DraftGrid's only consumer is DraftPlayerBoard,
+   *  which always has a sport in scope, and a silent default would just
+   *  reintroduce the wrong-color-for-football bug this prop exists to fix. */
+  sport: SportKind;
   /** Set of team IDs that currently have auto-pick enabled (LS-439) */
   autoPickTeamIds?: ReadonlySet<string>;
   /** Set of team IDs whose managers are currently online (LS-478) */
@@ -139,7 +146,9 @@ export function DraftGrid({
                     ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
                     : `Player #${pick.playerId}`;
                 const position = player?.position;
-                const posBucket = normalizeDraftPosition(position);
+                const posColor = position
+                  ? getPositionColor(sport, position)
+                  : undefined;
                 const isMyTeam = pick.teamId === myTeamId;
                 const className = [
                   'd-draft-grid-cell',
@@ -152,14 +161,31 @@ export function DraftGrid({
                   <div
                     key={team.id}
                     className={className}
-                    data-pos={posBucket ?? undefined}
+                    data-pos={position ?? undefined}
                     title={`Pick #${pick.overallPick}: ${playerName}${position ? ` (${position})` : ''}`}
+                    style={
+                      posColor
+                        ? {
+                            borderLeftWidth: 3,
+                            borderLeftStyle: 'solid',
+                            borderLeftColor: isMyTeam ? undefined : posColor,
+                            backgroundColor: isMyTeam
+                              ? undefined
+                              : `${posColor}17`,
+                          }
+                        : undefined
+                    }
                   >
                     <span className="d-draft-grid-cell-name">{playerName}</span>
                     {position && (
                       <span
                         className="d-draft-grid-cell-pos"
                         aria-hidden="true"
+                        style={
+                          posColor
+                            ? { color: posColor, opacity: 0.55 }
+                            : undefined
+                        }
                       >
                         {position}
                       </span>

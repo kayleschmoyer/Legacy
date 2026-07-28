@@ -404,6 +404,7 @@ export function DraftPlayerBoard({
             currentPickInfo={currentPickInfo}
             myTeamId={myTeamId}
             statsLookup={statsLookup}
+            sport={sport}
             autoPickTeamIds={autoPickTeamIds}
             maxRounds={
               leagueTeamsLength > 0
@@ -497,7 +498,7 @@ export function DraftPlayerBoard({
               <tbody>
                 {sortedPlayers.map((player, idx) => {
                   const posColor = getPositionColor(
-                    'baseball',
+                    sport,
                     player.position ?? '',
                   );
                   return (

@@ -42,12 +42,6 @@ export const CSS = `
      match docs/design/.../mockups/draft.html 1:1. */
   --f-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
   --f-body: 'Literata', Georgia, 'Times New Roman', serif;
-  /* Position accents — 1px edges only, never wider per brief. */
-  --pos-p: #C41E3A;
-  --pos-c: #7C8794;
-  --pos-if: #8B6F47;
-  --pos-of: #2D6A4F;
-  --pos-u: #C5A55A;
 }
 
 /* ===== Typography recipes (mockup-aligned) =====
@@ -1321,47 +1315,9 @@ export const CSS = `
 }
 
 /* Position color accent on filled cells — 3px left stripe + faint
-   position-tinted background, keyed on the normalized data-pos bucket
-   (P / C / IF / OF / U) using the --pos-* tokens from LS-4627. Raw
-   positions (SP/RP, CF/LF/RF, UTIL, etc.) are normalized in JSX via
-   normalizeDraftPosition() before reaching the DOM. */
-.d-draft-grid-cell.filled[data-pos='P'] {
-  border-left: 3px solid var(--pos-p);
-  background: color-mix(in srgb, var(--pos-p) 9%, rgba(255,255,255,0.04));
-}
-.d-draft-grid-cell.filled[data-pos='C'] {
-  border-left: 3px solid var(--pos-c);
-  background: color-mix(in srgb, var(--pos-c) 9%, rgba(255,255,255,0.04));
-}
-.d-draft-grid-cell.filled[data-pos='IF'] {
-  border-left: 3px solid var(--pos-if);
-  background: color-mix(in srgb, var(--pos-if) 9%, rgba(255,255,255,0.04));
-}
-.d-draft-grid-cell.filled[data-pos='OF'] {
-  border-left: 3px solid var(--pos-of);
-  background: color-mix(in srgb, var(--pos-of) 9%, rgba(255,255,255,0.04));
-}
-.d-draft-grid-cell.filled[data-pos='U'] {
-  border-left: 3px solid var(--pos-u);
-  background: color-mix(in srgb, var(--pos-u) 9%, rgba(255,255,255,0.04));
-}
-/* Hover variants brighten the tint while preserving the position accent
-   (the position rules above would otherwise win over .filled:hover). */
-.d-draft-grid-cell.filled[data-pos='P']:hover {
-  background: color-mix(in srgb, var(--pos-p) 16%, rgba(255,255,255,0.07));
-}
-.d-draft-grid-cell.filled[data-pos='C']:hover {
-  background: color-mix(in srgb, var(--pos-c) 16%, rgba(255,255,255,0.07));
-}
-.d-draft-grid-cell.filled[data-pos='IF']:hover {
-  background: color-mix(in srgb, var(--pos-if) 16%, rgba(255,255,255,0.07));
-}
-.d-draft-grid-cell.filled[data-pos='OF']:hover {
-  background: color-mix(in srgb, var(--pos-of) 16%, rgba(255,255,255,0.07));
-}
-.d-draft-grid-cell.filled[data-pos='U']:hover {
-  background: color-mix(in srgb, var(--pos-u) 16%, rgba(255,255,255,0.07));
-}
+   position-tinted background, computed inline per-cell via
+   getPositionColor(sport, position) (LS-8784) so both baseball and
+   football position codes render correct colors. */
 
 /* Lower-right position glyph — display-font, large, low-opacity reinforcement. */
 .d-draft-grid-cell-pos {
@@ -1376,26 +1332,6 @@ export const CSS = `
   opacity: 0.22;
   pointer-events: none;
   color: var(--d-text);
-}
-.d-draft-grid-cell[data-pos='P'] .d-draft-grid-cell-pos {
-  color: var(--pos-p);
-  opacity: 0.55;
-}
-.d-draft-grid-cell[data-pos='C'] .d-draft-grid-cell-pos {
-  color: var(--pos-c);
-  opacity: 0.55;
-}
-.d-draft-grid-cell[data-pos='IF'] .d-draft-grid-cell-pos {
-  color: var(--pos-if);
-  opacity: 0.55;
-}
-.d-draft-grid-cell[data-pos='OF'] .d-draft-grid-cell-pos {
-  color: var(--pos-of);
-  opacity: 0.55;
-}
-.d-draft-grid-cell[data-pos='U'] .d-draft-grid-cell-pos {
-  color: var(--pos-u);
-  opacity: 0.55;
 }
 
 /* My-team override — gold border replaces position stripe (loudest signal). */
