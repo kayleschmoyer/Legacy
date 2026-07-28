@@ -3,7 +3,6 @@ import './types/tamagui.d.ts';
 export * from './Button';
 export * from './IconButton';
 export * from './Layout';
-export * from './screens/DraftBoardScreen';
 
 // New shared components
 export * from './ConditionalProviders';
@@ -74,7 +73,6 @@ export * from './features/stats/PitchingStatsTable';
 export * from './features/leagues/CreateLeagueModal';
 
 // Draft components
-export * from './features/draft/DraftBoard';
 export * from './features/draft/ChatPanel';
 export * from './features/draft/MockDraftSetup';
 
