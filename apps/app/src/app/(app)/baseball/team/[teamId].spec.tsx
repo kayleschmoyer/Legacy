@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
-import BaseballTeam, { TeamIdHeader } from './[teamId]';
+import BaseballTeam from './[teamId]';
 
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
 
@@ -367,12 +367,6 @@ describe('BaseballTeam route — team identity header (LS-8313)', () => {
     });
     render(<BaseballTeam />);
     expect(screen.queryByTestId('team-visitor-note')).toBeNull();
-  });
-
-  it('TeamIdHeader still renders the team name alongside the avatar/letter-fallback (AC5)', () => {
-    render(<TeamIdHeader />);
-    expect(screen.getByText('Test Team')).toBeTruthy();
-    expect(screen.getByTestId('team-avatar-fallback')).toHaveTextContent('T');
   });
 });
 

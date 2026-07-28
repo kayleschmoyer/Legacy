@@ -143,6 +143,12 @@ interface SeasonDraftGameProps {
   currentUserId: number;
   websocketUrl?: string;
   websocketToken?: string;
+  /**
+   * Navigates away from the cancelled game. Invoked only after the viewer
+   * confirms "cancel game" — no back affordance is rendered (LS-8766); ordinary
+   * back navigation is handled by the platform (system back on Android, browser
+   * back on web). When omitted the game is refetched in place instead.
+   */
   onBack?: () => void;
 }
 
@@ -588,15 +594,6 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
     return (
       <YStack flex={1} alignItems="center" justifyContent="center" gap="$3">
         <Text color="$color">Game not found</Text>
-        {onBack && (
-          <Button
-            backgroundColor="$brandGold"
-            color="$brandNavy"
-            onPress={onBack}
-          >
-            Go Back
-          </Button>
-        )}
       </YStack>
     );
   }
@@ -679,20 +676,6 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
         $sm={{ padding: '$3' }}
         gap="$5"
       >
-        {/* Top bar */}
-        {onBack && (
-          <Button
-            chromeless
-            size="$2"
-            alignSelf="flex-start"
-            color="$textMuted"
-            onPress={onBack}
-            pressStyle={{ opacity: 0.7 }}
-          >
-            ← Back to Lobby
-          </Button>
-        )}
-
         {/* Inline error */}
         {errorMessage !== null && (
           <XStack

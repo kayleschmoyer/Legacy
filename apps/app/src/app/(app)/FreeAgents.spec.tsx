@@ -19,6 +19,9 @@ jest.mock('expo-router', () => {
   jest.requireActual<typeof import('react-native')>('react-native');
   return {
     Redirect: () => null,
+    useFocusEffect: (cb: () => (() => void) | void) => {
+      cb();
+    },
   };
 });
 

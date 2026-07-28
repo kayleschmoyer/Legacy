@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ChevronLeft, MessageSquare, Send, Users } from '@tamagui/lucide-icons';
+import { MessageSquare, Send, Users } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import { captureError } from '@legacy-sports/rollbar/native';
 import { Button } from '@legacy-sports/shared-components';
@@ -15,6 +15,7 @@ import {
   useSendDirectMessageMutation,
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
+import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
 
 const MESSAGE_MAX_LENGTH = 2000;
 const MESSAGE_WARN_THRESHOLD = MESSAGE_MAX_LENGTH - 100;
@@ -23,12 +24,10 @@ function ConversationThread({
   otherUserId,
   otherRecipientName,
   leagueId,
-  onBack,
 }: {
   otherUserId: number;
   otherRecipientName: string;
   leagueId: number;
-  onBack: () => void;
 }) {
   const userInfo = useAuthorizedUserInfo();
   const [messageText, setMessageText] = useState('');
@@ -121,7 +120,9 @@ function ConversationThread({
       keyboardVerticalOffset={90}
     >
       <YStack flex={1}>
-        {/* Header */}
+        {/* Who the thread is with. Not a navigation header — the back
+            affordance was removed in LS-8766 and system back unwinds the
+            thread — but the name is the only identifier this view has. */}
         <XStack
           alignItems="center"
           gap="$2"
@@ -130,13 +131,7 @@ function ConversationThread({
           borderBottomWidth={1}
           borderBottomColor="$borderColor"
         >
-          <Text
-            onPress={onBack}
-            color="$brandGoldLight"
-            fontSize="$4"
-            pressStyle={{ opacity: 0.7 }}
-          >
-            <ChevronLeft size={16} color="$brandGoldLight" />{' '}
+          <Text color="$color" fontSize="$4" fontWeight="600">
             {otherRecipientName}
           </Text>
         </XStack>
@@ -228,12 +223,10 @@ function ConversationThread({
 function LeagueMemberList({
   leagueId,
   leagueName,
-  onBack,
   onSelectUser,
 }: {
   leagueId: number;
   leagueName: string;
-  onBack: () => void;
   onSelectUser: (userId: number, recipientName: string) => void;
 }) {
   const userInfo = useAuthorizedUserInfo();
@@ -250,13 +243,8 @@ function LeagueMemberList({
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
       <YStack flex={1} padding="$4" gap="$4">
         <XStack alignItems="center" gap="$2">
-          <Text
-            onPress={onBack}
-            color="$brandGoldLight"
-            fontSize="$4"
-            pressStyle={{ opacity: 0.7 }}
-          >
-            <ChevronLeft size={16} color="$brandGoldLight" /> {leagueName}
+          <Text color="$color" fontSize="$4" fontWeight="600">
+            {leagueName}
           </Text>
         </XStack>
 
@@ -335,6 +323,19 @@ export default function DirectMessagesScreen() {
     skip: !userInfo?.id,
   });
 
+  // System back unwinds the drill-down one level at a time — thread → member
+  // picker → league picker — before it pops the screen. This replaces the
+  // in-content back links removed in LS-8766.
+  const unwindOneLevel = useCallback(() => {
+    if (selectedUser) {
+      setSelectedUser(null);
+      return;
+    }
+    setSelectedLeague(null);
+  }, [selectedUser]);
+
+  useSystemBackAction(selectedLeague != null, unwindOneLevel);
+
   // Conversation thread
   if (selectedLeague && selectedUser) {
     return (
@@ -342,7 +343,6 @@ export default function DirectMessagesScreen() {
         otherUserId={selectedUser.id}
         otherRecipientName={selectedUser.name}
         leagueId={selectedLeague.id}
-        onBack={() => setSelectedUser(null)}
       />
     );
   }
@@ -353,7 +353,6 @@ export default function DirectMessagesScreen() {
       <LeagueMemberList
         leagueId={selectedLeague.id}
         leagueName={selectedLeague.name}
-        onBack={() => setSelectedLeague(null)}
         onSelectUser={(userId, recipientName) =>
           setSelectedUser({ id: userId, name: recipientName })
         }

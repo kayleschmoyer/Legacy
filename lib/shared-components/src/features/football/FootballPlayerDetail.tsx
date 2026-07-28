@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ArrowLeft, Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons';
 import { FootballPlayerHeader } from './FootballPlayerHeader';
 import { GameLogsTable } from '../stats/GameLogsTable';
 import { Select } from '../../components/Select';
@@ -954,12 +954,6 @@ export interface FootballPlayerDetailProps {
    */
   notFound?: boolean;
   /**
-   * Called when the back affordance is pressed. Apps supply their own
-   * navigation (react-router on web, expo-router on mobile); the component
-   * stays platform-agnostic. The back row is hidden when omitted.
-   */
-  onBack?: () => void;
-  /**
    * Whether the current user has premium access. When `false` (the default),
    * the "Projections (Premium)" upsell teaser is shown. When `true`, the teaser
    * is hidden — premium projection data is not yet available, so there is
@@ -998,7 +992,6 @@ export function FootballPlayerDetail({
   loading,
   error,
   notFound,
-  onBack,
   isPremium = false,
   onUpgrade,
   initialTab: _initialTab = 'overview',
@@ -1012,25 +1005,6 @@ export function FootballPlayerDetail({
 
   return (
     <YStack flex={1} backgroundColor={BG_DARK}>
-      {/* Back nav */}
-      {onBack && (
-        <XStack
-          paddingHorizontal={16}
-          paddingVertical={12}
-          alignItems="center"
-          gap={8}
-          onPress={onBack}
-          cursor="pointer"
-          pressStyle={{ opacity: 0.7 }}
-          hoverStyle={{ opacity: 0.7 }}
-        >
-          <ArrowLeft size={16} color={TEXT_MUTED} />
-          <Text fontSize={14} color={TEXT_MUTED} fontFamily={FONT_BODY}>
-            Back to Players
-          </Text>
-        </XStack>
-      )}
-
       {loading && (
         <YStack
           flex={1}

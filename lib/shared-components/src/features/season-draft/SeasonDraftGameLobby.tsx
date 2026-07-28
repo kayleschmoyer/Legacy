@@ -98,7 +98,6 @@ interface SeasonDraftGameLobbyProps {
   onSelectGame: (gameId: number) => void;
   onCreateGame: () => void;
   onJoinByInvite?: () => void;
-  onBack?: () => void;
   /** Override for the current viewer's name (used to mark "You" avatars). */
   viewerName?: string;
 }
@@ -113,7 +112,6 @@ export const SeasonDraftGameLobby: React.FC<SeasonDraftGameLobbyProps> = ({
   onSelectGame,
   onCreateGame,
   onJoinByInvite,
-  onBack,
   viewerName,
 }) => {
   // `cache-and-network` ensures we always trigger a network refetch on
@@ -156,19 +154,6 @@ export const SeasonDraftGameLobby: React.FC<SeasonDraftGameLobbyProps> = ({
         $sm={{ padding: '$3' }}
         gap="$5"
       >
-        {onBack && (
-          <Button
-            chromeless
-            size="$2"
-            alignSelf="flex-start"
-            color="$textMuted"
-            onPress={onBack}
-            pressStyle={{ opacity: 0.7 }}
-          >
-            ← Back to Games
-          </Button>
-        )}
-
         <XStack
           gap="$4"
           alignItems="flex-end"

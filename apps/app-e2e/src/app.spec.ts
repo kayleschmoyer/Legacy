@@ -50,8 +50,10 @@ describe('Legacy Sports App - E2E Test Infrastructure', () => {
       expect(content).toContain("Stack } from 'expo-router'");
       expect(content).toContain("initialRouteName: '(tabs)'");
       expect(content).toContain('name="(tabs)"');
-      expect(content).toContain("title: 'Draft Board'");
-      expect(content).toContain("title: 'Free Agents'");
+      // LS-8766: the group is headerless — no route sets a header title, and
+      // back navigation is the platform back button / edge-swipe gesture.
+      expect(content).toContain('headerShown: false');
+      expect(content).not.toContain('title:');
     });
 
     it('should have the five-tab navigator', () => {

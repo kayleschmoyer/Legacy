@@ -70,7 +70,6 @@ interface GameState {
 }
 
 export interface TwentyQuestionsGameProps {
-  onBack: () => void;
   /** Sport for the player pool; when supplied the user cannot change it (league context). */
   sport?: Sport;
 }
@@ -108,7 +107,6 @@ function mapGame(raw: RawGame): GameState | null {
 }
 
 export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
-  onBack,
   sport: sportProp,
 }) => {
   const [phase, setPhase] = useState<Phase>('entry');
@@ -295,16 +293,6 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
             {errorMsg}
           </Paragraph>
         )}
-        <Button
-          size="$3"
-          chromeless
-          onPress={onBack}
-          alignSelf="center"
-          marginBottom="$4"
-          testID="back-button"
-        >
-          Back
-        </Button>
       </YStack>
     );
   }
@@ -319,7 +307,6 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
         questionsUsed={game.questionsUsed}
         maxQuestions={game.maxQuestions}
         onPlayAgain={handlePlayAgain}
-        onBack={onBack}
       />
     );
   }

@@ -78,10 +78,6 @@ export function FootballPlayerDetailPage() {
         loading={loading}
         error={!!error && !isAuthError}
         notFound={notFound}
-        onBack={() => {
-          if (window.history.length > 1) navigate(-1);
-          else navigate('/football/players');
-        }}
         isPremium={isPremium}
         onUpgrade={handleUpgrade}
         initialTab={initialTab}

@@ -399,7 +399,6 @@ export function LeagueDetailPageV2(): React.JSX.Element {
           activeTab={tab}
           onTabChange={(t) => setTab(t as TabId)}
           onAnalytics={() => navigate(`/leagues/${leagueId}/analytics`)}
-          onBack={() => navigate('/baseball/leagues')}
           onInvite={() => {
             setTab('overview');
             // Scroll to the invite card after the overview tab has rendered.

@@ -20,7 +20,6 @@ export default function SeasonDraftGamesScreen() {
         })
       }
       onCreateGame={() => router.push({ pathname: '/season-draft/create' })}
-      onBack={() => router.back()}
     />
   );
 }

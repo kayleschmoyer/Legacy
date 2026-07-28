@@ -1,6 +1,6 @@
 import React from 'react';
 import { BackHandler } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 // ── Subject ───────────────────────────────────────────────────────────────────
@@ -250,18 +250,17 @@ describe('HomeTab sport switching (LS-5814)', () => {
     expect(screen.getByTestId('football-home-screen')).toBeTruthy();
   });
 
-  it('returns to the home dashboard when the SportBackBar back button is pressed', () => {
+  it('renders no in-content back bar over the sport view (LS-8766)', () => {
     render(<HomeTab />);
     void act(() => {
       capturedOnViewSport?.('baseball');
     });
 
-    fireEvent.press(screen.getByText('Sports'));
-
-    expect(screen.getByTestId('home-screen')).toBeTruthy();
+    expect(screen.queryByText('Sports')).toBeNull();
+    expect(screen.queryByTestId('chevron-left')).toBeNull();
   });
 
-  it('dismisses the sport view on Android hardware back press', () => {
+  it('dismisses the sport view on Android system back (button or gesture)', () => {
     render(<HomeTab />);
     void act(() => {
       capturedOnViewSport?.('baseball');
@@ -274,20 +273,17 @@ describe('HomeTab sport switching (LS-5814)', () => {
     expect(screen.getByTestId('home-screen')).toBeTruthy();
   });
 
-  it('renders the SportBackBar title for baseball', () => {
+  it('renders no sport-view title bar (LS-8766)', () => {
     render(<HomeTab />);
     void act(() => {
       capturedOnViewSport?.('baseball');
     });
-    expect(screen.getByText('Baseball Home')).toBeTruthy();
-  });
+    expect(screen.queryByText('Baseball Home')).toBeNull();
 
-  it('renders the SportBackBar title for football', () => {
-    render(<HomeTab />);
     void act(() => {
       capturedOnViewSport?.('football');
     });
-    expect(screen.getByText('Football Home')).toBeTruthy();
+    expect(screen.queryByText('Football Home')).toBeNull();
   });
 });
 

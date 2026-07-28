@@ -20,12 +20,12 @@ describe('Sports Feature Infrastructure', () => {
       expect(content).toContain('export default');
     });
 
-    it('should register the football home route in the stack navigator', () => {
-      const layoutPath = path.join(APP_SRC, 'app/(app)/_layout.tsx');
-      const content = fs.readFileSync(layoutPath, 'utf8');
-
-      expect(content).toContain("title: 'Football Home'");
-      expect(content).toContain('name="football/index"');
+    it('should expose the football home route to the file-based router', () => {
+      // LS-8766 removed the per-route <Stack.Screen> entries (they only set
+      // header options, and the group is now headerless); expo-router registers
+      // these routes from the filesystem instead.
+      const footballPath = path.join(APP_SRC, 'app/(app)/football/index.tsx');
+      expect(fs.existsSync(footballPath)).toBe(true);
     });
   });
 
@@ -38,12 +38,9 @@ describe('Sports Feature Infrastructure', () => {
       expect(content).toContain('export default');
     });
 
-    it('should register the baseball home route in the stack navigator', () => {
-      const layoutPath = path.join(APP_SRC, 'app/(app)/_layout.tsx');
-      const content = fs.readFileSync(layoutPath, 'utf8');
-
-      expect(content).toContain("title: 'Baseball Home'");
-      expect(content).toContain('name="baseball/index"');
+    it('should expose the baseball home route to the file-based router', () => {
+      const baseballPath = path.join(APP_SRC, 'app/(app)/baseball/index.tsx');
+      expect(fs.existsSync(baseballPath)).toBe(true);
     });
 
     it('should have league management screens', () => {
@@ -96,10 +93,10 @@ describe('Sports Feature Infrastructure', () => {
   });
 
   describe('Navigation Structure', () => {
-    it('should have all sport navigation routes registered', () => {
-      const layoutPath = path.join(APP_SRC, 'app/(app)/_layout.tsx');
-      const content = fs.readFileSync(layoutPath, 'utf8');
-
+    it('should have a route file for every sport navigation destination', () => {
+      // Routes are registered by expo-router from the filesystem — LS-8766
+      // deleted the explicit <Stack.Screen> entries, which existed only to set
+      // header titles on a group that is now headerless.
       const expectedRoutes = [
         'index',
         'football/index',
@@ -114,8 +111,19 @@ describe('Sports Feature Infrastructure', () => {
       ];
 
       for (const route of expectedRoutes) {
-        expect(content).toContain(`name="${route}"`);
+        const routePath = path.join(APP_SRC, `app/(app)/${route}.tsx`);
+        expect(fs.existsSync(routePath)).toBe(true);
       }
+    });
+
+    it('should render no navigation header for any route in the group', () => {
+      const layoutPath = path.join(APP_SRC, 'app/(app)/_layout.tsx');
+      const content = fs.readFileSync(layoutPath, 'utf8');
+
+      expect(content).toContain('headerShown: false');
+      expect(content).not.toContain('headerShown: true');
+      expect(content).not.toContain('headerTitle');
+      expect(content).not.toContain('headerLeft');
     });
 
     it('should render the sport-selection Home tab via the shared HomeScreen', () => {

@@ -312,19 +312,4 @@ export default function FootballTeam(): React.JSX.Element {
   );
 }
 
-export function FootballTeamHeader(): React.JSX.Element {
-  const params = useLocalSearchParams();
-  const teamId = params.teamId;
-
-  const numTeamId = toIntId(teamId);
-
-  const { data: team } = useGetTeamByIdQuery({
-    skip: numTeamId === null,
-    variables: {
-      teamId: numTeamId ?? 0,
-    },
-  });
-
-  return <Text>{team?.team?.name}</Text>;
-}
 export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

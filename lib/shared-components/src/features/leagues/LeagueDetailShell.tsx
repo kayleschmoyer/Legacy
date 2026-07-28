@@ -81,7 +81,6 @@ export interface LeagueDetailShellProps {
   onAnalytics?: () => void;
 
   // Hero actions
-  onBack: () => void;
   onInvite?: () => void;
 
   /** Tab content rendered below the chrome (inside the centered page column). */
@@ -188,13 +187,11 @@ export function LeagueDetailHero({
   sport,
   league,
   isCommissioner,
-  onBack,
   onInvite,
 }: {
   sport: Sport;
   league: HeroLeague;
   isCommissioner: boolean;
-  onBack: () => void;
   onInvite?: () => void;
 }): React.JSX.Element {
   const sportLabel = sport === 'football' ? 'Football' : 'Baseball';
@@ -226,7 +223,9 @@ export function LeagueDetailHero({
       // Web-only rich gradient layer; native falls back to the solid card bg.
       style={{ backgroundImage: HERO_GRADIENT }}
     >
-      {/* Top row — back link · sport eyebrow · commissioner chip */}
+      {/* Top row — sport eyebrow · commissioner chip. The "Leagues" back link
+          was removed in LS-8766: back navigation is the platform's job (system
+          back on Android, browser back on web). */}
       <XStack
         alignItems="center"
         gap={10}
@@ -235,36 +234,6 @@ export function LeagueDetailHero({
         $xs={{ gap: 6, marginBottom: 8 }}
         flexWrap="wrap"
       >
-        <XStack
-          tag="button"
-          role="button"
-          tabIndex={0}
-          alignItems="center"
-          gap={6}
-          paddingVertical={6}
-          cursor="pointer"
-          hoverStyle={{ opacity: 0.85 }}
-          pressStyle={{ opacity: 0.7 }}
-          onPress={onBack}
-        >
-          <BrandIcon
-            name="chevron-left"
-            size={14}
-            color={FG3}
-            accentColor={FG3}
-          />
-          <Text
-            fontFamily="$heading"
-            fontWeight="700"
-            fontSize={12}
-            letterSpacing={0.96}
-            textTransform="uppercase"
-            color="$textMuted"
-          >
-            Leagues
-          </Text>
-        </XStack>
-        <Text color="$color10">·</Text>
         <XStack alignItems="center" gap={6}>
           <BrandIcon
             name={sportIcon}
@@ -941,7 +910,6 @@ export function LeagueDetailShell({
   onTabChange,
   pendingTradeCount,
   onAnalytics,
-  onBack,
   onInvite,
   children,
   fill = false,
@@ -973,7 +941,6 @@ export function LeagueDetailShell({
           sport={sport}
           league={league}
           isCommissioner={effIsCommissioner}
-          onBack={onBack}
           onInvite={onInvite}
         />
         <LeagueTabBar

@@ -7,12 +7,7 @@ import React, {
 } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  ArrowLeftRight,
-  ChevronLeft,
-  RefreshCw,
-  Users,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight, RefreshCw, Users } from '@tamagui/lucide-icons';
 import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { config } from '@legacy-sports/app-config/native';
 import { TradingCenter, useWebSocket } from '@legacy-sports/shared-components';
@@ -25,6 +20,7 @@ import {
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
+import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
 import { useSubscription } from '../../features/subscription/useSubscription';
 
 // ── LeagueTrades ──────────────────────────────────────────────────────────────
@@ -33,14 +29,12 @@ interface LeagueTradesProps {
   leagueId: number;
   leagueName: string;
   tradeOfferId?: number;
-  onBack: () => void;
 }
 
 function LeagueTrades({
   leagueId,
   leagueName,
   tradeOfferId,
-  onBack,
 }: LeagueTradesProps) {
   const router = useRouter();
   const { isPremium } = useSubscription();
@@ -116,18 +110,6 @@ function LeagueTrades({
   if (userTeamId == null) {
     return (
       <YStack flex={1}>
-        <XStack alignItems="center" gap="$2" padding="$4" paddingBottom="$2">
-          <Text
-            onPress={onBack}
-            color="$brandGoldLight"
-            fontSize="$4"
-            pressStyle={{ opacity: 0.7 }}
-            accessibilityRole="button"
-            accessibilityLabel={`Back to league list`}
-          >
-            <ChevronLeft size={16} color="$brandGoldLight" /> Back
-          </Text>
-        </XStack>
         <YStack
           flex={1}
           alignItems="center"
@@ -149,19 +131,6 @@ function LeagueTrades({
 
   return (
     <YStack flex={1}>
-      <XStack alignItems="center" gap="$2" padding="$4" paddingBottom="$2">
-        <Text
-          onPress={onBack}
-          color="$brandGoldLight"
-          fontSize="$4"
-          pressStyle={{ opacity: 0.7 }}
-          accessibilityRole="button"
-          accessibilityLabel={`Back to league list`}
-        >
-          <ChevronLeft size={16} color="$brandGoldLight" /> {leagueName}
-        </Text>
-      </XStack>
-
       <ScrollView style={{ flex: 1 }}>
         <TradingCenter
           leagueId={leagueId}
@@ -193,6 +162,8 @@ export default function TradeCenterPage() {
     name: string;
     tradeOfferId?: number;
   } | null>(null);
+
+  const clearSelectedLeague = useCallback(() => setSelectedLeague(null), []);
 
   const { data, previousData, loading, error, refetch } =
     useGetUserLeaguesQuery({
@@ -233,13 +204,16 @@ export default function TradeCenterPage() {
     }
   }, [leagueIdParam, tradeOfferIdParam, leagues, selectedLeague]);
 
+  // The in-content back links were removed in LS-8766, so system back has to
+  // unwind the league selection before it pops the screen.
+  useSystemBackAction(selectedLeague != null, clearSelectedLeague);
+
   if (selectedLeague != null) {
     return (
       <LeagueTrades
         leagueId={selectedLeague.id}
         leagueName={selectedLeague.name}
         tradeOfferId={selectedLeague.tradeOfferId}
-        onBack={() => setSelectedLeague(null)}
       />
     );
   }

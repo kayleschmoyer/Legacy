@@ -581,14 +581,7 @@ describe('FootballPlayerDetail', () => {
     ).toBeTruthy();
   });
 
-  it('renders the back affordance and fires onBack when pressed', () => {
-    const onBack = jest.fn();
-    render(<FootballPlayerDetail player={QB_PLAYER} onBack={onBack} />);
-    fireEvent.click(screen.getByText('Back to Players'));
-    expect(onBack).toHaveBeenCalledTimes(1);
-  });
-
-  it('hides the back affordance when onBack is not provided', () => {
+  it('renders no back affordance (LS-8766)', () => {
     render(<FootballPlayerDetail player={QB_PLAYER} />);
     expect(screen.queryByText('Back to Players')).toBeNull();
   });

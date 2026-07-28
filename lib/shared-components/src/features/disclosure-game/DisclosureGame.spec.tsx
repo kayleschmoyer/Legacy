@@ -148,7 +148,7 @@ async function startGameAndRevealClue() {
     },
   });
 
-  render(<DisclosureGame onBack={jest.fn()} />);
+  render(<DisclosureGame />);
   await waitFor(() => expect(mockFetchActive).toHaveBeenCalled());
 
   fireEvent.click(screen.getByTestId('start-game-button'));
@@ -169,7 +169,7 @@ describe('DisclosureGame — intro copy', () => {
   it('describes the actual 5-clue max instead of the stale "Seven clues" copy', async () => {
     mockFetchActive.mockResolvedValue({ data: { activeDisclosureGame: null } });
 
-    render(<DisclosureGame onBack={jest.fn()} />);
+    render(<DisclosureGame />);
     await waitFor(() => expect(mockFetchActive).toHaveBeenCalled());
 
     expect(screen.getByTestId('disclosure-game-idle').textContent).toMatch(

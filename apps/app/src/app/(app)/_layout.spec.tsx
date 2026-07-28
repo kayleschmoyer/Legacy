@@ -1,28 +1,39 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import type { Text as RNText, View as RNView } from 'react-native';
 
 // ── Import the component under test ──────────────────────────────────────────
 import Layout from './_layout';
 
-// ── Mock type helpers ────────────────────────────────────────────────────────
-
-type RNComponents = {
-  View: typeof RNView;
-  Text: typeof RNText;
-  ActivityIndicator: React.ComponentType;
-};
-
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-// Mock expo-router (Stack navigator + Redirect)
-jest.mock('expo-router', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { View, Text } = require('react-native') as RNComponents;
+const TOP_INSET = 42;
 
-  const Stack = ({ children }: { children: React.ReactNode }) => (
-    <View testID="stack-navigator">{children}</View>
-  );
+/**
+ * Navigator options captured during render. The `mock` prefix is what lets the
+ * hoisted `jest.mock` factory below reference this binding.
+ */
+const mockNav: {
+  screenOptions?: Record<string, unknown>;
+  screens: Record<string, Record<string, unknown> | undefined>;
+} = { screens: {} };
+
+// Mock expo-router (Stack navigator + Redirect). Both the navigator-level
+// `screenOptions` and each `Stack.Screen`'s `options` are captured so the tests
+// can assert on the navigation chrome directly.
+jest.mock('expo-router', () => {
+  const { View, Text } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+
+  const Stack = ({
+    children,
+    screenOptions,
+  }: {
+    children?: React.ReactNode;
+    screenOptions?: Record<string, unknown>;
+  }) => {
+    mockNav.screenOptions = screenOptions;
+    return <View testID="stack-navigator">{children}</View>;
+  };
 
   Stack.Screen = ({
     name,
@@ -30,13 +41,10 @@ jest.mock('expo-router', () => {
   }: {
     name: string;
     options?: Record<string, unknown>;
-  }) => (
-    <View testID={`screen-${name}`}>
-      <Text testID={`opts-${name}`}>
-        {JSON.stringify({ name, ...(options ?? {}) })}
-      </Text>
-    </View>
-  );
+  }) => {
+    mockNav.screens[name] = options;
+    return <View testID={`screen-${name}`} />;
+  };
 
   return {
     Stack,
@@ -46,10 +54,9 @@ jest.mock('expo-router', () => {
   };
 });
 
-// Mock react-native-gesture-handler
 jest.mock('react-native-gesture-handler', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { View } = require('react-native') as RNComponents;
+  const { View } =
+    jest.requireActual<typeof import('react-native')>('react-native');
   return {
     GestureHandlerRootView: ({
       children,
@@ -62,10 +69,13 @@ jest.mock('react-native-gesture-handler', () => {
   };
 });
 
-// Mock @legacy-sports/shared-components
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 42, right: 0, bottom: 0, left: 0 }),
+}));
+
 jest.mock('@legacy-sports/shared-components', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { View, ActivityIndicator } = require('react-native') as RNComponents;
+  const { View, ActivityIndicator } =
+    jest.requireActual<typeof import('react-native')>('react-native');
   return {
     BrandedSplash: () => (
       <View testID="branded-splash">
@@ -75,7 +85,6 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
-// Mock auth hooks
 const mockCurrentUser = { id: 1, name: 'Test User' };
 const mockUseCurrentUserInfo = jest.fn(() => ({
   data: mockCurrentUser,
@@ -85,10 +94,9 @@ jest.mock('../../common/auth/AuthHooks', () => ({
   useCurrentUserInfo: (...args: unknown[]) => mockUseCurrentUserInfo(...args),
 }));
 
-// Mock AuthorizedUserContext
 jest.mock('../../common/auth/AuthorizedUserContext', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { View } = require('react-native') as RNComponents;
+  const { View } =
+    jest.requireActual<typeof import('react-native')>('react-native');
   return {
     AuthorizedUserContextProvider: ({
       children,
@@ -98,132 +106,66 @@ jest.mock('../../common/auth/AuthorizedUserContext', () => {
   };
 });
 
-// Mock push notifications hook
 jest.mock('../../features/notifications/hooks/usePushNotifications', () => ({
   usePushNotifications: jest.fn(),
 }));
 
-// Mock the header-bearing route modules (named header exports only)
-jest.mock('./baseball/league/[leagueId]', () => ({
-  __esModule: true,
-  default: () => 'LeagueId',
-  LeagueIdHeader: () => 'League',
-}));
-jest.mock('./football/league/[leagueId]', () => ({
-  __esModule: true,
-  default: () => 'FootballLeagueId',
-  FootballLeagueIdHeader: () => 'FootballLeague',
-}));
-jest.mock('./league/[leagueId]', () => ({
-  __esModule: true,
-  default: () => 'LeagueContext',
-  LeagueContextHeader: () => 'League',
-}));
-jest.mock('./baseball/team/[teamId]', () => ({
-  __esModule: true,
-  default: () => 'Team',
-  TeamIdHeader: () => 'Team',
-}));
-jest.mock('./football/team/[teamId]', () => ({
-  __esModule: true,
-  default: () => 'FootballTeam',
-  FootballTeamHeader: () => 'FootballTeam',
-}));
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-// ── Expected data ────────────────────────────────────────────────────────────
-
-const EXPECTED_SCREENS = [
-  '(tabs)',
-  'index',
-  'baseball/index',
-  'football/index',
-  'league/create',
-  'league/join',
-  'baseball/league/create',
-  'football/league/create',
-  'baseball/league/join',
-  'football/league/join',
-  'league-discovery',
-  'league/[leagueId]',
-  'baseball/league/[leagueId]',
-  'football/league/[leagueId]',
-  'baseball/team/[teamId]',
-  'football/team/[teamId]',
-  'baseball/matchup',
-  'football/matchup',
-  'DraftBoardPage',
-  'FreeAgents',
-  'PlayerStats',
-  'PlayerDetail',
-  'DirectMessages',
-  'TradeCenterPage',
-  'WaiversPage',
-  'management',
-  'games/index',
-  'disclosure-game/index',
-  'season-draft/index',
-  'season-draft/[gameId]',
-  'season-draft/create',
-  'season-draft/join',
-  'baseball/scoreboard',
-  'about',
-  'help',
-  'profile-settings',
-  'preferences',
-  'notifications',
-  'subscription-settings',
-  'update-check',
-];
-
-// Screens intentionally removed from navigation (drawer removal).
-const REMOVED_FROM_NAV = [
-  'view_game_logs',
-  'view_career_stats',
-  'admin-revenue',
-];
+function contentStyleOf(options: Record<string, unknown> | undefined): {
+  paddingTop?: number;
+} {
+  return options?.contentStyle ?? {};
+}
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('App (tabs) Stack Layout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockNav.screenOptions = undefined;
+    mockNav.screens = {};
     mockUseCurrentUserInfo.mockReturnValue({
       data: mockCurrentUser,
       loading: false,
     });
   });
 
-  describe('navigation structure', () => {
+  describe('navigation chrome (LS-8766)', () => {
     it('renders a Stack navigator (the flat drawer is removed)', () => {
       render(<Layout />);
       expect(screen.getByTestId('stack-navigator')).toBeTruthy();
     });
 
-    it('registers every expected screen in the stack', () => {
+    it('hides the native header for every route in the group', () => {
       render(<Layout />);
-      for (const name of EXPECTED_SCREENS) {
-        expect(screen.getByTestId(`screen-${name}`)).toBeTruthy();
+      expect(mockNav.screenOptions?.headerShown).toBe(false);
+    });
+
+    it('pads the scene by the top safe-area inset in place of the header', () => {
+      render(<Layout />);
+      expect(contentStyleOf(mockNav.screenOptions).paddingTop).toBe(TOP_INSET);
+    });
+
+    it('re-registers no route with a header, title, or back affordance', () => {
+      render(<Layout />);
+      for (const options of Object.values(mockNav.screens)) {
+        expect(options).not.toHaveProperty('headerShown', true);
+        expect(options).not.toHaveProperty('title');
+        expect(options).not.toHaveProperty('headerTitle');
+        expect(options).not.toHaveProperty('headerLeft');
       }
     });
 
-    it('hides the header on the (tabs) group and the index redirect', () => {
+    it('opts the tab shell and the index redirect out of the scene top padding', () => {
       render(<Layout />);
-      // Both the tab group and the `/` redirect opt out of a stack header so
-      // there is no chrome stacked above the tab bar / during the redirect.
-      expect(
-        screen.getByText(
-          JSON.stringify({ name: '(tabs)', headerShown: false }),
-        ),
-      ).toBeTruthy();
-      expect(
-        screen.getByText(JSON.stringify({ name: 'index', headerShown: false })),
-      ).toBeTruthy();
-    });
-
-    it('no longer registers screens removed from navigation', () => {
-      render(<Layout />);
-      for (const name of REMOVED_FROM_NAV) {
-        expect(screen.queryByTestId(`screen-${name}`)).toBeNull();
+      // Each tab screen reads `useSafeAreaInsets` itself, so scene-level
+      // padding would double the status-bar clearance there.
+      for (const name of ['(tabs)', 'index']) {
+        expect(mockNav.screens).toHaveProperty(name);
+        expect(
+          contentStyleOf(mockNav.screens[name]).paddingTop,
+        ).toBeUndefined();
       }
     });
   });

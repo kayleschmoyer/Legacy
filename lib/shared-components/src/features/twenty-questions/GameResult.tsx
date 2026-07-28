@@ -16,7 +16,6 @@ interface GameResultProps {
   questionsUsed: number;
   maxQuestions: number;
   onPlayAgain: () => void;
-  onBack: () => void;
 }
 
 export const GameResult: React.FC<GameResultProps> = ({
@@ -26,7 +25,6 @@ export const GameResult: React.FC<GameResultProps> = ({
   questionsUsed,
   maxQuestions,
   onPlayAgain,
-  onBack,
 }) => {
   const won = status === TwentyQuestionsStatus.Won;
   const playerName = targetPlayer
@@ -101,9 +99,6 @@ export const GameResult: React.FC<GameResultProps> = ({
         testID="play-again-button"
       >
         Play Again
-      </Button>
-      <Button size="$3" chromeless onPress={onBack} testID="back-button">
-        Back
       </Button>
     </YStack>
   );

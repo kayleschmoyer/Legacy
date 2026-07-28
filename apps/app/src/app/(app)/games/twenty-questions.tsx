@@ -1,5 +1,4 @@
 import React from 'react';
-import { useRouter } from 'expo-router';
 import { TwentyQuestionsGame } from '@legacy-sports/shared-components';
 
 /**
@@ -9,8 +8,6 @@ import { TwentyQuestionsGame } from '@legacy-sports/shared-components';
  * Route: /games/twenty-questions (Expo Router file-based)
  */
 export default function TwentyQuestionsScreen() {
-  const router = useRouter();
-
-  return <TwentyQuestionsGame onBack={() => router.back()} />;
+  return <TwentyQuestionsGame />;
 }
 export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

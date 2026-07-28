@@ -120,7 +120,6 @@ export function FootballPlayerDetailModal({
             loading={loading}
             error={!!error}
             notFound={notFound}
-            onBack={() => onOpenChange(false)}
             isPremium={isPremium}
             onUpgrade={() => setShowUpgradeModal(true)}
             initialTab="overview"

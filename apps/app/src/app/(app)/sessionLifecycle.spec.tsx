@@ -49,6 +49,10 @@ jest.mock('expo-router', () => {
   };
 });
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
+}));
+
 jest.mock('react-native-gesture-handler', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
@@ -129,33 +133,6 @@ jest.mock('../../context/ThemeContext', () => ({
 
 jest.mock('./_screenErrorBoundary', () => ({
   ScreenErrorBoundary: () => null,
-}));
-
-// Header-bearing route modules (named header exports only).
-jest.mock('./baseball/league/[leagueId]', () => ({
-  __esModule: true,
-  default: () => 'LeagueId',
-  LeagueIdHeader: () => 'League',
-}));
-jest.mock('./football/league/[leagueId]', () => ({
-  __esModule: true,
-  default: () => 'FootballLeagueId',
-  FootballLeagueIdHeader: () => 'FootballLeague',
-}));
-jest.mock('./league/[leagueId]', () => ({
-  __esModule: true,
-  default: () => 'LeagueContext',
-  LeagueContextHeader: () => 'League',
-}));
-jest.mock('./baseball/team/[teamId]', () => ({
-  __esModule: true,
-  default: () => 'Team',
-  TeamIdHeader: () => 'Team',
-}));
-jest.mock('./football/team/[teamId]', () => ({
-  __esModule: true,
-  default: () => 'FootballTeam',
-  FootballTeamHeader: () => 'FootballTeam',
 }));
 
 // ── Mocks: the REAL AuthHooks' native transitive deps (mirrors AuthHooks.spec) ──

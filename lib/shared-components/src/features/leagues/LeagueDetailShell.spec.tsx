@@ -166,11 +166,9 @@ describe('LeagueDetailShell', () => {
     expect(onTabChange).toHaveBeenCalledWith('trades');
   });
 
-  it('fires onBack from the hero back link', () => {
-    const onBack = jest.fn();
-    const { getByText } = renderShell({ onBack });
-    fireEvent.click(getByText('Leagues'));
-    expect(onBack).toHaveBeenCalledTimes(1);
+  it('renders no back link in the hero (LS-8766)', () => {
+    const { queryByText } = renderShell({});
+    expect(queryByText('Leagues')).toBeNull();
   });
 
   it('fires onInvite from the hero invite action', () => {

@@ -51,7 +51,6 @@ export const SeasonDraftGamesPage: React.FC = () => {
       <SeasonDraftGameLobby
         onSelectGame={(gameId) => navigate(`/games/season-draft/${gameId}`)}
         onCreateGame={() => navigate('/games/season-draft/create')}
-        onBack={() => navigate('/')}
       />
     </>
   );

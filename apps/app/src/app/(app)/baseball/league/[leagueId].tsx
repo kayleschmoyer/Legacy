@@ -1,8 +1,4 @@
-import {
-  useGlobalSearchParams,
-  useLocalSearchParams,
-  useRouter,
-} from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, {
   useCallback,
   useEffect,
@@ -10,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Button, H3, Spinner, Text, YStack } from 'tamagui';
+import { Button, Spinner, Text, YStack } from 'tamagui';
 import { ShoppingCart } from '@tamagui/lucide-icons';
 import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
@@ -49,8 +45,6 @@ import { useLeagueScoringSettings } from '../../../../common/scoring';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
-import { toIntId } from '../../../../common/utilities/RouteUtils';
-import { goBackToApp } from '../../../../common/utilities/leagueNavigation';
 import { setLastVisitedLeague } from '../../../../common/utilities/lastVisitedLeague';
 import { useSubscription } from '../../../../features/subscription/useSubscription';
 
@@ -471,7 +465,6 @@ export default function LeagueId(): React.JSX.Element {
       tabs={leagueTabs}
       activeTab={selectedTab}
       onTabChange={setSelectedTab}
-      onBack={() => goBackToApp(router)}
       onInvite={() => void handleInviteShare()}
     >
       {userTeamId != null && (
@@ -679,22 +672,4 @@ export default function LeagueId(): React.JSX.Element {
   );
 }
 
-export function LeagueIdHeader(_props: {
-  tintColor?: string | object | null;
-  children?: string;
-}): React.JSX.Element {
-  const params = useGlobalSearchParams();
-  const leagueId = params.leagueId;
-
-  const numLeagueId = toIntId(leagueId);
-
-  const { data } = useGetLeagueByIdQuery({
-    skip: numLeagueId === null,
-    variables: {
-      id: numLeagueId ?? 0,
-    },
-  });
-
-  return <H3>{data ? data.league?.name : ''}</H3>;
-}
 export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

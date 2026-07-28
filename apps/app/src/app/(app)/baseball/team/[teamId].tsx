@@ -596,28 +596,4 @@ export default function Team(): React.JSX.Element {
   );
 }
 
-export function TeamIdHeader(): React.JSX.Element {
-  const params = useLocalSearchParams();
-  const teamId = params.teamId;
-
-  const numTeamId = toIntId(teamId);
-
-  const { data: team } = useGetTeamByIdQuery({
-    skip: numTeamId === null,
-    variables: {
-      teamId: numTeamId ?? 0,
-    },
-  });
-
-  return (
-    <XStack gap="$2" alignItems="center">
-      <TeamAvatarGlyph
-        avatarUrl={team?.team?.avatarUrl}
-        name={team?.team?.name}
-        size={24}
-      />
-      <Text>{team?.team?.name}</Text>
-    </XStack>
-  );
-}
 export { ScreenErrorBoundary as ErrorBoundary } from '../../_screenErrorBoundary';

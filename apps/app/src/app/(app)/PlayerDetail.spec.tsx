@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 
 // import type (erased at compile time — no barrel loaded at runtime) solely to
 // type the jest.requireActual generic parameters without triggering boundary rules.
@@ -167,63 +167,34 @@ describe('PlayerDetailScreen', () => {
     mockUseLocalSearchParams.mockReturnValue({});
     render(<PlayerDetailScreen />);
     expect(screen.getByText('Player Not Found')).toBeTruthy();
-    expect(screen.getByTestId('player-detail-invalid-back')).toBeTruthy();
   });
 
   it('shows invalid-deep-link-fallback when playerId param is undefined', () => {
     mockUseLocalSearchParams.mockReturnValue({ playerId: undefined });
     render(<PlayerDetailScreen />);
     expect(screen.getByText('Player Not Found')).toBeTruthy();
-    expect(screen.getByTestId('player-detail-invalid-back')).toBeTruthy();
   });
 
   it('shows invalid-deep-link-fallback when playerId param is non-numeric', () => {
     mockUseLocalSearchParams.mockReturnValue({ playerId: 'abc' });
     render(<PlayerDetailScreen />);
     expect(screen.getByText('Player Not Found')).toBeTruthy();
-    expect(screen.getByTestId('player-detail-invalid-back')).toBeTruthy();
   });
 
-  it('calls router.back when the Go Back button is pressed on the fallback screen and canGoBack is true', () => {
-    mockCanGoBack = true;
+  // LS-8766 — no back affordance of any kind is rendered on this screen any
+  // more (no native header, no in-content button). Back navigation is the
+  // platform back button / edge-swipe gesture.
+  it('renders no back affordance on the invalid-deep-link fallback', () => {
     mockUseLocalSearchParams.mockReturnValue({ playerId: undefined });
     render(<PlayerDetailScreen />);
-    fireEvent.press(screen.getByTestId('player-detail-invalid-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('player-detail-invalid-back')).toBeNull();
+    expect(screen.queryByText('Go Back')).toBeNull();
   });
 
-  it('calls router.replace to players hub when Go Back is pressed on the fallback screen and canGoBack is false', () => {
-    mockCanGoBack = false;
-    mockUseLocalSearchParams.mockReturnValue({ playerId: undefined });
-    render(<PlayerDetailScreen />);
-    fireEvent.press(screen.getByTestId('player-detail-invalid-back'));
-    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/players');
-    expect(mockBack).not.toHaveBeenCalled();
-  });
-
-  it('renders a header back button when a valid playerId is provided', () => {
+  it('renders no header back button for a valid playerId', () => {
     mockUseLocalSearchParams.mockReturnValue({ playerId: '42' });
     render(<PlayerDetailScreen />);
-    expect(screen.getByTestId('player-detail-header-back')).toBeTruthy();
-  });
-
-  it('calls router.back from the header back button when canGoBack is true', () => {
-    mockCanGoBack = true;
-    mockUseLocalSearchParams.mockReturnValue({ playerId: '42' });
-    render(<PlayerDetailScreen />);
-    fireEvent.press(screen.getByTestId('player-detail-header-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
-
-  it('calls router.replace to players hub from the header back button when canGoBack is false', () => {
-    mockCanGoBack = false;
-    mockUseLocalSearchParams.mockReturnValue({ playerId: '42' });
-    render(<PlayerDetailScreen />);
-    fireEvent.press(screen.getByTestId('player-detail-header-back'));
-    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/players');
-    expect(mockBack).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('player-detail-header-back')).toBeNull();
   });
 
   it('passes playerName param to PlayerDetailById as initialName', () => {

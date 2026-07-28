@@ -59,12 +59,6 @@ interface ResultState {
   correctPlayerName: string | null;
 }
 
-// ── Props ──────────────────────────────────────────────────────────────────
-
-export interface DisclosureGameProps {
-  onBack: () => void;
-}
-
 // ── Tier styling ───────────────────────────────────────────────────────────
 
 const TIER_STYLES: Record<
@@ -129,31 +123,9 @@ function Eyebrow({
   );
 }
 
-function BackButton({
-  onPress,
-  label,
-}: {
-  onPress: () => void;
-  label: string;
-}): React.JSX.Element {
-  return (
-    <Button
-      chromeless
-      size="$2"
-      alignSelf="flex-start"
-      color="$textMuted"
-      onPress={onPress}
-      pressStyle={{ opacity: 0.7 }}
-      testID="back-button"
-    >
-      {`← ${label}`}
-    </Button>
-  );
-}
-
 // ── Component ──────────────────────────────────────────────────────────────
 
-export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
+export const DisclosureGame: React.FC = () => {
   // ── Session state ──────────────────────────────────────────────────────
   const [phase, setPhase] = useState<GamePhase>('idle');
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -409,7 +381,6 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
           gap="$4"
           testID="disclosure-game-idle"
         >
-          <BackButton onPress={onBack} label="Back to Games" />
           <YStack
             alignItems="center"
             gap="$4"
@@ -522,15 +493,6 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
                       ? 'Checking…'
                       : 'Start Game'}
               </Button>
-              <Button
-                size="$5"
-                variant="outlined"
-                borderColor="$surfacePanelBorder"
-                color="$color"
-                onPress={onBack}
-              >
-                Not Now
-              </Button>
             </XStack>
           </YStack>
         </YStack>
@@ -569,7 +531,6 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
           gap="$4"
           testID="disclosure-game-result"
         >
-          <BackButton onPress={onBack} label="Back to Games" />
           <YStack
             alignItems="center"
             gap="$3"
@@ -687,15 +648,6 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
               >
                 Play Again
               </Button>
-              <Button
-                size="$5"
-                variant="outlined"
-                borderColor="$surfacePanelBorder"
-                color="$color"
-                onPress={onBack}
-              >
-                Back to Games
-              </Button>
             </XStack>
           </YStack>
         </YStack>
@@ -718,8 +670,6 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
         gap="$4"
         testID="disclosure-game-playing"
       >
-        <BackButton onPress={onBack} label="Back to Games" />
-
         {/* Header */}
         <XStack
           justifyContent="space-between"

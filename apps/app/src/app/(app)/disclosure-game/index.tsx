@@ -1,5 +1,4 @@
 import React from 'react';
-import { useRouter } from 'expo-router';
 import { DisclosureGame } from '@legacy-sports/shared-components';
 
 /**
@@ -9,8 +8,6 @@ import { DisclosureGame } from '@legacy-sports/shared-components';
  * Route: /disclosure-game (Expo Router file-based)
  */
 export default function DisclosureGameScreen() {
-  const router = useRouter();
-
-  return <DisclosureGame onBack={() => router.back()} />;
+  return <DisclosureGame />;
 }
 export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

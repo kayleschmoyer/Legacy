@@ -1,11 +1,7 @@
-import {
-  useGlobalSearchParams,
-  useLocalSearchParams,
-  useRouter,
-} from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView } from 'react-native';
-import { Card, H3, Spinner, Text, YStack } from 'tamagui';
+import { Card, Spinner, Text, YStack } from 'tamagui';
 import { Tabs } from '@tamagui/tabs';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
@@ -393,10 +389,7 @@ export default function LeagueContext(): React.JSX.Element {
         </Tabs.Content>
 
         <Tabs.Content value="freeagents" flex={1}>
-          <LeagueFreeAgents
-            leagueId={numLeagueId}
-            leagueName={league.name ?? 'League'}
-          />
+          <LeagueFreeAgents leagueId={numLeagueId} />
         </Tabs.Content>
 
         <Tabs.Content value="trades" flex={1}>
@@ -452,22 +445,6 @@ export default function LeagueContext(): React.JSX.Element {
       </Tabs>
     </YStack>
   );
-}
-
-export function LeagueContextHeader(_props: {
-  tintColor?: string | object | null;
-  children?: string;
-}): React.JSX.Element {
-  const params = useGlobalSearchParams();
-  const leagueId = params.leagueId;
-  const numLeagueId = toIntId(leagueId);
-
-  const { data } = useGetLeagueByIdQuery({
-    skip: numLeagueId === null,
-    variables: { id: numLeagueId ?? 0 },
-  });
-
-  return <H3>{data?.league?.name ?? ''}</H3>;
 }
 
 export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

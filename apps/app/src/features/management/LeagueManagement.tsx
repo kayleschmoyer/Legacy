@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView } from 'react-native';
 import {
   Button,
@@ -9,12 +9,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  AlertTriangle,
-  ChevronLeft,
-  Settings,
-  Shield,
-} from '@tamagui/lucide-icons';
+import { AlertTriangle, Settings, Shield } from '@tamagui/lucide-icons';
 import {
   CommissionerAuditLog,
   CommissionerNoteControl,
@@ -29,16 +24,21 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
+import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
 import { useSubscription } from '../subscription/useSubscription';
 
 function LeagueCommissionerTools({
   leagueId,
   leagueName,
-  onBack,
+  onDeleted,
 }: {
   leagueId: number;
   leagueName: string;
-  onBack: () => void;
+  /**
+   * Returns to the league list after the league is deleted. This screen renders
+   * no back affordance (LS-8766) — ordinary back navigation is system back.
+   */
+  onDeleted: () => void;
 }) {
   const userInfo = useAuthorizedUserInfo();
   const { isPremium } = useSubscription();
@@ -77,14 +77,6 @@ function LeagueCommissionerTools({
         <Text color="$red10" fontSize="$4" textAlign="center">
           {error ? 'Failed to load league data.' : 'League not found.'}
         </Text>
-        <Text
-          onPress={onBack}
-          color="$brandGoldLight"
-          fontSize="$4"
-          pressStyle={{ opacity: 0.7 }}
-        >
-          Go back
-        </Text>
       </YStack>
     );
   }
@@ -101,17 +93,6 @@ function LeagueCommissionerTools({
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16 }}>
       <YStack gap="$4">
-        <XStack alignItems="center" gap="$2">
-          <Text
-            onPress={onBack}
-            color="$brandGoldLight"
-            fontSize="$4"
-            pressStyle={{ opacity: 0.7 }}
-          >
-            <ChevronLeft size={16} color="$brandGoldLight" /> {leagueName}
-          </Text>
-        </XStack>
-
         {!isCommissioner && (
           <Card
             backgroundColor="$yellow3"
@@ -173,7 +154,7 @@ function LeagueCommissionerTools({
             <DeleteLeagueControl
               leagueId={leagueId}
               leagueName={leagueName}
-              onDeleted={onBack}
+              onDeleted={onDeleted}
               onError={handleError}
             />
           </>
@@ -190,16 +171,22 @@ export const LeagueManagement: React.FC = () => {
     name: string;
   } | null>(null);
 
+  const clearSelectedLeague = useCallback(() => setSelectedLeague(null), []);
+
   const { data, loading, error, refetch } = useGetUserLeaguesQuery({
     skip: !userInfo?.id,
   });
+
+  // No in-content back affordance is rendered any more (LS-8766), so system
+  // back has to unwind the league selection before it pops the screen.
+  useSystemBackAction(selectedLeague != null, clearSelectedLeague);
 
   if (selectedLeague != null) {
     return (
       <LeagueCommissionerTools
         leagueId={selectedLeague.id}
         leagueName={selectedLeague.name}
-        onBack={() => setSelectedLeague(null)}
+        onDeleted={clearSelectedLeague}
       />
     );
   }

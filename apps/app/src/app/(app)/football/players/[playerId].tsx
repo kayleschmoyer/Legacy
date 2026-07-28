@@ -22,7 +22,6 @@ export default function FootballPlayerDetailScreen(): React.JSX.Element {
         player={data?.footballPlayer}
         loading={loading}
         error={!!error}
-        onBack={() => router.back()}
         isPremium={isPremium}
         onUpgrade={() => router.navigate('subscription-settings')}
       />

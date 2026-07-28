@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, ScrollView } from 'react-native';
 import { Button, Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ChevronLeft, UserPlus, Users } from '@tamagui/lucide-icons';
+import { UserPlus, Users } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   type FreeAgentClaimPlayer,
@@ -17,6 +17,7 @@ import {
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { useIsMounted } from '../../common/hooks/useIsMounted';
+import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
 
 /**
  * Native league free-agents view (LS-7818).
@@ -29,15 +30,7 @@ import { useIsMounted } from '../../common/hooks/useIsMounted';
  * both the league-detail Free Agents tab and the standalone Free Agents screen
  * below, so there is a single free-agent UI on native.
  */
-export function LeagueFreeAgents({
-  leagueId,
-  leagueName,
-  onBack,
-}: {
-  leagueId: number;
-  leagueName: string;
-  onBack?: () => void;
-}) {
+export function LeagueFreeAgents({ leagueId }: { leagueId: number }) {
   const [claimingPlayerId, setClaimingPlayerId] = useState<number | null>(null);
   const [faabBid, setFaabBid] = useState('');
 
@@ -224,25 +217,6 @@ export function LeagueFreeAgents({
 
   return (
     <YStack flex={1}>
-      {onBack != null && (
-        <XStack alignItems="center" gap="$2" padding="$4" paddingBottom="$2">
-          <Text
-            onPress={onBack}
-            tabIndex={0}
-            onKeyDown={(e: React.KeyboardEvent) => {
-              if (e.key === 'Enter' || e.key === ' ') onBack?.();
-            }}
-            color="$brandGoldLight"
-            fontSize="$4"
-            pressStyle={{ opacity: 0.7 }}
-            accessibilityRole="button"
-            accessibilityLabel={`Back to ${leagueName}`}
-          >
-            <ChevronLeft size={16} color="$brandGoldLight" /> {leagueName}
-          </Text>
-        </XStack>
-      )}
-
       <LeagueDetailFreeAgentsTab
         league={{
           id: leagueId,
@@ -270,14 +244,14 @@ export default function FreeAgentsScreen() {
     skip: !userInfo?.id,
   });
 
+  const clearSelectedLeague = useCallback(() => setSelectedLeague(null), []);
+
+  // The in-content back link was removed in LS-8766, so system back has to
+  // unwind the league selection before it pops the screen.
+  useSystemBackAction(selectedLeague != null, clearSelectedLeague);
+
   if (selectedLeague != null) {
-    return (
-      <LeagueFreeAgents
-        leagueId={selectedLeague.id}
-        leagueName={selectedLeague.name}
-        onBack={() => setSelectedLeague(null)}
-      />
-    );
+    return <LeagueFreeAgents leagueId={selectedLeague.id} />;
   }
 
   const leagues = data?.userLeagues ?? [];

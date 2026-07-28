@@ -1,9 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { BackHandler, Pressable, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft } from '@tamagui/lucide-icons';
-import { Text, XStack } from 'tamagui';
 import {
   formatDisplayName,
   type HomeLeagueSummary,
@@ -15,77 +13,15 @@ import {
   useGetArchivedUserLeagueSummariesQuery,
   useGetUserLeagueSummariesQuery,
 } from '@legacy-sports/graphql';
-import { colors } from '@legacy-sports/design-tokens';
 import { LOGGER } from '@legacy-sports/logging';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
+import { useSystemBackAction } from '../../../common/hooks/useSystemBackAction';
 import { toPlayerDetailIdParam } from '../../../common/utilities/RouteUtils';
 import BaseballHomeScreen from '../baseball/index';
 import FootballHomeScreen from '../football/index';
 
 type ActiveSport = 'baseball' | 'football';
-
-const SPORT_TITLES: Record<ActiveSport, string> = {
-  baseball: 'Baseball Home',
-  football: 'Football Home',
-};
-
-/**
- * Minimal navigation bar rendered at the top of the inline sport views.
- * Replicates the Stack navigator header back affordance so iOS users have a
- * clear way to return to the sports dashboard without a hardware back button.
- */
-function SportBackBar({
-  sport,
-  topInset,
-  onBack,
-}: {
-  sport: ActiveSport;
-  topInset: number;
-  onBack: () => void;
-}) {
-  // The XStack/Text below resolve `$token` props against the active Tamagui
-  // theme. ChevronLeft is a non-Tamagui icon, so it needs a resolved hex value
-  // — read from the design-token package (the theme's source of truth) keyed
-  // by the active light/dark theme.
-  const { resolvedTheme } = useThemeContext();
-  const iconColor = colors[resolvedTheme].text.fg1;
-
-  return (
-    <XStack
-      alignItems="center"
-      backgroundColor="$background"
-      borderBottomWidth={1}
-      borderBottomColor="$surfacePanelBorder"
-      paddingTop={topInset}
-      paddingHorizontal="$4"
-      paddingVertical="$3"
-    >
-      <Pressable
-        onPress={onBack}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel="Back to Sports"
-        style={{ flexDirection: 'row', alignItems: 'center' }}
-      >
-        <ChevronLeft size={24} color={iconColor} />
-        <Text color="$color" fontSize="$4">
-          Sports
-        </Text>
-      </Pressable>
-      <Text
-        flex={1}
-        textAlign="center"
-        fontWeight="600"
-        color="$color"
-        fontSize="$5"
-        marginRight="$8"
-      >
-        {SPORT_TITLES[sport]}
-      </Text>
-    </XStack>
-  );
-}
 
 /**
  * The Home tab renders the shared, cross-platform `HomeScreen` dashboard from
@@ -172,21 +108,11 @@ export default function HomeTab() {
     setActiveSport(null);
   }, []);
 
-  // Android hardware back: dismiss the inline sport view and return to the
-  // sports dashboard. Only registered when a sport view is active.
-  useFocusEffect(
-    useCallback(() => {
-      if (!activeSport) return;
-      const subscription = BackHandler.addEventListener(
-        'hardwareBackPress',
-        () => {
-          setActiveSport(null);
-          return true;
-        },
-      );
-      return () => subscription.remove();
-    }, [activeSport]),
-  );
+  // System back (hardware button / edge-swipe): dismiss the inline sport view
+  // and return to the sports dashboard. Only registered when a sport view is
+  // active — this is the only way back now that the sport views no longer
+  // render their own back bar (LS-8766).
+  useSystemBackAction(activeSport !== null, handleBackFromSport);
 
   const userName = formatDisplayName(userInfo.username || 'Manager');
 
@@ -251,13 +177,11 @@ export default function HomeTab() {
           style={{
             display: activeSport === 'baseball' ? 'flex' : 'none',
             flex: 1,
+            // The sport views used to get their status-bar clearance from the
+            // back bar removed in LS-8766; pad the container instead.
+            paddingTop: topInset,
           }}
         >
-          <SportBackBar
-            sport="baseball"
-            topInset={topInset}
-            onBack={handleBackFromSport}
-          />
           <BaseballHomeScreen />
         </View>
       )}
@@ -266,13 +190,9 @@ export default function HomeTab() {
           style={{
             display: activeSport === 'football' ? 'flex' : 'none',
             flex: 1,
+            paddingTop: topInset,
           }}
         >
-          <SportBackBar
-            sport="football"
-            topInset={topInset}
-            onBack={handleBackFromSport}
-          />
           <FootballHomeScreen />
         </View>
       )}

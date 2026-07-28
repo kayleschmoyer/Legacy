@@ -30,6 +30,9 @@ const mockNavigate = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({ navigate: mockNavigate }),
+  useFocusEffect: (cb: () => (() => void) | void) => {
+    cb();
+  },
   Redirect: () => null,
 }));
 

@@ -6,4 +6,3 @@
  */
 
 export { DisclosureGame } from './DisclosureGame';
-export type { DisclosureGameProps } from './DisclosureGame';
