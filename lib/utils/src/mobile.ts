@@ -10,8 +10,18 @@ export * from './lib/entitlements';
 export * from './lib/DbCredentials';
 export * from './lib/DbOptions';
 export * from './lib/ErrorHandling';
+// formatDraftDate is called during render by LeagueListRow (shared-components
+// HomeScreen). It was defined only in `index.ts`, so on device it resolved to
+// `undefined` and the Home dashboard crashed to the error boundary with
+// "undefined is not a function" for any user with a scheduled draft (LS-8755).
+export * from './lib/format-draft-date';
 export * from './lib/help-content';
 export * from './lib/notification-types';
+// Pure roster/lineup defaults consumed by shared-components' `config/sports.ts`
+// at module-evaluation time (DEFAULT_LINEUP_BY_SPORT). Missing here they are
+// silently `undefined` on device rather than throwing at import — same
+// barrel-drift root cause as formatDraftDate above.
+export * from './lib/sport-defaults';
 // Pure, Hermes-safe string helpers consumed by shared-components (OnThisDayFeed).
 // These must be re-exported here — Metro resolves '@legacy-sports/utils' to this
 // file via the package "react-native" field, so anything missing here is

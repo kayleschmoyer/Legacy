@@ -10,6 +10,7 @@ export {
   stripDiacritics,
 } from './lib/utils';
 export * from './lib/ErrorHandling';
+export * from './lib/format-draft-date';
 export * from './lib/help-content';
 export * from './lib/league-utils';
 export * from './lib/notification-copy';
@@ -18,33 +19,3 @@ export * from './lib/sanitize-name';
 export * from './lib/scoring-math';
 export * from './lib/season-constants';
 // Node.js-only exports (DbCredentials, DbOptions, LambdaHelpers, version) are in '@legacy-sports/utils/node'
-
-/**
- * Formats an ISO timestamp for draft scheduling display.
- * Returns a locale-aware string like "Apr 20, 8:00 PM", or a
- * locale-independent "YYYY-MM-DD HH:MM" if locale formatting is
- * unavailable (e.g. a Hermes release build without full ICU/Intl data).
- * Returns an empty string for null/undefined/invalid input.
- */
-export function formatDraftDate(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  try {
-    return (
-      d.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-      }) +
-      ', ' +
-      d.toLocaleTimeString(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    );
-  } catch {
-    // Hermes release builds without full ICU/Intl data can leave
-    // toLocaleDateString/toLocaleTimeString undefined, throwing here.
-    return d.toISOString().slice(0, 16).replace('T', ' ');
-  }
-}

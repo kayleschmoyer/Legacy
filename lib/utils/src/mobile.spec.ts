@@ -1,6 +1,9 @@
 import {
   cleanDescription,
+  DEFAULT_BASEBALL_ROSTER_POSITIONS,
+  DEFAULT_FOOTBALL_ROSTER_POSITIONS,
   extractPlayerNameFromDescription,
+  formatDraftDate,
   stripDiacritics,
 } from './mobile';
 
@@ -32,5 +35,36 @@ describe('mobile entry point (LS-7953)', () => {
   it('re-exports stripDiacritics as a callable function', () => {
     expect(typeof stripDiacritics).toBe('function');
     expect(stripDiacritics('José Ramírez')).toBe('Jose Ramirez');
+  });
+});
+
+/**
+ * Same barrel-drift failure mode, re-hit on the Home dashboard. `LeagueListRow`
+ * (shared-components HomeScreen) calls `formatDraftDate` during render for any
+ * league with a scheduled draft. It was defined inline in `index.ts` only, so
+ * Metro resolved it to `undefined` on device and the call threw
+ * "TypeError: undefined is not a function" straight into the screen error
+ * boundary — note the throw happens at the *call site*, so a try/catch inside
+ * `formatDraftDate` cannot catch it; only reaching this barrel fixes it.
+ */
+describe('mobile entry point (LS-8755)', () => {
+  it('re-exports formatDraftDate as a callable function', () => {
+    expect(typeof formatDraftDate).toBe('function');
+    expect(formatDraftDate('2026-04-20T20:00:00.000Z')).toMatch(/Apr 20/);
+  });
+
+  it('returns an empty string for missing input rather than throwing', () => {
+    expect(formatDraftDate(null)).toBe('');
+    expect(formatDraftDate(undefined)).toBe('');
+  });
+
+  it('re-exports the sport roster defaults as populated arrays', () => {
+    // shared-components' config/sports.ts spreads these into
+    // DEFAULT_LINEUP_BY_SPORT at module-evaluation time; when missing from this
+    // barrel they are silently `undefined` on device instead of throwing.
+    expect(Array.isArray(DEFAULT_BASEBALL_ROSTER_POSITIONS)).toBe(true);
+    expect(DEFAULT_BASEBALL_ROSTER_POSITIONS.length).toBeGreaterThan(0);
+    expect(Array.isArray(DEFAULT_FOOTBALL_ROSTER_POSITIONS)).toBe(true);
+    expect(DEFAULT_FOOTBALL_ROSTER_POSITIONS.length).toBeGreaterThan(0);
   });
 });
