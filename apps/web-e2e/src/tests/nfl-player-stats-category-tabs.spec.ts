@@ -55,7 +55,6 @@ const MAHOMES = {
   position: 'QB',
   isDst: false,
   nflTeam: 'KC',
-  injuryStatus: null,
   careerStats: {
     ...EMPTY_CAREER,
     fantasyPoints: 3120.5,
@@ -81,7 +80,6 @@ const BARKLEY = {
   position: 'RB',
   isDst: false,
   nflTeam: 'PHI',
-  injuryStatus: null,
   careerStats: {
     ...EMPTY_CAREER,
     fantasyPoints: 1710.2,
@@ -106,7 +104,6 @@ const NINERS_DST = {
   position: 'DST',
   isDst: true,
   nflTeam: 'SF',
-  injuryStatus: null,
   careerStats: {
     ...EMPTY_CAREER,
     fantasyPoints: 890.0,
@@ -133,7 +130,6 @@ const PARSONS = {
   position: 'LB',
   isDst: false,
   nflTeam: 'DAL',
-  injuryStatus: null,
   careerStats: {
     ...EMPTY_CAREER,
     fantasyPoints: 610.8,

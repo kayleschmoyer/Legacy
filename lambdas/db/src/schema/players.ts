@@ -47,7 +47,6 @@ interface PlayerShape {
   mlbPlayerId?: number | null;
   statsLastFetchedAt: Date | null;
   scoring?: PlayerCareerScore | null;
-  injuryStatus?: string | null;
   // Career achievement fields (from DB columns)
   allStarSelections?: number | null;
   goldGloves?: number | null;
@@ -184,11 +183,6 @@ PlayerRef.implement({
       resolve: async (parent, _args, context) => {
         return context.loaders.eligiblePositions.load(parent.id);
       },
-    }),
-    injuryStatus: t.exposeString('injuryStatus', {
-      nullable: true,
-      description:
-        'Current injury/roster status (e.g. "IL-10", "IL-60", "DTD"). Null when the player is active or no status has been synced.',
     }),
     careerBatting: t.field({
       description: 'Career batting statistics for the player',

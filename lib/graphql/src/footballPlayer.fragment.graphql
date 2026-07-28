@@ -8,7 +8,5 @@ fragment FootballPlayer on FootballPlayer {
   pfrId
   headshotUrl
   previousTeams
-  injuryStatus
-  injuryDesignation
   news
 }

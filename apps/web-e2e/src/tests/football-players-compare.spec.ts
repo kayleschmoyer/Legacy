@@ -30,8 +30,8 @@ import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 // Two QBs: both have passing stats (so the passing rows render for both), only
 // Mahomes has rushing (so a Rush row stays with an em-dash for Allen), and
 // neither has kicking/defense (so those rows are hidden). Shape matches the
-// `FootballPlayer` query selection (FootballPlayerHeader + DetailExtras +
-// injuriesLastSyncedAt); unused stat groups are null.
+// `FootballPlayer` query selection (FootballPlayerHeader + DetailExtras);
+// unused stat groups are null.
 const MAHOMES = {
   __typename: 'FootballPlayer',
   id: 42,
@@ -43,7 +43,6 @@ const MAHOMES = {
   pfrId: 'MahoPa00',
   headshotUrl: null,
   previousTeams: [],
-  injuryStatus: null,
   projectedFantasyPoints: null,
   adpRank: null,
   careerStats: {
@@ -56,7 +55,6 @@ const MAHOMES = {
     idp: null,
   },
   seasonStats: null,
-  injuriesLastSyncedAt: null,
 } as const;
 
 const ALLEN = {
@@ -70,7 +68,6 @@ const ALLEN = {
   pfrId: 'AlleJo02',
   headshotUrl: null,
   previousTeams: [],
-  injuryStatus: null,
   projectedFantasyPoints: null,
   adpRank: null,
   careerStats: {
@@ -83,7 +80,6 @@ const ALLEN = {
     idp: null,
   },
   seasonStats: null,
-  injuriesLastSyncedAt: null,
 } as const;
 
 const PLAYERS_BY_ID: Record<number, unknown> = { 42: MAHOMES, 7: ALLEN };

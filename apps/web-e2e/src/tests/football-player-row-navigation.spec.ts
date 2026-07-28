@@ -32,8 +32,6 @@ const MAHOMES = {
   pfrId: 'MahoPa00',
   headshotUrl: null,
   previousTeams: [],
-  injuryStatus: null,
-  injuryDesignation: null,
   news: null,
   careerStats: null,
 } as const;
@@ -56,7 +54,6 @@ function playerDetailResponse(): object {
     data: {
       footballPlayer: {
         ...MAHOMES,
-        injuriesLastSyncedAt: null,
         seasonStats: null,
         careerStats: null,
       },

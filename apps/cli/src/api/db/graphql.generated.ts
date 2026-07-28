@@ -974,10 +974,6 @@ export type FootballPlayer = {
   gameLogs: Array<FootballPlayerGameLog>;
   headshotUrl?: Maybe<Scalars['String']['output']>;
   id: Scalars['Int']['output'];
-  /** ISO-8601 timestamp injury data was last refreshed from the upstream provider, or null if never synced. Drives the freshness badge on the player detail page (LS-6251 / FPD-027). */
-  injuriesLastSyncedAt?: Maybe<Scalars['String']['output']>;
-  injuryDesignation?: Maybe<Scalars['String']['output']>;
-  injuryStatus?: Maybe<Scalars['String']['output']>;
   isDst: Scalars['Boolean']['output'];
   jerseyNumber?: Maybe<Scalars['Int']['output']>;
   lastName: Scalars['String']['output'];
@@ -2810,8 +2806,6 @@ export type Player = {
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
-  /** Current injury/roster status (e.g. "IL-10", "IL-60", "DTD"). Null when the player is active or no status has been synced. */
-  injuryStatus?: Maybe<Scalars['String']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
   /** MLB Stats API player ID for cross-referencing with the external data provider. Null for players without a known mapping. */
   mlbPlayerId?: Maybe<Scalars['Int']['output']>;
@@ -3274,7 +3268,6 @@ export type QueryFootballPlayersArgs = {
   conference?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
-  injuryStatus?: InputMaybe<Scalars['String']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;

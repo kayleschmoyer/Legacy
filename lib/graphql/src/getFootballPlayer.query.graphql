@@ -4,7 +4,6 @@
 query GetFootballPlayer($id: Int!, $season: Int) {
   footballPlayer(id: $id) {
     ...FootballPlayer
-    injuriesLastSyncedAt
     seasonStats(season: $season) {
       ...FootballPlayerSeasonStats
     }

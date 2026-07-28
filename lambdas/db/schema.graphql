@@ -1134,13 +1134,6 @@ type FootballPlayer {
   gameLogs(season: Int!): [FootballPlayerGameLog!]!
   headshotUrl: String
   id: Int!
-
-  """
-  ISO-8601 timestamp injury data was last refreshed from the upstream provider, or null if never synced. Drives the freshness badge on the player detail page (LS-6251 / FPD-027).
-  """
-  injuriesLastSyncedAt: String
-  injuryDesignation: String
-  injuryStatus: String
   isDst: Boolean!
   jerseyNumber: Int
   lastName: String!
@@ -2995,11 +2988,6 @@ type Player {
   eligiblePositions: [String!]
   firstName: String
   id: Int
-
-  """
-  Current injury/roster status (e.g. "IL-10", "IL-60", "DTD"). Null when the player is active or no status has been synced.
-  """
-  injuryStatus: String
   lastName: String
 
   """
@@ -3310,7 +3298,6 @@ type Query {
     conference: String
     first: Int
     freeAgent: Boolean
-    injuryStatus: String
     maxAdpRank: Int
     minProjectedPoints: Float
     nflTeam: String

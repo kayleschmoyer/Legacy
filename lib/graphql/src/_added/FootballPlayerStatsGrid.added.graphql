@@ -11,7 +11,6 @@ fragment FootballPlayerStatsRow on FootballPlayer {
   position
   isDst
   nflTeam
-  injuryStatus
   careerStats {
     fantasyPoints
     passing {
@@ -81,7 +80,6 @@ query FootballPlayerStatsGrid(
   $search: String
   $after: String
   $first: Int
-  $injuryStatus: String
   $minProjectedPoints: Float
   $maxAdpRank: Int
   $sortBy: String
@@ -96,7 +94,6 @@ query FootballPlayerStatsGrid(
     search: $search
     after: $after
     first: $first
-    injuryStatus: $injuryStatus
     minProjectedPoints: $minProjectedPoints
     maxAdpRank: $maxAdpRank
     sortBy: $sortBy

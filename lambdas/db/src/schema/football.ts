@@ -1067,9 +1067,6 @@ interface FootballPlayerShape {
   nflTeam: string | null;
   position: string | null;
   jerseyNumber: number | null;
-  injuriesLastSyncedAt: Date | null;
-  injuryStatus: string | null;
-  injuryDesignation: string | null;
   news: string | null;
   projectedFantasyPoints: number | null;
   adpRank: number | null;
@@ -1149,15 +1146,6 @@ FootballPlayerRef.implement({
     nflTeam: t.exposeString('nflTeam', { nullable: true }),
     position: t.exposeString('position', { nullable: true }),
     jerseyNumber: t.exposeInt('jerseyNumber', { nullable: true }),
-    injuriesLastSyncedAt: t.field({
-      type: 'String',
-      nullable: true,
-      description:
-        'ISO-8601 timestamp injury data was last refreshed from the upstream ' +
-        'provider, or null if never synced. Drives the freshness badge on the ' +
-        'player detail page (LS-6251 / FPD-027).',
-      resolve: (parent) => parent.injuriesLastSyncedAt?.toISOString() ?? null,
-    }),
     previousTeams: t.field({
       type: ['String'],
       nullable: false,
@@ -1205,8 +1193,6 @@ FootballPlayerRef.implement({
         return [...new Set(allTeams)].filter((team) => team !== currentTeam);
       },
     }),
-    injuryStatus: t.exposeString('injuryStatus', { nullable: true }),
-    injuryDesignation: t.exposeString('injuryDesignation', { nullable: true }),
     news: t.exposeString('news', { nullable: true }),
     projectedFantasyPoints: t.exposeFloat('projectedFantasyPoints', {
       nullable: true,
@@ -2148,7 +2134,6 @@ builder.queryField('footballPlayers', (t) =>
       // Premium-only advanced search filters (LS-6489 / FPL-008). Gated behind
       // the `advanced_search_filters` entitlement: a free-tier request that
       // supplies any of these is rejected with a PremiumRequiredError.
-      injuryStatus: t.arg.string({ required: false }),
       minProjectedPoints: t.arg.float({ required: false }),
       maxAdpRank: t.arg.int({ required: false }),
       // Sort over players-table columns ('name' = lastName/firstName,
@@ -2173,9 +2158,7 @@ builder.queryField('footballPlayers', (t) =>
       // when one is actually supplied so the basic list stays open to all tiers
       // and existing callers are unaffected.
       const usesAdvancedFilter =
-        args.injuryStatus != null ||
-        args.minProjectedPoints != null ||
-        args.maxAdpRank != null;
+        args.minProjectedPoints != null || args.maxAdpRank != null;
       if (usesAdvancedFilter) {
         await requireEntitlement(context, ENTITLEMENTS.advanced_search_filters);
       }
@@ -2326,12 +2309,6 @@ builder.queryField('footballPlayers', (t) =>
       // players with a NULL projection/ADP are excluded by the numeric filters
       // (NULL comparisons are not true), which is the desired behavior — an
       // un-projected player should not surface in a "top projected" search.
-      if (args.injuryStatus != null) {
-        conditions.push(
-          eq(PublicSchema.players.injuryStatus, args.injuryStatus),
-        );
-      }
-
       if (args.minProjectedPoints != null) {
         conditions.push(
           gte(
@@ -2401,9 +2378,6 @@ builder.queryField('footballPlayers', (t) =>
           nflTeam: PublicSchema.players.nflTeam,
           position: PublicSchema.players.position,
           jerseyNumber: PublicSchema.players.jerseyNumber,
-          injuriesLastSyncedAt: PublicSchema.players.injuriesLastSyncedAt,
-          injuryStatus: PublicSchema.players.injuryStatus,
-          injuryDesignation: PublicSchema.players.injuryDesignation,
           news: PublicSchema.players.news,
           projectedFantasyPoints: PublicSchema.players.projectedFantasyPoints,
           adpRank: PublicSchema.players.adpRank,
@@ -2489,9 +2463,6 @@ builder.queryField('footballPlayer', (t) =>
           nflTeam: PublicSchema.players.nflTeam,
           position: PublicSchema.players.position,
           jerseyNumber: PublicSchema.players.jerseyNumber,
-          injuriesLastSyncedAt: PublicSchema.players.injuriesLastSyncedAt,
-          injuryStatus: PublicSchema.players.injuryStatus,
-          injuryDesignation: PublicSchema.players.injuryDesignation,
           news: PublicSchema.players.news,
           projectedFantasyPoints: PublicSchema.players.projectedFantasyPoints,
           adpRank: PublicSchema.players.adpRank,

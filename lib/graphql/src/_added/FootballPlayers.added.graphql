@@ -8,7 +8,6 @@ fragment FootballPlayerHeader on FootballPlayer {
   pfrId
   headshotUrl
   previousTeams
-  injuryStatus
   projectedFantasyPoints
   adpRank
   careerStats {
@@ -129,7 +128,6 @@ query FootballPlayers(
   $search: String
   $after: String
   $first: Int
-  $injuryStatus: String
   $minProjectedPoints: Float
   $maxAdpRank: Int
   $sortBy: String
@@ -143,7 +141,6 @@ query FootballPlayers(
     search: $search
     after: $after
     first: $first
-    injuryStatus: $injuryStatus
     minProjectedPoints: $minProjectedPoints
     maxAdpRank: $maxAdpRank
     sortBy: $sortBy
@@ -163,7 +160,6 @@ query FootballPlayer($id: Int!) {
   footballPlayer(id: $id) {
     ...FootballPlayerHeader
     ...FootballPlayerDetailExtras
-    injuriesLastSyncedAt
   }
 }
 

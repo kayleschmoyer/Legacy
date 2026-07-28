@@ -980,10 +980,6 @@ export type FootballPlayer = {
   gameLogs: Array<FootballPlayerGameLog>;
   headshotUrl?: Maybe<Scalars['String']['output']>;
   id: Scalars['Int']['output'];
-  /** ISO-8601 timestamp injury data was last refreshed from the upstream provider, or null if never synced. Drives the freshness badge on the player detail page (LS-6251 / FPD-027). */
-  injuriesLastSyncedAt?: Maybe<Scalars['String']['output']>;
-  injuryDesignation?: Maybe<Scalars['String']['output']>;
-  injuryStatus?: Maybe<Scalars['String']['output']>;
   isDst: Scalars['Boolean']['output'];
   jerseyNumber?: Maybe<Scalars['Int']['output']>;
   lastName: Scalars['String']['output'];
@@ -2816,8 +2812,6 @@ export type Player = {
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
-  /** Current injury/roster status (e.g. "IL-10", "IL-60", "DTD"). Null when the player is active or no status has been synced. */
-  injuryStatus?: Maybe<Scalars['String']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
   /** MLB Stats API player ID for cross-referencing with the external data provider. Null for players without a known mapping. */
   mlbPlayerId?: Maybe<Scalars['Int']['output']>;
@@ -3280,7 +3274,6 @@ export type QueryFootballPlayersArgs = {
   conference?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
   freeAgent?: InputMaybe<Scalars['Boolean']['input']>;
-  injuryStatus?: InputMaybe<Scalars['String']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   nflTeam?: InputMaybe<Scalars['String']['input']>;
@@ -5146,7 +5139,6 @@ export type FootballPlayerStatsRowFragment = {
   position?: string | null;
   isDst: boolean;
   nflTeam?: string | null;
-  injuryStatus?: string | null;
   careerStats?: {
     __typename?: 'FootballCareerStats';
     fantasyPoints?: number | null;
@@ -5225,7 +5217,6 @@ export type FootballPlayerStatsGridQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
-  injuryStatus?: InputMaybe<Scalars['String']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   sortBy?: InputMaybe<Scalars['String']['input']>;
@@ -5246,7 +5237,6 @@ export type FootballPlayerStatsGridQuery = {
       position?: string | null;
       isDst: boolean;
       nflTeam?: string | null;
-      injuryStatus?: string | null;
       careerStats?: {
         __typename?: 'FootballCareerStats';
         fantasyPoints?: number | null;
@@ -5333,7 +5323,6 @@ export type FootballPlayerHeaderFragment = {
   pfrId?: string | null;
   headshotUrl?: string | null;
   previousTeams: Array<string>;
-  injuryStatus?: string | null;
   projectedFantasyPoints?: number | null;
   adpRank?: number | null;
   careerStats?: {
@@ -5473,7 +5462,6 @@ export type FootballPlayersQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
   first?: InputMaybe<Scalars['Int']['input']>;
-  injuryStatus?: InputMaybe<Scalars['String']['input']>;
   minProjectedPoints?: InputMaybe<Scalars['Float']['input']>;
   maxAdpRank?: InputMaybe<Scalars['Int']['input']>;
   sortBy?: InputMaybe<Scalars['String']['input']>;
@@ -5495,7 +5483,6 @@ export type FootballPlayersQuery = {
       pfrId?: string | null;
       headshotUrl?: string | null;
       previousTeams: Array<string>;
-      injuryStatus?: string | null;
       projectedFantasyPoints?: number | null;
       adpRank?: number | null;
       careerStats?: {
@@ -5557,7 +5544,6 @@ export type FootballPlayerQuery = {
   __typename?: 'Query';
   footballPlayer?: {
     __typename?: 'FootballPlayer';
-    injuriesLastSyncedAt?: string | null;
     id: number;
     firstName: string;
     lastName: string;
@@ -5567,7 +5553,6 @@ export type FootballPlayerQuery = {
     pfrId?: string | null;
     headshotUrl?: string | null;
     previousTeams: Array<string>;
-    injuryStatus?: string | null;
     projectedFantasyPoints?: number | null;
     adpRank?: number | null;
     careerStats?: {
@@ -6589,7 +6574,6 @@ export type GetMatchupRosterQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -6795,7 +6779,6 @@ export type UpdateMatchupPlayerPositionMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -6966,7 +6949,6 @@ export type SwapMatchupPlayerPositionsMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -7938,7 +7920,6 @@ export type UpdateTeamMemberPositionMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -7976,7 +7957,6 @@ export type SwapTeamMemberPositionsMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -8078,7 +8058,6 @@ export type SetNicknameMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -9281,8 +9260,6 @@ export type FootballPlayerFragment = {
   pfrId?: string | null;
   headshotUrl?: string | null;
   previousTeams: Array<string>;
-  injuryStatus?: string | null;
-  injuryDesignation?: string | null;
   news?: string | null;
 };
 
@@ -9892,7 +9869,6 @@ export type GetFootballPlayerQuery = {
   __typename?: 'Query';
   footballPlayer?: {
     __typename?: 'FootballPlayer';
-    injuriesLastSyncedAt?: string | null;
     id: number;
     firstName: string;
     lastName: string;
@@ -9902,8 +9878,6 @@ export type GetFootballPlayerQuery = {
     pfrId?: string | null;
     headshotUrl?: string | null;
     previousTeams: Array<string>;
-    injuryStatus?: string | null;
-    injuryDesignation?: string | null;
     news?: string | null;
     seasonStats?: {
       __typename?: 'FootballPlayerSeasonStats';
@@ -10059,8 +10033,6 @@ export type GetFootballPlayersQuery = {
       pfrId?: string | null;
       headshotUrl?: string | null;
       previousTeams: Array<string>;
-      injuryStatus?: string | null;
-      injuryDesignation?: string | null;
       news?: string | null;
     }>;
     pageInfo: {
@@ -10259,7 +10231,6 @@ export type GetLeagueTradeBlockQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -10291,7 +10262,6 @@ export type GetMatchupPlayersQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
     } | null;
     seasonBatting?: {
       __typename?: 'SeasonBatting';
@@ -10833,7 +10803,6 @@ export type GetTeamMembersQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -11635,7 +11604,6 @@ export type MatchupPlayerFragment = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
-    injuryStatus?: string | null;
   } | null;
   seasonBatting?: {
     __typename?: 'SeasonBatting';
@@ -12789,7 +12757,6 @@ export type SetTradeBlockMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
-      injuryStatus?: string | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -12902,7 +12869,6 @@ export type TeamMemberFragment = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
-    injuryStatus?: string | null;
     seasonsPlayed?: number | null;
     careerBatting?: {
       __typename?: 'CareerBatting';
@@ -13586,7 +13552,6 @@ export const FootballPlayerStatsRowFragmentDoc = gql`
     position
     isDst
     nflTeam
-    injuryStatus
     careerStats {
       fantasyPoints
       passing {
@@ -13659,7 +13624,6 @@ export const FootballPlayerHeaderFragmentDoc = gql`
     pfrId
     headshotUrl
     previousTeams
-    injuryStatus
     projectedFantasyPoints
     adpRank
     careerStats {
@@ -14483,8 +14447,6 @@ export const FootballPlayerFragmentDoc = gql`
     pfrId
     headshotUrl
     previousTeams
-    injuryStatus
-    injuryDesignation
     news
   }
 `;
@@ -14696,7 +14658,6 @@ export const MatchupPlayerFragmentDoc = gql`
       lastName
       brefId
       eligiblePositions
-      injuryStatus
     }
     seasonBatting {
       games
@@ -15060,7 +15021,6 @@ export const TeamMemberFragmentDoc = gql`
       lastName
       brefId
       eligiblePositions
-      injuryStatus
       careerBatting {
         games
       }
@@ -16202,7 +16162,6 @@ export const FootballPlayerStatsGrid = gql`
     $search: String
     $after: String
     $first: Int
-    $injuryStatus: String
     $minProjectedPoints: Float
     $maxAdpRank: Int
     $sortBy: String
@@ -16217,7 +16176,6 @@ export const FootballPlayerStatsGrid = gql`
       search: $search
       after: $after
       first: $first
-      injuryStatus: $injuryStatus
       minProjectedPoints: $minProjectedPoints
       maxAdpRank: $maxAdpRank
       sortBy: $sortBy
@@ -16256,7 +16214,6 @@ export const FootballPlayerStatsGrid = gql`
  *      search: // value for 'search'
  *      after: // value for 'after'
  *      first: // value for 'first'
- *      injuryStatus: // value for 'injuryStatus'
  *      minProjectedPoints: // value for 'minProjectedPoints'
  *      maxAdpRank: // value for 'maxAdpRank'
  *      sortBy: // value for 'sortBy'
@@ -16336,7 +16293,6 @@ export const FootballPlayers = gql`
     $search: String
     $after: String
     $first: Int
-    $injuryStatus: String
     $minProjectedPoints: Float
     $maxAdpRank: Int
     $sortBy: String
@@ -16350,7 +16306,6 @@ export const FootballPlayers = gql`
       search: $search
       after: $after
       first: $first
-      injuryStatus: $injuryStatus
       minProjectedPoints: $minProjectedPoints
       maxAdpRank: $maxAdpRank
       sortBy: $sortBy
@@ -16387,7 +16342,6 @@ export const FootballPlayers = gql`
  *      search: // value for 'search'
  *      after: // value for 'after'
  *      first: // value for 'first'
- *      injuryStatus: // value for 'injuryStatus'
  *      minProjectedPoints: // value for 'minProjectedPoints'
  *      maxAdpRank: // value for 'maxAdpRank'
  *      sortBy: // value for 'sortBy'
@@ -16462,7 +16416,6 @@ export const FootballPlayer = gql`
     footballPlayer(id: $id) {
       ...FootballPlayerHeader
       ...FootballPlayerDetailExtras
-      injuriesLastSyncedAt
     }
   }
   ${FootballPlayerHeaderFragmentDoc}
@@ -24640,7 +24593,6 @@ export const GetFootballPlayer = gql`
   query GetFootballPlayer($id: Int!, $season: Int) {
     footballPlayer(id: $id) {
       ...FootballPlayer
-      injuriesLastSyncedAt
       seasonStats(season: $season) {
         ...FootballPlayerSeasonStats
       }
