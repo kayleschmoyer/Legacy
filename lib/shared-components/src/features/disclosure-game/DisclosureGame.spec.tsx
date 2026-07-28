@@ -160,6 +160,27 @@ async function startGameAndRevealClue() {
   await waitFor(() => expect(screen.getByTestId('clue-1')).toBeTruthy());
 }
 
+describe('DisclosureGame — intro copy', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupHooks();
+  });
+
+  it('describes the actual 5-clue max instead of the stale "Seven clues" copy', async () => {
+    mockFetchActive.mockResolvedValue({ data: { activeDisclosureGame: null } });
+
+    render(<DisclosureGame onBack={jest.fn()} />);
+    await waitFor(() => expect(mockFetchActive).toHaveBeenCalled());
+
+    expect(screen.getByTestId('disclosure-game-idle').textContent).toMatch(
+      /Five clues/,
+    );
+    expect(screen.getByTestId('disclosure-game-idle').textContent).not.toMatch(
+      /Seven clues/,
+    );
+  });
+});
+
 describe('DisclosureGame — player search', () => {
   beforeEach(() => {
     jest.clearAllMocks();

@@ -447,7 +447,7 @@ export const DisclosureGame: React.FC<DisclosureGameProps> = ({ onBack }) => {
               maxWidth={420}
               fontSize={17}
             >
-              Seven clues. One player from the record book. Guess early for a
+              Five clues. One player from the record book. Guess early for a
               bigger score — but guess wrong and you keep revealing.
             </Paragraph>
             <XStack
