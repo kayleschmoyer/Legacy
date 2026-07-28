@@ -13,6 +13,7 @@ import {
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
   GetMyDraftQueue as GET_MY_DRAFT_QUEUE,
+  GetPositionsForLeague as GET_POSITIONS_FOR_LEAGUE,
   type GetAvailableDraftPlayersQuery,
   type GetAvailableDraftPlayersQueryVariables,
   type GetCurrentDraftPickQuery,
@@ -30,6 +31,8 @@ import {
   type GetLiveDraftLeagueDraftQuery,
   type GetMyDraftQueueQuery,
   type GetMyDraftQueueQueryVariables,
+  type GetPositionsForLeagueQuery,
+  type GetPositionsForLeagueQueryVariables,
 } from '@legacy-sports/graphql';
 import type {
   AvailableDraftPlayer,
@@ -70,6 +73,29 @@ export function useDraftQueries({
     variables: { leagueId },
     skip: !leagueId,
   });
+
+  // ---- League roster-slot config (My Depth Chart tab, LS-8785) ----
+  // Reuses the same query the roster board (RosterBoard/Roster.tsx) fetches
+  // its `positions` prop from, so the depth chart groups picks by the
+  // league's real configured slots instead of a hardcoded, baseball-only list.
+  const { data: positionsData } = useQuery<
+    GetPositionsForLeagueQuery,
+    GetPositionsForLeagueQueryVariables
+  >(GET_POSITIONS_FOR_LEAGUE, {
+    variables: { leagueId: leagueId ?? 0 },
+    skip: !leagueId,
+  });
+
+  const leaguePositions = useMemo(
+    () =>
+      (positionsData?.leaguePositions ?? [])
+        .filter(
+          (p): p is { id: number; positionType: string } =>
+            p.id != null && p.positionType != null,
+        )
+        .map((p) => ({ id: p.id, positionType: p.positionType })),
+    [positionsData],
+  );
 
   const league = leagueData?.league;
   const leagueTeams: LeagueTeam[] = useMemo(
@@ -522,6 +548,7 @@ export function useDraftQueries({
     leagueLoading,
     leagueError,
     leagueTeams,
+    leaguePositions,
     refetchLeague,
     permLevel,
     isOwner,

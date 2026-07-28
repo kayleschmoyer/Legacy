@@ -1,10 +1,18 @@
 import React from 'react';
 import {
-  depthChartSlotForPosition,
-  DraftPlayerBoard,
-} from './DraftPlayerBoard';
+  DEFAULT_BASEBALL_ROSTER_POSITIONS,
+  DEFAULT_FOOTBALL_ROSTER_POSITIONS,
+} from '@legacy-sports/utils';
+import { buildDepthChartBuckets, DraftPlayerBoard } from './DraftPlayerBoard';
 import type { DraftPlayer } from './types';
 import { render } from '../../test-utils';
+
+const baseballLeaguePositions = DEFAULT_BASEBALL_ROSTER_POSITIONS.map(
+  (positionType, id) => ({ id, positionType }),
+);
+const footballLeaguePositions = DEFAULT_FOOTBALL_ROSTER_POSITIONS.map(
+  (positionType, id) => ({ id, positionType }),
+);
 
 // Stub the no-op detail modal + DraftGrid imports already inline-stubbed.
 jest.mock('./DraftGrid', () => ({
@@ -45,6 +53,8 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     filteredPlayers: [basePlayer()],
     myTeam: [],
     positionCounts: {},
+    leaguePositions: baseballLeaguePositions,
+    maxRosterSize: null,
     watchlist: [],
     queuedPlayerIds: new Set<number>(),
     autoPickTeamIds: new Set<string>(),
@@ -95,30 +105,7 @@ describe('DraftPlayerBoard — sport-aware stat headers (LS-4662)', () => {
   });
 });
 
-describe('depthChartSlotForPosition (LS-8069)', () => {
-  it('collapses granular pitcher positions to the P slot', () => {
-    expect(depthChartSlotForPosition('SP')).toBe('P');
-    expect(depthChartSlotForPosition('RP')).toBe('P');
-    expect(depthChartSlotForPosition('P')).toBe('P');
-  });
-
-  it('collapses granular outfield positions to the OF slot', () => {
-    expect(depthChartSlotForPosition('CF')).toBe('OF');
-    expect(depthChartSlotForPosition('LF')).toBe('OF');
-    expect(depthChartSlotForPosition('RF')).toBe('OF');
-    expect(depthChartSlotForPosition('OF')).toBe('OF');
-  });
-
-  it('passes infield positions through unchanged and handles missing values', () => {
-    expect(depthChartSlotForPosition('SS')).toBe('SS');
-    expect(depthChartSlotForPosition('1B')).toBe('1B');
-    expect(depthChartSlotForPosition('UTIL')).toBe('UTIL');
-    expect(depthChartSlotForPosition(undefined)).toBeUndefined();
-    expect(depthChartSlotForPosition('')).toBeUndefined();
-  });
-});
-
-describe('DraftPlayerBoard — depth chart slot assignment (LS-8069)', () => {
+describe('buildDepthChartBuckets (LS-8785)', () => {
   const pitcher = (
     id: number,
     name: string,
@@ -130,9 +117,9 @@ describe('DraftPlayerBoard — depth chart slot assignment (LS-8069)', () => {
     position,
   });
 
-  it('shows drafted pitchers in the P slot, not UTIL', () => {
-    // Reproduces the report: 4 pitchers (SP/RP) + 2 OF drafted, but the depth
-    // chart hid pitchers and filled UTIL because of exact position matching.
+  it('collapses granular pitcher slots (SP/RP) into a single P bucket', () => {
+    // Reproduces the LS-8069 report: 4 pitchers (SP/RP) + 2 OF drafted, but an
+    // exact-match slot lookup hid pitchers and filled UTIL/DH instead.
     const myTeam: DraftPlayer[] = [
       pitcher(101, 'Ace Starter', 'SP'),
       pitcher(102, 'Reliable Reliever', 'RP'),
@@ -142,20 +129,130 @@ describe('DraftPlayerBoard — depth chart slot assignment (LS-8069)', () => {
       { ...basePlayer(), id: 202, name: 'Right Fielder', position: 'OF' },
     ];
 
+    const buckets = buildDepthChartBuckets(
+      baseballLeaguePositions,
+      myTeam,
+      'baseball',
+      null,
+    );
+
+    const pBucket = buckets.find((b) => b.positionType === 'P');
+    expect(pBucket?.total).toBe(8); // 5 SP + 3 RP rows in the default roster
+    expect(pBucket?.players.map((p) => p.name)).toEqual([
+      'Ace Starter',
+      'Reliable Reliever',
+      'Second Starter',
+      'Closer Guy',
+    ]);
+
+    // OF (3 slots) takes both outfielders; the DH slot (baseball's UTIL-style
+    // catch-all) stays empty since neither pitcher nor OF player spills into it.
+    const ofBucket = buckets.find((b) => b.positionType === 'OF');
+    expect(ofBucket?.players.map((p) => p.name)).toEqual([
+      'Center Fielder',
+      'Right Fielder',
+    ]);
+    const dhBucket = buckets.find((b) => b.positionType === 'DH');
+    expect(dhBucket?.players).toHaveLength(0);
+
+    // No drafted player is dropped from the chart.
+    const allShown = buckets.flatMap((b) => b.players.map((p) => p.id));
+    expect(allShown.sort()).toEqual([101, 102, 103, 104, 201, 202]);
+  });
+
+  it('fills specific slots before broad ones (e.g. 1B before DH)', () => {
+    const myTeam: DraftPlayer[] = [
+      { ...basePlayer(), id: 1, name: 'First Baseman', position: '1B' },
+    ];
+    const buckets = buildDepthChartBuckets(
+      baseballLeaguePositions,
+      myTeam,
+      'baseball',
+      null,
+    );
+    expect(
+      buckets.find((b) => b.positionType === '1B')?.players.map((p) => p.id),
+    ).toEqual([1]);
+    expect(buckets.find((b) => b.positionType === 'DH')?.players).toHaveLength(
+      0,
+    );
+  });
+
+  it('sizes the BENCH bucket from maxRosterSize and never drops overflow players', () => {
+    const myTeam: DraftPlayer[] = Array.from({ length: 20 }, (_, i) => ({
+      ...basePlayer(),
+      id: i,
+      name: `Player ${i}`,
+      position: '1B',
+    }));
+    const buckets = buildDepthChartBuckets(
+      baseballLeaguePositions,
+      myTeam,
+      'baseball',
+      18, // smaller than the 20 drafted players — forces overflow
+    );
+    const bench = buckets.find((b) => b.positionType === 'BENCH');
+    // 18 roster size - 17 starter slots = 1 configured bench slot, but the
+    // bucket grows to hold every player that didn't fit a starter slot.
+    expect(bench?.total).toBeGreaterThanOrEqual(bench?.players.length ?? 0);
+    const allShown = buckets.flatMap((b) => b.players.map((p) => p.id));
+    expect(allShown).toHaveLength(20);
+  });
+
+  it('renders sport-appropriate football slots (QB/RB/WR/TE/FLEX/K/DST/BENCH)', () => {
+    const myTeam: DraftPlayer[] = [
+      { ...basePlayer(), id: 1, name: 'Star QB', position: 'QB' },
+    ];
+    const buckets = buildDepthChartBuckets(
+      footballLeaguePositions,
+      myTeam,
+      'football',
+      null,
+    );
+    const bucketTypes = buckets.map((b) => b.positionType);
+    expect(bucketTypes).toEqual([
+      'QB',
+      'RB',
+      'WR',
+      'TE',
+      'FLEX',
+      'K',
+      'DST',
+      'BENCH',
+    ]);
+    expect(
+      buckets.find((b) => b.positionType === 'QB')?.players.map((p) => p.id),
+    ).toEqual([1]);
+  });
+});
+
+describe('DraftPlayerBoard — My Depth Chart view (LS-8785)', () => {
+  it('renders baseball slots with drafted players or "Open"', () => {
+    const myTeam: DraftPlayer[] = [
+      { ...basePlayer(), id: 1, name: 'Test Catcher', position: 'C' },
+    ];
     const { getByText, getAllByText } = render(
       <DraftPlayerBoard {...makeProps({ viewMode: 'depth', myTeam })} />,
     );
+    expect(getByText('Test Catcher')).toBeTruthy();
+    expect(getAllByText('Open').length).toBeGreaterThan(0);
+  });
 
-    // All four pitchers and both outfielders render (no player is dropped).
-    expect(getByText('Ace Starter')).toBeTruthy();
-    expect(getByText('Reliable Reliever')).toBeTruthy();
-    expect(getByText('Second Starter')).toBeTruthy();
-    expect(getByText('Closer Guy')).toBeTruthy();
-    expect(getByText('Center Fielder')).toBeTruthy();
-    expect(getByText('Right Fielder')).toBeTruthy();
-
-    // Both UTIL slots stay empty — pitchers no longer spill into them.
-    // UTIL has 2 slots; with no eligible UTIL-only players both read "Empty".
-    expect(getAllByText('Empty').length).toBeGreaterThanOrEqual(2);
+  it('renders football slots with drafted players or "Open"', () => {
+    const myTeam: DraftPlayer[] = [
+      { ...basePlayer(), id: 1, name: 'Star QB', position: 'QB' },
+    ];
+    const { getByText, getAllByText } = render(
+      <DraftPlayerBoard
+        {...makeProps({
+          viewMode: 'depth',
+          sport: 'football',
+          myTeam,
+          leaguePositions: footballLeaguePositions,
+        })}
+      />,
+    );
+    expect(getByText('Star QB')).toBeTruthy();
+    expect(getAllByText('Open').length).toBeGreaterThan(0);
   });
 });

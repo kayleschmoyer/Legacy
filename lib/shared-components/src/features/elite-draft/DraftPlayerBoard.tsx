@@ -1,4 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ALLOWED_POSITIONS_BY_SPORT,
+  DEFAULT_ROSTER_SIZE_BY_SPORT,
+} from '@legacy-sports/utils';
 import type {
   CurrentDraftPickInfo,
   DraftPickRecord,
@@ -10,6 +14,7 @@ import { PlayerCard } from './PlayerCard';
 import { getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
 import type { SportKind } from '../../config/sports';
+import { getPositionLabel, isPitcherSlot } from '../roster/rosterEligibility';
 // PlayerDetailModal is web-specific; consumers can provide their own via composition.
 // Inline a no-op stub so the component compiles in all environments.
 const PlayerDetailModal: React.FC<{
@@ -22,40 +27,115 @@ const PlayerDetailModal: React.FC<{
 
 const positions = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
 
-const DEPTH_SLOTS: Array<{ pos: string; label: string; slots: number }> = [
-  { pos: 'C', label: 'C', slots: 1 },
-  { pos: '1B', label: '1B', slots: 1 },
-  { pos: '2B', label: '2B', slots: 1 },
-  { pos: '3B', label: '3B', slots: 1 },
-  { pos: 'SS', label: 'SS', slots: 1 },
-  { pos: 'OF', label: 'OF', slots: 3 },
-  { pos: 'P', label: 'P', slots: 9 },
-  { pos: 'U', label: 'UTIL', slots: 2 },
-];
+/** A single depth-chart slot bucket: one or more league-configured roster
+ *  positions of the same canonical type (e.g. all SP/RP rows collapse into
+ *  a single 'P' bucket), plus whichever of the user's drafted players have
+ *  been greedily assigned to fill it. */
+interface DepthChartBucket {
+  positionType: string;
+  total: number;
+  players: DraftPlayer[];
+}
 
-// Dedicated (non-UTIL) depth-chart slot keys. A drafted player whose canonical
-// slot is one of these fills that slot; anything else falls through to UTIL.
-const DEDICATED_DEPTH_SLOTS = ['C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
+const BENCH_SLOT = 'BENCH';
 
-const DEPTH_OUTFIELD_POSITIONS = new Set(['OF', 'CF', 'LF', 'RF']);
-const DEPTH_PITCHER_POSITIONS = new Set(['P', 'SP', 'RP']);
+/** A drafted player's eligible position strings, falling back to their
+ *  single canonical `position` when granular eligibility wasn't loaded. */
+const eligiblePositionsOf = (player: DraftPlayer): string[] =>
+  player.eligiblePositions?.length
+    ? player.eligiblePositions
+    : [player.position];
 
 /**
- * Map a drafted player's granular eligible position (e.g. 'SP', 'RP', 'CF') to
- * its canonical depth-chart slot key ('P', 'OF', ...). `myTeam` players carry
- * the first entry of `eligiblePositions`, which can be a specific pitcher or
- * outfield position that never equals the canonical slot key — so an exact
- * match dropped pitchers from the 'P' slot and spilled them into UTIL. Mirrors
- * the normalization used by `positionCounts` in usePlayerData. (LS-8069)
+ * Groups `myTeam`'s drafted players into the league's real configured roster
+ * slots (`leaguePositions`, the same data RosterBoard renders elsewhere)
+ * instead of a hardcoded, baseball-only slot list (LS-8785). Pitcher slot
+ * rows (SP/RP/P) collapse into one 'P' bucket, matching `isPitcherSlot`'s
+ * existing cross-sport definition of "the same slot" (LS-8069's fix,
+ * generalized). Any players beyond the league's starter slots — including
+ * true roster overflow — land in a synthetic BENCH bucket so no drafted
+ * player is ever silently dropped from view.
+ *
+ * Eligibility is checked directly against `ALLOWED_POSITIONS_BY_SPORT[sport]`
+ * rather than `rosterEligibility.ts`'s `canPlayerPlayPosition`, which reads
+ * the legacy baseball-only `ALLOWED_POSITIONS` alias and would silently
+ * reject every football slot.
  */
-export const depthChartSlotForPosition = (
-  position?: string,
-): string | undefined => {
-  if (!position) return undefined;
-  if (DEPTH_OUTFIELD_POSITIONS.has(position)) return 'OF';
-  if (DEPTH_PITCHER_POSITIONS.has(position)) return 'P';
-  return position;
-};
+export function buildDepthChartBuckets(
+  leaguePositions: ReadonlyArray<{ positionType: string }>,
+  myTeam: DraftPlayer[],
+  sport: SportKind,
+  maxRosterSize: number | null,
+): DepthChartBucket[] {
+  const order: string[] = [];
+  const totals = new Map<string, number>();
+  // Union of every real position type (e.g. both 'SP' and 'RP') that
+  // collapsed into a given bucket key, so eligibility checks against the
+  // canonical 'P' bucket still accept SP/RP-eligible players.
+  const allowedByBucket = new Map<string, Set<string>>();
+  const positionEligibility = ALLOWED_POSITIONS_BY_SPORT[sport];
+  for (const { positionType } of leaguePositions) {
+    const key = isPitcherSlot(positionType) ? 'P' : positionType;
+    if (!totals.has(key)) {
+      order.push(key);
+      allowedByBucket.set(key, new Set());
+    }
+    totals.set(key, (totals.get(key) ?? 0) + 1);
+    for (const accepted of positionEligibility[positionType] ?? []) {
+      allowedByBucket.get(key)?.add(accepted);
+    }
+  }
+  const startersTotal = leaguePositions.length;
+  const effectiveRosterSize =
+    maxRosterSize ?? DEFAULT_ROSTER_SIZE_BY_SPORT[sport];
+  order.push(BENCH_SLOT);
+  totals.set(BENCH_SLOT, Math.max(0, effectiveRosterSize - startersTotal));
+
+  const buckets = new Map<string, DepthChartBucket>(
+    order.map((key) => [
+      key,
+      { positionType: key, total: totals.get(key) ?? 0, players: [] },
+    ]),
+  );
+
+  // Fill the most specific (narrowest eligible-position) slots first, so a
+  // player eligible for both a dedicated slot and a broad one (DH/FLEX) fills
+  // the dedicated slot — mirroring the fix in LS-8069.
+  const acceptListSize = (key: string): number =>
+    allowedByBucket.get(key)?.size ?? Infinity;
+  const fillOrder = order
+    .filter((key) => key !== BENCH_SLOT)
+    .sort((a, b) => acceptListSize(a) - acceptListSize(b));
+
+  let unassigned = [...myTeam];
+  for (const key of fillOrder) {
+    const bucket = buckets.get(key);
+    const allowed = allowedByBucket.get(key);
+    if (!bucket || !allowed) continue;
+    const stillUnassigned: DraftPlayer[] = [];
+    for (const player of unassigned) {
+      const eligible = eligiblePositionsOf(player).some((p) => allowed.has(p));
+      if (bucket.players.length < bucket.total && eligible) {
+        bucket.players.push(player);
+      } else {
+        stillUnassigned.push(player);
+      }
+    }
+    unassigned = stillUnassigned;
+  }
+
+  // Whatever's left — including true overflow beyond the configured roster
+  // size — always lands in BENCH, growing it past `total` if needed.
+  const bench = buckets.get(BENCH_SLOT);
+  if (bench) {
+    bench.players.push(...unassigned);
+    bench.total = Math.max(bench.total, bench.players.length);
+  }
+
+  // `buckets` was built from the same `order` array, so this always yields
+  // one entry per key in the original order (Map preserves insertion order).
+  return Array.from(buckets.values());
+}
 
 type ViewMode = 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
 type SortKey = string;
@@ -77,6 +157,12 @@ interface DraftPlayerBoardProps {
   filteredPlayers: DraftPlayer[];
   myTeam: DraftPlayer[];
   positionCounts: Record<string, number>;
+  /** League's configured roster slots (from `leaguePositions`), used to group
+   *  the My Depth Chart tab by the real per-league slot config (LS-8785). */
+  leaguePositions: ReadonlyArray<{ id: number; positionType: string }>;
+  /** League's max roster size, sizes the depth chart's BENCH bucket. Falls
+   *  back to the sport's default when the league hasn't set one. */
+  maxRosterSize: number | null;
   watchlist: number[];
   queuedPlayerIds: ReadonlySet<number>;
   autoPickTeamIds: ReadonlySet<string>;
@@ -124,6 +210,8 @@ export function DraftPlayerBoard({
   filteredPlayers,
   myTeam,
   positionCounts: _positionCounts,
+  leaguePositions,
+  maxRosterSize,
   watchlist,
   queuedPlayerIds,
   autoPickTeamIds,
@@ -157,6 +245,14 @@ export function DraftPlayerBoard({
 
   // O(1) watchlist lookup — avoids O(n) Array.includes per card per render
   const watchlistSet = useMemo(() => new Set(watchlist), [watchlist]);
+
+  // My Depth Chart view: recomputes on every pick (myTeam updates live via the
+  // draft WebSocket / pick history refetch), so the view always reflects the
+  // latest roster without a manual refresh (LS-8785 AC2).
+  const depthChartBuckets = useMemo(
+    () => buildDepthChartBuckets(leaguePositions, myTeam, sport, maxRosterSize),
+    [leaguePositions, myTeam, sport, maxRosterSize],
+  );
 
   // Preserves each player's original rank (1-based position in filteredPlayers)
   // so the Rank column stays accurate even when the table is sorted by another column.
@@ -590,68 +686,67 @@ export function DraftPlayerBoard({
         {/* My Depth Chart view */}
         {viewMode === 'depth' && (
           <div className="d-depth-grid">
-            {DEPTH_SLOTS.map(({ pos, label, slots }) => {
-              const drafted = myTeam
-                .filter((p) => {
-                  const slotPos = depthChartSlotForPosition(p.position);
-                  return pos === 'U'
-                    ? !(slotPos && DEDICATED_DEPTH_SLOTS.includes(slotPos))
-                    : slotPos === pos;
-                })
-                .slice(0, slots);
-              const posColor = getPositionColor('baseball', pos);
+            {depthChartBuckets.map(({ positionType, total, players }) => {
+              const complete = total > 0 && players.length >= total;
+              const posColor = getPositionColor(sport, positionType);
               return (
-                <div key={pos} className="d-depth-slot">
-                  <div
-                    className="d-depth-slot-head"
-                    style={{ borderColor: posColor, color: posColor }}
-                  >
-                    {label}
+                <div
+                  key={positionType}
+                  className={`d-depth-slot${complete ? ' complete' : ''}`}
+                >
+                  <div className="d-depth-slot-head">
+                    <span
+                      className="d-depth-slot-pos"
+                      style={{ color: posColor }}
+                      title={
+                        positionType === BENCH_SLOT
+                          ? 'Bench'
+                          : getPositionLabel(positionType)
+                      }
+                    >
+                      {positionType}
+                    </span>
+                    <span className="d-depth-slot-ct">
+                      {players.length} / {total}
+                    </span>
                   </div>
-                  {Array.from({ length: slots }).map((_, i) => {
-                    const player = drafted[i];
-                    return (
-                      <div
-                        key={i}
-                        className={`d-depth-row${player ? ' filled' : ' empty'}`}
-                      >
-                        {player ? (
-                          <>
-                            <span
-                              style={{
-                                fontWeight: 600,
-                                fontSize: 12,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {player.name}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: 'var(--d-text-muted)',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {player.position}
-                            </span>
-                          </>
-                        ) : (
-                          <span
-                            style={{
-                              fontSize: 11,
-                              color: 'var(--d-text-muted)',
-                              fontStyle: 'italic',
-                            }}
-                          >
-                            Empty
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {Array.from({ length: Math.max(total, players.length) }).map(
+                    (_, i) => {
+                      const player = players[i];
+                      return (
+                        <div
+                          key={i}
+                          className={`d-depth-row${player ? ' filled' : ' empty'}`}
+                        >
+                          {player ? (
+                            <>
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {player.name}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: 'var(--d-text-muted)',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {player.position}
+                              </span>
+                            </>
+                          ) : (
+                            'Open'
+                          )}
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               );
             })}

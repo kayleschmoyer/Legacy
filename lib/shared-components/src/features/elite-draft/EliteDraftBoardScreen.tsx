@@ -570,6 +570,8 @@ export function EliteDraftBoardScreen({
           onlineTeamIds={onlineTeamIds}
           myTeam={playerData.myTeam}
           positionCounts={playerData.positionCounts}
+          leaguePositions={queries.leaguePositions}
+          maxRosterSize={queries.league?.maxRosterSize ?? null}
           onSetSearchTerm={ui.setSearchTerm}
           onSetSelectedPosition={ui.setSelectedPosition}
           onSetViewMode={ui.setViewMode}
