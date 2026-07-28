@@ -1543,6 +1543,132 @@ describe('League Mutations', () => {
     });
   });
 
+  describe('createLeagueAndTeams mutation — draft slot trading (LS-8675)', () => {
+    const baseInput = {
+      leagueName: 'Slot Trading League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+    };
+
+    const getCreateLeagueAndTeamsResolver = () => {
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+      return field.resolve;
+    };
+
+    it('blocks a free user from enabling draft slot trading', async () => {
+      // getSubscriptionTier reads the tier via .limit(1) → free tier.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const resolve = getCreateLeagueAndTeamsResolver();
+
+      await expect(
+        resolve(
+          {},
+          { input: { ...baseInput, allowDraftSlotTrading: true } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Draft slot trading requires a premium subscription');
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('rejects draft slot trading for an auction league even for premium users', async () => {
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const resolve = getCreateLeagueAndTeamsResolver();
+
+      await expect(
+        resolve(
+          {},
+          {
+            input: {
+              ...baseInput,
+              selectionMethod: 'auction',
+              allowDraftSlotTrading: true,
+            },
+          },
+          adminContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(
+        'Draft slot trading is not available for auction leagues',
+      );
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a premium (admin) user to enable draft slot trading for a standard draft', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 3,
+          name: 'Slot Trading League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const resolve = getCreateLeagueAndTeamsResolver();
+
+      await resolve(
+        {},
+        { input: { ...baseInput, allowDraftSlotTrading: true } },
+        adminContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ allowDraftSlotTrading: true }),
+      );
+    });
+
+    it('defaults to disabled when the field is omitted', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 4,
+          name: 'Slot Trading League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const resolve = getCreateLeagueAndTeamsResolver();
+
+      await resolve({}, { input: baseInput }, mockContext, undefined as never);
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({ allowDraftSlotTrading: false }),
+      );
+    });
+  });
+
   describe('createLeagueAndTeams mutation — FAAB budget server-side gate (LS-6117)', () => {
     const baseInput = {
       leagueName: 'Waiver League',

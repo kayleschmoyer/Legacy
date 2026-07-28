@@ -34,6 +34,7 @@ import {
   waiverType,
   weekAdvanceStatus,
   tradeOfferStatus,
+  draftSlotTradeStatus,
   sportKind,
 } from './Enums';
 
@@ -172,6 +173,11 @@ export const leagues = pgTable(
     salaryDecayPct: integer('salary_decay_pct').notNull().default(25),
     auctionBudget: integer('auction_budget').notNull().default(260),
     auctionMinBid: integer('auction_min_bid').notNull().default(1),
+    /** Premium setting: managers may trade draft slots before the draft starts
+     *  (LS-8675). Rejected at creation for auction leagues — no slots to trade. */
+    allowDraftSlotTrading: boolean('allow_draft_slot_trading')
+      .notNull()
+      .default(false),
     discordWebhookUrl: text('discord_webhook_url'),
     /** Hours before matchup lock to send Discord lineup reminder (default: 3) */
     discordReminderHours: integer('discord_reminder_hours')
@@ -819,6 +825,61 @@ export const tradeOfferPlayers = pgTable(
         table.tradeOfferId,
         table.playerId,
       ),
+    };
+  },
+);
+
+// ── Draft Slot Trades ──────────────────────────────────────────────────────
+
+/**
+ * A pre-draft proposal to swap draft slots between two teams (LS-8675).
+ * Dormant in this schema-only ticket — the propose/respond/approve/execute
+ * lifecycle mutations land in a follow-up ticket (child 2 of LS-8387).
+ *
+ * Status lifecycle:
+ *   proposed → accepted | declined | cancelled
+ *   accepted → approved (commissioner) → executed
+ */
+export const draftSlotTrades = pgTable(
+  'draft_slot_trades',
+  {
+    id: serial('id').primaryKey().notNull(),
+    leagueId: integer('league_id').notNull(),
+    proposerTeamId: integer('proposer_team_id').notNull(),
+    counterpartTeamId: integer('counterpart_team_id').notNull(),
+    status: draftSlotTradeStatus('status').notNull().default('proposed'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      draftSlotTradesLeagueFk: foreignKey({
+        columns: [table.leagueId],
+        foreignColumns: [leagues.id],
+        name: 'draft_slot_trades_league_fk',
+      }).onDelete('cascade'),
+      draftSlotTradesProposerTeamFk: foreignKey({
+        columns: [table.proposerTeamId],
+        foreignColumns: [teams.id],
+        name: 'draft_slot_trades_proposer_team_fk',
+      }).onDelete('cascade'),
+      draftSlotTradesCounterpartTeamFk: foreignKey({
+        columns: [table.counterpartTeamId],
+        foreignColumns: [teams.id],
+        name: 'draft_slot_trades_counterpart_team_fk',
+      }).onDelete('cascade'),
+      leagueIdIdx: index('draft_slot_trades_league_id_idx').on(table.leagueId),
+      proposerTeamIdIdx: index('draft_slot_trades_proposer_team_id_idx').on(
+        table.proposerTeamId,
+      ),
+      counterpartTeamIdIdx: index(
+        'draft_slot_trades_counterpart_team_id_idx',
+      ).on(table.counterpartTeamId),
+      statusIdx: index('draft_slot_trades_status_idx').on(table.status),
     };
   },
 );

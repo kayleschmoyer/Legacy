@@ -466,6 +466,7 @@ export enum ConsentType {
 }
 
 export type CreateLeagueAndTeamsInput = {
+  allowDraftSlotTrading?: InputMaybe<Scalars['Boolean']['input']>;
   auctionBudget?: InputMaybe<Scalars['Int']['input']>;
   auctionMinBid?: InputMaybe<Scalars['Int']['input']>;
   baseballHofOnly?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1365,6 +1366,7 @@ export type KeeperSettingsInput = {
 /** A fantasy sports league */
 export type League = {
   __typename?: 'League';
+  allowDraftSlotTrading?: Maybe<Scalars['Boolean']['output']>;
   auctionBudget?: Maybe<Scalars['Int']['output']>;
   auctionMinBid?: Maybe<Scalars['Int']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;

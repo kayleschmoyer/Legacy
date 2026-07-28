@@ -525,6 +525,7 @@ enum ConsentType {
 }
 
 input CreateLeagueAndTeamsInput {
+  allowDraftSlotTrading: Boolean
   auctionBudget: Int
   auctionMinBid: Int
   baseballHofOnly: Boolean
@@ -1557,6 +1558,7 @@ input KeeperSettingsInput {
 A fantasy sports league
 """
 type League {
+  allowDraftSlotTrading: Boolean
   auctionBudget: Int
   auctionMinBid: Int
   bannerUrl: String

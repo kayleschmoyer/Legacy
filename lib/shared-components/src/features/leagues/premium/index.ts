@@ -6,4 +6,5 @@ export * from './EraFilterGrid';
 export * from './CustomEraRange';
 export * from './WaiverFields';
 export * from './SalaryCapField';
+export * from './DraftSlotTradingField';
 export * from './RosterContinuityField';

@@ -106,6 +106,11 @@ export interface CreateLeagueOptions {
   salaryDecayPct?: number;
   auctionBudget?: number;
   auctionMinBid?: number;
+  /** Premium setting: managers may trade draft slots before the draft starts
+   *  (LS-8675). Callers must have already rejected auction leagues and
+   *  enforced the `draft_slot_trading` entitlement — this service does not
+   *  gate. */
+  allowDraftSlotTrading?: boolean;
   /** ISO datetime string for the scheduled draft start time. */
   startDate?: string;
   /** PPR scoring format for football leagues (LS-4158).
@@ -160,6 +165,7 @@ export interface CreateLeagueResult {
     faabBudgetDefault?: number;
     isPublic: boolean;
     playoffEnabled: boolean;
+    allowDraftSlotTrading?: boolean;
     rosterContinuity?: 'redraft' | 'keeper' | 'dynasty';
     keeperSettings?: KeeperSettings | null;
   };
@@ -228,6 +234,7 @@ export class LeagueService {
       salaryDecayPct = 25,
       auctionBudget = 260,
       auctionMinBid = 1,
+      allowDraftSlotTrading = false,
       startDate,
       scoringFormat = 'ppr',
       gamesPerMatchup,
@@ -305,6 +312,8 @@ export class LeagueService {
                 faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
                 isPublic: PublicSchema.leagues.isPublic,
                 playoffEnabled: PublicSchema.leagues.playoffEnabled,
+                allowDraftSlotTrading:
+                  PublicSchema.leagues.allowDraftSlotTrading,
                 rosterContinuity: PublicSchema.leagues.rosterContinuity,
                 keeperSettings: PublicSchema.leagues.keeperSettings,
               })
@@ -437,6 +446,7 @@ export class LeagueService {
             salaryDecayPct,
             auctionBudget,
             auctionMinBid,
+            allowDraftSlotTrading,
             ...(gamesPerMatchup !== undefined ? { gamesPerMatchup } : {}),
           })
           .returning({
@@ -460,6 +470,7 @@ export class LeagueService {
             faabBudgetDefault: PublicSchema.leagues.faabBudgetDefault,
             isPublic: PublicSchema.leagues.isPublic,
             playoffEnabled: PublicSchema.leagues.playoffEnabled,
+            allowDraftSlotTrading: PublicSchema.leagues.allowDraftSlotTrading,
             rosterContinuity: PublicSchema.leagues.rosterContinuity,
             keeperSettings: PublicSchema.leagues.keeperSettings,
           });

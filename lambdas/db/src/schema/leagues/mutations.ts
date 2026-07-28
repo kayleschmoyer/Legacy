@@ -122,6 +122,22 @@ export function validateAuctionMinBid(value: number | null | undefined): void {
     );
   }
 }
+
+/**
+ * Throws a UserInputError when draft slot trading is enabled for an auction
+ * league (LS-8675) — auction drafts assign players by bidding, so there are
+ * no draft slots to trade.
+ */
+export function validateAllowDraftSlotTrading(
+  allowDraftSlotTrading: boolean | null | undefined,
+  selectionMethod: string | null | undefined,
+): void {
+  if (allowDraftSlotTrading === true && selectionMethod === 'auction') {
+    throw UserInputError(
+      'Draft slot trading is not available for auction leagues',
+    );
+  }
+}
 const MIN_SALARY_CAP = 1;
 const MAX_SALARY_CAP = 1_000_000_000;
 
@@ -305,6 +321,10 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       salaryDecayPct: t.int({ required: false }),
       auctionBudget: t.int({ required: false }),
       auctionMinBid: t.int({ required: false }),
+      // Premium (draft_slot_trading entitlement): managers may trade draft
+      // slots before the draft starts (LS-8675). Rejected for auction
+      // leagues — no slots to trade.
+      allowDraftSlotTrading: t.boolean({ required: false }),
       pickTimeLimitSeconds: t.int({ required: false }), // seconds per pick (default 120)
       // Client-generated idempotency key for this create attempt (LS-6063).
       // Lets the resolver recognize a resubmission (double-click, retry,
@@ -441,6 +461,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         salaryDecayPct: inputSalaryDecayPct,
         auctionBudget: inputAuctionBudget,
         auctionMinBid: inputAuctionMinBid,
+        allowDraftSlotTrading: inputAllowDraftSlotTrading,
         startDate: inputStartDate,
         gamesPerMatchup: inputGamesPerMatchup,
         pickTimeLimitSeconds: inputPickTimeLimitSeconds,
@@ -521,6 +542,17 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           context,
           ENTITLEMENTS.auction_draft,
           'Auction draft mode requires a premium subscription. Upgrade to unlock auction drafts.',
+        );
+      }
+
+      // Draft slot trading is a premium league setting (LS-8675) — hard-reject
+      // rather than silently coerce, matching the FAAB / salary cap / auction
+      // pattern above.
+      if (inputAllowDraftSlotTrading) {
+        await requireFreshEntitlement(
+          context,
+          ENTITLEMENTS.draft_slot_trading,
+          'Draft slot trading requires a premium subscription. Upgrade to let managers trade draft positions.',
         );
       }
 
@@ -663,6 +695,14 @@ builder.mutationField('createLeagueAndTeams', (t) =>
       }
       const validatedSelectionMethod = (selectionMethod ??
         'standard') as (typeof VALID_SELECTION_METHODS)[number];
+
+      // Draft slot trading is meaningless for auction drafts (LS-8675) —
+      // validate against the resolved selection method so the `?? 'standard'`
+      // default can't mask an auction league.
+      validateAllowDraftSlotTrading(
+        inputAllowDraftSlotTrading,
+        validatedSelectionMethod,
+      );
 
       // ── Roster continuity / keeper settings validation (LS-8671) ────────
       const validatedCostModel = validateKeeperConfig(
@@ -841,6 +881,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           salaryDecayPct: inputSalaryDecayPct ?? 25,
           auctionBudget: inputAuctionBudget ?? 260,
           auctionMinBid: inputAuctionMinBid ?? 1,
+          allowDraftSlotTrading: inputAllowDraftSlotTrading ?? false,
           startDate: inputStartDate ?? undefined,
           ...(inputGamesPerMatchup != null
             ? { gamesPerMatchup: inputGamesPerMatchup }
@@ -3224,6 +3265,8 @@ builder.mutationField('renewLeague', (t) =>
             salaryDecayPct: oldLeague.salaryDecayPct,
             auctionBudget: oldLeague.auctionBudget,
             auctionMinBid: oldLeague.auctionMinBid,
+            // Draft slot trading carried forward (LS-8675)
+            allowDraftSlotTrading: oldLeague.allowDraftSlotTrading,
           })
           .returning();
 

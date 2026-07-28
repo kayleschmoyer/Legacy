@@ -51,6 +51,7 @@ export const ENTITLEMENTS = {
   optimal_lineup: 'optimal_lineup',
   logo_upload: 'logo_upload',
   advanced_scheduling: 'advanced_scheduling',
+  draft_slot_trading: 'draft_slot_trading',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -93,4 +94,5 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   optimal_lineup: 'Optimal Lineup (auto-set)',
   logo_upload: 'Team logo upload (direct file upload)',
   advanced_scheduling: 'Advanced scheduling (custom in-division game ratio)',
+  draft_slot_trading: 'Draft slot trading',
 };

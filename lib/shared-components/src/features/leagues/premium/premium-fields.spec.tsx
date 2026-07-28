@@ -2,6 +2,7 @@ import React from 'react';
 import { EraFilterGrid } from './EraFilterGrid';
 import { FaabBudgetField, WaiverSystemField } from './WaiverFields';
 import { SalaryCapField } from './SalaryCapField';
+import { DraftSlotTradingField } from './DraftSlotTradingField';
 import { RosterContinuityField } from './RosterContinuityField';
 import { CustomEraRange } from './CustomEraRange';
 import { FREE_ERA_IDS_BY_SPORT } from './constants';
@@ -442,6 +443,121 @@ describe('premium league-create fields (LS-5174)', () => {
           'Suggested: $30,000,000 based on your 30-man roster (10 teams)',
         ),
       ).toBeTruthy();
+    });
+  });
+
+  describe('DraftSlotTradingField (LS-8675)', () => {
+    const baseProps = {
+      enabled: false,
+      onToggleEnabled: jest.fn(),
+      onUpgrade: jest.fn(),
+    };
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('renders the toggle with its label and hint', () => {
+      const { getByText } = render(
+        <DraftSlotTradingField {...baseProps} isPremium />,
+      );
+      expect(getByText('Draft Slot Trading')).toBeTruthy();
+      expect(
+        getByText(
+          'Let managers propose draft position swaps before the draft starts',
+        ),
+      ).toBeTruthy();
+    });
+
+    it('routes an enable tap to onUpgrade for free users (locked-tap pattern)', () => {
+      const onToggleEnabled = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByText } = render(
+        <DraftSlotTradingField
+          {...baseProps}
+          onToggleEnabled={onToggleEnabled}
+          onUpgrade={onUpgrade}
+          isPremium={false}
+        />,
+      );
+      fireEvent.click(getByText('On'));
+      expect(onUpgrade).toHaveBeenCalledTimes(1);
+      expect(onToggleEnabled).not.toHaveBeenCalled();
+    });
+
+    it('shows a proactive lock for free users and hides it for premium users', () => {
+      const { getByTestId, rerender, queryByTestId } = render(
+        <DraftSlotTradingField {...baseProps} isPremium={false} />,
+      );
+      expect(getByTestId('Lock')).toBeTruthy();
+
+      rerender(<DraftSlotTradingField {...baseProps} isPremium />);
+      expect(queryByTestId('Lock')).toBeNull();
+    });
+
+    // LS-6100 — a premium viewer toggling while entitlement is still
+    // resolving must not have the upgrade modal fired at them.
+    it('does not route an enable tap to onUpgrade while loading, even if isPremium is currently false', () => {
+      const onToggleEnabled = jest.fn();
+      const onUpgrade = jest.fn();
+      const { getByText } = render(
+        <DraftSlotTradingField
+          {...baseProps}
+          onToggleEnabled={onToggleEnabled}
+          onUpgrade={onUpgrade}
+          isPremium={false}
+          loading
+        />,
+      );
+      fireEvent.click(getByText('On'));
+      expect(onUpgrade).not.toHaveBeenCalled();
+      expect(onToggleEnabled).not.toHaveBeenCalled();
+    });
+
+    it('does not show the proactive lock while loading (LS-6100)', () => {
+      const { queryByTestId } = render(
+        <DraftSlotTradingField {...baseProps} isPremium={false} loading />,
+      );
+      expect(queryByTestId('Lock')).toBeNull();
+    });
+
+    it('enables slot trading for premium users', () => {
+      const onToggleEnabled = jest.fn();
+      const { getByText } = render(
+        <DraftSlotTradingField
+          {...baseProps}
+          onToggleEnabled={onToggleEnabled}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('On'));
+      expect(onToggleEnabled).toHaveBeenCalledWith(true);
+    });
+
+    it('disables slot trading for premium users', () => {
+      const onToggleEnabled = jest.fn();
+      const { getByText } = render(
+        <DraftSlotTradingField
+          {...baseProps}
+          enabled
+          onToggleEnabled={onToggleEnabled}
+          isPremium
+        />,
+      );
+      fireEvent.click(getByText('Off'));
+      expect(onToggleEnabled).toHaveBeenCalledWith(false);
+    });
+
+    it('respects an explicit disabled prop even for premium users', () => {
+      const onToggleEnabled = jest.fn();
+      const { getByText } = render(
+        <DraftSlotTradingField
+          {...baseProps}
+          onToggleEnabled={onToggleEnabled}
+          isPremium
+          disabled
+        />,
+      );
+      fireEvent.click(getByText('On'));
+      expect(onToggleEnabled).not.toHaveBeenCalled();
     });
   });
 

@@ -16,6 +16,7 @@ import { DateTimePicker, Skeleton } from '@legacy-sports/shared-components';
 import {
   CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   CustomEraRange,
+  DraftSlotTradingField,
   EraFilterGrid,
   FaabBudgetField,
   MAX_SALARY_CAP,
@@ -56,6 +57,9 @@ interface BaseballFormData {
   faabBudgetDefault: number;
   salaryCapEnabled: boolean;
   salaryCap?: number;
+  // Premium (LS-8675): managers may trade draft slots pre-draft. Hidden and
+  // coerced false for auction leagues — no slots to trade.
+  allowDraftSlotTrading: boolean;
 }
 
 interface FootballFormData {
@@ -266,6 +270,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
     waiverType: 'standard',
     faabBudgetDefault: 100,
     salaryCapEnabled: false,
+    allowDraftSlotTrading: false,
   });
 
   // ── Football form state ──────────────────────────────────────────────────
@@ -421,6 +426,12 @@ export default function CreateLeagueScreen(): React.JSX.Element {
               salaryCapEnabled: baseballForm.salaryCapEnabled,
               ...(baseballForm.salaryCapEnabled
                 ? { salaryCap: baseballForm.salaryCap }
+                : {}),
+              // Draft slot trading (LS-8675) — only sent when enabled for a
+              // non-auction draft; the server rejects true for auction leagues.
+              ...(baseballForm.selectionMethod !== 'auction' &&
+              baseballForm.allowDraftSlotTrading
+                ? { allowDraftSlotTrading: true }
                 : {}),
             },
           },
@@ -824,7 +835,16 @@ export default function CreateLeagueScreen(): React.JSX.Element {
               }
               onChange={(v) =>
                 sport === 'baseball'
-                  ? setBaseballField('selectionMethod', v)
+                  ? setBaseballForm((prev) => ({
+                      ...prev,
+                      selectionMethod: v,
+                      // Auction drafts have no slots to trade (LS-8675) —
+                      // coerce the hidden toggle back off so a previously
+                      // enabled value can't be submitted.
+                      ...(v === 'auction'
+                        ? { allowDraftSlotTrading: false }
+                        : {}),
+                    }))
                   : setFootballField('selectionMethod', v)
               }
               loading={loading}
@@ -910,9 +930,9 @@ export default function CreateLeagueScreen(): React.JSX.Element {
                         bordered
                       >
                         <Text size="$3" color="$gray11">
-                          Salary cap, FAAB waivers, and historical era filters
-                          are Premium features. Free leagues use All Eras and
-                          standard waivers.
+                          Salary cap, FAAB waivers, draft slot trading, and
+                          historical era filters are Premium features. Free
+                          leagues use All Eras and standard waivers.
                         </Text>
                       </Card>
                     )}
@@ -995,6 +1015,20 @@ export default function CreateLeagueScreen(): React.JSX.Element {
                         maxRosterSize={baseballForm.maxRosterSize}
                       />
                     </PremiumGate>
+
+                    {/* Draft Slot Trading — hidden for auction leagues (no
+                        slots to trade; server rejects it, LS-8675) */}
+                    {baseballForm.selectionMethod !== 'auction' && (
+                      <DraftSlotTradingField
+                        enabled={baseballForm.allowDraftSlotTrading}
+                        onToggleEnabled={(v) =>
+                          setBaseballField('allowDraftSlotTrading', v)
+                        }
+                        isPremium={isPremium}
+                        disabled={loading}
+                        onUpgrade={() => goToUpgrade('Draft Slot Trading')}
+                      />
+                    )}
                   </>
                 )}
               </YStack>

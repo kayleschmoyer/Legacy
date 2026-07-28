@@ -143,6 +143,11 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('create-league-salary-cap-input');
   }
 
+  /** The draft-slot-trading pill toggle (Draft Settings; hidden for auction leagues, LS-8675). */
+  get draftSlotTradingToggle(): UIElement {
+    return this.driver.byTestId('create-league-draft-slot-trading-toggle');
+  }
+
   /** The FAAB custom-budget amount input (visible once "Custom" is selected). */
   get faabBudgetCustomInput(): UIElement {
     return this.driver.byTestId('create-league-faab-budget-custom-input');

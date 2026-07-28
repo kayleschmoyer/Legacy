@@ -66,6 +66,7 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
     CustomEraRange: () => null,
     WaiverSystemField: () => null,
     FaabBudgetField: () => null,
+    DraftSlotTradingField: () => null,
     // Lean stand-in exposing the toggle, amount input, and inline error used
     // by the salary-cap validation tests (LS-8361).
     SalaryCapField: ({

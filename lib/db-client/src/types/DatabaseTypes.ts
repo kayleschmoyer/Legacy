@@ -10,6 +10,7 @@ import {
   careerFootballDefenseIdp,
   careerPitching,
   commissionerAuditLog,
+  draftSlotTrades,
   footballSeasonDefenseIdp,
   gameBatting,
   gameFielding,
@@ -105,6 +106,8 @@ export type TradeOffer = typeof tradeOffers.$inferSelect;
 export type TradeOfferPlayer = typeof tradeOfferPlayers.$inferSelect;
 export type CreateTradeOfferInput = typeof tradeOffers.$inferInsert;
 export type CreateTradeOfferPlayerInput = typeof tradeOfferPlayers.$inferInsert;
+export type DraftSlotTrade = typeof draftSlotTrades.$inferSelect;
+export type CreateDraftSlotTradeInput = typeof draftSlotTrades.$inferInsert;
 export type LeagueMember = typeof leagueMembers.$inferSelect;
 export type ScoringStatDefinition = typeof scoringStatDefinitions.$inferSelect;
 export type LeagueScoringProfile = typeof leagueScoringProfiles.$inferSelect;

@@ -211,6 +211,16 @@ export const tradeOfferStatus = pgEnum('trade_offer_status', [
   'expired',
 ]);
 
+// Draft slot trading (LS-8675) — lifecycle mutations land in a follow-up ticket
+export const draftSlotTradeStatus = pgEnum('draft_slot_trade_status', [
+  'proposed',
+  'accepted',
+  'declined',
+  'approved',
+  'executed',
+  'cancelled',
+]);
+
 export const matchupMessageType = pgEnum('matchup_message_type', [
   'text',
   'gif',

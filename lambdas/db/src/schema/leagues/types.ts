@@ -144,6 +144,8 @@ export const League = builder.objectRef<{
   salaryDecayPct?: number;
   auctionBudget?: number;
   auctionMinBid?: number;
+  /** Premium setting: managers may trade draft slots pre-draft (LS-8675) */
+  allowDraftSlotTrading?: boolean;
   // Era filter settings
   baseballEraFilter?: string;
   baseballHofOnly?: boolean;
@@ -284,6 +286,9 @@ League.implement({
     salaryDecayPct: t.exposeInt('salaryDecayPct', { nullable: true }),
     auctionBudget: t.exposeInt('auctionBudget', { nullable: true }),
     auctionMinBid: t.exposeInt('auctionMinBid', { nullable: true }),
+    allowDraftSlotTrading: t.exposeBoolean('allowDraftSlotTrading', {
+      nullable: true,
+    }),
     // Era filter settings
     eraFilter: t.exposeString('baseballEraFilter', { nullable: true }),
     baseballHofOnly: t.exposeBoolean('baseballHofOnly', { nullable: true }),

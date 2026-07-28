@@ -40,6 +40,7 @@ import {
 } from '@legacy-sports/shared-components/sports';
 import {
   CustomEraRange,
+  DraftSlotTradingField,
   EraFilterGrid,
   ERAS_BY_SPORT,
   FAAB_BUDGET_MAX,
@@ -234,6 +235,9 @@ export interface CreateLeagueFormData {
   salaryDecayPct?: number;
   auctionBudget: number;
   auctionMinBid: number;
+  // Premium (draft_slot_trading entitlement): managers may trade draft slots
+  // pre-draft (LS-8675). Hidden and coerced false for auction leagues.
+  allowDraftSlotTrading: boolean;
   pickTimeLimitSeconds: number;
   // Keeper draft mode (LS-8672). rosterContinuity gates the fields below —
   // only meaningful (and sent to the server) when 'keeper'.
@@ -1361,6 +1365,8 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [showEraUpgradeModal, setShowEraUpgradeModal] = useState(false);
   const [showHofUpgradeModal, setShowHofUpgradeModal] = useState(false);
   const [showAuctionUpgradeModal, setShowAuctionUpgradeModal] = useState(false);
+  const [showSlotTradingUpgradeModal, setShowSlotTradingUpgradeModal] =
+    useState(false);
   const [showKeeperUpgradeModal, setShowKeeperUpgradeModal] = useState(false);
   const [showLeagueLimitModal, setShowLeagueLimitModal] = useState(false);
   const [createdLeague, setCreatedLeague] = useState<{
@@ -1471,6 +1477,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       salaryDecayPct: undefined,
       auctionBudget: 200,
       auctionMinBid: 1,
+      allowDraftSlotTrading: false,
       pickTimeLimitSeconds: 120,
       rosterContinuity: 'redraft',
       keeperCount: undefined,
@@ -1664,6 +1671,11 @@ export function LeagueCreatePage(): React.JSX.Element {
         } else {
           setSelectionResetNotice(null);
         }
+      }
+      // Auction drafts have no slots to trade (LS-8675) — coerce the hidden
+      // toggle back off so a previously-enabled value can't be submitted.
+      if (next.selectionMethod === 'auction' && next.allowDraftSlotTrading) {
+        next.allowDraftSlotTrading = false;
       }
       if (
         field === 'numberOfTeams' &&
@@ -2007,6 +2019,13 @@ export function LeagueCreatePage(): React.JSX.Element {
             auctionMinBid:
               formData.selectionMethod === 'auction'
                 ? formData.auctionMinBid
+                : undefined,
+            // Draft slot trading (LS-8675) — only sent when enabled for a
+            // non-auction draft; the server rejects true for auction leagues.
+            allowDraftSlotTrading:
+              formData.selectionMethod !== 'auction' &&
+              formData.allowDraftSlotTrading
+                ? true
                 : undefined,
             pickTimeLimitSeconds:
               formData.draftMode === 'live'
@@ -3239,6 +3258,33 @@ export function LeagueCreatePage(): React.JSX.Element {
                     </>
                   </FieldRow>
 
+                  {/* Draft Slot Trading — premium, baseball-only, hidden for
+                      auction leagues (no slots to trade; server rejects it,
+                      LS-8675). Locked-tap pattern like the HOF toggle — a
+                      PremiumGate overlay would stack a second CTA in this
+                      section. Rendered below the Draft Date field so the
+                      date-picker trigger keeps its viewport position — the
+                      popover anchors to it and its Apply button must stay
+                      on-screen in the E2E viewport (LS-5367). */}
+                  {formData.sport === 'baseball' &&
+                    formData.selectionMethod !== 'auction' && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <DraftSlotTradingField
+                          enabled={formData.allowDraftSlotTrading}
+                          onToggleEnabled={(v) =>
+                            handleInputChange('allowDraftSlotTrading', v)
+                          }
+                          isPremium={!!isPremium}
+                          loading={premiumLoading}
+                          disabled={isFormDisabled}
+                          onUpgrade={() => {
+                            trackPremiumFeatureClick('Draft Slot Trading');
+                            setShowSlotTradingUpgradeModal(true);
+                          }}
+                        />
+                      </div>
+                    )}
+
                   {/* Auction settings — conditional */}
                   {formData.selectionMethod === 'auction' &&
                     formData.draftMode !== 'automated' && (
@@ -3846,6 +3892,12 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowAuctionUpgradeModal}
         featureName="Auction Draft"
         featureDescription="Run a live auction where managers bid on players from a shared budget — the most competitive draft format for serious leagues."
+      />
+      <UpgradeModal
+        open={showSlotTradingUpgradeModal}
+        onOpenChange={setShowSlotTradingUpgradeModal}
+        featureName="Draft Slot Trading"
+        featureDescription="Let managers propose draft position swaps before the draft starts — the commissioner approves each trade."
       />
       <UpgradeModal
         open={showKeeperUpgradeModal}

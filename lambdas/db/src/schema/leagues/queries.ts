@@ -125,6 +125,7 @@ builder.queryField('league', (t) =>
             salaryDecayPct: PublicSchema.leagues.salaryDecayPct,
             auctionBudget: PublicSchema.leagues.auctionBudget,
             auctionMinBid: PublicSchema.leagues.auctionMinBid,
+            allowDraftSlotTrading: PublicSchema.leagues.allowDraftSlotTrading,
             // Era filter settings (LS-887)
             baseballEraFilter: PublicSchema.leagues.baseballEraFilter,
             baseballHofOnly: PublicSchema.leagues.baseballHofOnly,
@@ -225,6 +226,7 @@ builder.queryField('league', (t) =>
           salaryDecayPct: league.salaryDecayPct,
           auctionBudget: league.auctionBudget,
           auctionMinBid: league.auctionMinBid,
+          allowDraftSlotTrading: league.allowDraftSlotTrading,
           // Era filter settings (LS-887)
           baseballEraFilter: league.baseballEraFilter,
           baseballHofOnly: league.baseballHofOnly,
@@ -295,6 +297,7 @@ builder.queryField('userLeagues', (t) =>
             salaryDecayPct: PublicSchema.leagues.salaryDecayPct,
             auctionBudget: PublicSchema.leagues.auctionBudget,
             auctionMinBid: PublicSchema.leagues.auctionMinBid,
+            allowDraftSlotTrading: PublicSchema.leagues.allowDraftSlotTrading,
             // Tier downgrade freeze (LS-846)
             tierFrozenAt: PublicSchema.leagues.tierFrozenAt,
             // Roster continuity (LS-8671)
@@ -346,6 +349,7 @@ builder.queryField('userLeagues', (t) =>
           salaryDecayPct: league.salaryDecayPct,
           auctionBudget: league.auctionBudget,
           auctionMinBid: league.auctionMinBid,
+          allowDraftSlotTrading: league.allowDraftSlotTrading,
           // Tier downgrade freeze (LS-846)
           tierFrozenAt: league.tierFrozenAt?.toISOString() ?? null,
         }));
