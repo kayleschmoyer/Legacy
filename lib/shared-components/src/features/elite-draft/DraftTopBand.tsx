@@ -59,7 +59,7 @@ export function DraftTopBand({
   autoPickDisabled,
   pauseLoading,
   resumeLoading,
-  autoPickDisabledLoading: _autoPickDisabledLoading,
+  autoPickDisabledLoading,
   isMyTeamAutoPick,
   toggleAutoPickLoading,
   myTeamId,
@@ -70,7 +70,7 @@ export function DraftTopBand({
   onPauseDraft,
   onResumeDraft,
   onToggleCommPickMode,
-  onToggleAutoPickDisabled: _onToggleAutoPickDisabled,
+  onToggleAutoPickDisabled,
   onToggleUserAutoPick,
   onCommissionerToggleUserAutoPick,
 }: DraftTopBandProps): React.JSX.Element {
@@ -265,6 +265,23 @@ export function DraftTopBand({
             }
           >
             Commish
+          </button>
+          <button
+            className={`d-tb-btn${autoPickDisabled ? ' danger' : ''}`}
+            onClick={onToggleAutoPickDisabled}
+            disabled={autoPickDisabledLoading}
+            aria-pressed={autoPickDisabled}
+            title={
+              autoPickDisabled
+                ? 'Auto-pick is disabled. Click to re-enable automatic picks when time expires.'
+                : 'Click to disable auto-pick for all teams. No picks will be made automatically when time expires.'
+            }
+          >
+            {autoPickDisabledLoading
+              ? '…'
+              : autoPickDisabled
+                ? 'Auto-Pick OFF'
+                : 'Disable AP'}
           </button>
           <button
             className={`d-tb-btn${userApExpanded ? ' active' : ''}`}

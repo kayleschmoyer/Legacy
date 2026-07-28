@@ -56,9 +56,6 @@ jest.mock('./DraftRail', () => ({
     <div data-testid="draft-rail" data-is-premium={String(isPremium)} />
   ),
 }));
-jest.mock('./DraftSidebar', () => ({
-  DraftSidebar: () => <div data-testid="draft-sidebar" />,
-}));
 jest.mock('./DraftChatOverlay', () => ({
   DraftChatOverlay: () => null,
 }));

@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { DraftTopBand } from './DraftTopBand';
-import { render } from '../../test-utils';
+import { fireEvent, render } from '../../test-utils';
 
 const baseProps = {
   draftPaused: false,
@@ -162,5 +162,42 @@ describe('DraftTopBand commissioner button labels (LS-8063)', () => {
     expect(apBtn.textContent).toBe('AP');
     expect(commishBtn.textContent).not.toContain('…');
     expect(apBtn.textContent).not.toContain('…');
+  });
+});
+
+// LS-8783: the league-wide "Disable Auto-Pick" toggle moved from the sidebar
+// into the top band's commissioner controls when the sidebar was retired.
+describe('DraftTopBand global Disable Auto-Pick control (LS-8783)', () => {
+  it('is hidden for non-commissioners', () => {
+    const { queryByRole } = render(
+      <DraftTopBand {...baseProps} isCommissioner={false} isOwner={false} />,
+    );
+    expect(queryByRole('button', { name: /disable ap/i })).toBeNull();
+  });
+
+  it('calls onToggleAutoPickDisabled when a commissioner clicks it', () => {
+    const onToggleAutoPickDisabled = jest.fn();
+    const { getByRole } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={true}
+        isOwner={true}
+        onToggleAutoPickDisabled={onToggleAutoPickDisabled}
+      />,
+    );
+    fireEvent.click(getByRole('button', { name: /disable ap/i }));
+    expect(onToggleAutoPickDisabled).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the disabled state and label once auto-pick is off', () => {
+    const { getByRole } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={true}
+        isOwner={true}
+        autoPickDisabled={true}
+      />,
+    );
+    expect(getByRole('button', { name: /auto-pick off/i })).toBeTruthy();
   });
 });

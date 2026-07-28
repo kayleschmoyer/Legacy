@@ -28,15 +28,32 @@ const baseProps = {
   draftId: null,
   myTeamId: null,
   currentOverallPick: 0,
+  currentPickInfo: {
+    draftId: 1,
+    teamId: 1,
+    pickNumber: 1,
+    overallPick: 1,
+    round: 1,
+    isComplete: false,
+  },
+  currentPickTeamId: 1,
+  currentPickLoadError: null,
+  onlineTeamIds: new Set<string>(),
+  initDraftLoading: false,
   autoPickDisabled: false,
   myTeam: [],
   positionCounts: {} as Record<string, number>,
   pickHistory: [],
   statsLookup: new Map(),
   teamNameById: () => '',
+  chatOpen: false,
   onShowToast: jest.fn(),
   onDraftPlayer: jest.fn(),
   onCommissionerPick: jest.fn(),
+  onInitializeDraft: jest.fn(),
+  onRetryCurrentPick: jest.fn(),
+  onToggleChat: jest.fn(),
+  onRefresh: jest.fn(),
 };
 
 describe('DraftRail roster depth chart', () => {
@@ -230,5 +247,61 @@ describe('DraftRail roster depth chart', () => {
         (c) => !c.includes(POSITION_COLORS.baseball['1B'].toLowerCase()),
       ),
     ).toBe(true);
+  });
+});
+
+// LS-8783: current-pick edge states, League Chat, and Refresh moved from
+// DraftSidebar into the rail as part of the top-band + main + rail restructure.
+describe('DraftRail current-pick panel and actions (LS-8783)', () => {
+  it('does not render the current-pick panel once currentPickInfo resolves', () => {
+    const { queryByText } = render(<DraftRail {...baseProps} />);
+    expect(queryByText('Draft Order Pending')).toBeNull();
+    expect(queryByText('Pick Load Error')).toBeNull();
+  });
+
+  it('shows the retry affordance when the current pick fails to load', () => {
+    const onRetryCurrentPick = jest.fn();
+    const { getByText } = render(
+      <DraftRail
+        {...baseProps}
+        currentPickInfo={null}
+        currentPickLoadError="boom"
+        onRetryCurrentPick={onRetryCurrentPick}
+      />,
+    );
+    fireEvent.click(getByText('Retry'));
+    expect(onRetryCurrentPick).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows draft-order init buttons for the owner when currentPickInfo is null and no picks exist', () => {
+    const onInitializeDraft = jest.fn();
+    const { getByText } = render(
+      <DraftRail
+        {...baseProps}
+        currentPickInfo={null}
+        isOwner
+        onInitializeDraft={onInitializeDraft}
+      />,
+    );
+    fireEvent.click(getByText('Generate Snake Order'));
+    expect(onInitializeDraft).toHaveBeenCalledWith('snake');
+  });
+
+  it('toggles league chat via the League Chat button', () => {
+    const onToggleChat = jest.fn();
+    const { getByLabelText } = render(
+      <DraftRail {...baseProps} chatOpen={false} onToggleChat={onToggleChat} />,
+    );
+    fireEvent.click(getByLabelText('League chat closed'));
+    expect(onToggleChat).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onRefresh via the Refresh button', () => {
+    const onRefresh = jest.fn();
+    const { getByText } = render(
+      <DraftRail {...baseProps} onRefresh={onRefresh} />,
+    );
+    fireEvent.click(getByText('Refresh'));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });

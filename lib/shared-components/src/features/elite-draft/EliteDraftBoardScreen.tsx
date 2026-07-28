@@ -26,7 +26,6 @@ import {
   usePlayerData,
 } from './hooks';
 import { DraftChatOverlay } from './DraftChatOverlay';
-import { DraftSidebar } from './DraftSidebar';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import type { DraftPlayer } from './types';
@@ -545,58 +544,6 @@ export function EliteDraftBoardScreen({
           }
         />
 
-        <DraftSidebar
-          draftPaused={ui.draftPaused}
-          currentPick={currentPick}
-          round={round}
-          timeRemaining={timeRemaining}
-          isMyPick={isMyPick}
-          pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
-          pickDeadline={ui.pickDeadline}
-          isCommissioner={queries.isCommissioner}
-          isOwner={queries.isOwner}
-          isGeneralManager={queries.isGeneralManager}
-          draftId={queries.draftId}
-          commPickMode={ui.commPickMode}
-          autoPickDisabled={ui.autoPickDisabled}
-          pauseLoading={actions.pauseLoading}
-          resumeLoading={actions.resumeLoading}
-          commPickLoading={actions.commPickLoading}
-          autoPickDisabledLoading={actions.autoPickDisabledLoading}
-          initDraftLoading={actions.initDraftLoading}
-          currentPickInfo={queries.currentPickInfo}
-          currentPickTeamId={queries.currentPickTeamId}
-          currentPickLoadError={ui.currentPickLoadError}
-          myTeamId={queries.myTeamId}
-          onlineTeamIds={onlineTeamIds}
-          myTeam={playerData.myTeam}
-          myTeamPicks={playerData.myTeamPicks}
-          positionCounts={playerData.positionCounts}
-          isPremium={isPremium}
-          pickHistory={queries.pickHistory}
-          statsLookup={playerData.statsLookup}
-          chatOpen={ui.chatOpen}
-          onPauseDraft={() => void actions.handlePauseDraft()}
-          onResumeDraft={() => void actions.handleResumeDraft()}
-          onToggleCommPickMode={() => ui.setCommPickMode(!ui.commPickMode)}
-          onToggleAutoPickDisabled={() =>
-            void actions.handleToggleAutoPickDisabled()
-          }
-          onInitializeDraft={(order) =>
-            void actions.handleInitializeDraft(order)
-          }
-          onRefresh={handleRefresh}
-          onToggleUserAutoPick={() => void actions.handleToggleUserAutoPick()}
-          isMyTeamAutoPick={actions.isMyTeamAutoPick}
-          toggleAutoPickLoading={actions.toggleAutoPickLoading}
-          onToggleChat={() => ui.setChatOpen(!ui.chatOpen)}
-          onRetryCurrentPick={handleRetryCurrentPick}
-          onShowToast={ui.showToast}
-          teamNameById={queries.teamNameById}
-          onDraftPlayer={handleDraftPlayer}
-          onCommissionerPick={handleCommissionerPick}
-        />
-
         <DraftPlayerBoard
           viewMode={ui.viewMode}
           sport={sport}
@@ -644,6 +591,11 @@ export function EliteDraftBoardScreen({
           draftId={queries.draftId}
           myTeamId={queries.myTeamId}
           currentOverallPick={queries.currentPickInfo?.overallPick ?? 0}
+          currentPickInfo={queries.currentPickInfo}
+          currentPickTeamId={queries.currentPickTeamId}
+          currentPickLoadError={ui.currentPickLoadError}
+          onlineTeamIds={onlineTeamIds}
+          initDraftLoading={actions.initDraftLoading}
           autoPickDisabled={ui.autoPickDisabled}
           myTeam={playerData.myTeam}
           positionCounts={playerData.positionCounts}
@@ -651,9 +603,16 @@ export function EliteDraftBoardScreen({
           pickHistory={queries.pickHistory}
           statsLookup={playerData.statsLookup}
           teamNameById={queries.teamNameById}
+          chatOpen={ui.chatOpen}
           onShowToast={ui.showToast}
           onDraftPlayer={handleDraftPlayer}
           onCommissionerPick={handleCommissionerPick}
+          onInitializeDraft={(order) =>
+            void actions.handleInitializeDraft(order)
+          }
+          onRetryCurrentPick={handleRetryCurrentPick}
+          onToggleChat={() => ui.setChatOpen(!ui.chatOpen)}
+          onRefresh={handleRefresh}
           draggedPlayer={draggedPlayer}
         />
       </div>

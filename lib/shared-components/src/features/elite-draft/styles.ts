@@ -198,9 +198,9 @@ export const CSS = `
 .d-layout {
   position: relative; z-index: 1;
   display: grid;
-  grid-template-columns: 280px 1fr 320px;
+  grid-template-columns: 1fr 320px;
   grid-template-rows: auto 1fr;
-  grid-template-areas: "topband topband topband" "sidebar main rail";
+  grid-template-areas: "topband topband" "main rail";
   height: 100%;
   overflow: hidden;
 }
@@ -493,62 +493,11 @@ export const CSS = `
 }
 .d-pick-row.mine .d-pick-name { color: var(--d-accent); }
 
-/* ===== Sidebar ===== */
-.d-side-l {
-  grid-area: sidebar;
-}
-.d-side {
-  background: #0D1526;
-  padding: 20px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.08) transparent;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  position: relative;
-}
-.d-side::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 120px;
-  background: linear-gradient(180deg, rgba(197, 165, 90, 0.04) 0%, transparent 100%);
-  pointer-events: none;
-}
-.d-side::-webkit-scrollbar { width: 4px; }
-.d-side::-webkit-scrollbar-track { background: transparent; }
-.d-side::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-
-/* ===== Draft Status Card ===== */
-.d-status {
-  background: linear-gradient(135deg, var(--d-accent) 0%, var(--d-accent-dark, #A68B3E) 60%, var(--d-navy, #1B3A5C) 100%);
-  padding: 14px 16px;
-  border-radius: var(--d-radius-md);
-  margin-bottom: 16px;
-  position: relative;
-  overflow: hidden;
-  display: flex; align-items: center; gap: 10px;
-  box-shadow: 0 4px 20px rgba(197, 165, 90, 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
-}
-.d-status::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%);
-  background-size: 200% 100%;
-  animation: shimmer 4s ease-in-out infinite;
-}
 .d-live-dot {
   width: 7px; height: 7px; flex-shrink: 0;
   background: #fff; border-radius: 50%;
   animation: liveDot 1.5s ease-in-out infinite;
   box-shadow: 0 0 6px rgba(255,255,255,0.6);
-}
-.d-status-info {
-  position: relative; line-height: 1.3;
-}
-.d-status-title {
-  font-size: 12px; font-weight: 800; letter-spacing: 1px;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.25);
-}
-.d-status-sub {
-  font-size: 11px; opacity: 0.85; font-weight: 500;
 }
 
 /* ===== Circular Timer ===== */
@@ -608,40 +557,6 @@ export const CSS = `
 .d-panel-title.a-orange { color: var(--d-accent); }
 .d-panel-title.a-green { color: var(--d-success); }
 .d-panel-title.a-amber { color: var(--d-warning); }
-
-/* ===== Roster ===== */
-.d-roster-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  gap: 5px; margin-bottom: 12px;
-}
-.d-roster-cell {
-  background: rgba(13, 21, 38, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--d-radius-sm);
-  padding: 7px 5px; text-align: center; font-size: 11px;
-  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
-}
-.d-roster-cell:hover {
-  background: rgba(27, 58, 92, 0.2);
-  border-color: rgba(197, 165, 90, 0.15);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  transform: translateY(-1px);
-}
-.d-roster-player {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px;
-  background: rgba(13, 21, 38, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: var(--d-radius-sm);
-  margin-bottom: 5px;
-  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-  animation: slideInLeft 0.3s ease-out both;
-}
-.d-roster-player:hover {
-  background: rgba(27, 58, 92, 0.15);
-  border-color: rgba(255, 255, 255, 0.08);
-  transform: translateX(3px);
-}
 
 /* ===== Glass Button ===== */
 .d-btn-glass {
@@ -1121,7 +1036,7 @@ export const CSS = `
 
 /* ===== Responsive ===== */
 @media (max-width: 1200px) {
-  .d-layout { grid-template-columns: 240px 1fr 280px; }
+  .d-layout { grid-template-columns: 1fr 280px; }
   .d-depth-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 900px) {
@@ -1130,7 +1045,6 @@ export const CSS = `
     grid-template-rows: auto auto 1fr;
     grid-template-areas: "topband" "rail" "main";
   }
-  .d-side-l { display: none; }
   .d-rail {
     border-left: none;
     border-top: 1px solid rgba(255,255,255,0.06);
@@ -1162,7 +1076,6 @@ export const CSS = `
   .d-topband { grid-template-columns: 1fr auto; grid-template-rows: auto auto; }
 }
 @media (max-width: 768px) {
-  .d-side-l { display: none; }
   .d-main { padding: 12px 14px; }
   .d-controls { flex-direction: column; align-items: stretch; padding: 12px; }
   .d-search-wrap { min-width: 0; }
@@ -1352,54 +1265,6 @@ export const CSS = `
 }
 .d-paused-resume-btn:active:not(:disabled) { transform: translateY(0) scale(0.98); }
 .d-paused-resume-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-/* ===== Commissioner Controls ===== */
-.d-comm-controls {
-  background: rgba(27, 58, 92, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--d-radius-md);
-  padding: 12px;
-  margin-bottom: 14px;
-}
-.d-comm-title {
-  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
-  text-transform: uppercase; color: var(--d-text-secondary);
-  margin-bottom: 8px;
-}
-.d-comm-btn {
-  display: block; width: 100%;
-  padding: 8px 12px; border-radius: var(--d-radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(27, 58, 92, 0.15);
-  color: var(--d-text); font-size: 12px; font-weight: 600;
-  cursor: pointer; transition: all 0.2s;
-  font-family: inherit; margin-bottom: 6px; text-align: left;
-}
-.d-comm-btn:hover {
-  background: rgba(27, 58, 92, 0.3);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-.d-comm-btn:disabled {
-  opacity: 0.5; cursor: not-allowed;
-}
-.d-comm-btn.danger {
-  border-color: rgba(239,68,68,0.25);
-  background: rgba(239,68,68,0.1);
-  color: #fca5a5;
-}
-.d-comm-btn.danger:hover {
-  background: rgba(239,68,68,0.2);
-  border-color: rgba(239,68,68,0.4);
-}
-.d-comm-btn.success {
-  border-color: rgba(16,185,129,0.25);
-  background: rgba(16,185,129,0.1);
-  color: #6ee7b7;
-}
-.d-comm-btn.success:hover {
-  background: rgba(16,185,129,0.2);
-  border-color: rgba(16,185,129,0.4);
-}
 
 /* ===== Draft Grid (Team Columns) ===== */
 .d-draft-grid-view {

@@ -1,7 +1,12 @@
 import React from 'react';
-import type { DraftPickRecord, DraftPlayer } from './types';
+import type {
+  CurrentDraftPickInfo,
+  DraftPickRecord,
+  DraftPlayer,
+} from './types';
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
+import { CurrentPickPanel } from './CurrentPickPanel';
 import { getPositionColor } from './utils';
 import { isPlayerEligibleForSlot } from './draftDnd';
 import type { Sport } from '../../utils/colors';
@@ -48,6 +53,12 @@ interface DraftRailProps {
   draftId: number | null;
   myTeamId: number | null;
   currentOverallPick: number;
+  // Current pick (whose-turn edge states: load error / draft-order pending)
+  currentPickInfo: CurrentDraftPickInfo | null;
+  currentPickTeamId: number | null;
+  currentPickLoadError: string | null;
+  onlineTeamIds: ReadonlySet<string>;
+  initDraftLoading: boolean;
   // Queue
   autoPickDisabled: boolean;
   // Roster
@@ -61,10 +72,16 @@ interface DraftRailProps {
   teamNameById: (teamId: number | null | undefined) => string;
   /** Drag-to-draft (LS-8068): the player card currently being dragged, or null. */
   draggedPlayer?: DraftPlayer | null;
+  // Chat
+  chatOpen: boolean;
   // Actions
   onShowToast: (msg: string) => void;
   onDraftPlayer: (playerId: number) => void;
   onCommissionerPick: (playerId: number) => void;
+  onInitializeDraft: (order: 'snake' | 'linear') => void;
+  onRetryCurrentPick: () => void;
+  onToggleChat: () => void;
+  onRefresh: () => void;
 }
 
 function playerName(
@@ -95,6 +112,11 @@ export function DraftRail({
   draftId,
   myTeamId,
   currentOverallPick,
+  currentPickInfo,
+  currentPickTeamId,
+  currentPickLoadError,
+  onlineTeamIds,
+  initDraftLoading,
   autoPickDisabled,
   myTeam,
   positionCounts,
@@ -103,9 +125,14 @@ export function DraftRail({
   statsLookup,
   teamNameById,
   draggedPlayer = null,
+  chatOpen,
   onShowToast,
   onDraftPlayer,
   onCommissionerPick,
+  onInitializeDraft,
+  onRetryCurrentPick,
+  onToggleChat,
+  onRefresh,
 }: DraftRailProps): React.JSX.Element {
   const positionSlots = getPositionSlotsForSport(sport);
   const totalDrafted = myTeam.length;
@@ -155,6 +182,27 @@ export function DraftRail({
         <span aria-hidden="true">{mobileCollapsed ? '▾ Show' : '▴ Hide'}</span>
       </button>
       <div id="d-rail-content" className="d-rail-content">
+        {/* Current-pick edge states — the top band's on-the-clock slab covers
+            the normal case, but a failed load or a not-yet-initialized draft
+            order needs the retry / Generate Order affordances the sidebar
+            used to provide. Hidden once currentPickInfo resolves. */}
+        {!currentPickInfo && (
+          <CurrentPickPanel
+            currentPickInfo={currentPickInfo}
+            currentPickTeamId={currentPickTeamId}
+            currentPickLoadError={currentPickLoadError}
+            isMyPick={isMyPick}
+            isOwner={isOwner}
+            myTeamId={myTeamId}
+            onlineTeamIds={onlineTeamIds}
+            initDraftLoading={initDraftLoading}
+            pickHistoryLength={pickHistory.length}
+            teamNameById={teamNameById}
+            onInitializeDraft={onInitializeDraft}
+            onRetryCurrentPick={onRetryCurrentPick}
+          />
+        )}
+
         {/* Draft Intelligence — only on user's pick, premium only */}
         {isMyPick && (
           <div className="d-intel-panel">
@@ -369,6 +417,19 @@ export function DraftRail({
             </div>
           </div>
         )}
+
+        {/* Actions */}
+        <button
+          className="d-btn-glass"
+          onClick={onToggleChat}
+          aria-pressed={chatOpen}
+          aria-label={`League chat ${chatOpen ? 'open' : 'closed'}`}
+        >
+          League Chat
+        </button>
+        <button className="d-btn-glass" onClick={onRefresh}>
+          Refresh
+        </button>
       </div>
     </aside>
   );
