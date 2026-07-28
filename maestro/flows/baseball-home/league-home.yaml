@@ -1,4 +1,5 @@
-# League home: home tab hero/content, sport card into baseball home, leagues tab list.
+# League home: "Scoreboard First" home tab (greeting, ticker, league rail,
+# quick actions), then the leagues tab list.
 appId: com.legacysports.app
 tags:
   - baseball-home
@@ -9,37 +10,43 @@ tags:
 - takeScreenshot: maestro/artifacts/baseball-home/01-home-screen
 - assertVisible:
     id: "home-content"
+# The live matchup ticker only renders when one of the account's leagues has a
+# matchup in progress, so screenshot it opportunistically (LS-8794).
 - runFlow:
-    # Hero card only renders when the account has an active league
     when:
       visible:
-        id: "home-hero-card"
+        id: "home-live-ticker"
     commands:
-      - takeScreenshot: maestro/artifacts/baseball-home/02-hero-card
-# Core navigation (LS-8446): the baseball sport card is a static element of the
-# home sport-switcher (below the fold), so reveal it with scrollUntilVisible —
-# Maestro tapOn does not auto-scroll — then tapping it and landing on the
-# baseball home screen are mandatory. A broken switcher fails the flow loudly
-# instead of emitting a home-screen screenshot mislabelled as baseball home.
+      - takeScreenshot: maestro/artifacts/baseball-home/02-live-ticker
+# Core navigation (LS-8446, retargeted by LS-8794): the home sport-switcher
+# cards are gone from the returning-user layout — sport switching now lives
+# behind the league rail and the Leagues tab. The rail and the quick-action
+# grid are the static elements of the redesigned home, so assert them loudly:
+# a broken home tab fails the flow instead of emitting a screenshot of a blank
+# dashboard.
 - scrollUntilVisible:
     element:
-      id: "sport-card-title-baseball"
+      id: "home-league-rail"
     direction: DOWN
     timeout: 15000
-- tapOn:
-    id: "sport-card-title-baseball"
-- extendedWaitUntil:
-    visible:
-      id: "baseball-home-screen"
-    timeout: 20000
-- takeScreenshot: maestro/artifacts/baseball-home/03-baseball-home
+- assertVisible:
+    id: "home-league-rail"
+- takeScreenshot: maestro/artifacts/baseball-home/03-league-rail
+- scrollUntilVisible:
+    element:
+      id: "home-quick-actions"
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: "home-quick-actions"
+- takeScreenshot: maestro/artifacts/baseball-home/04-quick-actions
 - tapOn: "Leagues"
 - extendedWaitUntil:
     visible:
       id: "leagues-list"
     timeout: 15000
-- takeScreenshot: maestro/artifacts/baseball-home/04-leagues-tab
+- takeScreenshot: maestro/artifacts/baseball-home/05-leagues-tab
 - assertVisible:
     id: "leagues-add-button"
 - scroll
-- takeScreenshot: maestro/artifacts/baseball-home/05-leagues-scrolled
+- takeScreenshot: maestro/artifacts/baseball-home/06-leagues-scrolled

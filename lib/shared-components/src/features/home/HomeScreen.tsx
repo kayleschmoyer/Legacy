@@ -1,14 +1,5 @@
 import React, { useMemo } from 'react';
-import {
-  H1,
-  H2,
-  isWeb,
-  ScrollView,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { H1, H2, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import type { GestureResponderEvent } from 'react-native';
 import { formatDraftDate } from '@legacy-sports/utils';
 import { formatEraDescriptor, formatEraYears } from './homeSummaryFormatters';
@@ -20,6 +11,7 @@ import {
   safeScore,
   sortByUrgency,
 } from './leagueSummaryStats';
+import { BODY_FONT, DISPLAY_FONT } from './homeFonts';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
 import {
   AMBER_WARM,
@@ -46,13 +38,6 @@ export { formatDisplayName } from './homeSummaryFormatters';
 // Leagues ledger can consume them without importing this component module.
 // Re-exported here to keep `@legacy-sports/shared-components` imports stable.
 export type { HomeLeagueSummary, HomeUserStats } from './leagueSummaryStats';
-
-/* ─── Typography helpers (web uses Heritage fonts; native falls back) ─── */
-
-const DISPLAY_FONT = isWeb
-  ? 'Big Shoulders Display, system-ui, sans-serif'
-  : undefined;
-const BODY_FONT = isWeb ? 'Literata, Georgia, serif' : undefined;
 
 /* ─── Public types ─── */
 

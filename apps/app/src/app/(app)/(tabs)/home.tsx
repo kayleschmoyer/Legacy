@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   formatDisplayName,
   type HomeLeagueSummary,
-  HomeScreen,
+  MobileHomeScreen,
 } from '@legacy-sports/shared-components';
 import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
 import {
@@ -24,10 +24,11 @@ import FootballHomeScreen from '../football/index';
 type ActiveSport = 'baseball' | 'football';
 
 /**
- * The Home tab renders the shared, cross-platform `HomeScreen` dashboard from
- * `lib/shared-components`, wired to mobile's GraphQL data layer and expo-router
- * navigation. UI is shared across web and native and adapts by viewport
- * (shared-components-first, LS-7790).
+ * The Home tab renders `MobileHomeScreen` from `lib/shared-components` — the
+ * compact "Scoreboard First" layout (LS-8794) — wired to mobile's GraphQL data
+ * layer and expo-router navigation. `MobileHomeScreen` delegates its loading,
+ * error and new-user states back to the shared `HomeScreen`, which still owns
+ * the web dashboard unchanged (shared-components-first, LS-7790).
  *
  * Sport switching uses local state rather than router.push so that the baseball
  * and football home screens stay mounted once visited — preserving scroll
@@ -114,28 +115,54 @@ export default function HomeTab() {
   // render their own back bar (LS-8766).
   useSystemBackAction(activeSport !== null, handleBackFromSport);
 
+  const viewMatchup = useCallback(
+    (s: HomeLeagueSummary) => {
+      if (s.matchupId == null) {
+        viewLeague(s);
+        return;
+      }
+      const params = {
+        matchupId: String(s.matchupId),
+        leagueId: String(s.leagueId),
+      };
+      if (s.sport === 'football') {
+        router.push({ pathname: '/football/matchup', params });
+      } else {
+        router.push({ pathname: '/baseball/matchup', params });
+      }
+    },
+    [router, viewLeague],
+  );
+
   const userName = formatDisplayName(userInfo.username || 'Manager');
 
-  const onThisDay = (
-    <OnThisDayFeed
-      onPlayerPress={(id) => {
-        // Validate the id before navigating (LS-8627) — a blind String(id)
-        // coercion let a missing/invalid id reach PlayerDetail, which fails
-        // to parse it and always shows "Player Not Found".
-        const playerId = toPlayerDetailIdParam(id);
-        if (playerId === null) {
-          LOGGER.warn(
-            '[Home] skipping PlayerDetail navigation for invalid player id',
-            { id },
-          );
-          return;
-        }
-        router.push({
-          pathname: '/PlayerDetail',
-          params: { playerId, playerName: '' },
-        });
-      }}
-    />
+  const handlePlayerPress = useCallback(
+    (id: number) => {
+      // Validate the id before navigating (LS-8627) — a blind String(id)
+      // coercion let a missing/invalid id reach PlayerDetail, which fails
+      // to parse it and always shows "Player Not Found".
+      const playerId = toPlayerDetailIdParam(id);
+      if (playerId === null) {
+        LOGGER.warn(
+          '[Home] skipping PlayerDetail navigation for invalid player id',
+          { id },
+        );
+        return;
+      }
+      router.push({
+        pathname: '/PlayerDetail',
+        params: { playerId, playerName: '' },
+      });
+    },
+    [router],
+  );
+
+  // Full feed — rendered by the delegated new-user / error states.
+  const onThisDay = <OnThisDayFeed onPlayerPress={handlePlayerPress} />;
+  // Condensed feed — a single top entry plus "More ›" — for the compact
+  // returning-user layout (LS-8794).
+  const onThisDayCondensed = (
+    <OnThisDayFeed condensed onPlayerPress={handlePlayerPress} />
   );
 
   return (
@@ -144,7 +171,7 @@ export default function HomeTab() {
       <View
         style={{ display: activeSport !== null ? 'none' : 'flex', flex: 1 }}
       >
-        <HomeScreen
+        <MobileHomeScreen
           userName={userName}
           isLight={resolvedTheme === 'light'}
           topInset={topInset}
@@ -156,11 +183,15 @@ export default function HomeTab() {
           loading={loading}
           error={Boolean(error && !data?.getUserLeagueSummaries)}
           onThisDay={onThisDay}
+          onThisDayCondensed={onThisDayCondensed}
           onShowArchived={handleShowArchived}
           onHideArchived={handleHideArchived}
           onRetry={() => void refetch()}
           onViewLeague={viewLeague}
+          onViewMatchup={viewMatchup}
           onSetLineup={viewLeague}
+          onSeeAllLeagues={() => router.navigate('/leagues')}
+          onOpenProfile={() => router.navigate('/you')}
           onMockDraft={() => router.push('/baseball/mock-draft')}
           onCreateLeague={() => router.navigate('/baseball/league/create')}
           onJoinLeague={() => router.navigate('/baseball/league/join')}

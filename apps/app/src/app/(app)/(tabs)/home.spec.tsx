@@ -71,9 +71,27 @@ let capturedOnPlayerPress: ((playerId: number) => void) | null = null;
 let capturedOnShowArchived: (() => void) | null = null;
 let capturedOnHideArchived: (() => void) | null = null;
 let capturedShowArchived: boolean | undefined;
+// Capture the "Scoreboard First" navigation callbacks (LS-8794)
+let capturedOnSeeAllLeagues: (() => void) | null = null;
+let capturedOnOpenProfile: (() => void) | null = null;
+let capturedOnViewMatchup: ((summary: Record<string, unknown>) => void) | null =
+  null;
+
+type MobileHomeScreenMockProps = {
+  onViewSport: (sport: 'baseball' | 'football') => void;
+  testID?: string;
+  topInset?: number;
+  onThisDay?: React.ReactNode;
+  onShowArchived?: () => void;
+  onHideArchived?: () => void;
+  showArchived?: boolean;
+  onSeeAllLeagues?: () => void;
+  onOpenProfile?: () => void;
+  onViewMatchup?: (summary: Record<string, unknown>) => void;
+};
 
 jest.mock('@legacy-sports/shared-components', () => ({
-  HomeScreen: ({
+  MobileHomeScreen: ({
     onViewSport,
     testID,
     topInset,
@@ -81,20 +99,18 @@ jest.mock('@legacy-sports/shared-components', () => ({
     onShowArchived,
     onHideArchived,
     showArchived,
-  }: {
-    onViewSport: (sport: 'baseball' | 'football') => void;
-    testID?: string;
-    topInset?: number;
-    onThisDay?: React.ReactNode;
-    onShowArchived?: () => void;
-    onHideArchived?: () => void;
-    showArchived?: boolean;
-  }) => {
+    onSeeAllLeagues,
+    onOpenProfile,
+    onViewMatchup,
+  }: MobileHomeScreenMockProps) => {
     capturedOnViewSport = onViewSport;
     capturedTopInset = topInset;
     capturedOnShowArchived = onShowArchived ?? null;
     capturedOnHideArchived = onHideArchived ?? null;
     capturedShowArchived = showArchived;
+    capturedOnSeeAllLeagues = onSeeAllLeagues ?? null;
+    capturedOnOpenProfile = onOpenProfile ?? null;
+    capturedOnViewMatchup = onViewMatchup ?? null;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
     return <View testID={testID ?? 'home-screen'}>{onThisDay}</View>;
@@ -369,5 +385,86 @@ describe('HomeTab archived leagues toggle (LS-8633)', () => {
       capturedOnHideArchived?.();
     });
     expect(capturedShowArchived).toBe(false);
+  });
+});
+
+describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    capturedOnSeeAllLeagues = null;
+    capturedOnOpenProfile = null;
+    capturedOnViewMatchup = null;
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: [] },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    mockGetArchivedLazy.mockReturnValue([
+      jest.fn(),
+      { data: null, loading: false },
+    ]);
+    mockGetArchivedCached.mockReturnValue({ data: null });
+  });
+
+  it('navigates to the Leagues tab from "See all"', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnSeeAllLeagues?.();
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/leagues');
+  });
+
+  it('navigates to the You tab from the greeting avatar', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnOpenProfile?.();
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/you');
+  });
+
+  it('opens the baseball matchup detail from the live ticker', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnViewMatchup?.({
+        matchupId: 12,
+        leagueId: 5,
+        sport: 'baseball',
+      });
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/baseball/matchup',
+      params: { matchupId: '12', leagueId: '5' },
+    });
+  });
+
+  it('opens the football matchup detail for a football league', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnViewMatchup?.({
+        matchupId: 3,
+        leagueId: 9,
+        sport: 'football',
+      });
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/football/matchup',
+      params: { matchupId: '3', leagueId: '9' },
+    });
+  });
+
+  it('falls back to the league route when the summary carries no matchup id', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnViewMatchup?.({
+        matchupId: null,
+        leagueId: 7,
+        sport: 'baseball',
+      });
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/baseball/league/[leagueId]',
+      params: { leagueId: '7' },
+    });
   });
 });

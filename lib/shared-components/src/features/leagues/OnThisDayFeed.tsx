@@ -5,7 +5,7 @@
  * today's calendar date (month + day) across all seasons in the database,
  * plus off-season events (signings, trades) from the on_this_day_events table.
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Separator, Spinner, styled, Text, XStack, YStack } from 'tamagui';
 import {
   ArrowLeftRight,
@@ -227,11 +227,20 @@ function EntryIcon({ type }: EntryIconProps) {
 export interface OnThisDayFeedProps {
   /** Callback when a player entry is tapped. Consumers handle navigation. */
   onPlayerPress?: (playerId: number) => void;
+  /**
+   * Renders only the single top-ranked entry plus a "More ›" control that
+   * expands to the full feed in place. Used by the compact mobile Home layout
+   * (LS-8794); off by default, so the web dashboard is unchanged.
+   */
+  condensed?: boolean;
 }
 
 export function OnThisDayFeed({
   onPlayerPress,
+  condensed = false,
 }: OnThisDayFeedProps = {}): React.JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  const isCondensed = condensed && !expanded;
   const today = useMemo(() => new Date(), []);
   const month = today.getMonth() + 1; // 1-indexed
   const day = today.getDate();
@@ -258,17 +267,23 @@ export function OnThisDayFeed({
   // impressive performances (LS-8670).
   const displayedEntries = useMemo(() => {
     const priorityPool = entries.slice(0, PRIORITY_POOL_LIMIT);
+    // Condensed mode shows the single highest-ranked entry rather than a
+    // random sample, so the one performance on screen is always the best one.
+    if (isCondensed) return priorityPool.slice(0, 1);
     return priorityPool.length <= DISPLAY_LIMIT
       ? priorityPool
       : fisherYatesSample(priorityPool, DISPLAY_LIMIT);
-  }, [entries]);
-  const displayedEvents = useMemo(
-    () =>
-      events.length <= DISPLAY_LIMIT
-        ? [...events]
-        : fisherYatesSample(events, DISPLAY_LIMIT),
-    [events],
-  );
+  }, [entries, isCondensed]);
+  const displayedEvents = useMemo(() => {
+    if (isCondensed) return [];
+    return events.length <= DISPLAY_LIMIT
+      ? [...events]
+      : fisherYatesSample(events, DISPLAY_LIMIT);
+  }, [events, isCondensed]);
+
+  /** Whether condensed mode is actually hiding something worth expanding to. */
+  const hasMoreToShow =
+    isCondensed && (entries.length > 1 || events.length > 0);
 
   const dateLabel = `${MONTH_NAMES[month - 1]} ${ordinal(day)}`;
 
@@ -528,6 +543,29 @@ export function OnThisDayFeed({
             );
           })}
         </YStack>
+      )}
+
+      {/* Condensed mode: expand in place to the full feed (LS-8794). */}
+      {hasMoreToShow && (
+        <XStack
+          testID="on-this-day-more"
+          accessibilityRole="button"
+          accessibilityLabel="Show more On This Day entries"
+          onPress={() => setExpanded(true)}
+          alignItems="center"
+          justifyContent="center"
+          gap="$1"
+          paddingVertical="$3"
+          borderTopWidth={1}
+          borderTopColor="$glassBorder"
+          cursor="pointer"
+          pressStyle={{ opacity: 0.7 }}
+        >
+          <Text fontSize="$2" fontWeight="700" color="$textMuted">
+            More
+          </Text>
+          <ChevronRight size={14} color="$textMuted" />
+        </XStack>
       )}
     </FeedContainer>
   );
