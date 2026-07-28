@@ -1,0 +1,38 @@
+fragment DraftSlotTrade on DraftSlotTrade {
+  id
+  leagueId
+  proposerTeamId
+  proposerTeamName
+  counterpartTeamId
+  counterpartTeamName
+  status
+  createdAt
+  updatedAt
+}
+
+query GetLeagueDraftSlotTrades($leagueId: Int!) {
+  leagueDraftSlotTrades(leagueId: $leagueId) {
+    ...DraftSlotTrade
+  }
+}
+
+mutation ProposeDraftSlotTrade($leagueId: Int!, $counterpartTeamId: Int!) {
+  proposeDraftSlotTrade(
+    leagueId: $leagueId
+    counterpartTeamId: $counterpartTeamId
+  ) {
+    ...DraftSlotTrade
+  }
+}
+
+mutation RespondDraftSlotTrade($tradeId: Int!, $accept: Boolean!) {
+  respondDraftSlotTrade(tradeId: $tradeId, accept: $accept) {
+    ...DraftSlotTrade
+  }
+}
+
+mutation ApproveDraftSlotTrade($tradeId: Int!) {
+  approveDraftSlotTrade(tradeId: $tradeId) {
+    ...DraftSlotTrade
+  }
+}

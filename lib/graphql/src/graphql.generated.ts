@@ -5036,6 +5036,101 @@ export type DeleteLeagueAnnouncementMutation = {
   deleteLeagueAnnouncement?: boolean | null;
 };
 
+export type DraftSlotTradeFragment = {
+  __typename?: 'DraftSlotTrade';
+  id?: number | null;
+  leagueId?: number | null;
+  proposerTeamId?: number | null;
+  proposerTeamName?: string | null;
+  counterpartTeamId?: number | null;
+  counterpartTeamName?: string | null;
+  status?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type GetLeagueDraftSlotTradesQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeagueDraftSlotTradesQuery = {
+  __typename?: 'Query';
+  leagueDraftSlotTrades?: Array<{
+    __typename?: 'DraftSlotTrade';
+    id?: number | null;
+    leagueId?: number | null;
+    proposerTeamId?: number | null;
+    proposerTeamName?: string | null;
+    counterpartTeamId?: number | null;
+    counterpartTeamName?: string | null;
+    status?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  }> | null;
+};
+
+export type ProposeDraftSlotTradeMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  counterpartTeamId: Scalars['Int']['input'];
+}>;
+
+export type ProposeDraftSlotTradeMutation = {
+  __typename?: 'Mutation';
+  proposeDraftSlotTrade?: {
+    __typename?: 'DraftSlotTrade';
+    id?: number | null;
+    leagueId?: number | null;
+    proposerTeamId?: number | null;
+    proposerTeamName?: string | null;
+    counterpartTeamId?: number | null;
+    counterpartTeamName?: string | null;
+    status?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type RespondDraftSlotTradeMutationVariables = Exact<{
+  tradeId: Scalars['Int']['input'];
+  accept: Scalars['Boolean']['input'];
+}>;
+
+export type RespondDraftSlotTradeMutation = {
+  __typename?: 'Mutation';
+  respondDraftSlotTrade?: {
+    __typename?: 'DraftSlotTrade';
+    id?: number | null;
+    leagueId?: number | null;
+    proposerTeamId?: number | null;
+    proposerTeamName?: string | null;
+    counterpartTeamId?: number | null;
+    counterpartTeamName?: string | null;
+    status?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
+export type ApproveDraftSlotTradeMutationVariables = Exact<{
+  tradeId: Scalars['Int']['input'];
+}>;
+
+export type ApproveDraftSlotTradeMutation = {
+  __typename?: 'Mutation';
+  approveDraftSlotTrade?: {
+    __typename?: 'DraftSlotTrade';
+    id?: number | null;
+    leagueId?: number | null;
+    proposerTeamId?: number | null;
+    proposerTeamName?: string | null;
+    counterpartTeamId?: number | null;
+    counterpartTeamName?: string | null;
+    status?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+};
+
 export type DuesSettingsFragment = {
   __typename?: 'LeagueDuesSettings';
   id?: number | null;
@@ -6003,6 +6098,7 @@ export type CreateLeagueAndTeamsMutation = {
       customEraStartYear?: number | null;
       customEraEndYear?: number | null;
       tradeDeadlineWeek?: number | null;
+      allowDraftSlotTrading?: boolean | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -6069,6 +6165,7 @@ export type GetUserLeaguesQuery = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    allowDraftSlotTrading?: boolean | null;
     tierFrozenAt?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
@@ -6137,6 +6234,7 @@ export type GetMyLeaguesQuery = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    allowDraftSlotTrading?: boolean | null;
     tierFrozenAt?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
@@ -6215,6 +6313,7 @@ export type StartDraftMutation = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    allowDraftSlotTrading?: boolean | null;
     tierFrozenAt?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
@@ -6357,6 +6456,7 @@ export type StartSeasonMutation = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    allowDraftSlotTrading?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -9009,6 +9109,7 @@ export type UpdateLeagueSettingsMutation = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    allowDraftSlotTrading?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -10188,6 +10289,7 @@ export type GetLeagueByIdQuery = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    allowDraftSlotTrading?: boolean | null;
     tierFrozenAt?: string | null;
     userMembership?: {
       __typename?: 'LeagueMember';
@@ -10976,6 +11078,7 @@ export type LeagueFragment = {
   customEraStartYear?: number | null;
   customEraEndYear?: number | null;
   tradeDeadlineWeek?: number | null;
+  allowDraftSlotTrading?: boolean | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -12290,6 +12393,7 @@ export type RenewLeagueMutation = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
+    allowDraftSlotTrading?: boolean | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -13560,6 +13664,19 @@ export type CancelWaiverClaimMutation = {
   } | null;
 };
 
+export const DraftSlotTradeFragmentDoc = gql`
+  fragment DraftSlotTrade on DraftSlotTrade {
+    id
+    leagueId
+    proposerTeamId
+    proposerTeamName
+    counterpartTeamId
+    counterpartTeamName
+    status
+    createdAt
+    updatedAt
+  }
+`;
 export const DuesSettingsFragmentDoc = gql`
   fragment DuesSettings on LeagueDuesSettings {
     id
@@ -14652,6 +14769,7 @@ export const LeagueFragmentDoc = gql`
     customEraStartYear
     customEraEndYear
     tradeDeadlineWeek
+    allowDraftSlotTrading
     userMembership {
       ...LeagueMember
     }
@@ -15852,6 +15970,255 @@ export type DeleteLeagueAnnouncementMutationResult =
 export type DeleteLeagueAnnouncementMutationOptions = BaseMutationOptions<
   DeleteLeagueAnnouncementMutation,
   DeleteLeagueAnnouncementMutationVariables
+>;
+export const GetLeagueDraftSlotTrades = gql`
+  query GetLeagueDraftSlotTrades($leagueId: Int!) {
+    leagueDraftSlotTrades(leagueId: $leagueId) {
+      ...DraftSlotTrade
+    }
+  }
+  ${DraftSlotTradeFragmentDoc}
+`;
+
+/**
+ * __useGetLeagueDraftSlotTradesQuery__
+ *
+ * To run a query within a React component, call `useGetLeagueDraftSlotTradesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeagueDraftSlotTradesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeagueDraftSlotTradesQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeagueDraftSlotTradesQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeagueDraftSlotTradesQuery,
+    GetLeagueDraftSlotTradesQueryVariables
+  > &
+    (
+      | { variables: GetLeagueDraftSlotTradesQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeagueDraftSlotTradesQuery,
+    GetLeagueDraftSlotTradesQueryVariables
+  >(GetLeagueDraftSlotTrades, options);
+}
+export function useGetLeagueDraftSlotTradesLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeagueDraftSlotTradesQuery,
+    GetLeagueDraftSlotTradesQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeagueDraftSlotTradesQuery,
+    GetLeagueDraftSlotTradesQueryVariables
+  >(GetLeagueDraftSlotTrades, options);
+}
+export function useGetLeagueDraftSlotTradesSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeagueDraftSlotTradesQuery,
+        GetLeagueDraftSlotTradesQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeagueDraftSlotTradesQuery,
+    GetLeagueDraftSlotTradesQueryVariables
+  >(
+    GetLeagueDraftSlotTrades,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeagueDraftSlotTradesQuery,
+          GetLeagueDraftSlotTradesQueryVariables
+        >,
+  );
+}
+export type GetLeagueDraftSlotTradesQueryHookResult = ReturnType<
+  typeof useGetLeagueDraftSlotTradesQuery
+>;
+export type GetLeagueDraftSlotTradesLazyQueryHookResult = ReturnType<
+  typeof useGetLeagueDraftSlotTradesLazyQuery
+>;
+export type GetLeagueDraftSlotTradesSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeagueDraftSlotTradesSuspenseQuery
+>;
+export type GetLeagueDraftSlotTradesQueryResult = Apollo.QueryResult<
+  GetLeagueDraftSlotTradesQuery,
+  GetLeagueDraftSlotTradesQueryVariables
+>;
+export const ProposeDraftSlotTrade = gql`
+  mutation ProposeDraftSlotTrade($leagueId: Int!, $counterpartTeamId: Int!) {
+    proposeDraftSlotTrade(
+      leagueId: $leagueId
+      counterpartTeamId: $counterpartTeamId
+    ) {
+      ...DraftSlotTrade
+    }
+  }
+  ${DraftSlotTradeFragmentDoc}
+`;
+export type ProposeDraftSlotTradeMutationFn = MutationFunction<
+  ProposeDraftSlotTradeMutation,
+  ProposeDraftSlotTradeMutationVariables
+>;
+
+/**
+ * __useProposeDraftSlotTradeMutation__
+ *
+ * To run a mutation, you first call `useProposeDraftSlotTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useProposeDraftSlotTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [proposeDraftSlotTradeMutation, { data, loading, error }] = useProposeDraftSlotTradeMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      counterpartTeamId: // value for 'counterpartTeamId'
+ *   },
+ * });
+ */
+export function useProposeDraftSlotTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ProposeDraftSlotTradeMutation,
+    ProposeDraftSlotTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ProposeDraftSlotTradeMutation,
+    ProposeDraftSlotTradeMutationVariables
+  >(ProposeDraftSlotTrade, options);
+}
+export type ProposeDraftSlotTradeMutationHookResult = ReturnType<
+  typeof useProposeDraftSlotTradeMutation
+>;
+export type ProposeDraftSlotTradeMutationResult =
+  Apollo.MutationResult<ProposeDraftSlotTradeMutation>;
+export type ProposeDraftSlotTradeMutationOptions = BaseMutationOptions<
+  ProposeDraftSlotTradeMutation,
+  ProposeDraftSlotTradeMutationVariables
+>;
+export const RespondDraftSlotTrade = gql`
+  mutation RespondDraftSlotTrade($tradeId: Int!, $accept: Boolean!) {
+    respondDraftSlotTrade(tradeId: $tradeId, accept: $accept) {
+      ...DraftSlotTrade
+    }
+  }
+  ${DraftSlotTradeFragmentDoc}
+`;
+export type RespondDraftSlotTradeMutationFn = MutationFunction<
+  RespondDraftSlotTradeMutation,
+  RespondDraftSlotTradeMutationVariables
+>;
+
+/**
+ * __useRespondDraftSlotTradeMutation__
+ *
+ * To run a mutation, you first call `useRespondDraftSlotTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRespondDraftSlotTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [respondDraftSlotTradeMutation, { data, loading, error }] = useRespondDraftSlotTradeMutation({
+ *   variables: {
+ *      tradeId: // value for 'tradeId'
+ *      accept: // value for 'accept'
+ *   },
+ * });
+ */
+export function useRespondDraftSlotTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    RespondDraftSlotTradeMutation,
+    RespondDraftSlotTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    RespondDraftSlotTradeMutation,
+    RespondDraftSlotTradeMutationVariables
+  >(RespondDraftSlotTrade, options);
+}
+export type RespondDraftSlotTradeMutationHookResult = ReturnType<
+  typeof useRespondDraftSlotTradeMutation
+>;
+export type RespondDraftSlotTradeMutationResult =
+  Apollo.MutationResult<RespondDraftSlotTradeMutation>;
+export type RespondDraftSlotTradeMutationOptions = BaseMutationOptions<
+  RespondDraftSlotTradeMutation,
+  RespondDraftSlotTradeMutationVariables
+>;
+export const ApproveDraftSlotTrade = gql`
+  mutation ApproveDraftSlotTrade($tradeId: Int!) {
+    approveDraftSlotTrade(tradeId: $tradeId) {
+      ...DraftSlotTrade
+    }
+  }
+  ${DraftSlotTradeFragmentDoc}
+`;
+export type ApproveDraftSlotTradeMutationFn = MutationFunction<
+  ApproveDraftSlotTradeMutation,
+  ApproveDraftSlotTradeMutationVariables
+>;
+
+/**
+ * __useApproveDraftSlotTradeMutation__
+ *
+ * To run a mutation, you first call `useApproveDraftSlotTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useApproveDraftSlotTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [approveDraftSlotTradeMutation, { data, loading, error }] = useApproveDraftSlotTradeMutation({
+ *   variables: {
+ *      tradeId: // value for 'tradeId'
+ *   },
+ * });
+ */
+export function useApproveDraftSlotTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    ApproveDraftSlotTradeMutation,
+    ApproveDraftSlotTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    ApproveDraftSlotTradeMutation,
+    ApproveDraftSlotTradeMutationVariables
+  >(ApproveDraftSlotTrade, options);
+}
+export type ApproveDraftSlotTradeMutationHookResult = ReturnType<
+  typeof useApproveDraftSlotTradeMutation
+>;
+export type ApproveDraftSlotTradeMutationResult =
+  Apollo.MutationResult<ApproveDraftSlotTradeMutation>;
+export type ApproveDraftSlotTradeMutationOptions = BaseMutationOptions<
+  ApproveDraftSlotTradeMutation,
+  ApproveDraftSlotTradeMutationVariables
 >;
 export const GetLeagueDuesSettings = gql`
   query GetLeagueDuesSettings($leagueId: Int!) {

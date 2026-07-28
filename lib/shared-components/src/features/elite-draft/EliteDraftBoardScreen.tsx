@@ -463,15 +463,24 @@ export function EliteDraftBoardScreen({
       <PreDraftLobby
         league={queries.league}
         sport={sport}
-        leagueTeams={queries.leagueTeams}
+        leagueId={leagueId}
+        leagueTeams={queries.boardOrderedTeams}
         myTeamId={queries.myTeamId}
         isOwner={queries.isOwner}
+        canManageOwnTeam={
+          queries.permLevel === 'general_manager' ||
+          queries.permLevel === 'commissioner'
+        }
+        isCommissioner={queries.isCommissioner}
         onlineTeamIds={onlineTeamIds}
         customDraftOrder={ui.customDraftOrder}
         setCustomDraftOrder={ui.setCustomDraftOrder}
         initError={ui.initError}
         initDraftLoading={actions.initDraftLoading}
         onInitializeDraft={actions.handleInitializeDraft}
+        onDraftSlotTradeExecuted={() => {
+          void queries.refetchDraftTeamOrder();
+        }}
       />
     );
   }

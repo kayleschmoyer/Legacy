@@ -407,12 +407,19 @@ export function useDraftQueries({
   });
 
   // ---- Draft team order ----
-  const { data: draftTeamOrderData } = useQuery<
+  // Fetched for the 'board' view (existing) and also for the pre-draft lobby
+  // (LS-8677), so an executed draft slot trade's swap is reflected in the
+  // lobby's order display immediately. Still skipped for other views
+  // (grid/list/compact/table) once the draft is live, to avoid firing an
+  // unused query throughout an active draft.
+  const isPreDraft =
+    league?.draftStatus !== 'in-progress' && league?.draftStatus !== 'paused';
+  const { data: draftTeamOrderData, refetch: refetchDraftTeamOrder } = useQuery<
     GetDraftTeamOrderQuery,
     GetDraftTeamOrderQueryVariables
   >(GET_DRAFT_TEAM_ORDER, {
     variables: { draftId: draftId ?? 0 },
-    skip: !draftId || viewMode !== 'board',
+    skip: !draftId || (viewMode !== 'board' && !isPreDraft),
   });
 
   const boardOrderedTeams = useMemo<LeagueTeam[]>(() => {
@@ -552,6 +559,7 @@ export function useDraftQueries({
     boardOrderedTeams,
     autoPickTeamIds,
     refetchAutoPickStatuses,
+    refetchDraftTeamOrder,
     // Queue
     queueEntries,
     queuedPlayerIds,

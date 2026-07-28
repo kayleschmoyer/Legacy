@@ -1165,6 +1165,26 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/pre-draft-lobby-trades.spec.ts": [
+      "apps/web/src/pages/draft/**",
+      "apps/web/src/components/EliteDraftBoard.tsx",
+      "lib/shared-components/src/features/elite-draft/**",
+      "lib/shared-components/src/features/leagues/**",
+      "lambdas/db/src/schema/draft-slot-trades/**",
+      "lambdas/db/schema.graphql",
+      "lib/graphql/src/**",
+      "lib/app-config/src/lib/**",
+      "lib/design-tokens/src/lib/**",
+      "lib/env-utilities/src/lib/**",
+      "lib/logging/src/**",
+      "lib/logging/src/lib/**",
+      "lib/logging/src/lib/destinations/**",
+      "lib/rollbar/src/**",
+      "lib/rollbar/src/lib/**",
+      "lib/tamagui-config/src/lib/**",
+      "lib/test-fixtures/src/lib/**",
+      "lib/utils/src/lib/**"
+    ],
     "apps/web-e2e/src/tests/draft-graphql-integration.spec.ts": [
       "apps/web/src/pages/draft/**",
       "apps/web/src/pages/baseball/**",

@@ -1,24 +1,36 @@
 import React from 'react';
 import type { LeagueTeam } from './types';
 import { CSS } from './styles';
+import { DraftSlotTradePanel } from './DraftSlotTradePanel';
 import type { SportKind } from '../../config/sports';
 
 interface PreDraftLobbyProps {
   league:
-    | { name?: string | null; draftStatus?: string | null }
+    | {
+        name?: string | null;
+        draftStatus?: string | null;
+        allowDraftSlotTrading?: boolean | null;
+      }
     | null
     | undefined;
   /** Active league sport — drives lobby copy and icon. */
   sport: SportKind;
+  /** Guaranteed non-null by the caller's earlier NoLeagueScreen guard. */
+  leagueId: number;
   leagueTeams: LeagueTeam[];
   myTeamId: number | null;
   isOwner: boolean;
+  /** GM of own team, or commissioner — the roles allowed to propose/respond to a draft slot trade. */
+  canManageOwnTeam: boolean;
+  isCommissioner: boolean;
   onlineTeamIds: ReadonlySet<string>;
   customDraftOrder: string[] | null;
   setCustomDraftOrder: (v: string[] | null) => void;
   initError: string | null;
   initDraftLoading: boolean;
   onInitializeDraft: (order: 'snake' | 'linear') => Promise<void>;
+  /** Fired after a draft slot trade executes, so the caller can refresh draft order data. */
+  onDraftSlotTradeExecuted?: () => void;
 }
 
 const LOBBY_CHROME: Record<
@@ -40,16 +52,23 @@ const LOBBY_CHROME: Record<
 export function PreDraftLobby({
   league,
   sport,
+  leagueId,
   leagueTeams,
   myTeamId,
   isOwner,
+  canManageOwnTeam,
+  isCommissioner,
   onlineTeamIds,
   customDraftOrder,
   setCustomDraftOrder,
   initError,
   initDraftLoading,
   onInitializeDraft,
+  onDraftSlotTradeExecuted,
 }: PreDraftLobbyProps): React.JSX.Element {
+  const showTrading =
+    Boolean(league?.allowDraftSlotTrading) &&
+    league?.draftStatus === 'not-started';
   const chrome = LOBBY_CHROME[sport];
   return (
     <div className="d-root" data-sport={sport}>
@@ -242,6 +261,17 @@ export function PreDraftLobby({
               </button>
             )}
           </div>
+        )}
+
+        {showTrading && (
+          <DraftSlotTradePanel
+            leagueId={leagueId}
+            myTeamId={myTeamId}
+            leagueTeams={leagueTeams}
+            canManageOwnTeam={canManageOwnTeam}
+            isCommissioner={isCommissioner}
+            onTradeExecuted={onDraftSlotTradeExecuted}
+          />
         )}
 
         {initError && (
