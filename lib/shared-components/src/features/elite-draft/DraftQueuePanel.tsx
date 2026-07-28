@@ -1,5 +1,22 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   GetMyDraftQueue as GET_MY_DRAFT_QUEUE,
   type GetMyDraftQueueQuery,
@@ -10,9 +27,11 @@ import {
 
 // ---------------------------------------------------------------------------
 // DraftQueuePanel
-// Displays the user's prioritised draft queue with reorder and remove.
-// Shown in the left sidebar during an active live draft.
+// Displays the user's prioritised draft queue with drag-to-sort and remove.
+// Shown in the right rail during an active live draft.
 // ---------------------------------------------------------------------------
+
+type QueueEntry = NonNullable<GetMyDraftQueueQuery['getMyDraftQueue']>[number];
 
 interface DraftQueuePanelProps {
   draftId: number;
@@ -27,6 +46,88 @@ interface DraftQueuePanelProps {
    * gate on permission upstream keep working.
    */
   enabled?: boolean;
+}
+
+function entryKey(entry: QueueEntry): string {
+  return String(entry.id ?? entry.playerId ?? entry.player?.id ?? '');
+}
+
+function entryName(entry: QueueEntry): string {
+  return entry.player
+    ? `${entry.player.firstName} ${entry.player.lastName}`.trim()
+    : `Player #${entry.playerId ?? '?'}`;
+}
+
+interface SortableQueueRowProps {
+  entry: QueueEntry;
+  index: number;
+  busy: boolean;
+  onRemove: (playerId: number) => void;
+}
+
+function SortableQueueRow({
+  entry,
+  index,
+  busy,
+  onRemove,
+}: SortableQueueRowProps) {
+  const name = entryName(entry);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: entryKey(entry), disabled: busy });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      role="listitem"
+      className={`d-queue-row${isDragging ? ' dragging' : ''}`}
+      aria-label={`Queue position ${index + 1}: ${name}`}
+    >
+      {/* Drag handle (LS-8786) */}
+      <span
+        className="d-queue-drag"
+        aria-label={`Drag to reorder ${name}`}
+        title="Drag to reorder"
+        {...attributes}
+        {...listeners}
+      >
+        ⋮⋮
+      </span>
+
+      {/* Priority rank */}
+      <span className="d-queue-rank" aria-hidden="true">
+        {index + 1}
+      </span>
+
+      {/* Player name */}
+      <span className="d-queue-name">{name}</span>
+
+      {/* Remove control */}
+      <span className="d-queue-actions" aria-label="Queue actions">
+        <button
+          className="d-queue-btn d-queue-remove"
+          onClick={() => onRemove(entry.playerId ?? entry.player?.id ?? 0)}
+          disabled={busy}
+          aria-label={`Remove ${name} from queue`}
+          title="Remove from queue"
+        >
+          ×
+        </button>
+      </span>
+    </div>
+  );
 }
 
 export function DraftQueuePanel({
@@ -54,6 +155,15 @@ export function DraftQueuePanel({
 
   const entries = useMemo(() => data?.getMyDraftQueue ?? [], [data]);
 
+  // Local order mirrors `entries` but is updated immediately on drag-end so
+  // the reorder feels instant rather than waiting a network round-trip
+  // (LS-8786). Reconciled back to the server-driven `entries` whenever the
+  // query returns fresh data (including the post-mutation refetch below).
+  const [localEntries, setLocalEntries] = useState<QueueEntry[]>(entries);
+  useEffect(() => {
+    setLocalEntries(entries);
+  }, [entries]);
+
   const [removeFromQueue, { loading: removing }] = useMutation(
     REMOVE_FROM_DRAFT_QUEUE,
   );
@@ -74,52 +184,43 @@ export function DraftQueuePanel({
     [draftId, removeFromQueue, refetchQueue, onError],
   );
 
-  const handleMoveUp = useCallback(
-    async (index: number) => {
-      if (index === 0) return;
-      const reordered = [...entries];
-      [reordered[index - 1], reordered[index]] = [
-        reordered[index],
-        reordered[index - 1],
-      ];
-      try {
-        await reorderQueue({
-          variables: {
-            draftId,
-            playerIds: reordered.map((e) => e.playerId ?? e.player?.id ?? 0),
-          },
-        });
-      } catch {
-        onError?.('Failed to reorder queue. Please try again.');
-      } finally {
-        void refetchQueue();
-      }
-    },
-    [draftId, entries, reorderQueue, refetchQueue, onError],
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
-  const handleMoveDown = useCallback(
-    async (index: number) => {
-      if (index === entries.length - 1) return;
-      const reordered = [...entries];
-      [reordered[index], reordered[index + 1]] = [
-        reordered[index + 1],
-        reordered[index],
-      ];
-      try {
-        await reorderQueue({
-          variables: {
-            draftId,
-            playerIds: reordered.map((e) => e.playerId ?? e.player?.id ?? 0),
-          },
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const oldIndex = localEntries.findIndex((e) => entryKey(e) === active.id);
+      const newIndex = localEntries.findIndex((e) => entryKey(e) === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(localEntries, oldIndex, newIndex);
+      // Optimistic reorder — the queue-update mutation persists this order,
+      // but the UI reflects it immediately rather than waiting for the
+      // round-trip (AC2/AC3, LS-8786).
+      setLocalEntries(reordered);
+      void reorderQueue({
+        variables: {
+          draftId,
+          playerIds: reordered.map((e) => e.playerId ?? e.player?.id ?? 0),
+        },
+      })
+        .catch(() => {
+          // Revert to the last known server order so the UI doesn't show a
+          // reorder that never actually persisted.
+          setLocalEntries(entries);
+          onError?.('Failed to reorder queue. Please try again.');
+        })
+        .finally(() => {
+          void refetchQueue();
         });
-      } catch {
-        onError?.('Failed to reorder queue. Please try again.');
-      } finally {
-        void refetchQueue();
-      }
     },
-    [draftId, entries, reorderQueue, refetchQueue, onError],
+    [draftId, localEntries, entries, reorderQueue, refetchQueue, onError],
   );
 
   // Non-GM users: parent should pass enabled={false} so the query never fires
@@ -143,86 +244,51 @@ export function DraftQueuePanel({
         <span role="img" aria-label="queue">
           📋
         </span>{' '}
-        MY QUEUE ({entries.length})
+        MY QUEUE ({localEntries.length})
       </h3>
 
-      {loading && entries.length === 0 && (
+      {loading && localEntries.length === 0 && (
         <div className="d-queue-empty">Loading queue…</div>
       )}
 
-      {!loading && entries.length === 0 && (
+      {!loading && localEntries.length === 0 && (
         <div className="d-queue-empty">
           No players queued — add players from the list below
         </div>
       )}
 
-      {entries.length > 0 && (
+      {localEntries.length > 0 && (
         <div
           role="list"
           aria-labelledby="draft-queue-heading"
           style={{ maxHeight: 220, overflowY: 'auto' }}
         >
-          {entries.map((entry, idx) => {
-            const name = entry.player
-              ? `${entry.player.firstName} ${entry.player.lastName}`.trim()
-              : `Player #${entry.playerId ?? '?'}`;
-
-            return (
-              <div
-                key={entry.id}
-                role="listitem"
-                className="d-queue-row"
-                aria-label={`Queue position ${idx + 1}: ${name}`}
-              >
-                {/* Priority rank */}
-                <span className="d-queue-rank" aria-hidden="true">
-                  {idx + 1}
-                </span>
-
-                {/* Player name */}
-                <span className="d-queue-name">{name}</span>
-
-                {/* Reorder + remove controls */}
-                <span className="d-queue-actions" aria-label="Reorder controls">
-                  <button
-                    className="d-queue-btn"
-                    onClick={() => void handleMoveUp(idx)}
-                    disabled={busy || idx === 0}
-                    aria-label={`Move ${name} up in queue`}
-                    title="Move up"
-                  >
-                    ▲
-                  </button>
-                  <button
-                    className="d-queue-btn"
-                    onClick={() => void handleMoveDown(idx)}
-                    disabled={busy || idx === entries.length - 1}
-                    aria-label={`Move ${name} down in queue`}
-                    title="Move down"
-                  >
-                    ▼
-                  </button>
-                  <button
-                    className="d-queue-btn d-queue-remove"
-                    onClick={() =>
-                      void handleRemove(entry.playerId ?? entry.player?.id ?? 0)
-                    }
-                    disabled={busy}
-                    aria-label={`Remove ${name} from queue`}
-                    title="Remove from queue"
-                  >
-                    ×
-                  </button>
-                </span>
-              </div>
-            );
-          })}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={localEntries.map(entryKey)}
+              strategy={verticalListSortingStrategy}
+            >
+              {localEntries.map((entry, idx) => (
+                <SortableQueueRow
+                  key={entryKey(entry)}
+                  entry={entry}
+                  index={idx}
+                  busy={busy}
+                  onRemove={(playerId) => void handleRemove(playerId)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
       )}
 
-      {entries.length > 0 && !autoPickDisabled && (
+      {localEntries.length > 0 && !autoPickDisabled && (
         <div className="d-queue-hint">
-          Auto-pick will select from this queue first
+          Drag ⋮⋮ to reorder. Auto-pick will select from this queue first.
         </div>
       )}
     </div>

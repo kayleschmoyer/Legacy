@@ -302,6 +302,71 @@ describe('useDraftActions auto-pick toggle refetch (LS-7978)', () => {
   });
 });
 
+describe('useDraftActions auto-pick toggle optimistic update (LS-8786)', () => {
+  beforeEach(() => {
+    mockCallCounter.current = 0;
+    mockNoop.mockReset();
+  });
+
+  it('flips isMyTeamAutoPick synchronously before the mutation resolves', async () => {
+    let resolveToggle: (v: unknown) => void = () => undefined;
+    mockNoop.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveToggle = resolve;
+        }),
+    );
+    const refetchAutoPickStatuses = jest.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ refetchAutoPickStatuses })),
+    );
+
+    expect(result.current.isMyTeamAutoPick).toBe(false);
+
+    let togglePromise: Promise<void> = Promise.resolve();
+    act(() => {
+      togglePromise = result.current.handleToggleUserAutoPick();
+    });
+
+    // The pill must flip immediately, before the mutation round-trip
+    // completes — this is the regression gate for LS-8786.
+    expect(result.current.isMyTeamAutoPick).toBe(true);
+
+    await act(async () => {
+      resolveToggle({ data: {} });
+      await togglePromise;
+    });
+  });
+
+  it('reverts the optimistic flip and surfaces a toast when the mutation fails', async () => {
+    mockNoop.mockRejectedValueOnce(new Error('network error'));
+    const showToast = jest.fn();
+    const refetchAutoPickStatuses = jest.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useDraftActions(
+        makeParams({
+          showToast,
+          refetchAutoPickStatuses,
+          autoPickTeamIds: new Set(['7']),
+        }),
+      ),
+    );
+
+    expect(result.current.isMyTeamAutoPick).toBe(true);
+
+    await act(async () => {
+      await result.current.handleToggleUserAutoPick();
+    });
+
+    // Optimistic override clears once the round-trip settles, so the value
+    // falls back to the (unchanged, static-in-this-test) server truth.
+    expect(result.current.isMyTeamAutoPick).toBe(true);
+    expect(showToast).toHaveBeenCalledWith('network error', 'error');
+  });
+});
+
 describe('useDraftActions pause/resume optimistic update (LS-4834)', () => {
   beforeEach(() => {
     mockCallCounter.current = 0;

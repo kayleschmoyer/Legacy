@@ -1594,6 +1594,26 @@ export const CSS = `
 .d-queue-row:last-of-type {
   border-bottom: none;
 }
+.d-queue-row.dragging {
+  background: var(--d-surface-hover);
+  border-radius: 6px;
+}
+.d-queue-drag {
+  cursor: grab;
+  color: var(--d-text-muted);
+  font-size: 14px;
+  line-height: 0.8;
+  padding: 0 2px;
+  letter-spacing: -2px;
+  user-select: none;
+  flex-shrink: 0;
+}
+.d-queue-drag:active {
+  cursor: grabbing;
+}
+.d-queue-row:hover .d-queue-drag {
+  color: var(--d-text-secondary);
+}
 .d-queue-rank {
   min-width: 18px;
   font-size: 10px;

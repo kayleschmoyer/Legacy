@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { useMutation } from '@apollo/client/react';
 import {
@@ -408,16 +408,27 @@ export function useDraftActions({
     ],
   );
 
-  // LS-1339: Toggle the current user's own auto-pick for their team
-  const isMyTeamAutoPick =
+  // LS-1339: Toggle the current user's own auto-pick for their team.
+  // LS-8786: `optimisticAutoPick` overrides the server-derived value the
+  // instant the user clicks, so the pill flips immediately instead of
+  // waiting out the mutation round-trip. It is cleared only once
+  // `refetchAutoPickStatuses` has resolved (success or failure), so a
+  // concurrent WebSocket-driven refetch (e.g. from another team's pick)
+  // can't flicker the pill back to a stale value mid-toggle.
+  const [optimisticAutoPick, setOptimisticAutoPick] = useState<boolean | null>(
+    null,
+  );
+  const serverIsMyTeamAutoPick =
     myTeamId !== null && autoPickTeamIds.has(String(myTeamId));
+  const isMyTeamAutoPick = optimisticAutoPick ?? serverIsMyTeamAutoPick;
 
   const handleToggleUserAutoPick = useCallback(async () => {
     if (!draftId || toggleAutoPickLoading) return;
     const enable = !isMyTeamAutoPick;
+    setOptimisticAutoPick(enable);
     try {
       await toggleAutoPickMutation({ variables: { draftId, enable } });
-      void refetchAutoPickStatuses();
+      await refetchAutoPickStatuses();
       // When enabling, the server may have immediately expired the deadline (if
       // it is currently this team's turn). Refetch the draft so the client sees
       // the updated currentPickDeadline and the countdown timer can reach zero,
@@ -433,6 +444,8 @@ export function useDraftActions({
       const msg =
         err instanceof Error ? err.message : 'Failed to update auto-pick';
       showToast(msg, 'error');
+    } finally {
+      setOptimisticAutoPick(null);
     }
   }, [
     draftId,
