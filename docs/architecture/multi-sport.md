@@ -110,6 +110,8 @@ Stats tables are sport-specific; no single table mixes baseball and football row
 
 Scoring, roster, and matchup tables are shared across sports — the `leagues.sport` discriminator determines which stat tables are joined at query time.
 
+**Team reference tables**: `nfl_teams` (football) and `mlb_teams` (baseball, LS-8597) hold per-franchise display data (name, city, colors) keyed by abbreviation. `players.nfl_team` / `players.mlb_team` FK into these tables respectively; `players.jersey_number` is shared across both sports.
+
 ---
 
 ## Stats Lambda — Message-Shape Routing

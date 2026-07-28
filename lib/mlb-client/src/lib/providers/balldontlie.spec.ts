@@ -173,6 +173,17 @@ describe('retryDelay', () => {
   });
 });
 
+// ─── BallDontLieProvider.getPlayerInfo ───────────────────────────────────────
+
+describe('BallDontLieProvider.getPlayerInfo', () => {
+  it('throws NotImplementedError (LS-8597 — not yet implemented for this provider)', () => {
+    const provider = new BallDontLieProvider('test-api-key');
+    expect(() => provider.getPlayerInfo(660271)).toThrow(
+      'getPlayerInfo is not yet implemented',
+    );
+  });
+});
+
 // ─── BallDontLieProvider.getScoreboard ───────────────────────────────────────
 
 describe('BallDontLieProvider.getScoreboard', () => {

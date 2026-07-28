@@ -62,6 +62,7 @@ async function loadPlayerGameStats(
     news: string | null;
     projectedFantasyPoints: number | null;
     adpRank: number | null;
+    mlbTeam: string | null;
   } = {
     id: playerId,
     firstName: '',
@@ -89,6 +90,7 @@ async function loadPlayerGameStats(
     news: null,
     projectedFantasyPoints: null,
     adpRank: null,
+    mlbTeam: null,
   };
 
   // Load batting stats

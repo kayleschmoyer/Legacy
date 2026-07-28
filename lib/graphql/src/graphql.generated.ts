@@ -2848,9 +2848,13 @@ export type Player = {
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  /** Jersey number (LS-8597 for baseball players, sourced from the MLB Stats API). Null until synced. */
+  jerseyNumber?: Maybe<Scalars['Int']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
   /** MLB Stats API player ID for cross-referencing with the external data provider. Null for players without a known mapping. */
   mlbPlayerId?: Maybe<Scalars['Int']['output']>;
+  /** Current MLB team abbreviation for baseball players (LS-8597), sourced from the MLB Stats API. Null until synced. */
+  mlbTeam?: Maybe<Scalars['String']['output']>;
   /** The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era */
   primaryEra?: Maybe<Scalars['String']['output']>;
   /** Fantasy scoring data (only populated when using scoring-based sort) */
@@ -8061,6 +8065,8 @@ export type UpdateTeamMemberPositionMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      mlbTeam?: string | null;
+      jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -8098,6 +8104,8 @@ export type SwapTeamMemberPositionsMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      mlbTeam?: string | null;
+      jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -8199,6 +8207,8 @@ export type SetNicknameMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      mlbTeam?: string | null;
+      jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -10374,6 +10384,8 @@ export type GetLeagueTradeBlockQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      mlbTeam?: string | null;
+      jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -10946,6 +10958,8 @@ export type GetTeamMembersQuery = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      mlbTeam?: string | null;
+      jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -12902,6 +12916,8 @@ export type SetTradeBlockMutation = {
       lastName?: string | null;
       brefId?: string | null;
       eligiblePositions?: Array<string> | null;
+      mlbTeam?: string | null;
+      jerseyNumber?: number | null;
       seasonsPlayed?: number | null;
       careerBatting?: {
         __typename?: 'CareerBatting';
@@ -13014,6 +13030,8 @@ export type TeamMemberFragment = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
+    mlbTeam?: string | null;
+    jerseyNumber?: number | null;
     seasonsPlayed?: number | null;
     careerBatting?: {
       __typename?: 'CareerBatting';
@@ -15180,6 +15198,8 @@ export const TeamMemberFragmentDoc = gql`
       lastName
       brefId
       eligiblePositions
+      mlbTeam
+      jerseyNumber
       careerBatting {
         games
       }

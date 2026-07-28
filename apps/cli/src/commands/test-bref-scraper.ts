@@ -67,6 +67,7 @@ async function main() {
     news: null,
     projectedFantasyPoints: null,
     adpRank: null,
+    mlbTeam: null,
   };
 
   const season = parseInt(options.season, 10);

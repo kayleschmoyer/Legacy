@@ -47,6 +47,8 @@ interface PlayerShape {
   mlbPlayerId?: number | null;
   statsLastFetchedAt: Date | null;
   scoring?: PlayerCareerScore | null;
+  mlbTeam?: string | null;
+  jerseyNumber?: number | null;
   // Career achievement fields (from DB columns)
   allStarSelections?: number | null;
   goldGloves?: number | null;
@@ -183,6 +185,16 @@ PlayerRef.implement({
       resolve: async (parent, _args, context) => {
         return context.loaders.eligiblePositions.load(parent.id);
       },
+    }),
+    mlbTeam: t.exposeString('mlbTeam', {
+      nullable: true,
+      description:
+        'Current MLB team abbreviation for baseball players (LS-8597), sourced from the MLB Stats API. Null until synced.',
+    }),
+    jerseyNumber: t.exposeInt('jerseyNumber', {
+      nullable: true,
+      description:
+        'Jersey number (LS-8597 for baseball players, sourced from the MLB Stats API). Null until synced.',
     }),
     careerBatting: t.field({
       description: 'Career batting statistics for the player',

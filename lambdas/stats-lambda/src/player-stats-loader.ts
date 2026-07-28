@@ -58,6 +58,7 @@ export async function loadPlayerGameStats(
     news: string | null;
     projectedFantasyPoints: number | null;
     adpRank: number | null;
+    mlbTeam: string | null;
   } = {
     id: playerId,
     firstName: '',
@@ -85,6 +86,7 @@ export async function loadPlayerGameStats(
     news: null,
     projectedFantasyPoints: null,
     adpRank: null,
+    mlbTeam: null,
   };
 
   try {

@@ -12,6 +12,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import type {
   MlbApiGameFeedResponse,
   MlbApiLinescoreTeam,
+  MlbApiPersonResponse,
   MlbApiPlayerStatsResponse,
   MlbApiScheduleGame,
   MlbApiScheduleResponse,
@@ -27,6 +28,7 @@ import type {
   MlbGameStatus,
   MlbTeamScore,
   PlayerGameStats,
+  PlayerInfo,
   PlayerSeasonStats,
   Schedule,
   ScheduleGame,
@@ -270,6 +272,23 @@ export class MlbStatsApiProvider implements MlbDataProvider {
       gamePk,
       group,
       ...this.mapStats(split.stat ?? {}, group),
+    };
+  }
+
+  async getPlayerInfo(mlbPlayerId: number): Promise<PlayerInfo> {
+    const data = await this.get<MlbApiPersonResponse>(
+      `/v1/people/${mlbPlayerId}`,
+      undefined,
+      STATIC_TTL_MS,
+    );
+    const person = data.people?.[0];
+    const parsedNumber = person?.primaryNumber
+      ? parseInt(person.primaryNumber, 10)
+      : NaN;
+    return {
+      playerId: mlbPlayerId,
+      mlbTeamAbbreviation: person?.currentTeam?.abbreviation ?? null,
+      jerseyNumber: Number.isNaN(parsedNumber) ? null : parsedNumber,
     };
   }
 

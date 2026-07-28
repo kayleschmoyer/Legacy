@@ -17,6 +17,7 @@ import type {
   MlbGameStatus,
   MlbTeamScore,
   PlayerGameStats,
+  PlayerInfo,
   PlayerSeasonStats,
   Schedule,
   ScheduleOptions,
@@ -265,6 +266,10 @@ export class BallDontLieProvider implements MlbDataProvider {
     _season?: number,
   ): Promise<PlayerGameStats | null> {
     throw new NotImplementedError('getPlayerGameStats');
+  }
+
+  getPlayerInfo(_mlbPlayerId: number): Promise<PlayerInfo> {
+    throw new NotImplementedError('getPlayerInfo');
   }
 
   getSchedule(_date: string, _options?: ScheduleOptions): Promise<Schedule> {

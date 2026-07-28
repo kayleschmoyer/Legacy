@@ -3020,12 +3020,22 @@ type Player {
   eligiblePositions: [String!]
   firstName: String
   id: Int
+
+  """
+  Jersey number (LS-8597 for baseball players, sourced from the MLB Stats API). Null until synced.
+  """
+  jerseyNumber: Int
   lastName: String
 
   """
   MLB Stats API player ID for cross-referencing with the external data provider. Null for players without a known mapping.
   """
   mlbPlayerId: Int
+
+  """
+  Current MLB team abbreviation for baseball players (LS-8597), sourced from the MLB Stats API. Null until synced.
+  """
+  mlbTeam: String
 
   """
   The player's primary historical baseball era, derived from the midpoint of their MLB career. Values: Dead Ball Era | Golden Age | Expansion Era | Free Agency Era | Steroid Era | Modern Era

@@ -647,4 +647,46 @@ describe('players resolver', () => {
 
     expect(result).toBeNull();
   });
+
+  // ── mlbTeam / jerseyNumber exposure (LS-8597) ────────────────────────────
+
+  describe('Player.mlbTeam / Player.jerseyNumber', () => {
+    function getPlayerFieldResolver(name: 'mlbTeam' | 'jerseyNumber') {
+      const playerType = schema.getType('Player');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- narrow to object type for field access in tests
+      const field = (playerType as any)?.getFields?.()[name];
+      if (!field?.resolve) throw new Error(`Player.${name} resolver not found`);
+      return field.resolve.bind(field);
+    }
+
+    it('mlbTeam: exposes the mlbTeam property from the parent player', () => {
+      const result = getPlayerFieldResolver('mlbTeam')(
+        { ...MOCK_PLAYER, mlbTeam: 'NYY' },
+        {},
+        mockContext,
+        undefined,
+      );
+      expect(result).toBe('NYY');
+    });
+
+    it('mlbTeam: resolves to null when unsynced', () => {
+      const result = getPlayerFieldResolver('mlbTeam')(
+        { ...MOCK_PLAYER, mlbTeam: null },
+        {},
+        mockContext,
+        undefined,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('jerseyNumber: exposes the jerseyNumber property from the parent player', () => {
+      const result = getPlayerFieldResolver('jerseyNumber')(
+        { ...MOCK_PLAYER, jerseyNumber: 99 },
+        {},
+        mockContext,
+        undefined,
+      );
+      expect(result).toBe(99);
+    });
+  });
 });

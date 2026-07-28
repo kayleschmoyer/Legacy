@@ -208,4 +208,68 @@ describe('RosterBoard', () => {
     );
     expect(onPlayerSwap).not.toHaveBeenCalled();
   });
+
+  // ── mlbTeam / jerseyNumber badge (LS-8597) ─────────────────────────────────
+
+  it('renders a team + jersey number badge for a starter when present', () => {
+    const players: RosterBoardPlayer[] = [
+      {
+        id: 101,
+        positionId: 1,
+        player: {
+          firstName: 'Mike',
+          lastName: 'Johnson',
+          eligiblePositions: ['C'],
+          mlbTeam: 'NYY',
+          jerseyNumber: 99,
+        },
+      },
+    ];
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={players}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+      />,
+    );
+    expect(screen.getByText('NYY #99')).toBeTruthy();
+  });
+
+  it('renders a team + jersey number badge for a bench player when present', () => {
+    const players: RosterBoardPlayer[] = [
+      {
+        id: 102,
+        positionId: null,
+        player: {
+          firstName: 'Wade',
+          lastName: 'Boggs',
+          eligiblePositions: ['1B'],
+          mlbTeam: 'BOS',
+          jerseyNumber: 26,
+        },
+      },
+    ];
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={players}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+      />,
+    );
+    expect(screen.getByText('BOS #26')).toBeTruthy();
+  });
+
+  it('renders no badge when mlbTeam and jerseyNumber are absent', () => {
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+      />,
+    );
+    expect(screen.queryByText(/^[A-Z]{2,3} #\d+$/)).toBeNull();
+  });
 });

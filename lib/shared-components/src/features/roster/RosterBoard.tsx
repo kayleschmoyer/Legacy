@@ -32,7 +32,22 @@ export interface RosterBoardPlayer {
     firstName?: string | null;
     lastName?: string | null;
     eligiblePositions?: readonly string[] | null;
+    /** Current MLB team abbreviation for baseball players (LS-8597). */
+    mlbTeam?: string | null;
+    /** Jersey number (LS-8597 for baseball players). */
+    jerseyNumber?: number | null;
   } | null;
+}
+
+/** Renders "TEAM #NN", "TEAM", or "#NN" depending on which fields are present. */
+function formatTeamJersey(
+  mlbTeam?: string | null,
+  jerseyNumber?: number | null,
+): string | null {
+  const parts: string[] = [];
+  if (mlbTeam) parts.push(mlbTeam);
+  if (jerseyNumber != null) parts.push(`#${jerseyNumber}`);
+  return parts.length > 0 ? parts.join(' ') : null;
 }
 
 type SlotState = 'idle' | 'selected' | 'eligible-empty' | 'eligible-swap';
@@ -70,6 +85,8 @@ interface SlotRowProps {
   positionType: string;
   assignedName: string | null;
   assignedEligible: readonly string[];
+  assignedMlbTeam?: string | null;
+  assignedJerseyNumber?: number | null;
   selectedName: string | null;
   state: SlotState;
   readOnly: boolean;
@@ -83,6 +100,8 @@ function SlotRow({
   positionType,
   assignedName,
   assignedEligible,
+  assignedMlbTeam,
+  assignedJerseyNumber,
   selectedName,
   state,
   readOnly,
@@ -167,6 +186,17 @@ function SlotRow({
           {subText}
         </Text>
       </YStack>
+      {assignedName &&
+        formatTeamJersey(assignedMlbTeam, assignedJerseyNumber) && (
+          <Text
+            fontSize="$1"
+            fontWeight="700"
+            color="$gray10"
+            numberOfLines={1}
+          >
+            {formatTeamJersey(assignedMlbTeam, assignedJerseyNumber)}
+          </Text>
+        )}
       {assignedName && isLocked && (
         <Lock size={14} color="var(--amber9)" aria-label="Locked" />
       )}
@@ -191,6 +221,8 @@ interface BenchRowProps {
   name: string;
   eligible: readonly string[];
   primaryPosition: string;
+  mlbTeam?: string | null;
+  jerseyNumber?: number | null;
   selected: boolean;
   readOnly: boolean;
   isLocked?: boolean;
@@ -202,6 +234,8 @@ function BenchRow({
   name,
   eligible,
   primaryPosition,
+  mlbTeam,
+  jerseyNumber,
   selected,
   readOnly,
   isLocked = false,
@@ -256,6 +290,11 @@ function BenchRow({
               : 'Unclassified'}
         </Text>
       </YStack>
+      {formatTeamJersey(mlbTeam, jerseyNumber) && (
+        <Text fontSize="$1" fontWeight="700" color="$gray10" numberOfLines={1}>
+          {formatTeamJersey(mlbTeam, jerseyNumber)}
+        </Text>
+      )}
       {isLocked && <Lock size={14} color="var(--amber9)" aria-label="Locked" />}
       {onPlayerPress && (
         <YStack
@@ -497,6 +536,8 @@ export function RosterBoard<
         positionType={position.positionType ?? ''}
         assignedName={assigned ? getPlayerName(assigned) : null}
         assignedEligible={assigned?.player?.eligiblePositions ?? []}
+        assignedMlbTeam={assigned?.player?.mlbTeam}
+        assignedJerseyNumber={assigned?.player?.jerseyNumber}
         selectedName={selectedName}
         state={state}
         readOnly={readOnly}
@@ -616,6 +657,8 @@ export function RosterBoard<
                     name={getPlayerName(p)}
                     eligible={p.player?.eligiblePositions ?? []}
                     primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
+                    mlbTeam={p.player?.mlbTeam}
+                    jerseyNumber={p.player?.jerseyNumber}
                     selected={selected?.id === p.id}
                     readOnly={readOnly}
                     isLocked={p.isLocked ?? false}
@@ -642,6 +685,8 @@ export function RosterBoard<
                     name={getPlayerName(p)}
                     eligible={p.player?.eligiblePositions ?? []}
                     primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
+                    mlbTeam={p.player?.mlbTeam}
+                    jerseyNumber={p.player?.jerseyNumber}
                     selected={selected?.id === p.id}
                     readOnly={readOnly}
                     isLocked={p.isLocked ?? false}

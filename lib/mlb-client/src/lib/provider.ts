@@ -1,6 +1,7 @@
 import type {
   GameFeed,
   PlayerGameStats,
+  PlayerInfo,
   PlayerSeasonStats,
   Schedule,
   ScheduleOptions,
@@ -50,6 +51,13 @@ export interface MlbDataProvider {
     gamePk: number,
     season?: number,
   ): Promise<PlayerGameStats | null>;
+
+  /**
+   * Returns current team affiliation and jersey number for a player (LS-8597).
+   * Both fields are null when the provider has no current mapping (e.g.
+   * unrostered or retired player).
+   */
+  getPlayerInfo(mlbPlayerId: number): Promise<PlayerInfo>;
 
   // ── Reference ─────────────────────────────────────────────────────────────
   /** Returns the schedule for a given date with optional filters. */

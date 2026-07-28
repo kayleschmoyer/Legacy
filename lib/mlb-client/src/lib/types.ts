@@ -183,3 +183,12 @@ export interface Team {
   divisionId: number | null;
   leagueId: number | null;
 }
+
+/** Current team affiliation + jersey number for a player (LS-8597). */
+export interface PlayerInfo {
+  playerId: number;
+  /** Current MLB team abbreviation (e.g. 'NYY'), or null if unrostered/unknown. */
+  mlbTeamAbbreviation: string | null;
+  /** Jersey number, or null if unassigned/unknown. */
+  jerseyNumber: number | null;
+}

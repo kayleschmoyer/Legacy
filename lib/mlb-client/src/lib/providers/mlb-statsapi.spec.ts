@@ -170,3 +170,74 @@ describe('MlbStatsApiProvider.getPlayerGameStats', () => {
     });
   });
 });
+
+// ── LS-8597: getPlayerInfo (team affiliation + jersey number) ───────────────
+
+describe('MlbStatsApiProvider.getPlayerInfo', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedAxios.isAxiosError = jest.fn().mockReturnValue(false) as never;
+  });
+
+  it('maps currentTeam.abbreviation and primaryNumber', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        people: [
+          {
+            id: 592450,
+            currentTeam: { id: 147, abbreviation: 'NYY' },
+            primaryNumber: '99',
+          },
+        ],
+      },
+    });
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getPlayerInfo(592450);
+
+    expect(result).toEqual({
+      playerId: 592450,
+      mlbTeamAbbreviation: 'NYY',
+      jerseyNumber: 99,
+    });
+  });
+
+  it('returns nulls when the person has no currentTeam or primaryNumber', async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: { people: [{ id: 592450 }] },
+    });
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getPlayerInfo(592450);
+
+    expect(result).toEqual({
+      playerId: 592450,
+      mlbTeamAbbreviation: null,
+      jerseyNumber: null,
+    });
+  });
+
+  it('returns nulls when the people array is empty (unknown player)', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { people: [] } });
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getPlayerInfo(1);
+
+    expect(result).toEqual({
+      playerId: 1,
+      mlbTeamAbbreviation: null,
+      jerseyNumber: null,
+    });
+  });
+
+  it('requests /v1/people/{id}', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { people: [] } });
+
+    const provider = new MlbStatsApiProvider();
+    await provider.getPlayerInfo(592450);
+
+    const calls = mockedAxios.get.mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toContain('/v1/people/592450');
+  });
+});

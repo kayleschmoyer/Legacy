@@ -17,6 +17,7 @@ import {
 import { playerPosition, sportKind } from './Enums';
 import { sql } from 'drizzle-orm';
 import { nflTeams } from './FootballTeams';
+import { mlbTeams } from './MlbTeams';
 
 export const players = pgTable(
   'players',
@@ -53,7 +54,9 @@ export const players = pgTable(
     // PFR canonical position for football players (LS-250). Nullable — baseball players
     // and football players without a PFR mapping have null.
     position: playerPosition('position'),
-    // NFL jersey number for display (LS-6236). Nullable — DST and unmapped players have null.
+    // Jersey number for display. Originally NFL-only (LS-6236); shared across
+    // sports as of LS-8597 — populated for baseball players by the MLB Stats
+    // API pipeline. Nullable — DST and unmapped players have null.
     jerseyNumber: integer('jersey_number'),
     // News for football players (LS-5436). Populated by the news pipeline;
     // null until a feed is connected.
@@ -64,6 +67,10 @@ export const players = pgTable(
     // used as search filters.
     projectedFantasyPoints: real('projected_fantasy_points'),
     adpRank: integer('adp_rank'),
+    // Current MLB team abbreviation for baseball players (LS-8597), FK ->
+    // mlb_teams.abbreviation. Populated by the MLB Stats API pipeline via
+    // mlbPlayerId; null until synced.
+    mlbTeam: varchar('mlb_team', { length: 3 }),
   },
   (table) => {
     return {
@@ -78,6 +85,11 @@ export const players = pgTable(
         columns: [table.nflTeam],
         foreignColumns: [nflTeams.abbreviation],
         name: 'players_nfl_team_fk',
+      }).onDelete('set null'),
+      playersMlbTeamFk: foreignKey({
+        columns: [table.mlbTeam],
+        foreignColumns: [mlbTeams.abbreviation],
+        name: 'players_mlb_team_fk',
       }).onDelete('set null'),
     };
   },

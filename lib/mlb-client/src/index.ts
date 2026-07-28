@@ -7,6 +7,7 @@ export type {
   MlbGameStatus,
   MlbTeamScore,
   PlayerGameStats,
+  PlayerInfo,
   PlayerSeasonStats,
   Schedule,
   ScheduleGame,

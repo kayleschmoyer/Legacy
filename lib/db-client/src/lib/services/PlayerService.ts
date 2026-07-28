@@ -76,6 +76,8 @@ interface ScoringResultRow {
   // Football premium advanced-search filter columns (LS-6489)
   projected_fantasy_points: number | null;
   adp_rank: number | null;
+  // MLB team affiliation for baseball players (LS-8597)
+  mlb_team: string | null;
 }
 
 export interface PlayerFilters {
@@ -610,7 +612,7 @@ export class PlayerService {
             p.bat_hand, p.throw_hand,
             p.sport, p.pfr_id, p.is_dst, p.nfl_team, p.position, p.jersey_number,
             p.news,
-            p.projected_fantasy_points, p.adp_rank,
+            p.projected_fantasy_points, p.adp_rank, p.mlb_team,
             ${battingScoreExpr} AS batting_score,
             ${pitchingScoreExpr} AS pitching_score,
             ${fieldingScoreExpr} AS fielding_score,
@@ -663,6 +665,7 @@ export class PlayerService {
           news: row.news ?? null,
           projectedFantasyPoints: row.projected_fantasy_points ?? null,
           adpRank: row.adp_rank ?? null,
+          mlbTeam: row.mlb_team ?? null,
           scoring: {
             playerId: row.id,
             battingScore: Number(row.batting_score) || 0,

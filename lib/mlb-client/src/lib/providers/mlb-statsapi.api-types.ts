@@ -125,3 +125,12 @@ export interface MlbApiTeamsResponse {
     league?: { id?: number };
   }>;
 }
+
+/** Response shape from GET /v1/people/{personId} (LS-8597). */
+export interface MlbApiPersonResponse {
+  people?: Array<{
+    id?: number;
+    currentTeam?: { id?: number; abbreviation?: string };
+    primaryNumber?: string;
+  }>;
+}
