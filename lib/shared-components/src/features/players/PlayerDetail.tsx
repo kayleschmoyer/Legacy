@@ -1,5 +1,9 @@
 import React from 'react';
 import { ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
+import {
+  type GetPlayerDetailByIdQuery,
+  useGetPlayerDetailByIdQuery,
+} from '@legacy-sports/graphql';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,36 +37,6 @@ export interface PlayerDetailProps {
   onPlayerSelect?: (playerId: number) => void;
   initialName?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Mock data (fallback for stories / testing)
-// ---------------------------------------------------------------------------
-
-const getPlayerDetails = (playerId: number): PlayerDetailData | undefined => {
-  const playersData: PlayerDetailData[] = [
-    {
-      battingAvg: 0.342,
-      homeRuns: 714,
-      id: 1,
-      name: 'Babe Ruth',
-      position: 'OF',
-      rbi: 2213,
-      runs: 2174,
-      team: 'New York Yankees',
-    },
-    {
-      battingAvg: 0.366,
-      homeRuns: 117,
-      id: 2,
-      name: 'Ty Cobb',
-      position: 'CF',
-      rbi: 1944,
-      runs: 2246,
-      team: 'Detroit Tigers',
-    },
-  ];
-  return playersData.find((player) => player.id === playerId);
-};
 
 // ---------------------------------------------------------------------------
 // Stat row helper
@@ -198,6 +172,18 @@ function PlayerDetail({
     );
   }
 
+  // Mirror the pitching-section guard below: with real API data a pure pitcher
+  // has no career batting line, and an unconditional header would render an
+  // empty "Batting Statistics" card (LS-8824).
+  const hasBattingStats =
+    player.battingAvg !== undefined ||
+    player.homeRuns !== undefined ||
+    player.rbi !== undefined ||
+    player.runs !== undefined ||
+    player.hits !== undefined ||
+    player.obp !== undefined ||
+    player.slg !== undefined;
+
   return (
     <ScrollView flex={1} backgroundColor="$background" padding="$4">
       {/* ── Player header ── */}
@@ -230,50 +216,52 @@ function PlayerDetail({
         </XStack>
       </YStack>
 
-      {/* ── Batting stats ── */}
-      <YStack
-        borderRadius="$4"
-        borderWidth={1}
-        borderColor="$borderColor"
-        overflow="hidden"
-        marginBottom="$4"
-      >
-        <SectionHeader title="Batting Statistics" />
+      {/* ── Batting stats (shown only if relevant) ── */}
+      {hasBattingStats && (
+        <YStack
+          borderRadius="$4"
+          borderWidth={1}
+          borderColor="$borderColor"
+          overflow="hidden"
+          marginBottom="$4"
+        >
+          <SectionHeader title="Batting Statistics" />
 
-        {player.battingAvg !== undefined && (
-          <StatRow
-            label="Batting Average"
-            value={player.battingAvg.toFixed(3)}
-            accent
-          />
-        )}
-        {player.homeRuns !== undefined && (
-          <StatRow label="Home Runs" value={player.homeRuns} />
-        )}
-        {player.rbi !== undefined && (
-          <StatRow label="RBIs" value={player.rbi} />
-        )}
-        {player.runs !== undefined && (
-          <StatRow label="Runs" value={player.runs} />
-        )}
-        {player.hits !== undefined && (
-          <StatRow label="Hits" value={player.hits} />
-        )}
-        {player.obp !== undefined && (
-          <StatRow
-            label="On-Base Percentage"
-            value={player.obp.toFixed(3)}
-            accent
-          />
-        )}
-        {player.slg !== undefined && (
-          <StatRow
-            label="Slugging Percentage"
-            value={player.slg.toFixed(3)}
-            accent
-          />
-        )}
-      </YStack>
+          {player.battingAvg !== undefined && (
+            <StatRow
+              label="Batting Average"
+              value={player.battingAvg.toFixed(3)}
+              accent
+            />
+          )}
+          {player.homeRuns !== undefined && (
+            <StatRow label="Home Runs" value={player.homeRuns} />
+          )}
+          {player.rbi !== undefined && (
+            <StatRow label="RBIs" value={player.rbi} />
+          )}
+          {player.runs !== undefined && (
+            <StatRow label="Runs" value={player.runs} />
+          )}
+          {player.hits !== undefined && (
+            <StatRow label="Hits" value={player.hits} />
+          )}
+          {player.obp !== undefined && (
+            <StatRow
+              label="On-Base Percentage"
+              value={player.obp.toFixed(3)}
+              accent
+            />
+          )}
+          {player.slg !== undefined && (
+            <StatRow
+              label="Slugging Percentage"
+              value={player.slg.toFixed(3)}
+              accent
+            />
+          )}
+        </YStack>
+      )}
 
       {/* ── Pitching stats (shown only if relevant) ── */}
       {(player.era !== undefined || player.wins !== undefined) && (
@@ -313,10 +301,113 @@ export interface PlayerDetailByIdProps {
   initialName?: string;
 }
 
-function PlayerDetailById({ playerId, initialName }: PlayerDetailByIdProps) {
-  const player = getPlayerDetails(playerId);
+/** Placeholder for a field the API has no value for. */
+const UNKNOWN = '—';
 
-  return <PlayerDetail player={player} initialName={initialName} />;
+/** Narrow `null` to `undefined` so PlayerDetail's `!== undefined` guards hold. */
+function orUndefined<T>(value: T | null | undefined): T | undefined {
+  return value ?? undefined;
+}
+
+/**
+ * `CareerPitching.era` is a String in the schema, but PlayerDetailData.era is a
+ * number that gets `.toFixed(2)` applied — parse defensively.
+ */
+function toNumber(value: string | null | undefined): number | undefined {
+  if (value == null) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * Most recent team across the player's batting and pitching season lines.
+ * `Player` carries no historical team field, so this is the only team available
+ * for players who are not on a current MLB roster.
+ */
+function latestTeam(
+  seasons: ReadonlyArray<{
+    season?: number | null;
+    team?: string | null;
+  }>,
+): string | undefined {
+  let latest: { season: number; team: string } | undefined;
+
+  for (const entry of seasons) {
+    const team = entry.team?.trim();
+    if (entry.season == null || !team) continue;
+    if (!latest || entry.season > latest.season) {
+      latest = { season: entry.season, team };
+    }
+  }
+
+  return latest?.team;
+}
+
+/**
+ * Map the GraphQL payload onto the presentational shape. Returns `undefined`
+ * only when the API genuinely has no player for the requested id — that is the
+ * sole path to PlayerDetail's "Player not found" state.
+ */
+export function toPlayerDetailData(
+  data: GetPlayerDetailByIdQuery | undefined,
+): PlayerDetailData | undefined {
+  const player = data?.player;
+  if (!player || player.id == null) return undefined;
+
+  const batting = player.careerBatting;
+  const pitching = player.careerPitching;
+
+  const name = [player.firstName, player.lastName]
+    .filter((part): part is string => Boolean(part?.trim()))
+    .join(' ');
+
+  return {
+    id: player.id,
+    name: name || UNKNOWN,
+    position:
+      batting?.primaryPosition ??
+      pitching?.primaryPosition ??
+      player.eligiblePositions?.[0] ??
+      UNKNOWN,
+    team:
+      latestTeam([
+        ...(data?.playerSeasonBatting ?? []),
+        ...(data?.playerSeasonPitching ?? []),
+      ]) ??
+      player.mlbTeam ??
+      UNKNOWN,
+    battingAvg: orUndefined(batting?.battingAverage),
+    homeRuns: orUndefined(batting?.homeRuns),
+    rbi: orUndefined(batting?.rbi),
+    runs: orUndefined(batting?.runs),
+    hits: orUndefined(batting?.hits),
+    obp: orUndefined(batting?.onBasePercentage),
+    slg: orUndefined(batting?.sluggingPercentage),
+    era: toNumber(pitching?.era),
+    wins: orUndefined(pitching?.wins),
+    losses: orUndefined(pitching?.losses),
+    saves: orUndefined(pitching?.saves),
+  };
+}
+
+function PlayerDetailById({ playerId, initialName }: PlayerDetailByIdProps) {
+  // Ids that can never match a row (the route's own guard already rejects
+  // non-numeric params) short-circuit to the not-found state without a request.
+  const skip = !Number.isInteger(playerId) || playerId <= 0;
+
+  const { data, loading, error } = useGetPlayerDetailByIdQuery({
+    variables: { playerId },
+    skip,
+  });
+
+  return (
+    <PlayerDetail
+      player={toPlayerDetailData(data)}
+      loading={loading}
+      error={error?.message}
+      initialName={initialName}
+    />
+  );
 }
 
 export { PlayerDetail };

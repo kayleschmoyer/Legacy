@@ -1,0 +1,43 @@
+# Single-player lookup backing the cross-platform PlayerDetailById screen
+# (LS-8824). Selections are limited to what PlayerDetail actually renders:
+# identity, primary position, most recent team, and the career batting /
+# pitching lines. `player` is the existence source of truth — a null player is
+# the only thing that should surface "Player not found".
+#
+# The season lists carry only season + team because `Player` has no historical
+# team field (`mlbTeam` is populated for current MLB players only), so the most
+# recent season entry is the sole reliable team for historical players.
+query GetPlayerDetailById($playerId: Int!) {
+  player(id: $playerId) {
+    id
+    firstName
+    lastName
+    eligiblePositions
+    mlbTeam
+    careerBatting {
+      primaryPosition
+      battingAverage
+      homeRuns
+      rbi
+      runs
+      hits
+      onBasePercentage
+      sluggingPercentage
+    }
+    careerPitching {
+      primaryPosition
+      era
+      wins
+      losses
+      saves
+    }
+  }
+  playerSeasonBatting(playerId: $playerId) {
+    season
+    team
+  }
+  playerSeasonPitching(playerId: $playerId) {
+    season
+    team
+  }
+}

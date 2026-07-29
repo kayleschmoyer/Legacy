@@ -48,8 +48,10 @@ export default function PlayerDetailScreen() {
 }
 ```
 
-`PlayerDetailById` resolves the ID via an in-memory lookup (mock data in shared lib)
-and delegates to `PlayerDetail`, which renders via Tamagui `ScrollView` and displays:
+`PlayerDetailById` resolves the ID through the `GetPlayerDetailById` GraphQL query
+(LS-8824 — it previously used an in-memory mock array, which made every real
+`players.id` render "Player not found") and delegates to `PlayerDetail`, which
+renders via Tamagui `ScrollView` and displays:
 
 - **Batting Statistics** section (AVG, HR, RBI, Runs, Hits, OBP, SLG) — shown whenever
   batting fields are present on the player record
@@ -66,12 +68,12 @@ and delegates to `PlayerDetail`, which renders via Tamagui `ScrollView` and disp
 | Aspect                  | Web (`PlayerDetailModal`)                                                  | Native (`PlayerDetailById`)                                   |
 | ----------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | Component location      | `apps/web/src/components/PlayerDetailModal.tsx`                            | `lib/shared-components/src/features/players/PlayerDetail.tsx` |
-| Data source             | GraphQL (`useGetAllPlayerSeasonStatsQuery`)                                | In-memory player lookup (shared lib)                          |
+| Data source             | GraphQL (`useGetAllPlayerSeasonStatsQuery`)                                | GraphQL (`useGetPlayerDetailByIdQuery`)                       |
 | Sections rendered       | Hero stats · Career grid · Career Arc · Batting · Pitching · Fielding tabs | Batting Statistics · Pitching Statistics sections             |
 | Loading state           | Spinner + `previousData` fallback                                          | Tamagui `Spinner` full-screen                                 |
 | Error state             | Editorial error card                                                       | Red text message                                              |
 | Empty / not-found state | Dashed empty-state card ("No season statistics")                           | "Player not found" text                                       |
-| Premium gating          | Advanced columns gated separately (see LS-5571+)                           | None (shared lib uses mock data)                              |
+| Premium gating          | Advanced columns gated separately (see LS-5571+)                           | None                                                          |
 
 **Regression risk:** A change to `PlayerDetailById` or `PlayerDetail` in
 `lib/shared-components` affects the **native** player detail surface only. It is

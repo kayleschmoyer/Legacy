@@ -10796,6 +10796,51 @@ export type GetNflTeamSeasonMetadataQuery = {
   }>;
 };
 
+export type GetPlayerDetailByIdQueryVariables = Exact<{
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type GetPlayerDetailByIdQuery = {
+  __typename?: 'Query';
+  player?: {
+    __typename?: 'Player';
+    id?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    eligiblePositions?: Array<string> | null;
+    mlbTeam?: string | null;
+    careerBatting?: {
+      __typename?: 'CareerBatting';
+      primaryPosition?: string | null;
+      battingAverage?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      onBasePercentage?: number | null;
+      sluggingPercentage?: number | null;
+    } | null;
+    careerPitching?: {
+      __typename?: 'CareerPitching';
+      primaryPosition?: string | null;
+      era?: string | null;
+      wins?: number | null;
+      losses?: number | null;
+      saves?: number | null;
+    } | null;
+  } | null;
+  playerSeasonBatting?: Array<{
+    __typename?: 'SeasonBatting';
+    season?: number | null;
+    team?: string | null;
+  }> | null;
+  playerSeasonPitching?: Array<{
+    __typename?: 'SeasonPitching';
+    season?: number | null;
+    team?: string | null;
+  }> | null;
+};
+
 export type GetPlayersWithStatsQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -26522,6 +26567,125 @@ export type GetNflTeamSeasonMetadataSuspenseQueryHookResult = ReturnType<
 export type GetNflTeamSeasonMetadataQueryResult = Apollo.QueryResult<
   GetNflTeamSeasonMetadataQuery,
   GetNflTeamSeasonMetadataQueryVariables
+>;
+export const GetPlayerDetailById = gql`
+  query GetPlayerDetailById($playerId: Int!) {
+    player(id: $playerId) {
+      id
+      firstName
+      lastName
+      eligiblePositions
+      mlbTeam
+      careerBatting {
+        primaryPosition
+        battingAverage
+        homeRuns
+        rbi
+        runs
+        hits
+        onBasePercentage
+        sluggingPercentage
+      }
+      careerPitching {
+        primaryPosition
+        era
+        wins
+        losses
+        saves
+      }
+    }
+    playerSeasonBatting(playerId: $playerId) {
+      season
+      team
+    }
+    playerSeasonPitching(playerId: $playerId) {
+      season
+      team
+    }
+  }
+`;
+
+/**
+ * __useGetPlayerDetailByIdQuery__
+ *
+ * To run a query within a React component, call `useGetPlayerDetailByIdQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayerDetailByIdQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayerDetailByIdQuery({
+ *   variables: {
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useGetPlayerDetailByIdQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetPlayerDetailByIdQuery,
+    GetPlayerDetailByIdQueryVariables
+  > &
+    (
+      | { variables: GetPlayerDetailByIdQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPlayerDetailByIdQuery,
+    GetPlayerDetailByIdQueryVariables
+  >(GetPlayerDetailById, options);
+}
+export function useGetPlayerDetailByIdLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayerDetailByIdQuery,
+    GetPlayerDetailByIdQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPlayerDetailByIdQuery,
+    GetPlayerDetailByIdQueryVariables
+  >(GetPlayerDetailById, options);
+}
+export function useGetPlayerDetailByIdSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayerDetailByIdQuery,
+        GetPlayerDetailByIdQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayerDetailByIdQuery,
+    GetPlayerDetailByIdQueryVariables
+  >(
+    GetPlayerDetailById,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayerDetailByIdQuery,
+          GetPlayerDetailByIdQueryVariables
+        >,
+  );
+}
+export type GetPlayerDetailByIdQueryHookResult = ReturnType<
+  typeof useGetPlayerDetailByIdQuery
+>;
+export type GetPlayerDetailByIdLazyQueryHookResult = ReturnType<
+  typeof useGetPlayerDetailByIdLazyQuery
+>;
+export type GetPlayerDetailByIdSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayerDetailByIdSuspenseQuery
+>;
+export type GetPlayerDetailByIdQueryResult = Apollo.QueryResult<
+  GetPlayerDetailByIdQuery,
+  GetPlayerDetailByIdQueryVariables
 >;
 export const GetPlayersWithStats = gql`
   query GetPlayersWithStats(

@@ -133,6 +133,20 @@ jest.mock('tamagui', () => {
   };
 });
 
+// PlayerDetailById is API-backed (LS-8824) — the integration describes below
+// render the real component, so the generated query hook is stubbed here.
+interface MockPlayerDetailQueryResult {
+  data?: unknown;
+  loading: boolean;
+  error?: { message: string };
+}
+
+let mockPlayerDetailQuery: MockPlayerDetailQueryResult = { loading: false };
+
+jest.mock('@legacy-sports/graphql', () => ({
+  useGetPlayerDetailByIdQuery: () => mockPlayerDetailQuery,
+}));
+
 jest.mock('@tamagui/lucide-icons', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
@@ -229,47 +243,76 @@ describe('PlayerDetailScreen', () => {
 const PLAYER_DETAIL_MODULE =
   '../../../../../lib/shared-components/src/features/players/PlayerDetail';
 
+function requireRealPlayerDetailById() {
+  return jest.requireActual<{
+    PlayerDetailById: typeof PlayerDetailByIdComponent;
+  }>(PLAYER_DETAIL_MODULE).PlayerDetailById;
+}
+
 describe('PlayerDetailById — render-with-data', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPlayerDetailQuery = { loading: false };
   });
 
-  it('renders player name and team for a known playerId', () => {
-    const { PlayerDetailById } = jest.requireActual<{
-      PlayerDetailById: typeof PlayerDetailByIdComponent;
-    }>(PLAYER_DETAIL_MODULE);
-    render(<PlayerDetailById playerId={1} />);
-    expect(screen.getByText('Babe Ruth')).toBeTruthy();
-    expect(screen.getByText('New York Yankees')).toBeTruthy();
-  });
-
-  it('renders a second player correctly', () => {
-    const { PlayerDetailById } = jest.requireActual<{
-      PlayerDetailById: typeof PlayerDetailByIdComponent;
-    }>(PLAYER_DETAIL_MODULE);
-    render(<PlayerDetailById playerId={2} />);
-    expect(screen.getByText('Ty Cobb')).toBeTruthy();
-    expect(screen.getByText('Detroit Tigers')).toBeTruthy();
+  // LS-8824 — 4242 is deliberately outside the removed mock array's 1..2 range:
+  // before the fix any such id rendered "Player not found" on mobile.
+  it('renders the API-supplied player name and team for a real playerId', () => {
+    mockPlayerDetailQuery = {
+      loading: false,
+      data: {
+        player: {
+          id: 4242,
+          firstName: 'Jose',
+          lastName: 'Ramirez',
+          eligiblePositions: ['3B'],
+          mlbTeam: null,
+          careerBatting: {
+            primaryPosition: '3B',
+            battingAverage: 0.279,
+            homeRuns: 246,
+            rbi: 878,
+            runs: 863,
+            hits: 1403,
+            onBasePercentage: 0.353,
+            sluggingPercentage: 0.503,
+          },
+          careerPitching: null,
+        },
+        playerSeasonBatting: [{ season: 2024, team: 'CLE' }],
+        playerSeasonPitching: [],
+      },
+    };
+    const PlayerDetailById = requireRealPlayerDetailById();
+    render(<PlayerDetailById playerId={4242} />);
+    expect(screen.getByText('Jose Ramirez')).toBeTruthy();
+    expect(screen.getByText('CLE')).toBeTruthy();
+    expect(screen.getByText('246')).toBeTruthy();
   });
 });
 
 describe('PlayerDetailById — empty state', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPlayerDetailQuery = { loading: false };
   });
 
-  it('shows "Player not found" for an unknown playerId', () => {
-    const { PlayerDetailById } = jest.requireActual<{
-      PlayerDetailById: typeof PlayerDetailByIdComponent;
-    }>(PLAYER_DETAIL_MODULE);
+  it('shows "Player not found" when the API returns no player', () => {
+    mockPlayerDetailQuery = {
+      loading: false,
+      data: {
+        player: null,
+        playerSeasonBatting: [],
+        playerSeasonPitching: [],
+      },
+    };
+    const PlayerDetailById = requireRealPlayerDetailById();
     render(<PlayerDetailById playerId={999} />);
     expect(screen.getByText('Player not found')).toBeTruthy();
   });
 
   it('shows "Player not found" when playerId defaults to 0 (missing route param)', () => {
-    const { PlayerDetailById } = jest.requireActual<{
-      PlayerDetailById: typeof PlayerDetailByIdComponent;
-    }>(PLAYER_DETAIL_MODULE);
+    const PlayerDetailById = requireRealPlayerDetailById();
     render(<PlayerDetailById playerId={0} />);
     expect(screen.getByText('Player not found')).toBeTruthy();
   });
