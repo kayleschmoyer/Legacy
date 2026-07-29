@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import {
+  getSubmitErrorMessage,
   LeagueCreateWizard,
   type LeagueCreateWizardForm,
   type WizardSport,
@@ -106,13 +107,14 @@ export default function CreateLeagueScreen(): React.JSX.Element {
       }
     },
     onError: (err: unknown) => {
+      // The real error goes to the log; the user only ever sees an allowlisted
+      // server message or the generic fallback, never raw server vocabulary
+      // (LS-8814 / LS-6069).
       LOGGER.error(
         'Error creating league:',
         err instanceof Error ? err : new Error(String(err)),
       );
-      const message =
-        err instanceof Error ? err.message : 'Failed to create league';
-      Alert.alert('Error', message);
+      Alert.alert('Error', getSubmitErrorMessage(err));
     },
   });
 
@@ -170,7 +172,9 @@ export default function CreateLeagueScreen(): React.JSX.Element {
       isPremium={isPremium}
       premiumLoading={premiumLoading}
       submitting={loading}
-      submitError={error?.message}
+      // Same allowlist as the Alert above — `error` here is the very error
+      // `onError` already logged, so this path only decides what to display.
+      submitError={error ? getSubmitErrorMessage(error) : undefined}
       onSubmit={handleSubmit}
       onClose={handleClose}
       onUpgrade={handleUpgrade}

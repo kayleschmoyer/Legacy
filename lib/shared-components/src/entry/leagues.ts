@@ -12,4 +12,5 @@ export * from '../features/leagues/LeaguesLedgerScreen';
 export * from '../features/leagues/OnThisDayFeed';
 export * from '../features/leagues/premium';
 export * from '../features/leagues/PremiumTradeTools';
+export * from '../features/leagues/submitError';
 export * from '../features/leagues/TradingCenter';

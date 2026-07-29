@@ -2,8 +2,19 @@ import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type { View as RNView } from 'react-native';
+import { CombinedGraphQLErrors } from '@apollo/client';
 
 import CreateLeagueScreen, { buildCreateLeagueInput } from './create';
+
+/**
+ * The generic copy shown whenever the server's message is not allowlisted.
+ * Spelled out rather than imported from `LEAGUE_SUBMIT_ERROR_FALLBACK` on
+ * purpose: asserting against the constant the code under test already uses
+ * would pass even if that constant silently changed. This pins the copy the
+ * user actually sees.
+ */
+const SUBMIT_ERROR_FALLBACK =
+  'Unable to save league. Your settings are still filled in — try again or come back later.';
 
 // ── Mock type helpers ────────────────────────────────────────────────────────
 
@@ -51,8 +62,14 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
   >(
     '../../../../../../lib/shared-components/src/features/leagues/create-wizard/constants',
   );
+  // The submit-error allowlist is the behaviour under test here (LS-8814), so
+  // it stays real rather than being stubbed out with the rest of the entry.
+  const submitError = jest.requireActual<
+    typeof import('../../../../../../lib/shared-components/src/features/leagues/submitError')
+  >('../../../../../../lib/shared-components/src/features/leagues/submitError');
   return {
     ...constants,
+    ...submitError,
     LeagueCreateWizard: (props: WizardProps) => {
       wizardProps = props;
       return ReactActual.createElement(View, {
@@ -83,8 +100,12 @@ jest.mock('react-native/Libraries/Alert/Alert', () => ({
 }));
 
 const mockCreateLeagueMutate = jest.fn();
-const mockCreateLeagueState: { loading: boolean; error?: { message: string } } =
-  { loading: false, error: undefined };
+const mockCreateLeagueState: { loading: boolean; error?: unknown } = {
+  loading: false,
+  error: undefined,
+};
+/** Captured so a test can drive the mutation's `onError` handler directly. */
+let mutationOptions: { onError?: (error: unknown) => void } | undefined;
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Football: 'football', Baseball: 'baseball' },
   DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
@@ -92,6 +113,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     onCompleted?: (data: unknown) => void;
     onError?: (error: unknown) => void;
   }) => {
+    mutationOptions = options;
     mockCreateLeagueMutate.mockImplementation((_args: unknown) => {
       options?.onCompleted?.({
         createLeagueAndTeams: { league: { id: 42, name: 'Test League' } },
@@ -153,6 +175,7 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     wizardProps = undefined;
+    mutationOptions = undefined;
     mockIsPremium = false;
     mockPremiumLoading = false;
     mockSearchParams = {};
@@ -189,12 +212,85 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
     expect(props.premiumLoading).toBe(true);
   });
 
-  it('reports mutation in-flight and error state to the wizard', () => {
+  it('reports mutation in-flight state to the wizard', () => {
     mockCreateLeagueState.loading = true;
-    mockCreateLeagueState.error = { message: 'League name is taken' };
-    const props = renderScreen();
-    expect(props.submitting).toBe(true);
-    expect(props.submitError).toBe('League name is taken');
+    expect(renderScreen().submitting).toBe(true);
+  });
+
+  // LS-8814 — the screen must never hand raw server vocabulary to the UI. Both
+  // display paths (the wizard's inline banner and the onError Alert) run the
+  // error through the shared allowlist in lib/shared-components.
+  describe('submit-error surfacing (LS-8814)', () => {
+    const allowlisted = () =>
+      new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'You already have a league with that name.',
+            extensions: { code: 'BAD_USER_INPUT' },
+          },
+        ],
+      });
+
+    const notAllowlisted = () =>
+      new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'GraphQLError: relation "leagues" does not exist',
+            extensions: { code: 'INTERNAL_SERVER_ERROR' },
+          },
+        ],
+      });
+
+    it('passes an allowlisted server message straight to the wizard', () => {
+      mockCreateLeagueState.error = allowlisted();
+      expect(renderScreen().submitError).toBe(
+        'You already have a league with that name.',
+      );
+    });
+
+    it('replaces a non-allowlisted server message with the generic fallback', () => {
+      mockCreateLeagueState.error = notAllowlisted();
+      expect(renderScreen().submitError).toBe(SUBMIT_ERROR_FALLBACK);
+    });
+
+    it('leaves submitError undefined while the mutation has no error', () => {
+      expect(renderScreen().submitError).toBeUndefined();
+    });
+
+    it('alerts with the allowlisted message and logs the real error', () => {
+      const { LOGGER } = jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
+        '@legacy-sports/logging',
+      );
+      renderScreen();
+      const error = allowlisted();
+
+      mutationOptions?.onError?.(error);
+
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Error',
+        'You already have a league with that name.',
+      );
+      expect(LOGGER.error).toHaveBeenCalledWith(
+        'Error creating league:',
+        error,
+      );
+    });
+
+    it('alerts with the generic fallback for a non-allowlisted code and still logs', () => {
+      const { LOGGER } = jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
+        '@legacy-sports/logging',
+      );
+      renderScreen();
+      const error = notAllowlisted();
+
+      mutationOptions?.onError?.(error);
+
+      expect(Alert.alert).toHaveBeenCalledWith('Error', SUBMIT_ERROR_FALLBACK);
+      expect(LOGGER.error).toHaveBeenCalledWith(
+        'Error creating league:',
+        error,
+      );
+    });
   });
 
   describe('submit', () => {
