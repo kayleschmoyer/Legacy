@@ -205,6 +205,20 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     expect(text).not.toContain('player_eligible_positions');
   });
 
+  it('excludes players already rostered in the league (LS-8674 kept players)', async () => {
+    const resolve = await captureResolver();
+    verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
+    getUnfilledPositionTypes.mockResolvedValue([]);
+    eligibleStatPositionsForUnfilledSlots.mockReturnValue([]);
+    const db = makeDb();
+
+    await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
+
+    const { sql: text, params } = serializeExecutedQuery(db);
+    expect(text).toContain('team_members');
+    expect(params).toEqual(expect.arrayContaining([7])); // draft.leagueId
+  });
+
   it('does not filter when every roster requirement is already met', async () => {
     const resolve = await captureResolver();
     verifyLeagueMembership.mockResolvedValue({ teamId: 11 });

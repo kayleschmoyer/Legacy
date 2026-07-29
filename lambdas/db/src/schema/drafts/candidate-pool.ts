@@ -186,6 +186,14 @@ async function fetchUndraftedCandidates(
         SELECT 1 FROM draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
       )
+      -- Exclude players already rostered in this league (LS-8674: keeper
+      -- designations are applied to rosters before the draft's first pick,
+      -- so kept players must not appear in the draftable pool). A no-op for
+      -- redraft leagues, whose rosters are empty at draft time.
+      AND NOT EXISTS (
+        SELECT 1 FROM team_members tm
+        WHERE tm.league_id = ${league.id} AND tm.player_id = p.id
+      )
       AND p.sport = ${league.sport}
       ORDER BY fpg DESC
       LIMIT 1000`,

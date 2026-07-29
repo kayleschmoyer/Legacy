@@ -98,6 +98,8 @@ function setupResolver(options: {
   transactionFailures?: number;
   /** Error thrown by the failing attempts above. Defaults to a 57014 SQLSTATE error. */
   transactionError?: Error;
+  /** Whether isPlayerOnRoster should report the player as already kept (LS-8674). */
+  isPlayerOnRoster?: boolean;
 }) {
   jest.resetModules();
 
@@ -282,6 +284,9 @@ function setupResolver(options: {
 
   jest.doMock('../../../services/roster-service', () => ({
     checkRosterCapacity: jest.fn().mockResolvedValue({ isFull: false }),
+    isPlayerOnRoster: jest
+      .fn()
+      .mockResolvedValue(options.isPlayerOnRoster ?? false),
   }));
 
   jest.doMock('../../../services/activity-log', () => ({
@@ -619,6 +624,27 @@ describe('makeDraftPick — draft row lock-wait retry (LS-8476 / LS-8475)', () =
     ).rejects.toThrow('canceling statement due to statement timeout');
 
     expect(ctx.db.transaction).toHaveBeenCalledTimes(3);
+    expect(mockCommitDraftPick).not.toHaveBeenCalled();
+  });
+});
+
+describe('makeDraftPick — keeper roster guard (LS-8674)', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('throws BAD_USER_INPUT when the player is already rostered as a keeper', async () => {
+    const { resolve, ctx, mockCommitDraftPick } = setupResolver({
+      existingOwnPick: null,
+      isPlayerOnRoster: true,
+    });
+
+    await expect(
+      resolve({}, { draftId: 1, playerId: 42 }, ctx, undefined),
+    ).rejects.toMatchObject({
+      message: 'Player is already rostered as a keeper in this league',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
     expect(mockCommitDraftPick).not.toHaveBeenCalled();
   });
 });

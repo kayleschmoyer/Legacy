@@ -14,6 +14,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import { Draft } from '../types';
 import { enableAutoPickForUnmanagedTeams } from '../helpers';
 import { cancelPendingDraftSlotTradesForLeague } from '../../draft-slot-trades/helpers';
+import { applyKeeperDesignationsForDraft } from '../keeper-application';
 import { builder } from '../../builder';
 import {
   AuthenticationError,
@@ -216,6 +217,22 @@ builder.mutationField('initializeDraft', (t) =>
           // The draft is now starting — any still-pending draft slot trades
           // (proposed/accepted/approved) can never execute (LS-8676 AC4).
           await cancelPendingDraftSlotTradesForLeague(tx, leagueId);
+
+          // LS-8674: keeper leagues auto-assign locked keeper designations
+          // to their teams (with cost applied) before the first pick. Must
+          // run after draft_teams exists (forfeited-pick rows reference this
+          // draftId) and before any pick/bid can happen.
+          if (league.rosterContinuity === 'keeper' && league.keeperSettings) {
+            await applyKeeperDesignationsForDraft(tx, {
+              leagueId,
+              draftId: txDraft.id,
+              season: league.seasonNumber ?? 1,
+              maxRosterSize: league.maxRosterSize,
+              costModel: league.keeperSettings.costModel,
+              auctionBudget: league.auctionBudget,
+              auctionMinBid: league.auctionMinBid ?? 1,
+            });
+          }
 
           // ── Branch: Live vs Automated ───────────────────────────────
           if (draftMode === 'live') {

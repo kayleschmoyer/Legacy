@@ -10,6 +10,7 @@ import {
   careerFootballDefenseIdp,
   careerPitching,
   commissionerAuditLog,
+  draftForfeitedPicks,
   draftSlotTrades,
   footballSeasonDefenseIdp,
   gameBatting,
@@ -102,6 +103,9 @@ export type { KeeperSettings } from '../drizzle/public/schema';
 export type KeeperDesignation = typeof keeperDesignations.$inferSelect;
 export type CreateKeeperDesignationInput =
   typeof keeperDesignations.$inferInsert;
+export type DraftForfeitedPick = typeof draftForfeitedPicks.$inferSelect;
+export type CreateDraftForfeitedPickInput =
+  typeof draftForfeitedPicks.$inferInsert;
 export type TradeOffer = typeof tradeOffers.$inferSelect;
 export type TradeOfferPlayer = typeof tradeOfferPlayers.$inferSelect;
 export type CreateTradeOfferInput = typeof tradeOffers.$inferInsert;

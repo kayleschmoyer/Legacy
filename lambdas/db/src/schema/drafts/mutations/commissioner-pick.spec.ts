@@ -19,6 +19,7 @@ jest.mock('@legacy-sports/logging', () => ({
 // and return the captured GraphQL resolver function. Used by every test below.
 function captureCommissionerPickResolver(overrides?: {
   checkRosterCapacity?: jest.Mock;
+  isPlayerOnRoster?: jest.Mock;
   getCurrentDraftPickInfo?: jest.Mock;
   findFailedEligibilityRule?: jest.Mock;
   isLockWaitTimeout?: (error: unknown) => boolean;
@@ -81,6 +82,8 @@ function captureCommissionerPickResolver(overrides?: {
     checkRosterCapacity:
       overrides?.checkRosterCapacity ??
       jest.fn().mockResolvedValue({ isFull: false }),
+    isPlayerOnRoster:
+      overrides?.isPlayerOnRoster ?? jest.fn().mockResolvedValue(false),
   }));
   jest.doMock('../../../services/activity-log', () => ({
     logDraftPickActivity: jest.fn(),
@@ -118,6 +121,7 @@ describe('commissionerPick UNAUTHENTICATED guard', () => {
 describe('commissionerPick resolver', () => {
   let resolve: (...args: unknown[]) => Promise<unknown>;
   let mockCheckRosterCapacity: jest.Mock;
+  let mockIsPlayerOnRoster: jest.Mock;
   let mockGetCurrentDraftPickInfo: jest.Mock;
   let mockFindFailedEligibilityRule: jest.Mock;
   let mockIsLockWaitTimeout: jest.Mock;
@@ -127,6 +131,7 @@ describe('commissionerPick resolver', () => {
     jest.resetModules();
 
     mockCheckRosterCapacity = jest.fn().mockResolvedValue({ isFull: false });
+    mockIsPlayerOnRoster = jest.fn().mockResolvedValue(false);
     mockGetCurrentDraftPickInfo = jest.fn().mockResolvedValue({
       teamId: 10,
       overallPick: 1,
@@ -203,6 +208,7 @@ describe('commissionerPick resolver', () => {
 
     jest.doMock('../../../services/roster-service', () => ({
       checkRosterCapacity: mockCheckRosterCapacity,
+      isPlayerOnRoster: mockIsPlayerOnRoster,
     }));
 
     jest.doMock('../../../services/activity-log', () => ({
@@ -295,6 +301,68 @@ describe('commissionerPick resolver', () => {
       message: 'Team roster is full (25 players maximum)',
       extensions: { code: 'BAD_USER_INPUT' },
     });
+  });
+
+  it('throws BAD_USER_INPUT when the player is already rostered as a keeper (LS-8674)', async () => {
+    const leagueRow = {
+      id: 1,
+      draftStatus: 'in-progress',
+      playerPool: 'all',
+      baseballHofOnly: false,
+      eraFilter: null,
+      minCareerGames: 0,
+      minCareerSeasons: 0,
+      maxRosterSize: 25,
+      isMockDraft: false,
+    };
+    const draftRow = {
+      id: 1,
+      league_id: 1,
+      pick_time_limit_seconds: 30,
+      selection_method: 'snake',
+    };
+
+    const db = {
+      execute: jest.fn().mockResolvedValueOnce({ rows: [draftRow] }),
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest
+        .fn()
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([leagueRow])
+        .mockResolvedValueOnce([{ id: 5, hallOfFame: false }]),
+      transaction: jest.fn(),
+    };
+
+    const tx = {
+      execute: jest
+        .fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [draftRow] }),
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest
+        .fn()
+        .mockResolvedValueOnce([leagueRow])
+        .mockResolvedValueOnce([]),
+    };
+
+    db.transaction.mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
+      fn(tx),
+    );
+
+    mockIsPlayerOnRoster.mockResolvedValueOnce(true);
+
+    const ctx = { user: { id: 99 }, db, notificationService: null };
+    await expect(
+      resolve({}, { draftId: 1, playerId: 5 }, ctx, undefined),
+    ).rejects.toMatchObject({
+      message: 'Player is already rostered as a keeper in this league',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    expect(mockCheckRosterCapacity).not.toHaveBeenCalled();
   });
 });
 
@@ -443,6 +511,7 @@ describe('commissionerPick — draft row lock-wait retry (LS-8480)', () => {
     }));
     jest.doMock('../../../services/roster-service', () => ({
       checkRosterCapacity: jest.fn().mockResolvedValue({ isFull: false }),
+      isPlayerOnRoster: jest.fn().mockResolvedValue(false),
     }));
     jest.doMock('../../../services/activity-log', () => ({
       logDraftPickActivity: jest.fn(),

@@ -222,6 +222,65 @@ export function eligibleStatPositionsForUnfilledSlots(
   ];
 }
 
+/** Safety cap on rounds searched when resolving a pick assignment — well
+ *  beyond any realistic maxRosterSize, guards against an infinite loop if
+ *  every team somehow forfeited the same round. */
+const MAX_ROUND_SEARCH = 500;
+
+/**
+ * Walk rounds in draft order (skipping any team's forfeited round — LS-8674
+ * keeper round-penalty) until `overallPick` falls within a round's active
+ * teams. With an empty `forfeited` set this is arithmetically identical to
+ * the plain snake/linear computation it replaces (round = ceil(pick/teams),
+ * teamIndex mirrored on even rounds for snake) — keeper leagues with no
+ * forfeited picks and non-keeper leagues both draft in the original order.
+ */
+export function resolvePickAssignment(params: {
+  overallPick: number;
+  draftTeams: { teamId: number }[];
+  isSnake: boolean;
+  forfeited: Set<string>;
+}): { teamId: number; round: number; pickNumber: number } | null {
+  const { overallPick, draftTeams, isSnake, forfeited } = params;
+  let cumulative = 0;
+
+  for (let round = 1; round <= MAX_ROUND_SEARCH; round++) {
+    const isReverseRound = isSnake && round % 2 === 0;
+    const ordered = isReverseRound ? [...draftTeams].reverse() : draftTeams;
+    const active =
+      forfeited.size === 0
+        ? ordered
+        : ordered.filter((t) => !forfeited.has(`${t.teamId}:${round}`));
+
+    if (overallPick <= cumulative + active.length) {
+      const idxInRound = overallPick - cumulative - 1;
+      const team = active[idxInRound];
+      if (!team) return null;
+      return { teamId: team.teamId, round, pickNumber: idxInRound + 1 };
+    }
+    cumulative += active.length;
+  }
+
+  return null;
+}
+
+/**
+ * Total draftable picks across the whole draft, accounting for forfeited
+ * rounds (LS-8674 keeper round-penalty) — one fewer pick per forfeiture.
+ */
+export async function getTotalDraftPicks(
+  db: PublicDb,
+  draftId: number,
+  numTeams: number,
+  maxRosterSize: number,
+): Promise<number> {
+  const [{ forfeitedCount }] = await db
+    .select({ forfeitedCount: count() })
+    .from(PublicSchema.draftForfeitedPicks)
+    .where(eq(PublicSchema.draftForfeitedPicks.draftId, draftId));
+  return numTeams * maxRosterSize - Number(forfeitedCount);
+}
+
 /**
  * Calculate current pick information based on draft settings
  */
@@ -257,35 +316,34 @@ export async function getCurrentDraftPickInfo(
     throw new Error('No teams configured for this draft');
   }
 
-  const teamCount = draftTeams.length;
   const currentOverallPick = draft.currentPick + 1;
-
-  // Calculate round (1-indexed)
-  const round = Math.ceil(currentOverallPick / teamCount);
-
-  // Determine team based on draft order (snake vs normal)
   const isSnake = draft.draftOrder === 'snake';
-  const isReverseRound = isSnake && round % 2 === 0;
 
-  // Calculate pick within round (1-indexed)
-  const pickInRound = ((currentOverallPick - 1) % teamCount) + 1;
+  const forfeitedRows = await db
+    .select({
+      teamId: PublicSchema.draftForfeitedPicks.teamId,
+      round: PublicSchema.draftForfeitedPicks.round,
+    })
+    .from(PublicSchema.draftForfeitedPicks)
+    .where(eq(PublicSchema.draftForfeitedPicks.draftId, draftId));
+  const forfeited = new Set(forfeitedRows.map((r) => `${r.teamId}:${r.round}`));
 
-  // Determine team index
-  const teamIndex = isReverseRound
-    ? teamCount - pickInRound // Reverse order for snake draft even rounds
-    : pickInRound - 1; // Normal order (0-indexed)
+  const assignment = resolvePickAssignment({
+    overallPick: currentOverallPick,
+    draftTeams,
+    isSnake,
+    forfeited,
+  });
 
-  const team = draftTeams[teamIndex];
-
-  if (!team) {
+  if (!assignment) {
     throw new Error('Could not determine team for current pick');
   }
 
   return {
     draftId,
-    teamId: team.teamId,
-    round,
-    pickNumber: pickInRound,
+    teamId: assignment.teamId,
+    round: assignment.round,
+    pickNumber: assignment.pickNumber,
     overallPick: currentOverallPick,
     // True once the draft has been marked complete in the DB (draftCompletedAt set).
     // Previously hardcoded false, which caused the 5-second poll to never signal
@@ -369,7 +427,15 @@ export async function commitDraftPick(
     .from(PublicSchema.draftTeams)
     .where(eq(PublicSchema.draftTeams.draftId, draftId));
   const numTeams = draftTeamRows.length;
-  const totalPicks = numTeams * maxRosterSize;
+  // Forfeited rounds (LS-8674 keeper round-penalty) mean fewer total picks
+  // than a plain numTeams * maxRosterSize — the forfeiting team's slot was
+  // already filled by the keeper at draft init, not by a pick.
+  const totalPicks = await getTotalDraftPicks(
+    tx,
+    draftId,
+    numTeams,
+    maxRosterSize,
+  );
   const isDraftComplete = pickInfo.overallPick >= totalPicks;
 
   // Compute the next pick deadline.

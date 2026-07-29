@@ -703,6 +703,51 @@ export const keeperDesignations = pgTable(
   },
 );
 
+/**
+ * Records a team's forfeited draft round for a given draft (LS-8674) — the
+ * consequence of a locked keeper_designation on the 'round-penalty' cost
+ * model. Draft order generation (getCurrentDraftPickInfo) consults this
+ * table to skip the team for that round in both snake and linear order.
+ */
+export const draftForfeitedPicks = pgTable(
+  'draft_forfeited_picks',
+  {
+    id: serial('id').primaryKey().notNull(),
+    draftId: integer('draft_id').notNull(),
+    teamId: integer('team_id').notNull(),
+    round: integer('round').notNull(),
+    keeperDesignationId: integer('keeper_designation_id'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      draftForfeitedPicksDraftFk: foreignKey({
+        columns: [table.draftId],
+        foreignColumns: [drafts.id],
+        name: 'draft_forfeited_picks_draft_fk',
+      }).onDelete('cascade'),
+      draftForfeitedPicksTeamFk: foreignKey({
+        columns: [table.teamId],
+        foreignColumns: [teams.id],
+        name: 'draft_forfeited_picks_team_fk',
+      }).onDelete('cascade'),
+      draftForfeitedPicksKeeperDesignationFk: foreignKey({
+        columns: [table.keeperDesignationId],
+        foreignColumns: [keeperDesignations.id],
+        name: 'draft_forfeited_picks_keeper_designation_fk',
+      }).onDelete('cascade'),
+      draftForfeitedPicksUk: unique('draft_forfeited_picks_uk').on(
+        table.draftId,
+        table.teamId,
+        table.round,
+      ),
+      draftIdIdx: index('draft_forfeited_picks_draft_id_idx').on(table.draftId),
+    };
+  },
+);
+
 export const rosterLockRules = pgTable(
   'roster_lock_rules',
   {

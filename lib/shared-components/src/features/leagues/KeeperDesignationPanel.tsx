@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
@@ -63,23 +63,35 @@ function KeeperRow({
   onError?: (error: Error) => void;
 }) {
   const [pending, setPending] = useState(false);
+  // Mirrors `designated` locally rather than depending on the
+  // refetchQueries round-trip to land before the button re-renders — the
+  // mutations already return the updated entity, so there's no need to wait
+  // on a second network request just to reflect the toggle. `refetchQueries`
+  // below is kept as eventual-consistency insurance (e.g. keeperCount
+  // recompute), not as the source of truth for this row's own label.
+  const [localDesignated, setLocalDesignated] = useState<boolean | null>(null);
+  useEffect(() => {
+    setLocalDesignated(null);
+  }, [designated]);
+  const isDesignated = localDesignated ?? designated;
+
   const [designateKeeper] = useDesignateKeeperMutation({
     refetchQueries: ['GetKeeperEligibleRoster'],
-    awaitRefetchQueries: true,
   });
   const [undesignateKeeper] = useUndesignateKeeperMutation({
     refetchQueries: ['GetKeeperEligibleRoster'],
-    awaitRefetchQueries: true,
   });
 
   const handleToggle = async () => {
     setPending(true);
     try {
-      if (designated) {
+      if (isDesignated) {
         await undesignateKeeper({ variables: { leagueId, playerId } });
+        setLocalDesignated(false);
         onSuccess?.(`${playerName} is no longer a designated keeper`);
       } else {
         await designateKeeper({ variables: { leagueId, playerId } });
+        setLocalDesignated(true);
         onSuccess?.(`${playerName} designated as a keeper`);
       }
     } catch (err) {
@@ -96,9 +108,11 @@ function KeeperRow({
       paddingVertical="$2"
       paddingHorizontal="$3"
       borderRadius="$3"
-      backgroundColor={designated ? withAlpha(BRAND_GOLD, 0.06) : 'transparent'}
+      backgroundColor={
+        isDesignated ? withAlpha(BRAND_GOLD, 0.06) : 'transparent'
+      }
       borderWidth={1}
-      borderColor={designated ? withAlpha(BRAND_GOLD, 0.25) : 'transparent'}
+      borderColor={isDesignated ? withAlpha(BRAND_GOLD, 0.25) : 'transparent'}
     >
       <YStack flex={1} minWidth={0}>
         <XStack alignItems="center" gap="$2">
@@ -132,14 +146,14 @@ function KeeperRow({
         disabled={locked || pending}
         opacity={locked || pending ? 0.5 : 1}
         onPress={() => void handleToggle()}
-        variant={designated ? 'outlined' : undefined}
-        backgroundColor={designated ? 'transparent' : BRAND_GOLD}
-        borderColor={designated ? BRAND_GOLD : undefined}
-        color={designated ? BRAND_GOLD : BRAND_NAVY_DARK}
+        variant={isDesignated ? 'outlined' : undefined}
+        backgroundColor={isDesignated ? 'transparent' : BRAND_GOLD}
+        borderColor={isDesignated ? BRAND_GOLD : undefined}
+        color={isDesignated ? BRAND_GOLD : BRAND_NAVY_DARK}
         fontWeight="700"
         icon={pending ? <Spinner size="small" /> : undefined}
       >
-        {pending ? undefined : designated ? 'Undesignate' : 'Keep'}
+        {pending ? undefined : isDesignated ? 'Undesignate' : 'Keep'}
       </Button>
     </XStack>
   );

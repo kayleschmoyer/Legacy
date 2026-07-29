@@ -18,7 +18,10 @@ import { isLockWaitTimeout } from '../scheduled-mutations';
 import { builder } from '../../builder';
 import { createAllMatchupsForLeague } from '../../matchups/mutations';
 import { logDraftPickActivity } from '../../../services/activity-log';
-import { checkRosterCapacity } from '../../../services/roster-service';
+import {
+  checkRosterCapacity,
+  isPlayerOnRoster,
+} from '../../../services/roster-service';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -227,6 +230,15 @@ builder.mutationField('commissionerPick', (t) =>
 
             if (existingPick.length > 0) {
               throw UserInputError('Player has already been drafted');
+            }
+
+            // LS-8674: a kept player is rostered (team_members) before the
+            // first pick with no draft_picks row — the check above alone
+            // would miss it.
+            if (await isPlayerOnRoster(tx, draft.league_id, playerId)) {
+              throw UserInputError(
+                'Player is already rostered as a keeper in this league',
+              );
             }
 
             // Validate roster limit — count existing team members

@@ -316,6 +316,15 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
       )`);
 
+      // Exclude players already rostered in this league (LS-8674: keeper
+      // designations are applied to rosters before the draft's first pick,
+      // so kept players must not appear in the draftable pool). A no-op for
+      // redraft leagues, whose rosters are empty at draft time.
+      sqlConditions.push(sql`NOT EXISTS (
+        SELECT 1 FROM public.team_members tm
+        WHERE tm.league_id = ${draft.leagueId} AND tm.player_id = p.id
+      )`);
+
       // Apply optional name filter
       if (search && search.trim().length > 0) {
         // Escape LIKE metacharacters (%, _, and \) to prevent wildcard injection
@@ -929,9 +938,15 @@ builder.queryField('getDraftRecommendations', (t) =>
         pitcher_era: string | null;
       };
 
+      // LS-8674: also exclude players already rostered in this league (kept
+      // players) — a no-op for redraft leagues, whose rosters are empty at
+      // draft time.
       const excludeClause = sql`AND NOT EXISTS (
         SELECT 1 FROM public.draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
+      ) AND NOT EXISTS (
+        SELECT 1 FROM public.team_members tm
+        WHERE tm.league_id = ${draft.leagueId} AND tm.player_id = p.id
       )`;
 
       const statsResult = await context.db.execute(sql`
