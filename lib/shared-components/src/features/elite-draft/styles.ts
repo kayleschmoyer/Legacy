@@ -19,7 +19,7 @@ export const CSS = `
   --d-accent-dark: var(--brandGoldDark, #A68B3E);
   --d-accent-light: var(--brandGoldLight, #D4BB78);
   --d-success: var(--green8, #22C55E);
-  --d-danger: #ef4444;
+  --d-danger: var(--statusDangerFg, #ef4444);
   --d-warning: var(--amber9, #F59E0B);
   --d-text: var(--color, #F8FAFC);
   --d-text-secondary: var(--textMuted, #9CAAC5);
@@ -202,7 +202,7 @@ export const CSS = `
 /* ===== Top Status Band ===== */
 .d-topband {
   grid-area: topband;
-  background: #0D1526;
+  background: var(--surfaceSubtle, #0D1526);
   border-bottom: 1px solid rgba(255,255,255,0.06);
   padding: 10px 20px;
   display: grid;
@@ -221,9 +221,9 @@ export const CSS = `
   display: inline-flex; align-items: center; gap: 6px;
   font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
   font-weight: 800; font-size: 11px; letter-spacing: 0.16em;
-  text-transform: uppercase; color: #E63950;
+  text-transform: uppercase; color: var(--brandSeamRedLight, #E63950);
 }
-.d-tb-live .d-live-dot { background: #E63950; box-shadow: 0 0 6px rgba(230,57,80,0.6); }
+.d-tb-live .d-live-dot { background: var(--brandSeamRedLight, #E63950); box-shadow: 0 0 6px rgba(230,57,80,0.6); }
 .d-tb-pick-num {
   font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
   font-weight: 800; font-size: 22px; line-height: 1;
@@ -241,7 +241,7 @@ export const CSS = `
 }
 .d-tb-ring-time.safe  { color: var(--d-text); }
 .d-tb-ring-time.warn  { color: var(--d-accent); }
-.d-tb-ring-time.crit  { color: #E63950; }
+.d-tb-ring-time.crit  { color: var(--brandSeamRedLight, #E63950); }
 .d-tb-ring-time.paused { color: var(--d-text-secondary); font-size: 18px; }
 .d-tb-timer-info .d-tb-timer-cap {
   font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
@@ -307,7 +307,7 @@ export const CSS = `
   font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
   font-weight: 700; font-size: 13px; color: var(--d-text); letter-spacing: 0.04em;
 }
-.d-tb-autopick.on .d-tb-autopick-state { color: #6FD39A; }
+.d-tb-autopick.on .d-tb-autopick-state { color: var(--statusSuccessFg, #6FD39A); }
 .d-tb-autopick-sub { font-size: 10px; color: var(--d-text-muted); font-style: italic; }
 /* Commissioner compact */
 .d-tb-commish { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
@@ -321,13 +321,13 @@ export const CSS = `
 }
 .d-tb-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
 .d-tb-btn:active { transform: translateY(1px); }
-.d-tb-btn.danger { background: rgba(196,30,58,0.12); border-color: rgba(196,30,58,0.3); color: #E63950; }
+.d-tb-btn.danger { background: rgba(196,30,58,0.12); border-color: rgba(196,30,58,0.3); color: var(--brandSeamRedLight, #E63950); }
 .d-tb-btn.danger:hover { background: rgba(196,30,58,0.2); }
 
 /* ===== Right Rail ===== */
 .d-rail {
   grid-area: rail;
-  background: #0D1526;
+  background: var(--surfaceSubtle, #0D1526);
   border-left: 1px solid rgba(255,255,255,0.06);
   padding: 14px;
   display: flex; flex-direction: column; gap: 12px;
@@ -408,7 +408,7 @@ export const CSS = `
   font-weight: 800; font-size: 13px; letter-spacing: 0.1em;
 }
 .d-depth-slot-ct { font-size: 11px; color: var(--d-text-secondary); font-variant-numeric: tabular-nums; }
-.d-depth-slot.complete .d-depth-slot-ct { color: #6FD39A; }
+.d-depth-slot.complete .d-depth-slot-ct { color: var(--statusSuccessFg, #6FD39A); }
 .d-depth-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 5px 8px; background: rgba(13,21,38,0.6); border-radius: 4px;
@@ -418,7 +418,7 @@ export const CSS = `
   border: 1px dashed rgba(255,255,255,0.08); background: transparent;
   color: var(--d-text-muted); font-style: italic; justify-content: center;
 }
-.d-depth-row.need { border-color: rgba(196,30,58,0.4); color: #E63950; font-style: normal; }
+.d-depth-row.need { border-color: rgba(196,30,58,0.4); color: var(--brandSeamRedLight, #E63950); font-style: normal; }
 
 /* ===== Roster Progress Bars (right rail) ===== */
 .d-rail-panel {
@@ -463,7 +463,7 @@ export const CSS = `
   font-variant-numeric: tabular-nums; text-align: right;
 }
 .d-pos-progress-row.filled .d-pos-progress-count { color: var(--d-text); }
-.d-pos-progress-row.complete .d-pos-progress-count { color: #6FD39A; }
+.d-pos-progress-row.complete .d-pos-progress-count { color: var(--statusSuccessFg, #6FD39A); }
 /* Drag-to-draft drop targets (LS-8068) */
 .d-pos-progress-row.drop-eligible {
   border-radius: 6px;
@@ -595,7 +595,7 @@ export const CSS = `
 
 /* ===== Controls Bar ===== */
 .d-controls {
-  background: #111B2F;
+  background: var(--surfacePanel, #111B2F);
   border: 1px solid rgba(255, 255, 255, 0.07);
   padding: 14px 18px;
   border-radius: var(--d-radius-lg);
