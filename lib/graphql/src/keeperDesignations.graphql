@@ -1,0 +1,40 @@
+query GetKeeperEligibleRoster($leagueId: Int!) {
+  keeperEligibleRoster(leagueId: $leagueId) {
+    playerId
+    teamId
+    isRookie
+    designated
+    designationId
+    previewCostRound
+    previewCostAmount
+    player {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+mutation DesignateKeeper($leagueId: Int!, $playerId: Int!) {
+  designateKeeper(leagueId: $leagueId, playerId: $playerId) {
+    id
+    leagueId
+    teamId
+    playerId
+    season
+    status
+    costRound
+    costAmount
+  }
+}
+
+mutation UndesignateKeeper($leagueId: Int!, $playerId: Int!) {
+  undesignateKeeper(leagueId: $leagueId, playerId: $playerId) {
+    id
+    leagueId
+    teamId
+    playerId
+    season
+    status
+  }
+}

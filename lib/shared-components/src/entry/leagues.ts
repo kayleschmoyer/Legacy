@@ -4,6 +4,7 @@
 export * from '../config/sports';
 export * from '../features/leagues/AwardVotingPanel';
 export * from '../features/leagues/CreateLeagueModal';
+export * from '../features/leagues/KeeperDesignationPanel';
 export * from '../features/leagues/LeagueActivityFeed';
 export * from '../features/leagues/LeagueScoringSummary';
 export * from '../features/leagues/LeaguesLedgerScreen';

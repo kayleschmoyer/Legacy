@@ -9,6 +9,7 @@ import './teams';
 import './waivers';
 import './trades';
 import './draft-slot-trades';
+import './keepers';
 import './matchups';
 import './version';
 import './scoring';

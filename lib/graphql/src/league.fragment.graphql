@@ -57,6 +57,14 @@ fragment League on League {
   customEraEndYear
   tradeDeadlineWeek
   allowDraftSlotTrading
+  # Roster continuity / keeper mode (LS-8671/LS-8673)
+  rosterContinuity
+  keeperSettings {
+    keeperCount
+    costModel
+    maxConsecutiveKeeps
+    rookieExempt
+  }
   userMembership {
     ...LeagueMember
   }

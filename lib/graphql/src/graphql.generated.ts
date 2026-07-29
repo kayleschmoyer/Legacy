@@ -1353,6 +1353,39 @@ export type JoinLeaguePayload = {
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A manager's pre-draft designation of a roster player to keep into the next season. Locks once the league draft goes live. (LS-8673) */
+export type KeeperDesignation = {
+  __typename?: 'KeeperDesignation';
+  costAmount?: Maybe<Scalars['Int']['output']>;
+  costRound?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A roster player eligible for keeper designation, with rookie-exemption and estimated-cost preview info for the manager designation UI. (LS-8673) */
+export type KeeperEligiblePlayer = {
+  __typename?: 'KeeperEligiblePlayer';
+  /** True when this player currently has a pending or locked keeper designation. */
+  designated?: Maybe<Scalars['Boolean']['output']>;
+  designationId?: Maybe<Scalars['Int']['output']>;
+  /** True when the player has zero recorded career MLB games — the signal used for keeperSettings.rookieExempt (there is no dedicated rookie-season field on the historical player dataset). */
+  isRookie?: Maybe<Scalars['Boolean']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  /** Estimated auction budget deduction for 'auction-budget' leagues. Currently always null — the deduction source is an open product question (last winning bid vs. commissioner-set); no value is fabricated here. Final cost is resolved at draft initialization. */
+  previewCostAmount?: Maybe<Scalars['Int']['output']>;
+  /** Estimated forfeited round for 'round-penalty' leagues. Null for 'auction-budget' leagues or when not applicable. Final cost is resolved at draft initialization. */
+  previewCostRound?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Keeper-mode configuration for a league. Only present when rosterContinuity is keeper. (LS-8671) */
 export type KeeperSettings = {
   __typename?: 'KeeperSettings';
@@ -1888,6 +1921,8 @@ export type Mutation = {
   deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
   /** Delete all mock-draft leagues owned by the calling user (owner = caller AND is_mock_draft = true). Scoped to the caller and to mock leagues only — never affects real leagues or other users' leagues, even for an admin caller. Returns the number of mock leagues deleted. */
   deleteMyMockDraftLeagues?: Maybe<Scalars['Int']['output']>;
+  /** Designate a roster player as a keeper for the upcoming draft. Enforces keeperCount, maxConsecutiveKeeps, and rookieExempt; rejected once the draft is live. (LS-8673) */
+  designateKeeper?: Maybe<KeeperDesignation>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: edit the scores of a past or current matchup. All edits are audit-logged. */
   editMatchupScore?: Maybe<CommissionerActionResult>;
@@ -2020,6 +2055,8 @@ export type Mutation = {
   twentyQuestionsGuess?: Maybe<TwentyQuestionsGame>;
   /** Start a new 20 Questions game (errors if an active game exists) */
   twentyQuestionsStart?: Maybe<TwentyQuestionsGame>;
+  /** Withdraw a pending keeper designation before the draft goes live. (LS-8673) */
+  undesignateKeeper?: Maybe<KeeperDesignation>;
   undoLastDraftPick?: Maybe<DraftPick>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
@@ -2239,6 +2276,11 @@ export type MutationDeleteLeagueSeasonAwardArgs = {
   awardType: Scalars['String']['input'];
   leagueId: Scalars['Int']['input'];
   season: Scalars['Int']['input'];
+};
+
+export type MutationDesignateKeeperArgs = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationDisableDeviceTokenArgs = {
@@ -2595,6 +2637,11 @@ export type MutationTwentyQuestionsGuessArgs = {
 export type MutationTwentyQuestionsStartArgs = {
   difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
   sport?: InputMaybe<Sport>;
+};
+
+export type MutationUndesignateKeeperArgs = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationUndoLastDraftPickArgs = {
@@ -3102,6 +3149,8 @@ export type Query = {
   /** Returns true when the authenticated user holds the given entitlement. Admin users always return true. */
   hasEntitlement: Scalars['Boolean']['output'];
   hello?: Maybe<Scalars['String']['output']>;
+  /** The caller's roster players eligible for keeper designation, with rookie-exemption and cost-preview info. Empty when the league is not in keeper mode or the caller has no team in it. (LS-8673) */
+  keeperEligibleRoster?: Maybe<Array<KeeperEligiblePlayer>>;
   league?: Maybe<League>;
   /** Paginated activity timeline for a league, newest first. Optionally filter by one or more event types. */
   leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
@@ -3529,6 +3578,10 @@ export type QueryGetTiebreakerRulesArgs = {
 
 export type QueryHasEntitlementArgs = {
   key: Scalars['String']['input'];
+};
+
+export type QueryKeeperEligibleRosterArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryLeagueArgs = {
@@ -6103,6 +6156,14 @@ export type CreateLeagueAndTeamsMutation = {
       customEraEndYear?: number | null;
       tradeDeadlineWeek?: number | null;
       allowDraftSlotTrading?: boolean | null;
+      rosterContinuity?: RosterContinuity | null;
+      keeperSettings?: {
+        __typename?: 'KeeperSettings';
+        keeperCount?: number | null;
+        costModel?: string | null;
+        maxConsecutiveKeeps?: number | null;
+        rookieExempt?: boolean | null;
+      } | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -6170,7 +6231,15 @@ export type GetUserLeaguesQuery = {
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
+    rosterContinuity?: RosterContinuity | null;
     tierFrozenAt?: string | null;
+    keeperSettings?: {
+      __typename?: 'KeeperSettings';
+      keeperCount?: number | null;
+      costModel?: string | null;
+      maxConsecutiveKeeps?: number | null;
+      rookieExempt?: boolean | null;
+    } | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -6239,7 +6308,15 @@ export type GetMyLeaguesQuery = {
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
+    rosterContinuity?: RosterContinuity | null;
     tierFrozenAt?: string | null;
+    keeperSettings?: {
+      __typename?: 'KeeperSettings';
+      keeperCount?: number | null;
+      costModel?: string | null;
+      maxConsecutiveKeeps?: number | null;
+      rookieExempt?: boolean | null;
+    } | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -6318,7 +6395,15 @@ export type StartDraftMutation = {
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
+    rosterContinuity?: RosterContinuity | null;
     tierFrozenAt?: string | null;
+    keeperSettings?: {
+      __typename?: 'KeeperSettings';
+      keeperCount?: number | null;
+      costModel?: string | null;
+      maxConsecutiveKeeps?: number | null;
+      rookieExempt?: boolean | null;
+    } | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -6461,6 +6546,14 @@ export type StartSeasonMutation = {
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
+    rosterContinuity?: RosterContinuity | null;
+    keeperSettings?: {
+      __typename?: 'KeeperSettings';
+      keeperCount?: number | null;
+      costModel?: string | null;
+      maxConsecutiveKeeps?: number | null;
+      rookieExempt?: boolean | null;
+    } | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -9120,6 +9213,14 @@ export type UpdateLeagueSettingsMutation = {
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
+    rosterContinuity?: RosterContinuity | null;
+    keeperSettings?: {
+      __typename?: 'KeeperSettings';
+      keeperCount?: number | null;
+      costModel?: string | null;
+      maxConsecutiveKeeps?: number | null;
+      rookieExempt?: boolean | null;
+    } | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -10300,7 +10401,15 @@ export type GetLeagueByIdQuery = {
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
+    rosterContinuity?: RosterContinuity | null;
     tierFrozenAt?: string | null;
+    keeperSettings?: {
+      __typename?: 'KeeperSettings';
+      keeperCount?: number | null;
+      costModel?: string | null;
+      maxConsecutiveKeeps?: number | null;
+      rookieExempt?: boolean | null;
+    } | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -11033,6 +11142,68 @@ export type JoinSeasonDraftGameMutation = {
   joinSeasonDraftGame?: number | null;
 };
 
+export type GetKeeperEligibleRosterQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetKeeperEligibleRosterQuery = {
+  __typename?: 'Query';
+  keeperEligibleRoster?: Array<{
+    __typename?: 'KeeperEligiblePlayer';
+    playerId?: number | null;
+    teamId?: number | null;
+    isRookie?: boolean | null;
+    designated?: boolean | null;
+    designationId?: number | null;
+    previewCostRound?: number | null;
+    previewCostAmount?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  }> | null;
+};
+
+export type DesignateKeeperMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type DesignateKeeperMutation = {
+  __typename?: 'Mutation';
+  designateKeeper?: {
+    __typename?: 'KeeperDesignation';
+    id?: number | null;
+    leagueId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    season?: number | null;
+    status?: string | null;
+    costRound?: number | null;
+    costAmount?: number | null;
+  } | null;
+};
+
+export type UndesignateKeeperMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
+}>;
+
+export type UndesignateKeeperMutation = {
+  __typename?: 'Mutation';
+  undesignateKeeper?: {
+    __typename?: 'KeeperDesignation';
+    id?: number | null;
+    leagueId?: number | null;
+    teamId?: number | null;
+    playerId?: number | null;
+    season?: number | null;
+    status?: string | null;
+  } | null;
+};
+
 export type LeagueMemberFragment = {
   __typename?: 'LeagueMember';
   leagueId?: number | null;
@@ -11093,6 +11264,14 @@ export type LeagueFragment = {
   customEraEndYear?: number | null;
   tradeDeadlineWeek?: number | null;
   allowDraftSlotTrading?: boolean | null;
+  rosterContinuity?: RosterContinuity | null;
+  keeperSettings?: {
+    __typename?: 'KeeperSettings';
+    keeperCount?: number | null;
+    costModel?: string | null;
+    maxConsecutiveKeeps?: number | null;
+    rookieExempt?: boolean | null;
+  } | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -12408,6 +12587,14 @@ export type RenewLeagueMutation = {
     customEraEndYear?: number | null;
     tradeDeadlineWeek?: number | null;
     allowDraftSlotTrading?: boolean | null;
+    rosterContinuity?: RosterContinuity | null;
+    keeperSettings?: {
+      __typename?: 'KeeperSettings';
+      keeperCount?: number | null;
+      costModel?: string | null;
+      maxConsecutiveKeeps?: number | null;
+      rookieExempt?: boolean | null;
+    } | null;
     userMembership?: {
       __typename?: 'LeagueMember';
       leagueId?: number | null;
@@ -14788,6 +14975,13 @@ export const LeagueFragmentDoc = gql`
     customEraEndYear
     tradeDeadlineWeek
     allowDraftSlotTrading
+    rosterContinuity
+    keeperSettings {
+      keeperCount
+      costModel
+      maxConsecutiveKeeps
+      rookieExempt
+    }
     userMembership {
       ...LeagueMember
     }
@@ -27482,6 +27676,221 @@ export type JoinSeasonDraftGameMutationResult =
 export type JoinSeasonDraftGameMutationOptions = BaseMutationOptions<
   JoinSeasonDraftGameMutation,
   JoinSeasonDraftGameMutationVariables
+>;
+export const GetKeeperEligibleRoster = gql`
+  query GetKeeperEligibleRoster($leagueId: Int!) {
+    keeperEligibleRoster(leagueId: $leagueId) {
+      playerId
+      teamId
+      isRookie
+      designated
+      designationId
+      previewCostRound
+      previewCostAmount
+      player {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+
+/**
+ * __useGetKeeperEligibleRosterQuery__
+ *
+ * To run a query within a React component, call `useGetKeeperEligibleRosterQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetKeeperEligibleRosterQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetKeeperEligibleRosterQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetKeeperEligibleRosterQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetKeeperEligibleRosterQuery,
+    GetKeeperEligibleRosterQueryVariables
+  > &
+    (
+      | { variables: GetKeeperEligibleRosterQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetKeeperEligibleRosterQuery,
+    GetKeeperEligibleRosterQueryVariables
+  >(GetKeeperEligibleRoster, options);
+}
+export function useGetKeeperEligibleRosterLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetKeeperEligibleRosterQuery,
+    GetKeeperEligibleRosterQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetKeeperEligibleRosterQuery,
+    GetKeeperEligibleRosterQueryVariables
+  >(GetKeeperEligibleRoster, options);
+}
+export function useGetKeeperEligibleRosterSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetKeeperEligibleRosterQuery,
+        GetKeeperEligibleRosterQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetKeeperEligibleRosterQuery,
+    GetKeeperEligibleRosterQueryVariables
+  >(
+    GetKeeperEligibleRoster,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetKeeperEligibleRosterQuery,
+          GetKeeperEligibleRosterQueryVariables
+        >,
+  );
+}
+export type GetKeeperEligibleRosterQueryHookResult = ReturnType<
+  typeof useGetKeeperEligibleRosterQuery
+>;
+export type GetKeeperEligibleRosterLazyQueryHookResult = ReturnType<
+  typeof useGetKeeperEligibleRosterLazyQuery
+>;
+export type GetKeeperEligibleRosterSuspenseQueryHookResult = ReturnType<
+  typeof useGetKeeperEligibleRosterSuspenseQuery
+>;
+export type GetKeeperEligibleRosterQueryResult = Apollo.QueryResult<
+  GetKeeperEligibleRosterQuery,
+  GetKeeperEligibleRosterQueryVariables
+>;
+export const DesignateKeeper = gql`
+  mutation DesignateKeeper($leagueId: Int!, $playerId: Int!) {
+    designateKeeper(leagueId: $leagueId, playerId: $playerId) {
+      id
+      leagueId
+      teamId
+      playerId
+      season
+      status
+      costRound
+      costAmount
+    }
+  }
+`;
+export type DesignateKeeperMutationFn = MutationFunction<
+  DesignateKeeperMutation,
+  DesignateKeeperMutationVariables
+>;
+
+/**
+ * __useDesignateKeeperMutation__
+ *
+ * To run a mutation, you first call `useDesignateKeeperMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDesignateKeeperMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [designateKeeperMutation, { data, loading, error }] = useDesignateKeeperMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useDesignateKeeperMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DesignateKeeperMutation,
+    DesignateKeeperMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DesignateKeeperMutation,
+    DesignateKeeperMutationVariables
+  >(DesignateKeeper, options);
+}
+export type DesignateKeeperMutationHookResult = ReturnType<
+  typeof useDesignateKeeperMutation
+>;
+export type DesignateKeeperMutationResult =
+  Apollo.MutationResult<DesignateKeeperMutation>;
+export type DesignateKeeperMutationOptions = BaseMutationOptions<
+  DesignateKeeperMutation,
+  DesignateKeeperMutationVariables
+>;
+export const UndesignateKeeper = gql`
+  mutation UndesignateKeeper($leagueId: Int!, $playerId: Int!) {
+    undesignateKeeper(leagueId: $leagueId, playerId: $playerId) {
+      id
+      leagueId
+      teamId
+      playerId
+      season
+      status
+    }
+  }
+`;
+export type UndesignateKeeperMutationFn = MutationFunction<
+  UndesignateKeeperMutation,
+  UndesignateKeeperMutationVariables
+>;
+
+/**
+ * __useUndesignateKeeperMutation__
+ *
+ * To run a mutation, you first call `useUndesignateKeeperMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUndesignateKeeperMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [undesignateKeeperMutation, { data, loading, error }] = useUndesignateKeeperMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      playerId: // value for 'playerId'
+ *   },
+ * });
+ */
+export function useUndesignateKeeperMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UndesignateKeeperMutation,
+    UndesignateKeeperMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UndesignateKeeperMutation,
+    UndesignateKeeperMutationVariables
+  >(UndesignateKeeper, options);
+}
+export type UndesignateKeeperMutationHookResult = ReturnType<
+  typeof useUndesignateKeeperMutation
+>;
+export type UndesignateKeeperMutationResult =
+  Apollo.MutationResult<UndesignateKeeperMutation>;
+export type UndesignateKeeperMutationOptions = BaseMutationOptions<
+  UndesignateKeeperMutation,
+  UndesignateKeeperMutationVariables
 >;
 export const GetLeagueActivity = gql`
   query GetLeagueActivity(

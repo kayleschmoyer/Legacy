@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTeamBranding } from '@legacy-sports/shared-components';
+import { KeeperDesignationPanel } from '@legacy-sports/shared-components/leagues';
 import {
   type LeagueFragment,
+  RosterContinuity,
   type TeamFragment,
   useGetTeamMembersQuery,
 } from '@legacy-sports/graphql';
@@ -120,6 +122,8 @@ export const TeamTab: React.FC<TeamTabProps> = ({
   const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
   const canUploadLogo = useHasEntitlement(ENTITLEMENTS.logo_upload);
+  const [keeperMessage, setKeeperMessage] = useState<string | null>(null);
+  const [keeperError, setKeeperError] = useState<string | null>(null);
 
   // Save wiring (form state, dirty tracking, rename/branding mutations, saved
   // flash) is shared cross-platform via useTeamBranding (LS-7809); this tab
@@ -253,6 +257,40 @@ export const TeamTab: React.FC<TeamTabProps> = ({
           Error saving team: {saveError}
         </div>
       ) : null}
+      {keeperError ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="ls-banner ls-banner-error"
+        >
+          {keeperError}
+        </div>
+      ) : null}
+      {keeperMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="ls-banner ls-banner-success"
+        >
+          {keeperMessage}
+        </div>
+      ) : null}
+      {league.rosterContinuity === RosterContinuity.Keeper &&
+        league.keeperSettings && (
+          <KeeperDesignationPanel
+            leagueId={league.id ?? 0}
+            keeperSettings={league.keeperSettings}
+            draftStatus={league.draftStatus}
+            onSuccess={(msg) => {
+              setKeeperMessage(msg);
+              setKeeperError(null);
+            }}
+            onError={(err) => {
+              setKeeperError(err.message);
+              setKeeperMessage(null);
+            }}
+          />
+        )}
       <Section
         title="Team Identity"
         sub="How your team appears in standings, chat, and the draft room."

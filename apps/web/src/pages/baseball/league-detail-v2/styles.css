@@ -15,6 +15,8 @@
   --brand-seam-red: #c41e3a;
   --brand-seam-red-dark: #8b1a2b;
   --brand-seam-red-light: #e63950;
+  --brand-seam-red-rgb: 196, 30, 58;
+  --success-rgb: 111, 211, 154;
   --brand-gold: #c5a55a;
   --brand-gold-light: #d4bb78;
   --brand-gold-dark: #a68b3e;
@@ -749,6 +751,18 @@
 .ls-banner-gold {
   background: rgba(var(--brand-gold-rgb), 0.1);
   border-color: rgba(var(--brand-gold-rgb), 0.4);
+}
+.ls-banner-error {
+  background: rgba(var(--brand-seam-red-rgb), 0.1);
+  border-color: rgba(var(--brand-seam-red-rgb), 0.4);
+  color: var(--brand-seam-red);
+  font-weight: 600;
+}
+.ls-banner-success {
+  background: rgba(var(--success-rgb), 0.1);
+  border-color: rgba(var(--success-rgb), 0.4);
+  color: var(--success-fg);
+  font-weight: 600;
 }
 .ls-banner-spectator {
   background: linear-gradient(

@@ -9,6 +9,11 @@ import { TeamTab } from './Team';
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamMembersQuery: () => ({ data: undefined }),
+  RosterContinuity: {
+    Dynasty: 'dynasty',
+    Keeper: 'keeper',
+    Redraft: 'redraft',
+  },
 }));
 
 jest.mock('@legacy-sports/shared-components', () => ({

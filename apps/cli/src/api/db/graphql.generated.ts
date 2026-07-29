@@ -1347,6 +1347,39 @@ export type JoinLeaguePayload = {
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** A manager's pre-draft designation of a roster player to keep into the next season. Locks once the league draft goes live. (LS-8673) */
+export type KeeperDesignation = {
+  __typename?: 'KeeperDesignation';
+  costAmount?: Maybe<Scalars['Int']['output']>;
+  costRound?: Maybe<Scalars['Int']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  season?: Maybe<Scalars['Int']['output']>;
+  status?: Maybe<Scalars['String']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A roster player eligible for keeper designation, with rookie-exemption and estimated-cost preview info for the manager designation UI. (LS-8673) */
+export type KeeperEligiblePlayer = {
+  __typename?: 'KeeperEligiblePlayer';
+  /** True when this player currently has a pending or locked keeper designation. */
+  designated?: Maybe<Scalars['Boolean']['output']>;
+  designationId?: Maybe<Scalars['Int']['output']>;
+  /** True when the player has zero recorded career MLB games — the signal used for keeperSettings.rookieExempt (there is no dedicated rookie-season field on the historical player dataset). */
+  isRookie?: Maybe<Scalars['Boolean']['output']>;
+  player?: Maybe<Player>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  /** Estimated auction budget deduction for 'auction-budget' leagues. Currently always null — the deduction source is an open product question (last winning bid vs. commissioner-set); no value is fabricated here. Final cost is resolved at draft initialization. */
+  previewCostAmount?: Maybe<Scalars['Int']['output']>;
+  /** Estimated forfeited round for 'round-penalty' leagues. Null for 'auction-budget' leagues or when not applicable. Final cost is resolved at draft initialization. */
+  previewCostRound?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+};
+
 /** Keeper-mode configuration for a league. Only present when rosterContinuity is keeper. (LS-8671) */
 export type KeeperSettings = {
   __typename?: 'KeeperSettings';
@@ -1882,6 +1915,8 @@ export type Mutation = {
   deleteLeagueSeasonAward?: Maybe<Scalars['Boolean']['output']>;
   /** Delete all mock-draft leagues owned by the calling user (owner = caller AND is_mock_draft = true). Scoped to the caller and to mock leagues only — never affects real leagues or other users' leagues, even for an admin caller. Returns the number of mock leagues deleted. */
   deleteMyMockDraftLeagues?: Maybe<Scalars['Int']['output']>;
+  /** Designate a roster player as a keeper for the upcoming draft. Enforces keeperCount, maxConsecutiveKeeps, and rookieExempt; rejected once the draft is live. (LS-8673) */
+  designateKeeper?: Maybe<KeeperDesignation>;
   disableDeviceToken?: Maybe<Scalars['Boolean']['output']>;
   /** Commissioner: edit the scores of a past or current matchup. All edits are audit-logged. */
   editMatchupScore?: Maybe<CommissionerActionResult>;
@@ -2014,6 +2049,8 @@ export type Mutation = {
   twentyQuestionsGuess?: Maybe<TwentyQuestionsGame>;
   /** Start a new 20 Questions game (errors if an active game exists) */
   twentyQuestionsStart?: Maybe<TwentyQuestionsGame>;
+  /** Withdraw a pending keeper designation before the draft goes live. (LS-8673) */
+  undesignateKeeper?: Maybe<KeeperDesignation>;
   undoLastDraftPick?: Maybe<DraftPick>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
@@ -2233,6 +2270,11 @@ export type MutationDeleteLeagueSeasonAwardArgs = {
   awardType: Scalars['String']['input'];
   leagueId: Scalars['Int']['input'];
   season: Scalars['Int']['input'];
+};
+
+export type MutationDesignateKeeperArgs = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationDisableDeviceTokenArgs = {
@@ -2589,6 +2631,11 @@ export type MutationTwentyQuestionsGuessArgs = {
 export type MutationTwentyQuestionsStartArgs = {
   difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
   sport?: InputMaybe<Sport>;
+};
+
+export type MutationUndesignateKeeperArgs = {
+  leagueId: Scalars['Int']['input'];
+  playerId: Scalars['Int']['input'];
 };
 
 export type MutationUndoLastDraftPickArgs = {
@@ -3096,6 +3143,8 @@ export type Query = {
   /** Returns true when the authenticated user holds the given entitlement. Admin users always return true. */
   hasEntitlement: Scalars['Boolean']['output'];
   hello?: Maybe<Scalars['String']['output']>;
+  /** The caller's roster players eligible for keeper designation, with rookie-exemption and cost-preview info. Empty when the league is not in keeper mode or the caller has no team in it. (LS-8673) */
+  keeperEligibleRoster?: Maybe<Array<KeeperEligiblePlayer>>;
   league?: Maybe<League>;
   /** Paginated activity timeline for a league, newest first. Optionally filter by one or more event types. */
   leagueActivity?: Maybe<Array<LeagueActivityEvent>>;
@@ -3523,6 +3572,10 @@ export type QueryGetTiebreakerRulesArgs = {
 
 export type QueryHasEntitlementArgs = {
   key: Scalars['String']['input'];
+};
+
+export type QueryKeeperEligibleRosterArgs = {
+  leagueId: Scalars['Int']['input'];
 };
 
 export type QueryLeagueArgs = {

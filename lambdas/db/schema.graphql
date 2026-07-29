@@ -1523,6 +1523,52 @@ type JoinLeaguePayload {
 }
 
 """
+A manager's pre-draft designation of a roster player to keep into the next season. Locks once the league draft goes live. (LS-8673)
+"""
+type KeeperDesignation {
+  costAmount: Int
+  costRound: Int
+  createdAt: String
+  id: Int
+  leagueId: Int
+  player: Player
+  playerId: Int
+  season: Int
+  status: String
+  teamId: Int
+  updatedAt: String
+}
+
+"""
+A roster player eligible for keeper designation, with rookie-exemption and estimated-cost preview info for the manager designation UI. (LS-8673)
+"""
+type KeeperEligiblePlayer {
+  """
+  True when this player currently has a pending or locked keeper designation.
+  """
+  designated: Boolean
+  designationId: Int
+
+  """
+  True when the player has zero recorded career MLB games — the signal used for keeperSettings.rookieExempt (there is no dedicated rookie-season field on the historical player dataset).
+  """
+  isRookie: Boolean
+  player: Player
+  playerId: Int
+
+  """
+  Estimated auction budget deduction for 'auction-budget' leagues. Currently always null — the deduction source is an open product question (last winning bid vs. commissioner-set); no value is fabricated here. Final cost is resolved at draft initialization.
+  """
+  previewCostAmount: Int
+
+  """
+  Estimated forfeited round for 'round-penalty' leagues. Null for 'auction-budget' leagues or when not applicable. Final cost is resolved at draft initialization.
+  """
+  previewCostRound: Int
+  teamId: Int
+}
+
+"""
 Keeper-mode configuration for a league. Only present when rosterContinuity is keeper. (LS-8671)
 """
 type KeeperSettings {
@@ -2324,6 +2370,11 @@ type Mutation {
   Delete all mock-draft leagues owned by the calling user (owner = caller AND is_mock_draft = true). Scoped to the caller and to mock leagues only — never affects real leagues or other users' leagues, even for an admin caller. Returns the number of mock leagues deleted.
   """
   deleteMyMockDraftLeagues: Int
+
+  """
+  Designate a roster player as a keeper for the upcoming draft. Enforces keeperCount, maxConsecutiveKeeps, and rookieExempt; rejected once the draft is live. (LS-8673)
+  """
+  designateKeeper(leagueId: Int!, playerId: Int!): KeeperDesignation
   disableDeviceToken(deviceToken: String!): Boolean
 
   """
@@ -2729,6 +2780,11 @@ type Mutation {
     """
     sport: Sport
   ): TwentyQuestionsGame
+
+  """
+  Withdraw a pending keeper designation before the draft goes live. (LS-8673)
+  """
+  undesignateKeeper(leagueId: Int!, playerId: Int!): KeeperDesignation
   undoLastDraftPick(draftId: Int!): DraftPick
 
   """
@@ -3466,6 +3522,11 @@ type Query {
   """
   hasEntitlement(key: String!): Boolean!
   hello: String
+
+  """
+  The caller's roster players eligible for keeper designation, with rookie-exemption and cost-preview info. Empty when the league is not in keeper mode or the caller has no team in it. (LS-8673)
+  """
+  keeperEligibleRoster(leagueId: Int!): [KeeperEligiblePlayer!]
   league(id: Int!): League
 
   """
