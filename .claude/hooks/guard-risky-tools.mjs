@@ -22,16 +22,21 @@
  * command with heredoc bodies and quoted strings stripped, so a commit message
  * like `git commit -m "remove rm -rf usage"` never trips the guard. The secret
  * scan intentionally runs on the RAW text (secrets live inside quotes).
+ * A GUARDED rule may also carry a `gate` — a predicate checking real filesystem
+ * state — so it only fires where its rationale actually holds (see
+ * `pnpmInstallGate`).
  *
  * Audit trail: every hit (including bypassed ones) is appended to
  * .claude/audit/risk-guard.jsonl (gitignored).
  */
 
+import { lstatSync, statSync } from 'fs';
 import { join } from 'path';
 import {
   readHookInput,
   appendJsonl,
   auditDir,
+  projectDir,
   truncate,
 } from './lib/hook-utils.mjs';
 
@@ -101,6 +106,50 @@ const SECRET_PATTERNS = [
   [/\b[sr]k_live_[A-Za-z0-9]{20,}/, 'Stripe live key'],
 ];
 
+// ---------------------------------------------------------------------------
+// Rule gates — extra conditions a GUARDED rule must satisfy before it fires.
+// A gate returns { fire, message? }; the message overrides the rule's default.
+// ---------------------------------------------------------------------------
+
+/** True when this checkout is a linked worktree (`.git` is a file, not a dir). */
+function isLinkedWorktree(root) {
+  try {
+    return statSync(join(root, '.git')).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `pnpm-install-symlink` only applies where its rationale does: pnpm writing
+ * through a worktree symlink rewrites the shared pool slot every other worktree
+ * on the machine is linked to. In a main-repo or Claude Code Remote
+ * direct-branch checkout node_modules is a real directory, so installing there
+ * is exactly the right move — blocking it was a false positive (LS-8731).
+ */
+function pnpmInstallGate() {
+  const root = projectDir(input);
+  try {
+    // lstat, not stat: Windows junctions (what modules-pool/link.mjs creates)
+    // also report as symbolic links here, but resolve away under stat.
+    return lstatSync(join(root, 'node_modules')).isSymbolicLink()
+      ? { fire: true }
+      : { fire: false };
+  } catch (err) {
+    if (err?.code !== 'ENOENT') return { fire: false }; // fail open
+    // No node_modules yet. In a worktree the pool link is the intended
+    // bootstrap; in the main repo a real install is the legitimate one.
+    return isLinkedWorktree(root)
+      ? {
+          fire: true,
+          message:
+            'This worktree has no node_modules yet — `pnpm install` would build it a private tree ' +
+            'instead of linking the shared pool. Run `node scripts/modules-pool/link.mjs` first.',
+        }
+      : { fire: false };
+  }
+}
+
 const findings = [];
 
 // --- Secret scan (raw text, all tools) ---
@@ -162,6 +211,7 @@ if (command) {
       /(^|[;&|\s])pnpm\s+(install|i|add|remove|update)\b/,
       'pnpm-install-symlink',
       'Never run pnpm install/add straight through a worktree symlink — it corrupts the node_modules pool. Use `node scripts/modules-pool/link.mjs` or `make install`.',
+      pnpmInstallGate,
     ],
     [
       /git\s+clean\b[^\n]*\s-[A-Za-z]*[dxX]/,
@@ -184,9 +234,15 @@ if (command) {
     if (re.test(scannable))
       findings.push({ severity: 'CATASTROPHIC', rule, message });
   }
-  for (const [re, rule, message] of GUARDED) {
-    if (re.test(scannable))
-      findings.push({ severity: 'GUARDED', rule, message });
+  for (const [re, rule, message, gate] of GUARDED) {
+    if (!re.test(scannable)) continue;
+    const { fire, message: override } = gate ? gate() : { fire: true };
+    if (fire)
+      findings.push({
+        severity: 'GUARDED',
+        rule,
+        message: override ?? message,
+      });
   }
   if (
     /(^|[;&|\s])rm\s+-[A-Za-z]*r/.test(scannable) &&
