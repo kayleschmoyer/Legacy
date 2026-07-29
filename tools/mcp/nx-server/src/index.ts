@@ -8,6 +8,10 @@ import { installPackage } from './tools/install-package.js';
 import { jobList, jobStatus, jobWait } from './tools/job-tools.js';
 import { runAffected } from './tools/run-affected.js';
 import { runE2ESpecs } from './tools/run-e2e-specs.js';
+import {
+  runESLint,
+  MAX_FILES as ESLINT_MAX_FILES,
+} from './tools/run-eslint.js';
 import { runPcChunk, PC_CHUNKS } from './tools/run-pc-chunk.js';
 import {
   runPrettier,
@@ -339,6 +343,45 @@ server.tool(
       .describe('Worktree path (default: repo root)'),
   },
   async (params) => runPrettier(params),
+);
+
+// --- nx_run_eslint ---
+server.tool(
+  'nx_run_eslint',
+  'Prefer this over raw `pnpm exec eslint <files>` via shell when you need to lint a small, ' +
+    'explicit file list. Runs eslint --max-warnings=0 — the same threshold as the nx lint ' +
+    'target — against exactly the given files, and from the nearest directory owning an ' +
+    "eslint.config.* so the project's flat config actually applies (ESLint 9 resolves flat " +
+    'config from its cwd, not per file). A file list spanning two config roots is rejected — ' +
+    `split it into one call per root. Capped at ${ESLINT_MAX_FILES} files. ` +
+    'IMPORTANT — this is NOT a fast path in this repo: every TS config here enables type-aware ' +
+    'rules via parserOptions.project, so ESLint builds a full TypeScript program before linting ' +
+    'even one file. Measured in lambdas/db: one file 4m40s vs the whole project 4m42s — scoping ' +
+    'saves ~2s of ~280s. That cost is per-run, not per-file. Use this when ' +
+    'you want a narrow report; use nx_run({ project, target: "lint" }) for a whole project (it ' +
+    'is Nx-cached) and nx_run_pc_chunk({ chunk: "pc-lint" }) for the repo. Note: typecheck ' +
+    'cannot be file-scoped at all — tsc rejects explicit source files combined with -p — so use ' +
+    'nx_run({ target: "typecheck" }) for project-granular type checking.',
+  {
+    files: z
+      .array(z.string())
+      .min(1)
+      .describe(
+        'File paths (relative to worktreePath/repo root, or absolute) to lint. All files must live under the same eslint.config.* root.',
+      ),
+    mode: z
+      .enum(['check', 'fix'])
+      .default('check')
+      .describe(
+        '"check" reports lint errors without modifying files (default); "fix" applies eslint --fix in place.',
+      ),
+    worktreePath: z
+      .string()
+      .regex(ABSOLUTE_PATH_REGEX, 'worktreePath must be an absolute path')
+      .optional()
+      .describe('Worktree path (default: repo root)'),
+  },
+  async (params) => runESLint(params),
 );
 
 // --- nx_job_status ---

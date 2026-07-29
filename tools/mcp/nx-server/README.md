@@ -10,6 +10,7 @@ Nx build system intelligence for AI agents — project discovery, affected analy
 - **nx_run** — Run an Nx target on a specific project
 - **nx_run_affected** — Run a target on all affected projects
 - **nx_run_prettier** — Run `prettier --check`/`--write` against an explicit, small file list (capped at 50 files) without the whole-repo side effects of `nx_run_pc_chunk({ chunk: 'pc-format' })`
+- **nx_run_eslint** — Run `eslint --max-warnings=0` (optionally `--fix`) against an explicit, small file list (capped at 50 files) instead of linting a whole project or the whole repo. See [Scoped lint and typecheck](#scoped-lint-and-typecheck)
 - **nx_dep_graph** — Query dependency relationships between projects
 - **nx_install_package** — Symlink-aware package installation with lock file, duplicate detection, and @types/ companion check
 - **nx_check_package_health** — Scan workspace for nested node_modules, wildcard ranges, missing overrides, and missing @types/ companions
@@ -17,6 +18,25 @@ Nx build system intelligence for AI agents — project discovery, affected analy
 ## How It Works
 
 Wraps Nx CLI commands (`nx show projects`, `nx show project`, `nx affected`, `nx run`, `nx graph`) with token-efficient structured output (see [Response format](#response-format)) and safety guardrails. Target execution is limited to an allowlist of safe targets (build, test, lint, typecheck, codegen, serve, dev, print-schema, deploy:plan, e2e, storybook) to prevent unintended side effects.
+
+### Scoped lint and typecheck
+
+`nx_run_eslint` lints an explicit, small file list instead of a whole project (`eslint . --max-warnings=0`) or the whole repo (`pc-lint`) — useful when you want a report narrowed to the files you just touched (LS-8735).
+
+> **It is not a fast path in this repo, and the ticket's premise that it would be did not survive measurement.** Every TS config here enables type-aware `@typescript-eslint` rules via `parserOptions.project` (the root config points at `tsconfig.base.json`, `lambdas/db/eslint.config.mjs` at `tsconfig.*?.json`), so ESLint constructs a full TypeScript program before linting even one file. Measured in `lambdas/db`:
+
+| Run                        | Time     |
+| -------------------------- | -------- |
+| single file                | 4m 39.9s |
+| whole project (`eslint .`) | 4m 41.9s |
+
+Scoping to one file saves **~2 seconds out of ~280** (0.7%). The cost is per-_run_, not per-_file_, so narrowing the file list does not shrink it. Prefer `nx_run({ project, target: 'lint' })` when you want a whole project — it is Nx-cached, so a repeat run with no input changes returns instantly, which a direct ESLint invocation never does. The tool's timeout is 10 minutes for this reason.
+
+Unlike `nx_run_prettier`, it cannot simply hand the file list to the CLI from the repo root. Prettier resolves `.prettierrc` per file; **ESLint 9 resolves flat config from its current working directory**, so linting `lambdas/db/src/*.ts` from the workspace root silently applies the root config and drops `lambdas/db/eslint.config.mjs` — including that project's `@nx/enforce-module-boundaries` allow-list, which turns legitimate `@apollo/server` imports into reported violations. Verified with `eslint --print-config` on the same file: `allow: []` from the repo root, the project's allow-list from `lambdas/db`.
+
+So the tool walks up from each file to the nearest directory owning an `eslint.config.*`, runs ESLint from there, and relativises the paths to it. A file list spanning two config roots is rejected rather than silently linted under one project's rules — split it into one call per root.
+
+**There is deliberately no file-scoped typecheck tool.** `tsc` refuses to combine `-p/--project` with explicit source files, and dropping `-p` discards the project's `compilerOptions`, path mappings, and `include`/`exclude`, which produces errors that aren't real. The honest granularity for typecheck is the project: `nx_run({ project, target: 'typecheck' })`. Likewise there is no `nx_run_jest` — scoped Jest already works through `nx_run({ project, target: 'test', args: ['--testPathPatterns', '<pattern>'] })`.
 
 ### Package Installation Safety
 
