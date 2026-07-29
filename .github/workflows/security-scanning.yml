@@ -505,7 +505,7 @@ jobs:
       - name: "🔬 Initialize CodeQL Analysis"
         # Skip CodeQL on PRs for faster feedback
         if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review'
-        uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
         with:
           languages: javascript,typescript
           queries: security-extended,security-and-quality
@@ -539,7 +539,7 @@ jobs:
       - name: "🔍 Perform CodeQL Analysis"
         # Skip CodeQL on PRs for faster feedback
         if: github.event_name != 'pull_request' && github.event_name != 'pull_request_review'
-        uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
         with:
           category: "/language:javascript"
           upload: false
