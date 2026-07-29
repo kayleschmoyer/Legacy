@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import type { HomeLeagueSummary } from './HomeScreen';
 import {
+  homeContentTopPadding,
   MobileHomeScreen,
   type MobileHomeScreenProps,
 } from './MobileHomeScreen';
@@ -49,6 +50,24 @@ const liveLeague: HomeLeagueSummary = {
   losses: 4,
   teamCount: 12,
 };
+
+// LS-8808 defect 3: the greeting sat flush against the Android status bar.
+// The inset now lands on the scroll *content*, and this is the arithmetic
+// behind it — style props themselves are stripped by the Tamagui jest mock.
+describe('homeContentTopPadding (LS-8808)', () => {
+  it('adds the full top safe-area inset to the page gutter', () => {
+    expect(homeContentTopPadding(44)).toBe(62);
+  });
+
+  it('falls back to the page gutter alone on platforms without an inset', () => {
+    expect(homeContentTopPadding(0)).toBe(18);
+  });
+
+  it('ignores negative and non-finite insets', () => {
+    expect(homeContentTopPadding(-20)).toBe(18);
+    expect(homeContentTopPadding(Number.NaN)).toBe(18);
+  });
+});
 
 describe('MobileHomeScreen (LS-8794)', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -167,6 +186,24 @@ describe('MobileHomeScreen (LS-8794)', () => {
       );
       fireEvent.click(getByText('Matchup'));
       expect(onViewMatchup).toHaveBeenCalledWith(liveLeague);
+    });
+
+    // LS-8808 defects 1 & 2: the gradient header broke out of the card and the
+    // card surface vanished on Android. The Tamagui jest mock strips style
+    // props, so structure is what jsdom can assert — the header must stay a
+    // child of the card, and both of its end labels must render.
+    it('keeps the gradient header and the scoreboard row inside the ticker card (LS-8808)', () => {
+      const { getByTestId } = render(
+        <MobileHomeScreen {...baseProps} leagues={[liveLeague]} />,
+      );
+      const card = getByTestId('home-live-ticker');
+      const header = getByTestId('home-live-ticker-header');
+
+      expect(card.contains(header)).toBe(true);
+      expect(header.textContent).toContain('Live · Week 8');
+      expect(header.textContent).toContain('Closes ');
+      expect(card.textContent).toContain('My Team');
+      expect(card.textContent).toContain('12.5');
     });
 
     it('falls back to onViewLeague when no onViewMatchup handler is supplied', () => {

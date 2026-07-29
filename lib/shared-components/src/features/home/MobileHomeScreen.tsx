@@ -37,6 +37,31 @@ const CARD_WIDTH = 250;
 const CARD_HEIGHT = 172;
 const CARD_GAP = 12;
 const AVATAR_SIZE = 40;
+/** Live-ticker card corner radius and hairline border. */
+const TICKER_RADIUS = 16;
+const TICKER_BORDER = 1;
+/**
+ * Radius of the ticker's *inner* top corners — the gradient header sits inside
+ * the card's 1px border, so it needs a slightly tighter radius to sit flush.
+ */
+const TICKER_HEADER_RADIUS = TICKER_RADIUS - TICKER_BORDER;
+
+/**
+ * Top padding for the scroll content: the page gutter plus the full top
+ * safe-area inset, so the greeting always clears the status bar (LS-8808
+ * defect 3, a mobile-fork regression of LS-8625).
+ *
+ * Applied to the scroll *content* rather than to the `ScrollView`'s own style:
+ * padding set on a Tamagui/RN `ScrollView` pads the scroll container, which
+ * does not reliably inset the content on Android. Non-finite or negative
+ * insets are ignored so a missing safe-area provider degrades to the gutter
+ * rather than collapsing or inflating the layout.
+ */
+export function homeContentTopPadding(topInset: number): number {
+  return (
+    PAGE_PADDING + (Number.isFinite(topInset) && topInset > 0 ? topInset : 0)
+  );
+}
 
 /* ─── Public types ─── */
 
@@ -282,13 +307,17 @@ function LiveMatchupTicker({
   return (
     <YStack
       testID="home-live-ticker"
-      borderRadius={16}
-      borderWidth={1}
+      borderRadius={TICKER_RADIUS}
+      borderWidth={TICKER_BORDER}
       borderColor="$surfacePanelBorder"
       backgroundColor="$surfacePanel"
       overflow="hidden"
     >
+      {/* The header rounds its own top corners rather than relying on the
+          card's `overflow: 'hidden'` — Android does not reliably clip a
+          non-background child to its parent's border radius (LS-8808). */}
       <GradientSurface
+        testID="home-live-ticker-header"
         colors={[brand.seamRed, brand.seamRedDark]}
         angle={90}
         flexDirection="row"
@@ -297,6 +326,8 @@ function LiveMatchupTicker({
         gap="$2"
         paddingVertical={8}
         paddingHorizontal={14}
+        borderTopLeftRadius={TICKER_HEADER_RADIUS}
+        borderTopRightRadius={TICKER_HEADER_RADIUS}
       >
         <XStack alignItems="center" gap="$2">
           <YStack
@@ -637,15 +668,13 @@ export function MobileHomeScreen(
   const onThisDayNode = onThisDayCondensed ?? onThisDay;
 
   return (
-    <ScrollView
-      testID="home-screen"
-      backgroundColor="$background"
-      paddingTop={topInset}
-    >
+    <ScrollView testID="home-screen" backgroundColor="$background">
       <YStack
         testID="home-content"
         width="100%"
-        padding={PAGE_PADDING}
+        paddingTop={homeContentTopPadding(topInset)}
+        paddingHorizontal={PAGE_PADDING}
+        paddingBottom={PAGE_PADDING}
         gap="$5"
       >
         <GreetingRow userName={userName} onOpenProfile={onOpenProfile} />
@@ -676,15 +705,21 @@ export function MobileHomeScreen(
               />
             }
           />
+          {/* Full-bleed rail: the viewport escapes the page gutter so the
+              trailing card peeks off the physical screen edge — a deliberate
+              "scroll for more" affordance — instead of being sliced by a hard
+              vertical line one gutter in (LS-8808 defect 4). The gutter moves
+              onto the content, so cards stay gutter-aligned at every snap. */}
           <ScrollView
             testID="home-league-rail"
             horizontal
+            marginHorizontal={-PAGE_PADDING}
             showsHorizontalScrollIndicator={false}
             snapToInterval={CARD_WIDTH + CARD_GAP}
             snapToAlignment="start"
             decelerationRate="fast"
           >
-            <XStack gap={CARD_GAP} paddingRight={PAGE_PADDING}>
+            <XStack gap={CARD_GAP} paddingHorizontal={PAGE_PADDING}>
               {sorted.map((summary) => (
                 <LeagueRailCard
                   key={summary.leagueId}
