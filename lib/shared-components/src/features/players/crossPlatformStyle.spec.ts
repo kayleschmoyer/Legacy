@@ -28,6 +28,17 @@ describe('resolveLength', () => {
     expect(resolveLength('clamp(40px, 4.4vw, 60px)')).toBeUndefined();
     expect(resolveLength('')).toBeUndefined();
   });
+
+  it('resolves `em` to px against a numeric emBase (value × base)', () => {
+    expect(resolveLength('0.1em', 11)).toBeCloseTo(1.1);
+    expect(resolveLength('-0.02em', 16)).toBeCloseTo(-0.32);
+    expect(resolveLength('2em', 10)).toBe(20);
+  });
+
+  it('still drops `em` when no emBase is supplied, and never resolves `rem`', () => {
+    expect(resolveLength('0.1em')).toBeUndefined();
+    expect(resolveLength('1rem', 16)).toBeUndefined();
+  });
 });
 
 describe('toNativeStyle — box shorthands', () => {
@@ -102,28 +113,27 @@ describe('toNativeStyle — background / border shorthands', () => {
 });
 
 describe('toNativeStyle — drops values RN would reject or ignore', () => {
-  it('drops a `transform` string (RN requires the array form and throws on a string)', () => {
-    expect(toNativeStyle({ transform: 'translateY(-50%)' })).toEqual({});
-  });
-
   it('keeps an already-RN transform array', () => {
     const t = [{ translateY: -4 }];
     expect(toNativeStyle({ transform: t })).toEqual({ transform: t });
   });
 
-  it('drops `em` letterSpacing but keeps numeric letterSpacing', () => {
+  it('drops `em` letterSpacing with no co-located fontSize (inherited — cannot resolve)', () => {
     expect(toNativeStyle({ letterSpacing: '0.08em' })).toEqual({});
     expect(toNativeStyle({ letterSpacing: '-0.02em' })).toEqual({});
     expect(toNativeStyle({ letterSpacing: 1 })).toEqual({ letterSpacing: 1 });
   });
 
-  it('drops web-only text keys', () => {
+  it('drops web-only keys with no native equivalent', () => {
     expect(
       toNativeStyle({
         whiteSpace: 'nowrap',
         textOverflow: 'ellipsis',
         cursor: 'pointer',
         outlineWidth: 0,
+        filter: 'blur(4px)',
+        backdropFilter: 'blur(4px)',
+        gridTemplateColumns: '1fr 1fr',
       }),
     ).toEqual({});
   });
@@ -176,6 +186,117 @@ describe('toNativeStyle — the never-crash invariant', () => {
     }
     // Sanity: the good numeric props survived.
     expect(native).toMatchObject({ marginTop: 14, borderRadius: 8 });
+  });
+});
+
+describe('toNativeStyle — em→px against a co-located fontSize (LS-8631)', () => {
+  it('converts co-located `em` length keys to px (value × numeric fontSize)', () => {
+    // Binary-exact fractions (0.25, 1.5) so the product is an exact float.
+    expect(toNativeStyle({ fontSize: 16, letterSpacing: '0.25em' })).toEqual({
+      fontSize: 16,
+      letterSpacing: 4,
+    });
+    expect(toNativeStyle({ fontSize: 16, lineHeight: '1.5em' })).toEqual({
+      fontSize: 16,
+      lineHeight: 24,
+    });
+  });
+
+  it('resolves `em` box shorthands against the co-located fontSize', () => {
+    expect(toNativeStyle({ fontSize: 10, padding: '1em 2em' })).toEqual({
+      fontSize: 10,
+      paddingTop: 10,
+      paddingRight: 20,
+      paddingBottom: 10,
+      paddingLeft: 20,
+    });
+  });
+
+  it('uses a px-string fontSize as the em base', () => {
+    expect(toNativeStyle({ fontSize: '12px', letterSpacing: '0.5em' })).toEqual(
+      { fontSize: 12, letterSpacing: 6 },
+    );
+  });
+
+  it('drops co-located `em` when fontSize is itself an unresolvable string (inherited)', () => {
+    // fontSize: '1.2em' has no base → cannot seed emBase → letterSpacing drops.
+    expect(
+      toNativeStyle({ fontSize: '1.2em', letterSpacing: '0.1em' }),
+    ).toEqual({});
+  });
+
+  it('drops `em` when there is no fontSize in the same object', () => {
+    expect(toNativeStyle({ letterSpacing: '0.1em', marginTop: '2em' })).toEqual(
+      {},
+    );
+  });
+});
+
+describe('toNativeStyle — transform string → RN array (LS-8631)', () => {
+  it('converts a single `translateY` percentage to the RN array form', () => {
+    expect(toNativeStyle({ transform: 'translateY(-50%)' })).toEqual({
+      transform: [{ translateY: '-50%' }],
+    });
+  });
+
+  it('converts px/unitless translate, scale, and rotate', () => {
+    expect(toNativeStyle({ transform: 'translateX(10px)' })).toEqual({
+      transform: [{ translateX: 10 }],
+    });
+    expect(toNativeStyle({ transform: 'scale(1.5)' })).toEqual({
+      transform: [{ scale: 1.5 }],
+    });
+    expect(toNativeStyle({ transform: 'rotate(45deg)' })).toEqual({
+      transform: [{ rotate: '45deg' }],
+    });
+  });
+
+  it('drops multi-function or ambiguous transforms', () => {
+    expect(
+      toNativeStyle({ transform: 'translateX(10px) rotate(45deg)' }),
+    ).toEqual({});
+    expect(toNativeStyle({ transform: 'translate(10px, 20px)' })).toEqual({});
+    expect(toNativeStyle({ transform: 'matrix(1,0,0,1,0,0)' })).toEqual({});
+  });
+});
+
+describe('toNativeStyle — boxShadow → RN array (LS-8631)', () => {
+  it('converts a simple shadow with an rgba color to the RN array form', () => {
+    expect(toNativeStyle({ boxShadow: '0 2px 8px rgba(0,0,0,0.3)' })).toEqual({
+      boxShadow: [
+        {
+          offsetX: 0,
+          offsetY: 2,
+          blurRadius: 8,
+          color: 'rgba(0,0,0,0.3)',
+        },
+      ],
+    });
+  });
+
+  it('converts offset-only and spread shadows', () => {
+    expect(toNativeStyle({ boxShadow: '1px 1px' })).toEqual({
+      boxShadow: [{ offsetX: 1, offsetY: 1 }],
+    });
+    expect(toNativeStyle({ boxShadow: '0 2px 4px 1px #1C2740' })).toEqual({
+      boxShadow: [
+        {
+          offsetX: 0,
+          offsetY: 2,
+          blurRadius: 4,
+          spreadDistance: 1,
+          color: '#1C2740',
+        },
+      ],
+    });
+  });
+
+  it('drops inset, multiple, and non-px shadows', () => {
+    expect(toNativeStyle({ boxShadow: 'inset 0 2px 4px #000' })).toEqual({});
+    expect(
+      toNativeStyle({ boxShadow: '0 1px 2px #000, 0 4px 8px #111' }),
+    ).toEqual({});
+    expect(toNativeStyle({ boxShadow: '0 0.5em 1em #000' })).toEqual({});
   });
 });
 
