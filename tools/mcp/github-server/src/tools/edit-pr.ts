@@ -2,7 +2,11 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
-import { hasJiraLinkMarker } from './jira-link.js';
+import {
+  extractJiraLinkBlock,
+  stripJiraLinkBlocks,
+  validateJiraLinkMarker,
+} from './jira-link.js';
 
 interface EditPRParams {
   number: number;
@@ -17,14 +21,13 @@ interface PullRequest {
   html_url: string;
 }
 
-const JIRA_LINK_BLOCK_RE =
-  /<!--\s*jira-link[\s\S]*?-->(?:\s*\n\n\*\*Jira:\*\*[^\n]*)?\n*/i;
-
-/** Extract the jira-link block (comment + optional Jira: line) from a body. */
-function extractJiraLinkBlock(body: string): string | null {
-  const match = JIRA_LINK_BLOCK_RE.exec(body);
-  return match ? match[0].trimEnd() : null;
-}
+const MARKER_FIXIT =
+  'A well-formed marker looks like:\n\n' +
+  '<!-- jira-link\n' +
+  'primary: LS-1234\n' +
+  '-->\n\n' +
+  'Re-send the edit with that block at the top of the body (or omit the ' +
+  'marker entirely and it will be re-injected from the PR).';
 
 /** Update a pull request's title and/or body. */
 export async function editPR(params: EditPRParams): Promise<ToolResult> {
@@ -45,17 +48,54 @@ export async function editPR(params: EditPRParams): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
 
-    // Re-inject the jira-link marker if the new body drops it but the current
-    // PR body has one — prevents Jira Link Check CI failures (LS-8017).
+    // Repair the jira-link marker if the new body drops it, or declares one
+    // that Jira Link Check would reject, but the current PR body has a good
+    // one — prevents Jira Link Check CI failures (LS-8017, LS-8721). A
+    // caller-supplied marker is only trusted once it is *structurally valid*;
+    // matching `<!-- jira-link` is not enough (LS-8721).
     let effectiveBody = body;
-    if (body !== undefined && !hasJiraLinkMarker(body)) {
-      const currentPr = await githubRest<PullRequest>({
-        method: 'GET',
-        path: `/repos/${repo.owner}/${repo.name}/pulls/${number}`,
-      });
-      const existingBlock = extractJiraLinkBlock(currentPr.body ?? '');
-      if (existingBlock) {
-        effectiveBody = `${existingBlock}\n\n${body}`;
+    const warnings: string[] = [];
+    if (body !== undefined) {
+      const marker = validateJiraLinkMarker(body);
+      if (!marker.valid) {
+        const currentPr = await githubRest<PullRequest>({
+          method: 'GET',
+          path: `/repos/${repo.owner}/${repo.name}/pulls/${number}`,
+        });
+        const existingBlock = extractJiraLinkBlock(currentPr.body ?? '');
+        const canFallBack =
+          existingBlock !== null && validateJiraLinkMarker(existingBlock).valid;
+
+        if (canFallBack) {
+          const rest = marker.present ? stripJiraLinkBlocks(body) : body;
+          effectiveBody = `${existingBlock}\n\n${rest}`;
+          warnings.push(
+            marker.present
+              ? `Replaced a malformed jira-link marker in the supplied body ` +
+                  `with PR #${number}'s existing well-formed block ` +
+                  `(${marker.errors.join(' ')}).`
+              : `Re-injected PR #${number}'s existing jira-link block — the ` +
+                  `supplied body had none.`,
+          );
+        } else if (marker.present) {
+          // Nothing good to fall back on: refuse rather than PATCH a body
+          // that is guaranteed to fail Jira Link Check.
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Refusing to edit PR #${number}: the supplied body declares ` +
+                  `a jira-link marker that Jira Link Check would reject, and ` +
+                  `the PR has no well-formed marker to fall back on.\n` +
+                  marker.errors.map((e) => `  - ${e}`).join('\n') +
+                  `\n\n${MARKER_FIXIT}`,
+              },
+            ],
+          };
+        }
+        // Otherwise: no marker in either body — nothing to preserve, pass through.
       }
     }
 
@@ -80,6 +120,7 @@ export async function editPR(params: EditPRParams): Promise<ToolResult> {
             number: pr.number,
             url: pr.html_url,
             updatedFields,
+            ...(warnings.length > 0 ? { warnings } : {}),
           }),
         },
       ],

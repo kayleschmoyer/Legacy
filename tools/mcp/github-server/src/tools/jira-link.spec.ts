@@ -3,10 +3,13 @@ import {
   buildJiraLinkComment,
   ensureJiraLinkMarker,
   ensureTitleHasPrimaryKey,
+  extractJiraLinkBlock,
   extractPrimaryKey,
   hasJiraLinkMarker,
   isValidPrimary,
   parseRelatedKeys,
+  stripJiraLinkBlocks,
+  validateJiraLinkMarker,
 } from './jira-link';
 
 describe('jira-link marker (LS-7895)', () => {
@@ -179,6 +182,121 @@ describe('jira-link marker (LS-7895)', () => {
       const body =
         '<!-- jira-link\nprimary: LS-1\n-->\n\nMentions `<!-- jira-link -->` in prose.';
       expect(hasJiraLinkMarker(body)).toBe(true);
+    });
+  });
+
+  describe('validateJiraLinkMarker (LS-8721)', () => {
+    const WELL_FORMED = '<!-- jira-link\nprimary: LS-1234\n-->';
+
+    it('accepts a well-formed marker', () => {
+      expect(validateJiraLinkMarker(`${WELL_FORMED}\n\nbody`)).toEqual({
+        present: true,
+        valid: true,
+        errors: [],
+      });
+    });
+
+    it('accepts primary: none and well-formed related keys', () => {
+      const marker = '<!-- jira-link\nprimary: none\nrelated: LS-1, LS-2\n-->';
+      expect(validateJiraLinkMarker(marker).valid).toBe(true);
+    });
+
+    it('rejects the one-line marker that slipped past the loose regex on PR #6427', () => {
+      const result = validateJiraLinkMarker('<!-- jira-link: LS-8504 -->');
+      expect(result.present).toBe(true);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toMatch(/no `primary:` line/);
+    });
+
+    it('reports absence distinctly from malformation', () => {
+      const result = validateJiraLinkMarker('## Summary\n\nno marker here');
+      expect(result.present).toBe(false);
+      expect(result.valid).toBe(false);
+    });
+
+    it('rejects duplicate marker blocks', () => {
+      const result = validateJiraLinkMarker(`${WELL_FORMED}\n\n${WELL_FORMED}`);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toMatch(/2 jira-link markers/);
+    });
+
+    it('rejects two primary: lines in one block', () => {
+      const marker = '<!-- jira-link\nprimary: LS-1\nprimary: LS-2\n-->';
+      expect(validateJiraLinkMarker(marker).errors[0]).toMatch(
+        /2 `primary:` lines/,
+      );
+    });
+
+    it.each(['ls-1234', 'LS-', 'None', 'LS-1, LS-2'])(
+      'rejects primary: %s',
+      (value) => {
+        const result = validateJiraLinkMarker(
+          `<!-- jira-link\nprimary: ${value}\n-->`,
+        );
+        expect(result.valid).toBe(false);
+        expect(result.errors[0]).toMatch(/is not a valid value/);
+      },
+    );
+
+    it('rejects a malformed related key', () => {
+      const marker = '<!-- jira-link\nprimary: LS-1\nrelated: garbage\n-->';
+      expect(validateJiraLinkMarker(marker).errors[0]).toMatch(/"garbage"/);
+    });
+
+    it('ignores markers quoted in code — they are documentation, not declarations', () => {
+      const fenced = '```\n<!-- jira-link: bad -->\n```\n\nprose';
+      expect(validateJiraLinkMarker(fenced).present).toBe(false);
+      const span = 'Use `<!-- jira-link -->` to link a ticket.';
+      expect(validateJiraLinkMarker(span).present).toBe(false);
+    });
+
+    it('validates the real marker when a quoted decoy precedes it', () => {
+      const body = `\`\`\`\n<!-- jira-link: decoy -->\n\`\`\`\n\n${WELL_FORMED}`;
+      expect(validateJiraLinkMarker(body).valid).toBe(true);
+    });
+  });
+
+  describe('extractJiraLinkBlock / stripJiraLinkBlocks (LS-8721)', () => {
+    const BLOCK =
+      '<!-- jira-link\nprimary: LS-1234\n-->\n\n' +
+      '**Jira:** [LS-1234](https://bkrupa.atlassian.net/browse/LS-1234)';
+
+    it('extracts the comment plus the visible Jira line', () => {
+      expect(extractJiraLinkBlock(`${BLOCK}\n\n## Summary`)).toBe(BLOCK);
+    });
+
+    it('returns null when the body has no declared marker', () => {
+      expect(extractJiraLinkBlock('## Summary')).toBeNull();
+    });
+
+    it('skips a quoted decoy and extracts the real block', () => {
+      const body = `\`\`\`\n<!-- jira-link: decoy -->\n\`\`\`\n\n${BLOCK}\n\nrest`;
+      expect(extractJiraLinkBlock(body)).toBe(BLOCK);
+    });
+
+    it('removes the block and leaves the rest of the body intact', () => {
+      expect(
+        stripJiraLinkBlocks(`${BLOCK}\n\n## Summary\n\n- did things`),
+      ).toBe('## Summary\n\n- did things');
+    });
+
+    it('removes every block, not just the first', () => {
+      const body = `${BLOCK}\n\nmiddle\n\n${BLOCK}\n\nend`;
+      const result = stripJiraLinkBlocks(body);
+      expect(result).not.toContain('<!-- jira-link');
+      expect(result).toContain('middle');
+      expect(result).toContain('end');
+    });
+
+    it('leaves a quoted marker in place', () => {
+      const body = `${BLOCK}\n\nUse \`<!-- jira-link -->\` to link a ticket.`;
+      expect(stripJiraLinkBlocks(body)).toBe(
+        'Use `<!-- jira-link -->` to link a ticket.',
+      );
+    });
+
+    it('is a no-op on a body with no declared marker', () => {
+      expect(stripJiraLinkBlocks('## Summary')).toBe('## Summary');
     });
   });
 

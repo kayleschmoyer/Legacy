@@ -111,6 +111,58 @@ describe('editPR — jira-link marker preservation', () => {
     expect(markerCount).toBe(1);
   });
 
+  it("replaces a malformed caller marker with the PR's well-formed block (LS-8721)", async () => {
+    const currentBody = `${JIRA_BLOCK}\n\nOld content`;
+    // Hand-written one-line marker: matches the loose /<!--\s*jira-link\b/i
+    // regex but has no `primary:` line, so jira-link-check.mjs rejects it.
+    const newBody = '<!-- jira-link: LS-1234 -->\n\n## Verification\n\nchecked';
+
+    mockedRest
+      .mockResolvedValueOnce({
+        number: 13,
+        title: 'PR',
+        body: currentBody,
+        html_url: 'https://github.com/o/r/pull/13',
+      })
+      .mockResolvedValueOnce({
+        number: 13,
+        title: 'PR',
+        body: 'patched',
+        html_url: 'https://github.com/o/r/pull/13',
+      });
+
+    const result = await editPR({ number: 13, body: newBody });
+    expect(result.isError).toBeFalsy();
+
+    const sentBody: string =
+      (mockedRest.mock.calls[1][0].body as Record<string, string>).body ?? '';
+    // Exactly one marker, and it is the well-formed one.
+    expect((sentBody.match(/<!--\s*jira-link/gi) ?? []).length).toBe(1);
+    expect(sentBody).toContain('primary: LS-1234');
+    expect(sentBody).not.toContain('<!-- jira-link: LS-1234 -->');
+    // Caller's content survives.
+    expect(sentBody).toContain('## Verification');
+  });
+
+  it('rejects a malformed caller marker when the PR has no well-formed block to fall back on (LS-8721)', async () => {
+    mockedRest.mockResolvedValueOnce({
+      number: 14,
+      title: 'PR',
+      body: 'Old content without marker',
+      html_url: 'https://github.com/o/r/pull/14',
+    });
+
+    const result = await editPR({
+      number: 14,
+      body: '<!-- jira-link: LS-1234 -->\n\nbody',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('primary:');
+    // The PATCH must not have been sent.
+    expect(mockedRest).toHaveBeenCalledTimes(1);
+  });
+
   it('does not inject a marker when neither new nor current PR body has one', async () => {
     const currentBody = 'Old content without marker';
     const newBody = 'New content without marker';
