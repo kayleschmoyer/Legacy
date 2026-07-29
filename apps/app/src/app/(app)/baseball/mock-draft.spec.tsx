@@ -11,8 +11,14 @@ import { MockDraftPage } from './mock-draft';
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockNavigate = jest.fn();
+const mockBack = jest.fn();
+let mockCanGoBack = true;
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ navigate: mockNavigate }),
+  useRouter: () => ({
+    navigate: mockNavigate,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
 }));
 
 // Tamagui — shared mock from __test-utils__
@@ -82,6 +88,7 @@ jest.mock('@legacy-sports/graphql', () => ({
 describe('MockDraftPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack = true;
     mockInitState = { loading: false, error: undefined };
     mockUsageData = undefined;
     mockUseFeatureIsOn.mockReturnValue(false);
@@ -319,11 +326,22 @@ describe('MockDraftPage', () => {
     });
   });
 
+  // LS-8823 — cancelling used to push the standalone `/baseball` home, which
+  // took the user out of the tab shell onto a second home surface.
   describe('cancel', () => {
-    it('navigates back to the baseball home', () => {
+    it('returns to the screen the mock draft was opened from', () => {
       render(<MockDraftPage />);
       fireEvent.press(screen.getByText('Cancel'));
-      expect(mockNavigate).toHaveBeenCalledWith('/baseball');
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).not.toHaveBeenCalledWith('/baseball');
+    });
+
+    it('falls back to the Home tab when there is nothing to pop', () => {
+      mockCanGoBack = false;
+      render(<MockDraftPage />);
+      fireEvent.press(screen.getByText('Cancel'));
+      expect(mockNavigate).toHaveBeenCalledWith('/home');
+      expect(mockBack).not.toHaveBeenCalled();
     });
   });
 });

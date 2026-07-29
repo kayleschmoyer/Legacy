@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   formatDisplayName,
@@ -18,10 +18,15 @@ import { useThemeContext } from '../../../context/ThemeContext';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { useSystemBackAction } from '../../../common/hooks/useSystemBackAction';
 import { toPlayerDetailIdParam } from '../../../common/utilities/RouteUtils';
-import BaseballHomeScreen from '../baseball/index';
-import FootballHomeScreen from '../football/index';
+import BaseballHomeScreen from '../../../screens/BaseballHomeScreen';
+import FootballHomeScreen from '../../../screens/FootballHomeScreen';
 
 type ActiveSport = 'baseball' | 'football';
+
+/** Reads the `?sport=` deep-link param; anything unrecognized means "no sport". */
+function parseActiveSport(value: string | undefined): ActiveSport | null {
+  return value === 'baseball' || value === 'football' ? value : null;
+}
 
 /**
  * The Home tab renders `MobileHomeScreen` from `lib/shared-components` — the
@@ -33,10 +38,14 @@ type ActiveSport = 'baseball' | 'football';
  * Sport switching uses local state rather than router.push so that the baseball
  * and football home screens stay mounted once visited — preserving scroll
  * position and component state when the user switches between sports or returns
- * to a sport view (LS-5814).
+ * to a sport view (LS-5814). This tab is the *only* place those screens mount:
+ * `/baseball` and `/football` redirect here with `?sport=` rather than
+ * rendering their own copy, which used to read as a second home page
+ * (LS-8823).
  */
 export default function HomeTab() {
   const router = useRouter();
+  const { sport: sportParam } = useLocalSearchParams<{ sport?: string }>();
   const { top: topInset } = useSafeAreaInsets();
   const userInfo = useAuthorizedUserInfo();
   const { resolvedTheme } = useThemeContext();
@@ -108,6 +117,17 @@ export default function HomeTab() {
   const handleBackFromSport = useCallback(() => {
     setActiveSport(null);
   }, []);
+
+  // Deep links to `/baseball` and `/football` redirect here carrying `?sport=`
+  // (LS-8823). Open that sport's inline view, then clear the param: leaving it
+  // set would make the effect a no-op the next time the same link arrives, and
+  // would re-open the view the user had just dismissed with system back.
+  const deepLinkSport = parseActiveSport(sportParam);
+  useEffect(() => {
+    if (deepLinkSport === null) return;
+    handleViewSport(deepLinkSport);
+    router.setParams({ sport: '' });
+  }, [deepLinkSport, handleViewSport, router]);
 
   // System back (hardware button / edge-swipe): dismiss the inline sport view
   // and return to the sports dashboard. Only registered when a sport view is
@@ -213,7 +233,9 @@ export default function HomeTab() {
             paddingTop: topInset,
           }}
         >
-          <BaseballHomeScreen />
+          {/* The switcher flips the inline view instead of pushing
+              `/football`, which would leave the tab shell (LS-8823). */}
+          <BaseballHomeScreen onSwitchSport={handleViewSport} />
         </View>
       )}
       {mountedSports.has('football') && (

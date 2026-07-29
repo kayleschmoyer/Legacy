@@ -14,6 +14,7 @@ import {
 import { brand } from '@legacy-sports/design-tokens';
 import { useSubscription } from '../../../features/subscription/useSubscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
+import { closeToHomeTab } from '../../../common/utilities/RouteUtils';
 
 /**
  * GrowthBook flag key that gates the football sport option (ADR 0011 §4,
@@ -255,7 +256,9 @@ export function MockDraftPage(): React.JSX.Element {
           onStart={(s) => {
             void handleStart(s);
           }}
-          onCancel={() => router.navigate('/baseball')}
+          // Returns to whichever surface launched the mock draft rather than
+          // pushing the standalone `/baseball` home (LS-8823).
+          onCancel={() => closeToHomeTab(router)}
           loading={loading}
           error={errorMessage}
           footballMockEnabled={footballMockEnabled}

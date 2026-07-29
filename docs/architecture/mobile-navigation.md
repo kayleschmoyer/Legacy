@@ -111,6 +111,27 @@ These hold regardless of future tab changes:
 2. **Sport is an attribute, not a navigation level.** No screen exists solely to pick a sport; sport is a filter/badge on unified screens, and a picker on Create/Join.
 3. **The drawer is removed.** League onboarding (Browse/Join/Create) is an action on the Leagues tab.
 4. **`Games` is the data-driven tab.** It is justified on engagement and instrumented accordingly; the frequency-justified tabs (Leagues, Players) are not.
+5. **Every screen has exactly one mount point.** A screen the tab shell hosts is never also reachable as a standalone route — see [One home surface](#one-home-surface).
+
+## One home surface
+
+> **Decision (LS-8823):** the sport home screens are **removed as standalone screens** in favour of the tab-hosted inline views. `/baseball` and `/football` survive only as **redirects into the Home tab**.
+
+The Home tab mounts `BaseballHomeScreen` and `FootballHomeScreen` inline, switching between them with local state so scroll position and component state survive (LS-5814). Those same components were _also_ reachable as routes at `/baseball` and `/football`, outside the tab shell. Two shells rendering one screen is indistinguishable from two screens: cancelling out of Create League ran `router.navigate('/${sport}')` and dropped the user on a tab-bar-less copy of the home they had just come from, which read as a second home page.
+
+The screens therefore live in `apps/app/src/screens/`, **not** under `apps/app/src/app/` — anything under the route tree is addressable, and being addressable is what created the duplicate. The Home tab is their only mount point.
+
+The two paths are kept as redirects rather than deleted because they are live **universal-link targets**: `app.json` autoverifies every path on `legacy-fantasy.com` / `app.legacy-fantasy.com`, and the web app genuinely serves `/baseball` and `/football`, so a shared link would otherwise open the app on the unmatched-route screen. Each redirect forwards to `/home?sport=<sport>`; the Home tab consumes the param, opens that sport's inline view, and clears it.
+
+Consequences for call sites:
+
+| Intent                          | Use                                                      | Not                                      |
+| ------------------------------- | -------------------------------------------------------- | ---------------------------------------- |
+| Cancel / close a pushed screen  | `closeToHomeTab(router)` (`common/utilities/RouteUtils`) | `router.navigate('/<sport>')`            |
+| Go to the home surface outright | `router.navigate(HOME_TAB_HREF)` (`/home`)               | `router.navigate('/')` — only a redirect |
+| Switch the active sport         | the host's `onSwitchSport` (inline state)                | `router.navigate('/<sport>')`            |
+
+`(app)/index.tsx` remains a `<Redirect href="/home" />`; it is the post-login/logout landing for `router.replace('/')` and is not a home surface.
 
 ## Relationship to the web app
 

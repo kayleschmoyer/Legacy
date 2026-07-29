@@ -36,9 +36,16 @@ type WizardForm = ReturnType<typeof makeForm>;
 
 const mockPush = jest.fn();
 const mockNavigate = jest.fn();
+const mockBack = jest.fn();
+let mockCanGoBack = true;
 let mockSearchParams: { name?: string; sport?: string } = {};
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, navigate: mockNavigate }),
+  useRouter: () => ({
+    push: mockPush,
+    navigate: mockNavigate,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -179,6 +186,7 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
     mockIsPremium = false;
     mockPremiumLoading = false;
     mockSearchParams = {};
+    mockCanGoBack = true;
     mockCreateLeagueState.loading = false;
     mockCreateLeagueState.error = undefined;
   });
@@ -315,15 +323,25 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
     });
   });
 
+  // LS-8823 — cancelling used to `navigate('/${sport}')`, pushing the
+  // standalone sport home and stranding the user on a tab-bar-less screen that
+  // looked like a second home page. Closing now unwinds to whatever the user
+  // came from, and only falls back to the Home tab with no history to pop.
   describe('close', () => {
+    const discard = () => {
+      const buttons = jest.mocked(Alert.alert).mock.calls[0][2];
+      buttons?.find((b) => b.text === 'Discard')?.onPress?.();
+    };
+
     it('leaves immediately when nothing has been edited', () => {
       renderScreen().onClose(false);
       expect(Alert.alert).not.toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith('/baseball');
+      expect(mockBack).toHaveBeenCalledTimes(1);
     });
 
     it('confirms before discarding unsaved edits', () => {
       renderScreen().onClose(true);
+      expect(mockBack).not.toHaveBeenCalled();
       expect(mockNavigate).not.toHaveBeenCalled();
       expect(Alert.alert).toHaveBeenCalledWith(
         'Discard league setup?',
@@ -333,12 +351,31 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
       );
     });
 
-    it('navigates once the discard action is confirmed', () => {
+    it('returns to the screen the wizard was opened from once discard is confirmed', () => {
       renderScreen().onClose(true);
-      const buttons = jest.mocked(Alert.alert).mock.calls[0][2];
-      buttons?.find((b) => b.text === 'Discard')?.onPress?.();
-      expect(mockNavigate).toHaveBeenCalledWith('/baseball');
+      discard();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
+
+    it('falls back to the Home tab when the wizard was the entry point', () => {
+      mockCanGoBack = false;
+      renderScreen().onClose(false);
+      expect(mockNavigate).toHaveBeenCalledWith('/home');
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it.each(['baseball', 'football'])(
+      'never pushes the standalone /%s home when entered from that sport',
+      (sport) => {
+        mockSearchParams = { sport };
+        renderScreen().onClose(true);
+        discard();
+        expect(mockNavigate).not.toHaveBeenCalledWith(`/${sport}`);
+        expect(mockPush).not.toHaveBeenCalledWith(`/${sport}`);
+        expect(mockBack).toHaveBeenCalledTimes(1);
+      },
+    );
   });
 
   it('tracks a premium tap then routes to subscription settings', () => {

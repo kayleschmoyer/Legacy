@@ -17,6 +17,7 @@ import {
 } from '@legacy-sports/graphql';
 import { useSubscription } from '../../../features/subscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
+import { closeToHomeTab } from '../../../common/utilities/RouteUtils';
 
 /**
  * Create League — the "Line-score Wizard" (LS-8809).
@@ -139,7 +140,11 @@ export default function CreateLeagueScreen(): React.JSX.Element {
 
   const handleClose = useCallback(
     (isDirty: boolean) => {
-      const leave = () => router.navigate(`/${sport}`);
+      // Cancelling returns the user to the surface they opened the wizard from
+      // — the Home tab in the reported repro. It used to push `/${sport}`,
+      // which dropped them on the standalone sport home outside the tab shell
+      // and looked like a second home page (LS-8823).
+      const leave = () => closeToHomeTab(router);
       if (!isDirty) {
         leave();
         return;
@@ -154,7 +159,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
         { cancelable: true },
       );
     },
-    [router, sport],
+    [router],
   );
 
   const handleUpgrade = useCallback(

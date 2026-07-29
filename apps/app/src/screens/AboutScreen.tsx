@@ -4,6 +4,7 @@ import { Button, H1, H3, Text, XStack, YStack } from 'tamagui';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { config } from '@legacy-sports/app-config/native';
+import { HOME_TAB_HREF } from '../common/utilities/RouteUtils';
 
 declare const __DEV__: boolean;
 
@@ -206,7 +207,10 @@ export default function AboutScreen() {
             Ready to manage your fantasy sports league? Join Legacy Sports for
             free.
           </Text>
-          <Button onPress={() => router.push('/')} size="$4">
+          {/* `push('/')` used to stack a second copy of the tab shell: `/` is
+              only a redirect, so the pushed screen replaced itself with the
+              Home tab the user was already under (LS-8823). */}
+          <Button onPress={() => router.navigate(HOME_TAB_HREF)} size="$4">
             Get Started Free
           </Button>
         </YStack>

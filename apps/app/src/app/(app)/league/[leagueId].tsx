@@ -33,7 +33,7 @@ import { useMatchupsForLeague } from '../../../features/matchup/hooks/useMatchup
 import { handleError } from '../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
-import { toIntId } from '../../../common/utilities/RouteUtils';
+import { HOME_TAB_HREF, toIntId } from '../../../common/utilities/RouteUtils';
 import { setLastVisitedLeague } from '../../../common/utilities/lastVisitedLeague';
 import { useStandings } from '../../../features/matchup/hooks/useStandings';
 import { LeagueFreeAgents } from '../FreeAgents';
@@ -438,7 +438,9 @@ export default function LeagueContext(): React.JSX.Element {
             <CommissionerScreen
               leagueId={numLeagueId}
               league={league}
-              onLeagueDeleted={() => router.navigate('/')}
+              // Straight to the Home tab. `/` only redirects there, and
+              // routing through it left the redirect in the stack (LS-8823).
+              onLeagueDeleted={() => router.navigate(HOME_TAB_HREF)}
             />
           </Tabs.Content>
         )}

@@ -45,6 +45,7 @@ import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { useAuthorizedUserInfo } from '../../../../common/auth/AuthorizedUserContext';
 import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { setLastVisitedLeague } from '../../../../common/utilities/lastVisitedLeague';
+import { HOME_TAB_HREF } from '../../../../common/utilities/RouteUtils';
 import { useSubscription } from '../../../../features/subscription/useSubscription';
 
 const BASE_FOOTBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
@@ -605,7 +606,9 @@ export default function FootballLeagueId(): React.JSX.Element {
           <CommissionerScreen
             leagueId={numLeagueId}
             league={league}
-            onLeagueDeleted={() => router.navigate('/')}
+            // Straight to the Home tab. `/` only redirects there, and routing
+            // through it left the redirect in the stack (LS-8823).
+            onLeagueDeleted={() => router.navigate(HOME_TAB_HREF)}
           />
         </YStack>
       )}

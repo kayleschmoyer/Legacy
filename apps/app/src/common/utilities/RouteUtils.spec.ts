@@ -1,4 +1,48 @@
-import { toIntId } from './RouteUtils';
+import { closeToHomeTab, HOME_TAB_HREF, toIntId } from './RouteUtils';
+
+// LS-8823 — cancel handlers used to push a concrete home path (`/baseball`,
+// `/football`), which dropped the user on a standalone copy of the sport home
+// outside the tab shell.
+describe('closeToHomeTab', () => {
+  const makeRouter = (canGoBack: boolean) => ({
+    canGoBack: jest.fn(() => canGoBack),
+    back: jest.fn(),
+    navigate: jest.fn(),
+  });
+
+  it('pops back to the screen the user came from when there is history', () => {
+    const router = makeRouter(true);
+
+    closeToHomeTab(router);
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the Home tab when there is nothing to pop', () => {
+    const router = makeRouter(false);
+
+    closeToHomeTab(router);
+
+    expect(router.navigate).toHaveBeenCalledWith('/home');
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('never routes to a standalone sport home', () => {
+    const router = makeRouter(false);
+
+    closeToHomeTab(router);
+
+    expect(router.navigate).not.toHaveBeenCalledWith('/baseball');
+    expect(router.navigate).not.toHaveBeenCalledWith('/football');
+  });
+});
+
+describe('HOME_TAB_HREF', () => {
+  it('points at the Home tab, not the `/` redirect', () => {
+    expect(HOME_TAB_HREF).toBe('/home');
+  });
+});
 
 describe('toIntId', () => {
   it('returns a positive integer for a numeric string', () => {

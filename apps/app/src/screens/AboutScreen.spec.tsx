@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import AboutScreen from './AboutScreen';
 
 // expo-constants pulls in native expo-modules-core which is unavailable in Jest.
@@ -41,9 +41,10 @@ function setConfig(values: Record<string, string | undefined>): void {
 }
 
 const mockRouterPush = jest.fn();
+const mockRouterNavigate = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockRouterPush }),
+  useRouter: () => ({ push: mockRouterPush, navigate: mockRouterNavigate }),
 }));
 
 jest.mock('react-native/Libraries/Linking/Linking', () => ({
@@ -137,6 +138,17 @@ describe('AboutScreen', () => {
   it('renders Get Started Free button', () => {
     render(<AboutScreen />);
     expect(screen.getByText('Get Started Free')).toBeTruthy();
+  });
+
+  // LS-8823 — this used to `push('/')`, and because `/` only redirects to the
+  // Home tab the pushed screen became a second copy of the tab shell.
+  it('sends Get Started Free to the Home tab without stacking a second one', () => {
+    render(<AboutScreen />);
+
+    fireEvent.press(screen.getByText('Get Started Free'));
+
+    expect(mockRouterNavigate).toHaveBeenCalledWith('/home');
+    expect(mockRouterPush).not.toHaveBeenCalledWith('/');
   });
 
   it('shows "unknown" for app version when config.appVersion is absent', () => {

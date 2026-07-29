@@ -17,10 +17,18 @@ type RNComponents = {
 
 const mockNavigate = jest.fn();
 const mockPush = jest.fn();
+const mockSetParams = jest.fn();
+// `/baseball` and `/football` redirect into this tab carrying `?sport=` (LS-8823).
+let mockSearchParams: { sport?: string } = {};
 
 // useFocusEffect runs its callback synchronously in tests
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
+  useRouter: () => ({
+    navigate: mockNavigate,
+    push: mockPush,
+    setParams: mockSetParams,
+  }),
+  useLocalSearchParams: () => mockSearchParams,
   useFocusEffect: (cb: () => (() => void) | void) => {
     cb();
   },
@@ -155,23 +163,31 @@ jest.mock('../../../common/auth/AuthorizedUserContext', () => ({
   useAuthorizedUserInfo: () => ({ id: 1, username: 'Manager' }),
 }));
 
-jest.mock('../baseball/index', () => {
+// The sport home screens live outside the route tree so the Home tab is their
+// only mount point (LS-8823).
+let capturedOnSwitchSport: ((sport: 'football') => void) | null = null;
+jest.mock('../../../screens/BaseballHomeScreen', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { View } = require('react-native') as RNComponents;
   return {
     __esModule: true,
-    default: () => <View testID="baseball-home-screen" />,
-    ErrorBoundary: null,
+    default: ({
+      onSwitchSport,
+    }: {
+      onSwitchSport?: (sport: 'football') => void;
+    }) => {
+      capturedOnSwitchSport = onSwitchSport ?? null;
+      return <View testID="baseball-home-screen" />;
+    },
   };
 });
 
-jest.mock('../football/index', () => {
+jest.mock('../../../screens/FootballHomeScreen', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { View } = require('react-native') as RNComponents;
   return {
     __esModule: true,
     default: () => <View testID="football-home-screen" />,
-    ErrorBoundary: null,
   };
 });
 
@@ -183,6 +199,8 @@ describe('HomeTab sport switching (LS-5814)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
+    capturedOnSwitchSport = null;
     backHandlerHandlers.length = 0;
     capturedOnViewSport = null;
     capturedTopInset = undefined;
@@ -301,11 +319,88 @@ describe('HomeTab sport switching (LS-5814)', () => {
     });
     expect(screen.queryByText('Football Home')).toBeNull();
   });
+
+  // LS-8823 — `/baseball` and `/football` used to render their own copy of the
+  // sport home outside the tab shell. They now redirect here with `?sport=`, so
+  // the tab is the single mount point and the tab bar is never lost.
+  describe('deep links into the sport view (LS-8823)', () => {
+    it.each([
+      ['baseball', 'baseball-home-screen'],
+      ['football', 'football-home-screen'],
+    ])('opens the %s view when redirected with ?sport=', (sport, testID) => {
+      mockSearchParams = { sport };
+
+      render(<HomeTab />);
+
+      expect(screen.getByTestId(testID)).toBeTruthy();
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('clears the param so the view can be dismissed and re-opened', () => {
+      mockSearchParams = { sport: 'baseball' };
+
+      render(<HomeTab />);
+
+      expect(mockSetParams).toHaveBeenCalledWith({ sport: '' });
+    });
+
+    it('stays on the dashboard for a missing or unrecognized sport', () => {
+      mockSearchParams = { sport: 'cricket' };
+
+      render(<HomeTab />);
+
+      expect(screen.getByTestId('home-screen')).toBeTruthy();
+      expect(screen.queryByTestId('baseball-home-screen')).toBeNull();
+      expect(mockSetParams).not.toHaveBeenCalled();
+    });
+
+    it('lets system back dismiss a deep-linked sport view', () => {
+      mockSearchParams = { sport: 'baseball' };
+      const { rerender } = render(<HomeTab />);
+
+      // The router has cleared the param by the time back is pressed.
+      mockSearchParams = { sport: '' };
+      rerender(<HomeTab />);
+      void act(() => {
+        backHandlerHandlers.forEach((handler) => handler());
+      });
+
+      expect(screen.getByTestId('home-screen')).toBeTruthy();
+      expect(
+        screen.queryByTestId('baseball-home-screen', {
+          includeHiddenElements: false,
+        }),
+      ).toBeNull();
+    });
+  });
+
+  // LS-8823 — the switcher inside the baseball home used to push `/football`,
+  // leaving the tab shell for the standalone route.
+  describe('sport switcher (LS-8823)', () => {
+    it('switches sports inline instead of navigating', () => {
+      render(<HomeTab />);
+      void act(() => {
+        capturedOnViewSport?.('baseball');
+      });
+
+      expect(capturedOnSwitchSport).not.toBeNull();
+      void act(() => {
+        capturedOnSwitchSport?.('football');
+      });
+
+      expect(screen.getByTestId('football-home-screen')).toBeTruthy();
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('HomeTab OnThisDayFeed player navigation (LS-8627)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
+    capturedOnSwitchSport = null;
     capturedOnPlayerPress = null;
     mockGetUserLeagueSummaries.mockReturnValue({
       data: { getUserLeagueSummaries: [] },
@@ -345,6 +440,8 @@ describe('HomeTab OnThisDayFeed player navigation (LS-8627)', () => {
 describe('HomeTab archived leagues toggle (LS-8633)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
+    capturedOnSwitchSport = null;
     capturedOnShowArchived = null;
     capturedOnHideArchived = null;
     capturedShowArchived = undefined;
@@ -391,6 +488,8 @@ describe('HomeTab archived leagues toggle (LS-8633)', () => {
 describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
+    capturedOnSwitchSport = null;
     capturedOnSeeAllLeagues = null;
     capturedOnOpenProfile = null;
     capturedOnViewMatchup = null;
