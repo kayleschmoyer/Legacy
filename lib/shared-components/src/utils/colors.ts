@@ -20,6 +20,7 @@ import {
   darkSurface,
   footballPositionBadges,
   getPositionColor as getPositionColorToken,
+  ledger,
   positions,
   withAlpha as withAlphaToken,
 } from '@legacy-sports/design-tokens';
@@ -126,6 +127,15 @@ export const TEXT_SECONDARY = '#8A9BB5';
 export const TEXT_NEUTRAL_FG3 = '#9CAAC5';
 /** Tertiary text — further muted, de-emphasized content. */
 export const TEXT_TERTIARY = '#6C80BA';
+/** Disabled foreground — unreachable wizard steps, unavailable chip options. */
+export const TEXT_DISABLED = ledger.disabledFg;
+
+// -- Ledger / wizard accents (LS-8809) --------------------------------
+
+/** Muted ledger green — completed-step check marks. */
+export const LEDGER_SUCCESS = ledger.successCheck;
+/** Inline field-error rose — softer than STATUS_DANGER, for form validation. */
+export const INLINE_ERROR = ledger.errorInline;
 
 // -- Score / Status Colors ---------------------------------------------
 

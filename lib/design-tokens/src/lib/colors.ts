@@ -87,6 +87,16 @@ export const semantic = {
   accentBorder: 'rgba(197, 165, 90, 0.4)',
 } as const;
 
+// Accents introduced by the mobile design-handoff batch (LS-8794/8795/8800/
+// 8809) that have no equivalent in `semantic`: a muted ledger green for the
+// completed-step check, a softer rose for inline field errors, and a dimmed
+// foreground for disabled wizard steps and unavailable chip options.
+export const ledger = {
+  disabledFg: '#3E4E71',
+  successCheck: '#7BA05B',
+  errorInline: '#E06A7C',
+} as const;
+
 export const positions = {
   pitcher: '#C41E3A',
   catcher: '#7C8794',

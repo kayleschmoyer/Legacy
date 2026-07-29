@@ -1,41 +1,33 @@
 import React from 'react';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react-native';
+import { render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
-import type {
-  Pressable as RNPressable,
-  Text as RNText,
-  TextInput as RNTextInput,
-  View as RNView,
-} from 'react-native';
+import type { View as RNView } from 'react-native';
 
-import CreateLeagueScreen from './create';
+import CreateLeagueScreen, { buildCreateLeagueInput } from './create';
 
 // ── Mock type helpers ────────────────────────────────────────────────────────
 
-type RNComponents = {
-  View: typeof RNView;
-  Text: typeof RNText;
-  TextInput: typeof RNTextInput;
-  Pressable: typeof RNPressable;
+type WizardProps = {
+  sport: 'baseball' | 'football';
+  initialLeagueName?: string;
+  isPremium: boolean;
+  premiumLoading: boolean;
+  submitting?: boolean;
+  submitError?: string;
+  onSubmit: (form: WizardForm) => void;
+  onClose: (isDirty: boolean) => void;
+  onUpgrade: (featureName: string) => void;
 };
+
+type WizardForm = ReturnType<typeof makeForm>;
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockPush = jest.fn();
-const mockBack = jest.fn();
 const mockNavigate = jest.fn();
-let mockSearchParams: { name?: string } = {};
+let mockSearchParams: { name?: string; sport?: string } = {};
 jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    back: mockBack,
-    navigate: mockNavigate,
-  }),
+  useRouter: () => ({ push: mockPush, navigate: mockNavigate }),
   useLocalSearchParams: () => mockSearchParams,
 }));
 
@@ -46,60 +38,27 @@ jest.mock('../../../features/subscription', () => ({
     isPremium: mockIsPremium,
     loading: mockPremiumLoading,
   }),
-  PremiumGate: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// The wizard itself is covered by its own spec in lib/shared-components; here
+// it is a prop probe so this spec stays about the data wiring this route owns.
+let wizardProps: WizardProps | undefined;
 jest.mock('@legacy-sports/shared-components/leagues', () => {
-  const { View, Text, TextInput, Pressable } =
-    jest.requireActual<RNComponents>('react-native');
-  // Real salary-cap bounds so the LS-8361 validation tests exercise the same
-  // range the component enforces.
-  const { MIN_SALARY_CAP, MAX_SALARY_CAP } = jest.requireActual<
-    typeof import('../../../../../../lib/shared-components/src/features/leagues/premium/constants')
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<{ View: typeof RNView }>('react-native');
+  const constants = jest.requireActual<
+    typeof import('../../../../../../lib/shared-components/src/features/leagues/create-wizard/constants')
   >(
-    '../../../../../../lib/shared-components/src/features/leagues/premium/constants',
+    '../../../../../../lib/shared-components/src/features/leagues/create-wizard/constants',
   );
   return {
-    MIN_SALARY_CAP,
-    MAX_SALARY_CAP,
-    EraFilterGrid: () => null,
-    CustomEraRange: () => null,
-    WaiverSystemField: () => null,
-    FaabBudgetField: () => null,
-    DraftSlotTradingField: () => null,
-    // Lean stand-in exposing the toggle, amount input, and inline error used
-    // by the salary-cap validation tests (LS-8361).
-    SalaryCapField: ({
-      enabled,
-      amount,
-      onToggleEnabled,
-      onAmountChange,
-      error,
-    }: {
-      enabled: boolean;
-      amount?: number;
-      onToggleEnabled: (v: boolean) => void;
-      onAmountChange: (v: number | undefined) => void;
-      error?: string;
-    }) => (
-      <View>
-        <Pressable
-          testID="salary-cap-toggle"
-          onPress={() => onToggleEnabled(!enabled)}
-        />
-        {enabled && (
-          <TextInput
-            testID="salary-cap-input"
-            value={amount !== undefined ? String(amount) : ''}
-            onChangeText={(text: string) => {
-              const n = parseInt(text, 10);
-              onAmountChange(isNaN(n) ? undefined : n);
-            }}
-          />
-        )}
-        {error !== undefined && <Text testID="salary-cap-error">{error}</Text>}
-      </View>
-    ),
+    ...constants,
+    LeagueCreateWizard: (props: WizardProps) => {
+      wizardProps = props;
+      return ReactActual.createElement(View, {
+        testID: 'league-create-wizard',
+      });
+    },
   };
 });
 
@@ -123,52 +82,20 @@ jest.mock('react-native/Libraries/Alert/Alert', () => ({
   default: { alert: jest.fn() },
 }));
 
-jest.mock('@legacy-sports/shared-components', () => {
-  const { View, Text } = jest.requireActual<RNComponents>('react-native');
-  return {
-    DateTimePicker: ({
-      value,
-      placeholder,
-    }: {
-      value?: Date;
-      onChange: (date: Date) => void;
-      placeholder?: string;
-      disabled?: boolean;
-      minDate?: Date;
-    }) => (
-      <View testID="date-time-picker">
-        <Text>{placeholder ?? 'DateTimePicker'}</Text>
-        <Text testID="date-value">
-          {value ? value.toISOString() : 'no date'}
-        </Text>
-      </View>
-    ),
-    Skeleton: () => <View testID="skeleton" />,
-  };
-});
-
-jest.mock('tamagui', () => {
-  const mocks = jest.requireActual<
-    typeof import('../../../__test-utils__/tamagui-mocks')
-  >('../../../__test-utils__/tamagui-mocks');
-  return mocks.tamaguiMocks;
-});
-
 const mockCreateLeagueMutate = jest.fn();
-const mockCreateLeagueState = { loading: false, error: undefined };
+const mockCreateLeagueState: { loading: boolean; error?: { message: string } } =
+  { loading: false, error: undefined };
 jest.mock('@legacy-sports/graphql', () => ({
-  Sport: { Football: 'football' },
+  Sport: { Football: 'football', Baseball: 'baseball' },
   DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   useCreateLeagueMutation: (options?: {
     onCompleted?: (data: unknown) => void;
     onError?: (error: unknown) => void;
   }) => {
     mockCreateLeagueMutate.mockImplementation((_args: unknown) => {
-      if (options?.onCompleted) {
-        options.onCompleted({
-          createLeagueAndTeams: { league: { id: 42, name: 'Test League' } },
-        });
-      }
+      options?.onCompleted?.({
+        createLeagueAndTeams: { league: { id: 42, name: 'Test League' } },
+      });
       return Promise.resolve({
         data: {
           createLeagueAndTeams: { league: { id: 42, name: 'Test League' } },
@@ -181,100 +108,99 @@ jest.mock('@legacy-sports/graphql', () => ({
 
 jest.mock('../_screenErrorBoundary', () => ({ ScreenErrorBoundary: null }));
 
+// ── Fixtures ─────────────────────────────────────────────────────────────────
+
+function makeForm(overrides: Record<string, unknown> = {}) {
+  return {
+    leagueName: '  Diamond Dynasty  ',
+    numberOfTeams: 12,
+    numberOfDivisions: 2,
+    isPublic: true,
+    schedulingStrategy: 'divisional' as const,
+    maxRosterSize: 25,
+    playerPool: 'all',
+    draftMode: 'live' as const,
+    selectionMethod: 'standard' as const,
+    draftOrder: 'snake' as const,
+    draftDate: new Date('2030-08-08T19:00:00.000Z'),
+    auctionBudget: 200,
+    auctionMinBid: 1,
+    allowDraftSlotTrading: false,
+    baseballEraFilter: 'all',
+    customEraStartYear: undefined,
+    customEraEndYear: undefined,
+    baseballHofOnly: false,
+    waiverType: 'standard' as const,
+    faabBudgetDefault: 100,
+    salaryCapEnabled: false,
+    salaryCap: undefined,
+    scoringFormat: 'ppr' as const,
+    defensiveFormat: 'dst' as const,
+    ...overrides,
+  };
+}
+
+/** Renders the screen and returns the props the wizard was handed. */
+function renderScreen(): WizardProps {
+  render(<CreateLeagueScreen />);
+  if (!wizardProps) throw new Error('LeagueCreateWizard did not render');
+  return wizardProps;
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('CreateLeagueScreen (unified)', () => {
+describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    wizardProps = undefined;
     mockIsPremium = false;
     mockPremiumLoading = false;
     mockSearchParams = {};
+    mockCreateLeagueState.loading = false;
+    mockCreateLeagueState.error = undefined;
   });
 
-  describe('sport selector', () => {
-    it('renders the baseball and football sport selector buttons', () => {
-      render(<CreateLeagueScreen />);
-      expect(screen.getByTestId('sport-selector-baseball')).toBeTruthy();
-      expect(screen.getByTestId('sport-selector-football')).toBeTruthy();
+  describe('sport routing', () => {
+    it('defaults to baseball when no sport param is present', () => {
+      expect(renderScreen().sport).toBe('baseball');
     });
 
-    it('defaults to baseball', () => {
-      render(<CreateLeagueScreen />);
-      // "All MLB" is baseball-specific; confirms sport defaults to baseball
-      expect(screen.getByText('All MLB')).toBeTruthy();
+    it('reads football from the ?sport= param', () => {
+      mockSearchParams = { sport: 'football' };
+      expect(renderScreen().sport).toBe('football');
     });
 
-    it('switches to football fields when football is selected', () => {
-      render(<CreateLeagueScreen />);
-      fireEvent.press(screen.getByTestId('sport-selector-football'));
-      expect(screen.getByText('All NFL')).toBeTruthy();
-      expect(screen.getByText('Half-PPR')).toBeTruthy();
-      expect(screen.getByText('D/ST')).toBeTruthy();
-    });
-
-    it('switches back to baseball fields when baseball is selected after football', () => {
-      render(<CreateLeagueScreen />);
-      fireEvent.press(screen.getByTestId('sport-selector-football'));
-      fireEvent.press(screen.getByTestId('sport-selector-baseball'));
-      expect(screen.getByText('All MLB')).toBeTruthy();
+    it('falls back to baseball for an unrecognized sport param', () => {
+      mockSearchParams = { sport: 'cricket' };
+      expect(renderScreen().sport).toBe('baseball');
     });
   });
 
-  describe('baseball form', () => {
-    it('renders baseball player pool options by default', () => {
-      render(<CreateLeagueScreen />);
-      expect(screen.getByText('All MLB')).toBeTruthy();
-      expect(screen.getByText('NL Only')).toBeTruthy();
-      expect(screen.getByText('AL Only')).toBeTruthy();
-    });
+  it('passes the ?name= prefill through to the wizard', () => {
+    mockSearchParams = { name: 'Diamond Dynasty' };
+    expect(renderScreen().initialLeagueName).toBe('Diamond Dynasty');
+  });
 
-    it('renders baseball roster size options', () => {
-      render(<CreateLeagueScreen />);
-      for (const size of [20, 22, 25, 30, 35, 40]) {
-        expect(screen.getByText(String(size))).toBeTruthy();
-      }
-    });
+  it('forwards subscription state so premium controls can gate themselves', () => {
+    mockIsPremium = true;
+    mockPremiumLoading = true;
+    const props = renderScreen();
+    expect(props.isPremium).toBe(true);
+    expect(props.premiumLoading).toBe(true);
+  });
 
-    it('renders the date picker', () => {
-      render(<CreateLeagueScreen />);
-      expect(screen.getByTestId('date-time-picker')).toBeTruthy();
-    });
+  it('reports mutation in-flight and error state to the wizard', () => {
+    mockCreateLeagueState.loading = true;
+    mockCreateLeagueState.error = { message: 'League name is taken' };
+    const props = renderScreen();
+    expect(props.submitting).toBe(true);
+    expect(props.submitError).toBe('League name is taken');
+  });
 
-    it('renders Create League and Cancel buttons', () => {
-      render(<CreateLeagueScreen />);
-      expect(
-        screen.getByRole('button', { name: 'Create League' }),
-      ).toBeTruthy();
-      expect(screen.getByText('Cancel')).toBeTruthy();
-    });
-
-    it('updates league name when typed', () => {
-      render(<CreateLeagueScreen />);
-      const input = screen.getByPlaceholderText('Enter your league name');
-      fireEvent.changeText(input, 'My Test League');
-      expect(input.props.value).toBe('My Test League');
-    });
-
-    it('cancel button navigates to /baseball (LS-5372)', () => {
-      render(<CreateLeagueScreen />);
-      fireEvent.press(screen.getByText('Cancel'));
-      expect(mockNavigate).toHaveBeenCalledWith('/baseball');
-    });
-
-    it('pre-fills the league name from the ?name= route param (LS-5372)', () => {
-      mockSearchParams = { name: 'Diamond Dynasty' };
-      render(<CreateLeagueScreen />);
-      const input = screen.getByPlaceholderText('Enter your league name');
-      expect(input.props.value).toBe('Diamond Dynasty');
-    });
-
-    it('calls mutation with baseball input and navigates to baseball league on success', async () => {
-      render(<CreateLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your league name'),
-        'My Baseball League',
-      );
-      fireEvent.press(screen.getByRole('button', { name: 'Create League' }));
+  describe('submit', () => {
+    it('sends the assembled input and routes to the new baseball league', async () => {
+      const props = renderScreen();
+      props.onSubmit(makeForm());
 
       await waitFor(() => {
         expect(mockCreateLeagueMutate).toHaveBeenCalled();
@@ -282,200 +208,158 @@ describe('CreateLeagueScreen (unified)', () => {
       });
     });
 
-    it('does not call mutation when league name is too short', () => {
-      render(<CreateLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your league name'),
-        'AB',
-      );
-      fireEvent.press(screen.getByRole('button', { name: 'Create League' }));
-      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('baseball salary cap validation (LS-8361)', () => {
-    // Renders the screen with a valid league name and the salary cap enabled,
-    // then types `amountText` into the cap input (skipped when undefined).
-    const setUpWithSalaryCap = (amountText?: string) => {
-      render(<CreateLeagueScreen />);
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your league name'),
-        'My Baseball League',
-      );
-      fireEvent.press(screen.getByTestId('salary-cap-toggle'));
-      if (amountText !== undefined) {
-        fireEvent.changeText(
-          screen.getByTestId('salary-cap-input'),
-          amountText,
-        );
-      }
-    };
-
-    const submit = () =>
-      fireEvent.press(screen.getByRole('button', { name: 'Create League' }));
-
-    it('rejects salaryCap 0 (previously passed the undefined-only check)', () => {
-      setUpWithSalaryCap('0');
-      submit();
-      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Error',
-        expect.stringMatching(/Salary cap must be between/),
-      );
-    });
-
-    it('rejects a negative salaryCap', () => {
-      setUpWithSalaryCap('-100');
-      submit();
-      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Error',
-        expect.stringMatching(/Salary cap must be between/),
-      );
-    });
-
-    it('rejects a salaryCap above the maximum', () => {
-      setUpWithSalaryCap('9999999999');
-      submit();
-      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Error',
-        expect.stringMatching(/Salary cap must be between/),
-      );
-    });
-
-    it('still requires an amount when the cap is enabled and empty', () => {
-      setUpWithSalaryCap();
-      submit();
-      expect(mockCreateLeagueMutate).not.toHaveBeenCalled();
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Error',
-        'Please enter a salary cap amount',
-      );
-    });
-
-    it('shows an inline validation error on the field for an invalid amount', () => {
-      setUpWithSalaryCap('0');
-      expect(screen.getByTestId('salary-cap-error')).toBeTruthy();
-      expect(screen.getByText(/Salary cap must be between/)).toBeTruthy();
-    });
-
-    it('shows no inline error for a valid amount', () => {
-      setUpWithSalaryCap('50000000');
-      expect(screen.queryByTestId('salary-cap-error')).toBeNull();
-    });
-
-    it('accepts a valid salaryCap and submits it', async () => {
-      setUpWithSalaryCap('50000000');
-      submit();
-      await waitFor(() => {
-        expect(mockCreateLeagueMutate).toHaveBeenCalled();
-      });
-      type MutateCallArgs = {
-        variables: { input: { salaryCap?: number; salaryCapEnabled: boolean } };
-      };
-      const calls = mockCreateLeagueMutate.mock.calls as MutateCallArgs[][];
-      expect(calls[0][0].variables.input.salaryCapEnabled).toBe(true);
-      expect(calls[0][0].variables.input.salaryCap).toBe(50000000);
-    });
-
-    it('does not validate salaryCap when the cap is disabled', async () => {
-      setUpWithSalaryCap('0');
-      // Toggle the cap back off — the stale 0 amount must not block submit.
-      fireEvent.press(screen.getByTestId('salary-cap-toggle'));
-      submit();
-      await waitFor(() => {
-        expect(mockCreateLeagueMutate).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('premium settings entitlement loading (LS-8380)', () => {
-    it('shows a loading placeholder instead of the upsell card while premiumLoading is true', () => {
-      mockIsPremium = true;
-      mockPremiumLoading = true;
-      render(<CreateLeagueScreen />);
-      expect(screen.getByTestId('premium-settings-loading')).toBeTruthy();
-      expect(
-        screen.queryByText(/Premium features. Free leagues use All Eras/),
-      ).toBeNull();
-    });
-
-    it('does not show the non-premium upsell card for a premium user once loading resolves', () => {
-      mockIsPremium = true;
-      mockPremiumLoading = false;
-      render(<CreateLeagueScreen />);
-      expect(screen.queryByTestId('premium-settings-loading')).toBeNull();
-      expect(
-        screen.queryByText(/Premium features. Free leagues use All Eras/),
-      ).toBeNull();
-    });
-
-    it('shows the non-premium upsell card for a free user once loading resolves', () => {
-      mockIsPremium = false;
-      mockPremiumLoading = false;
-      render(<CreateLeagueScreen />);
-      expect(screen.queryByTestId('premium-settings-loading')).toBeNull();
-      expect(
-        screen.getByText(/Premium features. Free leagues use All Eras/),
-      ).toBeTruthy();
-    });
-  });
-
-  describe('football form', () => {
-    beforeEach(() => {
-      render(<CreateLeagueScreen />);
-      fireEvent.press(screen.getByTestId('sport-selector-football'));
-    });
-
-    it('renders football player pool options', () => {
-      expect(screen.getByText('All NFL')).toBeTruthy();
-      expect(screen.getByText('AFC')).toBeTruthy();
-      expect(screen.getByText('NFC')).toBeTruthy();
-    });
-
-    it('renders scoring format options', () => {
-      expect(screen.getAllByText('Standard').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText('Half-PPR')).toBeTruthy();
-      expect(screen.getByText('PPR')).toBeTruthy();
-    });
-
-    it('renders defensive format options', () => {
-      expect(screen.getByText('D/ST')).toBeTruthy();
-      expect(screen.getByText('IDP')).toBeTruthy();
-    });
-
-    it('calls mutation with football sport and navigates to football league on success', async () => {
-      fireEvent.changeText(
-        screen.getByPlaceholderText('Enter your league name'),
-        'My Football League',
-      );
-      fireEvent.press(screen.getByRole('button', { name: 'Create League' }));
+    it('routes to the football league when entered from the football wrapper', async () => {
+      mockSearchParams = { sport: 'football' };
+      const props = renderScreen();
+      props.onSubmit(makeForm());
 
       await waitFor(() => {
-        expect(mockCreateLeagueMutate).toHaveBeenCalled();
-        type MutateCallArgs = {
-          variables: { input: { sport: string } };
-        };
-        const calls = mockCreateLeagueMutate.mock.calls as MutateCallArgs[][];
-        expect(calls[0][0].variables.input.sport).toBe('football');
         expect(mockPush).toHaveBeenCalledWith('/football/league/42');
       });
     });
+  });
 
-    it('shows D/ST info text by default in info card', () => {
-      expect(
-        screen.getByText(
-          /A single D\/ST slot is included in the default roster/,
-        ),
-      ).toBeTruthy();
+  describe('close', () => {
+    it('leaves immediately when nothing has been edited', () => {
+      renderScreen().onClose(false);
+      expect(Alert.alert).not.toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith('/baseball');
     });
 
-    it('updates info card text when IDP is selected', () => {
-      fireEvent.press(screen.getByText('IDP'));
-      expect(
-        screen.getByText(/IDP roster slots \(DL\/LB\/DB\) will be configured/),
-      ).toBeTruthy();
+    it('confirms before discarding unsaved edits', () => {
+      renderScreen().onClose(true);
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Discard league setup?',
+        'Your settings will be lost.',
+        expect.any(Array),
+        expect.any(Object),
+      );
     });
+
+    it('navigates once the discard action is confirmed', () => {
+      renderScreen().onClose(true);
+      const buttons = jest.mocked(Alert.alert).mock.calls[0][2];
+      buttons?.find((b) => b.text === 'Discard')?.onPress?.();
+      expect(mockNavigate).toHaveBeenCalledWith('/baseball');
+    });
+  });
+
+  it('tracks a premium tap then routes to subscription settings', () => {
+    const { trackPremiumFeatureClick } = jest.requireMock<{
+      trackPremiumFeatureClick: jest.Mock;
+    }>('../../../utils/analytics');
+
+    renderScreen().onUpgrade('Salary Cap');
+
+    expect(trackPremiumFeatureClick).toHaveBeenCalledWith('Salary Cap');
+    expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
+  });
+});
+
+describe('buildCreateLeagueInput', () => {
+  it('trims the league name and sends the five new parity fields', () => {
+    const input = buildCreateLeagueInput(makeForm(), 'baseball');
+    expect(input.leagueName).toBe('Diamond Dynasty');
+    expect(input.numberOfDivisions).toBe(2);
+    expect(input.isPublic).toBe(true);
+    expect(input.schedulingStrategy).toBe('divisional');
+    expect(input.baseballHofOnly).toBe(false);
+  });
+
+  it('sends auction budget and minimum bid only for an auction draft', () => {
+    const standard = buildCreateLeagueInput(makeForm(), 'baseball');
+    expect(standard.auctionBudget).toBeUndefined();
+    expect(standard.auctionMinBid).toBeUndefined();
+
+    const auction = buildCreateLeagueInput(
+      makeForm({
+        selectionMethod: 'auction',
+        auctionBudget: 300,
+        auctionMinBid: 5,
+      }),
+      'baseball',
+    );
+    expect(auction.auctionBudget).toBe(300);
+    expect(auction.auctionMinBid).toBe(5);
+  });
+
+  it('never sends draft-slot trading for an auction league (LS-8675)', () => {
+    const input = buildCreateLeagueInput(
+      makeForm({ selectionMethod: 'auction', allowDraftSlotTrading: true }),
+      'baseball',
+    );
+    expect(input.allowDraftSlotTrading).toBeUndefined();
+  });
+
+  it('sends draft-slot trading when enabled on a non-auction league', () => {
+    const input = buildCreateLeagueInput(
+      makeForm({ allowDraftSlotTrading: true }),
+      'baseball',
+    );
+    expect(input.allowDraftSlotTrading).toBe(true);
+  });
+
+  it('sends custom-era bounds only when the custom era is selected', () => {
+    const preset = buildCreateLeagueInput(
+      makeForm({ customEraStartYear: 1940, customEraEndYear: 1950 }),
+      'baseball',
+    );
+    expect(preset.customEraStartYear).toBeUndefined();
+
+    const custom = buildCreateLeagueInput(
+      makeForm({
+        baseballEraFilter: 'custom',
+        customEraStartYear: 1940,
+        customEraEndYear: 1950,
+      }),
+      'baseball',
+    );
+    expect(custom.customEraStartYear).toBe(1940);
+    expect(custom.customEraEndYear).toBe(1950);
+  });
+
+  it('sends the FAAB budget only for FAAB waivers', () => {
+    expect(
+      buildCreateLeagueInput(makeForm(), 'baseball').faabBudgetDefault,
+    ).toBeUndefined();
+    expect(
+      buildCreateLeagueInput(makeForm({ waiverType: 'faab' }), 'baseball')
+        .faabBudgetDefault,
+    ).toBe(100);
+  });
+
+  it('sends the salary cap amount only when the cap is enabled', () => {
+    expect(
+      buildCreateLeagueInput(
+        makeForm({ salaryCapEnabled: false, salaryCap: 5_000_000 }),
+        'baseball',
+      ).salaryCap,
+    ).toBeUndefined();
+    expect(
+      buildCreateLeagueInput(
+        makeForm({ salaryCapEnabled: true, salaryCap: 5_000_000 }),
+        'baseball',
+      ).salaryCap,
+    ).toBe(5_000_000);
+  });
+
+  it('sends football scoring fields and omits the baseball-only ones', () => {
+    const input = buildCreateLeagueInput(
+      makeForm({ defensiveFormat: 'idp' }),
+      'football',
+    );
+    expect(input.sport).toBe('football');
+    expect(input.scoringFormat).toBe('ppr');
+    expect(input.defensiveFormat).toBe('idp');
+    expect(input.eraFilter).toBeUndefined();
+    expect(input.baseballHofOnly).toBeUndefined();
+    expect(input.salaryCapEnabled).toBeUndefined();
+  });
+
+  it('serializes the draft date as an ISO start date', () => {
+    expect(buildCreateLeagueInput(makeForm(), 'baseball').startDate).toBe(
+      '2030-08-08T19:00:00.000Z',
+    );
   });
 });
