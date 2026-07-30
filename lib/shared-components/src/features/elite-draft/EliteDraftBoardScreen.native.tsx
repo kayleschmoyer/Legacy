@@ -1,19 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet } from 'react-native';
-import {
-  Button,
-  Card,
-  H3,
-  H4,
-  Input,
-  ScrollView,
-  Spinner,
-  Text,
-  XStack,
-  YStack,
-} from 'tamagui';
+import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import type { DraftChatRenderer } from './DraftChatOverlay';
-import type { DraftPlayer, LeagueTeam } from './types';
+import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { getPositionColor } from './utils';
 import {
   useDraftActions,
@@ -24,8 +13,34 @@ import {
   useDraftWebSocket,
   usePlayerData,
 } from './hooks';
+import { DraftClockRing } from './DraftClockRing.native';
+import { DraftMiniBoard } from './DraftMiniBoard.native';
+import { DraftPickAnnouncement } from './DraftPickAnnouncement.native';
+import { DraftSquadStrip } from './DraftSquadStrip.native';
+import { useDraftPalette } from './nativeDraftPalette';
+import {
+  MIN_BOARD_ROUNDS,
+  resolveBoardRounds,
+  statLineFor,
+} from './nativeDraftBoard';
 import { useAuth } from '../../features/auth';
 import { PositionBadge } from '../../components/PositionBadge';
+import { withAlpha } from '../../utils/colors';
+
+const POSITION_FILTERS = [
+  'ALL',
+  'C',
+  '1B',
+  '2B',
+  '3B',
+  'SS',
+  'OF',
+  'SP',
+  'RP',
+  'DH',
+] as const;
+
+type SortKey = 'adp' | 'pts';
 
 // ---------------------------------------------------------------------------
 // Props (same interface as the web version)
@@ -44,8 +59,71 @@ export interface EliteDraftBoardScreenProps {
 }
 
 // ---------------------------------------------------------------------------
-// State screens (native equivalents of DraftStateScreens.tsx)
+// Shared chrome
 // ---------------------------------------------------------------------------
+
+/** Uppercase, wide-tracked label used above every headline on this screen. */
+function Eyebrow({
+  children,
+  color = '$fg4',
+}: {
+  children: React.ReactNode;
+  color?: string;
+}) {
+  return (
+    <Text
+      fontSize={9.5}
+      fontWeight="700"
+      letterSpacing={2}
+      textTransform="uppercase"
+      color={color}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** The gold lozenge used for every primary action on the draft surfaces. */
+function GoldButton({
+  label,
+  onPress,
+  disabled,
+  size = 'lg',
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  size?: 'lg' | 'sm';
+}) {
+  const large = size === 'lg';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+    >
+      <YStack
+        backgroundColor="$brandGold"
+        borderRadius={999}
+        paddingVertical={large ? 15 : 8}
+        paddingHorizontal={large ? 34 : 12}
+        opacity={disabled ? 0.55 : 1}
+      >
+        <Text
+          fontFamily="$heading"
+          fontSize={large ? 19 : 11.5}
+          fontWeight="800"
+          letterSpacing={large ? 1.5 : 0.5}
+          color="$textOnAccent"
+        >
+          {label}
+        </Text>
+      </YStack>
+    </Pressable>
+  );
+}
 
 function CenteredMessage({
   icon,
@@ -61,37 +139,85 @@ function CenteredMessage({
   onPress?: () => void;
 }) {
   return (
-    <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
-      <Text
-        fontSize={48}
-        marginBottom="$3"
-        accessibilityRole="image"
-        accessibilityLabel={title}
-      >
+    <YStack
+      flex={1}
+      backgroundColor="$background"
+      justifyContent="center"
+      alignItems="center"
+      padding="$6"
+      gap="$3"
+    >
+      <Text fontSize={48} accessibilityRole="image" accessibilityLabel={title}>
         {icon}
       </Text>
-      <H3 textAlign="center" marginBottom="$2">
-        {title}
-      </H3>
-      <Text color="$gray10" textAlign="center" fontSize="$4" marginBottom="$4">
+      <Text
+        fontFamily="$heading"
+        fontSize={28}
+        fontWeight="800"
+        color="$color"
+        textAlign="center"
+      >
+        {title.toUpperCase()}
+      </Text>
+      <Text
+        color="$textMuted"
+        textAlign="center"
+        fontSize={13.5}
+        maxWidth={300}
+      >
         {description}
       </Text>
       {buttonText && onPress && (
-        <Button
-          size="$4"
-          backgroundColor="$brandNavyLight"
-          color="$colorInverse"
-          onPress={onPress}
-        >
-          {buttonText}
-        </Button>
+        <GoldButton label={buttonText.toUpperCase()} onPress={onPress} />
       )}
     </YStack>
   );
 }
 
+/** Outlined, low-emphasis action (Back to League, commissioner toggles). */
+function GhostButton({
+  label,
+  onPress,
+  tone = 'neutral',
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  tone?: 'neutral' | 'active';
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+    >
+      <YStack
+        borderWidth={1}
+        borderRadius={999}
+        paddingVertical={7}
+        paddingHorizontal={13}
+        opacity={disabled ? 0.55 : 1}
+        borderColor={tone === 'active' ? '$brandGold' : '$outlineDefault'}
+        backgroundColor={tone === 'active' ? '$accentMuted' : 'transparent'}
+      >
+        <Text
+          fontSize={11}
+          fontWeight="700"
+          letterSpacing={0.5}
+          color={tone === 'active' ? '$brandGoldLight' : '$textMuted'}
+        >
+          {label}
+        </Text>
+      </YStack>
+    </Pressable>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Pre-Draft Lobby (native)
+// Pre-Draft Lobby (native) — "THE BOARD IS SET"
 // ---------------------------------------------------------------------------
 function NativePreDraftLobby({
   league,
@@ -115,135 +241,148 @@ function NativePreDraftLobby({
   initDraftLoading: boolean;
   onInitializeDraft: (order: 'snake' | 'linear') => Promise<void>;
 }) {
+  const palette = useDraftPalette();
+  // Decorative teaser board: two rounds wide, a scattering of cells pre-lit so
+  // the empty grid still reads as a draft board.
+  const teaserColumns = Math.max(leagueTeams.length, 4);
+  const teaser = Array.from(
+    { length: teaserColumns * 2 },
+    (_, i) => i % 3 === 1 || i % 7 === 4,
+  );
+
   return (
-    <ScrollView flex={1}>
-      <YStack padding="$4" alignItems="center" space="$4">
-        <Text
-          fontSize={48}
-          accessibilityRole="image"
-          accessibilityLabel="baseball"
-        >
-          ⚾
-        </Text>
-        <H3 textAlign="center">
-          {league?.name ? `${league.name} — Live Draft` : 'Live Draft Lobby'}
-        </H3>
-        <Text color="$gray10" textAlign="center" fontSize="$4">
-          {leagueTeams.length < 2
-            ? 'At least 2 teams are required to start a draft.'
-            : isOwner
-              ? 'As the commissioner, you can start the draft when ready.'
-              : 'Waiting for the commissioner to start the draft.'}
-        </Text>
+    <ScrollView flex={1} backgroundColor="$background">
+      <YStack padding="$4" alignItems="center" gap="$4">
+        <XStack flexWrap="wrap" justifyContent="center" gap={3} maxWidth={260}>
+          {teaser.map((lit, i) => (
+            <YStack
+              key={i}
+              width={26}
+              height={17}
+              borderRadius={3}
+              borderWidth={1}
+              borderColor="$surfacePanelBorder"
+              backgroundColor={
+                lit ? withAlpha(palette.gold.gold, 0.35) : '$surfacePanel'
+              }
+            />
+          ))}
+        </XStack>
+
+        <YStack alignItems="center" gap="$2">
+          {league?.name && (
+            <Eyebrow color="$brandGoldLight">{league.name}</Eyebrow>
+          )}
+          <Text
+            fontFamily="$heading"
+            fontSize={34}
+            fontWeight="800"
+            lineHeight={36}
+            color="$color"
+            textAlign="center"
+          >
+            THE BOARD{'\n'}IS SET
+          </Text>
+          <Text
+            color="$textMuted"
+            fontSize={13.5}
+            textAlign="center"
+            maxWidth={280}
+          >
+            {leagueTeams.length > 0
+              ? `${leagueTeams.length} teams, one board. Watch it fill in live.`
+              : 'One board, live picks. Teams are still joining.'}
+          </Text>
+          <Text color="$fg4" fontSize={12} textAlign="center">
+            {leagueTeams.length < 2
+              ? 'At least 2 teams are required to start a draft.'
+              : isOwner
+                ? 'You’re the commissioner — start when everyone’s in.'
+                : 'Waiting for the commissioner to start the draft.'}
+          </Text>
+        </YStack>
+
+        {isOwner && leagueTeams.length >= 2 && (
+          <XStack gap="$3" flexWrap="wrap" justifyContent="center">
+            <GoldButton
+              label={initDraftLoading ? 'STARTING…' : 'START SNAKE DRAFT'}
+              disabled={initDraftLoading}
+              onPress={() => void onInitializeDraft('snake')}
+            />
+            <GhostButton
+              label={initDraftLoading ? 'STARTING…' : 'LINEAR ORDER'}
+              disabled={initDraftLoading}
+              onPress={() => void onInitializeDraft('linear')}
+            />
+          </XStack>
+        )}
+
+        {initError && (
+          <YStack
+            width="100%"
+            maxWidth={360}
+            padding="$3"
+            borderRadius={12}
+            borderWidth={1}
+            backgroundColor="$statusDangerBg"
+            borderColor="$statusDangerBorder"
+          >
+            <Text color="$statusDangerFg" fontSize={13}>
+              {initError}
+            </Text>
+          </YStack>
+        )}
 
         {leagueTeams.length > 0 && (
-          <YStack width="100%" maxWidth={360}>
-            <Text
-              fontSize="$2"
-              fontWeight="700"
-              color="$gray10"
-              marginBottom="$2"
-              textTransform="uppercase"
-            >
-              Teams ({leagueTeams.length})
-            </Text>
-            {leagueTeams.map((team, idx) => (
-              <Card
-                key={team.id}
-                padding="$2"
-                paddingHorizontal="$3"
-                marginBottom="$1"
-                bordered
-              >
-                <XStack alignItems="center" space="$2">
+          <YStack width="100%" maxWidth={360} gap="$2">
+            <Eyebrow>Draft order · {leagueTeams.length} teams</Eyebrow>
+            {leagueTeams.map((team, idx) => {
+              const isMine = String(team.id) === String(myTeamId);
+              return (
+                <XStack
+                  key={team.id}
+                  alignItems="center"
+                  gap="$2"
+                  paddingVertical={9}
+                  paddingHorizontal={12}
+                  borderRadius={12}
+                  borderWidth={1}
+                  borderColor={isMine ? '$brandGold' : '$surfacePanelBorder'}
+                  backgroundColor="$surfaceCard"
+                >
                   <Text
-                    fontSize="$2"
-                    fontWeight="700"
-                    color="$gray9"
-                    width={24}
+                    fontFamily="$heading"
+                    fontSize={14}
+                    fontWeight="800"
+                    color="$fg4"
+                    width={22}
                   >
-                    {idx + 1}.
+                    {idx + 1}
                   </Text>
                   <YStack
                     width={8}
                     height={8}
                     borderRadius={4}
                     backgroundColor={
-                      onlineTeamIds.has(String(team.id)) ? '$green9' : '$gray7'
+                      onlineTeamIds.has(String(team.id))
+                        ? '$statusSuccessFg'
+                        : '$outlineDefault'
                     }
                   />
                   <Text
                     flex={1}
-                    fontSize="$3"
-                    fontWeight="500"
-                    color={
-                      String(team.id) === String(myTeamId)
-                        ? '$brandNavyLight'
-                        : '$color'
-                    }
+                    fontSize={14.5}
+                    fontWeight="600"
+                    numberOfLines={1}
+                    color={isMine ? '$brandGoldLight' : '$color'}
                   >
                     {team.name}
-                    {String(team.id) === String(myTeamId) ? ' (You)' : ''}
+                    {isMine ? ' (You)' : ''}
                   </Text>
                 </XStack>
-              </Card>
-            ))}
+              );
+            })}
           </YStack>
-        )}
-
-        {initError && (
-          <Card
-            padding="$3"
-            backgroundColor="$red2"
-            borderColor="$red6"
-            bordered
-            width="100%"
-            maxWidth={360}
-          >
-            <Text color="$red10" fontSize="$3">
-              {initError}
-            </Text>
-          </Card>
-        )}
-
-        {isOwner && leagueTeams.length >= 2 && (
-          <XStack space="$3">
-            <Button
-              size="$4"
-              backgroundColor="$brandNavyLight"
-              color="$colorInverse"
-              disabled={initDraftLoading}
-              opacity={initDraftLoading ? 0.6 : 1}
-              onPress={() => void onInitializeDraft('snake')}
-            >
-              {initDraftLoading ? 'Starting...' : 'Snake Draft'}
-            </Button>
-            <Button
-              size="$4"
-              backgroundColor="$brandNavy"
-              color="$colorInverse"
-              disabled={initDraftLoading}
-              opacity={initDraftLoading ? 0.6 : 1}
-              onPress={() => void onInitializeDraft('linear')}
-            >
-              {initDraftLoading ? 'Starting...' : 'Normal Draft'}
-            </Button>
-          </XStack>
-        )}
-
-        {!isOwner && (
-          <Card
-            padding="$3"
-            backgroundColor="$surfaceInteractive"
-            borderColor="$outlineSubtle"
-            bordered
-            width="100%"
-            maxWidth={360}
-          >
-            <Text color="$brandGoldLight" fontSize="$3">
-              You'll be notified when the commissioner starts the draft.
-            </Text>
-          </Card>
         )}
       </YStack>
     </ScrollView>
@@ -251,11 +390,12 @@ function NativePreDraftLobby({
 }
 
 // ---------------------------------------------------------------------------
-// Draft Complete (native)
+// Draft Complete (native) — "FINAL BOARD"
 // ---------------------------------------------------------------------------
 function NativeDraftComplete({
   league,
   leagueId,
+  boardTeams,
   pickHistory,
   myTeamId,
   statsLookup,
@@ -263,15 +403,8 @@ function NativeDraftComplete({
 }: {
   league: { isMockDraft?: boolean; name?: string } | null | undefined;
   leagueId: number | null;
-  pickHistory: Array<{
-    id: string;
-    round: number;
-    pickNumber: number;
-    overallPick: number;
-    teamId: number;
-    playerId: number;
-    player?: { id: number; firstName: string; lastName: string } | null;
-  }>;
+  boardTeams: LeagueTeam[];
+  pickHistory: DraftPickRecord[];
   myTeamId: number | null;
   statsLookup: Map<number, DraftPlayer>;
   onNavigate: (path: string) => void;
@@ -282,28 +415,63 @@ function NativeDraftComplete({
     [pickHistory, myTeamId],
   );
 
+  const rounds = resolveBoardRounds({
+    teamCount: boardTeams.length,
+    pickCount: pickHistory.length,
+    currentRound: null,
+    maxPickRound: pickHistory.reduce((max, p) => Math.max(max, p.round), 0),
+  });
+
   return (
-    <ScrollView flex={1}>
-      <YStack padding="$4" space="$4">
-        <YStack alignItems="center" space="$2">
+    <ScrollView flex={1} backgroundColor="$background">
+      <YStack padding="$4" gap="$3">
+        <YStack alignItems="center" marginTop="$2">
           <Text
-            fontSize={48}
+            fontSize={44}
             accessibilityRole="image"
             accessibilityLabel="trophy"
           >
             🏆
           </Text>
-          <H3 textAlign="center">Draft Complete!</H3>
+          <Text
+            fontFamily="$heading"
+            fontSize={28}
+            fontWeight="800"
+            color="$brandGoldLight"
+          >
+            FINAL BOARD
+          </Text>
           {league?.name && (
-            <Text color="$gray10" fontSize="$4">
+            <Text color="$textMuted" fontSize={13}>
               {league.name}
             </Text>
           )}
         </YStack>
 
+        {boardTeams.length > 0 && (
+          <YStack
+            backgroundColor="$surfacePanel"
+            borderWidth={1}
+            borderColor="$surfacePanelBorder"
+            borderRadius={12}
+            padding="$3"
+          >
+            <DraftMiniBoard
+              teams={boardTeams}
+              picks={pickHistory}
+              currentPickInfo={null}
+              myTeamId={myTeamId}
+              statsLookup={statsLookup}
+              rounds={rounds}
+            />
+          </YStack>
+        )}
+
         {myPicks.length > 0 && (
-          <YStack space="$2">
-            <H4>Your Picks ({myPicks.length})</H4>
+          <YStack gap="$2">
+            <Eyebrow color="$brandGoldLight">
+              Your haul · {myPicks.length} picks
+            </Eyebrow>
             {myPicks.map((pick) => {
               const player = statsLookup.get(pick.playerId);
               const name = player
@@ -311,39 +479,68 @@ function NativeDraftComplete({
                 : pick.player
                   ? `${pick.player.firstName} ${pick.player.lastName}`
                   : `Player #${pick.playerId}`;
+              const position = player?.position;
               return (
-                <Card key={pick.id} padding="$3" bordered>
-                  <XStack justifyContent="space-between" alignItems="center">
-                    <YStack>
-                      <Text fontWeight="600" fontSize="$4">
-                        {name}
-                      </Text>
-                      {player && (
-                        <Text color="$gray10" fontSize="$2">
-                          {player.position}
-                        </Text>
-                      )}
-                    </YStack>
-                    <Text color="$gray9" fontSize="$2">
-                      Rd {pick.round}, Pick {pick.pickNumber}
+                <XStack
+                  key={pick.id}
+                  alignItems="center"
+                  gap={11}
+                  backgroundColor="$surfaceCard"
+                  borderWidth={1}
+                  borderColor="$surfacePanelBorder"
+                  borderRadius={12}
+                  paddingVertical={11}
+                  paddingHorizontal={13}
+                >
+                  {position && (
+                    <PositionBadge
+                      position={position}
+                      color={getPositionColor('baseball', position)}
+                      alpha={0.14}
+                      paddingHorizontal={8}
+                      paddingVertical={3}
+                      borderRadius={6}
+                    />
+                  )}
+                  <YStack flex={1}>
+                    <Text
+                      fontWeight="600"
+                      fontSize={14.5}
+                      color="$color"
+                      numberOfLines={1}
+                    >
+                      {name}
                     </Text>
-                  </XStack>
-                </Card>
+                    <Text fontSize={11} color="$fg4">
+                      Rd {pick.round} · Pick #{pick.overallPick}
+                    </Text>
+                  </YStack>
+                  {player?.ppg != null && (
+                    <Text
+                      fontFamily="$heading"
+                      fontSize={16}
+                      fontWeight="700"
+                      color="$brandGoldLight"
+                    >
+                      {player.ppg.toFixed(1)}
+                    </Text>
+                  )}
+                </XStack>
               );
             })}
           </YStack>
         )}
 
-        <Button
-          size="$4"
-          backgroundColor="$brandNavyLight"
-          color="$colorInverse"
-          onPress={() =>
-            onNavigate(leagueId ? `/baseball/league/${leagueId}` : '/baseball')
-          }
-        >
-          Back to League
-        </Button>
+        <YStack alignItems="center" marginTop="$2">
+          <GhostButton
+            label="BACK TO LEAGUE"
+            onPress={() =>
+              onNavigate(
+                leagueId ? `/baseball/league/${leagueId}` : '/baseball',
+              )
+            }
+          />
+        </YStack>
       </YStack>
     </ScrollView>
   );
@@ -354,137 +551,76 @@ function NativeDraftComplete({
 // ---------------------------------------------------------------------------
 function PlayerRow({
   player,
-  isMyPick,
+  adp,
+  canDraft,
   commPickMode,
-  isOwner,
   onDraft,
   onCommissionerPick,
 }: {
   player: DraftPlayer;
-  isMyPick: boolean;
+  adp: number;
+  canDraft: boolean;
   commPickMode: boolean;
-  isOwner: boolean;
   onDraft: (id: number) => void;
   onCommissionerPick: (id: number) => void;
 }) {
   const posColor = getPositionColor('baseball', player.position);
-  const canDraft = isMyPick || (commPickMode && isOwner);
 
   return (
-    <Card padding="$3" marginBottom="$2" bordered>
-      <XStack justifyContent="space-between" alignItems="center">
-        <YStack flex={1} marginRight="$2">
-          <XStack alignItems="center" space="$2">
-            <Text fontWeight="700" fontSize="$4">
-              {player.name}
-            </Text>
-            <PositionBadge
-              position={player.position}
-              color={posColor}
-              alpha={0.12}
-              paddingHorizontal="$1"
-              paddingVertical={0}
-              borderRadius="$1"
-              fontSize="$2"
-              fontWeight="600"
-            />
-          </XStack>
-          <XStack space="$3" marginTop="$1">
-            {player.isPitcher ? (
-              <>
-                <Text fontSize="$2" color="$gray10">
-                  ERA {player.era?.toFixed(2) ?? '—'}
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  K {player.strikeouts ?? '—'}
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  W {player.wins ?? 0}-{player.losses ?? 0}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text fontSize="$2" color="$gray10">
-                  AVG {player.avg.toFixed(3)}
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  HR {player.hr}
-                </Text>
-                <Text fontSize="$2" color="$gray10">
-                  RBI {player.rbi}
-                </Text>
-              </>
-            )}
-            {player.ppg != null && (
-              <Text fontSize="$2" color="$brandNavyLight" fontWeight="600">
-                {player.ppg.toFixed(1)} Pts/Matchup
-              </Text>
-            )}
-          </XStack>
-        </YStack>
-        {canDraft && (
-          <Button
-            size="$3"
-            backgroundColor={commPickMode ? '$orange9' : '$green9'}
-            color="$colorInverse"
-            onPress={() =>
-              commPickMode && isOwner
-                ? onCommissionerPick(player.id)
-                : onDraft(player.id)
-            }
-          >
-            Draft
-          </Button>
-        )}
-      </XStack>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tab selector
-// ---------------------------------------------------------------------------
-type DraftTab = 'players' | 'myteam' | 'history';
-
-function TabBar({
-  active,
-  onSelect,
-}: {
-  active: DraftTab;
-  onSelect: (tab: DraftTab) => void;
-}) {
-  const tabs: Array<{ key: DraftTab; label: string }> = [
-    { key: 'players', label: 'Players' },
-    { key: 'myteam', label: 'My Team' },
-    { key: 'history', label: 'History' },
-  ];
-
-  return (
-    <XStack borderBottomWidth={1} borderBottomColor="$gray4">
-      {tabs.map((tab) => (
-        <Pressable
-          key={tab.key}
-          onPress={() => onSelect(tab.key)}
-          style={styles.tabPressable}
+    <XStack
+      alignItems="center"
+      gap={10}
+      backgroundColor="$surfaceCard"
+      borderWidth={1}
+      borderColor="$surfacePanelBorder"
+      borderRadius={12}
+      paddingVertical={10}
+      paddingHorizontal={13}
+      marginBottom={7}
+    >
+      <PositionBadge
+        position={player.position}
+        color={posColor}
+        alpha={0.14}
+        paddingHorizontal={8}
+        paddingVertical={3}
+        borderRadius={6}
+      />
+      <YStack flex={1} minWidth={0}>
+        <Text fontWeight="600" fontSize={15} color="$color" numberOfLines={1}>
+          {player.name}
+        </Text>
+        <Text
+          fontSize={11.5}
+          color="$textMuted"
+          marginTop={2}
+          numberOfLines={1}
         >
-          <YStack
-            paddingVertical="$2"
-            paddingHorizontal="$3"
-            borderBottomWidth={2}
-            borderBottomColor={
-              active === tab.key ? '$brandNavyLight' : 'transparent'
-            }
-          >
-            <Text
-              fontWeight={active === tab.key ? '700' : '400'}
-              color={active === tab.key ? '$brandNavyLight' : '$gray10'}
-              fontSize="$3"
-            >
-              {tab.label}
-            </Text>
-          </YStack>
-        </Pressable>
-      ))}
+          {statLineFor(player)}
+        </Text>
+      </YStack>
+      <YStack alignItems="flex-end" flexShrink={0}>
+        <Text
+          fontFamily="$heading"
+          fontSize={16}
+          fontWeight="700"
+          color="$brandGoldLight"
+        >
+          {player.ppg != null ? player.ppg.toFixed(1) : '—'}
+        </Text>
+        <Text fontSize={9} color="$fg4" letterSpacing={0.5}>
+          ADP {adp}
+        </Text>
+      </YStack>
+      {canDraft && (
+        <GoldButton
+          size="sm"
+          label={commPickMode ? 'ASSIGN' : 'DRAFT'}
+          onPress={() =>
+            commPickMode ? onCommissionerPick(player.id) : onDraft(player.id)
+          }
+        />
+      )}
     </XStack>
   );
 }
@@ -500,8 +636,10 @@ export function EliteDraftBoardScreen({
 }: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user, token: authToken } = useAuth();
   const isAuthenticated = !!user;
+  const palette = useDraftPalette();
 
-  const [activeTab, setActiveTab] = useState<DraftTab>('players');
+  const [sortKey, setSortKey] = useState<SortKey>('adp');
+  const [rosterOpen, setRosterOpen] = useState(false);
 
   const ui = useDraftUIState();
 
@@ -639,6 +777,23 @@ export function EliteDraftBoardScreen({
     return set;
   }, [queries.leagueTeams, ui.onlineUserIds]);
 
+  // boardOrderedTeams falls back to leagueTeams when the draft-order query is
+  // skipped, so the board always has columns to render.
+  const boardTeams =
+    queries.boardOrderedTeams.length > 0
+      ? queries.boardOrderedTeams
+      : queries.leagueTeams;
+
+  const boardRounds = resolveBoardRounds({
+    teamCount: boardTeams.length,
+    pickCount: queries.pickHistory.length,
+    currentRound: queries.currentPickInfo?.round ?? null,
+    maxPickRound: queries.pickHistory.reduce(
+      (max, p) => Math.max(max, p.round),
+      0,
+    ),
+  });
+
   const round =
     queries.currentPickInfo?.round ??
     Math.ceil(
@@ -647,7 +802,23 @@ export function EliteDraftBoardScreen({
     );
   const currentPick =
     queries.currentPickInfo?.overallPick ?? queries.pickHistory.length + 1;
-  const filteredPlayers = playerData.enrichedPlayers;
+
+  // ADP is the server's own ordering of the available pool, so capture it
+  // before any client-side re-sort — otherwise the PTS sort renumbers it.
+  const rankedPlayers = useMemo(
+    () =>
+      playerData.enrichedPlayers.map((player, index) => ({
+        player,
+        adp: index + 1,
+      })),
+    [playerData.enrichedPlayers],
+  );
+  const listedPlayers = useMemo(() => {
+    if (sortKey === 'adp') return rankedPlayers;
+    return [...rankedPlayers].sort(
+      (a, b) => (b.player.ppg ?? 0) - (a.player.ppg ?? 0),
+    );
+  }, [rankedPlayers, sortKey]);
 
   // ---- Early returns for special states ----
   if (!leagueId) {
@@ -668,10 +839,15 @@ export function EliteDraftBoardScreen({
     !queries.leagueData
   ) {
     return (
-      <YStack flex={1} justifyContent="center" alignItems="center">
-        <Spinner size="large" />
-        <Text marginTop="$2" color="$gray10">
-          Loading draft board...
+      <YStack
+        flex={1}
+        backgroundColor="$background"
+        justifyContent="center"
+        alignItems="center"
+      >
+        <Spinner size="large" color="$brandGold" />
+        <Text marginTop="$2" color="$textMuted">
+          Setting the board…
         </Text>
       </YStack>
     );
@@ -735,6 +911,7 @@ export function EliteDraftBoardScreen({
             : null
         }
         leagueId={leagueId}
+        boardTeams={boardTeams}
         pickHistory={queries.pickHistory}
         myTeamId={queries.myTeamId}
         statsLookup={playerData.statsLookup}
@@ -751,7 +928,7 @@ export function EliteDraftBoardScreen({
     return (
       <NativePreDraftLobby
         league={queries.league}
-        leagueTeams={queries.leagueTeams}
+        leagueTeams={boardTeams}
         myTeamId={queries.myTeamId}
         isOwner={queries.isOwner}
         onlineTeamIds={onlineTeamIds}
@@ -777,312 +954,252 @@ export function EliteDraftBoardScreen({
   }
 
   // ---- Main Live Draft UI ----
-  const timerColor =
-    timeRemaining <= 10
-      ? '$red9'
-      : timeRemaining <= 30
-        ? '$orange9'
-        : '$green9';
-  const minutes = Math.floor(timeRemaining / 60);
-  const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+  const canCommissionerPick = ui.commPickMode && queries.isOwner;
+  const canDraft = isMyPick || canCommissionerPick;
+  const showCommissionerBar = queries.isCommissioner || queries.isOwner;
 
   return (
-    <YStack flex={1}>
-      {/* Current Pick Banner */}
-      {queries.currentPickInfo && (
-        <YStack
-          padding="$3"
-          backgroundColor={isMyPick ? '$green2' : '$gray2'}
-          borderBottomWidth={1}
-          borderBottomColor="$gray4"
-        >
-          <XStack justifyContent="space-between" alignItems="center">
-            <YStack>
-              <Text
-                fontWeight="800"
-                fontSize="$5"
-                color={isMyPick ? '$green10' : '$color'}
-              >
-                {isMyPick
-                  ? 'YOUR PICK'
-                  : queries.teamNameById(queries.currentPickTeamId)}
-              </Text>
-              <Text fontSize="$2" color="$gray10">
-                Pick #{currentPick} · Round {round} · Pick{' '}
-                {queries.currentPickInfo.pickNumber}
-              </Text>
-            </YStack>
-            <YStack alignItems="center">
-              {ui.draftPaused ? (
-                <Text fontWeight="700" fontSize="$5" color="$orange9">
-                  PAUSED
-                </Text>
-              ) : (
-                <Text fontWeight="700" fontSize="$6" color={timerColor}>
-                  {minutes}:{seconds}
-                </Text>
-              )}
-            </YStack>
-          </XStack>
-        </YStack>
-      )}
-
-      {/* Commissioner Controls */}
-      {(queries.isCommissioner || queries.isOwner) && (
+    <YStack flex={1} backgroundColor="$background">
+      {/* ---- On the clock: team, countdown ring, and the board itself ---- */}
+      <YStack
+        paddingHorizontal="$3"
+        paddingTop={10}
+        paddingBottom={11}
+        borderBottomWidth={1}
+        backgroundColor={isMyPick ? '$surfaceRaised' : '$surfacePanel'}
+        borderBottomColor={isMyPick ? '$brandGold' : '$outlineSubtle'}
+      >
         <XStack
-          padding="$2"
+          justifyContent="space-between"
+          alignItems="center"
+          gap="$3"
+          marginBottom={8}
+        >
+          <YStack flex={1} minWidth={0}>
+            <Eyebrow color={isMyPick ? '$brandGoldLight' : '$fg4'}>
+              {ui.draftPaused
+                ? 'Draft paused'
+                : isMyPick
+                  ? 'You’re on the clock'
+                  : 'On the clock'}
+            </Eyebrow>
+            <Text
+              fontFamily="$heading"
+              fontSize={19}
+              fontWeight="800"
+              letterSpacing={0.5}
+              lineHeight={21}
+              color="$color"
+              numberOfLines={1}
+            >
+              {queries.teamNameById(queries.currentPickTeamId)}
+            </Text>
+            <Text fontSize={11} color="$fg4" marginTop={1}>
+              Round {round} · Pick #{currentPick}
+            </Text>
+          </YStack>
+          <DraftClockRing
+            secondsRemaining={timeRemaining}
+            totalSeconds={ui.pickTimeLimitSeconds}
+            emphasize={isMyPick}
+            paused={ui.draftPaused}
+          />
+        </XStack>
+
+        <DraftMiniBoard
+          teams={boardTeams}
+          picks={queries.pickHistory}
+          currentPickInfo={queries.currentPickInfo}
+          myTeamId={queries.myTeamId}
+          statsLookup={playerData.statsLookup}
+          rounds={boardRounds}
+        />
+      </YStack>
+
+      {/* ---- Commissioner controls ---- */}
+      {showCommissionerBar && (
+        <XStack
+          gap="$2"
           paddingHorizontal="$3"
-          backgroundColor="$gray1"
-          borderBottomWidth={1}
-          borderBottomColor="$gray4"
-          space="$2"
+          paddingTop={8}
+          alignItems="center"
         >
           {!ui.draftPaused ? (
-            <Button
-              size="$2"
-              backgroundColor="$orange9"
-              color="$colorInverse"
+            <GhostButton
+              label="PAUSE"
               disabled={actions.pauseLoading}
               onPress={() => void actions.handlePauseDraft()}
-            >
-              Pause
-            </Button>
+            />
           ) : (
-            <Button
-              size="$2"
-              backgroundColor="$green9"
-              color="$colorInverse"
+            <GhostButton
+              label="RESUME"
+              tone="active"
               disabled={actions.resumeLoading}
               onPress={() => void actions.handleResumeDraft()}
-            >
-              Resume
-            </Button>
+            />
           )}
-          <Button
-            size="$2"
-            backgroundColor={ui.commPickMode ? '$orange9' : '$gray6'}
-            color="$colorInverse"
+          <GhostButton
+            label={ui.commPickMode ? 'COMM PICK ON' : 'COMM PICK'}
+            tone={ui.commPickMode ? 'active' : 'neutral'}
             onPress={() => ui.setCommPickMode(!ui.commPickMode)}
-          >
-            {ui.commPickMode ? 'Comm Pick ON' : 'Comm Pick'}
-          </Button>
+          />
         </XStack>
       )}
 
-      {/* Tabs */}
-      <TabBar active={activeTab} onSelect={setActiveTab} />
-
-      {/* Tab Content */}
-      {activeTab === 'players' && (
-        <YStack flex={1}>
-          {/* Search */}
-          <XStack padding="$2" paddingHorizontal="$3" space="$2">
-            <Input
-              flex={1}
-              size="$3"
-              placeholder="Search players..."
-              value={ui.searchTerm}
-              onChangeText={ui.setSearchTerm}
-            />
-          </XStack>
-
-          {/* Position filter */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <XStack padding="$2" paddingHorizontal="$3" space="$1">
-              <Pressable onPress={() => ui.setSelectedPosition('ALL')}>
+      {/* ---- Search + sort ---- */}
+      <XStack
+        gap="$2"
+        paddingHorizontal="$3"
+        paddingTop={9}
+        alignItems="center"
+      >
+        <Input
+          flex={1}
+          minWidth={0}
+          size="$3"
+          borderRadius={10}
+          backgroundColor="$surfacePanel"
+          borderColor="$surfacePanelBorder"
+          color="$color"
+          placeholder="Search…"
+          placeholderTextColor={palette.text.fg4}
+          value={ui.searchTerm}
+          onChangeText={ui.setSearchTerm}
+        />
+        <XStack
+          borderWidth={1}
+          borderColor="$surfacePanelBorder"
+          borderRadius={9}
+          overflow="hidden"
+        >
+          {(['adp', 'pts'] as const).map((key) => {
+            const active = sortKey === key;
+            return (
+              <Pressable
+                key={key}
+                accessibilityRole="button"
+                accessibilityLabel={`Sort by ${key.toUpperCase()}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => setSortKey(key)}
+              >
                 <YStack
-                  paddingHorizontal="$2"
-                  paddingVertical="$1"
-                  borderRadius="$2"
-                  backgroundColor={
-                    ui.selectedPosition === 'ALL' ? '$brandNavyLight' : '$gray3'
-                  }
+                  paddingVertical={8}
+                  paddingHorizontal={11}
+                  backgroundColor={active ? '$surfaceRaised' : 'transparent'}
                 >
                   <Text
-                    fontSize="$2"
-                    fontWeight="600"
-                    color={
-                      ui.selectedPosition === 'ALL'
-                        ? '$colorInverse'
-                        : '$gray11'
-                    }
+                    fontSize={11}
+                    fontWeight="800"
+                    color={active ? '$color' : '$fg4'}
                   >
-                    ALL
+                    {key.toUpperCase()}
                   </Text>
                 </YStack>
               </Pressable>
-              {['C', '1B', '2B', '3B', 'SS', 'OF', 'SP', 'RP', 'DH'].map(
-                (pos) => (
-                  <Pressable
-                    key={pos}
-                    onPress={() => ui.setSelectedPosition(pos)}
-                  >
-                    <YStack
-                      paddingHorizontal="$2"
-                      paddingVertical="$1"
-                      borderRadius="$2"
-                      backgroundColor={
-                        ui.selectedPosition === pos
-                          ? getPositionColor('baseball', pos)
-                          : '$gray3'
-                      }
-                    >
-                      <Text
-                        fontSize="$2"
-                        fontWeight="600"
-                        color={
-                          ui.selectedPosition === pos
-                            ? '$colorInverse'
-                            : '$gray11'
-                        }
-                      >
-                        {pos}
-                      </Text>
-                    </YStack>
-                  </Pressable>
-                ),
-              )}
-            </XStack>
-          </ScrollView>
-
-          {/* Player list */}
-          <FlatList
-            data={filteredPlayers}
-            keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={styles.playerList}
-            renderItem={({ item }) => (
-              <PlayerRow
-                player={item}
-                isMyPick={isMyPick}
-                commPickMode={ui.commPickMode}
-                isOwner={queries.isOwner}
-                onDraft={(id) => void actions.handleMakePick(id)}
-                onCommissionerPick={(id) =>
-                  void actions.handleCommissionerPick(id)
-                }
-              />
-            )}
-            onEndReached={() => {
-              if (queries.hasMorePlayers && !queries.loadingMore) {
-                void queries.handleLoadMorePlayers();
-              }
-            }}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              queries.loadingMore ? (
-                <YStack padding="$3" alignItems="center">
-                  <Spinner />
-                </YStack>
-              ) : null
-            }
-            ListEmptyComponent={
-              <YStack padding="$6" alignItems="center">
-                <Text color="$gray10">No players found</Text>
-              </YStack>
-            }
-          />
-        </YStack>
-      )}
-
-      {activeTab === 'myteam' && (
-        <ScrollView flex={1} contentContainerStyle={styles.tabContent}>
-          <YStack padding="$3" space="$2">
-            <Text fontWeight="700" fontSize="$5" marginBottom="$1">
-              My Roster ({playerData.myTeam.length})
-            </Text>
-            {playerData.myTeam.length === 0 ? (
-              <Text color="$gray10">No picks yet</Text>
-            ) : (
-              playerData.myTeam.map((player) => {
-                const posColor = getPositionColor('baseball', player.position);
-                return (
-                  <Card key={player.id} padding="$3" bordered>
-                    <XStack alignItems="center" space="$2">
-                      <Text
-                        fontSize="$2"
-                        fontWeight="600"
-                        color={posColor}
-                        width={30}
-                      >
-                        {player.position}
-                      </Text>
-                      <Text flex={1} fontWeight="600" fontSize="$4">
-                        {player.name}
-                      </Text>
-                      {player.ppg != null && (
-                        <Text
-                          fontSize="$2"
-                          color="$brandNavyLight"
-                          fontWeight="600"
-                        >
-                          {player.ppg.toFixed(1)} Pts/Matchup
-                        </Text>
-                      )}
-                    </XStack>
-                  </Card>
-                );
-              })
-            )}
-          </YStack>
-        </ScrollView>
-      )}
-
-      {activeTab === 'history' && (
-        <FlatList
-          data={queries.pickHistory}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.tabContent}
-          renderItem={({ item: pick }) => {
-            const player = playerData.statsLookup.get(pick.playerId);
-            const teamName = queries.teamNameById(pick.teamId);
-            const name = player
-              ? player.name
-              : pick.player
-                ? `${pick.player.firstName} ${pick.player.lastName}`
-                : `Player #${pick.playerId}`;
-            const isMine = pick.teamId === queries.myTeamId;
-            return (
-              <Card
-                padding="$2"
-                paddingHorizontal="$3"
-                marginBottom="$1"
-                marginHorizontal="$3"
-                bordered
-                backgroundColor={isMine ? '$surfaceInteractive' : undefined}
-              >
-                <XStack justifyContent="space-between" alignItems="center">
-                  <XStack flex={1} alignItems="center" space="$2">
-                    <Text
-                      fontSize="$2"
-                      fontWeight="700"
-                      color="$gray9"
-                      width={36}
-                    >
-                      #{pick.overallPick}
-                    </Text>
-                    <YStack flex={1}>
-                      <Text fontWeight="600" fontSize="$3">
-                        {name}
-                      </Text>
-                      <Text fontSize="$1" color="$gray10">
-                        {teamName}
-                      </Text>
-                    </YStack>
-                  </XStack>
-                  <Text fontSize="$1" color="$gray9">
-                    Rd {pick.round}
-                  </Text>
-                </XStack>
-              </Card>
             );
-          }}
-          ListEmptyComponent={
-            <YStack padding="$6" alignItems="center">
-              <Text color="$gray10">No picks yet</Text>
-            </YStack>
+          })}
+        </XStack>
+      </XStack>
+
+      {/* ---- Position filter chips ---- */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        flexGrow={0}
+        flexShrink={0}
+      >
+        <XStack gap={4} paddingHorizontal="$3" paddingVertical={8}>
+          {POSITION_FILTERS.map((pos) => {
+            const active = ui.selectedPosition === pos;
+            const tint =
+              pos === 'ALL'
+                ? palette.gold.gold
+                : getPositionColor('baseball', pos);
+            return (
+              <Pressable
+                key={pos}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter by ${pos}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => ui.setSelectedPosition(pos)}
+              >
+                <YStack
+                  paddingVertical={4}
+                  paddingHorizontal={10}
+                  borderRadius={999}
+                  borderWidth={1}
+                  borderColor={active ? tint : '$outlineDefault'}
+                  backgroundColor={active ? tint : 'transparent'}
+                >
+                  <Text
+                    fontSize={11.5}
+                    fontWeight="700"
+                    color={active ? '$textOnAccent' : '$textMuted'}
+                  >
+                    {pos}
+                  </Text>
+                </YStack>
+              </Pressable>
+            );
+          })}
+        </XStack>
+      </ScrollView>
+
+      {/* ---- Available players ---- */}
+      <FlatList
+        data={listedPlayers}
+        keyExtractor={(item) => String(item.player.id)}
+        contentContainerStyle={styles.playerList}
+        renderItem={({ item }) => (
+          <PlayerRow
+            player={item.player}
+            adp={item.adp}
+            canDraft={canDraft}
+            commPickMode={canCommissionerPick}
+            onDraft={(id) => void actions.handleMakePick(id)}
+            onCommissionerPick={(id) => void actions.handleCommissionerPick(id)}
+          />
+        )}
+        onEndReached={() => {
+          if (queries.hasMorePlayers && !queries.loadingMore) {
+            void queries.handleLoadMorePlayers();
           }
-        />
-      )}
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          queries.loadingMore ? (
+            <YStack padding="$3" alignItems="center">
+              <Spinner color="$brandGold" />
+            </YStack>
+          ) : null
+        }
+        ListEmptyComponent={
+          <YStack padding="$6" alignItems="center">
+            <Text color="$textMuted">No players match that filter</Text>
+          </YStack>
+        }
+      />
+
+      {/* ---- My squad strip + roster sheet ---- */}
+      <DraftSquadStrip
+        myPicks={playerData.myTeamPicks}
+        myTeam={playerData.myTeam}
+        statsLookup={playerData.statsLookup}
+        rounds={Math.max(boardRounds, MIN_BOARD_ROUNDS)}
+        teamName={queries.teamNameById(queries.myTeamId)}
+        isMyPick={isMyPick}
+        open={rosterOpen}
+        onOpen={() => setRosterOpen(true)}
+        onClose={() => setRosterOpen(false)}
+      />
+
+      {/* ---- Pick announcement + confetti ---- */}
+      <DraftPickAnnouncement
+        announcement={ui.announcement}
+        teamName={queries.teamNameById(queries.currentPickTeamId)}
+        celebrate
+        onDismiss={ui.dismissAnnouncement}
+      />
 
       {/* Toast overlay */}
       {ui.toastMessage && (
@@ -1091,19 +1208,27 @@ export function EliteDraftBoardScreen({
           bottom={20}
           left={16}
           right={16}
+          zIndex={100}
+          borderRadius={12}
+          borderWidth={1}
+          padding="$3"
           backgroundColor={
             ui.toastMessage.type === 'error'
-              ? '$red9'
+              ? '$statusDangerBg'
               : ui.toastMessage.type === 'success'
-                ? '$green9'
-                : '$brandNavyLight'
+                ? '$statusSuccessBg'
+                : '$surfaceRaised'
           }
-          borderRadius="$3"
-          padding="$3"
-          zIndex={100}
+          borderColor={
+            ui.toastMessage.type === 'error'
+              ? '$statusDangerBorder'
+              : ui.toastMessage.type === 'success'
+                ? '$statusSuccessBorder'
+                : '$outlineDefault'
+          }
         >
           <Pressable onPress={() => ui.setToastMessage(null)}>
-            <Text color="$colorInverse" fontWeight="600" textAlign="center">
+            <Text color="$color" fontWeight="600" textAlign="center">
               {ui.toastMessage.text}
             </Text>
           </Pressable>
@@ -1124,13 +1249,15 @@ export function EliteDraftBoardScreen({
           bottom={20}
           left={16}
           right={16}
-          backgroundColor="$red9"
-          borderRadius="$3"
-          padding="$3"
           zIndex={100}
+          borderRadius={12}
+          borderWidth={1}
+          padding="$3"
+          backgroundColor="$statusDangerBg"
+          borderColor="$statusDangerBorder"
         >
           <Pressable onPress={() => ui.setUrgentMessage('')}>
-            <Text color="$colorInverse" fontWeight="600" textAlign="center">
+            <Text color="$statusDangerFg" fontWeight="600" textAlign="center">
               {ui.urgentMessage}
             </Text>
           </Pressable>
@@ -1146,15 +1273,7 @@ export function EliteDraftBoardScreen({
 const styles = StyleSheet.create({
   playerList: {
     paddingHorizontal: 12,
-    paddingTop: 4,
+    paddingTop: 2,
     paddingBottom: 16,
-  },
-  tabContent: {
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  tabPressable: {
-    flex: 1,
-    alignItems: 'center',
   },
 });
