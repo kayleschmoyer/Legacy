@@ -7,7 +7,10 @@ import { SortControl } from './SortControl';
 import { PlayerFeedCard } from './PlayerFeedCard';
 import { PremiumTeaserCard } from './PremiumTeaserCard';
 import { PlayerFeedSkeleton } from './PlayerFeedSkeleton';
-import type { CardTrendDirection } from './cardFeedHelpers';
+import {
+  type CardTrendDirection,
+  playersCardFeedTopPadding,
+} from './cardFeedHelpers';
 import { EmptyCard, ErrorCard } from '../shell/StateCards';
 import { FONT_DISPLAY } from '../shell/tokens';
 import type { Sport } from '../../../utils/colors';
@@ -39,6 +42,10 @@ export interface PlayersCardFeedProps {
    *  when only one sport is available (e.g. the `football_enabled` GrowthBook
    *  flag is off), matching the pre-redesign screen's behavior. Default true. */
   showSportToggle?: boolean;
+  /** Top safe-area inset (`useSafeAreaInsets().top`) so the header clears the
+   *  status bar — the screen wiring owns reading the inset, per
+   *  shared-components-first (mirrors `MobileHomeScreen`'s `topInset` prop). */
+  topInset?: number;
   positions: readonly string[];
   position: string;
   onPositionChange: (position: string) => void;
@@ -77,6 +84,7 @@ export function PlayersCardFeed({
   sport,
   onSportChange,
   showSportToggle = true,
+  topInset = 0,
   positions,
   position,
   onPositionChange,
@@ -119,7 +127,11 @@ export function PlayersCardFeed({
       backgroundColor={BG_DARK}
       paddingHorizontal={16}
     >
-      <YStack gap={10} paddingTop={16}>
+      <YStack
+        testID={`${testID}-header`}
+        gap={10}
+        paddingTop={playersCardFeedTopPadding(topInset)}
+      >
         <XStack justifyContent="space-between" alignItems="center">
           <Text
             fontFamily={FONT_DISPLAY}

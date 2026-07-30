@@ -55,6 +55,26 @@ export function positionFilterParam(position: string): string | undefined {
   return position === 'ALL' ? undefined : position;
 }
 
+// ── Header safe-area padding ────────────────────────────────────────────────
+
+/** The card feed header's page gutter, absent any safe-area inset. */
+const HEADER_PAGE_PADDING = 16;
+
+/**
+ * Top padding for the card feed header: the page gutter plus the top
+ * safe-area inset, so the "Players" title and search bar always clear the
+ * status bar (LS-8834, the same status-bar-overlap regression class as
+ * LS-8808/MobileHomeScreen's `homeContentTopPadding`). Non-finite or negative
+ * insets are ignored so a missing safe-area provider degrades to the gutter
+ * rather than collapsing or inflating the layout.
+ */
+export function playersCardFeedTopPadding(topInset: number): number {
+  return (
+    HEADER_PAGE_PADDING +
+    (Number.isFinite(topInset) && topInset > 0 ? topInset : 0)
+  );
+}
+
 // ── Stat formatting ─────────────────────────────────────────────────────────
 
 /**

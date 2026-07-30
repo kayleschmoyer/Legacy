@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   cardPositionsForSport,
   formatBaseballCardSubStats,
@@ -127,6 +128,7 @@ interface SportFeedProps {
   position: string;
   appliedSearch: string;
   sortDir: SortDir;
+  topInset: number;
   isPremium: boolean;
   onPositionChange: (position: string) => void;
   onSearchChange: (value: string) => void;
@@ -143,6 +145,7 @@ function BaseballCardFeed({
   position,
   appliedSearch,
   sortDir,
+  topInset,
   isPremium,
   onPositionChange,
   onSearchChange,
@@ -226,6 +229,7 @@ function BaseballCardFeed({
       sport={sport}
       onSportChange={onSportChange}
       showSportToggle={showSportToggle}
+      topInset={topInset}
       positions={cardPositionsForSport('baseball')}
       position={position}
       onPositionChange={onPositionChange}
@@ -260,6 +264,7 @@ function FootballCardFeed({
   position,
   appliedSearch,
   sortDir,
+  topInset,
   isPremium,
   onPositionChange,
   onSearchChange,
@@ -344,6 +349,7 @@ function FootballCardFeed({
       sport={sport}
       onSportChange={onSportChange}
       showSportToggle={showSportToggle}
+      topInset={topInset}
       positions={cardPositionsForSport('football')}
       position={position}
       onPositionChange={onPositionChange}
@@ -375,6 +381,7 @@ function FootballCardFeed({
 export default function PlayersTab(): React.JSX.Element {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { top: topInset } = useSafeAreaInsets();
   const { isPremium } = useSubscription();
   const footballEnabled = useFeatureIsOn('football_enabled');
 
@@ -442,6 +449,7 @@ export default function PlayersTab(): React.JSX.Element {
     position,
     appliedSearch,
     sortDir,
+    topInset,
     isPremium,
     onPositionChange: setPosition,
     onSearchChange: setSearchInput,

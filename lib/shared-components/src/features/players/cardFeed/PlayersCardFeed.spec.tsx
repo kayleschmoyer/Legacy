@@ -151,6 +151,22 @@ describe('PlayersCardFeed', () => {
     ).not.toBeInTheDocument();
   });
 
+  test('pads the header by the page gutter alone when topInset is omitted', () => {
+    render(<PlayersCardFeed {...baseProps()} />);
+
+    expect(screen.getByTestId('players-card-feed-header')).toHaveStyle({
+      paddingTop: 16,
+    });
+  });
+
+  test('pads the header by the gutter plus the safe-area top inset', () => {
+    render(<PlayersCardFeed {...baseProps()} topInset={44} />);
+
+    expect(screen.getByTestId('players-card-feed-header')).toHaveStyle({
+      paddingTop: 60,
+    });
+  });
+
   test('renders an overflow action when provided (Compare entry point)', () => {
     const onOverflowPress = jest.fn();
     render(

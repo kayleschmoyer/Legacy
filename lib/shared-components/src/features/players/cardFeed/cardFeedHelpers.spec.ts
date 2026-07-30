@@ -5,6 +5,7 @@ import {
   formatBaseballCardSubStats,
   formatDecimalNoLeadingZero,
   formatFootballCardSubStats,
+  playersCardFeedTopPadding,
   positionFilterParam,
 } from './cardFeedHelpers';
 
@@ -52,6 +53,24 @@ describe('positionFilterParam', () => {
 
   test('a concrete position passes through unchanged', () => {
     expect(positionFilterParam('SS')).toBe('SS');
+  });
+});
+
+describe('playersCardFeedTopPadding (LS-8834)', () => {
+  test('adds the safe-area inset to the header gutter', () => {
+    expect(playersCardFeedTopPadding(44)).toBe(60);
+  });
+
+  test('falls back to just the gutter when there is no inset', () => {
+    expect(playersCardFeedTopPadding(0)).toBe(16);
+  });
+
+  test('ignores a negative inset', () => {
+    expect(playersCardFeedTopPadding(-20)).toBe(16);
+  });
+
+  test('ignores a non-finite inset', () => {
+    expect(playersCardFeedTopPadding(Number.NaN)).toBe(16);
   });
 });
 

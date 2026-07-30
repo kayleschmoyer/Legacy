@@ -26,6 +26,12 @@ jest.mock('@growthbook/growthbook-react', () => ({
   useFeatureIsOn: (...args: unknown[]) => mockUseFeatureIsOn(...args),
 }));
 
+// Mirrors home.spec.tsx's mock (LS-8625/LS-8834) — a real SafeAreaProvider
+// isn't mounted in this unit-test tree, so the hook needs a fixed value.
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
+}));
+
 const mockPush = jest.fn();
 const mockNavigate = jest.fn();
 const mockSetParams = jest.fn();
@@ -87,6 +93,7 @@ interface MockPlayersCardFeedProps {
   rows: Array<{ id: string }>;
   position: string;
   searchValue: string;
+  topInset: number;
   showSportToggle: boolean;
   isPremium: boolean;
   onSportChange: (sport: string) => void;
@@ -379,6 +386,13 @@ describe('PlayersTab', () => {
     render(<PlayersTab />);
     fireEvent.press(screen.getByTestId('mock-premium'));
     expect(mockNavigate).toHaveBeenCalledWith('/subscription-settings');
+  });
+
+  it('forwards the safe-area top inset to the card feed (LS-8834)', () => {
+    render(<PlayersTab />);
+    expect(mockPlayersCardFeed).toHaveBeenCalledWith(
+      expect.objectContaining({ topInset: 44 }),
+    );
   });
 
   it('forwards isPremium from useSubscription', () => {
