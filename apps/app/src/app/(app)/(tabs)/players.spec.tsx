@@ -4,88 +4,260 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import PlayersTab from './players';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
+//
+// `PlayersCardFeed` renders the full card-feed UI and is already covered by
+// its own suite in lib/shared-components (PlayersCardFeed.spec.tsx) — this
+// screen's spec only needs to verify that `players.tsx` wires the right data
+// and callbacks into it (routing, sport-switch reset, pagination/cursor
+// handling), so `PlayersCardFeed` is mocked as a plain-RN prop-capturing stub
+// rather than re-testing its rendering here (mirrors how this codebase's
+// other screen specs mock whole child screens — see
+// `../football/players.spec.tsx`'s `PlayerStatsScreen` mock).
+//
+// `@legacy-sports/shared-components` and `@legacy-sports/graphql` are never
+// `requireActual`'d: importing either barrel for real pulls in Apollo/GraphQL
+// client setup that touches `expo`'s fetch polyfill at module-evaluation time
+// and crashes under Jest (`Cannot read properties of undefined (reading
+// 'EventEmitter')` in `expo/src/winter/fetch`) — this is why every export
+// below is a hand-written stub, not a `jest.requireActual` passthrough.
 
 const mockUseFeatureIsOn = jest.fn(() => false);
 jest.mock('@growthbook/growthbook-react', () => ({
   useFeatureIsOn: (...args: unknown[]) => mockUseFeatureIsOn(...args),
 }));
 
-jest.mock('tamagui', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { View, Pressable, Text } =
-    jest.requireActual<typeof import('react-native')>('react-native');
+const mockPush = jest.fn();
+const mockNavigate = jest.fn();
+const mockSetParams = jest.fn();
+let mockSearchParams: Record<string, string | string[]> = {};
+jest.mock('expo-router', () => ({
+  useRouter: () => ({
+    push: (...args: unknown[]): void => {
+      mockPush(...args);
+    },
+    navigate: (...args: unknown[]): void => {
+      mockNavigate(...args);
+    },
+    setParams: (...args: unknown[]): void => {
+      mockSetParams(...args);
+    },
+  }),
+  useLocalSearchParams: () => mockSearchParams,
+}));
+
+const mockUseSubscription = jest.fn(() => ({ isPremium: false }));
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useSubscription: (...args: unknown[]) => mockUseSubscription(...args),
+}));
+
+interface MockFootballQueryReturn {
+  data?: {
+    footballPlayers?: {
+      nodes: Array<Record<string, unknown>>;
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    };
+  };
+  loading: boolean;
+  error: unknown;
+  refetch: () => void;
+}
+
+const mockUseFootballPlayersQuery = jest.fn();
+jest.mock('@legacy-sports/graphql', () => ({
+  useFootballPlayersQuery: (...args: unknown[]) =>
+    mockUseFootballPlayersQuery(...args) as MockFootballQueryReturn,
+}));
+
+interface MockCareerStatsReturn {
+  data: Array<Record<string, unknown>>;
+  loading: boolean;
+  error: unknown;
+  totalCount: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  currentPage: number;
+  pageSize: number;
+  endCursor: string | null;
+  refetch: () => void;
+}
+
+interface MockPlayersCardFeedProps {
+  sport: string;
+  resultCount: number;
+  rows: Array<{ id: string }>;
+  position: string;
+  searchValue: string;
+  showSportToggle: boolean;
+  isPremium: boolean;
+  onSportChange: (sport: string) => void;
+  onPlayerPress: (id: string) => void;
+  onToggleSort: () => void;
+  onEndReached: () => void;
+  onOverflowPress?: () => void;
+  onPremiumPress: () => void;
+  onRetry?: () => void;
+  onClearFilters: () => void;
+}
+
+const mockUseCareerStatsWithNames = jest.fn();
+const mockPlayersCardFeed = jest.fn<void, [MockPlayersCardFeedProps]>();
+
+jest.mock('@legacy-sports/shared-components', () => {
+  // Real ES `import` cannot appear inside a jest.mock() factory (babel-plugin-
+  // jest-hoist statically forbids referencing out-of-scope bindings other than
+  // `mock`-prefixed ones) — `require` is the only option here, matching the
+  // existing convention in ../football/players.spec.tsx.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- ES import cannot appear inside a jest.mock() factory
+  const ReactActual = require('react') as typeof import('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- ES import cannot appear inside a jest.mock() factory
+  const ReactNative = require('react-native') as typeof import('react-native');
+  const { Pressable, Text, View } = ReactNative;
+
+  const BASEBALL_POSITIONS = [
+    'ALL',
+    'C',
+    '1B',
+    '2B',
+    '3B',
+    'SS',
+    'OF',
+    'DH',
+    'SP',
+    'RP',
+  ];
+  const FOOTBALL_POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DST'];
+
   return {
-    Text: ({
-      children,
-      ...rest
+    cardPositionsForSport: (sport: string) =>
+      sport === 'baseball' ? BASEBALL_POSITIONS : FOOTBALL_POSITIONS,
+    positionFilterParam: (position: string) =>
+      position === 'ALL' ? undefined : position,
+    formatBaseballCardSubStats: ({
+      homeRuns,
+      rbi,
+      battingAverage,
     }: {
-      children: React.ReactNode;
-      [key: string]: unknown;
-    }) => ReactActual.createElement(Text, rest, children),
-    XStack: ({
-      children,
-      testID,
-    }: {
-      children: React.ReactNode;
-      testID?: string;
-      [key: string]: unknown;
-    }) => ReactActual.createElement(View, { testID }, children),
-    YStack: ({
-      children,
-      onPress,
-      testID,
-    }: {
-      children: React.ReactNode;
-      onPress?: () => void;
-      testID?: string;
-      [key: string]: unknown;
-    }) => {
-      if (onPress) {
-        return ReactActual.createElement(
-          Pressable,
-          { onPress, testID },
-          children,
+      homeRuns: number;
+      rbi: number;
+      battingAverage: number;
+    }) => `HR ${homeRuns} · RBI ${rbi} · AVG ${battingAverage}`,
+    formatFootballCardSubStats: (player: { nflTeam?: string | null }) =>
+      player.nflTeam ?? '',
+    // No debounce in tests — resolve immediately so assertions don't need
+    // fake timers (LS-8832's debounce behavior has its own unit coverage in
+    // shared-components' useDebouncedValue.spec.ts).
+    useDebouncedValue: (value: unknown) => value,
+    useCareerStatsWithNames: (...args: unknown[]) =>
+      mockUseCareerStatsWithNames(...args) as MockCareerStatsReturn,
+    PlayersCardFeed: (props: MockPlayersCardFeedProps) => {
+      mockPlayersCardFeed(props);
+      const rows = props.rows ?? [];
+      const toggleSport = () =>
+        props.onSportChange(
+          props.sport === 'baseball' ? 'football' : 'baseball',
         );
-      }
-      return ReactActual.createElement(View, { testID }, children);
+      const pressFirstPlayer = () => {
+        if (rows[0]) props.onPlayerPress(rows[0].id);
+      };
+      return ReactActual.createElement(
+        View,
+        { testID: 'players-card-feed' },
+        ReactActual.createElement(Text, null, `sport:${props.sport}`),
+        ReactActual.createElement(
+          Text,
+          null,
+          `resultCount:${String(props.resultCount)}`,
+        ),
+        ReactActual.createElement(Pressable, {
+          testID: 'mock-sport-toggle',
+          onPress: toggleSport,
+        }),
+        ReactActual.createElement(Pressable, {
+          testID: 'mock-player-press',
+          onPress: pressFirstPlayer,
+        }),
+        ReactActual.createElement(Pressable, {
+          testID: 'mock-toggle-sort',
+          onPress: props.onToggleSort,
+        }),
+        ReactActual.createElement(Pressable, {
+          testID: 'mock-end-reached',
+          onPress: props.onEndReached,
+        }),
+        ReactActual.createElement(Pressable, {
+          testID: 'mock-overflow',
+          onPress: props.onOverflowPress,
+        }),
+        ReactActual.createElement(Pressable, {
+          testID: 'mock-premium',
+          onPress: props.onPremiumPress,
+        }),
+        ReactActual.createElement(Pressable, {
+          testID: 'mock-retry',
+          onPress: props.onRetry,
+        }),
+        ReactActual.createElement(Pressable, {
+          testID: 'mock-clear',
+          onPress: props.onClearFilters,
+        }),
+      );
     },
   };
 });
 
-jest.mock('../PlayerStats', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { View } =
-    jest.requireActual<typeof import('react-native')>('react-native');
-  return {
-    __esModule: true,
-    default: () =>
-      ReactActual.createElement(View, { testID: 'player-stats-screen' }),
-  };
-});
+// ── Fixtures ─────────────────────────────────────────────────────────────────
 
-jest.mock('../PlayerComparison', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { View } =
-    jest.requireActual<typeof import('react-native')>('react-native');
-  return {
-    __esModule: true,
-    default: () =>
-      ReactActual.createElement(View, { testID: 'player-comparison-screen' }),
-  };
-});
+const BASEBALL_PLAYER = {
+  id: 'player-1486',
+  playerId: 1486,
+  displayName: 'Babe Ruth',
+  primaryPosition: 'OF',
+  homeRuns: 714,
+  rbi: 2214,
+  battingAverage: 0.342,
+  fantasyPoints: 13716,
+};
 
-jest.mock('../football/players', () => {
-  const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { View } =
-    jest.requireActual<typeof import('react-native')>('react-native');
-  const FootballPlayersStub = () =>
-    ReactActual.createElement(View, { testID: 'football-players-screen' });
-  return {
-    __esModule: true,
-    default: FootballPlayersStub,
-    FootballPlayers: FootballPlayersStub,
-  };
-});
+function mockCareerStats(overrides: Partial<Record<string, unknown>> = {}) {
+  mockUseCareerStatsWithNames.mockReturnValue({
+    data: [BASEBALL_PLAYER],
+    loading: false,
+    error: null,
+    totalCount: 1,
+    hasNextPage: false,
+    hasPreviousPage: false,
+    currentPage: 1,
+    pageSize: 25,
+    endCursor: null,
+    refetch: jest.fn(),
+    ...overrides,
+  });
+}
+
+const FOOTBALL_PLAYER = {
+  id: 1,
+  firstName: 'Josh',
+  lastName: 'Allen',
+  position: 'QB',
+  isDst: false,
+  nflTeam: 'BUF',
+  careerStats: { fantasyPoints: 418.6 },
+};
+
+function mockFootballPlayers(overrides: Partial<Record<string, unknown>> = {}) {
+  mockUseFootballPlayersQuery.mockReturnValue({
+    data: {
+      footballPlayers: {
+        nodes: [FOOTBALL_PLAYER],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    },
+    loading: false,
+    error: null,
+    refetch: jest.fn(),
+    ...overrides,
+  });
+}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -93,133 +265,140 @@ describe('PlayersTab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseFeatureIsOn.mockReturnValue(false);
+    mockUseSubscription.mockReturnValue({ isPremium: false });
+    mockSearchParams = {};
+    mockCareerStats();
+    mockFootballPlayers();
   });
 
-  describe('segmented control', () => {
-    it('renders Stats and Compare segment buttons', () => {
-      render(<PlayersTab />);
-      expect(screen.getByTestId('players-segment-control')).toBeTruthy();
-      expect(screen.getByTestId('segment-stats')).toBeTruthy();
-      expect(screen.getByTestId('segment-compare')).toBeTruthy();
-      expect(screen.getByText('Stats')).toBeTruthy();
-      expect(screen.getByText('Compare')).toBeTruthy();
-    });
-
-    it('shows Stats content by default', () => {
-      render(<PlayersTab />);
-      expect(screen.getByTestId('player-stats-screen')).toBeTruthy();
-      expect(screen.queryByTestId('player-comparison-screen')).toBeNull();
-    });
-
-    it('switches to Compare content when Compare is pressed', () => {
-      render(<PlayersTab />);
-      fireEvent.press(screen.getByTestId('segment-compare'));
-      expect(screen.getByTestId('player-comparison-screen')).toBeTruthy();
-      expect(screen.queryByTestId('player-stats-screen')).toBeNull();
-    });
-
-    it('switches back to Stats content when Stats is pressed after Compare', () => {
-      render(<PlayersTab />);
-      fireEvent.press(screen.getByTestId('segment-compare'));
-      fireEvent.press(screen.getByTestId('segment-stats'));
-      expect(screen.getByTestId('player-stats-screen')).toBeTruthy();
-      expect(screen.queryByTestId('player-comparison-screen')).toBeNull();
-    });
+  it('renders the baseball card feed by default', () => {
+    render(<PlayersTab />);
+    expect(screen.getByTestId('players-card-feed')).toBeTruthy();
+    expect(screen.getByText('sport:baseball')).toBeTruthy();
   });
 
-  describe('sport filter — football disabled', () => {
-    it('hides the sport filter when football is not enabled', () => {
-      mockUseFeatureIsOn.mockReturnValue(false);
-      render(<PlayersTab />);
-      expect(screen.queryByTestId('players-sport-filter')).toBeNull();
-    });
-
-    it('shows baseball stats when football is disabled', () => {
-      mockUseFeatureIsOn.mockReturnValue(false);
-      render(<PlayersTab />);
-      expect(screen.getByTestId('player-stats-screen')).toBeTruthy();
-      expect(screen.queryByTestId('football-players-screen')).toBeNull();
-    });
+  it('wires the baseball data hook with orderBy totalScore and the ALL-cleared position', () => {
+    render(<PlayersTab />);
+    expect(mockUseCareerStatsWithNames).toHaveBeenCalledWith(
+      expect.objectContaining({
+        first: 25,
+        orderBy: 'totalScore',
+        orderDirection: 'desc',
+        position: undefined,
+        searchTerm: undefined,
+      }),
+    );
   });
 
-  describe('sport filter — football enabled', () => {
-    beforeEach(() => {
-      mockUseFeatureIsOn.mockReturnValue(true);
-    });
+  it('passes the server totalCount as resultCount for baseball', () => {
+    mockCareerStats({ totalCount: 42 });
+    render(<PlayersTab />);
+    expect(screen.getByText('resultCount:42')).toBeTruthy();
+  });
 
-    it('shows the sport filter when football is enabled', () => {
-      render(<PlayersTab />);
-      expect(screen.getByTestId('players-sport-filter')).toBeTruthy();
-      expect(screen.getByTestId('sport-baseball')).toBeTruthy();
-      expect(screen.getByTestId('sport-football')).toBeTruthy();
-      expect(screen.getByText('Baseball')).toBeTruthy();
-      expect(screen.getByText('Football')).toBeTruthy();
-    });
+  it('never shows the sport toggle when football is disabled, even after a forced sport state', () => {
+    mockUseFeatureIsOn.mockReturnValue(false);
+    render(<PlayersTab />);
+    expect(mockPlayersCardFeed).toHaveBeenCalledWith(
+      expect.objectContaining({ showSportToggle: false, sport: 'baseball' }),
+    );
+  });
 
-    it('shows baseball stats by default when football is enabled', () => {
-      render(<PlayersTab />);
-      expect(screen.getByTestId('player-stats-screen')).toBeTruthy();
-      expect(screen.queryByTestId('football-players-screen')).toBeNull();
-    });
+  it('switches to the football card feed when football is enabled and the toggle fires', () => {
+    mockUseFeatureIsOn.mockReturnValue(true);
+    render(<PlayersTab />);
 
-    it('switches to football players when Football pill is pressed', () => {
-      render(<PlayersTab />);
-      fireEvent.press(screen.getByTestId('sport-football'));
-      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
-      expect(screen.queryByTestId('player-stats-screen')).toBeNull();
-    });
+    fireEvent.press(screen.getByTestId('mock-sport-toggle'));
 
-    it('switches back to baseball when Baseball pill is pressed', () => {
-      render(<PlayersTab />);
-      fireEvent.press(screen.getByTestId('sport-football'));
-      fireEvent.press(screen.getByTestId('sport-baseball'));
-      expect(screen.getByTestId('player-stats-screen')).toBeTruthy();
-      expect(screen.queryByTestId('football-players-screen')).toBeNull();
-    });
+    expect(screen.getByText('sport:football')).toBeTruthy();
+    expect(mockUseFootballPlayersQuery).toHaveBeenCalled();
+  });
 
-    it('shows Compare content regardless of sport selection', () => {
-      render(<PlayersTab />);
-      fireEvent.press(screen.getByTestId('sport-football'));
-      fireEvent.press(screen.getByTestId('segment-compare'));
-      expect(screen.getByTestId('player-comparison-screen')).toBeTruthy();
-      expect(screen.queryByTestId('football-players-screen')).toBeNull();
+  it('resets position and search when switching sport', () => {
+    mockUseFeatureIsOn.mockReturnValue(true);
+    render(<PlayersTab />);
+
+    fireEvent.press(screen.getByTestId('mock-clear'));
+    fireEvent.press(screen.getByTestId('mock-sport-toggle'));
+
+    const calls = mockPlayersCardFeed.mock.calls;
+    const lastCall = calls[calls.length - 1][0];
+    expect(lastCall.position).toBe('ALL');
+    expect(lastCall.searchValue).toBe('');
+  });
+
+  it('navigates to /PlayerDetail on a baseball card press with a validated id', () => {
+    render(<PlayersTab />);
+
+    fireEvent.press(screen.getByTestId('mock-player-press'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/PlayerDetail',
+      params: { playerId: '1486', playerName: 'Babe Ruth' },
     });
   });
 
-  describe('sport switch filter reset (LS-7065)', () => {
-    beforeEach(() => {
-      mockUseFeatureIsOn.mockReturnValue(true);
-    });
+  it('navigates to the football detail route on a football card press', () => {
+    mockUseFeatureIsOn.mockReturnValue(true);
+    render(<PlayersTab />);
+    fireEvent.press(screen.getByTestId('mock-sport-toggle'));
 
-    it('remounts FootballPlayers on return to football after a sport switch', () => {
-      // Each sport change increments a key on FootballPlayers, guaranteeing a fresh
-      // component instance (and cleared position/teamFilter/searchInput state) on
-      // every sport transition — preventing filter state from bleeding across sports.
-      render(<PlayersTab />);
+    fireEvent.press(screen.getByTestId('mock-player-press'));
 
-      // Switch to football → component mounts.
-      fireEvent.press(screen.getByTestId('sport-football'));
-      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
+    expect(mockPush).toHaveBeenCalledWith('/football/players/1');
+  });
 
-      // Switch to baseball → component unmounts.
-      fireEvent.press(screen.getByTestId('sport-baseball'));
-      expect(screen.queryByTestId('football-players-screen')).toBeNull();
+  it('toggles sort direction and re-queries baseball stats with the new direction', () => {
+    render(<PlayersTab />);
 
-      // Switch back to football → component mounts fresh (new key), no lingering filters.
-      fireEvent.press(screen.getByTestId('sport-football'));
-      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
-    });
+    fireEvent.press(screen.getByTestId('mock-toggle-sort'));
 
-    it('does not increment the key when the same sport is selected again', () => {
-      // Pressing the already-active sport pill is a no-op and must not cause
-      // an unnecessary remount of FootballPlayers.
-      render(<PlayersTab />);
-      fireEvent.press(screen.getByTestId('sport-football'));
-      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
+    expect(mockUseCareerStatsWithNames).toHaveBeenCalledWith(
+      expect.objectContaining({ orderDirection: 'asc' }),
+    );
+  });
 
-      // Press football again — component should still be present (no remount teardown).
-      fireEvent.press(screen.getByTestId('sport-football'));
-      expect(screen.getByTestId('football-players-screen')).toBeTruthy();
-    });
+  it('advances the cursor on end-reached when the server reports a next page', () => {
+    mockCareerStats({ hasNextPage: true, endCursor: 'cursor-25' });
+    render(<PlayersTab />);
+
+    fireEvent.press(screen.getByTestId('mock-end-reached'));
+
+    expect(mockUseCareerStatsWithNames).toHaveBeenLastCalledWith(
+      expect.objectContaining({ after: 'cursor-25' }),
+    );
+  });
+
+  it('navigates to PlayerComparison on the overflow action', () => {
+    render(<PlayersTab />);
+    fireEvent.press(screen.getByTestId('mock-overflow'));
+    expect(mockPush).toHaveBeenCalledWith('/PlayerComparison');
+  });
+
+  it('navigates to subscription settings on the premium teaser action', () => {
+    render(<PlayersTab />);
+    fireEvent.press(screen.getByTestId('mock-premium'));
+    expect(mockNavigate).toHaveBeenCalledWith('/subscription-settings');
+  });
+
+  it('forwards isPremium from useSubscription', () => {
+    mockUseSubscription.mockReturnValue({ isPremium: true });
+    render(<PlayersTab />);
+    expect(mockPlayersCardFeed).toHaveBeenCalledWith(
+      expect.objectContaining({ isPremium: true }),
+    );
+  });
+
+  it('hydrates initial position/search/sort from expo-router search params', () => {
+    mockSearchParams = { position: 'SS', searchTerm: 'ruth', sortDir: 'asc' };
+    render(<PlayersTab />);
+
+    expect(mockPlayersCardFeed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        position: 'SS',
+        searchValue: 'ruth',
+        sortDirection: 'asc',
+      }),
+    );
   });
 });

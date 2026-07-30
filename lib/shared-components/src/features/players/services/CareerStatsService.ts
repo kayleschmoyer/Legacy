@@ -138,6 +138,14 @@ export interface CareerStatsServiceResponse {
   readonly hasPreviousPage: boolean;
   readonly currentPage: number;
   readonly pageSize: number;
+  /**
+   * Cursor for the next page (GraphQL connection `pageInfo.endCursor`), or
+   * `null` when there is no next page. Consumers doing cursor-continuation
+   * pagination (e.g. an infinite-scroll feed, as opposed to the stats grid's
+   * discrete next/prev pages) pass this back as the `after` param on the next
+   * call (LS-8832).
+   */
+  readonly endCursor: string | null;
   readonly refetch: () => void;
 }
 
@@ -416,6 +424,7 @@ export function useCareerStatsService(
   const hasNextPage = data?.careerBattingStats?.pageInfo?.hasNextPage ?? false;
   const hasPreviousPage =
     data?.careerBattingStats?.pageInfo?.hasPreviousPage ?? false;
+  const endCursor = data?.careerBattingStats?.pageInfo?.endCursor ?? null;
 
   // Calculate current page from cursor (simplified approximation)
   const currentPage = 1; // Since we're using cursor-based pagination, page concept is simplified
@@ -429,6 +438,7 @@ export function useCareerStatsService(
     hasPreviousPage,
     currentPage,
     pageSize,
+    endCursor,
     refetch: () => void refetch(),
   };
 }
@@ -474,6 +484,7 @@ export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
     statsData?.careerBattingStats?.pageInfo?.hasNextPage ?? false;
   const hasPreviousPage =
     statsData?.careerBattingStats?.pageInfo?.hasPreviousPage ?? false;
+  const endCursor = statsData?.careerBattingStats?.pageInfo?.endCursor ?? null;
   const currentPage = 1; // Simplified for cursor-based pagination
 
   // Combined loading and error states
@@ -493,6 +504,7 @@ export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
     hasPreviousPage,
     currentPage,
     pageSize,
+    endCursor,
     refetch,
   };
 }

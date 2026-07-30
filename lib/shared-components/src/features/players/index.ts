@@ -51,6 +51,9 @@ export {
   parseFootballPositions,
 } from './football/footballStatsHelpers';
 
+// Players tab card feed — mobile-first card feed redesign (LS-8832)
+export * from './cardFeed';
+
 // Column-visibility helpers + serialization (LS-7105 / PST-001)
 export {
   NO_COLUMNS_SENTINEL,

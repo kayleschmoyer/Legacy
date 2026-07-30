@@ -177,6 +177,134 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// -- Contrast-derived variants ---------------------------------------
+// Several dark-chrome surfaces need a *lightened* variant of an existing token
+// (e.g. a position badge color used as label text on `darkSurface.bg`, where
+// the badge hue itself is far too dark to read). Deriving those variants here
+// keeps them out of call sites as new hex literals — the palette above stays
+// the only place a color is spelled out. LS-8832.
+
+type Rgb = readonly [number, number, number];
+
+function hexToRgb(hex: string): Rgb {
+  const normalized = hex.replace('#', '');
+  return [
+    parseInt(normalized.slice(0, 2), 16),
+    parseInt(normalized.slice(2, 4), 16),
+    parseInt(normalized.slice(4, 6), 16),
+  ];
+}
+
+function rgbToHex([r, g, b]: Rgb): string {
+  const channel = (v: number) =>
+    Math.round(Math.min(255, Math.max(0, v)))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(r)}${channel(g)}${channel(b)}`.toUpperCase();
+}
+
+/**
+ * WCAG 2.1 relative luminance of a `#rrggbb` color, in `[0, 1]`.
+ * https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
+ */
+export function relativeLuminance(hex: string): number {
+  const linearize = (v: number): number => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const [r, g, b] = hexToRgb(hex);
+  return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
+}
+
+/**
+ * WCAG 2.1 contrast ratio between two `#rrggbb` colors, in `[1, 21]`.
+ * Order-independent. https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio
+ */
+export function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  const [light, dark] = la >= lb ? [la, lb] : [lb, la];
+  return (light + 0.05) / (dark + 0.05);
+}
+
+/** Default contrast target for derived text variants — WCAG AAA for body text,
+ *  which the design's 11px uppercase labels need to stay legible on dark. */
+export const DERIVED_TEXT_CONTRAST_TARGET = 7;
+
+// sRGB <-> OKLab (Björn Ottosson's published matrices). Lightening in OKLab
+// rather than mixing toward white preserves the hue and chroma of a saturated
+// accent, which is what the design handoff asks for ("compute via oklch
+// lighten") — a plain white mix desaturates the badge hue into grey.
+
+function srgbToLinear(v: number): number {
+  const c = v / 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function linearToSrgb(c: number): number {
+  const v = Math.max(c, 0);
+  return (
+    255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)
+  );
+}
+
+function hexToOklab(hex: string): Rgb {
+  const [r, g, b] = hexToRgb(hex).map(srgbToLinear);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+function oklabToHex([lightness, a, b]: Rgb): string {
+  const l = Math.pow(lightness + 0.3963377774 * a + 0.2158037573 * b, 3);
+  const m = Math.pow(lightness - 0.1055613458 * a - 0.0638541728 * b, 3);
+  const s = Math.pow(lightness - 0.0894841775 * a - 1.291485548 * b, 3);
+  return rgbToHex([
+    linearToSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    linearToSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    linearToSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+  ]);
+}
+
+/**
+ * Raise `color`'s OKLab lightness by the smallest amount that clears
+ * `targetRatio` contrast against `background`, keeping its hue and chroma.
+ *
+ * Used to derive a readable text variant of a saturated accent (e.g. a position
+ * badge hue used as a chip label on `darkSurface.bg`) without hand-picking a
+ * second hex per position. Returns `color` unchanged when it already clears the
+ * target. Contrast is always measured on the final 8-bit hex, so a value pushed
+ * outside the sRGB gamut is judged after clamping, not before.
+ */
+export function lightenForContrast(
+  color: string,
+  background: string,
+  targetRatio: number = DERIVED_TEXT_CONTRAST_TARGET,
+): string {
+  if (contrastRatio(color, background) >= targetRatio) return color;
+
+  const [lightness, a, b] = hexToOklab(color);
+  const at = (l: number): string => oklabToHex([l, a, b]);
+  if (contrastRatio(at(1), background) < targetRatio) return at(1);
+
+  // Contrast against a dark background rises monotonically with lightness, so
+  // 20 bisections resolve to far under one 8-bit channel step — the result is
+  // stable and snapshot-safe.
+  let low = lightness;
+  let high = 1;
+  for (let i = 0; i < 20; i++) {
+    const mid = (low + high) / 2;
+    if (contrastRatio(at(mid), background) >= targetRatio) high = mid;
+    else low = mid;
+  }
+  return at(high);
+}
+
 // Values `tamagui-config`'s brand themes need that have no equivalent
 // semantic name elsewhere in this module — kept here (rather than inline in
 // tamagui-config) so every hex/rgba literal in the theme still has a single

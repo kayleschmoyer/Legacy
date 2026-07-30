@@ -1,4 +1,9 @@
-import { closeToHomeTab, HOME_TAB_HREF, toIntId } from './RouteUtils';
+import {
+  closeToHomeTab,
+  HOME_TAB_HREF,
+  sanitizeSearchParam,
+  toIntId,
+} from './RouteUtils';
 
 // LS-8823 — cancel handlers used to push a concrete home path (`/baseball`,
 // `/football`), which dropped the user on a standalone copy of the sport home
@@ -91,5 +96,27 @@ describe('toIntId', () => {
 
   it('truncates a decimal string to its integer part', () => {
     expect(toIntId('3.14')).toBe(3);
+  });
+});
+
+// Relocated from PlayerStats.tsx (LS-8832) so screens that need only this
+// pure utility — not PlayerStats.tsx's full subscription/GraphQL transitive
+// graph — can import it directly. PlayerStats.spec.tsx keeps its own
+// coverage via the re-export; this is the canonical-source coverage.
+describe('sanitizeSearchParam', () => {
+  it('returns null for null input', () => {
+    expect(sanitizeSearchParam(null)).toBeNull();
+  });
+
+  it('strips control characters and returns null when nothing remains', () => {
+    expect(sanitizeSearchParam('\t\n')).toBeNull();
+  });
+
+  it('caps the value at 64 characters', () => {
+    expect(sanitizeSearchParam('a'.repeat(100))).toHaveLength(64);
+  });
+
+  it('passes a normal value through unchanged', () => {
+    expect(sanitizeSearchParam('Bonds')).toBe('Bonds');
   });
 });

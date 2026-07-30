@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&amp;family=Literata:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif}
+a{color:#1B3A5C}a:hover{color:#C41E3A}
+input::placeholder{color:#6C80BA}
+input:focus{outline:none}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55);max-width:412px}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}
+.hidescroll::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Players tab — current state + 5 redesign directions</span></div>
+<div style="max-width:900px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:18px 22px;margin:0 0 26px;font:12.5px/1.6 system-ui,sans-serif;color:#333">
+<div style="font-weight:600;margin-bottom:6px">Assumptions &amp; sources</div>
+<div>Rebuilt from <span style="font-family:ui-monospace,monospace">bkrupa/legacy-sports@main</span>: <span style="font-family:ui-monospace,monospace">players.tsx</span> tab shell, PlayerStatsShell + baseball controller, design-tokens palette, and the stats-shell type system (Big Shoulders Display / Literata / JetBrains Mono). Dark theme (the stats shell is dark-chrome in both app themes); football flag ON; free-tier user (premium teasers visible); sample career-leader data. <a href="#1a">1a</a> is faithful — including the low-contrast active sport pill (navy text on dark bg) and the desktop-scale 48px header, both part of the "bolted together / flat" problem. Every option is clickable: segments, chips, search, and sort all work.</div>
+</div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Current app — faithful recreation. Stats|Compare segments, sport pills, editorial header, Apply-based toolbar, dense scrolling grid.</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;background:#0A0F1A;font-family:'Literata',serif">
+<div style="flex:1;overflow-y:auto" class="hidescroll">
+<div style="display:flex;gap:4px;margin:12px 12px 8px;background:#20222A;border-radius:8px;padding:4px">
+<sc-for list="{{ aSegs }}" as="s" hint-placeholder-count="2">
+<div onClick="{{ s.onPress }}" style="flex:1;display:flex;align-items:center;justify-content:center;padding:8px 0;border-radius:5px;background:{{ s.bg }};cursor:pointer"><span style="font-size:13px;font-weight:700;font-family:system-ui,sans-serif;color:{{ s.color }}">{{ s.label }}</span></div>
+</sc-for>
+</div>
+<sc-if value="{{ footballEnabled }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:8px;padding:0 12px 8px">
+<sc-for list="{{ aSports }}" as="p" hint-placeholder-count="2">
+<div onClick="{{ p.onPress }}" style="padding:4px 12px;border-radius:9999px;border:1px solid {{ p.border }};background:{{ p.bg }};cursor:pointer"><span style="font-size:13px;font-weight:600;font-family:system-ui,sans-serif;color:{{ p.color }}">{{ p.label }}</span></div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ aShowStats }}" hint-placeholder-val="{{ true }}">
+<div style="padding:32px 24px 0">
+<div style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.76px;text-transform:uppercase;color:#D4BB78">Players · League Archive</div>
+<h1 style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:48px;line-height:1;letter-spacing:-0.96px;color:#FFFFFF;margin:6px 0 8px">Player Statistics</h1>
+<div style="font-size:17px;line-height:26px;color:#9CAAC5">Every qualified hitter and pitcher across the archive. Draft legends, compare seasons, and build your dynasty on the numbers that actually happened.</div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:8px 14px;background:rgba(13,21,38,0.6);border:1px solid #1C2740;border-radius:8px;overflow:hidden">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#6C80BA;flex-shrink:0">URL</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#9CAAC5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ aUrl }}</span>
+</div>
+<div style="display:flex;gap:8px;margin-top:12px">
+<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;border:1px solid rgba(197,165,90,0.4);background:rgba(197,165,90,0.08);cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.96px;text-transform:uppercase;color:#D4BB78">Share</span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;border:1px solid rgba(197,165,90,0.4);background:rgba(197,165,90,0.08);cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.96px;text-transform:uppercase;color:#D4BB78">Export JSON</span></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px;padding:24px 24px 40px">
+<div style="align-self:flex-start;display:flex;gap:4px;padding:5px;background:#111B2F;border:1px solid #1E2D45;border-radius:9999px">
+<sc-for list="{{ aTabs }}" as="t" hint-placeholder-count="3">
+<div onClick="{{ t.onPress }}" style="padding:10px 18px;border-radius:9999px;background:{{ t.bg }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.72px;text-transform:uppercase;color:{{ t.color }}">{{ t.label }}</span></div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;padding:14px;background:#111B2F;border:1px solid #1C2740;border-radius:16px">
+<div style="position:relative;display:flex;align-items:center;gap:8px;background:rgba(10,15,26,0.55);border:1px solid #1C2740;border-radius:6px;padding:0 12px 0 38px;min-height:44px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CAAC5" stroke-width="2" style="position:absolute;left:12px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input value="{{ aSearch }}" onChange="{{ onASearch }}" placeholder="Search player name · min 2 chars" style="flex:1;background:transparent;border:none;color:#F8FAFC;font-family:'Literata',serif;font-size:14px;padding:8px 0">
+</div>
+<div style="position:relative;display:flex;flex-direction:column;justify-content:center;background:rgba(10,15,26,0.55);border:1px solid #1C2740;border-radius:6px;padding:6px 30px 6px 12px;min-height:44px">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#9CAAC5">Position</span>
+<span style="font-size:14px;color:#F8FAFC">All Positions</span>
+<span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#9CAAC5;font-size:12px">▾</span>
+</div>
+<div style="position:relative;display:flex;flex-direction:column;justify-content:center;background:rgba(10,15,26,0.55);border:1px solid #1C2740;border-radius:6px;padding:6px 30px 6px 12px;min-height:44px">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#9CAAC5">Team</span>
+<span style="font-size:14px;color:#F8FAFC">All Teams</span>
+<span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#9CAAC5;font-size:12px">▾</span>
+</div>
+<div style="position:relative;display:flex;flex-direction:column;justify-content:center;background:rgba(10,15,26,0.55);border:1px solid #1C2740;border-radius:6px;padding:6px 30px 6px 12px;min-height:44px">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#9CAAC5">Rows</span>
+<span style="font-size:14px;color:#F8FAFC">25</span>
+<span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#9CAAC5;font-size:12px">▾</span>
+</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<div onClick="{{ onAApply }}" style="display:flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:12px;border:1px solid {{ aApplyBorder }};background:{{ aApplyBg }};min-height:44px;opacity:{{ aApplyOpacity }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.96px;text-transform:uppercase;color:{{ aApplyColor }}">Apply</span></div>
+<div onClick="{{ onAToggleAdv }}" style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;border:1px solid {{ aAdvBorder }};background:{{ aAdvBg }};min-height:44px;cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.96px;text-transform:uppercase;color:{{ aAdvColor }}">Advanced</span><span style="font-size:10px;color:#9CAAC5">{{ aAdvChevron }}</span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;border:1px solid #2F3B53;min-height:44px;cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.96px;text-transform:uppercase;color:#9CAAC5">Columns</span><span style="font-size:10px;color:#9CAAC5">▾</span></div>
+</div>
+</div>
+<sc-if value="{{ aAdv }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px;padding:16px;background:#111B2F;border:1px solid #1C2740;border-radius:16px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.76px;text-transform:uppercase;color:#D4BB78">Stat Ranges</span>
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;text-transform:uppercase;color:#9CAAC5;cursor:pointer">Reset ranges</span>
+</div>
+<sc-for list="{{ aSliders }}" as="sl" hint-placeholder-count="4">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#9CAAC5">{{ sl.label }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D4BB78">{{ sl.val }}</span></div>
+<div style="position:relative;height:4px;border-radius:2px;background:#1C2740"><div style="position:absolute;left:0;top:0;height:4px;border-radius:2px;background:#C5A55A;width:{{ sl.pct }}%"></div><div style="position:absolute;top:50%;left:{{ sl.pct }}%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:8px;background:#D4BB78;border:2px solid #0A0F1A"></div></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ aShowBat }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.76px;text-transform:uppercase;color:#D4BB78">Batting Leaders</span>
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.22px;color:#F5F7FA">MLB Career Batting Leaders</span>
+<span style="font-size:13px;color:#9CAAC5">1,247 players · sorted by homeRuns</span>
+</div>
+<div style="background:rgba(16,22,38,0.75);border:1px solid rgba(44,74,124,0.35);border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.3)">
+<div style="overflow-x:auto" class="hidescroll">
+<div style="min-width:756px">
+<div style="display:flex;background:#143050;border-bottom:2px solid #1C2740;padding:8px 0">
+<div style="width:240px;flex-shrink:0;padding:0 8px;position:sticky;left:0;z-index:2;background:#143050;display:flex;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">Player</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">FPTS</span></div>
+<div style="width:72px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">FPTS/G</span></div>
+<div style="width:56px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">H</span></div>
+<div style="width:56px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center;gap:4px;background:rgba(196,165,90,0.18);border-radius:4px"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#D4BB78">HR</span><span style="font-size:10px;color:#C5A55A">▼</span></div>
+<div style="width:60px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">RBI</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">AVG</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">OBP</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">SLG</span></div>
+</div>
+<sc-for list="{{ aRowsBat }}" as="r" hint-placeholder-count="8">
+<div style="display:flex;background:{{ r.bg }};border-bottom:1px solid #1C2740;padding:8px 0;cursor:pointer">
+<div style="width:240px;flex-shrink:0;padding:0 8px;display:flex;align-items:center;gap:8px;position:sticky;left:0;z-index:1;background:{{ r.bg }};border-left:2px solid {{ r.pc }}">
+<span style="background:{{ r.pc }};color:#fff;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.8px;padding:3px 7px;border-radius:4px;min-width:22px;text-align:center">{{ r.pos }}</span>
+<span style="font-weight:600;font-size:14px;color:#F5F7FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+</div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.fpts }}</span></div>
+<div style="width:72px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.fpg }}</span></div>
+<div style="width:56px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.h }}</span></div>
+<div style="width:56px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#F5F7FA">{{ r.hr }}</span></div>
+<div style="width:60px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.rbi }}</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.avg }}</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.obp }}</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.slg }}</span></div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;padding:12px;background:rgba(22,34,58,0.65);border:1px solid rgba(44,74,124,0.35);border-radius:12px">
+<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span style="font-size:14px;font-weight:600;color:#F5F7FA;font-family:system-ui,sans-serif">Page 1 of 50</span><span style="font-size:12px;color:#9CAAC5">(1,247 total)</span></div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;color:#9CAAC5">Show:</span>
+<span style="padding:5px 10px;border-radius:8px;background:rgba(10,15,26,0.5);border:1px solid rgba(44,74,124,0.35);color:#9CAAC5;font-size:12px;font-family:system-ui,sans-serif">10</span>
+<span style="padding:5px 10px;border-radius:8px;background:linear-gradient(135deg,#1B3A5C 0%,#2C4A7C 100%);border:1px solid rgba(196,165,90,0.4);color:#D4BB78;font-size:12px;font-family:system-ui,sans-serif">25</span>
+<span style="padding:5px 10px;border-radius:8px;background:rgba(10,15,26,0.5);border:1px solid rgba(44,74,124,0.35);color:#9CAAC5;font-size:12px;font-family:system-ui,sans-serif">50</span>
+</div>
+<div style="display:flex;gap:8px"><span style="padding:8px 14px;border-radius:10px;background:linear-gradient(135deg,#1B3A5C 0%,#2C4A7C 100%);border:1px solid rgba(196,165,90,0.25);color:#D4BB78;font-size:13px;opacity:0.4;font-family:system-ui,sans-serif">← Previous</span><span style="padding:8px 14px;border-radius:10px;background:linear-gradient(135deg,#1B3A5C 0%,#2C4A7C 100%);border:1px solid rgba(196,165,90,0.25);color:#D4BB78;font-size:13px;cursor:pointer;font-family:system-ui,sans-serif">Next →</span></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ aShowPit }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.76px;text-transform:uppercase;color:#D4BB78">Pitching Leaders</span>
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:22px;letter-spacing:-0.22px;color:#F5F7FA">MLB Career Pitching Leaders</span>
+<span style="font-size:13px;color:#9CAAC5">712 players · sorted by wins</span>
+</div>
+<div style="background:rgba(16,22,38,0.75);border:1px solid rgba(44,74,124,0.35);border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.3)">
+<div style="overflow-x:auto" class="hidescroll">
+<div style="min-width:456px">
+<div style="display:flex;background:#143050;border-bottom:2px solid #1C2740;padding:8px 0">
+<div style="width:200px;flex-shrink:0;padding:0 8px;display:flex;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">Player</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">FPTS</span></div>
+<div style="width:56px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center;gap:4px;background:rgba(196,165,90,0.18);border-radius:4px"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#D4BB78">W</span><span style="font-size:10px;color:#C5A55A">▼</span></div>
+<div style="width:64px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">SO</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">ERA</span></div>
+</div>
+<sc-for list="{{ aRowsPit }}" as="r" hint-placeholder-count="6">
+<div style="display:flex;background:{{ r.bg }};border-bottom:1px solid #1C2740;padding:8px 0;cursor:pointer">
+<div style="width:200px;flex-shrink:0;padding:0 8px;display:flex;align-items:center;gap:8px;border-left:2px solid {{ r.pc }}">
+<span style="background:{{ r.pc }};color:#fff;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.8px;padding:3px 7px;border-radius:4px;min-width:22px;text-align:center">{{ r.pos }}</span>
+<span style="font-weight:600;font-size:14px;color:#F5F7FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+</div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.fpts }}</span></div>
+<div style="width:56px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#F5F7FA">{{ r.w }}</span></div>
+<div style="width:64px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.so }}</span></div>
+<div style="width:68px;flex-shrink:0;padding:0 8px;display:flex;justify-content:flex-end;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.era }}</span></div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ aShowFootballNote }}" hint-placeholder-val="{{ false }}">
+<div style="margin:8px 0;padding:28px;border:1px dashed #2F3B53;border-radius:12px;background:repeating-linear-gradient(45deg,#0D1526,#0D1526 10px,#111B2F 10px,#111B2F 20px)">
+<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#9CAAC5">FootballPlayers screen — separate 37KB screen (football/players.tsx), remounted on every sport switch. Out of scope for the recreation; redesigned in <a href="#1b" style="color:#D4BB78">1b</a>–<a href="#1d" style="color:#D4BB78">1d</a>.</span>
+</div>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ aShowCompare }}" hint-placeholder-val="{{ false }}">
+<div style="padding:24px">
+<div style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.76px;text-transform:uppercase;color:#D4BB78">Players · Head to Head</div>
+<div style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:34px;line-height:1;color:#FFFFFF;margin:6px 0 8px">Player Comparison</div>
+<div style="font-size:14px;line-height:22px;color:#9CAAC5;margin-bottom:18px">Pick up to four players to compare careers side by side.</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<sc-for list="{{ aSlots }}" as="sl" hint-placeholder-count="4">
+<div style="min-height:120px;border:1.5px dashed {{ sl.c }};border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(13,21,38,0.4)">
+<span style="font-size:24px;color:{{ sl.c }}">+</span>
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;text-transform:uppercase;color:{{ sl.c }}">Add Player</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;background:#0A0F1A;border-top:1px solid #1F2D48;padding:6px 0 4px">
+<sc-for list="{{ navDark }}" as="n" hint-placeholder-count="5">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;cursor:pointer">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ n.color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>
+<span style="font-size:11px;font-family:system-ui,sans-serif;color:{{ n.color }}">{{ n.label }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Unified masthead — safe evolution. One branded header owns sport + Stats/Compare + always-on search; filters become live chips (no Apply); table trimmed to headline columns.</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;background:#0A0F1A;font-family:'Literata',serif">
+<div style="flex:1;overflow-y:auto" class="hidescroll">
+<div style="background:linear-gradient(160deg,#143050 0%,#0A0F1A 85%);border-bottom:1px solid #1F2D48;padding:14px 16px 0">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:28px;letter-spacing:0.5px;color:#FFFFFF">PLAYERS</span>
+<div style="display:flex;gap:2px;background:rgba(255,255,255,0.08);border-radius:9999px;padding:3px">
+<sc-for list="{{ bSports }}" as="p" hint-placeholder-count="2">
+<div onClick="{{ p.onPress }}" style="padding:6px 14px;border-radius:9999px;background:{{ p.bg }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;text-transform:uppercase;color:{{ p.color }}">{{ p.label }}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;gap:22px;margin-top:12px">
+<sc-for list="{{ bSegs }}" as="s" hint-placeholder-count="2">
+<div onClick="{{ s.onPress }}" style="padding:8px 2px 10px;border-bottom:2px solid {{ s.line }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.1px;text-transform:uppercase;color:{{ s.color }}">{{ s.label }}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+<div style="position:relative;display:flex;align-items:center;background:#111B2F;border:1px solid #1E2D45;border-radius:10px;padding:0 12px 0 38px;min-height:44px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CAAC5" stroke-width="2" style="position:absolute;left:12px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input value="{{ bSearch }}" onChange="{{ onBSearch }}" placeholder="Search {{ bSearchHint }} players" style="flex:1;background:transparent;border:none;color:#F8FAFC;font-family:'Literata',serif;font-size:14px;padding:8px 0">
+</div>
+<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px" class="hidescroll">
+<sc-for list="{{ bPosChips }}" as="c" hint-placeholder-count="8">
+<div onClick="{{ c.onPress }}" style="flex-shrink:0;padding:7px 13px;border-radius:9999px;border:1px solid {{ c.border }};background:{{ c.bg }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.8px;color:{{ c.color }}">{{ c.label }}</span></div>
+</sc-for>
+</div>
+</div>
+<sc-if value="{{ bShowStats }}" hint-placeholder-val="{{ true }}">
+<div style="padding:0 16px 24px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;padding:2px 2px 8px">
+<span style="font-size:12px;color:#6C80BA">{{ bCount }} players · career leaders</span>
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#D4BB78">All columns →</span>
+</div>
+<div style="background:rgba(16,22,38,0.75);border:1px solid rgba(44,74,124,0.35);border-radius:14px;overflow:hidden">
+<div style="display:flex;background:#143050;border-bottom:2px solid #1C2740;padding:8px 12px">
+<span style="flex:1;font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">Player</span>
+<span style="width:64px;text-align:right;font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#D4BB78">{{ bH1 }} ▼</span>
+<span style="width:56px;text-align:right;font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">{{ bH2 }}</span>
+<span style="width:56px;text-align:right;font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">{{ bH3 }}</span>
+</div>
+<sc-for list="{{ bRows }}" as="r" hint-placeholder-count="8">
+<div style="display:flex;align-items:center;background:{{ r.bg }};border-bottom:1px solid #1C2740;padding:10px 12px;border-left:2px solid {{ r.pc }};cursor:pointer">
+<div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
+<span style="background:{{ r.pc }};color:#fff;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.8px;padding:3px 6px;border-radius:4px;min-width:20px;text-align:center;flex-shrink:0">{{ r.pos }}</span>
+<div style="min-width:0"><div style="font-weight:600;font-size:14px;color:#F5F7FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div><div style="font-size:11px;color:#6C80BA;font-family:'JetBrains Mono',monospace">{{ r.team }}</div></div>
+</div>
+<span style="width:64px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#F5F7FA">{{ r.v1 }}</span>
+<span style="width:56px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.v2 }}</span>
+<span style="width:56px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;color:#9CAAC5">{{ r.v3 }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ bShowCompare }}" hint-placeholder-val="{{ false }}">
+<div style="padding:8px 16px 24px">
+<div style="font-size:14px;line-height:22px;color:#9CAAC5;margin-bottom:14px">Pick up to four players to compare careers side by side.</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<sc-for list="{{ aSlots }}" as="sl" hint-placeholder-count="4">
+<div style="min-height:110px;border:1.5px dashed {{ sl.c }};border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(13,21,38,0.4)">
+<span style="font-size:22px;color:{{ sl.c }}">+</span>
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;text-transform:uppercase;color:{{ sl.c }}">Add Player</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;background:#0A0F1A;border-top:1px solid #1F2D48;padding:6px 0 4px">
+<sc-for list="{{ navDark }}" as="n" hint-placeholder-count="5">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;cursor:pointer">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ n.color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>
+<span style="font-size:11px;font-family:system-ui,sans-serif;color:{{ n.color }}">{{ n.label }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Card feed — Sleeper-style. Position chip rail in real position colors, FPTS-first player cards with trend arrows, inline premium teaser. Tap FPTS to flip sort.</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;background:#0A0F1A;font-family:'Literata',serif">
+<div style="flex:1;overflow-y:auto" class="hidescroll">
+<div style="padding:14px 16px 0;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:26px;color:#FFFFFF">Players</span>
+<div style="display:flex;gap:2px;background:#111B2F;border:1px solid #1E2D45;border-radius:9999px;padding:3px">
+<sc-for list="{{ cSports }}" as="p" hint-placeholder-count="2">
+<div onClick="{{ p.onPress }}" style="padding:5px 12px;border-radius:9999px;background:{{ p.bg }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;color:{{ p.color }}">{{ p.label }}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="position:relative;display:flex;align-items:center;background:#111B2F;border:1px solid #1E2D45;border-radius:10px;padding:0 12px 0 38px;min-height:44px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CAAC5" stroke-width="2" style="position:absolute;left:12px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input value="{{ cSearch }}" onChange="{{ onCSearch }}" placeholder="Search players" style="flex:1;background:transparent;border:none;color:#F8FAFC;font-family:'Literata',serif;font-size:14px;padding:8px 0">
+</div>
+<div style="display:flex;gap:6px;overflow-x:auto" class="hidescroll">
+<sc-for list="{{ cChips }}" as="c" hint-placeholder-count="9">
+<div onClick="{{ c.onPress }}" style="flex-shrink:0;padding:7px 13px;border-radius:9999px;border:1px solid {{ c.border }};background:{{ c.bg }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.8px;color:{{ c.color }}">{{ c.label }}</span></div>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center">
+<span style="font-size:12px;color:#6C80BA">{{ cCount }} players</span>
+<div onClick="{{ onCSort }}" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid rgba(197,165,90,0.4);background:rgba(197,165,90,0.08);cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;text-transform:uppercase;color:#D4BB78">FPTS {{ cSortArrow }}</span></div>
+</div>
+</div>
+<div style="padding:10px 16px 24px;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ cRows }}" as="r" hint-placeholder-count="8">
+<div style="display:flex;align-items:center;gap:12px;background:#111B2F;border:1px solid #1E2D45;border-radius:12px;padding:12px;cursor:pointer">
+<div style="width:38px;height:38px;border-radius:9px;background:{{ r.pcSoft }};border:1px solid {{ r.pc }};display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.8px;color:{{ r.pcText }}">{{ r.pos }}</span></div>
+<div style="flex:1;min-width:0">
+<div style="font-weight:600;font-size:15px;color:#F5F7FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+<div style="font-size:11.5px;color:#9CAAC5;font-family:'JetBrains Mono',monospace;margin-top:2px">{{ r.sub }}</div>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">
+<span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:#F5F7FA">{{ r.fpts }}</span>
+<span style="font-size:11px;color:{{ r.tc }}">{{ r.ta }} FPTS</span>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{ showUpsell }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;align-items:center;gap:12px;border:1.5px dashed rgba(197,165,90,0.5);border-radius:12px;padding:14px;background:rgba(197,165,90,0.05);cursor:pointer">
+<div style="flex:1">
+<div style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.96px;text-transform:uppercase;color:#D4BB78">Go Premium</div>
+<div style="font-size:12.5px;color:#9CAAC5;margin-top:3px">Unlock FPTS/G, oWAR, custom columns and 500-row pages.</div>
+</div>
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:18px;color:#D4BB78">→</span>
+</div>
+</sc-if>
+</div>
+</div>
+<div style="display:flex;background:#0A0F1A;border-top:1px solid #1F2D48;padding:6px 0 4px">
+<sc-for list="{{ navDark }}" as="n" hint-placeholder-count="5">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;cursor:pointer">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ n.color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>
+<span style="font-size:11px;font-family:system-ui,sans-serif;color:{{ n.color }}">{{ n.label }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Box-score ledger — ESPN-style density done right. Rank column, three tappable sort headers, availability pills (All / Free Agents / Rostered), gold dot = on a roster in your leagues.</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;background:#0A0F1A;font-family:'Literata',serif">
+<div style="flex:1;overflow-y:auto" class="hidescroll">
+<div style="padding:14px 16px 10px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:26px;color:#FFFFFF">Players</span>
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.76px;text-transform:uppercase;color:#D4BB78">League Archive</span>
+</div>
+<div style="display:flex;gap:6px">
+<sc-for list="{{ dAvailPills }}" as="p" hint-placeholder-count="3">
+<div onClick="{{ p.onPress }}" style="padding:8px 14px;border-radius:9999px;border:1px solid {{ p.border }};background:{{ p.bg }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.8px;text-transform:uppercase;color:{{ p.color }}">{{ p.label }}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="margin:0 16px 24px;background:rgba(16,22,38,0.75);border:1px solid rgba(44,74,124,0.35);border-radius:14px;overflow:hidden">
+<div style="display:flex;align-items:center;background:#143050;border-bottom:2px solid #1C2740;padding:9px 12px">
+<span style="width:26px;font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;color:#9CAAC5">#</span>
+<span style="flex:1;font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#9CAAC5">Player</span>
+<sc-for list="{{ dCols }}" as="c" hint-placeholder-count="3">
+<div onClick="{{ c.onPress }}" style="width:62px;display:flex;justify-content:flex-end;align-items:center;gap:3px;padding:3px 4px;border-radius:4px;background:{{ c.bg }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:{{ c.color }}">{{ c.label }}</span><span style="font-size:9px;color:#C5A55A">{{ c.arrow }}</span></div>
+</sc-for>
+</div>
+<sc-for list="{{ dRows }}" as="r" hint-placeholder-count="8">
+<div style="display:flex;align-items:center;background:{{ r.bg }};border-bottom:1px solid #1C2740;padding:9px 12px;cursor:pointer">
+<span style="width:26px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#6C80BA">{{ r.rank }}</span>
+<div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
+<span style="background:{{ r.pc }};color:#fff;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.8px;padding:3px 6px;border-radius:4px;min-width:20px;text-align:center;flex-shrink:0">{{ r.pos }}</span>
+<span style="font-weight:600;font-size:14px;color:#F5F7FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+<sc-if value="{{ r.ros }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:3px;background:#C5A55A;flex-shrink:0"></span></sc-if>
+</div>
+<span style="width:62px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;color:{{ r.c1 }}">{{ r.fpts }}</span>
+<span style="width:62px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;color:{{ r.c2 }}">{{ r.hr }}</span>
+<span style="width:62px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;color:{{ r.c3 }}">{{ r.avg }}</span>
+</div>
+</sc-for>
+<div style="display:flex;align-items:center;gap:6px;padding:9px 12px"><span style="width:6px;height:6px;border-radius:3px;background:#C5A55A"></span><span style="font-size:11px;color:#6C80BA">rostered in one of your leagues</span></div>
+</div>
+</div>
+<div style="display:flex;background:#0A0F1A;border-top:1px solid #1F2D48;padding:6px 0 4px">
+<sc-for list="{{ navDark }}" as="n" hint-placeholder-count="5">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;cursor:pointer">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ n.color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>
+<span style="font-size:11px;font-family:system-ui,sans-serif;color:{{ n.color }}">{{ n.label }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="1e">
+<div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Search-first hub — fixes "hard to find a player fast". Hero search with live results (type 2+ chars), quick-action tiles fold Compare in, trending movers below.</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;background:#0A0F1A;font-family:'Literata',serif">
+<div style="flex:1;overflow-y:auto" class="hidescroll">
+<div style="padding:22px 16px 0">
+<div style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.76px;text-transform:uppercase;color:#D4BB78">Players</div>
+<div style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:36px;line-height:1;color:#FFFFFF;margin:6px 0 14px">Find a player</div>
+<div style="position:relative;display:flex;align-items:center;background:#111B2F;border:1px solid #2F3B53;border-radius:12px;padding:0 14px 0 42px;min-height:52px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4BB78" stroke-width="2" style="position:absolute;left:14px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input value="{{ eQuery }}" onChange="{{ onEQuery }}" placeholder="Name, position or team — MLB &amp; NFL" style="flex:1;background:transparent;border:none;color:#F8FAFC;font-family:'Literata',serif;font-size:15px;padding:10px 0">
+</div>
+<sc-if value="{{ eHasResults }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:8px;background:#111B2F;border:1px solid #1E2D45;border-radius:12px;overflow:hidden">
+<sc-for list="{{ eResults }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #1C2740;cursor:pointer">
+<span style="background:{{ r.pc }};color:#fff;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.8px;padding:3px 6px;border-radius:4px;min-width:20px;text-align:center">{{ r.pos }}</span>
+<span style="flex:1;font-weight:600;font-size:14px;color:#F5F7FA">{{ r.name }}</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6C80BA">{{ r.meta }}</span>
+</div>
+</sc-for>
+<sc-if value="{{ eNoMatch }}" hint-placeholder-val="{{ false }}">
+<div style="padding:14px;text-align:center"><span style="font-size:13px;color:#6C80BA">No players match "{{ eQuery }}"</span></div>
+</sc-if>
+</div>
+</sc-if>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+<sc-for list="{{ eActions }}" as="a" hint-placeholder-count="4">
+<div style="background:#111B2F;border:1px solid #1E2D45;border-radius:12px;padding:14px;cursor:pointer">
+<div style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.5px;text-transform:uppercase;color:{{ a.c }}">{{ a.title }}</div>
+<div style="font-size:11.5px;color:#9CAAC5;margin-top:4px;line-height:1.45">{{ a.sub }}</div>
+</div>
+</sc-for>
+</div>
+<div style="margin-top:22px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.76px;text-transform:uppercase;color:#D4BB78">Trending this week</span>
+<span style="font-size:12px;color:#6C80BA">by add/drop volume</span>
+</div>
+<div style="background:#111B2F;border:1px solid #1E2D45;border-radius:12px;overflow:hidden;margin-bottom:24px">
+<sc-for list="{{ eTrending }}" as="r" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #1C2740;cursor:pointer">
+<span style="background:{{ r.pc }};color:#fff;font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.8px;padding:3px 6px;border-radius:4px;min-width:20px;text-align:center">{{ r.pos }}</span>
+<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:#F5F7FA">{{ r.name }}</div><div style="font-size:11px;color:#6C80BA;font-family:'JetBrains Mono',monospace">{{ r.meta }}</div></div>
+<span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:{{ r.tc }}">{{ r.delta }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+<div style="display:flex;background:#0A0F1A;border-top:1px solid #1F2D48;padding:6px 0 4px">
+<sc-for list="{{ navDark }}" as="n" hint-placeholder-count="5">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;cursor:pointer">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ n.color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>
+<span style="font-size:11px;font-family:system-ui,sans-serif;color:{{ n.color }}">{{ n.label }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="1f">
+<div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Light theme — card feed (<a class="dv-oid" href="#1c">1c</a>) on the light token set: AA-desaturated gold (#B8942B), light surfaces from design-tokens.</div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="428px,908px">
+<div style="height:100%;display:flex;flex-direction:column;background:#FFFFFF;font-family:'Literata',serif">
+<div style="flex:1;overflow-y:auto" class="hidescroll">
+<div style="padding:14px 16px 0;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:26px;color:#0B1220">Players</span>
+<div style="display:flex;gap:2px;background:#EFF4FB;border:1px solid #D0DAE8;border-radius:9999px;padding:3px">
+<div style="padding:5px 12px;border-radius:9999px;background:#1B3A5C"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;color:#FFFFFF">MLB</span></div>
+<div style="padding:5px 12px;border-radius:9999px"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;color:#4A6080">NFL</span></div>
+</div>
+</div>
+<div style="position:relative;display:flex;align-items:center;background:#F5F7FA;border:1px solid #D0DAE8;border-radius:10px;padding:0 12px 0 38px;min-height:44px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A6080" stroke-width="2" style="position:absolute;left:12px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input value="{{ fSearch }}" onChange="{{ onFSearch }}" placeholder="Search players" style="flex:1;background:transparent;border:none;color:#0B1220;font-family:'Literata',serif;font-size:14px;padding:8px 0">
+</div>
+<div style="display:flex;gap:6px;overflow-x:auto" class="hidescroll">
+<sc-for list="{{ fChips }}" as="c" hint-placeholder-count="9">
+<div onClick="{{ c.onPress }}" style="flex-shrink:0;padding:7px 13px;border-radius:9999px;border:1px solid {{ c.border }};background:{{ c.bg }};cursor:pointer"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.8px;color:{{ c.color }}">{{ c.label }}</span></div>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center">
+<span style="font-size:12px;color:#7D8EAD">{{ fCount }} players</span>
+<div style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:1px solid rgba(184,148,43,0.45);background:rgba(184,148,43,0.08)"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.96px;text-transform:uppercase;color:#B8942B">FPTS ▼</span></div>
+</div>
+</div>
+<div style="padding:10px 16px 24px;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ fRows }}" as="r" hint-placeholder-count="8">
+<div style="display:flex;align-items:center;gap:12px;background:#FFFFFF;border:1px solid #E1E7F0;border-radius:12px;padding:12px;box-shadow:0 1px 3px rgba(2,6,23,0.06);cursor:pointer">
+<div style="width:38px;height:38px;border-radius:9px;background:{{ r.pcSoft }};border:1px solid {{ r.pc }};display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-family:'Big Shoulders Display',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.8px;color:{{ r.pc }}">{{ r.pos }}</span></div>
+<div style="flex:1;min-width:0">
+<div style="font-weight:600;font-size:15px;color:#0B1220;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+<div style="font-size:11.5px;color:#4A6080;font-family:'JetBrains Mono',monospace;margin-top:2px">{{ r.sub }}</div>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">
+<span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:#0B1220">{{ r.fpts }}</span>
+<span style="font-size:11px;color:{{ r.tcl }}">{{ r.ta }} FPTS</span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;background:#FFFFFF;border-top:1px solid #D0DAE8;padding:6px 0 4px">
+<sc-for list="{{ navLight }}" as="n" hint-placeholder-count="5">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;cursor:pointer">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ n.color }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>
+<span style="font-size:11px;font-family:system-ui,sans-serif;color:{{ n.color }}">{{ n.label }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</x-import>
+</div>
+
+</div>
+<p class="dv-next">Try next: "merge the chip rail from <a class="dv-oid" href="#1c">1c</a> into the masthead of <a class="dv-oid" href="#1b">1b</a>" · "expand <a class="dv-oid" href="#1c">1c</a> cards with a tap-to-reveal stat row" · "show <a class="dv-oid" href="#1d">1d</a> in light theme" · "new directions"</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;premium&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Scenario&quot;},&quot;footballEnabled&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Scenario&quot;}}">
+class Component extends DCLogic {
+  state = {
+    aSeg: 'stats', aSport: 'baseball', aTab: 'combined', aSearch: '', aApplied: '', aAdv: false,
+    bSport: 'baseball', bSeg: 'stats', bSearch: '', bPos: 'ALL',
+    cSport: 'baseball', cPos: 'ALL', cDir: 'desc', cSearch: '',
+    dAvail: 'all', dKey: 'fpts', dDir: 'desc',
+    eQuery: '',
+    fPos: 'ALL', fSearch: '',
+  };
+
+  PC = { SP:'#4A708B', RP:'#2E7D6E', P:'#4A708B', C:'#C41E3A', '1B':'#B5651D', '2B':'#C5A55A', '3B':'#2D6A4F', SS:'#2C4A7C', OF:'#64748B', DH:'#8B2635', QB:'#C41E3A', RB:'#8B6F47', WR:'#2D6A4F', TE:'#7C8794', K:'#C5A55A' };
+  // Lighter text variants for soft chips on dark bg
+  PCT = { SP:'#8FB4D6', RP:'#6FD3C0', C:'#E88A9A', '1B':'#E0A56B', '2B':'#D4BB78', '3B':'#7CC4A4', SS:'#8FA8D6', OF:'#AAB6C8', DH:'#D98A96', QB:'#E88A9A', RB:'#C9A87E', WR:'#7CC4A4', TE:'#B7C0CA' };
+
+  BAT = [
+    { name:'Barry Bonds', pos:'OF', team:'SFG · 1986–2007', fpts:'14,208', fptsN:14208, fpg:'4.8', h:'2,935', hr:'762', hrN:762, rbi:'1,996', avg:'.298', avgN:0.298, obp:'.444', slg:'.607', t:0, ros:false },
+    { name:'Hank Aaron', pos:'OF', team:'ATL · 1954–1976', fpts:'14,536', fptsN:14536, fpg:'4.4', h:'3,771', hr:'755', hrN:755, rbi:'2,297', avg:'.305', avgN:0.305, obp:'.374', slg:'.555', t:1, ros:true },
+    { name:'Babe Ruth', pos:'OF', team:'NYY · 1914–1935', fpts:'13,716', fptsN:13716, fpg:'5.5', h:'2,873', hr:'714', hrN:714, rbi:'2,214', avg:'.342', avgN:0.342, obp:'.474', slg:'.690', t:0, ros:true },
+    { name:'Albert Pujols', pos:'1B', team:'STL · 2001–2022', fpts:'12,530', fptsN:12530, fpg:'4.1', h:'3,384', hr:'703', hrN:703, rbi:'2,218', avg:'.296', avgN:0.296, obp:'.374', slg:'.544', t:1, ros:true },
+    { name:'Alex Rodriguez', pos:'SS', team:'NYY · 1994–2016', fpts:'12,388', fptsN:12388, fpg:'4.5', h:'3,115', hr:'696', hrN:696, rbi:'2,086', avg:'.295', avgN:0.295, obp:'.380', slg:'.550', t:-1, ros:false },
+    { name:'Willie Mays', pos:'OF', team:'SFG · 1951–1973', fpts:'12,862', fptsN:12862, fpg:'4.3', h:'3,283', hr:'660', hrN:660, rbi:'1,903', avg:'.302', avgN:0.302, obp:'.384', slg:'.557', t:0, ros:false },
+    { name:'Ken Griffey Jr.', pos:'OF', team:'SEA · 1989–2010', fpts:'11,304', fptsN:11304, fpg:'4.2', h:'2,781', hr:'630', hrN:630, rbi:'1,836', avg:'.284', avgN:0.284, obp:'.370', slg:'.538', t:1, ros:false },
+    { name:'Jim Thome', pos:'DH', team:'CLE · 1991–2012', fpts:'10,222', fptsN:10222, fpg:'4.1', h:'2,328', hr:'612', hrN:612, rbi:'1,699', avg:'.276', avgN:0.276, obp:'.402', slg:'.554', t:-1, ros:false },
+  ];
+
+  PIT = [
+    { name:'Cy Young', pos:'SP', w:'511', so:'2,803', era:'2.63', fpts:'11,842' },
+    { name:'Walter Johnson', pos:'SP', w:'417', so:'3,509', era:'2.17', fpts:'10,966' },
+    { name:'Christy Mathewson', pos:'SP', w:'373', so:'2,507', era:'2.13', fpts:'9,410' },
+    { name:'Greg Maddux', pos:'SP', w:'355', so:'3,371', era:'3.16', fpts:'9,876' },
+    { name:'Roger Clemens', pos:'SP', w:'354', so:'4,672', era:'3.12', fpts:'10,584' },
+    { name:'Nolan Ryan', pos:'SP', w:'324', so:'5,714', era:'3.19', fpts:'10,212' },
+  ];
+
+  FB = [
+    { name:'Josh Allen', pos:'QB', team:'BUF', fpts:'418.6', fptsN:418.6, v2:'4,587', v3:'42', sub:'BUF · YDS 4,587 · TD 42', t:1 },
+    { name:'Lamar Jackson', pos:'QB', team:'BAL', fpts:'398.4', fptsN:398.4, v2:'4,172', v3:'40', sub:'BAL · YDS 4,172 · TD 40', t:1 },
+    { name:'Saquon Barkley', pos:'RB', team:'PHI', fpts:'355.2', fptsN:355.2, v2:'2,283', v3:'15', sub:'PHI · YDS 2,283 · TD 15', t:1 },
+    { name:"Ja'Marr Chase", pos:'WR', team:'CIN', fpts:'342.8', fptsN:342.8, v2:'1,708', v3:'17', sub:'CIN · YDS 1,708 · TD 17', t:0 },
+    { name:'Justin Jefferson', pos:'WR', team:'MIN', fpts:'301.5', fptsN:301.5, v2:'1,533', v3:'10', sub:'MIN · YDS 1,533 · TD 10', t:-1 },
+    { name:'Bijan Robinson', pos:'RB', team:'ATL', fpts:'298.7', fptsN:298.7, v2:'1,887', v3:'14', sub:'ATL · YDS 1,887 · TD 14', t:1 },
+    { name:'CeeDee Lamb', pos:'WR', team:'DAL', fpts:'289.4', fptsN:289.4, v2:'1,194', v3:'6', sub:'DAL · YDS 1,194 · TD 6', t:-1 },
+    { name:'Travis Kelce', pos:'TE', team:'KC', fpts:'200.1', fptsN:200.1, v2:'823', v3:'3', sub:'KC · YDS 823 · TD 3', t:-1 },
+  ];
+
+  ICONS = {
+    home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10',
+    trophy: 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6 M18 9h1.5a2.5 2.5 0 0 0 0-5H18 M4 22h16 M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22 M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22 M18 2H6v7a6 6 0 0 0 12 0V2',
+    users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M22 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75',
+    gamepad: 'M6 12h4 M8 10v4 M15 13h.01 M18 11h.01 M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.152A4 4 0 0 0 17.32 5z',
+    user: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+  };
+
+  trend(t) {
+    if (t > 0) return { a: '▲', c: '#6FD39A', cl: '#2D6A4F', delta: '+' };
+    if (t < 0) return { a: '▼', c: '#E07A8C', cl: '#C23E54', delta: '-' };
+    return { a: '—', c: '#6C80BA', cl: '#7D8EAD', delta: '' };
+  }
+
+  nav(active, inactive) {
+    const I = this.ICONS;
+    return [
+      { label: 'Home', d: I.home, color: inactive },
+      { label: 'Leagues', d: I.trophy, color: inactive },
+      { label: 'Players', d: I.users, color: active },
+      { label: 'Games', d: I.gamepad, color: inactive },
+      { label: 'You', d: I.user, color: inactive },
+    ];
+  }
+
+  renderVals() {
+    const S = this.state;
+    const set = (o) => this.setState(o);
+    const zeb = (i) => (i % 2 === 0 ? '#0A0F1A' : 'rgba(17,27,47,0.92)');
+    const PC = this.PC, PCT = this.PCT;
+
+    // ── 1a: faithful recreation ──
+    const aSegs = [['stats','Stats'],['compare','Compare']].map(([id,label]) => ({
+      label, bg: S.aSeg===id ? '#1B3A5C' : 'transparent', color: S.aSeg===id ? '#FFFFFF' : '#9CAAC5', onPress: () => set({ aSeg:id }),
+    }));
+    const aSports = [['baseball','Baseball'],['football','Football']].map(([id,label]) => ({
+      label,
+      border: S.aSport===id ? '#1B3A5C' : '#2F3B53',
+      bg: S.aSport===id ? 'rgba(27,58,92,0.13)' : 'transparent',
+      color: S.aSport===id ? '#1B3A5C' : '#9CAAC5',
+      onPress: () => set({ aSport:id }),
+    }));
+    const aTabs = [['combined','Combined'],['hitters','Hitters'],['pitchers','Pitchers']].map(([id,label]) => ({
+      label, bg: S.aTab===id ? '#1B3A5C' : 'transparent', color: S.aTab===id ? '#FFFFFF' : '#9CAAC5', onPress: () => set({ aTab:id }),
+    }));
+    const aq = S.aApplied.trim().toLowerCase();
+    const aRowsBat = this.BAT.filter(p => !aq || p.name.toLowerCase().includes(aq)).map((p,i) => ({ ...p, bg: zeb(i), pc: PC[p.pos] }));
+    const aRowsPit = this.PIT.filter(p => !aq || p.name.toLowerCase().includes(aq)).map((p,i) => ({ ...p, bg: zeb(i), pc: PC[p.pos] }));
+    const aPending = S.aSearch !== S.aApplied;
+    const aBaseball = S.aSport === 'baseball';
+    const aStats = S.aSeg === 'stats';
+    const aUrl = '/players/stats?view=' + S.aTab + '&pageSize=25' + (aq ? '&search=' + encodeURIComponent(S.aApplied) : '');
+
+    // ── 1b: unified masthead ──
+    const bBaseball = S.bSport === 'baseball';
+    const bSports = [['baseball','MLB'],['football','NFL']].map(([id,label]) => ({
+      label, bg: S.bSport===id ? '#2C4A7C' : 'transparent', color: S.bSport===id ? '#FFFFFF' : '#9CAAC5',
+      onPress: () => set({ bSport:id, bPos:'ALL', bSearch:'' }),
+    }));
+    const bSegs = [['stats','Stats'],['compare','Compare']].map(([id,label]) => ({
+      label, line: S.bSeg===id ? '#C5A55A' : 'transparent', color: S.bSeg===id ? '#FFFFFF' : '#9CAAC5', onPress: () => set({ bSeg:id }),
+    }));
+    const bChipDefs = bBaseball ? ['ALL','C','1B','2B','3B','SS','OF','DH','SP','RP'] : ['ALL','QB','RB','WR','TE'];
+    const bPosChips = bChipDefs.map(p => {
+      const act = S.bPos === p;
+      const c = p === 'ALL' ? '#C5A55A' : PC[p];
+      return { label: p, border: act ? c : '#2F3B53', bg: act ? 'rgba(197,165,90,0.12)' : 'transparent', color: act ? (p==='ALL' ? '#D4BB78' : (PCT[p] || '#D4BB78')) : '#9CAAC5', onPress: () => set({ bPos:p }) };
+    });
+    const bq = S.bSearch.trim().toLowerCase();
+    const bData = bBaseball ? this.BAT : this.FB;
+    const bRows = bData
+      .filter(p => (S.bPos==='ALL' || p.pos===S.bPos) && (!bq || p.name.toLowerCase().includes(bq)))
+      .map((p,i) => ({ name:p.name, pos:p.pos, pc:PC[p.pos], team:p.team, bg:zeb(i),
+        v1:p.fpts, v2: bBaseball ? p.hr : p.v2, v3: bBaseball ? p.avg : p.v3 }));
+
+    // ── 1c: card feed ──
+    const cBaseball = S.cSport === 'baseball';
+    const cSports = [['baseball','MLB'],['football','NFL']].map(([id,label]) => ({
+      label, bg: S.cSport===id ? '#1B3A5C' : 'transparent', color: S.cSport===id ? '#FFFFFF' : '#9CAAC5',
+      onPress: () => set({ cSport:id, cPos:'ALL', cSearch:'' }),
+    }));
+    const cChipDefs = cBaseball ? ['ALL','C','1B','2B','3B','SS','OF','DH','SP','RP'] : ['ALL','QB','RB','WR','TE'];
+    const cChips = cChipDefs.map(p => {
+      const act = S.cPos === p;
+      const c = p === 'ALL' ? '#C5A55A' : PC[p];
+      const soft = p === 'ALL' ? 'rgba(197,165,90,0.14)' : 'rgba(255,255,255,0.06)';
+      return { label:p, border: act ? c : '#2F3B53', bg: act ? soft : 'transparent', color: act ? (p==='ALL' ? '#D4BB78' : (PCT[p] || '#D4BB78')) : '#9CAAC5', onPress: () => set({ cPos:p }) };
+    });
+    const cq = S.cSearch.trim().toLowerCase();
+    const cData = (cBaseball ? this.BAT : this.FB)
+      .filter(p => (S.cPos==='ALL' || p.pos===S.cPos) && (!cq || p.name.toLowerCase().includes(cq)))
+      .slice().sort((x,y) => S.cDir==='desc' ? y.fptsN - x.fptsN : x.fptsN - y.fptsN);
+    const cRows = cData.map(p => {
+      const t = this.trend(p.t);
+      return { name:p.name, pos:p.pos, pc:PC[p.pos], pcText: PCT[p.pos] || '#D4BB78',
+        pcSoft: 'rgba(255,255,255,0.05)',
+        sub: cBaseball ? ('HR ' + p.hr + ' · RBI ' + p.rbi + ' · AVG ' + p.avg) : p.sub,
+        fpts: p.fpts, ta: t.a, tc: t.c };
+    });
+
+    // ── 1d: ledger ──
+    const dAvailPills = [['all','All'],['fa','Free Agents'],['ros','Rostered']].map(([id,label]) => ({
+      label, border: S.dAvail===id ? '#C5A55A' : '#2F3B53', bg: S.dAvail===id ? 'rgba(197,165,90,0.12)' : 'transparent',
+      color: S.dAvail===id ? '#D4BB78' : '#9CAAC5', onPress: () => set({ dAvail:id }),
+    }));
+    const dCols = [['fpts','FPTS'],['hr','HR'],['avg','AVG']].map(([key,label]) => {
+      const act = S.dKey === key;
+      return { label, bg: act ? 'rgba(196,165,90,0.18)' : 'transparent', color: act ? '#D4BB78' : '#9CAAC5',
+        arrow: act ? (S.dDir==='desc' ? '▼' : '▲') : '',
+        onPress: () => set(act ? { dDir: S.dDir==='desc' ? 'asc' : 'desc' } : { dKey:key, dDir:'desc' }) };
+    });
+    const dSorted = this.BAT
+      .filter(p => S.dAvail==='all' || (S.dAvail==='fa' ? !p.ros : p.ros))
+      .slice().sort((x,y) => {
+        const k = S.dKey + 'N';
+        return S.dDir==='desc' ? y[k] - x[k] : x[k] - y[k];
+      });
+    const dRows = dSorted.map((p,i) => ({ ...p, rank: i+1, bg: zeb(i), pc: PC[p.pos],
+      c1: S.dKey==='fpts' ? '#F5F7FA' : '#9CAAC5', c2: S.dKey==='hr' ? '#F5F7FA' : '#9CAAC5', c3: S.dKey==='avg' ? '#F5F7FA' : '#9CAAC5' }));
+
+    // ── 1e: search hub ──
+    const eq = S.eQuery.trim().toLowerCase();
+    const eHasResults = eq.length >= 2;
+    const eResults = !eHasResults ? [] : [
+      ...this.BAT.filter(p => p.name.toLowerCase().includes(eq)).map(p => ({ name:p.name, pos:p.pos, pc:PC[p.pos], meta:'MLB · FPTS ' + p.fpts })),
+      ...this.FB.filter(p => p.name.toLowerCase().includes(eq)).map(p => ({ name:p.name, pos:p.pos, pc:PC[p.pos], meta:'NFL · ' + p.team })),
+    ].slice(0,5);
+    const eActions = [
+      { title:'Stats Browser', sub:'Full batting, pitching & NFL grids with every column.', c:'#D4BB78' },
+      { title:'Compare', sub:'Up to four players, career vs career.', c:'#8FB4E8' },
+      { title:'Trending', sub:'Biggest movers by add/drop volume.', c:'#6FD39A' },
+      { title:'Free Agents', sub:'Available in your leagues right now.', c:'#E88A9A' },
+    ];
+    const eTrending = [
+      { name:'Ken Griffey Jr.', pos:'OF', pc:PC.OF, meta:'MLB · FPTS 11,304', delta:'+38%', tc:'#6FD39A' },
+      { name:'Saquon Barkley', pos:'RB', pc:PC.RB, meta:'NFL · PHI', delta:'+24%', tc:'#6FD39A' },
+      { name:'Albert Pujols', pos:'1B', pc:PC['1B'], meta:'MLB · FPTS 12,530', delta:'+11%', tc:'#6FD39A' },
+      { name:'Travis Kelce', pos:'TE', pc:PC.TE, meta:'NFL · KC', delta:'-17%', tc:'#E07A8C' },
+    ];
+
+    // ── 1f: light card feed ──
+    const fChips = ['ALL','C','1B','2B','3B','SS','OF','DH','SP','RP'].map(p => {
+      const act = S.fPos === p;
+      const c = p === 'ALL' ? '#B8942B' : PC[p];
+      return { label:p, border: act ? c : '#D0DAE8', bg: act ? 'rgba(184,148,43,0.1)' : '#FFFFFF', color: act ? c : '#4A6080', onPress: () => set({ fPos:p }) };
+    });
+    const fq = S.fSearch.trim().toLowerCase();
+    const fData = this.BAT
+      .filter(p => (S.fPos==='ALL' || p.pos===S.fPos) && (!fq || p.name.toLowerCase().includes(fq)))
+      .slice().sort((x,y) => y.fptsN - x.fptsN);
+    const fRows = fData.map(p => {
+      const t = this.trend(p.t);
+      return { name:p.name, pos:p.pos, pc:PC[p.pos], pcSoft:'rgba(2,6,23,0.03)',
+        sub:'HR ' + p.hr + ' · RBI ' + p.rbi + ' · AVG ' + p.avg, fpts:p.fpts, ta:t.a, tcl:t.cl };
+    });
+
+    return {
+      footballEnabled: this.props.footballEnabled ?? true,
+      showUpsell: !(this.props.premium ?? false),
+      navDark: this.nav('#F8FAFC', '#9CAAC5'),
+      navLight: this.nav('#0B1220', '#7D8EAD'),
+      // 1a
+      aSegs, aSports, aTabs, aRowsBat, aRowsPit, aUrl,
+      aSearch: S.aSearch,
+      onASearch: (e) => set({ aSearch: e.target.value }),
+      onAApply: () => set({ aApplied: S.aSearch }),
+      aApplyBorder: aPending ? 'rgba(197,165,90,0.5)' : '#2F3B53',
+      aApplyBg: aPending ? 'rgba(197,165,90,0.12)' : 'transparent',
+      aApplyColor: aPending ? '#D4BB78' : '#9CAAC5',
+      aApplyOpacity: aPending ? '1' : '0.55',
+      aAdv: S.aAdv,
+      onAToggleAdv: () => set({ aAdv: !S.aAdv }),
+      aAdvBorder: S.aAdv ? '#2C4A7C' : '#2F3B53',
+      aAdvBg: S.aAdv ? 'rgba(27,58,92,0.35)' : 'transparent',
+      aAdvColor: S.aAdv ? '#F8FAFC' : '#9CAAC5',
+      aAdvChevron: S.aAdv ? '▴' : '▾',
+      aSliders: [
+        { label:'Min Home Runs', val:'0', pct:0 },
+        { label:'Max Home Runs', val:'—', pct:100 },
+        { label:'Min Batting Average', val:'.000', pct:0 },
+        { label:'Max ERA', val:'—', pct:100 },
+      ],
+      aShowStats: aStats && aBaseball,
+      aShowFootballNote: aStats && !aBaseball,
+      aShowCompare: S.aSeg === 'compare',
+      aShowBat: S.aTab !== 'pitchers',
+      aShowPit: S.aTab !== 'hitters',
+      aSlots: [ { c:'#C5A55A' }, { c:'#60A5FA' }, { c:'#34D399' }, { c:'#F87171' } ],
+      // 1b
+      bSports, bSegs, bPosChips, bRows,
+      bSearch: S.bSearch,
+      bSearchHint: bBaseball ? 'MLB' : 'NFL',
+      onBSearch: (e) => set({ bSearch: e.target.value }),
+      bShowStats: S.bSeg === 'stats',
+      bShowCompare: S.bSeg === 'compare',
+      bCount: String(bRows.length),
+      bH1: 'FPTS', bH2: bBaseball ? 'HR' : 'YDS', bH3: bBaseball ? 'AVG' : 'TD',
+      // 1c
+      cSports, cChips, cRows,
+      cSearch: S.cSearch,
+      onCSearch: (e) => set({ cSearch: e.target.value }),
+      cCount: String(cRows.length),
+      onCSort: () => set({ cDir: S.cDir==='desc' ? 'asc' : 'desc' }),
+      cSortArrow: S.cDir==='desc' ? '▼' : '▲',
+      // 1d
+      dAvailPills, dCols, dRows,
+      // 1e
+      eQuery: S.eQuery,
+      onEQuery: (e) => set({ eQuery: e.target.value }),
+      eHasResults, eResults, eNoMatch: eHasResults && eResults.length === 0,
+      eActions, eTrending,
+      // 1f
+      fChips, fRows,
+      fSearch: S.fSearch,
+      onFSearch: (e) => set({ fSearch: e.target.value }),
+      fCount: String(fRows.length),
+    };
+  }
+}
+</script>
+</body>
+</html>

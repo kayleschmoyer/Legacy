@@ -1,158 +1,463 @@
-import React, { useState } from 'react';
-import { Text, XStack, YStack } from 'tamagui';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
-import PlayerStatsScreen from '../PlayerStats';
-import PlayerComparisonScreen from '../PlayerComparison';
-import { FootballPlayers } from '../football/players';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  cardPositionsForSport,
+  formatBaseballCardSubStats,
+  formatFootballCardSubStats,
+  type PlayerFeedRow,
+  PlayersCardFeed,
+  positionFilterParam,
+  useCareerStatsWithNames,
+  useDebouncedValue,
+} from '@legacy-sports/shared-components';
+import { useFootballPlayersQuery } from '@legacy-sports/graphql';
+import {
+  sanitizeSearchParam,
+  toPlayerDetailIdParam,
+} from '../../../common/utilities/RouteUtils';
+import { useSubscription } from '../../../features/subscription/useSubscription';
 
-type Segment = 'stats' | 'compare';
 type Sport = 'baseball' | 'football';
+type SortDir = 'asc' | 'desc';
 
-function SegmentButton({
-  label,
-  active,
-  onPress,
-  testID,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  testID?: string;
-}): React.JSX.Element {
+const PAGE_SIZE = 25;
+const SEARCH_MIN_LENGTH = 2;
+const SEARCH_DEBOUNCE_MS = 300;
+
+// ── expo-router param round-trip ────────────────────────────────────────────
+// Mirrors the one-way-hydration pattern in `../PlayerStats.tsx`
+// (buildStatsParams/parseStatsParams): parse once on mount to seed initial
+// state, then mirror committed state back via `router.setParams` on change.
+// That pair's own param shape (view/pageSize/team/minHomeRuns/...) doesn't
+// cover this screen's fields (position/searchTerm/sortDir round-trip isn't
+// implemented there at all — sortDir has no param handling in that module),
+// so this is a parallel pair scoped to the card feed's state, reusing that
+// module's exported `sanitizeSearchParam` for value sanitization (LS-8832).
+
+interface CardFeedParamState {
+  position: string;
+  searchTerm: string;
+  sortDir: SortDir;
+}
+
+function firstParam(raw: string | string[] | undefined): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === 'string' ? value : null;
+}
+
+function parseCardFeedParams(
+  params: Record<string, string | string[]>,
+): CardFeedParamState {
+  return {
+    position: sanitizeSearchParam(firstParam(params.position)) ?? 'ALL',
+    searchTerm: sanitizeSearchParam(firstParam(params.searchTerm)) ?? '',
+    sortDir: firstParam(params.sortDir) === 'asc' ? 'asc' : 'desc',
+  };
+}
+
+function buildCardFeedParams(
+  state: CardFeedParamState,
+): Record<string, string> {
+  return {
+    position: state.position,
+    searchTerm: state.searchTerm,
+    sortDir: state.sortDir,
+  };
+}
+
+// ── Cursor-continuation pagination ──────────────────────────────────────────
+// Shared by both sport feeds below. Split into two hooks because of a
+// dependency order constraint: `cursor` must exist *before* the GraphQL hook
+// runs (it's the `after` variable), but the accumulated list can only be
+// derived *after* the GraphQL hook returns `data` — so a single combined hook
+// can't own both ends. `isResetRef` bridges the two: the cursor hook flags a
+// reset when `queryKey` changes (position/search/sort — an unrelated query,
+// not the next page), and the accumulation hook consumes that flag to replace
+// the list instead of appending to it.
+
+function useResettableCursor(queryKey: string) {
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const prevKeyRef = useRef(queryKey);
+  const isResetRef = useRef(true);
+
+  useEffect(() => {
+    if (prevKeyRef.current !== queryKey) {
+      prevKeyRef.current = queryKey;
+      isResetRef.current = true;
+      setCursor(undefined);
+    }
+  }, [queryKey]);
+
+  return { cursor, setCursor, isResetRef };
+}
+
+function useAccumulatedPages<T>(
+  data: readonly T[],
+  loading: boolean,
+  cursor: string | undefined,
+  isResetRef: React.MutableRefObject<boolean>,
+): readonly T[] {
+  const [accumulated, setAccumulated] = useState<readonly T[]>([]);
+  const prevCursorRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (loading) return;
+    if (isResetRef.current) {
+      setAccumulated(data);
+      isResetRef.current = false;
+    } else if (prevCursorRef.current !== cursor) {
+      setAccumulated((prev) => [...prev, ...data]);
+    }
+    prevCursorRef.current = cursor;
+  }, [data, loading, cursor, isResetRef]);
+
+  return accumulated;
+}
+
+// ── Baseball data source ─────────────────────────────────────────────────
+
+interface SportFeedProps {
+  position: string;
+  appliedSearch: string;
+  sortDir: SortDir;
+  isPremium: boolean;
+  onPositionChange: (position: string) => void;
+  onSearchChange: (value: string) => void;
+  searchInput: string;
+  onToggleSort: () => void;
+  onPremiumPress: () => void;
+  onOverflowPress: () => void;
+  showSportToggle: boolean;
+  sport: Sport;
+  onSportChange: (sport: Sport) => void;
+}
+
+function BaseballCardFeed({
+  position,
+  appliedSearch,
+  sortDir,
+  isPremium,
+  onPositionChange,
+  onSearchChange,
+  searchInput,
+  onToggleSort,
+  onPremiumPress,
+  onOverflowPress,
+  showSportToggle,
+  sport,
+  onSportChange,
+}: SportFeedProps) {
+  const router = useRouter();
+
+  // The server sorts (orderBy: 'totalScore' per
+  // COLUMN_TO_SORT_FIELD_MAP.fantasyPoints), so a sortDir change requires a
+  // fresh query from page 1, same as a position/search change.
+  const queryKey = `${position}|${appliedSearch}|${sortDir}`;
+  const { cursor, setCursor, isResetRef } = useResettableCursor(queryKey);
+
+  const { data, loading, error, totalCount, hasNextPage, endCursor, refetch } =
+    useCareerStatsWithNames({
+      first: PAGE_SIZE,
+      after: cursor,
+      orderBy: 'totalScore',
+      orderDirection: sortDir,
+      position: positionFilterParam(position),
+      searchTerm: appliedSearch || undefined,
+    });
+
+  const accumulated = useAccumulatedPages(data, loading, cursor, isResetRef);
+
+  const rows: PlayerFeedRow[] = useMemo(
+    () =>
+      accumulated.map((player) => ({
+        id: String(player.playerId),
+        position: player.primaryPosition ?? 'UT',
+        name: player.displayName,
+        subStats: formatBaseballCardSubStats({
+          homeRuns: player.homeRuns,
+          rbi: player.rbi,
+          battingAverage: player.battingAverage,
+        }),
+        fpts: Math.round(player.fantasyPoints).toLocaleString(),
+        // No backing data source for career-leaderboard trend — see
+        // cardFeedHelpers.CardTrendDirection.
+        trend: 'flat',
+      })),
+    [accumulated],
+  );
+
+  const isInitialLoading =
+    loading && accumulated.length === 0 && cursor === undefined;
+  const isLoadingMore = loading && cursor !== undefined;
+
+  const handlePlayerPress = useCallback(
+    (id: string) => {
+      const playerId = toPlayerDetailIdParam(id);
+      if (playerId === null) return;
+      const row = rows.find((r) => r.id === id);
+      router.push({
+        pathname: '/PlayerDetail',
+        params: { playerId, playerName: row?.name ?? '' },
+      });
+    },
+    [router, rows],
+  );
+
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && endCursor && !loading) {
+      setCursor(endCursor);
+    }
+  }, [hasNextPage, endCursor, loading, setCursor]);
+
+  const handleClearFilters = useCallback(() => {
+    onPositionChange('ALL');
+    onSearchChange('');
+  }, [onPositionChange, onSearchChange]);
+
   return (
-    <YStack
-      testID={testID}
-      flex={1}
-      paddingVertical="$2"
-      alignItems="center"
-      justifyContent="center"
-      backgroundColor={active ? '#1B3A5C' : 'transparent'}
-      borderRadius="$2"
-      onPress={onPress}
-      pressStyle={{ opacity: 0.8 }}
-    >
-      <Text
-        fontSize="$3"
-        fontWeight="700"
-        color={active ? 'white' : '$colorSubtle'}
-      >
-        {label}
-      </Text>
-    </YStack>
+    <PlayersCardFeed
+      sport={sport}
+      onSportChange={onSportChange}
+      showSportToggle={showSportToggle}
+      positions={cardPositionsForSport('baseball')}
+      position={position}
+      onPositionChange={onPositionChange}
+      searchValue={searchInput}
+      onSearchChange={onSearchChange}
+      sortDirection={sortDir}
+      onToggleSort={onToggleSort}
+      rows={rows}
+      resultCount={totalCount}
+      onPlayerPress={handlePlayerPress}
+      isLoading={isInitialLoading}
+      isError={Boolean(error)}
+      onRetry={() => void refetch()}
+      onClearFilters={handleClearFilters}
+      isPremium={isPremium}
+      onPremiumPress={onPremiumPress}
+      hasMore={hasNextPage}
+      isLoadingMore={isLoadingMore}
+      onEndReached={handleEndReached}
+      onOverflowPress={onOverflowPress}
+    />
   );
 }
 
-function SportPill({
-  label,
-  active,
-  onPress,
-  testID,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  testID?: string;
-}): React.JSX.Element {
+// ── Football data source ─────────────────────────────────────────────────
+
+function footballFeedPositionParam(position: string): string[] | undefined {
+  return position === 'ALL' ? undefined : [position];
+}
+
+function FootballCardFeed({
+  position,
+  appliedSearch,
+  sortDir,
+  isPremium,
+  onPositionChange,
+  onSearchChange,
+  searchInput,
+  onToggleSort,
+  onPremiumPress,
+  onOverflowPress,
+  showSportToggle,
+  sport,
+  onSportChange,
+}: SportFeedProps) {
+  const router = useRouter();
+
+  // The `footballPlayers` resolver has no global "sort by fantasy points"
+  // option (its sortBy allow-list is players-table columns + namespaced
+  // per-category stat keys — see FOOTBALL_STAT_SORT_FIELDS — with nothing
+  // equivalent to baseball's `orderBy: 'totalScore'`). Pages are fetched in
+  // the server's default order and accumulated for infinite scroll; the FPTS
+  // sort toggle re-sorts what's already loaded, client-side, with no refetch.
+  const queryKey = `${position}|${appliedSearch}`;
+  const { cursor, setCursor, isResetRef } = useResettableCursor(queryKey);
+
+  const { data, loading, error, refetch } = useFootballPlayersQuery({
+    variables: {
+      positions: footballFeedPositionParam(position),
+      search: appliedSearch || undefined,
+      after: cursor,
+      first: PAGE_SIZE,
+    },
+    notifyOnNetworkStatusChange: true,
+  });
+
+  const nodes = useMemo(() => data?.footballPlayers?.nodes ?? [], [data]);
+  const accumulated = useAccumulatedPages(nodes, loading, cursor, isResetRef);
+
+  const rows: PlayerFeedRow[] = useMemo(() => {
+    const sorted = [...accumulated].sort((a, b) => {
+      const aPts = a.careerStats?.fantasyPoints ?? 0;
+      const bPts = b.careerStats?.fantasyPoints ?? 0;
+      return sortDir === 'desc' ? bPts - aPts : aPts - bPts;
+    });
+    return sorted.map((player) => ({
+      id: String(player.id),
+      position: player.isDst ? 'DST' : (player.position ?? 'FLEX'),
+      name: [player.firstName, player.lastName].filter(Boolean).join(' '),
+      subStats: formatFootballCardSubStats(player),
+      fpts: Math.round(player.careerStats?.fantasyPoints ?? 0).toLocaleString(),
+      trend: 'flat',
+    }));
+  }, [accumulated, sortDir]);
+
+  const pageInfo = data?.footballPlayers?.pageInfo;
+  const hasMore = pageInfo?.hasNextPage ?? false;
+  const isInitialLoading =
+    loading && accumulated.length === 0 && cursor === undefined;
+  const isLoadingMore = loading && cursor !== undefined;
+
+  const handlePlayerPress = useCallback(
+    (id: string) => {
+      // Football has its own detail route (career stats shape differs from
+      // baseball's `/PlayerDetail`, which reads batting/pitching-specific
+      // fields) — preserve the existing, already-correct navigation target
+      // rather than routing every sport through `/PlayerDetail`.
+      router.push(`/football/players/${id}`);
+    },
+    [router],
+  );
+
+  const handleEndReached = useCallback(() => {
+    if (hasMore && pageInfo?.endCursor && !loading) {
+      setCursor(pageInfo.endCursor);
+    }
+  }, [hasMore, pageInfo?.endCursor, loading, setCursor]);
+
+  const handleClearFilters = useCallback(() => {
+    onPositionChange('ALL');
+    onSearchChange('');
+  }, [onPositionChange, onSearchChange]);
+
   return (
-    <YStack
-      testID={testID}
-      paddingHorizontal="$3"
-      paddingVertical="$1"
-      borderRadius="$10"
-      borderWidth={1}
-      borderColor={active ? '#1B3A5C' : '$borderColor'}
-      backgroundColor={active ? '#1B3A5C22' : 'transparent'}
-      onPress={onPress}
-      pressStyle={{ opacity: 0.8 }}
-    >
-      <Text
-        fontSize="$3"
-        fontWeight="600"
-        color={active ? '#1B3A5C' : '$colorSubtle'}
-      >
-        {label}
-      </Text>
-    </YStack>
+    <PlayersCardFeed
+      sport={sport}
+      onSportChange={onSportChange}
+      showSportToggle={showSportToggle}
+      positions={cardPositionsForSport('football')}
+      position={position}
+      onPositionChange={onPositionChange}
+      searchValue={searchInput}
+      onSearchChange={onSearchChange}
+      sortDirection={sortDir}
+      onToggleSort={onToggleSort}
+      rows={rows}
+      // The footballPlayers connection exposes no totalCount, only pageInfo —
+      // reflect the loaded count rather than fabricating a grand total.
+      resultCount={accumulated.length}
+      onPlayerPress={handlePlayerPress}
+      isLoading={isInitialLoading}
+      isError={Boolean(error)}
+      onRetry={() => void refetch()}
+      onClearFilters={handleClearFilters}
+      isPremium={isPremium}
+      onPremiumPress={onPremiumPress}
+      hasMore={hasMore}
+      isLoadingMore={isLoadingMore}
+      onEndReached={handleEndReached}
+      onOverflowPress={onOverflowPress}
+    />
   );
 }
+
+// ── Screen ────────────────────────────────────────────────────────────────
 
 export default function PlayersTab(): React.JSX.Element {
-  const [segment, setSegment] = useState<Segment>('stats');
-  const [sport, setSport] = useState<Sport>('baseball');
-  // Incremented on every sport change so FootballPlayers receives a new key,
-  // guaranteeing a full remount and clearing all sport-specific filter state
-  // (position, teamFilter, searchInput) whenever the user switches sports.
-  const [sportKey, setSportKey] = useState(0);
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const { isPremium } = useSubscription();
   const footballEnabled = useFeatureIsOn('football_enabled');
 
-  const handleSportChange = (newSport: Sport) => {
-    if (newSport !== sport) {
+  const [sport, setSport] = useState<Sport>('baseball');
+  // Incremented on every sport change so the football feed receives a new
+  // key, guaranteeing a full remount and clearing its internal pagination
+  // state whenever the user switches sports (mirrors the pre-redesign
+  // `sportKey` remount contract for FootballPlayers).
+  const [sportKey, setSportKey] = useState(0);
+
+  const [position, setPosition] = useState<string>(
+    () => parseCardFeedParams(params).position,
+  );
+  const [searchInput, setSearchInput] = useState<string>(
+    () => parseCardFeedParams(params).searchTerm,
+  );
+  const [sortDir, setSortDir] = useState<SortDir>(
+    () => parseCardFeedParams(params).sortDir,
+  );
+
+  const debouncedSearch = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
+  const appliedSearch =
+    debouncedSearch.trim().length >= SEARCH_MIN_LENGTH
+      ? debouncedSearch.trim()
+      : '';
+
+  // Mirror committed state back into expo-router params (persists across
+  // navigation/backgrounding, shareable) — persists the debounced value, not
+  // every keystroke, to avoid a setParams call per character typed. `params`
+  // (the raw route params) is deliberately not a dependency — only the lazy
+  // initializers above read it, for one-way hydration on mount.
+  useEffect(() => {
+    router.setParams(
+      buildCardFeedParams({ position, searchTerm: debouncedSearch, sortDir }),
+    );
+  }, [router, position, debouncedSearch, sortDir]);
+
+  const handleSportChange = useCallback(
+    (newSport: Sport) => {
+      if (newSport === sport) return;
       setSport(newSport);
       setSportKey((k) => k + 1);
-    }
+      setPosition('ALL');
+      setSearchInput('');
+    },
+    [sport],
+  );
+
+  const handleToggleSort = useCallback(() => {
+    setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
+  }, []);
+
+  const handleOverflowPress = useCallback(() => {
+    router.push('/PlayerComparison');
+  }, [router]);
+
+  const handlePremiumPress = useCallback(() => {
+    router.navigate('/subscription-settings');
+  }, [router]);
+
+  const showSportToggle = footballEnabled;
+  const activeSport: Sport = footballEnabled ? sport : 'baseball';
+
+  const sharedProps: SportFeedProps = {
+    position,
+    appliedSearch,
+    sortDir,
+    isPremium,
+    onPositionChange: setPosition,
+    onSearchChange: setSearchInput,
+    searchInput,
+    onToggleSort: handleToggleSort,
+    onPremiumPress: handlePremiumPress,
+    onOverflowPress: handleOverflowPress,
+    showSportToggle,
+    sport: activeSport,
+    onSportChange: handleSportChange,
   };
 
-  return (
-    <YStack flex={1} backgroundColor="$background">
-      {/* Segmented control: Stats | Compare */}
-      <XStack
-        testID="players-segment-control"
-        margin="$3"
-        marginBottom="$2"
-        backgroundColor="$gray3"
-        borderRadius="$3"
-        padding="$1"
-        gap="$1"
-      >
-        <SegmentButton
-          testID="segment-stats"
-          label="Stats"
-          active={segment === 'stats'}
-          onPress={() => setSegment('stats')}
-        />
-        <SegmentButton
-          testID="segment-compare"
-          label="Compare"
-          active={segment === 'compare'}
-          onPress={() => setSegment('compare')}
-        />
-      </XStack>
-
-      {/* Sport filter — only shown when football is enabled */}
-      {footballEnabled && (
-        <XStack
-          testID="players-sport-filter"
-          paddingHorizontal="$3"
-          paddingBottom="$2"
-          gap="$2"
-        >
-          <SportPill
-            testID="sport-baseball"
-            label="Baseball"
-            active={sport === 'baseball'}
-            onPress={() => handleSportChange('baseball')}
-          />
-          <SportPill
-            testID="sport-football"
-            label="Football"
-            active={sport === 'football'}
-            onPress={() => handleSportChange('football')}
-          />
-        </XStack>
-      )}
-
-      {/* Content area */}
-      <YStack flex={1}>
-        {segment === 'stats' && (sport === 'baseball' || !footballEnabled) && (
-          <PlayerStatsScreen />
-        )}
-        {segment === 'stats' && sport === 'football' && footballEnabled && (
-          <FootballPlayers key={sportKey} />
-        )}
-        {segment === 'compare' && <PlayerComparisonScreen />}
-      </YStack>
-    </YStack>
-  );
+  if (activeSport === 'football') {
+    return <FootballCardFeed key={sportKey} {...sharedProps} />;
+  }
+  return <BaseballCardFeed {...sharedProps} />;
 }
 
 export { ScreenErrorBoundary as ErrorBoundary } from '../_screenErrorBoundary';

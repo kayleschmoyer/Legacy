@@ -21,6 +21,7 @@ import {
   type PlayerCareerStats,
   transformCareerStats,
   useCareerStatsService,
+  useCareerStatsWithNames,
 } from '../services/CareerStatsService';
 
 // =============================================================================
@@ -408,6 +409,67 @@ describe('CareerStatsService - React Hooks', () => {
       expect(result.current.currentPage).toBe(1); // Cursor-based pagination always returns page 1
       expect(result.current.hasPreviousPage).toBe(true);
       expect(result.current.hasNextPage).toBe(true); // Matches pageInfo.hasNextPage from mock
+      expect(result.current.endCursor).toBe('cursor-75'); // LS-8832: exposed for cursor-continuation consumers
+    });
+  });
+
+  describe('useCareerStatsWithNames', () => {
+    test('exposes endCursor for cursor-continuation pagination (LS-8832)', async () => {
+      const paginationMock: MockedResponse = {
+        request: {
+          query: CAREER_BATTING_STATS_QUERY,
+          variables: { first: 25 },
+        },
+        result: {
+          data: {
+            careerBattingStats: {
+              edges: [{ node: mockRawPlayerStats }],
+              pageInfo: {
+                hasNextPage: true,
+                hasPreviousPage: false,
+                startCursor: 'cursor-0',
+                endCursor: 'cursor-25',
+              },
+              totalCount: 100,
+            },
+          },
+        },
+      };
+
+      const { result } = renderHook(
+        () => useCareerStatsWithNames({ first: 25 }),
+        {
+          wrapper: ({ children }) => (
+            <TestWrapper mocks={[paginationMock]}>{children}</TestWrapper>
+          ),
+        },
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.hasNextPage).toBe(true);
+      expect(result.current.endCursor).toBe('cursor-25');
+      expect(result.current.data[0]).toMatchObject({
+        playerId: 1486,
+        homeRuns: 755,
+      });
+    });
+
+    test('endCursor is null when there is no next page', async () => {
+      const { result } = renderHook(() => useCareerStatsWithNames(), {
+        wrapper: ({ children }) => (
+          <TestWrapper mocks={[mockGraphQLResponse]}>{children}</TestWrapper>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.hasNextPage).toBe(false);
+      expect(result.current.endCursor).toBeNull();
     });
   });
 });

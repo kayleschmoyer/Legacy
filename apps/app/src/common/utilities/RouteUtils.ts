@@ -45,6 +45,32 @@ export const toIntId = (raw: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+const SEARCH_PARAM_MAX_LENGTH = 64;
+
+/**
+ * Sanitize a URL search parameter value before forwarding to filters. Strips
+ * control characters (U+0000–U+001F, U+007F–U+009F) and enforces a maximum
+ * length. Mirrors the web wrapper's `sanitizeSearchParam` so iOS/Android and
+ * web hydrate from a shared link identically.
+ *
+ * Lives here (rather than in PlayerStats.tsx, its original home) so screens
+ * that only need this pure string utility — not the full PlayerStats screen
+ * and its subscription/PremiumGate/GraphQL transitive graph — can import it
+ * directly (LS-8832). PlayerStats.tsx re-exports it for its existing callers.
+ */
+export function sanitizeSearchParam(value: string | null): string | null {
+  if (value === null) return null;
+  let stripped = '';
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code > 0x1f && (code < 0x7f || code > 0x9f)) {
+      stripped += value[i];
+    }
+  }
+  if (!stripped) return null;
+  return stripped.slice(0, SEARCH_PARAM_MAX_LENGTH);
+}
+
 // GraphQL Int is a 32-bit signed integer — clamp id values to prevent query
 // errors (mirrors the web wrapper's MAX_GRAPHQL_INT guard).
 const MAX_GRAPHQL_INT = 2147483647;

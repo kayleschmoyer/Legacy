@@ -12,9 +12,12 @@ import { config } from '@legacy-sports/app-config/native';
 import { PremiumGate } from '../../features/subscription/PremiumGate';
 import { useSubscription } from '../../features/subscription/useSubscription';
 import { useStatsFormat } from '../../common/utilities/useStatsFormat';
-import { toPlayerDetailIdParam } from '../../common/utilities/RouteUtils';
+import {
+  sanitizeSearchParam,
+  toPlayerDetailIdParam,
+} from '../../common/utilities/RouteUtils';
 
-export { toPlayerDetailIdParam };
+export { sanitizeSearchParam, toPlayerDetailIdParam };
 
 // Web origin used to turn the shared component's relative share path into a
 // fully-qualified deep link (matches the SalaryCapManagementCard pattern).
@@ -23,8 +26,6 @@ const APP_BASE_URL = config.appBaseUrl ?? 'https://legacysports.app';
 // GraphQL Int is a 32-bit signed integer — clamp param values to prevent query
 // errors (mirrors the web wrapper's MAX_GRAPHQL_INT guard).
 const MAX_GRAPHQL_INT = 2147483647;
-
-const SEARCH_PARAM_MAX_LENGTH = 64;
 
 const VIEW_MODES: ReadonlySet<PlayerStatsViewMode> = new Set([
   'batting',
@@ -43,25 +44,6 @@ const VIEW_MODES: ReadonlySet<PlayerStatsViewMode> = new Set([
 function firstParam(raw: string | string[] | undefined): string | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
   return typeof value === 'string' ? value : null;
-}
-
-/**
- * Sanitize a URL search parameter value before forwarding to filters. Strips
- * control characters (U+0000–U+001F, U+007F–U+009F) and enforces a maximum
- * length. Mirrors the web wrapper's `sanitizeSearchParam` so iOS/Android and
- * web hydrate from a shared link identically.
- */
-export function sanitizeSearchParam(value: string | null): string | null {
-  if (value === null) return null;
-  let stripped = '';
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
-    if (code > 0x1f && (code < 0x7f || code > 0x9f)) {
-      stripped += value[i];
-    }
-  }
-  if (!stripped) return null;
-  return stripped.slice(0, SEARCH_PARAM_MAX_LENGTH);
 }
 
 /**

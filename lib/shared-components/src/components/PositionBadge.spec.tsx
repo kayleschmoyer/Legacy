@@ -104,4 +104,19 @@ describe('PositionBadge', () => {
     expect(getByText('QB')).toBeTruthy();
     expect(queryByTestId('custom-child')).toBeNull();
   });
+
+  it('renders a fixed-size tile when width/height are given (LS-8832 position tile)', () => {
+    const { getByText } = render(
+      <PositionBadge
+        position="OF"
+        sport="baseball"
+        width={38}
+        height={38}
+        borderRadius={9}
+        showBorder
+        borderAlpha={1}
+      />,
+    );
+    expect(getByText('OF')).toBeTruthy();
+  });
 });

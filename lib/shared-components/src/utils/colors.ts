@@ -21,7 +21,9 @@ import {
   footballPositionBadges,
   getPositionColor as getPositionColorToken,
   ledger,
+  lightenForContrast as lightenForContrastToken,
   positions,
+  semantic,
   withAlpha as withAlphaToken,
 } from '@legacy-sports/design-tokens';
 
@@ -30,6 +32,13 @@ import {
 /** Convert a hex color to an rgba() string at the given alpha. */
 export const withAlpha = withAlphaToken;
 
+/** Lighten a color toward a WCAG contrast target against a background, in
+ *  OKLab (hue/chroma-preserving) — see `@legacy-sports/design-tokens` for the
+ *  implementation. Used to derive readable text variants of saturated accents
+ *  (e.g. a position badge hue as chip/tile label text) without a second
+ *  hand-picked hex per accent (LS-8832). */
+export const lightenForContrast = lightenForContrastToken;
+
 // -- Backgrounds & Surfaces ------------------------------------------
 
 export const BG_DARK = darkSurface.bg;
@@ -37,6 +46,8 @@ export const SURFACE_SUBTLE = darkSurface.surfaceSubtle;
 export const SURFACE_PANEL = darkSurface.surfacePanel;
 export const SURFACE_CARD = darkSurface.surfaceCard;
 export const OUTLINE_SUBTLE = darkSurface.outlineSubtle;
+/** Mid dark-surface outline — inactive chip/pill borders (LS-8832). */
+export const OUTLINE_DEFAULT = darkSurface.outlineDefault;
 /** Strongest dark-surface outline — editorial button/rule borders on `$background`. */
 export const OUTLINE_STRONG = darkSurface.outlineStrong;
 export const PANEL_BORDER = darkSurface.panelBorder;
@@ -139,8 +150,13 @@ export const INLINE_ERROR = ledger.errorInline;
 
 // -- Score / Status Colors ---------------------------------------------
 
-/** Loss accent — score highlighting for losing matchup side. */
+/** Loss accent — score highlighting for losing matchup side. Matches
+ *  `semantic.dangerFg` in design-tokens; kept as its own named export since
+ *  callers reach for "loss"/"win" semantics rather than generic danger/success. */
 export const SCORE_LOSS = '#E07A8C';
+/** Win accent — score highlighting for the winning matchup side / positive
+ *  trend indicators. */
+export const SCORE_WIN = semantic.successFg;
 /** Warm amber text — "coming soon" labels and soft warning states. */
 export const AMBER_WARM = '#E3B870';
 

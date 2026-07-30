@@ -50,6 +50,14 @@ export interface PositionBadgeProps {
   paddingVertical?: number | string;
   borderRadius?: number | string;
   minWidth?: number | string;
+  /**
+   * Fixed container width/height (`shape="chip"` only — `shape="circle"` sizes
+   * itself from `size`). Set both to render a fixed-size tile (e.g. a square
+   * position tile) instead of the default content-hugging pill. Omit for the
+   * default padding-driven sizing.
+   */
+  width?: number;
+  height?: number;
   /** Circle diameter (`shape="circle"` only). Default 36. */
   size?: number;
   fontSize?: number | string;
@@ -91,6 +99,8 @@ export function PositionBadge({
   paddingVertical = 2,
   borderRadius = 4,
   minWidth,
+  width,
+  height,
   size = CIRCLE_DEFAULT_SIZE,
   fontSize = 11,
   fontWeight = '700',
@@ -140,10 +150,12 @@ export function PositionBadge({
 
   return (
     <XStack
-      paddingHorizontal={paddingHorizontal}
-      paddingVertical={paddingVertical}
+      paddingHorizontal={width == null ? paddingHorizontal : undefined}
+      paddingVertical={height == null ? paddingVertical : undefined}
       borderRadius={borderRadius}
       minWidth={minWidth}
+      width={width}
+      height={height}
       backgroundColor={background}
       borderWidth={border ? 1 : undefined}
       borderColor={border}
