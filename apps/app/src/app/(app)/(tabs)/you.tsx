@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Platform, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { getExpoPushTokenAsync } from 'expo-notifications';
@@ -221,17 +221,6 @@ export default function YouTab(): React.JSX.Element {
             label="About"
             onPress={() => router.navigate('about')}
           />
-          {Platform.OS === 'android' ? (
-            <>
-              <Separator marginHorizontal="$4" />
-              <MenuRow
-                testID="you-update-check"
-                icon="📲"
-                label="Check for Updates"
-                onPress={() => router.navigate('update-check')}
-              />
-            </>
-          ) : null}
         </YStack>
 
         {/* Sign Out */}

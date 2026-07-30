@@ -5,7 +5,6 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Platform } from 'react-native';
 
 import YouTab from './you';
 
@@ -149,13 +148,6 @@ function renderYouTab(): void {
   render(<YouTab />);
 }
 
-function setPlatformOS(os: string): void {
-  Object.defineProperty(Platform, 'OS', {
-    get: () => os,
-    configurable: true,
-  });
-}
-
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('YouTab', () => {
@@ -164,7 +156,6 @@ describe('YouTab', () => {
     mockUnreadCount = 0;
     mockIsPhysicalDevice = false;
     mockEasProjectId = 'proj-test';
-    setPlatformOS('ios');
     mockLogout.mockResolvedValue(undefined);
     mockDisableDeviceToken.mockResolvedValue({});
     mockGetExpoPushTokenAsync.mockResolvedValue({ data: 'mock-token' });
@@ -214,20 +205,6 @@ describe('YouTab', () => {
     it('renders Sign Out row', () => {
       renderYouTab();
       expect(screen.getByTestId('you-logout')).toBeTruthy();
-    });
-  });
-
-  describe('Check for Updates (platform-conditional)', () => {
-    it('hides Check for Updates on iOS', () => {
-      setPlatformOS('ios');
-      renderYouTab();
-      expect(screen.queryByTestId('you-update-check')).toBeNull();
-    });
-
-    it('shows Check for Updates on Android', () => {
-      setPlatformOS('android');
-      renderYouTab();
-      expect(screen.getByTestId('you-update-check')).toBeTruthy();
     });
   });
 
@@ -298,13 +275,6 @@ describe('YouTab', () => {
       renderYouTab();
       fireEvent.press(screen.getByTestId('you-management'));
       expect(mockNavigate).toHaveBeenCalledWith('management');
-    });
-
-    it('navigates to update-check when Check for Updates row is pressed (Android)', () => {
-      setPlatformOS('android');
-      renderYouTab();
-      fireEvent.press(screen.getByTestId('you-update-check'));
-      expect(mockNavigate).toHaveBeenCalledWith('update-check');
     });
   });
 
