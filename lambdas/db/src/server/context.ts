@@ -92,6 +92,15 @@ export async function getJwtSecret(): Promise<string> {
 
   if (!jwtSecretPromise) {
     jwtSecretPromise = retrieveSecretParameterValue(JWT_SECRET_NAME);
+    // Clear the cache on failure so the next request can retry rather than
+    // receiving the same permanently-rejected promise for the rest of this
+    // Lambda container's lifetime (e.g. a transient Secrets Manager timeout
+    // during cold start). Without this, every request routed to this warm
+    // container silently fails JWT verification — indistinguishable from a
+    // genuine bad token — until the container is recycled (LS-4392).
+    void jwtSecretPromise.catch(() => {
+      jwtSecretPromise = null;
+    });
   }
 
   return jwtSecretPromise;
@@ -129,6 +138,11 @@ export async function getSystemApiKey(): Promise<string | null> {
     systemApiKeyPromise = retrieveSecretParameterValue(
       SYSTEM_API_KEY_SECRET_NAME,
     );
+    // Same retry-on-failure fix as getJwtSecret() above — a rejected promise
+    // must not stay cached for the rest of this container's lifetime.
+    void systemApiKeyPromise.catch(() => {
+      systemApiKeyPromise = null;
+    });
   }
 
   return systemApiKeyPromise;
