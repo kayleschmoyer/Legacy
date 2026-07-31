@@ -288,6 +288,19 @@ jobs:
           # breaks multi-line shell constructs like if/then/fi. See LS-4755 for details.
           script: bash scripts/ci/android-boot-smoke.sh
 
+      # The script prints its capture to the job log too, but the log is
+      # truncated in the GH UI and expires with the run. Keeping the raw file
+      # means a boot failure can be diagnosed after the fact instead of
+      # re-running the job to watch it happen again (LS-8821).
+      - name: Upload boot logcat
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-boot-logcat
+          path: ./artifacts/logcat-boot.txt
+          if-no-files-found: warn
+          retention-days: 14
+
   create-release:
     name: Create GitHub Release
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
