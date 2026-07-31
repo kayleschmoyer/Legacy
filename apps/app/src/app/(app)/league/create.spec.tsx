@@ -35,6 +35,7 @@ type WizardForm = ReturnType<typeof makeForm>;
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockNavigate = jest.fn();
 const mockBack = jest.fn();
 let mockCanGoBack = true;
@@ -42,6 +43,7 @@ let mockSearchParams: { name?: string; sport?: string } = {};
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
+    replace: mockReplace,
     navigate: mockNavigate,
     back: mockBack,
     canGoBack: () => mockCanGoBack,
@@ -301,25 +303,31 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
     });
   });
 
+  // LS-8844 — the success handler must replace the wizard, not push on top of
+  // it. A push leaves the finished wizard mounted underneath the league page,
+  // so swiping back lands the user on a completed, non-resubmittable "step 5"
+  // instead of the Home tab the wizard was opened from.
   describe('submit', () => {
-    it('sends the assembled input and routes to the new baseball league', async () => {
+    it('sends the assembled input and replaces the wizard with the new baseball league', async () => {
       const props = renderScreen();
       props.onSubmit(makeForm());
 
       await waitFor(() => {
         expect(mockCreateLeagueMutate).toHaveBeenCalled();
-        expect(mockPush).toHaveBeenCalledWith('/baseball/league/42');
+        expect(mockReplace).toHaveBeenCalledWith('/baseball/league/42');
       });
+      expect(mockPush).not.toHaveBeenCalled();
     });
 
-    it('routes to the football league when entered from the football wrapper', async () => {
+    it('replaces with the football league when entered from the football wrapper', async () => {
       mockSearchParams = { sport: 'football' };
       const props = renderScreen();
       props.onSubmit(makeForm());
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/football/league/42');
+        expect(mockReplace).toHaveBeenCalledWith('/football/league/42');
       });
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 

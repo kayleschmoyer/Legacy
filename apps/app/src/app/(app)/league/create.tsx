@@ -104,7 +104,12 @@ export default function CreateLeagueScreen(): React.JSX.Element {
     onCompleted: (data: CreateLeagueMutation) => {
       const leagueId = data.createLeagueAndTeams?.league?.id;
       if (leagueId) {
-        router.push(`/${sport}/league/${leagueId}`);
+        // Replace, not push: swaps the finished wizard for the league page
+        // instead of stacking on top of it, so back lands on whatever
+        // surface opened the wizard (the Home tab) rather than a completed,
+        // non-resubmittable "step 5" (LS-8844). Same reasoning as the cancel
+        // path's closeToHomeTab below.
+        router.replace(`/${sport}/league/${leagueId}`);
       }
     },
     onError: (err: unknown) => {
