@@ -377,7 +377,7 @@ describe('LeagueTradeBlock', () => {
       setupMock();
       mockSetTradeBlock.mockRejectedValueOnce(new Error('Server error'));
 
-      const { getAllByText, getByRole } = render(
+      const { getAllByText, findByRole } = render(
         <LeagueTradeBlock leagueId={1} userTeamId={1} />,
       );
 
@@ -385,9 +385,7 @@ describe('LeagueTradeBlock', () => {
         fireEvent.click(getAllByText('Remove')[0]);
       });
 
-      await waitFor(() => {
-        expect(getByRole('alert')).toBeTruthy();
-      });
+      expect(await findByRole('alert')).toBeTruthy();
     });
   });
 
