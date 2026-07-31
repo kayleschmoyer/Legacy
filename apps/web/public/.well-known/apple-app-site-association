@@ -3,8 +3,13 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.com.legacySports",
-        "paths": ["/reset-password", "/reset-password/*"]
+        "appID": "TEAMID.com.legacysports.app",
+        "paths": [
+          "/reset-password",
+          "/reset-password/*",
+          "/football/league/*",
+          "/baseball/league/*"
+        ]
       }
     ]
   }
