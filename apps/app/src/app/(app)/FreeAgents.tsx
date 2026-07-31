@@ -1,7 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView } from 'react-native';
 import { Button, Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 import { UserPlus, Users } from '@tamagui/lucide-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   type FreeAgentClaimPlayer,
@@ -18,6 +19,7 @@ import {
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { useIsMounted } from '../../common/hooks/useIsMounted';
 import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
+import { toIntId } from '../../common/utilities/RouteUtils';
 
 /**
  * Native league free-agents view (LS-7818).
@@ -235,26 +237,65 @@ export function LeagueFreeAgents({ leagueId }: { leagueId: number }) {
 
 export default function FreeAgentsScreen() {
   const userInfo = useAuthorizedUserInfo();
+  const { leagueId: leagueIdParam } = useLocalSearchParams<{
+    leagueId?: string;
+  }>();
+  const routeLeagueId = toIntId(leagueIdParam);
+
   const [selectedLeague, setSelectedLeague] = useState<{
     id: number;
     name: string;
   } | null>(null);
+  // Whether selectedLeague was chosen from the in-screen picker, as opposed to
+  // seeded from the route param — system back should only unwind to the
+  // picker in the former case (LS-8854).
+  const [chosenInScreen, setChosenInScreen] = useState(false);
 
   const { data, loading } = useGetUserLeaguesQuery({
     skip: !userInfo?.id,
   });
+  const leagues = data?.userLeagues ?? [];
 
-  const clearSelectedLeague = useCallback(() => setSelectedLeague(null), []);
+  // Seed selectedLeague from the route param once the user's leagues have
+  // loaded, validating membership so a malformed or non-member id falls
+  // through to the picker instead of rendering a league the user can't act in
+  // — LeagueFreeAgents takes only a numeric id and does its own
+  // membership-dependent queries.
+  useEffect(() => {
+    if (routeLeagueId == null || loading || selectedLeague != null) return;
+    const match = data?.userLeagues?.find(
+      (league) => league.id === routeLeagueId,
+    );
+    if (match?.id != null) {
+      setSelectedLeague({ id: match.id, name: match.name ?? 'League' });
+    }
+  }, [routeLeagueId, loading, data, selectedLeague]);
+
+  const clearSelectedLeague = useCallback(() => {
+    setSelectedLeague(null);
+    setChosenInScreen(false);
+  }, []);
 
   // The in-content back link was removed in LS-8766, so system back has to
-  // unwind the league selection before it pops the screen.
-  useSystemBackAction(selectedLeague != null, clearSelectedLeague);
+  // unwind the league selection before it pops the screen — but only when the
+  // league was picked in-screen. A route-provided league has no picker to
+  // return to, so back must exit the screen instead of trapping the user
+  // (LS-8854).
+  useSystemBackAction(chosenInScreen, clearSelectedLeague);
+
+  // While a route-provided league id is still being validated against the
+  // user's leagues, show a spinner rather than flashing the picker.
+  if (routeLeagueId != null && selectedLeague == null && loading) {
+    return (
+      <YStack flex={1} alignItems="center" justifyContent="center">
+        <Spinner size="large" color="$color" />
+      </YStack>
+    );
+  }
 
   if (selectedLeague != null) {
     return <LeagueFreeAgents leagueId={selectedLeague.id} />;
   }
-
-  const leagues = data?.userLeagues ?? [];
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
@@ -297,12 +338,13 @@ export default function FreeAgentsScreen() {
               borderRadius="$5"
               padding="$4"
               pressStyle={{ opacity: 0.8, scale: 0.98 }}
-              onPress={() =>
+              onPress={() => {
                 setSelectedLeague({
                   id: leagueId,
                   name: league.name ?? 'League',
-                })
-              }
+                });
+                setChosenInScreen(true);
+              }}
               accessibilityRole="button"
               accessibilityLabel={`Browse free agents for ${league.name ?? 'League'}`}
             >

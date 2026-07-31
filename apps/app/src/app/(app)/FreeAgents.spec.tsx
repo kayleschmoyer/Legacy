@@ -1,6 +1,6 @@
 import React from 'react';
-import { Alert } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Alert, BackHandler } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import FreeAgentsScreen from './FreeAgents';
 
@@ -8,9 +8,11 @@ import FreeAgentsScreen from './FreeAgents';
 // These are reset in beforeEach. They must be prefixed with `mock` so jest
 // allows referencing them from inside the jest.mock factory below.
 let mockUserLeagues: unknown;
+let mockUserLeaguesLoading: boolean;
 let mockLeague: unknown;
 let mockTeamMembers: unknown;
 let mockClaim: jest.Mock;
+let mockSearchParams: { leagueId?: string };
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +24,7 @@ jest.mock('expo-router', () => {
     useFocusEffect: (cb: () => (() => void) | void) => {
       cb();
     },
+    useLocalSearchParams: () => mockSearchParams,
   };
 });
 
@@ -35,7 +38,10 @@ jest.mock('../../common/auth/AuthorizedUserContext', () => ({
 // waiver-type scenarios. The player pool + filters now live in the shared
 // LeagueDetailFreeAgentsTab (mocked below), so no player-pool query is needed.
 jest.mock('@legacy-sports/graphql', () => ({
-  useGetUserLeaguesQuery: () => ({ data: mockUserLeagues, loading: false }),
+  useGetUserLeaguesQuery: () => ({
+    data: mockUserLeagues,
+    loading: mockUserLeaguesLoading,
+  }),
   useGetLeagueByIdQuery: () => ({ data: mockLeague }),
   useGetTeamMembersQuery: () => ({ data: mockTeamMembers }),
   useGetUserTeamIdQuery: () => ({ data: { userTeamId: 42 } }),
@@ -164,9 +170,11 @@ function selectLeague(): void {
 
 beforeEach(() => {
   mockUserLeagues = undefined;
+  mockUserLeaguesLoading = false;
   mockLeague = undefined;
   mockTeamMembers = { teamMembers: [] };
   mockClaim = jest.fn();
+  mockSearchParams = {};
   jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 });
 
@@ -318,5 +326,89 @@ describe('FreeAgentsScreen — FAAB waiver bidding', () => {
     expect(mockClaim).toHaveBeenCalledWith({
       variables: { leagueId: 1, playerId: 99, faabBid: undefined },
     });
+  });
+});
+
+describe('FreeAgentsScreen — route leagueId param (LS-8854)', () => {
+  // Capture BackHandler subscriptions so tests can simulate hardware back
+  // press and assert whether the screen intercepted it.
+  const backHandlerHandlers: Array<() => boolean> = [];
+
+  beforeEach(() => {
+    backHandlerHandlers.length = 0;
+    jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockImplementation((_event, handler) => {
+        backHandlerHandlers.push(handler as () => boolean);
+        return {
+          remove: jest.fn(() => {
+            const idx = backHandlerHandlers.indexOf(handler as () => boolean);
+            if (idx !== -1) backHandlerHandlers.splice(idx, 1);
+          }),
+        };
+      });
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'Test League' }] };
+  });
+
+  it('lands directly on the league free-agent list when leagueId matches a user league', () => {
+    mockSearchParams = { leagueId: '1' };
+    render(<FreeAgentsScreen />);
+
+    expect(screen.queryByText(/Select a league/i)).toBeNull();
+  });
+
+  it('still shows the league picker when no leagueId param is present', () => {
+    mockSearchParams = {};
+    render(<FreeAgentsScreen />);
+
+    expect(screen.getByText(/Select a league/i)).toBeTruthy();
+  });
+
+  it('falls back to the picker for a non-member leagueId param', () => {
+    mockSearchParams = { leagueId: '999' };
+    render(<FreeAgentsScreen />);
+
+    expect(screen.getByText(/Select a league/i)).toBeTruthy();
+  });
+
+  it('falls back to the picker for a malformed leagueId param', () => {
+    mockSearchParams = { leagueId: 'not-a-number' };
+    render(<FreeAgentsScreen />);
+
+    expect(screen.getByText(/Select a league/i)).toBeTruthy();
+  });
+
+  it('shows a spinner (not the picker) while resolving a route leagueId', () => {
+    mockSearchParams = { leagueId: '1' };
+    mockUserLeaguesLoading = true;
+    mockUserLeagues = undefined;
+    render(<FreeAgentsScreen />);
+
+    expect(screen.getByTestId('spinner')).toBeTruthy();
+    expect(screen.queryByText(/Select a league/i)).toBeNull();
+  });
+
+  it('does not intercept system back when the league came from the route param', () => {
+    mockSearchParams = { leagueId: '1' };
+    render(<FreeAgentsScreen />);
+
+    expect(backHandlerHandlers).toHaveLength(0);
+  });
+
+  it('intercepts system back to unwind to the picker when the league was chosen in-screen', () => {
+    mockSearchParams = {};
+    render(<FreeAgentsScreen />);
+
+    fireEvent.press(
+      screen.getByLabelText('Browse free agents for Test League'),
+    );
+    expect(screen.queryByText(/Select a league/i)).toBeNull();
+    expect(backHandlerHandlers).toHaveLength(1);
+
+    void act(() => {
+      backHandlerHandlers.forEach((handler) => handler());
+    });
+
+    expect(screen.getByText(/Select a league/i)).toBeTruthy();
   });
 });
