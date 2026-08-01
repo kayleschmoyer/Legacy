@@ -90,3 +90,5 @@ describe('getSystemApiKey', () => {
     expect(mockRetrieveSecretParameterValue).toHaveBeenCalledTimes(2);
   });
 });
+
+export {};

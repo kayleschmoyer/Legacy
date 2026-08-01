@@ -118,6 +118,7 @@ export const CONFIG_KEYS = {
   jiraProxyUrl: {
     clientSafe: true,
     web: 'VITE_JIRA_PROXY_URL',
+    mobile: 'EXPO_PUBLIC_JIRA_PROXY_URL',
     required: false,
   },
   stripeMonthlyPriceId: {

@@ -48,7 +48,8 @@ export function buildNativeConfig(): AppConfig {
     branch: undefined,
     rollbarCaptureRate: undefined,
     googleAnalyticsMeasurementId: undefined,
-    jiraProxyUrl: undefined,
+    jiraProxyUrl:
+      process.env.EXPO_PUBLIC_JIRA_PROXY_URL ?? extra?.['jiraProxyUrl'],
     stripeMonthlyPriceId: undefined,
     stripeAnnualPriceId: undefined,
     vapidPublicKey: undefined,

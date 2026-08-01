@@ -465,6 +465,14 @@ export const glassLight = {
   borderHover: 'rgba(0, 0, 0, 0.12)',
 } as const;
 
+/**
+ * Full-screen modal backdrop scrim. Deliberately theme-invariant — a modal
+ * backdrop dims the content behind it the same way regardless of light/dark
+ * theme, unlike UI surface colors — so it's a flat constant rather than a
+ * dark/light pair.
+ */
+export const modalScrim = 'rgba(0, 0, 0, 0.8)';
+
 export const colors = {
   brand,
   positions,

@@ -127,6 +127,27 @@ describe('native adapter', () => {
     );
   });
 
+  it('reads jiraProxyUrl from EXPO_PUBLIC_JIRA_PROXY_URL (LS-8842)', () => {
+    process.env.EXPO_PUBLIC_JIRA_PROXY_URL = 'https://api.example.com/jira';
+    expect(buildNativeConfig().jiraProxyUrl).toBe(
+      'https://api.example.com/jira',
+    );
+  });
+
+  it('falls back to extra.jiraProxyUrl when EXPO_PUBLIC_JIRA_PROXY_URL is absent', () => {
+    mockExtraData = {
+      ...defaultMockExtra,
+      jiraProxyUrl: 'https://api-fallback.example.com/jira',
+    };
+    expect(buildNativeConfig().jiraProxyUrl).toBe(
+      'https://api-fallback.example.com/jira',
+    );
+  });
+
+  it('is undefined for jiraProxyUrl when absent from both env and extra', () => {
+    expect(buildNativeConfig().jiraProxyUrl).toBeUndefined();
+  });
+
   it('returns undefined for keys absent from both env and extra', () => {
     const cfg = buildNativeConfig();
     expect(cfg.websocketUrl).toBeUndefined();
