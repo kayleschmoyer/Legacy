@@ -36,15 +36,23 @@ fi
 # console window. This is what was flashing a CMD window on every session stop.
 if [ -L "$NM" ]; then
   rm -f "$NM" >/dev/null 2>&1
-  exit 0
+else
+  # Fallback for non-symlink links: Node fs.rmdirSync removes a junction (or an empty real
+  # directory) without following it, and throws harmlessly on non-empty real directories —
+  # the same semantics as non-recursive `cmd //c rmdir`, but with no console window.
+  # bash-spawned cmd.exe/powershell.exe each flash a focus-stealing terminal (LS-7892);
+  # node spawned from a hook does not.
+  WIN_PATH=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
+  node -e "try{require('fs').rmdirSync(process.argv[1])}catch{}" "$WIN_PATH" >/dev/null 2>&1
 fi
 
-# Fallback for non-symlink links: Node fs.rmdirSync removes a junction (or an empty real
-# directory) without following it, and throws harmlessly on non-empty real directories —
-# the same semantics as non-recursive `cmd //c rmdir`, but with no console window.
-# bash-spawned cmd.exe/powershell.exe each flash a focus-stealing terminal (LS-7892);
-# node spawned from a hook does not.
-WIN_PATH=$(cygpath -w "$NM" 2>/dev/null || echo "$NM" | sed 's|/d/|D:\\|; s|/|\\|g')
-node -e "try{require('fs').rmdirSync(process.argv[1])}catch{}" "$WIN_PATH" >/dev/null 2>&1
+# Remove the Copilot session marker so Copilot's cleanup-orphaned-symlinks hook
+# sees this session as ended. Without this, Copilot skips cleanup of the worktree
+# because the marker appears live — even though the Claude Code session has ended.
+# Only applies to *.worktrees paths (Copilot worktrees); .claude/worktrees paths
+# use .claude-session and are cleaned up by the Copilot-side hooks independently.
+if [[ "$PARENT_NAME" == *.worktrees ]]; then
+  rm -f "$WORKTREE/.copilot-session" 2>/dev/null || true
+fi
 
 exit 0

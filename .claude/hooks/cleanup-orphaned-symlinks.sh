@@ -22,7 +22,8 @@
 # runs first) writes a .claude-session marker with the current epoch. Sibling
 # worktrees whose marker is < 30 minutes old are skipped. Stale markers (crashed
 # sessions older than 30 minutes) are removed before the symlink is cleaned up.
-# For Copilot agents-* worktrees, setup-worktree.ps1 writes the same marker.
+# For Copilot agents-* worktrees, .github/copilot/hooks/setup-worktree-symlink.sh
+# writes a .copilot-session marker instead; the agents-* scan passes that name.
 
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
@@ -56,12 +57,15 @@ remove_symlink() {
 
 # Remove all symlinks in a worktree directory, respecting the session marker.
 # Symlinks created by make wt-setup: node_modules, .twig, certs, .github/skills
+# Optional third arg: marker file name to check for live sessions (default: .claude-session).
+# Copilot agents-* worktrees use .copilot-session; Claude Code worktrees use .claude-session.
 clean_worktree_symlinks() {
   local WORKTREE_DIR="$1"
   local NOW="$2"
+  local MARKER_NAME="${3:-.claude-session}"
 
   # Skip if a live session marker exists and is < 1800 seconds old
-  local MARKER="$WORKTREE_DIR/.claude-session"
+  local MARKER="$WORKTREE_DIR/$MARKER_NAME"
   if [ -f "$MARKER" ]; then
     # Strip non-numeric chars (BOM, whitespace) in case the marker was written by
     # PowerShell without -Encoding ascii (UTF-16LE produces a BOM that breaks arithmetic)
@@ -104,7 +108,9 @@ AGENTS_WORKTREES_DIR="$PARENT_DIR/${MAIN_REPO_NAME}.worktrees"
 if [ -d "$AGENTS_WORKTREES_DIR" ]; then
   for SIBLING_DIR in "$AGENTS_WORKTREES_DIR"/agents-*/; do
     [ -d "$SIBLING_DIR" ] || continue
-    clean_worktree_symlinks "$SIBLING_DIR" "$NOW"
+    # Copilot agents-* worktrees use .copilot-session (written by setup-worktree-symlink.sh
+    # in .github/copilot/hooks/), not .claude-session.
+    clean_worktree_symlinks "${SIBLING_DIR%/}" "$NOW" ".copilot-session"
   done
 fi
 
