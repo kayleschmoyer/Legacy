@@ -92,12 +92,18 @@ export function tierUserByIdResponse(tier: EntitlementTier) {
 // ---------------------------------------------------------------------------
 
 /**
- * Map of lowercased operationName → GraphQL response body.
+ * Map of lowercased operationName → GraphQL response body, or a function of
+ * the request's variables that returns one (for ops whose safe default
+ * depends on an id — see `getmatchupwinprobability` below).
  *
  * To add a new baseline mock, add an entry here. The key must be the
  * exact operationName (lowercased) that appears in the request's JSON body.
  */
-export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
+export const BASELINE_GRAPHQL_RESPONSES: Record<
+  string,
+  | Record<string, unknown>
+  | ((variables: Record<string, unknown>) => Record<string, unknown>)
+> = deepFreeze({
   // ── App shell (fires on every authenticated page) ─────────────────
   getunreadnotificationcount: { data: { getUnreadNotificationCount: 0 } },
   // Mirrors the `User` GraphQL fragment (apps/web/src/api/db/users/Users.graphql),
@@ -162,6 +168,29 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   getmatchupsforleague: matchupsForLeagueResponse(),
   getmatchupbyid: { data: { matchup: null } },
   getmatchupplayers: { data: { matchupPlayers: [] } },
+  // MatchupWinProbabilityPanel fires this on every matchup-detail render
+  // (LS-5907 — win probability is now a server-gated field). This query
+  // reuses the exact `getMatchupById(id)` root field that `GetMatchupById`
+  // (the page's main data query) also uses, so Apollo's InMemoryCache
+  // normalizes both under the SAME store key (cache identity is fieldName +
+  // args — GraphQL aliases are not part of the key, and neither is the
+  // operationName). A flat `{ getMatchupById: null }` response is NOT safe
+  // here: because the value can't be identified as an entity (no
+  // __typename/id), Apollo can't merge it — it overwrites that store key
+  // outright, nulling out whatever the main query already cached and
+  // breaking every spec that navigates to the matchup page (LS-5907 CI
+  // regression: shard 2/3 "Matchup not found"). Echo the requested id with
+  // `winProbability: null` instead — Apollo recognizes `Matchup:<id>` as the
+  // already-cached entity and merges the field in without clobbering it.
+  getmatchupwinprobability: (variables: Record<string, unknown>) => ({
+    data: {
+      getMatchupById: {
+        __typename: 'Matchup',
+        id: variables.id,
+        winProbability: null,
+      },
+    },
+  }),
   getcurrentmatchup: { data: { currentMatchup: null } },
   getleaguestandings: { data: { getLeagueStandings: [] } },
   getleaguescoringprofile: leagueScoringProfileResponse(),
@@ -309,6 +338,20 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<string, object> = deepFreeze({
   getalltimerecords: { data: { getAllTimeRecords: [] } },
 });
 
+/**
+ * Resolve a `BASELINE_GRAPHQL_RESPONSES` entry into a plain response body,
+ * invoking it with `variables` if it's a function. Prefer this over indexing
+ * `BASELINE_GRAPHQL_RESPONSES[op]` directly — a raw index can return a
+ * function (JSON.stringify(fn) silently serializes to `undefined`).
+ */
+export function resolveBaselineResponse(
+  op: string,
+  variables: Record<string, unknown> = {},
+): object | undefined {
+  const entry = BASELINE_GRAPHQL_RESPONSES[op];
+  return typeof entry === 'function' ? entry(variables) : entry;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -426,6 +469,21 @@ export function extractOperationName(route: Route): string {
   if (refMatch) return refMatch[1];
 
   return 'unknown';
+}
+
+/** GraphQL request variables, parsed from the route's POST body (`{}` if absent/unparseable). */
+export function extractOperationVariables(
+  route: Route,
+): Record<string, unknown> {
+  const postData = route.request().postData() ?? '';
+  try {
+    const body = JSON.parse(postData) as {
+      variables?: Record<string, unknown>;
+    };
+    return body.variables ?? {};
+  } catch {
+    return {};
+  }
 }
 
 /**

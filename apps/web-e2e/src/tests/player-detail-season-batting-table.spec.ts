@@ -15,8 +15,9 @@
 
 import { expect, test } from '../fixtures/pages';
 import {
-  BASELINE_GRAPHQL_RESPONSES,
   extractOperationName,
+  extractOperationVariables,
+  resolveBaselineResponse,
   useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -328,7 +329,10 @@ async function setupMocks(
         body: JSON.stringify(PLAYER_LIST_RESPONSE),
       });
     } else {
-      const baselineResponse = BASELINE_GRAPHQL_RESPONSES[op.toLowerCase()];
+      const baselineResponse = resolveBaselineResponse(
+        op.toLowerCase(),
+        extractOperationVariables(route),
+      );
       if (baselineResponse !== undefined) {
         await route.fulfill({
           status: 200,

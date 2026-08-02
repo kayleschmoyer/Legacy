@@ -1630,6 +1630,8 @@ export type Matchup = {
   team2Id?: Maybe<Scalars['Int']['output']>;
   team2Score?: Maybe<Scalars['Float']['output']>;
   weekNumber?: Maybe<Scalars['Int']['output']>;
+  /** Server-computed Monte Carlo win probability, gated by ENTITLEMENTS.matchup_projections. Null for completed matchups, unauthenticated callers, and non-entitled users (LS-5907). */
+  winProbability?: Maybe<MatchupWinProbability>;
 };
 
 /** User blocking relationship for chat */
@@ -1805,6 +1807,17 @@ export type MatchupStatusCounts = {
   inProgress?: Maybe<Scalars['Int']['output']>;
   scheduled?: Maybe<Scalars['Int']['output']>;
   total?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Server-computed Monte Carlo win probability for a scheduled or in-progress matchup. Gated by ENTITLEMENTS.matchup_projections. */
+export type MatchupWinProbability = {
+  __typename?: 'MatchupWinProbability';
+  simulationCount: Scalars['Int']['output'];
+  team1ProjectedScore: Scalars['Float']['output'];
+  team1WinProbability: Scalars['Float']['output'];
+  team2ProjectedScore: Scalars['Float']['output'];
+  team2WinProbability: Scalars['Float']['output'];
+  tiesProbability: Scalars['Float']['output'];
 };
 
 /** Result of merging two user accounts */

@@ -1,0 +1,8 @@
+fragment MatchupWinProbabilityFragment on MatchupWinProbability {
+  team1WinProbability
+  team2WinProbability
+  tiesProbability
+  team1ProjectedScore
+  team2ProjectedScore
+  simulationCount
+}

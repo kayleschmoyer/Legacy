@@ -1,8 +1,9 @@
 import { type Page, type TestInfo } from '@playwright/test';
 
 import {
-  BASELINE_GRAPHQL_RESPONSES,
   extractOperationName,
+  extractOperationVariables,
+  resolveBaselineResponse,
 } from './shared-mocks';
 import { E2E_SIGNING_SECRET, E2EJwtUtil, signE2EJwt } from '../utils/jwt';
 
@@ -147,7 +148,10 @@ export async function withApiIsolation(
       if (reqUrl.includes('/graphql')) {
         const opName = extractOperationName(route);
         const key = opName.toLowerCase();
-        const response = BASELINE_GRAPHQL_RESPONSES[key];
+        const response = resolveBaselineResponse(
+          key,
+          extractOperationVariables(route),
+        );
 
         if (response) {
           await route.fulfill({

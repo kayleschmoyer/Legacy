@@ -11,6 +11,10 @@ import {
 } from '@legacy-sports/narrative';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+import {
+  MatchupWinProbabilityType,
+  resolveMatchupWinProbability,
+} from './winProbability';
 import { builder } from '../builder';
 import { hasEntitlement } from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
@@ -339,6 +343,14 @@ builder.objectType(Matchup, {
 
         return recap;
       },
+    }),
+    winProbability: t.field({
+      type: MatchupWinProbabilityType,
+      nullable: true,
+      description:
+        'Server-computed Monte Carlo win probability, gated by ENTITLEMENTS.matchup_projections. Null for completed matchups, unauthenticated callers, and non-entitled users (LS-5907).',
+      resolve: async (matchup, _args, context) =>
+        resolveMatchupWinProbability(matchup, context),
     }),
   }),
 });

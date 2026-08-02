@@ -326,6 +326,37 @@ async function mockMatchupGraphQL(
             data: { getMatchupPlayers: MOCK_MATCHUP_PLAYERS },
           }),
         });
+      } else if (opName.includes('getmatchupwinprobability')) {
+        // LS-5907: win probability is now a server-gated field — the panel
+        // renders only what this query returns, mirroring what the real
+        // resolver would produce for an entitled vs. non-entitled caller.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              getMatchupById: isPremium
+                ? {
+                    __typename: 'Matchup',
+                    id: String(MATCHUP_ID_WEEK3),
+                    winProbability: {
+                      __typename: 'MatchupWinProbability',
+                      team1WinProbability: 0.62,
+                      team2WinProbability: 0.38,
+                      tiesProbability: 0,
+                      team1ProjectedScore: 100.5,
+                      team2ProjectedScore: 88.25,
+                      simulationCount: 5000,
+                    },
+                  }
+                : {
+                    __typename: 'Matchup',
+                    id: String(MATCHUP_ID_WEEK3),
+                    winProbability: null,
+                  },
+            },
+          }),
+        });
       } else if (
         opName.includes('getmysubscription') ||
         opName.includes('mysubscription')

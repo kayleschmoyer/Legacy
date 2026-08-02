@@ -1,0 +1,8 @@
+query GetMatchupWinProbability($id: Int!) {
+  getMatchupById(id: $id) {
+    id
+    winProbability {
+      ...MatchupWinProbabilityFragment
+    }
+  }
+}

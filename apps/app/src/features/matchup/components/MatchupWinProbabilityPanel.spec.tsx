@@ -50,7 +50,9 @@ jest.mock('../../subscription/useStripePrices', () => ({
   useStripePrices: () => ({ annualMonthlyEquivalent: '$6.67' }),
 }));
 
-// Scoring / analytics — deterministic so we control the rendered numbers.
+// Scoring — deterministic so we control the rendered category-breakdown
+// numbers. Win probability itself is no longer computed client-side
+// (LS-5907) — it comes from useGetMatchupWinProbabilityQuery below.
 const mockComputeScoring = jest.fn();
 const mockCalculateMatchupProjection = jest.fn();
 jest.mock('@legacy-sports/scoring', () => ({
@@ -58,12 +60,6 @@ jest.mock('@legacy-sports/scoring', () => ({
     mockComputeScoring(...args) as number,
   calculateMatchupProjection: (...args: unknown[]): unknown =>
     mockCalculateMatchupProjection(...args),
-}));
-
-const mockCalculateMatchupWinProbability = jest.fn();
-jest.mock('@legacy-sports/analytics', () => ({
-  calculateMatchupWinProbability: (...args: unknown[]): unknown =>
-    mockCalculateMatchupWinProbability(...args),
 }));
 
 const mockLoggerError = jest.fn();
@@ -80,6 +76,7 @@ jest.mock('@legacy-sports/logging', () => ({
 // GraphQL hooks + enum.
 const mockUseGetMatchupPlayersQuery = jest.fn();
 const mockUseGetLeagueTeamsQuery = jest.fn();
+const mockUseGetMatchupWinProbabilityQuery = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: {
     Scheduled: 'SCHEDULED',
@@ -90,6 +87,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetMatchupPlayersQuery(opts),
   useGetLeagueTeamsQuery: (opts: unknown): unknown =>
     mockUseGetLeagueTeamsQuery(opts),
+  useGetMatchupWinProbabilityQuery: (opts: unknown): unknown =>
+    mockUseGetMatchupWinProbabilityQuery(opts),
 }));
 
 const mockUseLeagueScoringSettings = jest.fn();
@@ -151,6 +150,15 @@ const PLAYERS = [
   },
 ];
 
+const WIN_PROBABILITY = {
+  team1WinProbability: 0.62,
+  team2WinProbability: 0.38,
+  tiesProbability: 0,
+  team1ProjectedScore: 100.5,
+  team2ProjectedScore: 88.25,
+  simulationCount: 5000,
+};
+
 function primeProjectionMocks() {
   mockUseGetMatchupPlayersQuery.mockReturnValue({
     data: { getMatchupPlayers: PLAYERS },
@@ -163,6 +171,9 @@ function primeProjectionMocks() {
       ],
     },
   });
+  mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
+    data: { getMatchupById: { winProbability: WIN_PROBABILITY } },
+  });
   mockUseLeagueScoringSettings.mockReturnValue({
     settings: { batting: {}, pitching: {}, fielding: {} },
   });
@@ -173,14 +184,6 @@ function primeProjectionMocks() {
     pitchingPerGame: 30,
     fieldingPerGame: 20,
   });
-  mockCalculateMatchupWinProbability.mockReturnValue({
-    team1WinProbability: 0.62,
-    team2WinProbability: 0.38,
-    tiesProbability: 0,
-    team1ProjectedScore: 100.5,
-    team2ProjectedScore: 88.25,
-    simulationCount: 5000,
-  });
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -190,7 +193,7 @@ describe('MatchupWinProbabilityPanel', () => {
     jest.clearAllMocks();
   });
 
-  it('renders win probability, projected scores, and team names when projections are available', () => {
+  it('renders win probability, projected scores, and team names from the server-computed field', () => {
     primeProjectionMocks();
 
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
@@ -203,18 +206,26 @@ describe('MatchupWinProbabilityPanel', () => {
     // Each team name appears in both the probability bar and the score row.
     expect(screen.getAllByText('Aces').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Bolts').length).toBeGreaterThan(0);
-    expect(mockCalculateMatchupWinProbability).toHaveBeenCalledWith(100, 100);
+    expect(mockUseGetMatchupWinProbabilityQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ variables: { id: 1 } }),
+    );
   });
 
   it('renders a tie-probability hint when the tie probability exceeds 1%', () => {
     primeProjectionMocks();
-    mockCalculateMatchupWinProbability.mockReturnValue({
-      team1WinProbability: 0.49,
-      team2WinProbability: 0.49,
-      tiesProbability: 0.02,
-      team1ProjectedScore: 100.5,
-      team2ProjectedScore: 100.4,
-      simulationCount: 5000,
+    mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
+      data: {
+        getMatchupById: {
+          winProbability: {
+            team1WinProbability: 0.49,
+            team2WinProbability: 0.49,
+            tiesProbability: 0.02,
+            team1ProjectedScore: 100.5,
+            team2ProjectedScore: 100.4,
+            simulationCount: 5000,
+          },
+        },
+      },
     });
 
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
@@ -243,13 +254,32 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(screen.queryByText('Win Probability')).toBeNull();
   });
 
-  // AC1 — a Scheduled matchup with 0 computed win-prob totals shows the
-  // pre-season fallback card instead of rendering nothing (LS-8471).
+  it('renders nothing when the server returns no win probability (non-entitled or unauthenticated caller)', () => {
+    primeProjectionMocks();
+    mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
+      data: { getMatchupById: { winProbability: null } },
+    });
+
+    render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
+
+    // LS-5907: visibility is gated entirely by the server response — a free
+    // user gets `null` back from the entitlement-gated field. With the
+    // default (non-empty) players, category totals are non-zero, so this
+    // isn't the pre-season case either — the panel renders nothing.
+    expect(screen.queryByText('Win Probability')).toBeNull();
+  });
+
+  // AC1 — a Scheduled matchup with 0 computed category totals AND no server
+  // win probability shows the pre-season fallback card instead of nothing
+  // (LS-8471).
   it('renders the pre-season fallback for a scheduled matchup with no projection-eligible players', () => {
     primeProjectionMocks();
     // No projections → both team totals are zero → no simulation runs.
     mockUseGetMatchupPlayersQuery.mockReturnValue({
       data: { getMatchupPlayers: [] },
+    });
+    mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
+      data: { getMatchupById: { winProbability: null } },
     });
 
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
@@ -258,7 +288,6 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(
       screen.getByText('Win probability will appear once games are scheduled.'),
     ).toBeTruthy();
-    expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
   });
 
   // AC2 — other null-winProb cases (data still loading) are unaffected and
@@ -266,6 +295,9 @@ describe('MatchupWinProbabilityPanel', () => {
   it('renders nothing for a scheduled matchup while player data is still loading', () => {
     primeProjectionMocks();
     mockUseGetMatchupPlayersQuery.mockReturnValue({ data: undefined });
+    mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
+      data: { getMatchupById: { winProbability: null } },
+    });
 
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
 
@@ -275,7 +307,6 @@ describe('MatchupWinProbabilityPanel', () => {
         'Win probability will appear once games are scheduled.',
       ),
     ).toBeNull();
-    expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
   });
 
   // AC2 — the pre-season fallback is scoped to Scheduled matchups only; a
@@ -284,6 +315,9 @@ describe('MatchupWinProbabilityPanel', () => {
     primeProjectionMocks();
     mockUseGetMatchupPlayersQuery.mockReturnValue({
       data: { getMatchupPlayers: [] },
+    });
+    mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
+      data: { getMatchupById: { winProbability: null } },
     });
 
     render(
@@ -298,7 +332,6 @@ describe('MatchupWinProbabilityPanel', () => {
         'Win probability will appear once games are scheduled.',
       ),
     ).toBeNull();
-    expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
   });
 
   it('renders nothing for a null matchup', () => {
@@ -309,8 +342,28 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(screen.queryByText('Win Probability')).toBeNull();
   });
 
-  it('falls back to the pre-season card (no throw) when projection calculation throws', () => {
+  it('logs but still renders the server win probability when the category-breakdown projection throws', () => {
     primeProjectionMocks();
+    // Projection throws for every player → category breakdown falls back to
+    // actual-only scores, but the win probability itself is independently
+    // server-sourced and must still render — the error must be surfaced
+    // rather than silently swallowed.
+    mockCalculateMatchupProjection.mockImplementation(() => {
+      throw new Error('bad scoring config');
+    });
+
+    render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
+
+    expect(mockLoggerError).toHaveBeenCalled();
+    expect(screen.getByText('Win Probability')).toBeTruthy();
+    expect(screen.getByText('62%')).toBeTruthy();
+  });
+
+  it('falls back to the pre-season card (no throw) when the category projection throws and the server has no win probability', () => {
+    primeProjectionMocks();
+    mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
+      data: { getMatchupById: { winProbability: null } },
+    });
     // Projection throws for every player → perGame stays null. With no played
     // games the actual totals are zero, so no simulation runs and the
     // pre-season fallback renders instead of the full panel — but the error
@@ -325,7 +378,6 @@ describe('MatchupWinProbabilityPanel', () => {
     expect(
       screen.getByText('Win probability will appear once games are scheduled.'),
     ).toBeTruthy();
-    expect(mockCalculateMatchupWinProbability).not.toHaveBeenCalled();
   });
 
   // AC2 — the panel must ship behind the Premium gate on mobile.

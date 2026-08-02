@@ -1891,6 +1891,11 @@ type Matchup {
   team2Id: Int
   team2Score: Float
   weekNumber: Int
+
+  """
+  Server-computed Monte Carlo win probability, gated by ENTITLEMENTS.matchup_projections. Null for completed matchups, unauthenticated callers, and non-entitled users (LS-5907).
+  """
+  winProbability: MatchupWinProbability
 }
 
 """
@@ -2098,6 +2103,18 @@ type MatchupStatusCounts {
   inProgress: Int
   scheduled: Int
   total: Int
+}
+
+"""
+Server-computed Monte Carlo win probability for a scheduled or in-progress matchup. Gated by ENTITLEMENTS.matchup_projections.
+"""
+type MatchupWinProbability {
+  simulationCount: Int!
+  team1ProjectedScore: Float!
+  team1WinProbability: Float!
+  team2ProjectedScore: Float!
+  team2WinProbability: Float!
+  tiesProbability: Float!
 }
 
 """

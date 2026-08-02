@@ -74,9 +74,19 @@ export interface GraphQLMockServerOptions {
    * Operation-name-keyed (lowercased) default responses — the baseline layer.
    * Supplied by the fixture layer (`BASELINE_GRAPHQL_RESPONSES`) so this server
    * stays a generic transport with no dependency on the fixtures/factories (no
-   * `mocks → fixtures` import cycle).
+   * `mocks → fixtures` import cycle). A value may be a function of the
+   * request's variables for ops whose safe default depends on an id (e.g. a
+   * query that reuses another query's root field — see
+   * `getmatchupwinprobability` in shared-mocks.ts for why a flat static
+   * value can silently clobber an already-cached entity).
    */
-  readonly baseline?: Readonly<Record<string, object>>;
+  readonly baseline?: Readonly<
+    Record<
+      string,
+      | Record<string, unknown>
+      | ((variables: Record<string, unknown>) => Record<string, unknown>)
+    >
+  >;
   /** Host to bind (default `127.0.0.1` — the worker-local loopback). */
   readonly host?: string;
 }
@@ -116,7 +126,13 @@ export function isSubscriptionDocument(query: string): boolean {
  * — it is a test-harness server, wired only by `fixtures/native-mock.ts`.
  */
 export class GraphQLMockServer {
-  readonly #baseline: Readonly<Record<string, object>>;
+  readonly #baseline: Readonly<
+    Record<
+      string,
+      | Record<string, unknown>
+      | ((variables: Record<string, unknown>) => Record<string, unknown>)
+    >
+  >;
   readonly #host: string;
   readonly #overrides = new Map<string, MockOperationHandler>();
   readonly #unmocked: string[] = [];
@@ -229,7 +245,11 @@ export class GraphQLMockServer {
 
     const baseline = this.#baseline[request.op];
     if (baseline) {
-      this.#json(res, 200, baseline);
+      this.#json(
+        res,
+        200,
+        typeof baseline === 'function' ? baseline(request.variables) : baseline,
+      );
       return;
     }
 

@@ -1636,6 +1636,8 @@ export type Matchup = {
   team2Id?: Maybe<Scalars['Int']['output']>;
   team2Score?: Maybe<Scalars['Float']['output']>;
   weekNumber?: Maybe<Scalars['Int']['output']>;
+  /** Server-computed Monte Carlo win probability, gated by ENTITLEMENTS.matchup_projections. Null for completed matchups, unauthenticated callers, and non-entitled users (LS-5907). */
+  winProbability?: Maybe<MatchupWinProbability>;
 };
 
 /** User blocking relationship for chat */
@@ -1811,6 +1813,17 @@ export type MatchupStatusCounts = {
   inProgress?: Maybe<Scalars['Int']['output']>;
   scheduled?: Maybe<Scalars['Int']['output']>;
   total?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Server-computed Monte Carlo win probability for a scheduled or in-progress matchup. Gated by ENTITLEMENTS.matchup_projections. */
+export type MatchupWinProbability = {
+  __typename?: 'MatchupWinProbability';
+  simulationCount: Scalars['Int']['output'];
+  team1ProjectedScore: Scalars['Float']['output'];
+  team1WinProbability: Scalars['Float']['output'];
+  team2ProjectedScore: Scalars['Float']['output'];
+  team2WinProbability: Scalars['Float']['output'];
+  tiesProbability: Scalars['Float']['output'];
 };
 
 /** Result of merging two user accounts */
@@ -10697,6 +10710,27 @@ export type GetMatchupRecapQuery = {
   } | null;
 };
 
+export type GetMatchupWinProbabilityQueryVariables = Exact<{
+  id: Scalars['Int']['input'];
+}>;
+
+export type GetMatchupWinProbabilityQuery = {
+  __typename?: 'Query';
+  getMatchupById?: {
+    __typename?: 'Matchup';
+    id?: string | null;
+    winProbability?: {
+      __typename?: 'MatchupWinProbability';
+      team1WinProbability: number;
+      team2WinProbability: number;
+      tiesProbability: number;
+      team1ProjectedScore: number;
+      team2ProjectedScore: number;
+      simulationCount: number;
+    } | null;
+  } | null;
+};
+
 export type GetMatchupsByWeekQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   weekNumber: Scalars['Int']['input'];
@@ -12137,6 +12171,16 @@ export type MatchupRecapFragmentFragment = {
   highlights?: Array<string> | null;
   matchupType?: string | null;
   winnerId?: number | null;
+};
+
+export type MatchupWinProbabilityFragmentFragment = {
+  __typename?: 'MatchupWinProbability';
+  team1WinProbability: number;
+  team2WinProbability: number;
+  tiesProbability: number;
+  team1ProjectedScore: number;
+  team2ProjectedScore: number;
+  simulationCount: number;
 };
 
 export type NextClueMutationVariables = Exact<{
@@ -15218,6 +15262,16 @@ export const MatchupRecapFragmentFragmentDoc = gql`
     highlights
     matchupType
     winnerId
+  }
+`;
+export const MatchupWinProbabilityFragmentFragmentDoc = gql`
+  fragment MatchupWinProbabilityFragment on MatchupWinProbability {
+    team1WinProbability
+    team2WinProbability
+    tiesProbability
+    team1ProjectedScore
+    team2ProjectedScore
+    simulationCount
   }
 `;
 export const NotificationPreferenceFragmentDoc = gql`
@@ -26203,6 +26257,100 @@ export type GetMatchupRecapSuspenseQueryHookResult = ReturnType<
 export type GetMatchupRecapQueryResult = Apollo.QueryResult<
   GetMatchupRecapQuery,
   GetMatchupRecapQueryVariables
+>;
+export const GetMatchupWinProbability = gql`
+  query GetMatchupWinProbability($id: Int!) {
+    getMatchupById(id: $id) {
+      id
+      winProbability {
+        ...MatchupWinProbabilityFragment
+      }
+    }
+  }
+  ${MatchupWinProbabilityFragmentFragmentDoc}
+`;
+
+/**
+ * __useGetMatchupWinProbabilityQuery__
+ *
+ * To run a query within a React component, call `useGetMatchupWinProbabilityQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMatchupWinProbabilityQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMatchupWinProbabilityQuery({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useGetMatchupWinProbabilityQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetMatchupWinProbabilityQuery,
+    GetMatchupWinProbabilityQueryVariables
+  > &
+    (
+      | { variables: GetMatchupWinProbabilityQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMatchupWinProbabilityQuery,
+    GetMatchupWinProbabilityQueryVariables
+  >(GetMatchupWinProbability, options);
+}
+export function useGetMatchupWinProbabilityLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMatchupWinProbabilityQuery,
+    GetMatchupWinProbabilityQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMatchupWinProbabilityQuery,
+    GetMatchupWinProbabilityQueryVariables
+  >(GetMatchupWinProbability, options);
+}
+export function useGetMatchupWinProbabilitySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMatchupWinProbabilityQuery,
+        GetMatchupWinProbabilityQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMatchupWinProbabilityQuery,
+    GetMatchupWinProbabilityQueryVariables
+  >(
+    GetMatchupWinProbability,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMatchupWinProbabilityQuery,
+          GetMatchupWinProbabilityQueryVariables
+        >,
+  );
+}
+export type GetMatchupWinProbabilityQueryHookResult = ReturnType<
+  typeof useGetMatchupWinProbabilityQuery
+>;
+export type GetMatchupWinProbabilityLazyQueryHookResult = ReturnType<
+  typeof useGetMatchupWinProbabilityLazyQuery
+>;
+export type GetMatchupWinProbabilitySuspenseQueryHookResult = ReturnType<
+  typeof useGetMatchupWinProbabilitySuspenseQuery
+>;
+export type GetMatchupWinProbabilityQueryResult = Apollo.QueryResult<
+  GetMatchupWinProbabilityQuery,
+  GetMatchupWinProbabilityQueryVariables
 >;
 export const GetMatchupsByWeek = gql`
   query GetMatchupsByWeek($leagueId: Int!, $weekNumber: Int!) {

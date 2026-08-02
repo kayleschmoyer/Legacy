@@ -14,8 +14,9 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import {
-  BASELINE_GRAPHQL_RESPONSES,
   extractOperationName,
+  extractOperationVariables,
+  resolveBaselineResponse,
 } from '../fixtures/shared-mocks';
 import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -355,7 +356,10 @@ async function setupGraphQL(
       });
     } else {
       const op = extractOperationName(route).toLowerCase();
-      const baseline = BASELINE_GRAPHQL_RESPONSES[op];
+      const baseline = resolveBaselineResponse(
+        op,
+        extractOperationVariables(route),
+      );
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
