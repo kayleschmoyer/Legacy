@@ -124,6 +124,10 @@ export function useDraftQueries({
   const permLevel = league?.userMembership?.permissionLevel as
     | string
     | undefined;
+  // NOT a privilege check — true for any team manager, including the ordinary
+  // general_manager role. Do not use this to gate commissioner-only UI
+  // (pause/resume, commissioner-pick, initialize draft); use isCommissioner
+  // for that (LS-8841).
   const isOwner =
     permLevel === 'owner' ||
     permLevel === 'commissioner' ||

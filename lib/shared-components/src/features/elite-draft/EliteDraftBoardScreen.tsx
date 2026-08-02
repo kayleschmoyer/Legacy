@@ -467,7 +467,7 @@ export function EliteDraftBoardScreen({
         leagueId={leagueId}
         leagueTeams={queries.boardOrderedTeams}
         myTeamId={queries.myTeamId}
-        isOwner={queries.isOwner}
+        isOwner={queries.isCommissioner}
         canManageOwnTeam={
           queries.permLevel === 'general_manager' ||
           queries.permLevel === 'commissioner'
@@ -553,7 +553,7 @@ export function EliteDraftBoardScreen({
           searchTerm={ui.searchTerm}
           availablePlayersLoading={queries.availablePlayersLoading}
           commPickMode={ui.commPickMode}
-          isOwner={queries.isOwner}
+          isOwner={queries.isCommissioner}
           isMyPick={isMyPick}
           pickLoading={actions.pickLoading}
           myTeamId={queries.myTeamId}
@@ -590,7 +590,7 @@ export function EliteDraftBoardScreen({
           isPremium={isPremium}
           isMyPick={isMyPick}
           commPickMode={ui.commPickMode}
-          isOwner={queries.isOwner}
+          isOwner={queries.isCommissioner}
           isGeneralManager={queries.isGeneralManager}
           draftId={queries.draftId}
           myTeamId={queries.myTeamId}
@@ -631,7 +631,7 @@ export function EliteDraftBoardScreen({
               </span>
             </div>
             <div className="d-paused-title">DRAFT PAUSED</div>
-            {queries.isOwner ? (
+            {queries.isCommissioner ? (
               <button
                 className="d-paused-resume-btn"
                 onClick={() => void actions.handleResumeDraft()}

@@ -477,7 +477,9 @@ describe('EliteDraftBoardScreen — pre-draft lobby guard (LS-4085)', () => {
 describe('EliteDraftBoardScreen — paused overlay', () => {
   it('does not show paused overlay when draft is not paused', () => {
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: false }));
-    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: false }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ isCommissioner: false }),
+    );
     mockUseDraftActions.mockReturnValue(makeBaseActions());
 
     const { queryByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
@@ -485,9 +487,11 @@ describe('EliteDraftBoardScreen — paused overlay', () => {
     expect(queryByText('DRAFT PAUSED')).toBeNull();
   });
 
-  it('shows paused overlay for non-owner when draft is paused', () => {
+  it('shows paused overlay for non-commissioner when draft is paused', () => {
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
-    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: false }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ isCommissioner: false }),
+    );
     mockUseDraftActions.mockReturnValue(makeBaseActions());
 
     const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
@@ -496,9 +500,11 @@ describe('EliteDraftBoardScreen — paused overlay', () => {
     expect(getByText(/commissioner has paused/i)).toBeTruthy();
   });
 
-  it('shows paused overlay for commissioner (owner) when draft is paused', () => {
+  it('shows paused overlay for commissioner when draft is paused', () => {
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
-    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: true }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ isCommissioner: true }),
+    );
     mockUseDraftActions.mockReturnValue(makeBaseActions());
 
     const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
@@ -508,7 +514,9 @@ describe('EliteDraftBoardScreen — paused overlay', () => {
 
   it('shows Resume Draft button for commissioner instead of wait message', () => {
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
-    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: true }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ isCommissioner: true }),
+    );
     mockUseDraftActions.mockReturnValue(makeBaseActions());
 
     const { getByText, queryByText } = render(
@@ -519,10 +527,27 @@ describe('EliteDraftBoardScreen — paused overlay', () => {
     expect(queryByText(/commissioner has paused/i)).toBeNull();
   });
 
+  it('does not show Resume Draft button for a general_manager when draft is paused (LS-8841)', () => {
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ isOwner: true, isCommissioner: false }),
+    );
+    mockUseDraftActions.mockReturnValue(makeBaseActions());
+
+    const { queryByText, getByText } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(queryByText('Resume Draft')).toBeNull();
+    expect(getByText(/commissioner has paused/i)).toBeTruthy();
+  });
+
   it('calls handleResumeDraft when commissioner clicks Resume Draft', () => {
     const handleResumeDraft = jest.fn().mockResolvedValue(undefined);
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
-    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: true }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ isCommissioner: true }),
+    );
     mockUseDraftActions.mockReturnValue(makeBaseActions({ handleResumeDraft }));
 
     const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
@@ -533,7 +558,9 @@ describe('EliteDraftBoardScreen — paused overlay', () => {
 
   it('shows Resuming… and disables button when resumeLoading is true', () => {
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftPaused: true }));
-    mockUseDraftQueries.mockReturnValue(makeBaseQueries({ isOwner: true }));
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ isCommissioner: true }),
+    );
     mockUseDraftActions.mockReturnValue(
       makeBaseActions({ resumeLoading: true }),
     );

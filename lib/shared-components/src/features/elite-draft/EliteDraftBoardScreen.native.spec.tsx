@@ -596,13 +596,52 @@ describe('EliteDraftBoardScreen (native) — live board', () => {
     expect(screen.getByText('Round 2 — not drafted yet')).toBeTruthy();
   });
 
-  it('exposes commissioner pause and comm-pick controls to the owner', () => {
-    setupLiveDraft({ queries: { isOwner: true } });
+  it('exposes commissioner pause and comm-pick controls to the commissioner', () => {
+    setupLiveDraft({ queries: { isCommissioner: true } });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(screen.getByText('PAUSE')).toBeTruthy();
     expect(screen.getByText('COMM PICK')).toBeTruthy();
+  });
+
+  // LS-8841: showCommissionerBar previously OR'd in queries.isOwner, which
+  // resolves true for every permission level (including the ordinary
+  // general_manager role), so the bar rendered for the whole league. Drive
+  // every league_permission_level enum value through the gate to lock in
+  // that only 'commissioner' sees the bar.
+  describe('commissioner control bar visibility by permission level (LS-8841)', () => {
+    it.each([
+      ['general_manager', false],
+      ['assistant_manager', false],
+      ['commissioner', true],
+    ] as const)(
+      'permissionLevel=%s → commissioner bar visible=%s',
+      (permissionLevel, expectVisible) => {
+        setupLiveDraft({
+          queries: {
+            isCommissioner: permissionLevel === 'commissioner',
+            league: {
+              id: 1,
+              name: 'Test League',
+              draftStatus: 'in-progress',
+              isMockDraft: false,
+              userMembership: { permissionLevel, teamId: 1 },
+            },
+          },
+        });
+
+        render(<EliteDraftBoardScreen {...defaultProps} />);
+
+        if (expectVisible) {
+          expect(screen.getByText('PAUSE')).toBeTruthy();
+          expect(screen.getByText('COMM PICK')).toBeTruthy();
+        } else {
+          expect(screen.queryByText('PAUSE')).toBeNull();
+          expect(screen.queryByText('COMM PICK')).toBeNull();
+        }
+      },
+    );
   });
 });
 
@@ -679,11 +718,11 @@ describe('EliteDraftBoardScreen (native) — lobby and complete states', () => {
         name: 'Test League',
         draftStatus: 'scheduled',
         isMockDraft: false,
-        userMembership: { permissionLevel: 'owner', teamId: 1 },
+        userMembership: { permissionLevel: 'commissioner', teamId: 1 },
       },
       leagueTeams: TEAMS,
       boardOrderedTeams: TEAMS,
-      isOwner: true,
+      isCommissioner: true,
     });
   }
 

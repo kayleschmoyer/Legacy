@@ -224,7 +224,7 @@ function NativePreDraftLobby({
   league,
   leagueTeams,
   myTeamId,
-  isOwner,
+  isCommissioner,
   onlineTeamIds,
   initError,
   initDraftLoading,
@@ -236,7 +236,7 @@ function NativePreDraftLobby({
     | undefined;
   leagueTeams: LeagueTeam[];
   myTeamId: number | null;
-  isOwner: boolean;
+  isCommissioner: boolean;
   onlineTeamIds: ReadonlySet<string>;
   initError: string | null;
   initDraftLoading: boolean;
@@ -297,13 +297,13 @@ function NativePreDraftLobby({
           <Text color="$fg4" fontSize={12} textAlign="center">
             {leagueTeams.length < 2
               ? 'At least 2 teams are required to start a draft.'
-              : isOwner
+              : isCommissioner
                 ? 'You’re the commissioner — start when everyone’s in.'
                 : 'Waiting for the commissioner to start the draft.'}
           </Text>
         </YStack>
 
-        {isOwner && leagueTeams.length >= 2 && (
+        {isCommissioner && leagueTeams.length >= 2 && (
           <XStack gap="$3" flexWrap="wrap" justifyContent="center">
             <GoldButton
               label={initDraftLoading ? 'STARTING…' : 'START SNAKE DRAFT'}
@@ -940,7 +940,7 @@ export function EliteDraftBoardScreen({
         league={queries.league}
         leagueTeams={boardTeams}
         myTeamId={queries.myTeamId}
-        isOwner={queries.isOwner}
+        isCommissioner={queries.isCommissioner}
         onlineTeamIds={onlineTeamIds}
         initError={ui.initError}
         initDraftLoading={actions.initDraftLoading}
@@ -964,9 +964,9 @@ export function EliteDraftBoardScreen({
   }
 
   // ---- Main Live Draft UI ----
-  const canCommissionerPick = ui.commPickMode && queries.isOwner;
+  const canCommissionerPick = ui.commPickMode && queries.isCommissioner;
   const canDraft = isMyPick || canCommissionerPick;
-  const showCommissionerBar = queries.isCommissioner || queries.isOwner;
+  const showCommissionerBar = queries.isCommissioner;
 
   return (
     <YStack flex={1} backgroundColor="$background">
