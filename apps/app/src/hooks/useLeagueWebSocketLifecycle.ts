@@ -11,6 +11,7 @@
  * async keychain-sourced token.
  */
 import { useEffect, useState } from 'react';
+import { useIsFocused } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
 
@@ -41,9 +42,15 @@ export function useLeagueWebSocketLifecycle({
 }: UseLeagueWebSocketLifecycleOptions): UseLeagueWebSocketLifecycleResult {
   const [client, setClient] = useState<WebSocketClient | null>(null);
   const [connected, setConnected] = useState(false);
+  // React Navigation's native stack keeps prior screens mounted (for the
+  // back gesture) when a league screen is pushed on top of another, so
+  // `useIsFocused` — not mount state — is what tells a backgrounded league
+  // screen to tear down its socket instead of listening indefinitely.
+  const isFocused = useIsFocused();
 
   useEffect(() => {
-    if (leagueId == null || isNaN(leagueId) || !url || !token) return;
+    if (leagueId == null || isNaN(leagueId) || !url || !token || !isFocused)
+      return;
 
     let active = true;
     const wsClient = new WebSocketClient({
@@ -77,7 +84,7 @@ export function useLeagueWebSocketLifecycle({
       setClient(null);
       setConnected(false);
     };
-  }, [leagueId, url, token]);
+  }, [leagueId, url, token, isFocused]);
 
   return { client, connected };
 }
