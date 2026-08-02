@@ -62,7 +62,7 @@ resource "aws_iam_role_policy_attachment" "rollbar_discord_lambda_secrets" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "rollbar_discord_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-rollbar-discord"
-  retention_in_days = var.environment == "dev" ? 7 : 14
+  retention_in_days = local.log_retention_days[var.environment]
 
   tags = local.common_tags
 }

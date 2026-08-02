@@ -38,6 +38,22 @@ resource "aws_s3_bucket_versioning" "terraform_state" {
   }
 }
 
+# Expire noncurrent state versions after 90 days. State is rewritten on every
+# `terraform apply`, so noncurrent versions accumulate unboundedly without this —
+# 90 days keeps enough history to recover from a bad apply without retaining it forever.
+resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+  }
+}
+
 # Enable server-side encryption
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
   bucket = aws_s3_bucket.terraform_state.id

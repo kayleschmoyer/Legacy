@@ -8,6 +8,9 @@ resource "aws_sqs_queue" "load_football_stats_dlq" {
   fifo_queue                  = true
   content_based_deduplication = true
 
+  # DLQ messages need manual investigation/replay, so retain longer than the live queue.
+  message_retention_seconds = 1209600 # 14 days
+
   tags = local.common_tags
 }
 
@@ -19,9 +22,9 @@ resource "aws_sqs_queue" "load_football_stats" {
 
   # Message settings — same profile as load-game-stats: one matchup per invocation,
   # 15-minute visibility window to cover PFR scrape + DB write latency.
-  visibility_timeout_seconds = 900     # 15 minutes
-  message_retention_seconds  = 1209600 # 14 days
-  receive_wait_time_seconds  = 10      # Long polling
+  visibility_timeout_seconds = 900    # 15 minutes
+  message_retention_seconds  = 345600 # 4 days (SQS default) — live queue, DLQ covers failure recovery
+  receive_wait_time_seconds  = 10     # Long polling
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.load_football_stats_dlq.arn
@@ -84,6 +87,9 @@ resource "aws_sqs_queue" "load_season_stats_dlq" {
   fifo_queue                  = true
   content_based_deduplication = true
 
+  # DLQ messages need manual investigation/replay, so retain longer than the live queue.
+  message_retention_seconds = 1209600 # 14 days
+
   tags = local.common_tags
 }
 
@@ -94,9 +100,9 @@ resource "aws_sqs_queue" "load_season_stats" {
   content_based_deduplication = true
 
   # Message settings
-  visibility_timeout_seconds = 360     # 6 minutes (longer than lambda timeout)
-  message_retention_seconds  = 1209600 # 14 days
-  receive_wait_time_seconds  = 10      # Long polling
+  visibility_timeout_seconds = 360    # 6 minutes (longer than lambda timeout)
+  message_retention_seconds  = 345600 # 4 days (SQS default) — live queue, DLQ covers failure recovery
+  receive_wait_time_seconds  = 10     # Long polling
 
   # Redrive policy for dead letter queue
   redrive_policy = jsonencode({
@@ -144,6 +150,9 @@ resource "aws_sqs_queue" "load_game_stats_dlq" {
   fifo_queue                  = true
   content_based_deduplication = true
 
+  # DLQ messages need manual investigation/replay, so retain longer than the live queue.
+  message_retention_seconds = 1209600 # 14 days
+
   tags = local.common_tags
 }
 
@@ -154,9 +163,9 @@ resource "aws_sqs_queue" "load_game_stats" {
   content_based_deduplication = true
 
   # Message settings
-  visibility_timeout_seconds = 900     # 15 minutes (longer than lambda timeout)
-  message_retention_seconds  = 1209600 # 14 days
-  receive_wait_time_seconds  = 10      # Long polling
+  visibility_timeout_seconds = 900    # 15 minutes (longer than lambda timeout)
+  message_retention_seconds  = 345600 # 4 days (SQS default) — live queue, DLQ covers failure recovery
+  receive_wait_time_seconds  = 10     # Long polling
 
   # Redrive policy for dead letter queue
   redrive_policy = jsonencode({
@@ -220,6 +229,9 @@ resource "aws_sqs_queue" "select_game_dlq" {
   fifo_queue                  = true
   content_based_deduplication = true
 
+  # DLQ messages need manual investigation/replay, so retain longer than the live queue.
+  message_retention_seconds = 1209600 # 14 days
+
   tags = local.common_tags
 }
 
@@ -230,9 +242,9 @@ resource "aws_sqs_queue" "select_game" {
   content_based_deduplication = true
 
   # Message settings
-  visibility_timeout_seconds = 90      # 1.5 minutes (longer than lambda timeout)
-  message_retention_seconds  = 1209600 # 14 days
-  receive_wait_time_seconds  = 10      # Long polling
+  visibility_timeout_seconds = 90     # 1.5 minutes (longer than lambda timeout)
+  message_retention_seconds  = 345600 # 4 days (SQS default) — live queue, DLQ covers failure recovery
+  receive_wait_time_seconds  = 10     # Long polling
 
   # Redrive policy for dead letter queue
   redrive_policy = jsonencode({
@@ -296,6 +308,9 @@ resource "aws_sqs_queue" "automatic_drafts_dlq" {
   fifo_queue                  = true
   content_based_deduplication = true
 
+  # DLQ messages need manual investigation/replay, so retain longer than the live queue.
+  message_retention_seconds = 1209600 # 14 days
+
   tags = local.common_tags
 }
 
@@ -306,9 +321,9 @@ resource "aws_sqs_queue" "automatic_drafts" {
   content_based_deduplication = true
 
   # Message settings
-  visibility_timeout_seconds = 300     # 5 minutes (longer than lambda timeout)
-  message_retention_seconds  = 1209600 # 14 days
-  receive_wait_time_seconds  = 10      # Long polling
+  visibility_timeout_seconds = 300    # 5 minutes (longer than lambda timeout)
+  message_retention_seconds  = 345600 # 4 days (SQS default) — live queue, DLQ covers failure recovery
+  receive_wait_time_seconds  = 10     # Long polling
 
   # Redrive policy for dead letter queue
   redrive_policy = jsonencode({
