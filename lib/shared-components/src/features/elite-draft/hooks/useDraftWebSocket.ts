@@ -552,6 +552,10 @@ export function useDraftWebSocket({
     void refetchWithRetry('pick history', refetchPickHistory);
     void refetchWithRetry('auto-pick statuses', refetchAutoPickStatuses);
     void refetchWithRetry('draft', refetchDraft);
+    // The queue is the server's first auto-pick source (auto-pick-scorer.ts),
+    // so a stale queue snapshot can show players already drafted while
+    // disconnected (LS-6787).
+    void refetchWithRetry('queue', refetchQueue);
     // The available-players list is the one stale-state a user can act on: an
     // out-of-date board lets them try to draft an already-taken player. Warn
     // them explicitly rather than failing silently.
@@ -585,6 +589,7 @@ export function useDraftWebSocket({
     refetchAvailablePlayers,
     refetchAutoPickStatuses,
     refetchDraft,
+    refetchQueue,
   ]);
 
   return { wsConnected } as const;

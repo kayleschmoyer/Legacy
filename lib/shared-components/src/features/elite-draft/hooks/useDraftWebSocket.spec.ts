@@ -352,6 +352,21 @@ describe('useDraftWebSocket — reconnect refetch recovery (LS-8506)', () => {
     expect(params.showToast).not.toHaveBeenCalled();
   });
 
+  it('refetches the draft queue on a genuine reconnect (LS-6787)', async () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    reconnect();
+    await flushBackoff();
+
+    // The queue is the server's first auto-pick source: without this refetch
+    // the rail keeps showing players the queue already auto-drafted while
+    // the user was disconnected.
+    expect(params.refetchQueue).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(params.showToast).not.toHaveBeenCalled();
+  });
+
   it('retries a failing refetch with backoff and stays quiet once it succeeds', async () => {
     const params = makeDefaultParams();
     params.refetchAvailablePlayers = jest
