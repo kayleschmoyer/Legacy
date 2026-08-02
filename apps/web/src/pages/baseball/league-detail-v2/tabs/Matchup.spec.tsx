@@ -18,6 +18,19 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { MatchupTab } from './Matchup';
 
+// --- websocket client (LS-6355: matchup-scoped context) --------------------
+const mockUpdateContext = jest.fn();
+const mockUseLeagueWebSocketClient = jest.fn<
+  { client: { updateContext: jest.Mock } | null; connected: boolean },
+  []
+>(() => ({
+  client: { updateContext: mockUpdateContext },
+  connected: true,
+}));
+jest.mock('../../../../context/LeagueWebSocketContext', () => ({
+  useLeagueWebSocketClient: () => mockUseLeagueWebSocketClient(),
+}));
+
 // --- hooks -----------------------------------------------------------------
 const mockUseMatchupById = jest.fn<
   {
@@ -157,6 +170,11 @@ beforeEach(() => {
   });
   mockUseMatchupsByWeek.mockReturnValue({ matchups: [], refetch: jest.fn() });
   mockUseMatchupsForLeague.mockReturnValue({ matchups: [] });
+  mockUpdateContext.mockClear();
+  mockUseLeagueWebSocketClient.mockReturnValue({
+    client: { updateContext: mockUpdateContext },
+    connected: true,
+  });
 });
 
 describe('MatchupTab — football-awareness', () => {
@@ -500,5 +518,42 @@ describe('MatchupTab — bye / no-team-in-week empty state (LS-5902)', () => {
     renderTab({}, { initialMatchupId: null, myTeamId: 10 });
     fireEvent.click(screen.getByTestId('bye-next-week'));
     expect(mockUseMatchupsByWeek).toHaveBeenLastCalledWith(1, 2);
+  });
+});
+
+describe('MatchupTab — matchup-scoped WebSocket context (LS-6355)', () => {
+  it('narrows the shared connection to viewContext=matchup with matchupId on mount', () => {
+    renderTab({}, { initialMatchupId: '1' });
+    expect(mockUpdateContext).toHaveBeenCalledWith({
+      matchupId: 1,
+      viewContext: 'matchup',
+    });
+  });
+
+  it('reverts the shared connection to viewContext=league on unmount', () => {
+    const { unmount } = renderTab({}, { initialMatchupId: '1' });
+    mockUpdateContext.mockClear();
+    unmount();
+    expect(mockUpdateContext).toHaveBeenCalledWith({ viewContext: 'league' });
+  });
+
+  it('does not call updateContext when there is no resolvable matchupId', () => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: null,
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    renderTab({}, { initialMatchupId: null });
+    expect(mockUpdateContext).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when no shared client is available yet', () => {
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+    expect(() => renderTab({}, { initialMatchupId: '1' })).not.toThrow();
+    expect(mockUpdateContext).not.toHaveBeenCalled();
   });
 });

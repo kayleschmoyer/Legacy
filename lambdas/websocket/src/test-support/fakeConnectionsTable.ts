@@ -122,9 +122,17 @@ export class FakeConnectionsTable {
     this.rows.set(connectionId, updated);
   }
 
-  queryByLeagueId(leagueId: number): AttrItem[] {
+  /**
+   * @param excludeViewContext - When set, rows whose `viewContext` equals
+   *   this value are excluded (mirrors the real table's FilterExpression —
+   *   see `WebSocketNotificationService.getConnections` — LS-6355).
+   */
+  queryByLeagueId(leagueId: number, excludeViewContext?: string): AttrItem[] {
     return [...this.rows.values()].filter(
-      (row) => !this.isExpired(row) && row['leagueId']?.N === String(leagueId),
+      (row) =>
+        !this.isExpired(row) &&
+        row['leagueId']?.N === String(leagueId) &&
+        (!excludeViewContext || row['viewContext']?.S !== excludeViewContext),
     );
   }
 

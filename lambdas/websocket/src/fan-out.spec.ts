@@ -144,6 +144,7 @@ jest.mock('@aws-sdk/client-dynamodb', () => ({
             return Promise.resolve({
               Items: mockConnectionsTable.queryByLeagueId(
                 Number(values[':leagueId']?.N ?? '0'),
+                values[':excludeViewContext']?.S,
               ),
             });
           }
@@ -371,6 +372,8 @@ function waitForEvent<T = void>(
 interface TestClientOptions {
   token?: string;
   leagueId?: number;
+  matchupId?: number;
+  viewContext?: 'general' | 'league' | 'matchup' | 'roster' | 'chat' | 'dm';
   reconnect?: boolean;
   reconnectDelay?: number;
   maxReconnectDelay?: number;
@@ -385,7 +388,8 @@ function makeClient(
     url: wsUrl,
     token: opts.token,
     leagueId: opts.leagueId,
-    viewContext: opts.leagueId ? 'league' : 'general',
+    matchupId: opts.matchupId,
+    viewContext: opts.viewContext ?? (opts.leagueId ? 'league' : 'general'),
     autoConnect: true,
     reconnect: opts.reconnect ?? false,
     reconnectDelay: opts.reconnectDelay,
@@ -1056,5 +1060,84 @@ describe('WebSocket fan-out (LS-8856)', () => {
     expect(received.sort((a, b) => a - b)).toEqual(
       Array.from({ length: BURST_SIZE }, (_, i) => i + 1),
     );
+  });
+
+  // ── LS-6355: matchup-scoped connections don't receive league chat/roster
+  // noise, but a plain league-scoped connection still does ──
+
+  it('does not deliver a league chat message to a matchup-scoped connection, but does deliver it to a league-scoped one', async () => {
+    const leagueId = 600;
+    const matchupId = 60;
+    mockMatchupLeague.set(matchupId, leagueId);
+    const sender = registerUser('leo');
+    const leagueViewer = registerUser('mia');
+    const matchupViewer = registerUser('noah');
+    for (const u of [sender, leagueViewer, matchupViewer]) {
+      grantLeagueMembership(u.userId, leagueId);
+    }
+
+    const leagueClient = client({ token: leagueViewer.token, leagueId });
+    const matchupClient = client({
+      token: matchupViewer.token,
+      leagueId,
+      matchupId,
+      viewContext: 'matchup',
+    });
+    await Promise.all([
+      waitForEvent(leagueClient, 'connected'),
+      waitForEvent(matchupClient, 'connected'),
+    ]);
+
+    const matchupMessages: unknown[] = [];
+    matchupClient.on('league-chat-message', (n) => matchupMessages.push(n));
+    const leagueReceived = waitForEvent(leagueClient, 'league-chat-message');
+
+    await notificationService().notifyLeagueChatMessage(leagueId, {
+      messageId: 1,
+      senderId: sender.userId,
+      senderUsername: 'leo',
+      messageText: 'hello league',
+      timestamp: '2026-01-01T00:00:00.000Z',
+    });
+
+    await expect(leagueReceived).resolves.toMatchObject({
+      messageText: 'hello league',
+    });
+    await sleep(300); // bounded wait for a negative assertion — see PR body
+    expect(matchupMessages).toHaveLength(0);
+  });
+
+  it('does not deliver a roster update to a matchup-scoped connection, but does deliver it to a league-scoped one', async () => {
+    const leagueId = 601;
+    const matchupId = 61;
+    mockMatchupLeague.set(matchupId, leagueId);
+    const commissioner = registerUser('olivia');
+    const leagueViewer = registerUser('paul');
+    const matchupViewer = registerUser('quinn');
+    for (const u of [commissioner, leagueViewer, matchupViewer]) {
+      grantLeagueMembership(u.userId, leagueId);
+    }
+
+    const leagueClient = client({ token: leagueViewer.token, leagueId });
+    const matchupClient = client({
+      token: matchupViewer.token,
+      leagueId,
+      matchupId,
+      viewContext: 'matchup',
+    });
+    await Promise.all([
+      waitForEvent(leagueClient, 'connected'),
+      waitForEvent(matchupClient, 'connected'),
+    ]);
+
+    const matchupMessages: unknown[] = [];
+    matchupClient.on('roster-update', (n) => matchupMessages.push(n));
+    const leagueReceived = waitForEvent(leagueClient, 'roster-update');
+
+    await notificationService().notifyRosterUpdate(leagueId);
+
+    await leagueReceived;
+    await sleep(300); // bounded wait for a negative assertion — see PR body
+    expect(matchupMessages).toHaveLength(0);
   });
 });

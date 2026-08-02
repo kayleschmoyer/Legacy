@@ -18,6 +18,7 @@ import {
   useMatchupsForLeague,
 } from '../../../../hooks/useMatchup';
 import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
+import { useLeagueWebSocketClient } from '../../../../context/LeagueWebSocketContext';
 import { MatchupRosterComparison } from '../../../../features/matchup/MatchupRosterComparison';
 import { computeMatchupScores } from '../../../../features/matchup/MatchupScoreboard';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
@@ -150,6 +151,20 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
       void refetchMatchupRef.current();
     },
   });
+
+  // Narrow the shared league connection's context to this matchup while the
+  // tab is active, so the server can skip league-wide chat/roster broadcasts
+  // that are irrelevant here (LS-6355). Reverts to 'league' on unmount /
+  // matchup change so other tabs sharing the same connection keep receiving
+  // full league-wide events.
+  const { client: wsClient } = useLeagueWebSocketClient();
+  useEffect(() => {
+    if (!wsClient || matchupId == null) return;
+    wsClient.updateContext({ matchupId, viewContext: 'matchup' });
+    return () => {
+      wsClient.updateContext({ viewContext: 'league' });
+    };
+  }, [wsClient, matchupId]);
 
   // Pull players + scoring settings to compute live scores and projections
   // client-side, mirroring the canonical MatchupScoreboard behaviour.

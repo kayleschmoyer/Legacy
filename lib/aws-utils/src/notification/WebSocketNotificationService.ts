@@ -469,9 +469,14 @@ export class WebSocketNotificationService {
   }
 
   /**
-   * Get all connections, optionally filtered by leagueId
+   * Get all connections, optionally filtered by leagueId and/or excluding a
+   * viewContext (e.g. 'matchup' connections don't need league-wide chat/
+   * roster noise — see LS-6355).
    */
-  private async getConnections(filterLeagueId?: number): Promise<string[]> {
+  private async getConnections(
+    filterLeagueId?: number,
+    excludeViewContext?: string,
+  ): Promise<string[]> {
     try {
       let items: DynamoDBItem[];
 
@@ -481,14 +486,24 @@ export class WebSocketNotificationService {
           TableName: this.connectionsTableName,
           IndexName: 'LeagueIdIndex',
           KeyConditionExpression: 'leagueId = :leagueId',
+          ...(excludeViewContext
+            ? {
+                FilterExpression:
+                  'attribute_not_exists(viewContext) OR viewContext <> :excludeViewContext',
+              }
+            : {}),
           ExpressionAttributeValues: {
             ':leagueId': { N: filterLeagueId.toString() },
+            ...(excludeViewContext
+              ? { ':excludeViewContext': { S: excludeViewContext } }
+              : {}),
           },
           ProjectionExpression: 'connectionId',
         });
 
         LOGGER.info('Retrieved league connections via Query', {
           leagueId: filterLeagueId,
+          excludeViewContext: excludeViewContext ?? null,
           count: items.length,
         });
       } else {
@@ -515,11 +530,18 @@ export class WebSocketNotificationService {
   }
 
   /**
-   * Broadcast a message to all connections or filtered by leagueId
+   * Broadcast a message to all connections or filtered by leagueId.
+   *
+   * @param excludeViewContext - Skip connections whose `viewContext` matches
+   *   this value. Used to keep matchup-scoped connections (viewContext=
+   *   'matchup') from receiving league-wide noise (chat, roster updates)
+   *   that's irrelevant to a user actively viewing a single matchup — see
+   *   LS-6355. Only applies when `filterLeagueId` is also set.
    */
   async broadcast(
     message: NotificationMessage,
     filterLeagueId?: number,
+    excludeViewContext?: string,
   ): Promise<{ sent: number; failed: number }> {
     if (!this.websocketEndpoint) {
       LOGGER.warn('WebSocket endpoint not configured, skipping broadcast');
@@ -527,7 +549,10 @@ export class WebSocketNotificationService {
     }
 
     try {
-      const connectionIds = await this.getConnections(filterLeagueId);
+      const connectionIds = await this.getConnections(
+        filterLeagueId,
+        excludeViewContext,
+      );
 
       if (connectionIds.length === 0) {
         LOGGER.info('No connections to broadcast to', { filterLeagueId });
@@ -917,9 +942,12 @@ export class WebSocketNotificationService {
       senderId: payload.senderId,
     });
 
+    // Matchup-scoped connections (users viewing a single matchup) don't need
+    // league chat noise — LS-6355.
     await this.broadcast(
       { type: 'notification', data: notification },
       leagueId,
+      'matchup',
     );
   }
 
@@ -1106,12 +1134,14 @@ export class WebSocketNotificationService {
 
     LOGGER.info('Sending roster update notification', { leagueId });
 
+    // Matchup-scoped connections don't need league roster-update noise — LS-6355.
     await this.broadcast(
       {
         type: 'notification',
         data: notification,
       },
       leagueId,
+      'matchup',
     );
   }
 
