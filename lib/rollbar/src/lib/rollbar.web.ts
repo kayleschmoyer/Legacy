@@ -74,6 +74,14 @@ class WebRollbarImplementation implements RollbarInterface {
         //   missing after that. By the time this message reaches Rollbar the
         //   user has already been handled gracefully — reporting it as a
         //   production error is noise, not a bug.
+        // - "3-league limit": the free-tier league-creation cap
+        //   (PremiumRequiredError, extensions.code PREMIUM_REQUIRED) thrown by
+        //   createLeagueAndTeams (LS-8703). This is expected business-logic
+        //   validation — the create-league forms already catch it and show
+        //   the upgrade copy inline — not a bug. The league-create catch
+        //   blocks log every mutation failure via LOGGER.error (for support
+        //   correlation on genuine failures), which otherwise forwards this
+        //   expected error to Rollbar too.
         checkIgnore: (_isUncaught: boolean, args: unknown[]) => {
           // Client-side sampling: drop (1 - captureRate) of items before they
           // reach Rollbar. Rollbar.js has no built-in sample-rate option, so
@@ -115,6 +123,9 @@ class WebRollbarImplementation implements RollbarInterface {
             err instanceof Error &&
             err.message.includes('Failed to fetch dynamically imported module')
           ) {
+            return true;
+          }
+          if (err instanceof Error && err.message.includes('3-league limit')) {
             return true;
           }
           return false;

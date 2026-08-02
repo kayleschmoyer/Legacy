@@ -72,6 +72,15 @@ describe('WebRollbarImplementation', () => {
       expect(checkIgnore(false, [realError])).toBe(false);
     });
 
+    it('drops the free-tier 3-league limit validation error (LS-8703)', () => {
+      const checkIgnore = getCheckIgnore();
+
+      const leagueLimitError = new Error(
+        'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
+      );
+      expect(checkIgnore(false, [leagueLimitError])).toBe(true);
+    });
+
     it('drops AbortError, WebSocket noise, and Failed to fetch (existing filters)', () => {
       const checkIgnore = getCheckIgnore();
 
