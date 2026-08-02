@@ -102,6 +102,7 @@ describe('useLeagueChat — message ordering (LS-4059)', () => {
 
   it('sorts new WS messages into correct position among existing messages', () => {
     type WsChatMessage = {
+      leagueId: number;
       messageId: string;
       senderId: string | null;
       senderUsername: string;
@@ -156,6 +157,7 @@ describe('useLeagueChat — message ordering (LS-4059)', () => {
     // WS delivers "first" out of order after "second" is already in state
     act(() => {
       wsCallback?.({
+        leagueId: 1,
         messageId: '1',
         senderId: '1',
         senderUsername: 'user1',
@@ -243,5 +245,110 @@ describe('useLeagueChat — stale-data guard (LS-2461)', () => {
     // Reset effect clears messages; loading guard must prevent stale league-1
     // data from re-populating the league-2 view.
     expect(result.current.messages).toHaveLength(0);
+  });
+});
+
+describe('useLeagueChat — WS notifications are scoped to the viewed league (LS-6301)', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    useSendLeagueChatMessageMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
+    useQuery.mockReturnValue({
+      loading: false,
+      data: { getLeagueMessages: [] },
+      refetch: jest.fn(),
+    });
+  });
+
+  it('drops a WS chat notification whose leagueId does not match the viewed league', () => {
+    type WsChatMessage = {
+      leagueId: number;
+      messageId: string;
+      senderId: string | null;
+      senderUsername: string;
+      messageText: string;
+      gifUrl: string | null;
+      timestamp: string;
+      messageType: string | null;
+      metadata: Record<string, unknown> | null;
+    };
+    let wsCallback: ((n: WsChatMessage) => void) | null = null;
+
+    useLeagueWebSocket.mockImplementation(
+      ({
+        onLeagueChatMessage,
+      }: {
+        onLeagueChatMessage: (n: WsChatMessage) => void;
+      }) => {
+        wsCallback = onLeagueChatMessage;
+      },
+    );
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    // Notification carries leagueId 2 while this hook instance is scoped to
+    // league 1 — must be silently dropped, not rendered into league 1's chat.
+    act(() => {
+      wsCallback?.({
+        leagueId: 2,
+        messageId: '99',
+        senderId: '7',
+        senderUsername: 'intruder',
+        messageText: 'message from another league',
+        gifUrl: null,
+        timestamp: '2024-01-01T00:00:00Z',
+        messageType: 'text',
+        metadata: null,
+      });
+    });
+
+    expect(result.current.messages).toHaveLength(0);
+  });
+
+  it('applies a WS chat notification whose leagueId matches the viewed league', () => {
+    type WsChatMessage = {
+      leagueId: number;
+      messageId: string;
+      senderId: string | null;
+      senderUsername: string;
+      messageText: string;
+      gifUrl: string | null;
+      timestamp: string;
+      messageType: string | null;
+      metadata: Record<string, unknown> | null;
+    };
+    let wsCallback: ((n: WsChatMessage) => void) | null = null;
+
+    useLeagueWebSocket.mockImplementation(
+      ({
+        onLeagueChatMessage,
+      }: {
+        onLeagueChatMessage: (n: WsChatMessage) => void;
+      }) => {
+        wsCallback = onLeagueChatMessage;
+      },
+    );
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    act(() => {
+      wsCallback?.({
+        leagueId: 1,
+        messageId: '100',
+        senderId: '7',
+        senderUsername: 'teammate',
+        messageText: 'message from this league',
+        gifUrl: null,
+        timestamp: '2024-01-01T00:00:00Z',
+        messageType: 'text',
+        metadata: null,
+      });
+    });
+
+    expect(result.current.messages.map((m) => m.messageText)).toEqual([
+      'message from this league',
+    ]);
   });
 });

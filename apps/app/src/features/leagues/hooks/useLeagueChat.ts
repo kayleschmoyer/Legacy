@@ -133,6 +133,12 @@ export function useLeagueChat(leagueId: number): {
       (notification: NotificationData) => {
         if (notification.type !== ClientNotificationType.LEAGUE_CHAT_MESSAGE)
           return;
+        // Defense-in-depth: the server already scopes WS fan-out to leagueId
+        // (LeagueIdIndex GSI query in WebSocketNotificationService), but the
+        // client must never render a notification for a league other than
+        // the one currently being viewed — a stale/misrouted connection must
+        // not leak messages across leagues (LS-6301 / FLD-049).
+        if (notification.leagueId !== leagueId) return;
         setMessages((prev) => {
           if (prev.some((m) => m.id === notification.messageId)) return prev;
           return [
@@ -155,7 +161,7 @@ export function useLeagueChat(leagueId: number): {
       unsubscribeError();
       unsubscribeMessage();
     };
-  }, [client]);
+  }, [client, leagueId]);
 
   return { messages, loading, sending, wsError, sendMessage };
 }

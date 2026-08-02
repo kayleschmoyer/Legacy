@@ -158,6 +158,12 @@ export function useLeagueChat(leagueId: number): {
   // Subscribe to chat messages and reconnect events via the shared socket.
   useLeagueWebSocket({
     onLeagueChatMessage: (n) => {
+      // Defense-in-depth: the server already scopes WS fan-out to leagueId
+      // (LeagueIdIndex GSI query in WebSocketNotificationService), but the
+      // client must never render a notification for a league other than the
+      // one currently being viewed — a stale/misrouted connection must not
+      // leak messages across leagues (LS-6301 / FLD-049).
+      if (n.leagueId !== leagueId) return;
       const numericId = Number(n.messageId);
       setMessages((prev) => {
         const isDupe = prev.some((m) => m.id === numericId);
