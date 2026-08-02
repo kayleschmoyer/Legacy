@@ -223,13 +223,26 @@ builder.mutationFields((t) => ({
     resolve: async (_parent, { input }, context) => {
       if (!context.user?.id) throw AuthenticationError();
       const parameter = JSON.parse(input.parameter) as Record<string, unknown>;
-      await TwentyQuestionsService.askQuestion(
-        context.db,
-        input.gameId,
-        context.user.id,
-        input.category,
-        parameter,
-      );
+      try {
+        await TwentyQuestionsService.askQuestion(
+          context.db,
+          input.gameId,
+          context.user.id,
+          input.category,
+          parameter,
+        );
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          (err.message.startsWith('Game is not active') ||
+            err.message === 'Maximum questions reached' ||
+            err.message.startsWith('Game not found') ||
+            err.message === 'Game does not belong to this user')
+        ) {
+          throw UserInputError(err.message);
+        }
+        throw err;
+      }
       const state = await TwentyQuestionsService.getGameState(
         context.db,
         input.gameId,

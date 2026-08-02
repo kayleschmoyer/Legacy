@@ -175,7 +175,7 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
   };
 
   const handleAsk = async (payload: AskPayload) => {
-    if (!game?.id) return;
+    if (!game?.id || game.status !== TwentyQuestionsStatus.Active) return;
     setErrorMsg(null);
     try {
       const { data } = await askQuestion({
@@ -314,6 +314,22 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
   // ── Playing ──────────────────────────────────────────────────────────
   if (!game) return null;
 
+  // Game may have become inactive out-of-band (e.g. abandoned in another
+  // tab). Fall back to the result screen instead of leaving the "ask
+  // question" controls live against a game that can no longer accept them.
+  if (game.status !== TwentyQuestionsStatus.Active) {
+    return (
+      <GameResult
+        status={game.status}
+        targetPlayer={game.targetPlayer}
+        tokensEarned={game.tokensEarned}
+        questionsUsed={game.questionsUsed}
+        maxQuestions={game.maxQuestions}
+        onPlayAgain={handlePlayAgain}
+      />
+    );
+  }
+
   const questionsLeft = game.maxQuestions - game.questionsUsed;
 
   return (
@@ -346,7 +362,10 @@ export const TwentyQuestionsGame: React.FC<TwentyQuestionsGameProps> = ({
 
       {/* Controls */}
       <YStack gap="$3">
-        <QuestionBuilder onAsk={(p) => void handleAsk(p)} asking={asking} />
+        <QuestionBuilder
+          onAsk={(p) => void handleAsk(p)}
+          asking={asking || game.status !== TwentyQuestionsStatus.Active}
+        />
 
         <YStack gap="$2">
           <Text fontSize="$3" fontWeight="600" color="$gray10">

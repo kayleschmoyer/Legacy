@@ -282,6 +282,45 @@ describe('twenty-questions resolvers', () => {
         extensions: { code: 'BAD_USER_INPUT' },
       });
     });
+
+    it('classifies "Game is not active" as UserInputError instead of an uncaught server error', async () => {
+      mockTwentyQuestionsService.askQuestion.mockRejectedValueOnce(
+        new Error('Game is not active (status: abandoned)'),
+      );
+
+      const resolver = getMutation('twentyQuestionsAsk');
+      await expect(
+        resolver({}, validInput, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message: 'Game is not active (status: abandoned)',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
+    it('classifies "Maximum questions reached" as UserInputError', async () => {
+      mockTwentyQuestionsService.askQuestion.mockRejectedValueOnce(
+        new Error('Maximum questions reached'),
+      );
+
+      const resolver = getMutation('twentyQuestionsAsk');
+      await expect(
+        resolver({}, validInput, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message: 'Maximum questions reached',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
+    it('rethrows unrecognized errors unchanged', async () => {
+      mockTwentyQuestionsService.askQuestion.mockRejectedValueOnce(
+        new Error('Unexpected database failure'),
+      );
+
+      const resolver = getMutation('twentyQuestionsAsk');
+      await expect(
+        resolver({}, validInput, mockContext, undefined as never),
+      ).rejects.toThrow('Unexpected database failure');
+    });
   });
 
   // ── twentyQuestionsGuess mutation ─────────────────────────────────────────
