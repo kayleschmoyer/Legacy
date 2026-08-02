@@ -28,11 +28,11 @@ import {
   useOpenAwardVotingMutation,
   useUpsertLeagueSeasonAwardMutation,
 } from '@legacy-sports/graphql';
+import { Select } from '../../components/Select';
 import {
   BRAND_GOLD,
   BRAND_NAVY_LIGHT,
   GREEN,
-  SURFACE_CARD,
   SURFACE_PANEL,
   withAlpha,
 } from '../../utils/colors';
@@ -602,33 +602,18 @@ export function SeasonAwardsControl({
         </XStack>
 
         {/* Season picker */}
-        <YStack gap="$1">
-          <Text fontSize="$2" color="$gray10">
-            Season
-          </Text>
-          <select
-            value={season}
-            onChange={(e) => setSeason(Number(e.target.value))}
-            style={{
-              backgroundColor: SURFACE_CARD,
-              border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.5)}`,
-              borderRadius: 6,
-              padding: '8px 12px',
-              color: 'inherit',
-              fontSize: 14,
-              fontFamily: 'inherit',
-              width: '100%',
-              maxWidth: 160,
-            }}
-            aria-label="Select season"
-          >
-            {seasonOptions.map((y) => (
-              <option key={y} value={y}>
-                {y} Season
-              </option>
-            ))}
-          </select>
-        </YStack>
+        <XStack maxWidth={160}>
+          <Select
+            label="Season"
+            value={String(season)}
+            onValueChange={(v) => setSeason(Number(v))}
+            options={seasonOptions.map((y) => ({
+              value: String(y),
+              label: `${y} Season`,
+            }))}
+            placeholder="Select season"
+          />
+        </XStack>
 
         <Separator />
 
