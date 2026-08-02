@@ -8,9 +8,18 @@ The infrastructure now dynamically scales resources based on the `environment` v
 
 #### CloudWatch Log Retention
 
-- **Development**: 7 days retention
-- **Production**: 14 days retention
-- **Cost Savings**: ~50% reduction in log storage costs for dev environments
+Defined in `local.log_retention_days` (`variables.tf`):
+
+- **Development**: 30 days retention
+- **Staging**: 30 days retention
+- **Production**: 90 days retention
+
+#### Backup Retention
+
+Defined in `local.backup_retention_days` (`variables.tf`):
+
+- **Development / Staging**: 7 days
+- **Production**: 30 days
 
 #### Lambda Memory Allocation
 
@@ -18,11 +27,10 @@ The infrastructure now dynamically scales resources based on the `environment` v
   - Dev: 512MB, Prod: 1024MB
   - Estimated savings: 20-30% on Lambda costs for dev
 - **OAuth Proxy**:
-  - Dev: 256MB, Prod: 512MB
-  - Estimated savings: 50% on Lambda costs for dev
+  - Dev: 512MB, Prod: 1024MB
 - **Stats Lambda**:
-  - Dev: 256MB + 3min timeout, Prod: 512MB + 5min timeout
-  - Estimated savings: 50% on compute costs for dev
+  - Dev: 256MB + 10min timeout, Prod: 512MB + 5min timeout
+  - Note: the dev timeout (600s) exceeds prod (300s) — see `lambda-stats.tf`.
 
 ### Already Optimized Components
 
@@ -30,15 +38,20 @@ The infrastructure now dynamically scales resources based on the `environment` v
 
 - ✅ Instance: `db.t3.micro` (smallest available)
 - ✅ Storage: 20GB with auto-scaling to 50GB max
-- ✅ Backup retention: 1 day minimum
+- ✅ Backup retention: 7 days (dev/staging), 30 days (prod)
 - ✅ Performance Insights: Disabled (saves ~$7/month)
 - ✅ Enhanced Monitoring: Disabled (saves ~$2/month)
 - ✅ Multi-AZ: Single AZ for dev
 
 #### RDS Proxy
 
-- ✅ Disabled by default for development (`enable_rds_proxy = false`)
-- ✅ Saves ~$15-20/month per environment
+- **Enabled** for the deployed stack via `infra.auto.tfvars`
+  (`enable_rds_proxy = true`); the variable default remains `false`.
+- Cost: ~$15-20/month. Kept deliberately: the VPC-attached Lambdas
+  (GraphQL, websocket, draft-processor, stats, etc.) pool connections
+  through the proxy into a `db.t3.micro`, which has very little connection
+  headroom. Do not disable without first verifying peak Lambda concurrency
+  against the instance's `max_connections`.
 
 ## 📊 Estimated Monthly Cost Impact
 
@@ -88,7 +101,7 @@ Environment variable includes validation to prevent typos:
 1. **Environment Segregation**: Different resource sizes for different environments
 2. **Right-sizing**: Resources match actual usage patterns
 3. **Retention Policies**: Shorter retention for non-critical environments
-4. **Conditional Resources**: RDS Proxy only when needed
+4. **Conditional Resources**: RDS Proxy behind a flag (currently enabled for connection pooling)
 5. **Validation**: Prevent configuration errors with Terraform validation
 
 ## ⚡ Quick Start

@@ -17,7 +17,11 @@ on:
     types: [opened, synchronize, reopened]
   pull_request_review:
     types: [submitted]
-  merge_group:
+  # No merge_group trigger: merging is handled by the custom queue in
+  # merge-queue.yml, which merges the already-validated head SHA. Do not re-add
+  # merge_group without a prior-success short-circuit — merge-group commits get
+  # fresh SHAs, so check-prior-success would re-run full CI + comprehensive
+  # security scans for every queued PR.
   workflow_dispatch:
     inputs:
       debug_mode:
@@ -75,14 +79,13 @@ jobs:
   # The "🔐 SHA Sanity Check" check-run is owned by .github/workflows/check-conflicts.yml
   # to avoid a duplicate row on PR check rollups (LS-4199). The diagnostic SHA
   # verification still runs here as a step inside determine-scope so coverage on
-  # merge_group / workflow_dispatch events (which check-conflicts does not see)
+  # workflow_dispatch events (which check-conflicts does not see)
   # is preserved — but as a step it does not surface as a separate check-run.
 
   determine-scope:
     name: "🔍 Determine Workflow Scope"
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request_review' &&
        github.event.review.state == 'approved') ||
@@ -103,8 +106,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -eo pipefail
-          # EVENT_SHA: for pull_request events use head.sha; for merge_group use head_sha.
-          EVENT_SHA="${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
+          # EVENT_SHA: for pull_request events use head.sha.
+          EVENT_SHA="${{ github.event.pull_request.head.sha }}"
           if [ -z "$EVENT_SHA" ] || [ "$EVENT_SHA" = "$GITHUB_SHA" ]; then
             echo "SHA matches; proceeding"
             exit 0
@@ -165,8 +168,6 @@ jobs:
 
           if [ "$event" = "workflow_dispatch" ]; then
             run_security="$manual_security"
-          elif [ "$event" = "merge_group" ]; then
-            run_security=true
           else
             base_ref=""
             if [ "$event" = "pull_request_review" ] || [ "$event" = "pull_request" ]; then
@@ -209,7 +210,8 @@ jobs:
                 code_changed=true
               fi
 
-              # SAST is expensive (10-20 min). Run it on merge_group only.
+              # SAST is expensive (10-20 min). It only runs via workflow_dispatch
+              # (comprehensive) or the 'security-scan' label.
               # PRs get secret scanning (fast) + dependency scanning when deps change.
               if [ "$deps_changed" = true ]; then
                 run_security=true
@@ -290,7 +292,7 @@ jobs:
             // CI check runs are attached to the PR head, so we must look them up by the
             // head SHA or this guard never finds the prior-success checks and CI re-runs
             // on every approval (LS-7736). Falls back to context.sha for events with no
-            // pull_request payload (e.g. merge_group), though this step only runs on
+            // pull_request payload, though this step only runs on
             // pull_request_review.
             let sha = context.payload.pull_request?.head?.sha ?? context.sha;
 
