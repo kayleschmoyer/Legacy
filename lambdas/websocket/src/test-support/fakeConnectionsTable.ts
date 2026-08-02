@@ -37,8 +37,21 @@ export class FakeConnectionsTable {
     this.rows.set(id, item);
   }
 
+  /**
+   * DynamoDB excludes TTL-expired items from Scan/Query/GetItem responses
+   * well before the background sweep physically deletes them — that's the
+   * "silent" part of LS-8878's bug (the row is gone from reads, but nothing
+   * ever told the client). Mirror that by filtering on `ttl` (epoch seconds)
+   * against the real wall clock on every read.
+   */
+  private isExpired(row: AttrItem): boolean {
+    const ttl = row['ttl']?.N;
+    return ttl !== undefined && Number(ttl) <= Math.floor(Date.now() / 1000);
+  }
+
   getItem(connectionId: string): AttrItem | undefined {
-    return this.rows.get(connectionId);
+    const row = this.rows.get(connectionId);
+    return row && !this.isExpired(row) ? row : undefined;
   }
 
   /**
@@ -111,13 +124,14 @@ export class FakeConnectionsTable {
 
   queryByLeagueId(leagueId: number): AttrItem[] {
     return [...this.rows.values()].filter(
-      (row) => row['leagueId']?.N === String(leagueId),
+      (row) => !this.isExpired(row) && row['leagueId']?.N === String(leagueId),
     );
   }
 
   queryByMatchupId(matchupId: number, viewContext?: string): AttrItem[] {
     return [...this.rows.values()].filter(
       (row) =>
+        !this.isExpired(row) &&
         row['matchupId']?.N === String(matchupId) &&
         (!viewContext || row['viewContext']?.S === viewContext),
     );
@@ -125,12 +139,12 @@ export class FakeConnectionsTable {
 
   queryByUserId(userId: number): AttrItem[] {
     return [...this.rows.values()].filter(
-      (row) => row['userId']?.N === String(userId),
+      (row) => !this.isExpired(row) && row['userId']?.N === String(userId),
     );
   }
 
   scanAll(): AttrItem[] {
-    return [...this.rows.values()];
+    return [...this.rows.values()].filter((row) => !this.isExpired(row));
   }
 
   clear(): void {

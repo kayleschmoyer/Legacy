@@ -290,6 +290,12 @@ jest.mock('drizzle-orm', () => ({
 
 process.env['CONNECTIONS_TABLE_NAME'] = 'test-connections';
 process.env['JWT_SECRET_NAME'] = 'test-jwt-secret-name';
+// Short TTL so LS-8878's expiry/refresh regression coverage below doesn't
+// need to wait out the real 2h window — see `CONNECTION_TTL_SECONDS` in
+// `index.ts`. 2s (rather than 1s) leaves headroom against the TTL's
+// epoch-*seconds* rounding so the refresh-path test isn't a coin flip on
+// exactly which second a heartbeat lands in.
+process.env['CONNECTION_TTL_SECONDS'] = '2';
 
 // `./index` reads CONNECTIONS_TABLE_NAME/JWT_SECRET_NAME into module-level
 // consts at import time, so it must load via `require()` AFTER the env vars
@@ -701,4 +707,88 @@ describe('WebSocket fan-out (LS-8856)', () => {
     });
     expect(disconnectedHandler).not.toHaveBeenCalled();
   });
+
+  // ── LS-8878: connections-table TTL refresh on heartbeat ping ──
+
+  it(
+    'drops a connection from broadcasts once its row TTL expires with no refresh ' +
+      '(regression: LS-8878 — the bug before the ping-refresh fix)',
+    async () => {
+      const leagueId = 502;
+      const sender = registerUser('ivan');
+      const viewer = registerUser('judy');
+      grantLeagueMembership(sender.userId, leagueId);
+      grantLeagueMembership(viewer.userId, leagueId);
+
+      // Default heartbeat is 8 minutes — this client never pings within the
+      // test, so its connections-table row's TTL (CONNECTION_TTL_SECONDS)
+      // expires with no refresh, exactly like a real client that only ever
+      // disconnects/reconnects via updateContext() instead of pinging.
+      const viewerClient = client({ token: viewer.token, leagueId });
+      await waitForEvent(viewerClient, 'connected');
+
+      const messages: unknown[] = [];
+      viewerClient.on('draft-pick-made', (n) => messages.push(n));
+
+      // Outlast the TTL with the socket still open — DynamoDB TTL eviction is
+      // lazy, so the row disappears from reads while the client believes it's
+      // still subscribed.
+      await sleep(2500);
+
+      await notificationService().notifyDraftPickMade(
+        leagueId,
+        1,
+        1,
+        sender.userId,
+        1,
+        1,
+        1,
+        1,
+      );
+      await sleep(300); // bounded wait for a negative assertion
+
+      expect(messages).toHaveLength(0);
+    },
+  );
+
+  it(
+    'keeps receiving broadcasts past the original TTL when heartbeat pings ' +
+      'refresh the row (LS-8878 fix)',
+    async () => {
+      const leagueId = 503;
+      const sender = registerUser('kevin');
+      const viewer = registerUser('laura');
+      grantLeagueMembership(sender.userId, leagueId);
+      grantLeagueMembership(viewer.userId, leagueId);
+
+      const viewerClient = client({ token: viewer.token, leagueId });
+      await waitForEvent(viewerClient, 'connected');
+
+      // Ping well inside the TTL so the server-side refresh (handleDefault's
+      // 'ping' branch) keeps extending the row's TTL for as long as the socket
+      // stays open — modelling a multi-hour draft against the short test TTL.
+      viewerClient.setHeartbeatInterval(300);
+
+      // Outlast the original TTL several times over; the connection should
+      // survive because the heartbeat kept refreshing it.
+      await sleep(2500);
+
+      const received = waitForEvent<{ playerId: number }>(
+        viewerClient,
+        'draft-pick-made',
+      );
+      await notificationService().notifyDraftPickMade(
+        leagueId,
+        1,
+        1,
+        sender.userId,
+        999,
+        1,
+        1,
+        1,
+      );
+
+      await expect(received).resolves.toMatchObject({ playerId: 999 });
+    },
+  );
 });

@@ -58,6 +58,38 @@ const connectionsTable = process.env['CONNECTIONS_TABLE_NAME'] ?? '';
 const JWT_SECRET_NAME = process.env['JWT_SECRET_NAME'] ?? '';
 
 /**
+ * Connections-table row TTL, in seconds. Overridable via env var so tests can
+ * exercise expiry/refresh behavior without waiting out the real 2h window.
+ */
+const CONNECTION_TTL_SECONDS =
+  Number(process.env['CONNECTION_TTL_SECONDS']) || 2 * 60 * 60;
+
+/** Epoch-seconds TTL value for a connections-table row, `CONNECTION_TTL_SECONDS` from now. */
+function computeConnectionTtl(): number {
+  return Math.floor(Date.now() / 1000) + CONNECTION_TTL_SECONDS;
+}
+
+/**
+ * Refresh a connection row's TTL without touching its other attributes.
+ * Called on every heartbeat ping so long-lived sockets (drafts, live
+ * leagues) don't have their row TTL-evicted while still open — shipped
+ * clients never call the server `updateContext` action (they disconnect and
+ * reconnect instead), so ping is the only refresh signal the server
+ * reliably receives from a client that never changes context.
+ */
+async function refreshConnectionTtl(connectionId: string): Promise<void> {
+  const ttl = computeConnectionTtl();
+  await dynamoClient.send(
+    new UpdateItemCommand({
+      TableName: connectionsTable,
+      Key: { connectionId: { S: connectionId } },
+      UpdateExpression: 'SET ttl = :ttl',
+      ExpressionAttributeValues: { ':ttl': { N: ttl.toString() } },
+    }),
+  );
+}
+
+/**
  * Coerce an unknown caught value to an Error instance.
  * Plain objects are JSON-serialised into the message so their content is
  * visible in Rollbar rather than collapsing to "[object Object]".
@@ -415,8 +447,8 @@ async function handleConnect(
       viewContext,
     });
 
-    // Build item with TTL (2 hours from now)
-    const ttl = Math.floor(Date.now() / 1000) + 2 * 60 * 60; // 2 hours
+    // Build item with TTL
+    const ttl = computeConnectionTtl();
     const username = payload?.username ?? '';
     const item: Record<string, { S?: string; N?: string }> = {
       connectionId: { S: connectionId },
@@ -782,8 +814,8 @@ async function handleUpdateContext(
     }
 
     if (setExpressions.length > 0 || removeExpressions.length > 0) {
-      // Refresh TTL (2 hours from now)
-      const ttl = Math.floor(Date.now() / 1000) + 2 * 60 * 60;
+      // Refresh TTL
+      const ttl = computeConnectionTtl();
       setExpressions.push('ttl = :ttl');
       attributeValues[':ttl'] = { N: ttl.toString() };
 
@@ -871,6 +903,19 @@ async function handleDefault(
     }
 
     if (message.type === 'ping') {
+      // Refresh the connections-table row TTL on every heartbeat so a long-lived
+      // socket (e.g. a multi-hour draft) never gets TTL-evicted while still
+      // open. Non-fatal: a refresh failure shouldn't block the pong ack.
+      try {
+        await refreshConnectionTtl(connectionId);
+      } catch (error) {
+        LOGGER.warn(
+          'Failed to refresh connection TTL on ping',
+          toError(error),
+          { connectionId },
+        );
+      }
+
       // Send pong response back to the client
       try {
         // Format endpoint for API Gateway Management API
