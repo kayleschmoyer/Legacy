@@ -9,7 +9,12 @@ name: E2E Native (Android)
 # to a booted emulator.
 #
 # Schedule-free per the repo CI policy (LS-8487): no cron — manual dispatch plus
-# an automated run after each "Build Android App" on main.
+# an automated run after each "Build Android App" on main, debounced to at most
+# one attempt per ANDROID_E2E_MIN_INTERVAL_HOURS (repo var, default 156h ≈
+# weekly) — see the `gate` job, which mirrors run-maestro-sweep.yml (LS-8897).
+# Manual dispatch always runs. Tradeoff: native Android regressions are caught
+# on the gate cadence rather than on every merge to main — the same tradeoff
+# already accepted for the sibling Maestro sweep.
 #
 # ── Auth strategy (AC3) ───────────────────────────────────────────────
 # Real OAuth is not automatable on native (OAuth-only app, LS-6656). The
@@ -28,7 +33,7 @@ on:
     branches: [main]
 
 permissions:
-  actions: read
+  actions: read # gate job inspects prior runs of this workflow for debouncing
   contents: read
 
 concurrency:
@@ -46,12 +51,68 @@ env:
   NODE_OPTIONS: "--max-old-space-size=2048"
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Post-merge debounce gate (schedule-free CI policy). Mirrors the `gate` job
+  # in run-maestro-sweep.yml.
+  # workflow_dispatch: always runs.
+  # workflow_run (Build Android App completed on main): runs at most once per
+  # ANDROID_E2E_MIN_INTERVAL_HOURS. A debounced run skips every downstream job,
+  # so its own run conclusion is "success" with all jobs skipped; the debounce
+  # check therefore inspects the "Build Bypass APK" job of prior automated runs
+  # (non-skipped = real attempt) rather than run-level conclusions, which would
+  # re-arm the debounce forever on a busy repo.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: "Native Android E2E Gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      should-run: ${{ steps.decide.outputs.should-run }}
+    steps:
+      - name: "Decide whether to run"
+        id: decide
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIN_INTERVAL_HOURS: ${{ vars.ANDROID_E2E_MIN_INTERVAL_HOURS || '156' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
+          # All automated runs of this workflow created since the cutoff,
+          # excluding this run itself.
+          RUN_IDS=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/e2e-native-android.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=30" \
+            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
+
+          for id in $RUN_IDS; do
+            # Non-skipped, completed "Build Bypass APK" = a real attempt.
+            PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
+              --jq '[.jobs[] | select(.name == "Build Bypass APK" and .conclusion != null and .conclusion != "skipped")] | length')
+            if [ "$PREPARED" -gt 0 ]; then
+              echo "should-run=false" >> "$GITHUB_OUTPUT"
+              echo "Debounced — automated native Android E2E (run ${id}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done
+
+          echo "should-run=true" >> "$GITHUB_OUTPUT"
+          echo "No automated native Android E2E run in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+
   # ── Build an automatable (bypass) APK ───────────────────────────────
   build-bypass-apk:
     name: Build Bypass APK
+    needs: [gate]
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      needs.gate.outputs.should-run == 'true' && (
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success'
+      )
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 45
     env:
