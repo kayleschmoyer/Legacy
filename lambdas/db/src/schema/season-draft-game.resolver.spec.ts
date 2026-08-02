@@ -735,6 +735,38 @@ describe('Season Draft Game Resolver', () => {
         extensions: { code: 'GAME_UNAVAILABLE' },
       });
     });
+
+    it('sends loading and updated notifications via the typed notify API, not raw broadcast()', async () => {
+      mockSeasonDraftGameService.checkPlayerHasStats.mockResolvedValueOnce(
+        false,
+      );
+      mockSeasonDraftGameService.getPlayerBrefId.mockResolvedValueOnce(
+        'ruthbaxX01',
+      );
+
+      const mockNotificationService = {
+        broadcast: jest.fn(),
+        notifyPlayerStatsLoading: jest.fn().mockResolvedValue(undefined),
+        notifyPlayerStatsUpdated: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const resolver = getMutation('triggerSeasonDraftStatLoading');
+      const result = await resolver(
+        {},
+        { playerId: 5 },
+        { ...mockContext, notificationService: mockNotificationService },
+        undefined as never,
+      );
+
+      expect(result).toBe(true);
+      expect(
+        mockNotificationService.notifyPlayerStatsLoading,
+      ).toHaveBeenCalledWith(5, 0, 0);
+      expect(
+        mockNotificationService.notifyPlayerStatsUpdated,
+      ).toHaveBeenCalledWith(5, 0, 0, null);
+      expect(mockNotificationService.broadcast).not.toHaveBeenCalled();
+    });
   });
 
   // ── processExpiredSeasonDraftPick mutation ────────────────────────────────

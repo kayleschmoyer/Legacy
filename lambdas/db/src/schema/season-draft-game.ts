@@ -721,15 +721,11 @@ builder.mutationFields((t) => ({
       // Send loading notification via WebSocket (if notification service is available)
       if (context.notificationService) {
         try {
-          await context.notificationService.broadcast({
-            type: 'notification',
-            data: {
-              type: 'PLAYER_STATS_LOADING',
-              playerId: args.playerId,
-              matchupId: 0,
-              leagueId: 0,
-            },
-          });
+          await context.notificationService.notifyPlayerStatsLoading(
+            args.playerId,
+            0,
+            0,
+          );
         } catch (notifyError) {
           LOGGER.warn('Failed to send stats loading notification', {
             error: notifyError,
@@ -744,16 +740,12 @@ builder.mutationFields((t) => ({
         // Send updated notification via WebSocket
         if (context.notificationService) {
           try {
-            await context.notificationService.broadcast({
-              type: 'notification',
-              data: {
-                type: 'PLAYER_STATS_UPDATED',
-                playerId: args.playerId,
-                matchupId: 0,
-                leagueId: 0,
-                stats: null,
-              },
-            });
+            await context.notificationService.notifyPlayerStatsUpdated(
+              args.playerId,
+              0,
+              0,
+              null,
+            );
           } catch (notifyError) {
             LOGGER.warn('Failed to send stats updated notification', {
               error: notifyError,
