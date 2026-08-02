@@ -367,3 +367,47 @@ describe('useDraftWebSocket — reconnect refetch recovery (LS-8506)', () => {
     expect(params.refetchCurrentPick).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('useDraftWebSocket — WS auth token rotation (LS-6788)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function getConstructor(): jest.Mock {
+    return jest.requireMock<{ WebSocketClient: jest.Mock }>(
+      '@legacy-sports/websocket-client',
+    ).WebSocketClient;
+  }
+
+  it('tears down the stale socket and opens a new one when the auth token rotates', async () => {
+    const params = makeDefaultParams();
+    const { rerender } = renderHook((p) => useDraftWebSocket(p), {
+      initialProps: params,
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const staleInstance = mockInstance;
+    expect(getConstructor()).toHaveBeenCalledTimes(1);
+    expect(getConstructor()).toHaveBeenLastCalledWith(
+      expect.objectContaining({ token: 'test-token' }),
+    );
+
+    // A long-running draft's access token is rotated in the background well
+    // before the WS is ever forced to reconnect by a network drop.
+    rerender({ ...params, token: 'rotated-token' });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(staleInstance.dispose).toHaveBeenCalledTimes(1);
+    expect(getConstructor()).toHaveBeenCalledTimes(2);
+    expect(getConstructor()).toHaveBeenLastCalledWith(
+      expect.objectContaining({ token: 'rotated-token' }),
+    );
+    expect(mockInstance.connect).toHaveBeenCalledTimes(1);
+  });
+});

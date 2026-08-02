@@ -353,6 +353,33 @@ describe('useWebSocket', () => {
     expect(instance.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it('disposes the stale client and reconnects with a rotated token (LS-6788)', async () => {
+    const { rerender } = renderHook(
+      ({ token }) => useWebSocket({ url: 'wss://example.com', token }),
+      { initialProps: { token: 'jwt-token-old' } },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const staleInstance = mockInstance;
+    expect(getConstructor()).toHaveBeenCalledTimes(1);
+
+    rerender({ token: 'jwt-token-new' });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(staleInstance.dispose).toHaveBeenCalledTimes(1);
+    expect(getConstructor()).toHaveBeenCalledTimes(2);
+    expect(getConstructor()).toHaveBeenLastCalledWith(
+      expect.objectContaining({ token: 'jwt-token-new' }),
+    );
+    expect(mockInstance.connect).toHaveBeenCalledTimes(1);
+  });
+
   // ── Forwarding methods ──────────────────────────────────────────────────
 
   it('connect() forwards to client.connect()', () => {
