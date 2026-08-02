@@ -1,27 +1,29 @@
 /**
- * Check if an error is a retryable Baseball-Reference error (timeout, rate limit, or overload).
- * Rate limit (429) and overload (529) errors should be retried after SQS visibility timeout delay.
+ * Check if an error is a retryable Baseball-Reference error (timeout, rate limit,
+ * overload, or any 5xx server error). 5xx responses (500, 502, 503, 504, 524, 529,
+ * etc.) indicate an upstream failure on Baseball-Reference's end, not a problem with
+ * the request itself, so they should always be retried rather than immediately
+ * marking the player's stats load as permanently failed.
  */
 export function isRetryableError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
   const errorMessage = error.message.toLowerCase();
 
-  // Check for HTTP 429 (Too Many Requests) or 529 (Site Overloaded)
+  // Check for any HTTP 5xx server error (500-599), including 429/529 (rate limit /
+  // overload) which are handled explicitly below, and 500/502/503/504/524 (server
+  // errors / gateway timeouts).
   const isRateLimited =
     errorMessage.includes('status code 429') ||
     errorMessage.includes('status code 529');
 
-  // Check for HTTP 504 (Gateway Timeout) or 524 (Cloudflare timeout)
-  const isTimeoutStatus =
-    errorMessage.includes('status code 504') ||
-    errorMessage.includes('status code 524');
+  const isServerError = /status code 5\d\d/.test(errorMessage);
 
   // Also check for generic timeout messages
   const isTimeoutMessage =
     errorMessage.includes('timeout') || errorMessage.includes('timed out');
 
-  return isRateLimited || isTimeoutStatus || isTimeoutMessage;
+  return isRateLimited || isServerError || isTimeoutMessage;
 }
 
 /**
