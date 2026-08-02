@@ -356,6 +356,15 @@ describe('draft-processor handler', () => {
           title: 'Draft Complete',
         }),
       );
+
+      // WebSocket broadcast seam: notifyDraftCompleted must actually be
+      // invoked with the completed draft's leagueId/selectionMethod so the
+      // real WebSocketNotificationService (see WebSocketNotificationService.spec.ts
+      // for the published-envelope contract) has correct inputs to work from.
+      expect(mockNotifyDraftCompleted).toHaveBeenCalledWith(
+        msg.payload.leagueId,
+        msg.payload.selectionMethod,
+      );
     });
 
     it('tracks batch failures per-record', async () => {

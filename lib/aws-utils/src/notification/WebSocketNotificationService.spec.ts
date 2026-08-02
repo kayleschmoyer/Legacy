@@ -34,6 +34,7 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+import { WireNotificationType } from '@legacy-sports/utils';
 import { WebSocketNotificationService } from './WebSocketNotificationService';
 
 interface QueryCall {
@@ -189,6 +190,37 @@ describe('WebSocketNotificationService — DynamoDB pagination', () => {
         connectionId: { S: 'u3' },
       });
       expect(mockApiGatewaySend).toHaveBeenCalledTimes(4);
+    });
+  });
+
+  describe('notifyDraftCompleted — published envelope contract (LS-8883)', () => {
+    it('broadcasts a DRAFT_COMPLETED envelope filtered to the league via LeagueIdIndex', async () => {
+      mockDynamoSend.mockResolvedValueOnce({
+        Items: makeConnectionItems(['c1', 'c2']),
+      });
+
+      await service.notifyDraftCompleted(42, 'automated');
+
+      const queryCalls = getDynamoCalls().filter((c) => c._type === 'Query');
+      expect(queryCalls).toHaveLength(1);
+      expect(queryCalls[0].input.IndexName).toBe('LeagueIdIndex');
+
+      expect(mockApiGatewaySend).toHaveBeenCalledTimes(2);
+      for (const [command] of mockApiGatewaySend.mock.calls) {
+        const published = JSON.parse(
+          (command as { input: { Data: Buffer } }).input.Data.toString('utf-8'),
+        ) as { type: string; data: Record<string, unknown> };
+
+        expect(published).toEqual({
+          type: 'notification',
+          data: {
+            type: WireNotificationType.DRAFT_COMPLETED,
+            leagueId: 42,
+            selectionMethod: 'automated',
+            completedAt: expect.any(String) as string,
+          },
+        });
+      }
     });
   });
 
