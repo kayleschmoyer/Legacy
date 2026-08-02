@@ -118,6 +118,21 @@ export interface MatchupStatsCompleteNotification {
 }
 
 /**
+ * Sent whenever the scoring system writes a matchup's score (LS-6396) —
+ * including single-player stat corrections outside of batch completion, so
+ * web clients don't have to wait for the next `MATCHUP_STATS_COMPLETE` tick
+ * (up to 30+s away) to see the corrected total.
+ */
+export interface MatchupScoreUpdatedNotification {
+  type: typeof WireNotificationType.MATCHUP_SCORE_UPDATED;
+  matchupId: number;
+  leagueId: number;
+  team1Score: number | null;
+  team2Score: number | null;
+  updatedAt: string;
+}
+
+/**
  * A new message posted to a league-wide chat room.
  * Broadcast to all WebSocket connections scoped to the league.
  */
@@ -878,6 +893,42 @@ export class WebSocketNotificationService {
     await this.notifyMatchupViewers(matchupId, notification);
 
     // Also broadcast to league-level viewers so the league page refreshes
+    await this.broadcast(
+      {
+        type: 'notification',
+        data: notification,
+      },
+      leagueId,
+    );
+  }
+
+  /**
+   * Notify league viewers that a matchup's score was written by the scoring
+   * system (LS-6396). Fired on every `updateMatchupScore` system write —
+   * not just at batch completion — so a single stat correction propagates
+   * to web clients immediately instead of waiting for the next
+   * `MATCHUP_STATS_COMPLETE` batch tick.
+   */
+  async notifyMatchupScoreUpdated(
+    matchupId: number,
+    leagueId: number,
+    team1Score: number | null,
+    team2Score: number | null,
+  ): Promise<void> {
+    const notification: MatchupScoreUpdatedNotification = {
+      type: WireNotificationType.MATCHUP_SCORE_UPDATED,
+      matchupId,
+      leagueId,
+      team1Score,
+      team2Score,
+      updatedAt: new Date().toISOString(),
+    };
+
+    LOGGER.info('Sending matchup score updated notification', {
+      matchupId,
+      leagueId,
+    });
+
     await this.broadcast(
       {
         type: 'notification',

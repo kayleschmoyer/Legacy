@@ -94,6 +94,24 @@ describe('useLeagueWebSocket', () => {
     expect(onMatchupStatsComplete).toHaveBeenCalledWith(notification);
   });
 
+  it('fires onMatchupScoreUpdated when a MATCHUP_SCORE_UPDATED notification arrives', () => {
+    const onMatchupScoreUpdated = jest.fn();
+    renderHook(() => useLeagueWebSocket({ onMatchupScoreUpdated }));
+
+    const payload = {
+      type: ClientNotificationType.MATCHUP_SCORE_UPDATED,
+      leagueId: 7,
+      matchupId: 42,
+      team1Score: 49,
+      team2Score: 31,
+      updatedAt: '2026-08-02T00:00:00.000Z',
+    };
+    mockClient._emit(ClientNotificationType.MATCHUP_SCORE_UPDATED, payload);
+
+    expect(onMatchupScoreUpdated).toHaveBeenCalledTimes(1);
+    expect(onMatchupScoreUpdated).toHaveBeenCalledWith(payload);
+  });
+
   it('does not subscribe when there is no client', () => {
     mockUseLeagueWebSocketClient.mockReturnValue({
       client: null,

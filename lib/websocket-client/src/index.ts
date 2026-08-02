@@ -25,6 +25,7 @@ export type {
   PlayerStatsLoadingNotification,
   PlayerStatsUpdatedNotification,
   MatchupStatsCompleteNotification,
+  MatchupScoreUpdatedNotification,
   LeagueChatMessageNotification,
   DirectMessageNotification,
   RosterUpdateNotification,

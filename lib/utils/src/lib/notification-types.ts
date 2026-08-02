@@ -28,6 +28,8 @@ export const WireNotificationType = {
   PLAYER_STATS_LOADING: 'PLAYER_STATS_LOADING',
   PLAYER_STATS_UPDATED: 'PLAYER_STATS_UPDATED',
   MATCHUP_STATS_COMPLETE: 'MATCHUP_STATS_COMPLETE',
+  /** Sent whenever a matchup's score is written by the scoring system (e.g. a stat correction), independent of batch completion. */
+  MATCHUP_SCORE_UPDATED: 'MATCHUP_SCORE_UPDATED',
   LEAGUE_CHAT_MESSAGE: 'LEAGUE_CHAT_MESSAGE',
   DIRECT_MESSAGE: 'DIRECT_MESSAGE',
   ROSTER_UPDATE: 'ROSTER_UPDATE',
@@ -70,6 +72,7 @@ export const ClientNotificationType = {
   PLAYER_STATS_LOADING: 'player-stats-loading',
   PLAYER_STATS_UPDATED: 'player-stats-updated',
   MATCHUP_STATS_COMPLETE: 'matchup-stats-complete',
+  MATCHUP_SCORE_UPDATED: 'matchup-score-updated',
   LEAGUE_CHAT_MESSAGE: 'league-chat-message',
   DIRECT_MESSAGE: 'direct-message',
   ROSTER_UPDATE: 'roster-update',

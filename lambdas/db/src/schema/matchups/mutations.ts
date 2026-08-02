@@ -98,6 +98,65 @@ builder.mutationField('createMatchup', (t) =>
   }),
 );
 
+/**
+ * Propagate a system-driven matchup score write over WebSocket (LS-6396).
+ *
+ * Previously the only WS signal for a score change was `MATCHUP_STATS_COMPLETE`,
+ * fired once at batch completion — so a single-player stat correction (e.g. a
+ * TD reversal re-scored outside the batch) left web clients showing the stale
+ * score for up to 30+s until the next batch tick. Firing this on every
+ * system-context `updateMatchupScore` write closes that gap. Exported
+ * standalone (rather than inlined in the resolver) so the notification
+ * gating can be unit-tested without the surrounding Pothos resolver plumbing.
+ */
+function parseMatchupScore(
+  score: string | null,
+  matchupId: number,
+): number | null {
+  if (score == null) {
+    return null;
+  }
+  const parsed = Number(score);
+  if (Number.isNaN(parsed)) {
+    LOGGER.warn(
+      'Encountered non-numeric matchup score string, sending null instead',
+      { score, matchupId },
+    );
+    return null;
+  }
+  return parsed;
+}
+
+export async function publishMatchupScoreUpdated(
+  context: Context,
+  matchup: {
+    id: number;
+    leagueId: number;
+    team1Score: string | null;
+    team2Score: string | null;
+  },
+): Promise<void> {
+  if (!context.isSystemRequest || !context.notificationService) {
+    return;
+  }
+
+  try {
+    await context.notificationService.notifyMatchupScoreUpdated(
+      matchup.id,
+      matchup.leagueId,
+      parseMatchupScore(matchup.team1Score, matchup.id),
+      parseMatchupScore(matchup.team2Score, matchup.id),
+    );
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    LOGGER.warn(
+      'Failed to send matchup score updated WS notification (non-fatal)',
+      error,
+      { matchupId: matchup.id },
+    );
+  }
+}
+
 // Mutation: updateMatchupScore
 builder.mutationField('updateMatchupScore', (t) =>
   t.field({
@@ -138,7 +197,11 @@ builder.mutationField('updateMatchupScore', (t) =>
         throw new Error('Matchup not found');
       }
 
-      return results[0];
+      const matchup = results[0];
+
+      await publishMatchupScoreUpdated(context, matchup);
+
+      return matchup;
     },
   }),
 );

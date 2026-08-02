@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import type {
   LeagueChatMessageNotification,
+  MatchupScoreUpdatedNotification,
   MatchupStatsCompleteNotification,
   SubscriptionUpdatedNotification,
 } from '@legacy-sports/websocket-client';
@@ -33,6 +34,13 @@ export interface UseLeagueWebSocketOptions {
    * out completions for matchups they aren't currently displaying.
    */
   onMatchupStatsComplete?: (n: MatchupStatsCompleteNotification) => void;
+  /**
+   * Fired whenever the scoring system writes a matchup's score, including a
+   * single-player stat correction outside of batch completion. Use this to
+   * refresh the score immediately instead of waiting for the next
+   * `onMatchupStatsComplete` batch tick.
+   */
+  onMatchupScoreUpdated?: (n: MatchupScoreUpdatedNotification) => void;
   /** Fired when a new chat message arrives in this league's chat room. */
   onLeagueChatMessage?: (n: LeagueChatMessageNotification) => void;
   /**
@@ -73,6 +81,9 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
 
   const onMatchupStatsCompleteRef = useRef(options.onMatchupStatsComplete);
   onMatchupStatsCompleteRef.current = options.onMatchupStatsComplete;
+
+  const onMatchupScoreUpdatedRef = useRef(options.onMatchupScoreUpdated);
+  onMatchupScoreUpdatedRef.current = options.onMatchupScoreUpdated;
 
   const onLeagueChatMessageRef = useRef(options.onLeagueChatMessage);
   onLeagueChatMessageRef.current = options.onLeagueChatMessage;
@@ -126,6 +137,14 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
       client.on(ClientNotificationType.MATCHUP_STATS_COMPLETE, (n) => {
         onMatchupStatsCompleteRef.current?.(
           n as MatchupStatsCompleteNotification,
+        );
+      }),
+    );
+
+    unsubs.push(
+      client.on(ClientNotificationType.MATCHUP_SCORE_UPDATED, (n) => {
+        onMatchupScoreUpdatedRef.current?.(
+          n as MatchupScoreUpdatedNotification,
         );
       }),
     );

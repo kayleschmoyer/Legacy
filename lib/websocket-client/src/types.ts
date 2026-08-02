@@ -99,6 +99,19 @@ export interface MatchupStatsCompleteNotification {
 }
 
 /**
+ * Sent whenever the scoring system writes a matchup's score, including
+ * single-player stat corrections outside of batch completion (LS-6396).
+ */
+export interface MatchupScoreUpdatedNotification {
+  type: typeof ClientNotificationType.MATCHUP_SCORE_UPDATED;
+  leagueId: number;
+  matchupId: number;
+  team1Score: number | null;
+  team2Score: number | null;
+  updatedAt: string;
+}
+
+/**
  * New chat message posted to a league chat room.
  * Broadcast to all WebSocket connections scoped to `leagueId`.
  */
@@ -259,6 +272,7 @@ export type NotificationData =
   | PlayerStatsLoadingNotification
   | PlayerStatsUpdatedNotification
   | MatchupStatsCompleteNotification
+  | MatchupScoreUpdatedNotification
   | LeagueChatMessageNotification
   | DirectMessageNotification
   | RosterUpdateNotification
