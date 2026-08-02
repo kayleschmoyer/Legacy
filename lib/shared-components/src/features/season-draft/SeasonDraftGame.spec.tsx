@@ -239,6 +239,39 @@ describe('SeasonDraftGame', () => {
     });
   });
 
+  // Regression test for LS-8395 / LS-8396: `TypeError: Cannot read property
+  // 'origin' of undefined` in the inviteUrl useMemo on Android, where a
+  // global `window` can exist without a `location` property.
+  it('does not throw building the invite link when window.location is undefined', () => {
+    const originalWindow = global.window;
+    // @ts-expect-error -- simulate a native environment where `window`
+    // exists but `location` does not.
+    global.window = {};
+
+    try {
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: {
+          seasonDraftGame: {
+            ...mockGameState,
+            status: 'setup' as const,
+            inviteCode: 'ABC123',
+          },
+        },
+        loading: false,
+        error: undefined,
+        refetch: mockRefetch,
+        startPolling: jest.fn(),
+        stopPolling: jest.fn(),
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      expect(() =>
+        render(<SeasonDraftGame gameId={1} currentUserId={1} />),
+      ).not.toThrow();
+    } finally {
+      global.window = originalWindow;
+    }
+  });
+
   // ── polling behaviour ───────────────────────────────────────────────────
 
   describe('conditional polling', () => {
