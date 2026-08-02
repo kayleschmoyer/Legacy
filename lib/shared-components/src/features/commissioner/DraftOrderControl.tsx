@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   Button,
   Card,
@@ -20,7 +20,6 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -28,25 +27,14 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  useGetDraftTeamOrderQuery,
-  useGetLeagueDraftQuery,
-  useRandomizeDraftOrderMutation,
-  useSetDraftOrderMutation,
-} from '@legacy-sports/graphql';
+  type DraftOrderControlProps,
+  type DraftTeam,
+  useDraftOrder,
+} from './useDraftOrder';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 import { PremiumGate } from '../../components/PremiumGate';
 
-export interface DraftOrderControlProps {
-  leagueId: number;
-  draftStatus: string | null | undefined;
-  /** Whether the current user has premium access. When false, the control is
-   * replaced with a locked upgrade prompt. Defaults to true when omitted. */
-  isPremium?: boolean;
-  onSuccess?: (message: string) => void;
-  onError?: (error: Error) => void;
-}
-
-type DraftTeam = { teamId: number; teamName: string; draftOrder: number };
+export type { DraftOrderControlProps };
 
 function SortableTeamRow({
   team,
@@ -77,7 +65,7 @@ function SortableTeamRow({
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <YStack ref={setNodeRef} style={style}>
       <XStack
         alignItems="center"
         gap="$3"
@@ -121,7 +109,7 @@ function SortableTeamRow({
           {team.teamName}
         </Text>
       </XStack>
-    </div>
+    </YStack>
   );
 }
 
@@ -132,6 +120,10 @@ function SortableTeamRow({
  * Editable only before the draft starts (not-started / queued). Once the
  * draft is in-progress the order is locked. Supports drag-and-drop
  * reordering via @dnd-kit/sortable.
+ *
+ * Web only — see DraftOrderControl.native.tsx for the Tamagui-only native
+ * variant (up/down reorder, no @dnd-kit). Both share query/mutation logic
+ * via useDraftOrder. See LS-8850.
  */
 export function DraftOrderControl({
   leagueId,
@@ -140,48 +132,28 @@ export function DraftOrderControl({
   onSuccess,
   onError,
 }: DraftOrderControlProps) {
-  // Fetch the draft to get draftId (skip only when completed — not needed post-season)
-  const { data: draftData } = useGetLeagueDraftQuery({
-    variables: { leagueId },
-    fetchPolicy: 'cache-and-network',
-    skip: draftStatus === 'completed',
-  });
+  const {
+    isOrderLocked,
+    loading,
+    localOrder,
+    hasCustomOrder,
+    settingOrder,
+    randomizing,
+    isBusy,
+    moveTeam,
+    handleSaveOrder,
+    handleRandomize,
+    handleReset,
+  } = useDraftOrder({ leagueId, draftStatus, onSuccess, onError });
 
-  const draftId = draftData?.getLeagueDraft?.id ?? null;
-
-  // Order is only editable before the draft starts (not-started or queued).
-  // Once in-progress, picks may begin at any time — the order is locked.
-  const isOrderLocked =
-    draftStatus !== 'not-started' && draftStatus !== 'queued';
-
-  // Fetch current draft team order (whenever we have a draftId)
-  const { data, loading, refetch } = useGetDraftTeamOrderQuery({
-    variables: { draftId: draftId ?? 0 },
-    fetchPolicy: 'cache-and-network',
-    skip: !draftId,
-  });
-
-  const [setDraftOrder, { loading: settingOrder }] = useSetDraftOrderMutation();
-  const [randomizeDraftOrder, { loading: randomizing }] =
-    useRandomizeDraftOrderMutation();
-
-  // Local ordered list for drag-to-reorder
-  const [localOrder, setLocalOrder] = useState<DraftTeam[]>([]);
-  const [hasCustomOrder, setHasCustomOrder] = useState(false);
-
-  // Sync local state from server
-  useEffect(() => {
-    if (data?.getDraftTeamOrder) {
-      const sorted = [...data.getDraftTeamOrder]
-        .filter(
-          (e): e is DraftTeam =>
-            e.teamId != null && e.teamName != null && e.draftOrder != null,
-        )
-        .sort((a, b) => a.draftOrder - b.draftOrder);
-      setLocalOrder(sorted);
-      setHasCustomOrder(false);
-    }
-  }, [data]);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localOrder.findIndex((t) => t.teamId === active.id);
+    const newIndex = localOrder.findIndex((t) => t.teamId === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    moveTeam(oldIndex, newIndex);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -189,69 +161,6 @@ export function DraftOrderControl({
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setLocalOrder((prev) => {
-      const oldIndex = prev.findIndex((t) => t.teamId === active.id);
-      const newIndex = prev.findIndex((t) => t.teamId === over.id);
-      return arrayMove(prev, oldIndex, newIndex);
-    });
-    setHasCustomOrder(true);
-  };
-
-  const handleSaveOrder = async () => {
-    if (!draftId) return;
-    try {
-      await setDraftOrder({
-        variables: {
-          draftId,
-          teamIds: localOrder.map((t) => t.teamId),
-        },
-        refetchQueries: ['GetDraftTeamOrder', 'GetLiveDraftLeagueDraft'],
-        awaitRefetchQueries: true,
-      });
-      setHasCustomOrder(false);
-      onSuccess?.('Draft order saved successfully!');
-      void refetch();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      onError?.(new Error(msg));
-    }
-  };
-
-  const handleRandomize = async () => {
-    if (!draftId) return;
-    try {
-      await randomizeDraftOrder({
-        variables: { draftId },
-        refetchQueries: ['GetDraftTeamOrder', 'GetLiveDraftLeagueDraft'],
-        awaitRefetchQueries: true,
-      });
-      setHasCustomOrder(false);
-      onSuccess?.('Draft order randomized!');
-      void refetch();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      onError?.(new Error(msg));
-    }
-  };
-
-  const handleReset = () => {
-    if (data?.getDraftTeamOrder) {
-      const sorted = [...data.getDraftTeamOrder]
-        .filter(
-          (e): e is DraftTeam =>
-            e.teamId != null && e.teamName != null && e.draftOrder != null,
-        )
-        .sort((a, b) => a.draftOrder - b.draftOrder);
-      setLocalOrder(sorted);
-      setHasCustomOrder(false);
-    }
-  };
-
-  const isBusy = settingOrder || randomizing;
 
   // Post-draft: season is active, order is permanently locked
   if (draftStatus === 'completed') {
