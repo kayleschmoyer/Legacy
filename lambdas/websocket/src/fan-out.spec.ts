@@ -33,9 +33,26 @@
  *
  * Scope (see LS-8856 for the full ticket and the PR description for the
  * coverage matrix): this spec covers AC1, AC2, AC5, and the LS-7977/LS-8067/
- * LS-8108 regression shapes. Reconnect-mid-draft (AC3), chained-auto-pick
- * burst/dedup (AC4), and true device-level (Appium) cross-platform E2E are
- * deliberately deferred — see the follow-up ticket referenced in the PR.
+ * LS-8108 regression shapes.
+ *
+ * LS-8865 (this ticket's second slice) extends the same harness with:
+ *   - reconnect-mid-draft (LS-8865 AC1): a client that drops and reconnects
+ *     still receives post-reconnect broadcasts, and a broadcast attempted
+ *     while it was offline fails gracefully without disrupting delivery to
+ *     other connected clients. The "no permanently missed picks" guarantee
+ *     itself is proved at the hook layer, not here — see
+ *     `useDraftWebSocket.spec.ts`'s "reconnect refetch recovery (LS-8506)"
+ *     block, which already covers the `RECONNECT_REFETCH_ATTEMPTS` resync
+ *     path this ticket's Technical Approach pointed at.
+ *   - chained auto-pick burst (LS-8865 AC2): a burst of `notifyDraftPickMade`
+ *     calls fired in quick succession to one connected client all arrive,
+ *     exactly once each — the fan-out/transport layer does not itself
+ *     dedupe or drop; the debounced-refetch/dedup contract on TOP of that
+ *     delivery lives in `useDraftWebSocket.ts` and is asserted there.
+ *
+ * True device-level (Appium) native cross-platform WS coverage remains
+ * deliberately out of this spec's reach — see
+ * `docs/decisions/0020-native-websocket-fan-out-stays-manual.md` for why.
  */
 
 // ── Mocks (must be declared before importing the module under test) ──
@@ -791,4 +808,143 @@ describe('WebSocket fan-out (LS-8856)', () => {
       await expect(received).resolves.toMatchObject({ playerId: 999 });
     },
   );
+
+  // ── LS-8865 AC1: reconnect-mid-draft ──
+
+  it('delivers a pick broadcast after a client drops and reconnects mid-draft', async () => {
+    const leagueId = 550;
+    const stableViewer = registerUser('noah'); // stays connected throughout
+    const droppedViewer = registerUser('olivia'); // disconnects and reconnects
+    grantLeagueMembership(stableViewer.userId, leagueId);
+    grantLeagueMembership(droppedViewer.userId, leagueId);
+
+    // `reconnect: false` — this test drives the connect/disconnect cycle
+    // itself rather than relying on the client's own backoff timer, per the
+    // ticket's Technical Approach.
+    const stableClient = client({ token: stableViewer.token, leagueId });
+    const droppedClient = client({
+      token: droppedViewer.token,
+      leagueId,
+      reconnect: false,
+    });
+    await Promise.all([
+      waitForEvent(stableClient, 'connected'),
+      waitForEvent(droppedClient, 'connected'),
+    ]);
+
+    // Drop the connection mid-draft (clean client-initiated close is
+    // sufficient here — LocalWsBridge's `$disconnect` path removes the
+    // DynamoDB row exactly as a genuine network drop would once the socket
+    // closes; see the harness docblock).
+    const droppedDisconnected = waitForEvent(droppedClient, 'disconnected');
+    droppedClient.disconnect();
+    await droppedDisconnected;
+
+    // A pick sent while the client is offline cannot reach it over the dead
+    // socket — but it must not disrupt delivery to the still-connected
+    // client, and must not throw out of the broadcast call. (The guarantee
+    // that the dropped client itself doesn't end up "permanently" missing
+    // this pick is the hook-layer reconnect-refetch's job — see the
+    // docblock above — not this transport-layer spec's.)
+    const stableReceivedFirst = waitForEvent<{ overallPick: number }>(
+      stableClient,
+      'draft-pick-made',
+    );
+    await expect(
+      notificationService().notifyDraftPickMade(
+        leagueId,
+        6,
+        10,
+        stableViewer.userId,
+        5151,
+        1,
+        3,
+        3,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(stableReceivedFirst).resolves.toMatchObject({
+      overallPick: 3,
+    });
+
+    // Reconnect with the same league context and re-assert delivery.
+    const droppedReconnected = waitForEvent(droppedClient, 'connected');
+    droppedClient.connect();
+    await droppedReconnected;
+
+    const droppedReceivedAfterReconnect = waitForEvent<{
+      overallPick: number;
+    }>(droppedClient, 'draft-pick-made');
+    await notificationService().notifyDraftPickMade(
+      leagueId,
+      6,
+      11,
+      stableViewer.userId,
+      5252,
+      1,
+      4,
+      4,
+    );
+
+    await expect(droppedReceivedAfterReconnect).resolves.toMatchObject({
+      overallPick: 4,
+    });
+  });
+
+  // ── LS-8865 AC2: chained auto-pick burst ──
+
+  it('delivers every pick in a burst of chained auto-picks exactly once', async () => {
+    const leagueId = 600;
+    const commissioner = registerUser('karl');
+    const viewer = registerUser('maria');
+    grantLeagueMembership(commissioner.userId, leagueId);
+    grantLeagueMembership(viewer.userId, leagueId);
+
+    const viewerClient = client({ token: viewer.token, leagueId });
+    await waitForEvent(viewerClient, 'connected');
+
+    const BURST_SIZE = 6;
+    const received: number[] = [];
+    const allReceived = new Promise<void>((resolve) => {
+      viewerClient.on('draft-pick-made', (n) => {
+        received.push((n as { overallPick: number }).overallPick);
+        if (received.length === BURST_SIZE) resolve();
+      });
+    });
+
+    // Fire a chain of auto-picks back-to-back without waiting between them —
+    // the shape of a real chained-auto-pick burst (a run of teams that are
+    // all on auto-pick, each pick immediately triggering the next).
+    const sends = Array.from({ length: BURST_SIZE }, (_, i) =>
+      notificationService().notifyDraftPickMade(
+        leagueId,
+        7,
+        20 + i,
+        commissioner.userId,
+        6000 + i,
+        1,
+        i + 1,
+        i + 1,
+        undefined,
+        { wasAutoPick: true },
+      ),
+    );
+    await Promise.all(sends);
+
+    await Promise.race([
+      allReceived,
+      sleep(2000).then(() => {
+        throw new Error(
+          `Timed out waiting for all ${BURST_SIZE} burst picks; received ${received.length}`,
+        );
+      }),
+    ]);
+
+    // Every pick observed exactly once, per AC2's "every pick is delivered"
+    // outcome — the fan-out/transport layer does not dedupe or drop.
+    expect(received).toHaveLength(BURST_SIZE);
+    expect(new Set(received).size).toBe(BURST_SIZE);
+    expect(received.sort((a, b) => a - b)).toEqual(
+      Array.from({ length: BURST_SIZE }, (_, i) => i + 1),
+    );
+  });
 });
