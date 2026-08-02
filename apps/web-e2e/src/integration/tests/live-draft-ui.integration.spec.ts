@@ -392,6 +392,44 @@ test.describe
       // Anchor for per-pick elapsed-time logs (LS-3851 timing instrumentation).
       const draftStart = Date.now();
 
+      // LS-8884: every other assertion in this suite detects a pick via the
+      // 5 s Apollo HTTP poll, so a total outage of the deployed WebSocket
+      // stack would never fail CI. Listen for raw WS frames on every client
+      // now, before any picks are made, so the first pick can be verified as
+      // WS-delivered independently of that poll (see wsPickVerified below).
+      const wsFrames: { label: string; type: string; receivedAt: number }[] =
+        [];
+      for (const { label, page } of pages) {
+        page.on('websocket', (ws) => {
+          ws.on('framereceived', (frame) => {
+            try {
+              const payload = JSON.parse(String(frame.payload)) as {
+                type?: string;
+              };
+              if (payload?.type) {
+                wsFrames.push({
+                  label,
+                  type: payload.type,
+                  receivedAt: Date.now(),
+                });
+              }
+            } catch {
+              // Non-JSON frame (e.g. a heartbeat/pong) — not a notification.
+            }
+          });
+        });
+      }
+      let wsPickConfirmed = false;
+      let wsPickAttempts = 0;
+      // Cap retries rather than gating strictly on pick #1: the WS connection
+      // can still be establishing during the earliest picks (see the
+      // "WebSocket startup lag" note on the nudge-threshold comment below,
+      // LS-4305), so a single missed frame on the very first pick would be a
+      // false failure, not a real outage signal. 3 attempts across the first
+      // few picks keeps that startup window from causing flakes while still
+      // hard-failing if the deployed WS stack never delivers anything.
+      const MAX_WS_PICK_ATTEMPTS = 3;
+
       while (pickCount < maxPicks) {
         // Check if draft is complete on any page.
         // Use a short waitFor (500 ms, parallel) instead of instant isVisible so
@@ -550,6 +588,52 @@ test.describe
               LOGGER.info(
                 `[live-draft] Pick #${pickCount} by ${label} accepted in ${Date.now() - pickStart}ms — ${ariaLabel}`,
               );
+
+              // LS-8884 WS canary: assert that a DRAFT_PICK_MADE frame was
+              // delivered over the raw WebSocket to a DIFFERENT browser
+              // context than the picker's — proving the deployed WS stack
+              // actually fanned the update out — within the 5 s Apollo poll
+              // interval that every other assertion here relies on. If the
+              // WS stack is fully down, this is the only thing in the suite
+              // that fails; wasAccepted above would still pass via HTTP
+              // polling and mask the outage.
+              if (!wsPickConfirmed && wsPickAttempts < MAX_WS_PICK_ATTEMPTS) {
+                wsPickAttempts++;
+                const isLastAttempt = wsPickAttempts === MAX_WS_PICK_ATTEMPTS;
+                try {
+                  await expect
+                    .poll(
+                      () =>
+                        wsFrames.some(
+                          (f) =>
+                            f.type === 'DRAFT_PICK_MADE' &&
+                            f.label !== label &&
+                            f.receivedAt >= pickStart,
+                        ),
+                      {
+                        timeout: 5_000,
+                        message:
+                          `No DRAFT_PICK_MADE WebSocket frame observed on ` +
+                          `any other client within 5s of pick attempt ` +
+                          `${wsPickAttempts}/${MAX_WS_PICK_ATTEMPTS} ` +
+                          `(picked by ${label}) — the deployed WebSocket ` +
+                          `stack may be down. HTTP polling would mask this ` +
+                          `outage (LS-8884).`,
+                      },
+                    )
+                    .toBe(true);
+                  wsPickConfirmed = true;
+                } catch (e) {
+                  if (isLastAttempt) throw e;
+                  LOGGER.info(
+                    `[live-draft] LS-8884 WS canary: no DRAFT_PICK_MADE ` +
+                      `frame observed for pick attempt ` +
+                      `${wsPickAttempts}/${MAX_WS_PICK_ATTEMPTS} (picked ` +
+                      `by ${label}) — retrying on a later pick before ` +
+                      `failing (WS connection may still be establishing).`,
+                  );
+                }
+              }
               // Record player name for post-draft roster assertions.
               // ariaLabel format: "Draft Bill Lange now"
               const playerName = ariaLabel
