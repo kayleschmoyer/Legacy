@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import {
   Button,
   Card,
@@ -47,9 +48,19 @@ function LeagueCommissionerTools({
     data: leagueData,
     loading,
     error,
+    refetch: refetchLeague,
   } = useGetLeagueByIdQuery({
     variables: { id: leagueId },
   });
+
+  // Commissioner actions taken on another platform (e.g. web) don't push to
+  // this client, so re-pull league state whenever this screen regains focus
+  // rather than relying on a stale cache (LS-6857).
+  useFocusEffect(
+    useCallback(() => {
+      void refetchLeague();
+    }, [refetchLeague]),
+  );
 
   const league = leagueData?.league;
   const isCommissioner = useMemo(() => {
@@ -180,6 +191,15 @@ export const LeagueManagement: React.FC = () => {
   // No in-content back affordance is rendered any more (LS-8766), so system
   // back has to unwind the league selection before it pops the screen.
   useSystemBackAction(selectedLeague != null, clearSelectedLeague);
+
+  // Commissioner actions on another platform (e.g. deleting a league on web)
+  // don't push to this client, so re-pull the league list whenever this
+  // screen regains focus rather than relying on a stale cache (LS-6857).
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   if (selectedLeague != null) {
     return (
