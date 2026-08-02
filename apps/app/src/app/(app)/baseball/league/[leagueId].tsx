@@ -12,6 +12,8 @@ import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
+  isDraftPaused,
+  isDraftRoomReachable,
   LeagueDetailShell,
   type LeagueRole,
   type LeagueTabDef,
@@ -447,8 +449,8 @@ export default function LeagueId(): React.JSX.Element {
   }, [standings, userTeamId]);
 
   const draftStatus = league?.draftStatus ?? 'pre-draft';
-  const isDrafting =
-    draftStatus === 'in-progress' || draftStatus === 'drafting';
+  const isDrafting = isDraftRoomReachable(draftStatus);
+  const isPausedDraft = isDraftPaused(draftStatus);
   const startersCount =
     teamMembersData?.teamMembers?.filter((m) => m?.positionId != null).length ??
     0;
@@ -542,6 +544,7 @@ export default function LeagueId(): React.JSX.Element {
               leagueId={numLeagueId}
               isCommissioner={isCommissioner}
               isDrafting={isDrafting}
+              isPaused={isPausedDraft}
               rankedStandings={rankedStandings}
               startersCount={startersCount}
               inviteCode={inviteCode}

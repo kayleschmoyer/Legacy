@@ -132,3 +132,38 @@ export function getDraftNextActionCopy(status?: string | null): string {
       return 'Keep the league vibrant with quick updates and timely reminders.';
   }
 }
+
+// ── Draft Room Reachability ─────────────────────────────────────────────────
+
+/**
+ * League `draftStatus` values for which the draft room is live and
+ * reachable — gates the "Join Draft" / "Return to Draft Room" banner on the
+ * native and web league Overview screens (LS-8843). `'drafting'` is included
+ * alongside `'in-progress'` to match the pre-existing call-site behavior.
+ */
+export const DRAFT_ROOM_REACHABLE_STATUSES = [
+  'in-progress',
+  'drafting',
+  'paused',
+] as const;
+
+/**
+ * Single shared definition of "the draft room is reachable" — replaces three
+ * copies of the same inline status comparison across the native baseball and
+ * football league pages and the web league-detail v2 Overview tab (LS-8843).
+ */
+export function isDraftRoomReachable(status?: string | null): boolean {
+  return (
+    !!status &&
+    (DRAFT_ROOM_REACHABLE_STATUSES as readonly string[]).includes(status)
+  );
+}
+
+/**
+ * True when the draft room is reachable but currently paused — used to vary
+ * the join-banner copy and action label between "live" and "paused" phrasing
+ * (LS-8843).
+ */
+export function isDraftPaused(status?: string | null): boolean {
+  return status === 'paused';
+}

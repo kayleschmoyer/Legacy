@@ -119,6 +119,22 @@ describe('LeagueOverviewTab', () => {
     expect(onJoinDraft).toHaveBeenCalledTimes(1);
   });
 
+  it('renders a "Draft Paused" banner with a re-entry action when isPaused is true (LS-8843)', () => {
+    const onJoinDraft = jest.fn();
+    render(
+      <LeagueOverviewTab
+        {...BASE_PROPS}
+        isDrafting
+        isPaused
+        onJoinDraft={onJoinDraft}
+      />,
+    );
+    expect(screen.getByText('Draft Paused')).toBeTruthy();
+    expect(screen.queryByText('Draft Is Live')).toBeNull();
+    fireEvent.press(screen.getByText('Return to Draft Room'));
+    expect(onJoinDraft).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the commissioner announcement banner when lmNotes is set', () => {
     render(
       <LeagueOverviewTab

@@ -40,6 +40,9 @@ interface LeagueOverviewTabProps {
   leagueId: number;
   isCommissioner: boolean;
   isDrafting: boolean;
+  /** True when the reachable draft room is currently paused rather than
+   *  actively live — swaps the join-banner copy and action label (LS-8843). */
+  isPaused?: boolean;
   rankedStandings: RankedStanding[];
   startersCount: number;
   inviteCode: string;
@@ -156,6 +159,7 @@ export function LeagueOverviewTab({
   leagueId,
   isCommissioner,
   isDrafting,
+  isPaused = false,
   rankedStandings,
   startersCount,
   inviteCode,
@@ -192,20 +196,24 @@ export function LeagueOverviewTab({
   return (
     <ScrollView refreshControl={refreshControl}>
       <YStack padding="$3" gap="$5">
-        {/* Draft Live Banner */}
+        {/* Draft Live / Paused Banner */}
         {isDrafting ? (
           <OverviewBanner
-            kind="live"
-            title="Draft Is Live"
-            sub="Join the draft room to make your picks."
+            kind={isPaused ? 'gold' : 'live'}
+            title={isPaused ? 'Draft Paused' : 'Draft Is Live'}
+            sub={
+              isPaused
+                ? 'The draft is paused. Return to the draft room when you’re ready to resume.'
+                : 'Join the draft room to make your picks.'
+            }
             actions={
               <Button
                 size="$3"
-                backgroundColor={BRAND_SEAM_RED}
+                backgroundColor={isPaused ? BRAND_GOLD : BRAND_SEAM_RED}
                 color="white"
                 onPress={onJoinDraft}
               >
-                Join Draft
+                {isPaused ? 'Return to Draft Room' : 'Join Draft'}
               </Button>
             }
           />

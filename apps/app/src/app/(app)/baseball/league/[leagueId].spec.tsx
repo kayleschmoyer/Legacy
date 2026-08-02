@@ -169,6 +169,9 @@ jest.mock('@legacy-sports/shared-components', () => {
     </View>
   );
   return {
+    isDraftPaused: (status: string | null | undefined) => status === 'paused',
+    isDraftRoomReachable: (status: string | null | undefined) =>
+      status === 'in-progress' || status === 'drafting' || status === 'paused',
     LeagueDetailShell,
     CommissionerAuditLog: () => <View testID="commissioner-audit-log" />,
     CommissionerNoteControl: () => <View testID="commissioner-note-control" />,
@@ -606,6 +609,44 @@ describe('BaseballLeagueId', () => {
       });
       expect(lastLifecycleProps()?.token).toBeUndefined();
     });
+  });
+
+  describe('paused draft banner (LS-8843)', () => {
+    it('shows a "Draft Paused" banner with a "Return to Draft Room" action when draftStatus is paused', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, draftStatus: 'paused' } },
+        loading: false,
+      });
+      render(<BaseballLeagueId />);
+      expect(screen.getByText('Draft Paused')).toBeTruthy();
+      expect(screen.queryByText('Draft Is Live')).toBeNull();
+      expect(screen.getByText('Return to Draft Room')).toBeTruthy();
+    });
+
+    it('navigates to the draft board when the paused-draft re-entry action is pressed', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, draftStatus: 'paused' } },
+        loading: false,
+      });
+      render(<BaseballLeagueId />);
+      fireEvent.press(screen.getByText('Return to Draft Room'));
+      expect(mockNavigate).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/DraftBoardPage' }),
+      );
+    });
+
+    it.each(['not-started', 'queued', 'completed'])(
+      'does not render a draft banner when draftStatus is %s',
+      (draftStatus) => {
+        mockGetLeagueByIdQuery.mockReturnValue({
+          data: { league: { ...mockLeague, draftStatus } },
+          loading: false,
+        });
+        render(<BaseballLeagueId />);
+        expect(screen.queryByText('Draft Paused')).toBeNull();
+        expect(screen.queryByText('Draft Is Live')).toBeNull();
+      },
+    );
   });
 
   describe('waivers tab', () => {

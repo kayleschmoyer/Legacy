@@ -291,6 +291,105 @@ describe('OverviewTab — Join Draft Room (LS-4916)', () => {
   });
 });
 
+describe('OverviewTab — paused draft banner (LS-8843)', () => {
+  const pausedLeague = {
+    __typename: 'League',
+    id: 3924,
+    sport: Sport.Baseball,
+    draftStatus: 'paused',
+    maxRosterSize: 25,
+    gamesPerMatchup: 7,
+    inviteCode: 'ABC123',
+    lmNotes: null,
+    currentWeekNumber: null,
+    currentMatchup: null,
+  } as unknown as LeagueFragment;
+
+  it('shows a "Draft Paused" banner with a "Return to Draft Room" action for a paused draft', () => {
+    render(
+      <OverviewTab
+        league={pausedLeague}
+        teams={[]}
+        myTeamId={1}
+        isCommissioner={false}
+        isMember={true}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(screen.getByText('Draft Paused')).toBeInTheDocument();
+    expect(screen.queryByText('Draft Is Live')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /return to draft room/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('calls onJoinDraft when the paused-draft re-entry action is clicked', () => {
+    const onJoinDraft = jest.fn();
+    render(
+      <OverviewTab
+        league={pausedLeague}
+        teams={[]}
+        myTeamId={1}
+        isCommissioner={false}
+        isMember={true}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={onJoinDraft}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: /return to draft room/i }),
+    );
+    expect(onJoinDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the re-entry banner for non-members even when the draft is paused', () => {
+    render(
+      <OverviewTab
+        league={pausedLeague}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={false}
+        isMember={false}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(screen.queryByText('Draft Paused')).not.toBeInTheDocument();
+  });
+
+  it.each(['not-started', 'queued', 'completed'])(
+    'does not render any draft banner when draftStatus is %s',
+    (draftStatus) => {
+      render(
+        <OverviewTab
+          league={{ ...pausedLeague, draftStatus }}
+          teams={[]}
+          myTeamId={1}
+          isCommissioner={false}
+          isMember={true}
+          onTab={jest.fn()}
+          onTeam={jest.fn()}
+          onJoinDraft={jest.fn()}
+          currentUserId={1}
+          myRoster={[]}
+        />,
+      );
+      expect(screen.queryByText('Draft Paused')).not.toBeInTheDocument();
+      expect(screen.queryByText('Draft Is Live')).not.toBeInTheDocument();
+    },
+  );
+});
+
 describe('Snapshot', () => {
   it('renders football-specific labels when isFootball is true', () => {
     render(<Snapshot {...snapshotBase} isFootball={true} />);

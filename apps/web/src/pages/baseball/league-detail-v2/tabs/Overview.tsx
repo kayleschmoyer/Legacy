@@ -2,6 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { LeagueScoringSummary } from '@legacy-sports/shared-components/leagues';
 import {
+  isDraftPaused,
+  isDraftRoomReachable,
+} from '@legacy-sports/shared-components/utils';
+import {
   type LeagueFragment,
   Sport,
   type TeamFragment,
@@ -478,8 +482,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   }, [standingsData, teams, myTeamId]);
 
   const draftStatus = league.draftStatus ?? 'pre-draft';
-  const isDrafting =
-    draftStatus === 'in-progress' || draftStatus === 'drafting';
+  const isDrafting = isDraftRoomReachable(draftStatus);
+  const isPausedDraft = isDraftPaused(draftStatus);
 
   const isFootball = league.sport === Sport.Football;
   const startersCount = myRoster.filter((p) => p.positionId != null).length;
@@ -498,18 +502,25 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {isDrafting && isMember ? (
         <Banner
-          kind="live"
+          kind={isPausedDraft ? 'warning' : 'live'}
           icon={<I.Zap size={20} />}
-          title="Draft Is Live"
-          sub="Join the draft room to make your picks."
+          title={isPausedDraft ? 'Draft Paused' : 'Draft Is Live'}
+          sub={
+            isPausedDraft
+              ? 'The draft is paused. Return to the draft room when you’re ready to resume.'
+              : 'Join the draft room to make your picks.'
+          }
           actions={
             <button
               className="ls-btn ls-btn-seam sm"
               type="button"
-              aria-label="Join draft room"
+              aria-label={
+                isPausedDraft ? 'Return to draft room' : 'Join draft room'
+              }
               onClick={onJoinDraft}
             >
-              <I.PlayCircle size={12} /> Join Draft Room
+              <I.PlayCircle size={12} />{' '}
+              {isPausedDraft ? 'Return to Draft Room' : 'Join Draft Room'}
             </button>
           }
         />
