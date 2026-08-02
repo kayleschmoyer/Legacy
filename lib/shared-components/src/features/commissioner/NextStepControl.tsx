@@ -200,9 +200,13 @@ export function NextStepControl({
         ? 'advance'
         : 'selectGame';
 
-  // Disable draft if already in progress (queued or in-progress) or completed
+  // Disable draft if already in progress (queued, in-progress, or paused) or completed.
+  // 'paused' only applies to live drafts (see pauseDraft) — initializeDraft only accepts
+  // 'not-started', so re-initializing a paused draft throws (LS-8840).
   const isDraftInProgress =
-    draftStatus === 'queued' || draftStatus === 'in-progress';
+    draftStatus === 'queued' ||
+    draftStatus === 'in-progress' ||
+    draftStatus === 'paused';
   const isDraftCompleted = draftStatus === 'completed';
 
   // Disable game selection if already in progress (queued or loading)
@@ -553,16 +557,23 @@ export function NextStepControl({
             <XStack
               alignItems="center"
               gap="$2"
-              backgroundColor="$green3"
-              borderColor="$green8"
+              backgroundColor={
+                draftStatus === 'paused' ? '$yellow3' : '$green3'
+              }
+              borderColor={draftStatus === 'paused' ? '$yellow8' : '$green8'}
               borderWidth={1}
               borderRadius="$3"
               paddingHorizontal="$3"
               paddingVertical="$2"
             >
-              <Text color="$green11" fontWeight="600" fontSize="$3">
-                Live draft is active! Click the button above to join the draft
-                board.
+              <Text
+                color={draftStatus === 'paused' ? '$yellow11' : '$green11'}
+                fontWeight="600"
+                fontSize="$3"
+              >
+                {draftStatus === 'paused'
+                  ? 'Live draft is paused. Click the button above to return to the draft board and resume.'
+                  : 'Live draft is active! Click the button above to join the draft board.'}
               </Text>
             </XStack>
           )}

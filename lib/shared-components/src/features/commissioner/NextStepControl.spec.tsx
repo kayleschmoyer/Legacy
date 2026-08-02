@@ -124,3 +124,25 @@ describe('NextStepControl — Start Draft dialog message (LS-7972)', () => {
     expect(screen.queryByText(/random draft/i)).not.toBeInTheDocument();
   });
 });
+
+describe('NextStepControl — paused draft guard (LS-8840)', () => {
+  it('routes to the draft board instead of re-initializing a paused live draft', () => {
+    mockDraftMode = 'live';
+    render(<NextStepControl {...defaultProps} draftStatus="paused" />);
+
+    // initializeDraft's "Start Draft" button must not be offered while paused —
+    // the server rejects initializeDraft unless draftStatus is 'not-started'.
+    expect(screen.queryByTestId('start-draft-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('go-to-draft-board')).toBeInTheDocument();
+    expect(screen.getByText(/paused/i)).toBeInTheDocument();
+  });
+
+  it('does not throw when the Start Draft button is clicked for a non-live paused draft state', () => {
+    mockDraftMode = 'automated';
+    render(<NextStepControl {...defaultProps} draftStatus="paused" />);
+
+    // Automated drafts never reach 'paused' server-side, but the button must
+    // still be disabled defensively rather than calling initializeDraft.
+    expect(screen.getByTestId('start-draft-button')).toBeDisabled();
+  });
+});
