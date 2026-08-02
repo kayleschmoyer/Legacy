@@ -4,117 +4,15 @@
 
 # Note: aws_region data source is defined in main.tf
 
-# Security Group for VPC Endpoints
-resource "aws_security_group" "vpc_endpoints" {
-  name_prefix = "${local.name_prefix}-vpc-endpoints-"
-  vpc_id      = aws_vpc.main.id
-  description = "Security group for VPC endpoints"
-
-  # Allow HTTPS traffic from Lambda subnets
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "HTTPS from VPC"
-  }
-
-  # Allow all outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "All outbound traffic"
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${local.name_prefix}-vpc-endpoints-sg"
-  })
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Secrets Manager VPC Endpoint
-# Required for Lambda functions to access database credentials
-resource "aws_vpc_endpoint" "secretsmanager" {
-  vpc_id             = aws_vpc.main.id
-  service_name       = "com.amazonaws.${data.aws_region.current.id}.secretsmanager"
-  vpc_endpoint_type  = "Interface"
-  subnet_ids         = aws_subnet.private_lambda[*].id
-  security_group_ids = [aws_security_group.vpc_endpoints.id]
-
-  private_dns_enabled = true
-
-  # Endpoint policy: scoped to this account's project-namespace secrets.
-  # private_dns_enabled routes ALL Secrets Manager API calls through this
-  # endpoint, including from self-hosted runners in public subnets.
-  #
-  # Resource scoping (not action filtering) is the meaningful control here:
-  # it prevents the endpoint from being used to reach secrets in other accounts
-  # or outside this project's namespace. IAM role policies enforce which
-  # actions each principal can actually perform.
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "AllowProjectNamespace"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "secretsmanager:*"
-        Resource = [
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/*",
-        ]
-      }
-    ]
-  })
-
-  tags = merge(local.common_tags, {
-    Name    = "${local.name_prefix}-secretsmanager-endpoint"
-    Service = "secretsmanager"
-  })
-}
-
-# CloudWatch Logs VPC Endpoint (optional but helpful for Lambda logging)
-resource "aws_vpc_endpoint" "logs" {
-  vpc_id             = aws_vpc.main.id
-  service_name       = "com.amazonaws.${data.aws_region.current.id}.logs"
-  vpc_endpoint_type  = "Interface"
-  subnet_ids         = aws_subnet.private_lambda[*].id
-  security_group_ids = [aws_security_group.vpc_endpoints.id]
-
-  private_dns_enabled = true
-
-  # Endpoint policy: scoped to this account's log groups.
-  # private_dns_enabled routes ALL CW Logs API calls through this endpoint,
-  # including from self-hosted runners in public subnets.
-  #
-  # Resource scoping (not action filtering) is the meaningful control here:
-  # it prevents the endpoint from being used to reach log groups in other
-  # accounts. IAM role policies enforce which actions each principal can
-  # actually perform, so maintaining an action allowlist here only causes
-  # repeated CI failures as new Terraform resources require new CW Logs APIs.
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "AllowAccountLogGroups"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "logs:*"
-        Resource  = "arn:aws:logs:*:${local.account_id}:*"
-      }
-    ]
-  })
-
-  tags = merge(local.common_tags, {
-    Name    = "${local.name_prefix}-logs-endpoint"
-    Service = "logs"
-  })
-}
+# Secrets Manager and CloudWatch Logs interface endpoints (and the security
+# group that existed solely to attach to them) were removed in
+# LS-8906 (cost-optimization epic LS-8893): at ~$29/month + per-GB data
+# processing for 4 ENIs across 2 AZs, they were the largest fixed non-runner
+# cost line item in the 2026-08 CI/infra audit, and are substantially
+# redundant given the t3.nano NAT instance (nat-instance.tf) already provides
+# HTTPS egress for the private subnets. Traffic to both services now routes
+# through the NAT instance instead of a dedicated endpoint path — see the
+# PR description for the resulting single-point-of-failure tradeoff.
 
 # S3 Gateway VPC Endpoint (required for Lambda deployment artifacts)
 resource "aws_vpc_endpoint" "s3" {
@@ -135,22 +33,20 @@ resource "aws_vpc_endpoint" "s3" {
 # Option 1: Use a lightweight NAT instance (cost ~$3-8/month vs $45/month NAT Gateway)
 # Option 2: Use AWS PrivateLink + VPC Endpoint for specific Google services (complex)
 # Option 3: Use AWS Lambda Layer + proxy pattern (development overhead)
-# 
+#
 # RECOMMENDED: Add a minimal NAT instance for Google API access only
 # This provides the best balance of cost, security, and simplicity
 
-# Output VPC Endpoint information
+# Output VPC Endpoint information. Kept as a stable contract even though the
+# secretsmanager/logs interface endpoints and their security group are gone
+# (LS-8906) — an empty/removed output would itself be a breaking change for
+# any consumer that reads it, so it now reflects only what still exists.
 output "vpc_endpoints" {
   description = "VPC Endpoint information"
   value = {
-    secretsmanager = {
-      id  = aws_vpc_endpoint.secretsmanager.id
-      dns = aws_vpc_endpoint.secretsmanager.dns_entry
+    s3 = {
+      id = aws_vpc_endpoint.s3.id
     }
-    logs = {
-      id  = aws_vpc_endpoint.logs.id
-      dns = aws_vpc_endpoint.logs.dns_entry
-    }
-    security_group_id = aws_security_group.vpc_endpoints.id
   }
 }
+

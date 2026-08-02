@@ -554,11 +554,11 @@ resource "aws_cloudwatch_log_group" "runner_cloud_init" {
   tags = local.common_tags
 
   # Note: cross-state depends_on against main/'s aws_vpc_endpoint.logs was removed
-  # as part of LS-2425 state separation. The endpoint is needed for the runtime
-  # CloudWatch agent to ship logs through the VPC endpoint, not for terraform to
-  # create the log group itself (which uses public CloudWatch Logs APIs). The
-  # endpoint is provisioned by make terraform-apply against terraform/main/ and
-  # exists long before make runner-apply runs.
+  # as part of LS-2425 state separation, and the endpoint itself was removed in
+  # LS-8906 (cost optimization). The runtime CloudWatch agent now ships logs
+  # through the NAT instance (terraform/main/nat-instance.tf) instead of a
+  # dedicated VPC endpoint; this has no bearing on terraform creating the log
+  # group itself, which uses the public CloudWatch Logs API.
 }
 
 resource "aws_cloudwatch_log_group" "runner_syslog" {

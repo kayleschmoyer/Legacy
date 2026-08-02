@@ -208,8 +208,7 @@ resource "aws_cloudwatch_log_group" "oauth_proxy_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-oauth-proxy"
   retention_in_days = local.log_retention_days[var.environment]
 
-  tags       = local.common_tags
-  depends_on = [aws_vpc_endpoint.logs]
+  tags = local.common_tags
 }
 
 # Data source to get the current OAuth Proxy Lambda version from SSM

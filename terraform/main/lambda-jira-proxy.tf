@@ -64,8 +64,7 @@ resource "aws_cloudwatch_log_group" "jira_proxy_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-jira-proxy"
   retention_in_days = local.log_retention_days[var.environment]
 
-  tags       = local.common_tags
-  depends_on = [aws_vpc_endpoint.logs]
+  tags = local.common_tags
 }
 
 # Data source to get the current Jira Proxy Lambda version from SSM
