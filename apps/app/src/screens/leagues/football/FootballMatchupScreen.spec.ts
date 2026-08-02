@@ -4,6 +4,19 @@ import {
   getPositionOrder,
 } from './FootballMatchupScreen';
 
+jest.mock('@legacy-sports/shared-components', () => ({
+  useWebSocket: jest.fn(() => ({ connected: false })),
+}));
+
+jest.mock('@legacy-sports/app-config/native', () => ({
+  config: { websocketUrl: undefined },
+}));
+
+jest.mock('../../../common/auth/AuthHooks', () => ({
+  readKeychainValue: jest.fn().mockResolvedValue(undefined),
+  Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
+}));
+
 describe('getPositionOrder', () => {
   it('returns DST position order when defensiveFormat is dst', () => {
     const order = getPositionOrder('dst');

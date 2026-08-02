@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import * as graphqlLib from '@legacy-sports/graphql';
+import * as sharedComponentsLib from '@legacy-sports/shared-components';
 import { FootballMatchupScreen } from './FootballMatchupScreen';
 
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
@@ -76,6 +77,19 @@ jest.mock('@legacy-sports/graphql', () => ({
     loading: false,
     refetch: mockRefetchPlayers,
   })),
+}));
+
+jest.mock('@legacy-sports/shared-components', () => ({
+  useWebSocket: jest.fn(() => ({ connected: false })),
+}));
+
+jest.mock('@legacy-sports/app-config/native', () => ({
+  config: { websocketUrl: 'wss://example.test' },
+}));
+
+jest.mock('../../../common/auth/AuthHooks', () => ({
+  readKeychainValue: jest.fn().mockResolvedValue('mock-token'),
+  Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
 }));
 
 jest.mock('tamagui', () => {
@@ -240,5 +254,43 @@ describe('FootballMatchupScreen', () => {
     render(<FootballMatchupScreen matchupId={1} />);
 
     expect(screen.getByTestId('score-refreshing-spinner')).toBeTruthy();
+  });
+
+  it('subscribes to matchup stats updates for this matchup', () => {
+    render(<FootballMatchupScreen matchupId={1} />);
+    expect(sharedComponentsLib.useWebSocket).toHaveBeenCalledWith(
+      expect.objectContaining({
+        matchupId: 1,
+        viewContext: 'matchup',
+      }),
+    );
+  });
+
+  it('refetches matchup and player data when a matchup-stats-complete notification arrives', () => {
+    const matchupRefetch = jest.fn();
+    const playersRefetch = jest.fn();
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: mockMatchup },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: matchupRefetch,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+    jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
+      data: { getMatchupPlayers: [mockMatchupPlayer] },
+      loading: false,
+      refetch: playersRefetch,
+    } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    const wsOptions = jest.mocked(sharedComponentsLib.useWebSocket).mock
+      .calls[0][0];
+    wsOptions?.onMatchupStatsComplete?.(
+      {} as Parameters<NonNullable<typeof wsOptions.onMatchupStatsComplete>>[0],
+    );
+
+    expect(matchupRefetch).toHaveBeenCalled();
+    expect(playersRefetch).toHaveBeenCalled();
   });
 });

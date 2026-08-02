@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { AppState } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AppState, RefreshControl } from 'react-native';
 import { NetworkStatus } from '@apollo/client';
 import {
   Card,
@@ -10,7 +10,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { config } from '@legacy-sports/app-config/native';
 import { LOGGER } from '@legacy-sports/logging';
+import { useWebSocket } from '@legacy-sports/shared-components';
 import {
   type GetMatchupByIdQuery,
   type GetMatchupPlayersQuery,
@@ -18,6 +20,7 @@ import {
   useGetMatchupByIdQuery,
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
+import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 
 type Matchup = NonNullable<GetMatchupByIdQuery['getMatchupById']>;
 type MatchupPlayer = NonNullable<
@@ -336,6 +339,46 @@ export function FootballMatchupScreen(
 
   const isRefreshingScore = matchupNetworkStatus === NetworkStatus.refetch;
 
+  const [wsToken, setWsToken] = useState<string | undefined>();
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const token = await readKeychainValue(Secret.INTERNAL_JWT);
+        if (active && token) setWsToken(token);
+      } catch (err) {
+        LOGGER.error(
+          'FootballMatchupScreen: failed to read keychain token',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const wsUrl = config.websocketUrl;
+  useWebSocket({
+    url: wsUrl,
+    token: wsToken,
+    matchupId,
+    viewContext: 'matchup',
+    autoConnect: !!wsUrl && !!wsToken,
+    onMatchupStatsComplete: () => {
+      void refetchMatchup();
+      void refetchPlayers();
+    },
+  });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => {
+    setRefreshing(true);
+    void Promise.all([refetchMatchup(), refetchPlayers()]).finally(() =>
+      setRefreshing(false),
+    );
+  };
+
   const matchup = matchupData?.getMatchupById;
   const players = playersData?.getMatchupPlayers ?? [];
   const positionOrder = useMemo(
@@ -387,7 +430,12 @@ export function FootballMatchupScreen(
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <YStack gap="$3" paddingBottom="$8">
         <ScoreHeader matchup={matchup} isRefreshing={isRefreshingScore} />
 
