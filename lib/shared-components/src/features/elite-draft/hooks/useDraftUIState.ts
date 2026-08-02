@@ -9,6 +9,8 @@ export interface AnnouncementData {
   roundPickNumber: number;
   isMyPick: boolean;
   isAuto: boolean;
+  /** Team that made the announced pick. */
+  teamName: string;
 }
 
 export interface ToastMessage {
@@ -61,6 +63,7 @@ export function useDraftUIState() {
       roundPickNumber: number,
       myPick: boolean,
       auto: boolean,
+      teamName: string,
     ) => {
       if (announcementTimerRef.current)
         clearTimeout(announcementTimerRef.current);
@@ -72,10 +75,15 @@ export function useDraftUIState() {
         roundPickNumber,
         isMyPick: myPick,
         isAuto: auto,
+        teamName,
       });
       announcementTimerRef.current = setTimeout(() => {
         setAnnouncementLeaving(true);
-        setTimeout(() => {
+        // Chained onto the same ref (rather than a bare, untracked setTimeout)
+        // so a pick that lands mid-fade-out can still clear this stage — else
+        // it fires 400ms later and wipes out the newer announcement it raced
+        // with (LS-8845).
+        announcementTimerRef.current = setTimeout(() => {
           setAnnouncement(null);
           setAnnouncementLeaving(false);
         }, 400);
@@ -88,7 +96,7 @@ export function useDraftUIState() {
     if (announcementTimerRef.current)
       clearTimeout(announcementTimerRef.current);
     setAnnouncementLeaving(true);
-    setTimeout(() => {
+    announcementTimerRef.current = setTimeout(() => {
       setAnnouncement(null);
       setAnnouncementLeaving(false);
     }, 400);

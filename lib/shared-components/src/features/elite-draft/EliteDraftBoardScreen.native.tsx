@@ -1206,7 +1206,6 @@ export function EliteDraftBoardScreen({
       {/* ---- Pick announcement + confetti ---- */}
       <DraftPickAnnouncement
         announcement={ui.announcement}
-        teamName={queries.teamNameById(queries.currentPickTeamId)}
         celebrate
         onDismiss={ui.dismissAnnouncement}
       />

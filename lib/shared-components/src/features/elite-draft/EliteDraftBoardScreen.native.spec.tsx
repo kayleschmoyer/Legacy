@@ -618,6 +618,7 @@ describe('EliteDraftBoardScreen (native) — pick announcement', () => {
           roundPickNumber: 7,
           isMyPick: true,
           isAuto: false,
+          teamName: 'Dinger Dynasty',
         },
       },
     });
@@ -638,6 +639,7 @@ describe('EliteDraftBoardScreen (native) — pick announcement', () => {
           roundPickNumber: 4,
           isMyPick: false,
           isAuto: false,
+          teamName: 'Bronx Bombers',
         },
       },
     });
@@ -657,6 +659,7 @@ describe('EliteDraftBoardScreen (native) — pick announcement', () => {
           roundPickNumber: 4,
           isMyPick: false,
           isAuto: true,
+          teamName: 'Bronx Bombers',
         },
       },
     });

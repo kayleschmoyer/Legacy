@@ -237,6 +237,55 @@ describe('useDraftWebSocket — paused draft resets stale completion state (LS-8
   });
 });
 
+// ── Pick announcements for players outside the local lookup (LS-8845) ──────
+
+describe('useDraftWebSocket — pick announcement fallback (LS-8845)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('still announces a pick when the player is absent from enrichedPlayers and statsLookup', () => {
+    const params = makeDefaultParams();
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, {
+        draftId: 42,
+        pickId: 201,
+        teamId: 2,
+        playerId: 555,
+        round: 1,
+        pickNumber: 2,
+        overallPick: 2,
+        wasAutoPick: false,
+        autoPickReason: null,
+        currentPickDeadline: null,
+        nextPick: {
+          teamId: 3,
+          round: 1,
+          pickNumber: 3,
+          overallPick: 3,
+        },
+      });
+    });
+
+    // The lookup misses (enrichedPlayers and statsLookup are both empty in
+    // makeDefaultParams), but the announcement must still fire — dropping it
+    // silently is exactly the bug this test guards against.
+    expect(params.showAnnouncement).toHaveBeenCalledTimes(1);
+    expect(params.showAnnouncement).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 555 }),
+      2,
+      1,
+      2,
+      false,
+      false,
+      expect.any(String),
+    );
+  });
+});
+
 // ── Reconnect recovery (LS-8506) ───────────────────────────────────────────
 
 /**

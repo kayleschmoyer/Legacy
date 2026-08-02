@@ -572,6 +572,7 @@ describe('EliteDraftBoardScreen — stale pick announcement dismissal (LS-4449/L
       roundPickNumber: ((pickNumber - 1) % 4) + 1,
       isMyPick,
       isAuto: false,
+      teamName: 'Test Team',
     };
   }
 

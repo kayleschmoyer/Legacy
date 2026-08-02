@@ -69,6 +69,7 @@ interface UseDraftWebSocketParams {
     roundPickNumber: number,
     myPick: boolean,
     auto: boolean,
+    teamName: string,
   ) => void;
   showToast: (
     text: string,
@@ -167,15 +168,30 @@ export function useDraftWebSocket({
         const position = pickedPlayer?.position ?? '??';
         const teamName = teamNameById(pickTeamId);
 
+        // The lookup misses for most other-team picks: enrichedPlayers is only
+        // the client's currently loaded available-players page and statsLookup
+        // its stats map, neither of which is guaranteed to hold the drafted
+        // player. Fall back to a minimal shape built from the notification's
+        // own fields so the announcement still fires instead of being dropped
+        // (LS-8845).
+        const announcementPlayer: DraftPlayer | AvailableDraftPlayer =
+          pickedPlayer ?? {
+            id: notification.playerId,
+            firstName: 'Unknown',
+            lastName: `(ID: ${notification.playerId})`,
+            brefId: '',
+          };
+
+        showAnnouncement(
+          announcementPlayer,
+          notification.overallPick,
+          notification.round,
+          notification.pickNumber,
+          isMyTeamPick,
+          notification.wasAutoPick,
+          teamName,
+        );
         if (pickedPlayer) {
-          showAnnouncement(
-            pickedPlayer,
-            notification.overallPick,
-            notification.round,
-            notification.pickNumber,
-            isMyTeamPick,
-            false,
-          );
           onPlayerDrafted?.(
             notification.playerId,
             pickedPlayer.position ?? '??',

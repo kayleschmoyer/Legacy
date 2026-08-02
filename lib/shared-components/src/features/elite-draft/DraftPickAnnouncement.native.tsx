@@ -120,8 +120,6 @@ function Confetti({ seed }: { seed: number }): React.JSX.Element {
 
 export interface DraftPickAnnouncementProps {
   announcement: AnnouncementData | null;
-  /** Team that made the pick — shown when it isn't the viewer's. */
-  teamName: string;
   /** Play a confetti burst (viewer's own pick, unless the user muted it). */
   celebrate: boolean;
   onDismiss: () => void;
@@ -129,7 +127,6 @@ export interface DraftPickAnnouncementProps {
 
 export function DraftPickAnnouncement({
   announcement,
-  teamName,
   celebrate,
   onDismiss,
 }: DraftPickAnnouncementProps): React.JSX.Element | null {
@@ -154,10 +151,10 @@ export function DraftPickAnnouncement({
       : 'Pick is in';
 
   const eyebrow = announcement.isAuto
-    ? `AUTO-PICK #${announcement.pickNumber} · ${teamName}`
+    ? `AUTO-PICK #${announcement.pickNumber} · ${announcement.teamName}`
     : announcement.isMyPick
       ? `WITH PICK #${announcement.pickNumber}, YOU SELECT`
-      : `PICK #${announcement.pickNumber} · ${teamName}`;
+      : `PICK #${announcement.pickNumber} · ${announcement.teamName}`;
 
   return (
     <>
