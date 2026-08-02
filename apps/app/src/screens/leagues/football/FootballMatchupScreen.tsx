@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
+import { AppState } from 'react-native';
+import { NetworkStatus } from '@apollo/client';
 import {
   Card,
   ScrollView,
@@ -102,7 +104,13 @@ export function getPlayerPosition(player: MatchupPlayer['player']): string {
   return positions[0] ?? '—';
 }
 
-function ScoreHeader({ matchup }: { matchup: Matchup }) {
+function ScoreHeader({
+  matchup,
+  isRefreshing,
+}: {
+  matchup: Matchup;
+  isRefreshing: boolean;
+}) {
   const team1Score = matchup.team1Score ?? 0;
   const team2Score = matchup.team2Score ?? 0;
   const isLive = matchup.status === MatchupStatus.InProgress;
@@ -118,15 +126,22 @@ function ScoreHeader({ matchup }: { matchup: Matchup }) {
             fontSize="$8"
             fontWeight="700"
             color={team1Score > team2Score ? '$green10' : '$color12'}
+            opacity={isRefreshing ? 0.5 : 1}
           >
             {team1Score.toFixed(2)}
           </Text>
         </YStack>
 
         <YStack alignItems="center" paddingHorizontal="$3">
-          <Text fontSize="$2" color="$gray7">
-            {isLive ? 'LIVE' : 'vs'}
-          </Text>
+          {isRefreshing ? (
+            <YStack testID="score-refreshing-spinner">
+              <Spinner size="small" color="$brandNavyLight" />
+            </YStack>
+          ) : (
+            <Text fontSize="$2" color="$gray7">
+              {isLive ? 'LIVE' : 'vs'}
+            </Text>
+          )}
           {matchup.weekNumber != null ? (
             <Text fontSize="$1" color="$gray7">
               Wk {matchup.weekNumber}
@@ -142,6 +157,7 @@ function ScoreHeader({ matchup }: { matchup: Matchup }) {
             fontSize="$8"
             fontWeight="700"
             color={team2Score > team1Score ? '$green10' : '$color12'}
+            opacity={isRefreshing ? 0.5 : 1}
           >
             {team2Score.toFixed(2)}
           </Text>
@@ -284,16 +300,41 @@ export function FootballMatchupScreen(
     data: matchupData,
     loading: matchupLoading,
     error: matchupError,
-  } = useGetMatchupByIdQuery({ variables: { id: matchupId } });
+    networkStatus: matchupNetworkStatus,
+    refetch: refetchMatchup,
+  } = useGetMatchupByIdQuery({
+    variables: { id: matchupId },
+    notifyOnNetworkStatusChange: true,
+  });
 
-  const { data: playersData, loading: playersLoading } =
-    useGetMatchupPlayersQuery({ variables: { matchupId } });
+  const {
+    data: playersData,
+    loading: playersLoading,
+    refetch: refetchPlayers,
+  } = useGetMatchupPlayersQuery({
+    variables: { matchupId },
+    notifyOnNetworkStatusChange: true,
+  });
 
   useEffect(() => {
     if (matchupError) {
       LOGGER.error('Failed to load matchup', matchupError, { matchupId });
     }
   }, [matchupError, matchupId]);
+
+  // On resume from background, cache-first would otherwise serve stale scores
+  // with no network round-trip — force a network refetch instead (LS-6388).
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void refetchMatchup();
+        void refetchPlayers();
+      }
+    });
+    return () => subscription.remove();
+  }, [refetchMatchup, refetchPlayers]);
+
+  const isRefreshingScore = matchupNetworkStatus === NetworkStatus.refetch;
 
   const matchup = matchupData?.getMatchupById;
   const players = playersData?.getMatchupPlayers ?? [];
@@ -348,7 +389,7 @@ export function FootballMatchupScreen(
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       <YStack gap="$3" paddingBottom="$8">
-        <ScoreHeader matchup={matchup} />
+        <ScoreHeader matchup={matchup} isRefreshing={isRefreshingScore} />
 
         {playersLoading ? (
           <YStack alignItems="center" padding="$4">

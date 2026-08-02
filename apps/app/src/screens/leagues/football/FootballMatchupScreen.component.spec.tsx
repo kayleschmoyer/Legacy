@@ -7,6 +7,34 @@ import { FootballMatchupScreen } from './FootballMatchupScreen';
 
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
 
+type AppStateChangeHandler = (state: string) => void;
+let appStateListeners: AppStateChangeHandler[] = [];
+const mockAppStateAddEventListener = jest.fn(
+  (_event: string, handler: AppStateChangeHandler) => {
+    appStateListeners.push(handler);
+    return {
+      remove: () => {
+        appStateListeners = appStateListeners.filter((h) => h !== handler);
+      },
+    };
+  },
+);
+
+jest.mock('react-native', () => {
+  const RN = jest.requireActual<typeof import('react-native')>('react-native');
+  return new Proxy(RN, {
+    get(target, prop: string) {
+      if (prop === 'AppState') {
+        return {
+          addEventListener: (...args: [string, AppStateChangeHandler]) =>
+            mockAppStateAddEventListener(...args),
+        };
+      }
+      return Reflect.get(target, prop) as unknown;
+    },
+  });
+});
+
 const mockMatchup = {
   id: 1,
   team1Id: 10,
@@ -31,16 +59,22 @@ const mockMatchupPlayer = {
   player: mockPlayer,
 };
 
+const mockRefetchMatchup = jest.fn().mockResolvedValue(undefined);
+const mockRefetchPlayers = jest.fn().mockResolvedValue(undefined);
+
 jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: { InProgress: 'in_progress', Final: 'final' },
   useGetMatchupByIdQuery: jest.fn(() => ({
     data: { getMatchupById: mockMatchup },
     loading: false,
     error: undefined,
+    networkStatus: 7, // NetworkStatus.ready
+    refetch: mockRefetchMatchup,
   })),
   useGetMatchupPlayersQuery: jest.fn(() => ({
     data: { getMatchupPlayers: [mockMatchupPlayer] },
     loading: false,
+    refetch: mockRefetchPlayers,
   })),
 }));
 
@@ -97,14 +131,18 @@ jest.mock('tamagui', () => {
 describe('FootballMatchupScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    appStateListeners = [];
     jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
       data: { getMatchupById: mockMatchup },
       loading: false,
       error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: mockRefetchMatchup,
     } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
     jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
       data: { getMatchupPlayers: [mockMatchupPlayer] },
       loading: false,
+      refetch: mockRefetchPlayers,
     } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
   });
 
@@ -163,5 +201,44 @@ describe('FootballMatchupScreen', () => {
   it('renders DL position slot in IDP format', () => {
     render(<FootballMatchupScreen matchupId={1} defensiveFormat="idp" />);
     expect(screen.getAllByText('DL').length).toBeGreaterThan(0);
+  });
+
+  it('refetches matchup and players network-only when the app returns to foreground', () => {
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    expect(mockAppStateAddEventListener).toHaveBeenCalledWith(
+      'change',
+      expect.any(Function),
+    );
+    expect(mockRefetchMatchup).not.toHaveBeenCalled();
+    expect(mockRefetchPlayers).not.toHaveBeenCalled();
+
+    appStateListeners.forEach((handler) => handler('active'));
+
+    expect(mockRefetchMatchup).toHaveBeenCalledTimes(1);
+    expect(mockRefetchPlayers).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch when the app state changes to background', () => {
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    appStateListeners.forEach((handler) => handler('background'));
+
+    expect(mockRefetchMatchup).not.toHaveBeenCalled();
+    expect(mockRefetchPlayers).not.toHaveBeenCalled();
+  });
+
+  it('shows a refreshing indicator instead of stale score data while a background refetch is in flight', () => {
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: mockMatchup },
+      loading: false,
+      error: undefined,
+      networkStatus: 4, // NetworkStatus.refetch
+      refetch: mockRefetchMatchup,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    expect(screen.getByTestId('score-refreshing-spinner')).toBeTruthy();
   });
 });
