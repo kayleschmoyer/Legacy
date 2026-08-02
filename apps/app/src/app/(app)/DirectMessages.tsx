@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
@@ -6,6 +6,12 @@ import { MessageSquare, Send, Users } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
 import { captureError } from '@legacy-sports/rollbar/native';
 import { Button } from '@legacy-sports/shared-components';
+import { config } from '@legacy-sports/app-config/native';
+import { ClientNotificationType } from '@legacy-sports/utils';
+import {
+  type DirectMessageNotification,
+  WebSocketClient,
+} from '@legacy-sports/websocket-client';
 
 import {
   type DirectMessageFieldsFragment,
@@ -16,11 +22,12 @@ import {
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../common/auth/AuthorizedUserContext';
 import { useSystemBackAction } from '../../common/hooks/useSystemBackAction';
+import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 
 const MESSAGE_MAX_LENGTH = 2000;
 const MESSAGE_WARN_THRESHOLD = MESSAGE_MAX_LENGTH - 100;
 
-function ConversationThread({
+export function ConversationThread({
   otherUserId,
   otherRecipientName,
   leagueId,
@@ -43,6 +50,57 @@ function ConversationThread({
       void refetch();
     }, [refetch]),
   );
+
+  // Live-append incoming messages instead of relying on the focus-effect
+  // refetch above, which only fires when the screen regains focus (LS-6000).
+  // Mirrors useLeagueChat's subscription, but this screen has no shared
+  // LeagueWebSocketContext to reuse, so it opens its own connection —
+  // matching useSubscription's standalone-connection fallback.
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+
+  useEffect(() => {
+    let active = true;
+    let client: WebSocketClient | null = null;
+
+    const connect = async () => {
+      try {
+        const token = await readKeychainValue(Secret.INTERNAL_JWT);
+        if (!active || !token) return;
+
+        const wsUrl = config.websocketUrl;
+        if (!wsUrl) return;
+
+        client = new WebSocketClient({
+          url: wsUrl,
+          token,
+          viewContext: 'dm',
+          autoConnect: true,
+          reconnect: true,
+        });
+
+        client.on(ClientNotificationType.DIRECT_MESSAGE, (n) => {
+          const notification = n as DirectMessageNotification;
+          if (
+            notification.fromUserId === otherUserId &&
+            notification.toUserId === userInfo.id
+          ) {
+            void refetchRef.current();
+          }
+        });
+      } catch (err) {
+        if (!active) return;
+        captureError(err instanceof Error ? err : new Error(String(err)));
+      }
+    };
+
+    void connect();
+
+    return () => {
+      active = false;
+      client?.dispose();
+    };
+  }, [otherUserId, userInfo.id]);
 
   const [sendMessage, { loading: sending }] = useSendDirectMessageMutation({
     onCompleted: () => {
