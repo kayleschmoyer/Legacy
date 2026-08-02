@@ -9,8 +9,15 @@
 # frameworks (SOC 2, PCI DSS, ISO 27001).
 #
 # Trail events are delivered to a dedicated encrypted S3 bucket with log-file
-# integrity validation enabled. A CloudWatch Logs destination powers a metric
-# filter + alarm that notifies ops whenever the root account is used.
+# integrity validation enabled — S3 is the sole delivery path (see LS-8908):
+# the trail no longer mirrors to CloudWatch Logs, since the only consumer of
+# that copy was a root-account-usage metric filter, and CloudTrail delivers
+# console sign-in events to the default EventBridge bus natively. Real-time
+# root-usage alerting now runs off an EventBridge rule (below) instead of a
+# CloudWatch Logs metric filter + alarm, with zero CWL ingestion/storage cost
+# for the full management-event stream. Ad-hoc historical queries over trail
+# events now require Athena over the S3 bucket (see note near the bottom of
+# this file — no Athena/Glue setup exists yet, so this is a known gap).
 
 # Audit log retention is intentionally longer than application log retention.
 # See local.cloudtrail_retention_days below for the per-environment values;
@@ -138,56 +145,6 @@ resource "aws_s3_bucket_policy" "cloudtrail_logs" {
   })
 }
 
-# ── CloudWatch Logs destination ──────────────────────────────────────────────
-# Mirroring the trail to CloudWatch Logs enables real-time metric filters and
-# alarms (below) without having to parse S3 objects.
-resource "aws_cloudwatch_log_group" "cloudtrail" {
-  name              = "/aws/cloudtrail/${local.name_prefix}"
-  retention_in_days = local.cloudtrail_retention_days[var.environment]
-
-  tags = merge(local.common_tags, {
-    Component = "cloudtrail"
-  })
-}
-
-data "aws_iam_policy_document" "cloudtrail_cw_assume" {
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["cloudtrail.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "cloudtrail_cw" {
-  name               = "${local.name_prefix}-cloudtrail-cw"
-  assume_role_policy = data.aws_iam_policy_document.cloudtrail_cw_assume.json
-
-  tags = local.common_tags
-}
-
-resource "aws_iam_role_policy" "cloudtrail_cw" {
-  name = "${local.name_prefix}-cloudtrail-cw"
-  role = aws_iam_role.cloudtrail_cw.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
-      }
-    ]
-  })
-}
-
 # ── Trail ────────────────────────────────────────────────────────────────────
 resource "aws_cloudtrail" "main" {
   name                          = local.cloudtrail_name
@@ -195,9 +152,6 @@ resource "aws_cloudtrail" "main" {
   include_global_service_events = true # capture IAM, STS, CloudFront, etc.
   is_multi_region_trail         = true
   enable_log_file_validation    = true
-
-  cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
-  cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cw.arn
 
   event_selector {
     read_write_type           = "All"
@@ -212,39 +166,52 @@ resource "aws_cloudtrail" "main" {
   })
 }
 
-# ── Root account usage alarm ─────────────────────────────────────────────────
-# CIS AWS Foundations 1.1 control: alert whenever root credentials make an
-# API call. Root should never be used for day-to-day operations, so any hit
-# here warrants immediate investigation.
-resource "aws_cloudwatch_log_metric_filter" "root_account_usage" {
-  name           = "${local.name_prefix}-root-account-usage"
-  log_group_name = aws_cloudwatch_log_group.cloudtrail.name
+# ── Root account console sign-in alarm (LS-8908) ─────────────────────────────
+# CIS AWS Foundations 1.1 control: alert whenever the root account signs in.
+# Root should never be used for day-to-day operations, so any hit here
+# warrants immediate investigation.
+#
+# Previously implemented as a CloudWatch Logs metric filter + alarm fed by a
+# full mirror of the CloudTrail management-event stream into CloudWatch Logs
+# (see git history). That metric filter was the *only* consumer of the CWL
+# copy of the trail, so paying to ingest/store every management event just to
+# feed this one alarm was wasteful. CloudTrail delivers console sign-in
+# events to the account's default EventBridge event bus natively — no log
+# group needed — so this rule matches directly on that bus and publishes
+# straight to the existing ops-alerts SNS topic (no intermediate CloudWatch
+# alarm required either).
+#
+# Scope note: the old metric filter matched ANY root API call (console,
+# CLI, or SDK use of root credentials). This EventBridge rule matches only
+# root *console* sign-ins (matching CloudTrail's "AWS Console Sign-in via
+# CloudTrail" notification), which is the dominant real-world root-misuse
+# pattern but is narrower than the old alarm's coverage of root API/CLI
+# calls made with long-lived root access keys. Root access keys are
+# strongly discouraged and, per AWS best practice, should not exist on this
+# account — if that changes, this rule needs revisiting.
+#
+# Validated the event_pattern below against AWS's documented sample root
+# console sign-in CloudTrail event (see PR description for the sample event
+# and validation method).
+resource "aws_cloudwatch_event_rule" "root_console_signin" {
+  name        = "${local.name_prefix}-root-console-signin"
+  description = "Detect AWS root account console sign-ins (CIS AWS Foundations 1.1)"
 
-  pattern = "{ $.userIdentity.type = \"Root\" && $.userIdentity.invokedBy NOT EXISTS && $.eventType != \"AwsServiceEvent\" }"
-
-  metric_transformation {
-    name      = "${local.name_prefix}-RootAccountUsage"
-    namespace = "LegacySports/Security"
-    value     = "1"
-  }
-}
-
-resource "aws_cloudwatch_metric_alarm" "root_account_usage" {
-  alarm_name          = "${local.name_prefix}-root-account-usage"
-  alarm_description   = "Root account used — investigate immediately. Root credentials should never be used for day-to-day operations."
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  threshold           = 1
-  evaluation_periods  = 1
-  period              = 60
-
-  namespace   = "LegacySports/Security"
-  metric_name = "${local.name_prefix}-RootAccountUsage"
-  statistic   = "Sum"
-
-  alarm_actions = [aws_sns_topic.ops_alerts.arn]
-  ok_actions    = [aws_sns_topic.ops_alerts.arn]
-
-  treat_missing_data = "notBreaching"
+  event_pattern = jsonencode({
+    source        = ["aws.signin"]
+    "detail-type" = ["AWS Console Sign-in via CloudTrail"]
+    detail = {
+      userIdentity = {
+        type = ["Root"]
+      }
+    }
+  })
 
   tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "root_console_signin_sns" {
+  rule      = aws_cloudwatch_event_rule.root_console_signin.name
+  target_id = "root-console-signin-sns"
+  arn       = aws_sns_topic.ops_alerts.arn
 }

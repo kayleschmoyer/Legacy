@@ -115,6 +115,24 @@ resource "aws_sns_topic_policy" "ops_alerts" {
             }
           }
         },
+        {
+          # Root console sign-in alerting (LS-8908) — the rule lives in
+          # cloudtrail.tf, same state, so this references it directly
+          # instead of a wildcard pattern.
+          Sid       = "AllowRootConsoleSigninEventBridgePublish"
+          Effect    = "Allow"
+          Principal = { Service = "events.amazonaws.com" }
+          Action    = "SNS:Publish"
+          Resource  = aws_sns_topic.ops_alerts.arn
+          Condition = {
+            StringEquals = {
+              "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+            }
+            ArnEquals = {
+              "aws:SourceArn" = aws_cloudwatch_event_rule.root_console_signin.arn
+            }
+          }
+        },
       ]
     )
   })
