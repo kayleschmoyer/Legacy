@@ -12,6 +12,13 @@ name: "Check Merge Conflicts"
 on:
   pull_request:
     # Include 'edited' to re-run when the PR base branch is retargeted.
+    # Conflict state can't change from a title/body edit alone, so the
+    # 'edited'-triggered jobs below (check-runner-access, sha-sanity) are
+    # guarded to actually run only when github.event.changes.base is present
+    # (LS-8898) — every other 'edited' event (e.g. a bot description update)
+    # short-circuits to a skipped job, which still satisfies the "No Merge
+    # Conflicts" required status check (skipped counts as passing) without
+    # spinning the ~5min self-hosted check-conflicts job.
     # 'ready_for_review' omitted: synchronize already fires on every commit
     # (even while draft), so the result is always current when a PR goes live.
     types: [opened, synchronize, reopened, edited]
@@ -41,6 +48,9 @@ jobs:
   # LS-1652: Restrict self-hosted runners to PR authors with write permission
   check-runner-access:
     name: "Resolve Runner Label"
+    # LS-8898: skip on 'edited' events that didn't change the base branch —
+    # conflict state can't change from a title/body edit alone.
+    if: github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.base != null
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -66,6 +76,9 @@ jobs:
 
   sha-sanity:
     name: "🔐 SHA Sanity Check"
+    # LS-8898: skip on 'edited' events that didn't change the base branch —
+    # conflict state can't change from a title/body edit alone.
+    if: github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.base != null
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
