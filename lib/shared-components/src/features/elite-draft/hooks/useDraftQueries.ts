@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { useApolloClient, useQuery } from '@apollo/client/react';
 import {
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
@@ -162,7 +163,24 @@ export function useDraftQueries({
   const isAuctionDraft = leagueDraft?.selectionMethod === 'auction';
 
   useEffect(() => {
-    if (draftError) LOGGER.error('[Draft] getLeagueDraft error:', draftError);
+    if (!draftError) return;
+    // A FORBIDDEN getLeagueDraft error is an expected condition — the user
+    // lost league membership (removed, or left) between navigating to the
+    // draft route and this query resolving. It is handled in the UI (see
+    // the leagueError/draftError check in EliteDraftBoardScreen) and must
+    // not be reported to Rollbar as a bug via LOGGER.error, which forwards
+    // every error/fatal log automatically (RollbarOutputDestination).
+    const isForbidden =
+      CombinedGraphQLErrors.is(draftError) &&
+      draftError.errors.some((e) => e.extensions?.['code'] === 'FORBIDDEN');
+    if (isForbidden) {
+      LOGGER.warn(
+        '[Draft] getLeagueDraft: user lost league access',
+        draftError,
+      );
+    } else {
+      LOGGER.error('[Draft] getLeagueDraft error:', draftError);
+    }
   }, [draftError]);
 
   // ---- Current Pick ----
@@ -559,6 +577,7 @@ export function useDraftQueries({
     // Draft
     leagueDraft,
     draftId,
+    draftError,
     isAuctionDraft,
     refetchDraft,
     // Current pick

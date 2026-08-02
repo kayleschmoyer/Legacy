@@ -31,6 +31,7 @@ import type { DraftChatRenderer } from './DraftChatOverlay';
 import type { DraftPlayer } from './types';
 import { useAuth } from '../../features/auth';
 import type { SportKind } from '../../config/sports';
+import { hasErrorCode } from '../../utils/graphql-errors';
 
 export interface EliteDraftBoardScreenProps {
   /** League ID to load (replaces route param). */
@@ -379,23 +380,24 @@ export function EliteDraftBoardScreen({
     !queries.league &&
     (queries.leagueError || queries.leagueData !== undefined)
   ) {
-    const graphQLErrors =
-      queries.leagueError && 'graphQLErrors' in queries.leagueError
-        ? (queries.leagueError.graphQLErrors as ReadonlyArray<{
-            extensions?: Record<string, unknown>;
-          }>)
-        : [];
-    const isUnauthorized = graphQLErrors.some(
-      (e) =>
-        e.extensions?.['code'] === 'UNAUTHENTICATED' ||
-        e.extensions?.['code'] === 'FORBIDDEN',
-    );
+    const isUnauthorized =
+      hasErrorCode(queries.leagueError, 'UNAUTHENTICATED') ||
+      hasErrorCode(queries.leagueError, 'FORBIDDEN');
     return (
       <LeagueErrorScreen
         isUnauthorized={isUnauthorized}
         onNavigate={onNavigate}
       />
     );
+  }
+
+  // The league itself loaded fine (e.g. it's still publicly viewable), but the
+  // draft-scoped query came back FORBIDDEN — the user was removed from this
+  // league after landing on the draft route. Without this check the board
+  // silently rendered with no draft data instead of telling the user why
+  // (LS-8863).
+  if (hasErrorCode(queries.draftError, 'FORBIDDEN')) {
+    return <LeagueErrorScreen isUnauthorized onNavigate={onNavigate} />;
   }
 
   // Check draft completion before any error screens — once the draft is done

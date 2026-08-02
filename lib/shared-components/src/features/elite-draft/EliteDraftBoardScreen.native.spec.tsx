@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, screen } from '@testing-library/react';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { EliteDraftBoardScreen } from './EliteDraftBoardScreen.native';
 import {
   useDraftActions,
@@ -731,5 +732,48 @@ describe('EliteDraftBoardScreen (native) — lobby and complete states', () => {
     expect(screen.getByText('Your haul · 1 picks')).toBeTruthy();
     expect(screen.getByText('Rd 1 · Pick #1')).toBeTruthy();
     expect(screen.getByText('BACK TO LEAGUE')).toBeTruthy();
+  });
+});
+
+// LS-8863: a user removed from a league between navigating to /draft and the
+// draft-scoped query resolving previously fell through every early-return
+// check (the league itself still loads — it's public data) and rendered a
+// broken, dataless board instead of telling the user why.
+describe('EliteDraftBoardScreen (native) — lost league access (LS-8863)', () => {
+  function forbiddenError() {
+    return new CombinedGraphQLErrors({
+      errors: [
+        {
+          message: 'User is not a member of this league',
+          extensions: { code: 'FORBIDDEN' },
+        },
+      ],
+    });
+  }
+
+  it('shows Access Denied when the draft query returns FORBIDDEN', () => {
+    mockUseDraftQueries.mockReturnValue({
+      ...makeBaseQueries(),
+      draftError: forbiddenError(),
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('ACCESS DENIED')).toBeTruthy();
+    expect(
+      screen.getByText("You don't have access to this draft room."),
+    ).toBeTruthy();
+  });
+
+  it('shows Access Denied when the league query returns FORBIDDEN', () => {
+    mockUseDraftQueries.mockReturnValue({
+      ...makeBaseQueries(),
+      league: undefined,
+      leagueError: forbiddenError(),
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('ACCESS DENIED')).toBeTruthy();
   });
 });

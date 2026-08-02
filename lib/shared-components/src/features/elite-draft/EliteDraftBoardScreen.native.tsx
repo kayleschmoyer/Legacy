@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../../features/auth';
 import { PositionBadge } from '../../components/PositionBadge';
 import { withAlpha } from '../../utils/colors';
+import { hasErrorCode } from '../../utils/graphql-errors';
 
 const POSITION_FILTERS = [
   'ALL',
@@ -858,17 +859,9 @@ export function EliteDraftBoardScreen({
     !queries.league &&
     (queries.leagueError || queries.leagueData !== undefined)
   ) {
-    const graphQLErrors =
-      queries.leagueError && 'graphQLErrors' in queries.leagueError
-        ? (queries.leagueError.graphQLErrors as ReadonlyArray<{
-            extensions?: Record<string, unknown>;
-          }>)
-        : [];
-    const isUnauthorized = graphQLErrors.some(
-      (e) =>
-        e.extensions?.['code'] === 'UNAUTHENTICATED' ||
-        e.extensions?.['code'] === 'FORBIDDEN',
-    );
+    const isUnauthorized =
+      hasErrorCode(queries.leagueError, 'UNAUTHENTICATED') ||
+      hasErrorCode(queries.leagueError, 'FORBIDDEN');
     return (
       <CenteredMessage
         icon={isUnauthorized ? '🔒' : '⚠️'}
@@ -878,6 +871,23 @@ export function EliteDraftBoardScreen({
             ? "You don't have access to this draft room."
             : "This league doesn't exist or the draft room is unavailable."
         }
+        buttonText="Back to Leagues"
+        onPress={() => onNavigate('/baseball')}
+      />
+    );
+  }
+
+  // The league itself loaded fine (e.g. it's still publicly viewable), but the
+  // draft-scoped query came back FORBIDDEN — the user was removed from this
+  // league after landing on the draft route. Without this check the board
+  // silently rendered with no draft data instead of telling the user why
+  // (LS-8863).
+  if (hasErrorCode(queries.draftError, 'FORBIDDEN')) {
+    return (
+      <CenteredMessage
+        icon="🔒"
+        title="Access Denied"
+        description="You don't have access to this draft room."
         buttonText="Back to Leagues"
         onPress={() => onNavigate('/baseball')}
       />

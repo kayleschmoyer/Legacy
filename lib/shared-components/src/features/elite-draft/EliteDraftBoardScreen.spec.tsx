@@ -1,4 +1,5 @@
 import React from 'react';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { AutomatedDraftScreen } from './DraftStateScreens';
 import { EliteDraftBoardScreen } from './EliteDraftBoardScreen';
@@ -860,5 +861,57 @@ describe('EliteDraftBoardScreen — premium entitlement (LS-8105)', () => {
     expect(getByTestId('draft-rail').getAttribute('data-is-premium')).toBe(
       'false',
     );
+  });
+});
+
+// LS-8863: a user removed from a league between navigating to /draft and the
+// draft-scoped query resolving previously fell through every early-return
+// check (the league itself still loads — it's public data) and rendered a
+// broken, dataless board while silently spamming Rollbar via LOGGER.error.
+describe('EliteDraftBoardScreen — lost league access (LS-8863)', () => {
+  function forbiddenError() {
+    return new CombinedGraphQLErrors({
+      errors: [
+        {
+          message: 'User is not a member of this league',
+          extensions: { code: 'FORBIDDEN' },
+        },
+      ],
+    });
+  }
+
+  it('shows Access Denied when the draft query returns FORBIDDEN', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ draftError: forbiddenError() }),
+    );
+
+    const { getByText, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByText('Access Denied')).toBeInTheDocument();
+    expect(
+      getByText("You don't have access to this draft room."),
+    ).toBeInTheDocument();
+    expect(queryByTestId('draft-player-board')).not.toBeInTheDocument();
+  });
+
+  it('shows Access Denied when the league query returns FORBIDDEN', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: undefined,
+        leagueError: forbiddenError(),
+      }),
+    );
+
+    const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByText('Access Denied')).toBeInTheDocument();
+  });
+
+  it('renders the board normally when there is no draft error', () => {
+    const { getByTestId } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByTestId('draft-player-board')).toBeInTheDocument();
   });
 });
