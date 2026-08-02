@@ -53,6 +53,7 @@ function isValidPlayerPool(v: string): v is PlayerPool {
 interface MockDraftInitShape {
   leagueId: number;
   draftId: number;
+  webSocketReady: boolean;
 }
 
 const MockDraftInit = builder.objectRef<MockDraftInitShape>('MockDraftInit');
@@ -62,6 +63,13 @@ builder.objectType(MockDraftInit, {
   fields: (t) => ({
     leagueId: t.exposeInt('leagueId'),
     draftId: t.exposeInt('draftId'),
+    webSocketReady: t.exposeBoolean('webSocketReady', {
+      description:
+        'False if the draft-started WebSocket notification failed to send. ' +
+        'The draft itself was created successfully either way; when false, ' +
+        'the client should fall back to polling immediately instead of ' +
+        'waiting for a WS event that will never arrive.',
+    }),
   }),
 });
 
@@ -315,16 +323,34 @@ builder.mutationField('initializeMockDraft', (t) =>
         // ── Post-transaction: WebSocket notification ──────────────────────
         // Kept outside the transaction so a notification failure does not
         // roll back the already-committed draft state (same pattern as
-        // initializeDraft).
+        // initializeDraft). Caught separately from the transaction: the
+        // draft already exists at this point, so a notification failure
+        // must not fail the mutation and strand the client without
+        // leagueId/draftId (LS-6954). webSocketReady tells the client
+        // whether to expect the WS event or fall back to polling now.
+        let webSocketReady = true;
         if (context.notificationService) {
-          await context.notificationService.notifyDraftStarted(
-            txResult.leagueId,
-            txResult.draftId,
-            draftOrder,
-            numTeams,
-            pickTimeLimit,
-            txResult.initialDeadline.toISOString(),
-          );
+          try {
+            await context.notificationService.notifyDraftStarted(
+              txResult.leagueId,
+              txResult.draftId,
+              draftOrder,
+              numTeams,
+              pickTimeLimit,
+              txResult.initialDeadline.toISOString(),
+            );
+          } catch (notificationError) {
+            webSocketReady = false;
+            LOGGER.error(
+              'Failed to send draft-started notification for mock draft',
+              notificationError instanceof Error
+                ? notificationError
+                : new Error(String(notificationError)),
+              { leagueId: txResult.leagueId, draftId: txResult.draftId },
+            );
+          }
+        } else {
+          webSocketReady = false;
         }
 
         LOGGER.info('Mock draft initialized', {
@@ -336,9 +362,14 @@ builder.mutationField('initializeMockDraft', (t) =>
           humanTeamId: txResult.humanTeamId,
           draftOrder,
           playerPool,
+          webSocketReady,
         });
 
-        return { leagueId: txResult.leagueId, draftId: txResult.draftId };
+        return {
+          leagueId: txResult.leagueId,
+          draftId: txResult.draftId,
+          webSocketReady,
+        };
       } catch (error) {
         LOGGER.error(
           'Error initializing mock draft',

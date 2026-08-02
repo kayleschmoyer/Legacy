@@ -240,6 +240,85 @@ describe('initializeMockDraft transaction behavior', () => {
       resolve({}, VALID_ARGS, { user: { id: 1 }, db }, undefined),
     ).rejects.toThrow('connection lost');
   });
+
+  it('returns webSocketReady:true when the notification succeeds', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }])
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }])
+      .mockResolvedValueOnce([{ id: 100 }]);
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    const notifyDraftStarted = jest.fn().mockResolvedValue(undefined);
+
+    const result = await resolve(
+      {},
+      VALID_ARGS,
+      { user: { id: 1 }, db, notificationService: { notifyDraftStarted } },
+      undefined,
+    );
+
+    expect(notifyDraftStarted).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      leagueId: 1,
+      draftId: 100,
+      webSocketReady: true,
+    });
+  });
+
+  it('returns webSocketReady:false without throwing when the notification fails after commit', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }])
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }])
+      .mockResolvedValueOnce([{ id: 100 }]);
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    const notifyDraftStarted = jest
+      .fn()
+      .mockRejectedValue(new Error('websocket fan-out failed'));
+
+    const result = await resolve(
+      {},
+      VALID_ARGS,
+      { user: { id: 1 }, db, notificationService: { notifyDraftStarted } },
+      undefined,
+    );
+
+    expect(result).toMatchObject({
+      leagueId: 1,
+      draftId: 100,
+      webSocketReady: false,
+    });
+  });
 });
 
 export {};
