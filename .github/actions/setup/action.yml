@@ -304,7 +304,16 @@ runs:
     - name: "Setup Nx Remote Cache"
       uses: ./.github/actions/nx-cache
       with:
-        restore-only: ${{ github.event_name == 'pull_request' }}
+        # restore-only is left false for PRs too: the nx-cache action's own
+        # event-name gate (push/merge_group/pull_request) already decides
+        # whether to save, and every save now writes a per-commit key, so
+        # PR saves can no longer collide with or freeze the main-branch
+        # cache. This lets multi-push PRs reuse their own prior-commit
+        # cache instead of recomputing from the base-branch snapshot every
+        # push, at the cost of extra cache storage churn (GitHub evicts LRU
+        # at the repo's 10 GB quota, so worst case is eviction pressure,
+        # not additional spend).
+        restore-only: "false"
         base-branch: "main"
 
     - name: Configure Basic Nx Environment

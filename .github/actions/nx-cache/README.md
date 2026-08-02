@@ -25,7 +25,7 @@ graph LR
     E --> G
 ```
 
-**Key Benefit**: When you open a PR, your branch restores the build cache from `main`. Nx then only rebuilds projects affected by your changes, dramatically speeding up CI.
+**Key Benefit**: When you open a PR, your branch restores the build cache from `main`. Nx then only rebuilds projects affected by your changes, dramatically speeding up CI. Each PR run also saves its own outputs under a per-commit key, so a later push on the same PR restores from the PR's own prior run instead of recomputing from the base-branch snapshot every time.
 
 ### For Main Branch Pushes
 
@@ -49,9 +49,13 @@ The action is automatically used in the `setup` action:
 - name: 'Setup Nx Remote Cache'
   uses: ./.github/actions/nx-cache
   with:
-    restore-only: ${{ github.event_name == 'pull_request' }}
+    restore-only: 'false'
     base-branch: 'main'
 ```
+
+PRs now save too (each save uses a per-commit key, so it can't collide with
+the main-branch cache) — `restore-only` mainly exists for callers that want
+to opt a specific job out of saving entirely.
 
 ### Inputs
 
@@ -130,7 +134,8 @@ When the cache is restored, Nx:
 ### Cache Key Format
 
 ```
-nx-cache-<branch>-<deps-hash>-<config-hash>
+nx-cache-<branch>-<deps-hash>-<config-hash>-<sha>   # save key
+nx-cache-<branch>-<deps-hash>-<config-hash>         # restore-keys prefix
 ```
 
 **Components**:
@@ -138,6 +143,15 @@ nx-cache-<branch>-<deps-hash>-<config-hash>
 - `branch`: Git branch name (e.g., `main`, `feature/my-branch`)
 - `deps-hash`: Hash of `pnpm-lock.yaml` or `package-lock.json`
 - `config-hash`: Hash of `nx.json` and `tsconfig.base.json`
+- `sha`: The triggering commit's SHA
+
+GitHub Actions cache keys are immutable — a save is a permanent no-op once
+its exact key already exists. Suffixing the save key with `github.sha`
+means every run gets a fresh key to save, instead of the first save after
+each lockfile/config change freezing the cache for the rest of that epoch.
+Restores still use the un-suffixed prefix as a `restore-keys` entry, so
+they fall back to the newest matching cache regardless of which commit
+saved it.
 
 ### Restore Priority (PRs)
 
