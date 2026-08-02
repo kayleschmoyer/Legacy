@@ -1477,6 +1477,21 @@ builder.mutationField('verifyGooglePurchase', (t) =>
         status,
       });
 
+      if (context.notificationService) {
+        try {
+          await context.notificationService.notifySubscriptionUpdated(
+            userId,
+            tier,
+            status,
+          );
+        } catch (err) {
+          LOGGER.warn(
+            'verifyGooglePurchase — notification failed (non-fatal)',
+            { err, userId },
+          );
+        }
+      }
+
       return { success: true, tier, status };
     },
   }),

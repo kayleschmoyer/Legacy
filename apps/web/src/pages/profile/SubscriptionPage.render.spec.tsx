@@ -97,6 +97,23 @@ jest.mock('@legacy-sports/graphql', () => ({
   useCreateBillingPortalSessionMutation: () => [jest.fn(), { loading: false }],
 }));
 
+type UseLeagueWebSocketOptions = {
+  onSubscriptionUpdated?: () => void;
+};
+
+const mockUseLeagueWebSocket = jest.fn<{ connected: boolean }, [unknown]>();
+jest.mock('../../hooks/useLeagueWebSocket', () => ({
+  useLeagueWebSocket: (opts: unknown) => mockUseLeagueWebSocket(opts),
+}));
+
+const mockUseLeagueWebSocketClient = jest.fn<
+  { client: unknown; connected: boolean },
+  []
+>();
+jest.mock('../../context/LeagueWebSocketContext', () => ({
+  useLeagueWebSocketClient: () => mockUseLeagueWebSocketClient(),
+}));
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -108,6 +125,11 @@ function renderPage() {
 describe('SubscriptionPage — Manage Subscription gating (LS-5176)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
   });
 
   it('hides the Manage Subscription button for free users with no subscription row', () => {
@@ -140,5 +162,74 @@ describe('SubscriptionPage — Manage Subscription gating (LS-5176)', () => {
     renderPage();
 
     expect(screen.getByText('Manage Subscription')).toBeInTheDocument();
+  });
+});
+
+describe('SubscriptionPage — realtime subscription refresh (LS-7380)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+  });
+
+  it('refetches when a SUBSCRIPTION_UPDATED push arrives', () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch,
+    });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: {},
+      connected: true,
+    });
+
+    renderPage();
+
+    const opts = mockUseLeagueWebSocket.mock
+      .calls[0]?.[0] as UseLeagueWebSocketOptions;
+    expect(opts.onSubscriptionUpdated).toBeDefined();
+    opts.onSubscriptionUpdated?.();
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches on window focus when no live WebSocket client is available', () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch,
+    });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+
+    renderPage();
+    window.dispatchEvent(new Event('focus'));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch on window focus when a live WebSocket client is present', () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch,
+    });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: {},
+      connected: true,
+    });
+
+    renderPage();
+    window.dispatchEvent(new Event('focus'));
+
+    expect(refetch).not.toHaveBeenCalled();
   });
 });

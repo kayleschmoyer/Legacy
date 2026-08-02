@@ -321,6 +321,118 @@ describe('Google Play mutation validation (LS-5121)', () => {
         }),
       );
     });
+
+    // LS-7380: the Android upgrade path must push a SUBSCRIPTION_UPDATED
+    // notification so an open web tab picks up the new tier without a
+    // manual reload, matching the Stripe webhook / Apple IAP call sites.
+    it('notifies via notifySubscriptionUpdated with the correct userId/tier/status on success', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ expiryTime: '2026-09-01T00:00:00.000Z' }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+      const mockNotifySubscriptionUpdated = jest
+        .fn()
+        .mockResolvedValue(undefined);
+
+      const resolve = getResolver('verifyGooglePurchase');
+      const result = await resolve(
+        {},
+        {
+          purchaseToken: 'fake-token',
+          productId: 'com.legacysports.app.premium.monthly',
+        },
+        {
+          ...mockContext,
+          notificationService: {
+            notifySubscriptionUpdated: mockNotifySubscriptionUpdated,
+          },
+        },
+        undefined as never,
+      );
+
+      expect(result).toMatchObject({ success: true, tier: 'premium' });
+      expect(mockNotifySubscriptionUpdated).toHaveBeenCalledWith(
+        1,
+        'premium',
+        'active',
+      );
+    });
+
+    it('does not notify when notificationService is not provided on the context', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+        lineItems: [{ expiryTime: '2026-09-01T00:00:00.000Z' }],
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(true);
+
+      const resolve = getResolver('verifyGooglePurchase');
+      // mockContext has no notificationService — resolver must not throw.
+      await expect(
+        resolve(
+          {},
+          {
+            purchaseToken: 'fake-token',
+            productId: 'com.legacysports.app.premium.monthly',
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).resolves.toMatchObject({ success: true });
+    });
+
+    it('does not notify on the unknown-productId failure path', async () => {
+      const mockNotifySubscriptionUpdated = jest
+        .fn()
+        .mockResolvedValue(undefined);
+
+      const resolve = getResolver('verifyGooglePurchase');
+      await expect(
+        resolve(
+          {},
+          { purchaseToken: 'fake-token', productId: 'com.bogus.product' },
+          {
+            ...mockContext,
+            notificationService: {
+              notifySubscriptionUpdated: mockNotifySubscriptionUpdated,
+            },
+          },
+          undefined as never,
+        ),
+      ).rejects.toBeDefined();
+
+      expect(mockNotifySubscriptionUpdated).not.toHaveBeenCalled();
+    });
+
+    it('does not notify on the subscription-not-active failure path', async () => {
+      mockFetchGoogleSubscription.mockResolvedValue({
+        subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
+      });
+      mockIsActiveGoogleSubscription.mockReturnValue(false);
+      const mockNotifySubscriptionUpdated = jest
+        .fn()
+        .mockResolvedValue(undefined);
+
+      const resolve = getResolver('verifyGooglePurchase');
+      await expect(
+        resolve(
+          {},
+          {
+            purchaseToken: 'fake-token',
+            productId: 'com.legacysports.app.premium.monthly',
+          },
+          {
+            ...mockContext,
+            notificationService: {
+              notifySubscriptionUpdated: mockNotifySubscriptionUpdated,
+            },
+          },
+          undefined as never,
+        ),
+      ).rejects.toBeDefined();
+
+      expect(mockNotifySubscriptionUpdated).not.toHaveBeenCalled();
+    });
   });
 
   describe('restoreGooglePurchases', () => {

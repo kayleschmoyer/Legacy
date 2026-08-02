@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   H1,
   Paragraph,
@@ -24,6 +24,8 @@ import {
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { StepUpModal } from '../../components/StepUpModal';
+import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
+import { useLeagueWebSocketClient } from '../../context/LeagueWebSocketContext';
 import {
   AMBER,
   BG_DARK,
@@ -578,6 +580,40 @@ const SubscriptionPage: React.FC = () => {
   const isCanceled = subscription?.status === 'canceled';
   const isFree = !subscription || subscription.status === null;
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
+
+  // Keep the tier badge fresh when a subscription change lands out-of-band
+  // (Android verifyGooglePurchase, Stripe webhook, or the grace-period-expiry
+  // sweep) while this tab is idle. Mirrors useIsPremium's WS-push +
+  // window-focus-fallback pattern (see useIsPremium.ts) so a page reload is
+  // never required to see the new tier.
+  const refetchSafely = useCallback(
+    (reason: string) => {
+      refetch().catch((err: unknown) => {
+        LOGGER.error(
+          `SubscriptionPage: refetch after ${reason} failed`,
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      });
+    },
+    [refetch],
+  );
+
+  useLeagueWebSocket({
+    onSubscriptionUpdated: () => refetchSafely('SUBSCRIPTION_UPDATED'),
+  });
+
+  // Fallback for when this page is not mounted inside a league page (the only
+  // place LeagueWebSocketContext.Provider is mounted, so useLeagueWebSocket
+  // safely no-ops here without it): refetch on window focus so a tier change
+  // is picked up the next time the tab regains focus instead of being
+  // silently missed.
+  const { client: wsClient } = useLeagueWebSocketClient();
+  useEffect(() => {
+    if (wsClient) return;
+    const onFocus = () => refetchSafely('window focus');
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [wsClient, refetchSafely]);
 
   // Track whether this page load was a successful checkout return so the
   // refetch effect below survives the searchParams change caused by navigate().
