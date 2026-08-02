@@ -49,6 +49,20 @@ permissions:
   pages: write
   pull-requests: write # deploy-storybook child posts a sticky PR comment
 
+# A burst of merges to main would otherwise fan out N fully concurrent umbrella
+# runs (deploy-web / upload-lambdas / deploy-storybook each racing N-wide), and
+# every completion re-arms the downstream workflow_run gates (lambda-terraform-apply,
+# run-playwright-tests, cross-browser-e2e, run-maestro-sweep) redundantly.
+# cancel-in-progress is intentionally FALSE — a cancelled mid-deploy is worse
+# than a queued one — so back-to-back merges deploy sequentially instead of
+# in parallel. Each queued run still targets HEAD at run time, so this trades
+# "N wasteful concurrent deploys" for "N deploys, later ones start later" —
+# it does not make any individual commit ship faster, since the old
+# concurrent behavior didn't guarantee every commit got its own deploy either.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
 jobs:
   # ---------------------------------------------------------------------------
   # Detect which deploy targets are affected by this push.
