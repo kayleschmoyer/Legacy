@@ -638,6 +638,102 @@ describe('WebSocket Lambda Handler', () => {
       expect(result.body).toBe('Message received');
     });
 
+    describe('requestUserList (LDB-028)', () => {
+      it('sends a fresh USER_LIST to the requesting connection', async () => {
+        // 1st call: GetItem (read the requesting connection's leagueId)
+        // 2nd call: Query (getLeagueConnections for peers)
+        mockDynamoSend
+          .mockResolvedValueOnce({
+            Item: {
+              connectionId: { S: 'test-conn-id' },
+              userId: { N: '42' },
+              username: { S: 'testuser' },
+              leagueId: { N: '10' },
+            },
+          })
+          .mockResolvedValueOnce({
+            Items: [
+              {
+                connectionId: { S: 'peer-1' },
+                userId: { N: '99' },
+                username: { S: 'peer' },
+              },
+            ],
+          });
+
+        const event = makeEvent({
+          routeKey: '$default',
+          connectionId: 'test-conn-id',
+          body: JSON.stringify({ type: 'requestUserList' }),
+        });
+
+        const result = asResult(await handler(event));
+        expect(result.statusCode).toBe(200);
+
+        expect(mockApiGatewaySend).toHaveBeenCalledWith(
+          expect.objectContaining({
+            input: expect.objectContaining({ ConnectionId: 'test-conn-id' }),
+          }),
+        );
+
+        type PostCmd = { input?: { ConnectionId?: string; Data?: Buffer } };
+        const sent = (mockApiGatewaySend.mock.calls as PostCmd[][])
+          .map((args) => args[0])
+          .find((cmd) => cmd.input?.ConnectionId === 'test-conn-id');
+        const parsed = JSON.parse(sent?.input?.Data?.toString() ?? '{}');
+
+        expect(parsed).toEqual({
+          type: 'USER_LIST',
+          leagueId: 10,
+          users: expect.arrayContaining([
+            { userId: 99, username: 'peer' },
+            { userId: 42, username: 'testuser' },
+          ]),
+        });
+      });
+
+      it('no-ops when the connection has no league context', async () => {
+        mockDynamoSend.mockResolvedValueOnce({
+          Item: {
+            connectionId: { S: 'test-conn-id' },
+            userId: { N: '42' },
+          },
+        });
+
+        const event = makeEvent({
+          routeKey: '$default',
+          connectionId: 'test-conn-id',
+          body: JSON.stringify({ type: 'requestUserList' }),
+        });
+
+        const result = asResult(await handler(event));
+        expect(result.statusCode).toBe(200);
+        expect(result.body).toBe('No league context');
+        expect(mockApiGatewaySend).not.toHaveBeenCalled();
+      });
+
+      it('returns 500 when the connection record is missing userId', async () => {
+        mockDynamoSend.mockResolvedValueOnce({
+          Item: {
+            connectionId: { S: 'test-conn-id' },
+            leagueId: { N: '10' },
+            // userId intentionally absent — a corrupted connection record.
+          },
+        });
+
+        const event = makeEvent({
+          routeKey: '$default',
+          connectionId: 'test-conn-id',
+          body: JSON.stringify({ type: 'requestUserList' }),
+        });
+
+        const result = asResult(await handler(event));
+        expect(result.statusCode).toBe(500);
+        expect(result.body).toBe('Invalid connection state');
+        expect(mockApiGatewaySend).not.toHaveBeenCalled();
+      });
+    });
+
     it('handles empty body', async () => {
       const event = makeEvent({
         routeKey: '$default',

@@ -591,6 +591,65 @@ async function getLeagueConnections(
 }
 
 /**
+ * Handle a client-initiated request for a fresh presence snapshot.
+ *
+ * On reconnect, `userJoined`/`userLeft` events that fired while the client
+ * was disconnected are lost, leaving `onlineTeamIds` stale until the next
+ * full page mount. The `$connect` handler already pushes a fresh USER_LIST
+ * on every new connection, but that broadcast is best-effort (LDB-028) —
+ * this gives the client an explicit way to re-sync presence without waiting
+ * for a full remount.
+ */
+async function handleRequestUserList(
+  connectionId: string,
+  event: APIGatewayProxyWebsocketEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  try {
+    const existing = await dynamoClient.send(
+      new GetItemCommand({
+        TableName: connectionsTable,
+        Key: { connectionId: { S: connectionId } },
+      }),
+    );
+
+    const leagueIdStr = existing.Item?.['leagueId']?.N;
+    if (!leagueIdStr) {
+      // No league context on this connection — nothing to refresh.
+      return { statusCode: 200, body: 'No league context' };
+    }
+
+    const userIdStr = existing.Item?.['userId']?.N;
+    if (!userIdStr) {
+      LOGGER.error('Connection missing userId', { connectionId });
+      return { statusCode: 500, body: 'Invalid connection state' };
+    }
+
+    const leagueId = parseInt(leagueIdStr, 10);
+    const userId = parseInt(userIdStr, 10);
+    const username = existing.Item?.['username']?.S ?? '';
+
+    const peers = await getLeagueConnections(leagueId, connectionId);
+    const endpoint = buildApiGatewayEndpoint(event);
+    const userListMsg = {
+      type: 'USER_LIST',
+      leagueId,
+      users: [
+        ...peers.map((p) => ({ userId: p.userId, username: p.username })),
+        { userId, username },
+      ],
+    };
+    await sendMessageToConnection(endpoint, connectionId, userListMsg);
+
+    return { statusCode: 200, body: 'User list sent' };
+  } catch (error) {
+    LOGGER.warn('Failed to handle requestUserList', toError(error), {
+      connectionId,
+    });
+    return { statusCode: 500, body: 'Failed to send user list' };
+  }
+}
+
+/**
  * Handle disconnection event - remove connection ID from DynamoDB
  * and broadcast USER_LEFT to remaining league peers.
  */
@@ -913,6 +972,10 @@ async function handleDefault(
         connectionId,
         message.data || { viewContext: 'general' },
       );
+    }
+
+    if (message.type === 'requestUserList') {
+      return await handleRequestUserList(connectionId, event);
     }
 
     if (message.type === 'ping') {

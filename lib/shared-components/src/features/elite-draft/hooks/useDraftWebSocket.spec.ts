@@ -548,3 +548,53 @@ describe('useDraftWebSocket — heartbeat (LS-8880)', () => {
     expect(mockInstance.setHeartbeatInterval).toHaveBeenCalledWith(15_000);
   });
 });
+
+// ── Presence re-sync on reconnect (LDB-028) ────────────────────────────────
+
+/**
+ * `userJoined`/`userLeft` events that fire while the client is disconnected
+ * are missed entirely, so `onlineTeamIds` can go stale after a reconnect. The
+ * server pushes a fresh USER_LIST on every new connection, but that push is
+ * best-effort — this asserts the client also explicitly re-requests one so
+ * presence recovers even if the server-side push is dropped, instead of
+ * staying stale until the next full page mount.
+ */
+describe('useDraftWebSocket — presence re-sync on reconnect (LDB-028)', () => {
+  function reconnect() {
+    act(() => mockInstance._emit('connected'));
+    act(() => mockInstance._emit('disconnected'));
+    act(() => mockInstance._emit('connected'));
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('does not request a user list on the initial connect', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => mockInstance._emit('connected'));
+
+    expect(mockInstance.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'requestUserList' }),
+    );
+  });
+
+  it('sends a requestUserList message on a genuine reconnect', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    reconnect();
+
+    expect(mockInstance.send).toHaveBeenCalledWith({
+      type: 'requestUserList',
+      leagueId: params.leagueId,
+    });
+  });
+});

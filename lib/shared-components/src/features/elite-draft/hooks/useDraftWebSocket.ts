@@ -368,6 +368,7 @@ export function useDraftWebSocket({
     connected: wsConnected,
     connect: wsConnect,
     disconnect: wsDisconnect,
+    sendMessage,
   } = useWebSocket({
     url: websocketUrl,
     token,
@@ -513,6 +514,14 @@ export function useDraftWebSocket({
       return 'failed';
     };
 
+    // Presence (onlineTeamIds) is WS-only — there is no GraphQL refetch to
+    // fall back on. The server pushes a fresh USER_LIST on every new
+    // connection, but that push is best-effort, so explicitly re-request one
+    // here too: userJoined/userLeft events missed while disconnected would
+    // otherwise leave presence stale until the next full page mount
+    // (LDB-028).
+    if (leagueId) sendMessage({ type: 'requestUserList', leagueId });
+
     void refetchWithRetry('current pick', () =>
       refetchCurrentPick({ draftId }),
     );
@@ -544,6 +553,8 @@ export function useDraftWebSocket({
   }, [
     wsConnected,
     draftId,
+    leagueId,
+    sendMessage,
     showToast,
     refetchCurrentPick,
     refetchPickHistory,
