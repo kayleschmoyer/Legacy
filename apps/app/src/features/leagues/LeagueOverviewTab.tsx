@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert, type RefreshControlProps, ScrollView } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   LeagueActivityFeed,
@@ -57,6 +57,8 @@ interface LeagueOverviewTabProps {
   onViewAllStandings: () => void;
   onInviteShare: () => void;
   onPlayerPress: (playerId: number) => void;
+  /** Pull-to-refresh control for the tab's `ScrollView` (LS-8847). */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 // ─── Section — a single bordered "glass" surface with a title/sub header,
@@ -165,6 +167,7 @@ export function LeagueOverviewTab({
   onViewAllStandings,
   onInviteShare,
   onPlayerPress,
+  refreshControl,
 }: LeagueOverviewTabProps): React.JSX.Element {
   const isFootball = league.sport === Sport.Football;
 
@@ -187,7 +190,7 @@ export function LeagueOverviewTab({
   ];
 
   return (
-    <ScrollView>
+    <ScrollView refreshControl={refreshControl}>
       <YStack padding="$3" gap="$5">
         {/* Draft Live Banner */}
         {isDrafting ? (

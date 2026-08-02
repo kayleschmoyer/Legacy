@@ -16,6 +16,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
+import { usePullToRefresh } from '../../../common/hooks/usePullToRefresh';
 import { useSystemBackAction } from '../../../common/hooks/useSystemBackAction';
 import { toPlayerDetailIdParam } from '../../../common/utilities/RouteUtils';
 import BaseballHomeScreen from '../../../screens/BaseballHomeScreen';
@@ -73,6 +74,8 @@ export default function HomeTab() {
   });
   const archivedCount =
     archivedCachedData?.getArchivedUserLeagueSummaries?.length ?? null;
+
+  const { refreshControl } = usePullToRefresh([() => refetch()]);
 
   const leagues = useMemo<HomeLeagueSummary[]>(
     () => data?.getUserLeagueSummaries ?? [],
@@ -218,6 +221,7 @@ export default function HomeTab() {
           onBrowseStats={() => router.navigate('PlayerStats')}
           onViewSport={handleViewSport}
           onStartMockDraft={() => router.push('/baseball/mock-draft')}
+          refreshControl={refreshControl}
         />
       </View>
 

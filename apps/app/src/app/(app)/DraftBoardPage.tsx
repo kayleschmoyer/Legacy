@@ -6,6 +6,10 @@ import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import { toIntId } from '../../common/utilities/RouteUtils';
 
+// Deliberately no pull-to-refresh here (LS-8847): the board is WebSocket-driven
+// and already live-updates via `EliteDraftBoardScreen`'s socket connection, and
+// a pull gesture stacked on the board's own drag/tap interactions for picks
+// would compete with them rather than help — see the ticket's Open Questions.
 export default function DraftBoardPage() {
   const { leagueId: leagueIdParam } = useLocalSearchParams();
   const router = useRouter();

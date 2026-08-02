@@ -19,6 +19,7 @@ import {
   useDebouncedValue,
 } from '@legacy-sports/shared-components';
 import { useFootballPlayersQuery } from '@legacy-sports/graphql';
+import { usePullToRefresh } from '../../../common/hooks/usePullToRefresh';
 import {
   sanitizeSearchParam,
   toPlayerDetailIdParam,
@@ -177,6 +178,8 @@ function BaseballCardFeed({
 
   const accumulated = useAccumulatedPages(data, loading, cursor, isResetRef);
 
+  const { refreshing, onRefresh } = usePullToRefresh([() => refetch()]);
+
   const rows: PlayerFeedRow[] = useMemo(
     () =>
       accumulated.map((player) => ({
@@ -250,6 +253,8 @@ function BaseballCardFeed({
       isLoadingMore={isLoadingMore}
       onEndReached={handleEndReached}
       onOverflowPress={onOverflowPress}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
     />
   );
 }
@@ -299,6 +304,8 @@ function FootballCardFeed({
 
   const nodes = useMemo(() => data?.footballPlayers?.nodes ?? [], [data]);
   const accumulated = useAccumulatedPages(nodes, loading, cursor, isResetRef);
+
+  const { refreshing, onRefresh } = usePullToRefresh([() => refetch()]);
 
   const rows: PlayerFeedRow[] = useMemo(() => {
     const sorted = [...accumulated].sort((a, b) => {
@@ -372,6 +379,8 @@ function FootballCardFeed({
       isLoadingMore={isLoadingMore}
       onEndReached={handleEndReached}
       onOverflowPress={onOverflowPress}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
     />
   );
 }

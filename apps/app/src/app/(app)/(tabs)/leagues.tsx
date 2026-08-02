@@ -7,6 +7,7 @@ import type { HomeLeagueSummary } from '@legacy-sports/shared-components';
 import { LeaguesLedgerScreen } from '@legacy-sports/shared-components/leagues';
 import { useGetUserLeagueSummariesQuery } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
+import { usePullToRefresh } from '../../../common/hooks/usePullToRefresh';
 
 /**
  * The Leagues tab renders the shared "Clubhouse Ledger" screen from
@@ -23,10 +24,12 @@ export default function LeaguesTab() {
   const { top: topInset } = useSafeAreaInsets();
   const userInfo = useAuthorizedUserInfo();
 
-  const { data, loading } = useGetUserLeagueSummariesQuery({
+  const { data, loading, refetch } = useGetUserLeagueSummariesQuery({
     fetchPolicy: 'cache-and-network',
     skip: !userInfo?.id,
   });
+
+  const { refreshControl } = usePullToRefresh([() => refetch()]);
 
   const leagues = useMemo<HomeLeagueSummary[]>(
     () => data?.getUserLeagueSummaries ?? [],
@@ -76,6 +79,7 @@ export default function LeaguesTab() {
       onCreateLeague={() => router.navigate('/league/create')}
       onJoinOrBrowse={showAddActions}
       onBrowseLeagues={() => router.navigate('/league-discovery')}
+      refreshControl={refreshControl}
     />
   );
 }

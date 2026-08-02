@@ -70,6 +70,9 @@ export interface PlayersCardFeedProps {
   onOverflowPress?: () => void;
   overflowLabel?: string;
   testID?: string;
+  /** Pull-to-refresh state for the card list (LS-8847). */
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }
 
 /**
@@ -107,6 +110,8 @@ export function PlayersCardFeed({
   onOverflowPress,
   overflowLabel = 'Compare',
   testID = 'players-card-feed',
+  refreshing,
+  onRefresh,
 }: PlayersCardFeedProps) {
   const listData = useMemo<ListItem[]>(() => {
     const items: ListItem[] = rows.map((row) => ({ kind: 'player', row }));
@@ -224,6 +229,8 @@ export function PlayersCardFeed({
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
               onEndReached={hasMore ? onEndReached : undefined}
               onEndReachedThreshold={0.5}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
               ListFooterComponent={
                 isLoadingMore ? (
                   <YStack alignItems="center" paddingVertical={16}>

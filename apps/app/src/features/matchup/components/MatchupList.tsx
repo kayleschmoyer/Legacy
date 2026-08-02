@@ -9,6 +9,9 @@ export interface MatchupListProps {
   onMatchupPress?: (matchup: AppMatchupFragment) => void;
   loading?: boolean;
   emptyMessage?: string;
+  /** Pull-to-refresh state for the list (LS-8847). */
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }
 
 /**
@@ -20,6 +23,8 @@ export function MatchupList({
   onMatchupPress,
   loading = false,
   emptyMessage = 'No matchups found',
+  refreshing,
+  onRefresh,
 }: MatchupListProps) {
   if (loading) {
     return (
@@ -49,6 +54,8 @@ export function MatchupList({
         />
       )}
       contentContainerStyle={{ padding: 8 }}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
     />
   );
 }

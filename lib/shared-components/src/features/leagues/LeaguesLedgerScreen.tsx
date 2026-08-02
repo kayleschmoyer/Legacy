@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
+import type { RefreshControlProps } from 'react-native';
 import { Trophy } from '@tamagui/lucide-icons';
 import { formatDraftDate } from '@legacy-sports/utils';
 import {
@@ -70,6 +71,8 @@ export interface LeaguesLedgerScreenProps {
   onJoinOrBrowse: () => void;
   /** Empty-state CTA — goes straight to league discovery. */
   onBrowseLeagues: () => void;
+  /** Pull-to-refresh control for the ledger's `ScrollView` (LS-8847). */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 /* ─── Ordering ─── */
@@ -450,6 +453,7 @@ export function LeaguesLedgerScreen({
   onCreateLeague,
   onJoinOrBrowse,
   onBrowseLeagues,
+  refreshControl,
 }: LeaguesLedgerScreenProps) {
   const rows = useMemo(() => sortLedgerRows(leagues), [leagues]);
   const aggregateRecord = useMemo(
@@ -472,7 +476,12 @@ export function LeaguesLedgerScreen({
   }
 
   return (
-    <ScrollView flex={1} backgroundColor="$background" paddingTop={topInset}>
+    <ScrollView
+      flex={1}
+      backgroundColor="$background"
+      paddingTop={topInset}
+      refreshControl={refreshControl}
+    >
       <YStack paddingVertical={24} paddingHorizontal={20} gap={18}>
         <LedgerMasthead
           leagueCount={leagues.length}

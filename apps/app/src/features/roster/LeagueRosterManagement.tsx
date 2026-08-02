@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, YStack } from 'tamagui';
+import type { RefreshControlProps } from 'react-native';
 import {
   PendingTradeOffers,
   PendingWaiverClaims,
@@ -39,6 +40,8 @@ export interface LeagueRosterManagementProps {
   totalWeeks?: number | null;
   /** The viewer's team id — enables pending trade/waiver banners. */
   myTeamId?: number | null;
+  /** Pull-to-refresh control for the tab's `ScrollView` (LS-8847). */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 /**
@@ -61,6 +64,7 @@ export function LeagueRosterManagement({
   currentWeek,
   totalWeeks,
   myTeamId,
+  refreshControl,
 }: LeagueRosterManagementProps): React.JSX.Element {
   const effectiveCurrent = currentWeek ?? 1;
   const effectiveTotal = totalWeeks ?? effectiveCurrent;
@@ -75,7 +79,7 @@ export function LeagueRosterManagement({
   const showWeekNav = currentWeek != null && effectiveTotal > 1;
 
   return (
-    <ScrollView>
+    <ScrollView refreshControl={refreshControl}>
       <YStack padding="$4" gap="$4">
         {showWeekNav && (
           <RosterWeekNavigation

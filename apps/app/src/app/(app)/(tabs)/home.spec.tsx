@@ -6,6 +6,7 @@ import type { Text as RNText, View as RNView } from 'react-native';
 // ── Subject ───────────────────────────────────────────────────────────────────
 
 import HomeTab from './home';
+import type { PullToRefreshControlElement } from '../../../common/hooks/usePullToRefresh';
 
 type RNComponents = {
   View: typeof RNView;
@@ -96,7 +97,13 @@ type MobileHomeScreenMockProps = {
   onSeeAllLeagues?: () => void;
   onOpenProfile?: () => void;
   onViewMatchup?: (summary: Record<string, unknown>) => void;
+  refreshControl?: PullToRefreshControlElement;
 };
+
+// Capture the refreshControl element so pull-to-refresh tests can assert it's
+// wired to the screen's refetch (LS-8847).
+let capturedRefreshControl: MobileHomeScreenMockProps['refreshControl'] | null =
+  null;
 
 jest.mock('@legacy-sports/shared-components', () => ({
   MobileHomeScreen: ({
@@ -110,6 +117,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     onSeeAllLeagues,
     onOpenProfile,
     onViewMatchup,
+    refreshControl,
   }: MobileHomeScreenMockProps) => {
     capturedOnViewSport = onViewSport;
     capturedTopInset = topInset;
@@ -119,6 +127,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     capturedOnSeeAllLeagues = onSeeAllLeagues ?? null;
     capturedOnOpenProfile = onOpenProfile ?? null;
     capturedOnViewMatchup = onViewMatchup ?? null;
+    capturedRefreshControl = refreshControl ?? null;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
     return <View testID={testID ?? 'home-screen'}>{onThisDay}</View>;
@@ -565,5 +574,38 @@ describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
       pathname: '/baseball/league/[leagueId]',
       params: { leagueId: '7' },
     });
+  });
+});
+
+describe('HomeTab pull-to-refresh (LS-8847)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = {};
+    capturedRefreshControl = null;
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: [] },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    mockGetArchivedLazy.mockReturnValue([
+      jest.fn(),
+      { data: null, loading: false },
+    ]);
+    mockGetArchivedCached.mockReturnValue({ data: null });
+  });
+
+  it('passes MobileHomeScreen a refreshControl wired to the leagues refetch', async () => {
+    render(<HomeTab />);
+
+    expect(capturedRefreshControl).toBeTruthy();
+    expect(typeof capturedRefreshControl?.props.onRefresh).toBe('function');
+
+    await act(async () => {
+      capturedRefreshControl?.props.onRefresh?.();
+      await new Promise((resolve) => setImmediate(resolve));
+    });
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
 });

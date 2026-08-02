@@ -35,6 +35,7 @@ import {
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
 import { LeagueOverviewTab } from '../../../../features/leagues/LeagueOverviewTab';
+import { usePullToRefresh } from '../../../../common/hooks/usePullToRefresh';
 import { useStandings } from '../../../../features/matchup/hooks/useStandings';
 import { CommissionerScreen } from '../../../../features/commissioner/CommissionerScreen';
 import { MatchupList } from '../../../../features/matchup/components/MatchupList';
@@ -107,23 +108,33 @@ export default function FootballLeagueId(): React.JSX.Element {
         : '';
   const numLeagueId = parseInt(leagueIdStr, 10);
 
-  const { matchups: rawMatchups, loading: matchupsLoading } =
-    useMatchupsForLeague(isNaN(numLeagueId) ? null : numLeagueId);
+  const {
+    matchups: rawMatchups,
+    loading: matchupsLoading,
+    refetch: refetchMatchups,
+  } = useMatchupsForLeague(isNaN(numLeagueId) ? null : numLeagueId);
 
-  const { data: leagueData, loading: leagueLoading } = useGetLeagueByIdQuery({
+  const {
+    data: leagueData,
+    loading: leagueLoading,
+    refetch: refetchLeague,
+  } = useGetLeagueByIdQuery({
     skip: isNaN(numLeagueId),
     variables: {
       id: numLeagueId,
     },
   });
 
-  const { data: positionsData, loading: positionsLoading } =
-    useGetPositionsForLeagueQuery({
-      skip: isNaN(numLeagueId),
-      variables: {
-        leagueId: numLeagueId,
-      },
-    });
+  const {
+    data: positionsData,
+    loading: positionsLoading,
+    refetch: refetchPositions,
+  } = useGetPositionsForLeagueQuery({
+    skip: isNaN(numLeagueId),
+    variables: {
+      leagueId: numLeagueId,
+    },
+  });
 
   const [
     getUserTeamId,
@@ -159,6 +170,7 @@ export default function FootballLeagueId(): React.JSX.Element {
     data: teamMembersData,
     loading: teamMembersLoading,
     error: teamMembersError,
+    refetch: refetchTeamMembers,
   } = useGetTeamMembersQuery({
     skip: !userTeamId,
     variables: {
@@ -175,11 +187,11 @@ export default function FootballLeagueId(): React.JSX.Element {
     standings,
     loading: standingsLoading,
     error: standingsError,
+    refetch: refetchStandings,
   } = useStandings(isNaN(numLeagueId) ? null : numLeagueId);
 
-  const { bracket: playoffBracket } = usePlayoffBracket(
-    isNaN(numLeagueId) ? null : numLeagueId,
-  );
+  const { bracket: playoffBracket, refetch: refetchPlayoffBracket } =
+    usePlayoffBracket(isNaN(numLeagueId) ? null : numLeagueId);
 
   const scoring = useLeagueScoringSettings(
     isNaN(numLeagueId) ? undefined : numLeagueId,
@@ -405,6 +417,25 @@ export default function FootballLeagueId(): React.JSX.Element {
     teamMembersData?.teamMembers?.filter((m) => m?.positionId != null).length ??
     0;
 
+  // Pull-to-refresh: this route fully unmounts inactive tabs (unlike the
+  // baseball league page's keep-mounted pattern), but each tab still owns
+  // only its own queries so the refresh contract stays identical (LS-8847).
+  const overviewRefresh = usePullToRefresh([
+    () => refetchLeague(),
+    () => refetchStandings(),
+    () => scoring.refetch(),
+  ]);
+  const rosterRefresh = usePullToRefresh(
+    userTeamId != null
+      ? [() => refetchPositions(), () => refetchTeamMembers()]
+      : [() => refetchPositions()],
+  );
+  const matchupsRefresh = usePullToRefresh([() => refetchMatchups()]);
+  const standingsRefresh = usePullToRefresh([
+    () => refetchStandings(),
+    () => refetchPlayoffBracket(),
+  ]);
+
   if (leagueLoading) {
     return <Spinner />;
   }
@@ -488,6 +519,7 @@ export default function FootballLeagueId(): React.JSX.Element {
                   params: { playerId: String(playerId), playerName: '' },
                 })
               }
+              refreshControl={overviewRefresh.refreshControl}
             />
           </YStack>
         )}
@@ -518,6 +550,7 @@ export default function FootballLeagueId(): React.JSX.Element {
               currentWeek={league?.currentWeekNumber}
               totalWeeks={league?.totalMatchups}
               myTeamId={userTeamId}
+              refreshControl={rosterRefresh.refreshControl}
             />
           </YStack>
         )}
@@ -539,6 +572,8 @@ export default function FootballLeagueId(): React.JSX.Element {
                   });
                 }
               }}
+              refreshing={matchupsRefresh.refreshing}
+              onRefresh={matchupsRefresh.onRefresh}
             />
           </YStack>
         )}
@@ -605,7 +640,7 @@ export default function FootballLeagueId(): React.JSX.Element {
 
         {selectedTab === 'standings' && (
           <YStack flex={1}>
-            <ScrollView>
+            <ScrollView refreshControl={standingsRefresh.refreshControl}>
               <YStack padding="$3" space="$4">
                 <StandingsTable
                   standings={standings}

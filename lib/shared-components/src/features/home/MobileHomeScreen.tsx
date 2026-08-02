@@ -12,6 +12,7 @@
  */
 import React, { useMemo } from 'react';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
+import type { RefreshControlProps } from 'react-native';
 import { ChevronRight, Plus, TrendingUp, Users } from '@tamagui/lucide-icons';
 import { formatDraftDate } from '@legacy-sports/utils';
 import {
@@ -80,6 +81,12 @@ export interface MobileHomeScreenProps extends HomeScreenProps {
    * `onThisDay`, which is also what the delegated states render.
    */
   onThisDayCondensed?: React.ReactNode;
+  /**
+   * Pull-to-refresh control for the returning-user layout's `ScrollView`
+   * (LS-8847). Not forwarded to the delegated loading/error/new-user states —
+   * those come from the shared `HomeScreen`, which stays unchanged for web.
+   */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 /* ─── Small shared bits ─── */
@@ -650,6 +657,7 @@ export function MobileHomeScreen(
     onBrowseStats,
     onStartMockDraft,
     mockDraftAtCap,
+    refreshControl,
   } = props;
 
   const sorted = useMemo(() => sortByUrgency(leagues), [leagues]);
@@ -668,7 +676,11 @@ export function MobileHomeScreen(
   const onThisDayNode = onThisDayCondensed ?? onThisDay;
 
   return (
-    <ScrollView testID="home-screen" backgroundColor="$background">
+    <ScrollView
+      testID="home-screen"
+      backgroundColor="$background"
+      refreshControl={refreshControl}
+    >
       <YStack
         testID="home-content"
         width="100%"
