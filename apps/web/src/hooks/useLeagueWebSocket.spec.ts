@@ -76,6 +76,24 @@ describe('useLeagueWebSocket', () => {
     expect(onDraftStarted).toHaveBeenCalledTimes(1);
   });
 
+  it('passes the notification payload (including matchupId) to onMatchupStatsComplete', () => {
+    const onMatchupStatsComplete = jest.fn();
+    renderHook(() => useLeagueWebSocket({ onMatchupStatsComplete }));
+
+    const notification = {
+      type: 'matchup-stats-complete',
+      leagueId: 1,
+      matchupId: 42,
+      completedAt: '2026-01-01T00:00:00.000Z',
+    };
+    mockClient._emit(
+      ClientNotificationType.MATCHUP_STATS_COMPLETE,
+      notification,
+    );
+
+    expect(onMatchupStatsComplete).toHaveBeenCalledWith(notification);
+  });
+
   it('does not subscribe when there is no client', () => {
     mockUseLeagueWebSocketClient.mockReturnValue({
       client: null,

@@ -133,13 +133,19 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     refetch: refetchMatchup,
   } = useMatchupById(matchupId);
 
-  // Refetch scores when the server signals stats have been recalculated.
+  // Refetch scores when the server signals stats have been recalculated —
+  // but only for the matchup currently displayed on this tab, since the
+  // notification is broadcast league-wide and other open matchups
+  // completing shouldn't trigger a refetch here (LS-6358).
   const refetchMatchupsRef = useRef(refetchMatchups);
   refetchMatchupsRef.current = refetchMatchups;
   const refetchMatchupRef = useRef(refetchMatchup);
   refetchMatchupRef.current = refetchMatchup;
+  const matchupIdRef = useRef(matchupId);
+  matchupIdRef.current = matchupId;
   useLeagueWebSocket({
-    onMatchupStatsComplete: () => {
+    onMatchupStatsComplete: (notification) => {
+      if (notification.matchupId !== matchupIdRef.current) return;
       void refetchMatchupsRef.current();
       void refetchMatchupRef.current();
     },

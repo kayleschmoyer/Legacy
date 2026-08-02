@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import type {
   LeagueChatMessageNotification,
+  MatchupStatsCompleteNotification,
   SubscriptionUpdatedNotification,
 } from '@legacy-sports/websocket-client';
 import { useLeagueWebSocketClient } from '../context/LeagueWebSocketContext';
@@ -26,8 +27,12 @@ export interface UseLeagueWebSocketOptions {
   onRosterUpdate?: () => void;
   /** Fired when a trade offer is sent / accepted / rejected / cancelled. */
   onTradeOffer?: () => void;
-  /** Fired when all matchup stats have finished loading. */
-  onMatchupStatsComplete?: () => void;
+  /**
+   * Fired when all matchup stats have finished loading. Carries the
+   * notification payload (including `matchupId`) so callers can filter
+   * out completions for matchups they aren't currently displaying.
+   */
+  onMatchupStatsComplete?: (n: MatchupStatsCompleteNotification) => void;
   /** Fired when a new chat message arrives in this league's chat room. */
   onLeagueChatMessage?: (n: LeagueChatMessageNotification) => void;
   /**
@@ -118,8 +123,10 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
     );
 
     unsubs.push(
-      client.on(ClientNotificationType.MATCHUP_STATS_COMPLETE, () => {
-        onMatchupStatsCompleteRef.current?.();
+      client.on(ClientNotificationType.MATCHUP_STATS_COMPLETE, (n) => {
+        onMatchupStatsCompleteRef.current?.(
+          n as MatchupStatsCompleteNotification,
+        );
       }),
     );
 

@@ -47,8 +47,11 @@ jest.mock('../../../../hooks/useMatchup', () => ({
   useMatchupsForLeague: (leagueId: number | null) =>
     mockUseMatchupsForLeague(leagueId),
 }));
+const mockUseLeagueWebSocket = jest.fn<{ connected: boolean }, [unknown]>(
+  () => ({ connected: true }),
+);
 jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
-  useLeagueWebSocket: () => undefined,
+  useLeagueWebSocket: (options: unknown) => mockUseLeagueWebSocket(options),
 }));
 jest.mock('../../../../lib/scoring', () => ({
   useLeagueScoringSettings: () => ({
@@ -180,6 +183,40 @@ describe('MatchupTab — football-awareness', () => {
     );
     const meta = container.querySelector('.meta');
     expect(meta?.textContent).toContain('Head-to-Head');
+  });
+});
+
+describe('MatchupTab — matchup-scoped stats-complete refetch (LS-6358)', () => {
+  it('refetches when matchup-stats-complete fires for the currently displayed matchup', () => {
+    const refetch = jest.fn();
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: null,
+      refetch,
+    });
+    renderTab({}, { initialMatchupId: '1' });
+
+    const { onMatchupStatsComplete } = mockUseLeagueWebSocket.mock.calls[0][0];
+    onMatchupStatsComplete({ matchupId: 1, leagueId: 1 });
+
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('does not refetch when matchup-stats-complete fires for a different matchup', () => {
+    const refetch = jest.fn();
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: null,
+      refetch,
+    });
+    renderTab({}, { initialMatchupId: '1' });
+
+    const { onMatchupStatsComplete } = mockUseLeagueWebSocket.mock.calls[0][0];
+    onMatchupStatsComplete({ matchupId: 999, leagueId: 1 });
+
+    expect(refetch).not.toHaveBeenCalled();
   });
 });
 
