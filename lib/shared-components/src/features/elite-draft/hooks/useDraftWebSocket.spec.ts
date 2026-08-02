@@ -171,6 +171,72 @@ describe('useDraftWebSocket — draft completion (LS-3823)', () => {
   });
 });
 
+// ── Paused draft must never render as complete (LS-8849) ───────────────────
+
+/**
+ * pauseDraft only succeeds when league.draftStatus is 'in-progress' (see
+ * pause-resume-draft.ts), so a DraftPaused WS event is server proof the draft
+ * is not complete. Before this fix, `draftComplete` was a one-way ratchet:
+ * once set true by a stale/misrouted DraftCompleted or missing-nextPick
+ * DraftPickMade event, nothing ever cleared it — a subsequent, legitimate
+ * DraftPaused event left the draft room permanently stuck on the
+ * "Draft Complete!" banner instead of the paused overlay.
+ */
+describe('useDraftWebSocket — paused draft resets stale completion state (LS-8849)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('calls setDraftComplete(false) when DraftPaused fires', () => {
+    const params = makeDefaultParams();
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PAUSED, {
+        leagueId: 1,
+        pausedAt: '2026-07-31T01:13:53.000Z',
+      });
+    });
+
+    expect(params.setDraftPaused).toHaveBeenCalledWith(true);
+    expect(params.setDraftComplete).toHaveBeenCalledWith(false);
+  });
+
+  it('clears a previously-latched draftComplete=true when the draft is paused', () => {
+    const params = makeDefaultParams();
+    jest.useFakeTimers();
+
+    renderHook(() => useDraftWebSocket(params));
+
+    // A stale/misrouted "no nextPick" pick notification latches draftComplete.
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, {
+        draftId: 42,
+        pickId: 104,
+        teamId: 10,
+        playerId: 999,
+        round: 26,
+        pickNumber: 4,
+        overallPick: 104,
+        wasAutoPick: false,
+        currentPickDeadline: null,
+      });
+    });
+    expect(params.setDraftComplete).toHaveBeenLastCalledWith(true);
+
+    // The commissioner then pauses — the server-confirmed event must win.
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PAUSED, {
+        leagueId: 1,
+      });
+    });
+    expect(params.setDraftComplete).toHaveBeenLastCalledWith(false);
+
+    jest.useRealTimers();
+  });
+});
+
 // ── Reconnect recovery (LS-8506) ───────────────────────────────────────────
 
 /**

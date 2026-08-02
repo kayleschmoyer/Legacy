@@ -146,3 +146,38 @@ describe('NextStepControl — paused draft guard (LS-8840)', () => {
     expect(screen.getByTestId('start-draft-button')).toBeDisabled();
   });
 });
+
+/**
+ * Regression guard for LS-8849, layered on top of the LS-8840 guard above:
+ * clicking through to the draft board while paused must call
+ * onNavigateToDraftBoard (never initializeDraft), and the disabled button
+ * for a paused non-live draft should read distinctly from the generic
+ * "Draft In Progress..." label.
+ */
+describe('NextStepControl — paused draft status (LS-8849)', () => {
+  it('calls onNavigateToDraftBoard, never initializeDraft, when clicked while paused', () => {
+    mockDraftMode = 'live';
+    const onNavigateToDraftBoard = jest.fn();
+    render(
+      <NextStepControl
+        {...defaultProps}
+        draftStatus="paused"
+        onNavigateToDraftBoard={onNavigateToDraftBoard}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('go-to-draft-board'));
+
+    expect(onNavigateToDraftBoard).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('disables the button and shows "Draft Paused" when the draft is paused and not live', () => {
+    mockDraftMode = 'automated';
+    render(<NextStepControl {...defaultProps} draftStatus="paused" />);
+
+    const button = screen.getByTestId('start-draft-button');
+    expect(button).toBeDisabled();
+    expect(screen.getByText('Draft Paused')).toBeInTheDocument();
+  });
+});

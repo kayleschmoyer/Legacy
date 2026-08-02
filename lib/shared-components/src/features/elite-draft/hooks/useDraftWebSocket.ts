@@ -272,6 +272,14 @@ export function useDraftWebSocket({
   const handleDraftPaused = useCallback(
     (notification?: DraftPausedNotification) => {
       setDraftPaused(true);
+      // pauseDraft only succeeds from draftStatus 'in-progress' (see
+      // pause-resume-draft.ts), so a DraftPaused event is proof the draft is
+      // not complete. Without this reset, a draft-complete flag latched
+      // earlier from a stale/misrouted WS notification (handleDraftPickMade's
+      // missing-nextPick inference, or handleDraftCompleted) can never be
+      // cleared, permanently stranding the draft room on "Draft Complete!"
+      // even while the server correctly reports 'paused' (LS-8849).
+      setDraftComplete(false);
       setLiveMessage(
         notification?.pausedAt
           ? `Draft paused at ${new Date(notification.pausedAt).toLocaleTimeString()}`
@@ -279,7 +287,7 @@ export function useDraftWebSocket({
       );
       showToast('Draft paused by commissioner', 'warning');
     },
-    [showToast, setDraftPaused, setLiveMessage],
+    [showToast, setDraftComplete, setDraftPaused, setLiveMessage],
   );
 
   const handleDraftResumed = useCallback(

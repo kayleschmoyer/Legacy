@@ -316,6 +316,10 @@ export function NextStepControl({
     if (loading || initializeDraftLoading || matchupsLoading)
       return 'Processing...';
     if (isGameSelectionInProgress) return 'Game Selection In Progress...';
+    // Automated drafts never reach 'paused' server-side today, but the
+    // button is defensively disabled for it (see isDraftInProgress above) —
+    // label it distinctly from the generic in-progress case (LS-8849).
+    if (draftStatus === 'paused') return 'Draft Paused';
     if (isDraftInProgress) return 'Draft In Progress...';
     if (isDraftCompleted && actionType === 'draft') return 'Draft Completed';
 
