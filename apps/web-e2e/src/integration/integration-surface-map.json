@@ -143,6 +143,11 @@
       "apps/web/src/features/roster/**",
       "apps/web/src/features/management/**",
       "apps/web/src/components/roster/**"
+    ],
+    "apps/web-e2e/src/integration/tests/wait-for-join-page-helpers.contract.spec.ts": [
+      "apps/web-e2e/src/integration/helpers/wait-for-join-page.ts",
+      "apps/web-e2e/src/integration/helpers/graphql.ts",
+      "apps/web-e2e/src/integration/helpers/gql-fetch.ts"
     ]
   }
 }

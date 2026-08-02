@@ -148,8 +148,14 @@ describe('integration-surface-map.json coverage', () => {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     // recursive: true (Node 20.1+) so specs nested under subdirectories are
     // discovered, not just top-level files (mirrors e2e-surface-map.test.mjs).
+    // Match on '.spec.ts' (not '.integration.spec.ts') — the Playwright
+    // runner picks up every '*.spec.ts' file under testDir regardless of the
+    // pre-extension suffix (e.g. '.contract.spec.ts' pure-unit specs live
+    // here too), and a narrower filter here silently excludes them from the
+    // completeness check the same way it excluded them from selection
+    // (LS-8904).
     const onDisk = readdirSync(specsDir, { recursive: true })
-      .filter((f) => f.endsWith('.integration.spec.ts'))
+      .filter((f) => f.endsWith('.spec.ts'))
       .map(
         (f) =>
           `apps/web-e2e/src/integration/tests/${f.split(path.sep).join('/')}`,
