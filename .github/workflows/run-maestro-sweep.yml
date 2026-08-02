@@ -284,5 +284,5 @@ jobs:
           name: maestro-screenshots-${{ matrix.variant }}
           path: |
             maestro/artifacts/**
-          retention-days: 14
+          retention-days: 7
           if-no-files-found: warn

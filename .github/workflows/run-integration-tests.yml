@@ -226,7 +226,7 @@ jobs:
             playwright-report
             test-results.json
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
 
       - name: "Post integration-results comment on PR"
         if: always() && hashFiles('test-results.json') != ''

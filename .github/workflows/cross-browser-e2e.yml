@@ -337,4 +337,4 @@ jobs:
           name: cross-browser-report-${{ matrix.browser }}
           path: playwright-report/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
