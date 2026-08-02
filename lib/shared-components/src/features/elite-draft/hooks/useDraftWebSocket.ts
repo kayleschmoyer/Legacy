@@ -357,7 +357,11 @@ export function useDraftWebSocket({
     [setOnlineUserIds],
   );
 
-  const { connected: wsConnected } = useWebSocket({
+  const {
+    connected: wsConnected,
+    connect: wsConnect,
+    disconnect: wsDisconnect,
+  } = useWebSocket({
     url: websocketUrl,
     token,
     leagueId: leagueId ?? undefined,
@@ -380,6 +384,48 @@ export function useDraftWebSocket({
       if (refetchDebounceRef.current) clearTimeout(refetchDebounceRef.current);
     };
   }, []);
+
+  // BFCache (back-forward cache) restoration recovery (LS-6792). iOS Safari
+  // and Android Chrome can restore a frozen page from BFCache with the old
+  // WebSocket object still reporting `readyState === OPEN` even though the
+  // underlying connection is dead — a plain `connect()` would see that and
+  // no-op ("Already connected"), leaving the user silently disconnected with
+  // no fresh handshake. Force a real close + reopen instead: `disconnect()`
+  // unconditionally tears down the socket and emits `disconnected`, then
+  // `connect()` opens a new one and emits `connected` on success. That
+  // `disconnected -> connected` edge is exactly what the reconnection
+  // recovery effect below already watches for, so it drives the full
+  // refetch without any duplicated notification-handler registration (the
+  // notification subscriptions live for the lifetime of the WebSocketClient
+  // instance in useWebSocket and are not re-created by connect/disconnect).
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      typeof window.addEventListener !== 'function'
+    ) {
+      return undefined;
+    }
+
+    const handlePageHide = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      // Proactively release the socket before the page freezes so it can't
+      // linger as a stale "open" connection while in the BFCache.
+      wsDisconnect();
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      wsDisconnect();
+      wsConnect();
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [wsConnect, wsDisconnect]);
 
   // Reconnection recovery
   const wsWasConnected = useRef(false);

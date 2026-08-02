@@ -411,3 +411,121 @@ describe('useDraftWebSocket — WS auth token rotation (LS-6788)', () => {
     expect(mockInstance.connect).toHaveBeenCalledTimes(1);
   });
 });
+
+// ── BFCache restoration recovery (LS-6792) ─────────────────────────────────
+
+/**
+ * iOS Safari and Android Chrome can restore a page from the BFCache
+ * (back-forward cache) with the previous WebSocket object still reporting
+ * `readyState === OPEN` even though the underlying connection is dead. A
+ * plain reconnect attempt no-ops against that stale state, so the user is
+ * left silently disconnected with duplicate/stale notification handlers.
+ * `pagehide`/`pageshow` (with `event.persisted`) must force a real
+ * close + reopen and drive the existing reconnect-refetch recovery.
+ */
+describe('useDraftWebSocket — BFCache restoration recovery (LS-6792)', () => {
+  function dispatchPageLifecycleEvent(
+    type: 'pagehide' | 'pageshow',
+    persisted: boolean,
+  ) {
+    const event = new Event(type);
+    Object.defineProperty(event, 'persisted', { value: persisted });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+  }
+
+  /** Flushes the backoff waits between retry attempts. */
+  async function flushBackoff() {
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('disconnects the socket on pagehide when persisted is true', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    dispatchPageLifecycleEvent('pagehide', true);
+
+    expect(mockInstance.disconnect).toHaveBeenCalled();
+  });
+
+  it('does not touch the socket on pagehide when persisted is false', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    dispatchPageLifecycleEvent('pagehide', false);
+
+    expect(mockInstance.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('forces close + reopen on pageshow when persisted is true, even if the cached socket looks open', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    // Simulate a stale-but-"connected" socket surviving the freeze, then
+    // being restored from the BFCache.
+    act(() => mockInstance._emit('connected'));
+    mockInstance.connect.mockClear();
+    mockInstance.disconnect.mockClear();
+
+    dispatchPageLifecycleEvent('pageshow', true);
+
+    expect(mockInstance.disconnect).toHaveBeenCalled();
+    expect(mockInstance.connect).toHaveBeenCalled();
+  });
+
+  it('does not touch the socket on pageshow when persisted is false (ordinary navigation)', () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    dispatchPageLifecycleEvent('pageshow', false);
+
+    expect(mockInstance.disconnect).not.toHaveBeenCalled();
+    expect(mockInstance.connect).not.toHaveBeenCalled();
+  });
+
+  it('a BFCache restore drives the existing reconnect-refetch recovery once the fresh handshake completes', async () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => mockInstance._emit('connected'));
+
+    dispatchPageLifecycleEvent('pageshow', true);
+    // The client itself emits `disconnected` -> `connected` once the forced
+    // close + reopen completes — mirroring what WebSocketClient does in
+    // response to disconnect()/connect().
+    act(() => mockInstance._emit('disconnected'));
+    act(() => mockInstance._emit('connected'));
+    await flushBackoff();
+
+    expect(params.refetchAvailablePlayers).toHaveBeenCalledTimes(1);
+    expect(params.refetchDraft).toHaveBeenCalled();
+    expect(params.refetchCurrentPick).toHaveBeenCalled();
+  });
+
+  it('removes the pagehide/pageshow listeners on unmount', () => {
+    const params = makeDefaultParams();
+    const { unmount } = renderHook(() => useDraftWebSocket(params));
+
+    unmount();
+    mockInstance.disconnect.mockClear();
+    mockInstance.connect.mockClear();
+
+    dispatchPageLifecycleEvent('pageshow', true);
+    dispatchPageLifecycleEvent('pagehide', true);
+
+    expect(mockInstance.disconnect).not.toHaveBeenCalled();
+    expect(mockInstance.connect).not.toHaveBeenCalled();
+  });
+});
