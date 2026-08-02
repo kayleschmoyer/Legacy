@@ -462,7 +462,9 @@ describe('useDraftWebSocket — reconnect refetch recovery (LS-8506)', () => {
    * If a WS reconnect lands during the 300ms pick-notification debounce
    * window, the debounce timer must be cancelled — otherwise it fires its own
    * refetches on top of the reconnect-recovery refetches, doubling network
-   * traffic on every reconnect (LDB-031).
+   * traffic on every reconnect (LDB-031). Reconnect recovery itself still
+   * refetches the queue (LS-6787), so the debounce cancellation should
+   * collapse what would otherwise be two calls down to one, not zero.
    */
   it('cancels the pending pick-notification debounce when a reconnect lands mid-window', async () => {
     const params = makeDefaultParams();
@@ -491,11 +493,13 @@ describe('useDraftWebSocket — reconnect refetch recovery (LS-8506)', () => {
 
     await flushBackoff();
 
-    // refetchQueue is only ever called from the debounce path — it must stay
-    // uncalled once the reconnect cancels that timer.
-    expect(params.refetchQueue).not.toHaveBeenCalled();
-    // refetchCurrentPick is called from both paths; only the reconnect
-    // recovery call should have gone through.
+    // refetchQueue is called from both the debounce path and reconnect
+    // recovery (LS-6787) — the debounce timer being cancelled must not
+    // suppress the reconnect-recovery call, and the two paths must not
+    // double up into two calls.
+    expect(params.refetchQueue).toHaveBeenCalledTimes(1);
+    // refetchCurrentPick is likewise called from both paths; only the
+    // reconnect recovery call should have gone through.
     expect(params.refetchCurrentPick).toHaveBeenCalledTimes(1);
   });
 });
