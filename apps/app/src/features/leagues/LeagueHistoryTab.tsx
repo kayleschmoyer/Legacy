@@ -53,8 +53,8 @@ export function LeagueHistoryTab({
 
   const defaultSeasonLeagueId = useMemo(() => {
     const frozen = seasons.find((s) => s.frozenAt !== null);
-    return frozen?.leagueId ?? seasons[0]?.leagueId ?? leagueId;
-  }, [seasons, leagueId]);
+    return frozen?.leagueId ?? null;
+  }, [seasons]);
 
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
   const viewingLeagueId = selectedLeagueId ?? defaultSeasonLeagueId;
@@ -64,12 +64,18 @@ export function LeagueHistoryTab({
     [seasons, viewingLeagueId],
   );
 
+  const isFrozenSeasonSelected = !!selectedSeason?.frozenAt;
+  const hasAnyFrozenSeason = useMemo(
+    () => seasons.some((s) => s.frozenAt !== null),
+    [seasons],
+  );
+
   const {
     data: standingsData,
     loading: standingsLoading,
     error: standingsError,
   } = useGetLeagueStandingsQuery({
-    variables: { leagueId: viewingLeagueId },
+    variables: { leagueId: viewingLeagueId ?? 0 },
     skip: !viewingLeagueId,
     errorPolicy: 'all',
   });
@@ -157,8 +163,10 @@ export function LeagueHistoryTab({
                 {historyLoading
                   ? 'Loading…'
                   : selectedSeason
-                    ? `Season ${selectedSeason.seasonNumber ?? '—'}${selectedSeason.frozenAt ? ` · Completed ${formatDate(selectedSeason.frozenAt)}` : ' · Current'}`
-                    : 'Past seasons + standings'}
+                    ? `Season ${selectedSeason.seasonNumber ?? '—'}${selectedSeason.frozenAt ? ` · Final Standings · Completed ${formatDate(selectedSeason.frozenAt)}` : ' · Current'}`
+                    : hasAnyFrozenSeason
+                      ? 'Select a season'
+                      : 'No completed seasons yet'}
               </Text>
             </YStack>
           </XStack>
@@ -214,6 +222,19 @@ export function LeagueHistoryTab({
                 History will be available after season renewal.
               </Text>
             </Card>
+          ) : !isFrozenSeasonSelected ? (
+            <Card padding="$4" bordered>
+              <Text fontWeight="600" marginBottom="$1">
+                {hasAnyFrozenSeason
+                  ? 'Season in progress'
+                  : 'First season in progress'}
+              </Text>
+              <Text fontSize="$2" color="$gray10">
+                {hasAnyFrozenSeason
+                  ? 'Final standings will appear once this season is complete.'
+                  : 'History will be available after season renewal.'}
+              </Text>
+            </Card>
           ) : standingsLoading && standings.length === 0 ? (
             <YStack alignItems="center" padding="$4">
               <Spinner />
@@ -235,6 +256,9 @@ export function LeagueHistoryTab({
             </Card>
           ) : (
             <YStack gap="$2">
+              <Text fontSize="$3" fontWeight="700" color="$gray11">
+                Final Standings
+              </Text>
               {standings.map((t, i) => {
                 const rank = i + 1;
                 const winPct = t.winPercentage ?? 0;

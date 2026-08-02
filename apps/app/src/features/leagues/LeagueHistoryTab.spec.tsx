@@ -229,15 +229,19 @@ describe('LeagueHistoryTab', () => {
       expect(screen.getByText('First season in progress')).toBeTruthy();
     });
 
-    it('shows standings for a single current (unfrozen) season', () => {
+    it('does not render a standings table for a single current (unfrozen) season', () => {
       setupMocks({
         history: { data: { getLeagueHistory: [SEASON_2] } },
         standings: { data: { getLeagueStandings: STANDINGS } },
         records: { data: { getAllTimeRecords: [] } },
       });
       render(<LeagueHistoryTab leagueId={20} />);
-      expect(screen.queryByText('First season in progress')).toBeNull();
-      expect(screen.getByText('Team Alpha')).toBeTruthy();
+      expect(screen.getByText('First season in progress')).toBeTruthy();
+      expect(
+        screen.getByText('History will be available after season renewal.'),
+      ).toBeTruthy();
+      expect(screen.queryByText('Team Alpha')).toBeNull();
+      expect(screen.queryByText('Final Standings')).toBeNull();
     });
   });
 
@@ -368,6 +372,23 @@ describe('LeagueHistoryTab', () => {
   });
 
   describe('season picker interaction', () => {
+    it('defaults to the most recent frozen season and labels its standings as final', () => {
+      setupMocks({
+        history: { data: { getLeagueHistory: [SEASON_1, SEASON_2] } },
+        standings: { data: { getLeagueStandings: STANDINGS } },
+        records: { data: { getAllTimeRecords: [] } },
+      });
+      render(<LeagueHistoryTab leagueId={10} />);
+
+      expect(
+        screen.getByText(/^Season 1 · Final Standings · Completed /),
+      ).toBeTruthy();
+      expect(screen.getByText('Final Standings')).toBeTruthy();
+      expect(screen.getAllByText('Team Alpha').length).toBeGreaterThanOrEqual(
+        1,
+      );
+    });
+
     it('switches to the selected season when a chip is pressed', () => {
       setupMocks({
         history: { data: { getLeagueHistory: [SEASON_1, SEASON_2] } },
@@ -381,6 +402,25 @@ describe('LeagueHistoryTab', () => {
 
       // Subtitle should reflect Season 2 (no frozenAt → "Current")
       expect(screen.getByText('Season 2 · Current')).toBeTruthy();
+    });
+
+    it('does not render standings when the selected season is not frozen', () => {
+      setupMocks({
+        history: { data: { getLeagueHistory: [SEASON_1, SEASON_2] } },
+        standings: { data: { getLeagueStandings: STANDINGS } },
+        records: { data: { getAllTimeRecords: [] } },
+      });
+      render(<LeagueHistoryTab leagueId={10} />);
+
+      fireEvent.press(screen.getByText('Season 2 (current)'));
+
+      expect(screen.getByText('Season in progress')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Final standings will appear once this season is complete.',
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText('Final Standings')).toBeNull();
     });
   });
 
