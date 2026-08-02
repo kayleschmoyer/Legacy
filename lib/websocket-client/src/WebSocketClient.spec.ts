@@ -561,6 +561,74 @@ describe('WebSocketClient', () => {
       client.dispose();
     });
 
+    it('emits a user-visible error once the reconnect attempt budget is exhausted (LS-8881)', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        reconnect: true,
+        reconnectDelay: 100,
+        maxReconnectAttempts: 2,
+        autoConnect: false,
+      });
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      // Don't create server, so every connection attempt fails before ever
+      // opening — the shape of a permanently-rejected connection (bad
+      // origin, revoked user, malformed token) that the client can't
+      // distinguish from a transient drop, but must still stop retrying for.
+      client.connect();
+      jest.advanceTimersByTime(100); // initial attempt fails
+      jest.advanceTimersByTime(100); // reconnect attempt 1 fails
+      jest.advanceTimersByTime(200); // reconnect attempt 2 fails — budget spent
+
+      expect(errorHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Max reconnection attempts reached',
+        }),
+      );
+
+      // No further reconnect is scheduled — advance well past another cycle
+      // and confirm the error was only emitted once.
+      jest.advanceTimersByTime(10_000);
+      expect(errorHandler).toHaveBeenCalledTimes(1);
+
+      client.dispose();
+    });
+
+    it('defaults maxReconnectAttempts to a finite value instead of Infinity (LS-8881)', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        reconnect: true,
+        reconnectDelay: 100,
+        maxReconnectDelay: 100,
+        autoConnect: false,
+      });
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      // Never create a server — every attempt fails before opening, exactly
+      // like a permanently-403'd origin. With the old `Infinity` default
+      // this would retry forever; it must now give up and surface an error.
+      client.connect();
+      // Initial attempt + up to 10 reconnect attempts at a 100ms fixed delay
+      // (maxReconnectDelay caps backoff at 100ms) comfortably fits in 2s.
+      jest.advanceTimersByTime(2_000);
+
+      expect(errorHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Max reconnection attempts reached',
+        }),
+      );
+
+      client.dispose();
+    });
+
     it('should not reconnect when reconnect option is false', () => {
       mockServer = new Server(mockUrl);
 

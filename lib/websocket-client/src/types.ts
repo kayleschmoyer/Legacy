@@ -315,7 +315,7 @@ export interface WebSocketClientOptions {
   autoConnect?: boolean;
   /** Enable auto-reconnect on disconnect */
   reconnect?: boolean;
-  /** Maximum reconnection attempts (default: Infinity) */
+  /** Maximum reconnection attempts (default: 10 — see LS-8881) */
   maxReconnectAttempts?: number;
   /** Initial reconnection delay in ms (default: 1000) */
   reconnectDelay?: number;

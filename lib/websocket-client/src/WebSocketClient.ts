@@ -13,6 +13,15 @@ import type {
 // Constants
 const DEFAULT_HEARTBEAT_MS = 8 * 60 * 1000; // 8 minutes
 const MAX_CONSECUTIVE_PINGS = 3;
+// A permanently-rejected connection (bad origin, revoked user, expired/
+// malformed token) must not retry forever — see LS-8881. Neither browsers
+// nor Node's native WebSocket expose the handshake's HTTP status to JS (both
+// report a generic failure), so a 401/403 is indistinguishable client-side
+// from a transient drop that happens to fail on every attempt. Bounding
+// attempts — and surfacing a user-visible error once the budget is spent —
+// is what actually stops the infinite loop. Finite by default; callers that
+// genuinely want unbounded retries can still pass Infinity explicitly.
+const DEFAULT_MAX_RECONNECT_ATTEMPTS = 10;
 
 /**
  * Framework-agnostic WebSocket Client
@@ -73,7 +82,8 @@ export class WebSocketClient {
       viewContext: options.viewContext || 'general',
       autoConnect: options.autoConnect ?? true,
       reconnect: options.reconnect ?? true,
-      maxReconnectAttempts: options.maxReconnectAttempts ?? Infinity,
+      maxReconnectAttempts:
+        options.maxReconnectAttempts ?? DEFAULT_MAX_RECONNECT_ATTEMPTS,
       reconnectDelay: options.reconnectDelay ?? 1000,
       maxReconnectDelay: options.maxReconnectDelay ?? 30000,
     };
@@ -564,7 +574,19 @@ export class WebSocketClient {
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
-      LOGGER.error('Max reconnection attempts reached');
+      // A connection that keeps failing after the full attempt budget is
+      // most likely a permanent rejection (bad origin, revoked user,
+      // expired/malformed token) rather than a transient drop — the client
+      // can't tell the two apart (see the constant comment above), but it
+      // must stop burning battery/network and server-side connect+DB-auth
+      // load either way (LS-8881). Surface it so subscribers (e.g. the
+      // `useWebSocket` hook) can show a real error instead of silently
+      // staying disconnected forever.
+      LOGGER.error('Max reconnection attempts reached — giving up', {
+        attempts: this.reconnectAttempts,
+      });
+      this.emitConnectionState('error');
+      this.emitError(new Error('Max reconnection attempts reached'));
       return;
     }
 

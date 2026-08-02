@@ -349,6 +349,9 @@ interface TestClientOptions {
   token?: string;
   leagueId?: number;
   reconnect?: boolean;
+  reconnectDelay?: number;
+  maxReconnectDelay?: number;
+  maxReconnectAttempts?: number;
 }
 
 function makeClient(
@@ -362,6 +365,9 @@ function makeClient(
     viewContext: opts.leagueId ? 'league' : 'general',
     autoConnect: true,
     reconnect: opts.reconnect ?? false,
+    reconnectDelay: opts.reconnectDelay,
+    maxReconnectDelay: opts.maxReconnectDelay,
+    maxReconnectAttempts: opts.maxReconnectAttempts,
   });
 }
 
@@ -499,6 +505,30 @@ describe('WebSocket fan-out (LS-8856)', () => {
     const user = registerUser('carol');
     const accepted = client({ token: user.token });
     await expect(waitForEvent(accepted, 'connected')).resolves.toBeUndefined();
+  });
+
+  // ── LS-8881: a permanent rejection (invalid token, mirrors 401/403-style
+  // auth failures — see the real `$connect` handler above) must not reconnect
+  // forever. Run against the REAL handler + REAL client over a real loopback
+  // socket, per ADR-0019 — a mock-socket-only test can't prove the real
+  // `$connect` auth-rejection path actually stops the real client's retry
+  // loop. ──
+
+  it('stops retrying and surfaces an error after repeated auth rejection, instead of reconnecting forever (LS-8881)', async () => {
+    const rejected = client({
+      token: 'not-a-real-token',
+      reconnect: true,
+      reconnectDelay: 10,
+      maxReconnectDelay: 10,
+      maxReconnectAttempts: 3,
+    });
+
+    const error = await waitForEvent<Error>(rejected, 'error', 3000);
+    expect(error.message).toBe('Max reconnection attempts reached');
+
+    // No further reconnect fires after the budget is spent — 'connected'
+    // never arrives.
+    await expect(waitForEvent(rejected, 'connected', 200)).rejects.toThrow();
   });
 
   // ── AC2: subscribe / unsubscribe / no-delivery-after-unsubscribe ──
