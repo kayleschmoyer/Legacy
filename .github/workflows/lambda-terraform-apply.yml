@@ -219,6 +219,12 @@ jobs:
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
+          # Optional (defaults to "" in secrets.tf) — deliver.ts treats missing keys
+          # as "web push disabled" (non-fatal). LS-6838.
+          TF_VAR_vapid_public_key: ${{ secrets.VAPID_PUBLIC_KEY }}
+          TF_VAR_vapid_private_key: ${{ secrets.VAPID_PRIVATE_KEY }}
+          TF_VAR_vapid_subject: ${{ secrets.VAPID_SUBJECT }}
         run: |
           echo "🔒 Bootstrapping IAM policy changes (refresh=false targeted pass)..."
           terraform apply \
@@ -264,6 +270,12 @@ jobs:
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
+          # Optional (defaults to "" in secrets.tf) — deliver.ts treats missing keys
+          # as "web push disabled" (non-fatal). LS-6838.
+          TF_VAR_vapid_public_key: ${{ secrets.VAPID_PUBLIC_KEY }}
+          TF_VAR_vapid_private_key: ${{ secrets.VAPID_PRIVATE_KEY }}
+          TF_VAR_vapid_subject: ${{ secrets.VAPID_SUBJECT }}
           # Note: TF_VAR_github_app_* removed in LS-2425 — those variables now
           # live in terraform/runners/ and are passed by runner-terraform-apply.yml.
         run: |
@@ -356,6 +368,12 @@ jobs:
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
+          # Optional (defaults to "" in secrets.tf) — deliver.ts treats missing keys
+          # as "web push disabled" (non-fatal). LS-6838.
+          TF_VAR_vapid_public_key: ${{ secrets.VAPID_PUBLIC_KEY }}
+          TF_VAR_vapid_private_key: ${{ secrets.VAPID_PRIVATE_KEY }}
+          TF_VAR_vapid_subject: ${{ secrets.VAPID_SUBJECT }}
           # Note: TF_VAR_github_app_* removed in LS-2425 — those variables now
           # live in terraform/runners/ and are passed by runner-terraform-apply.yml.
         run: |
@@ -413,6 +431,12 @@ jobs:
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          # VAPID keypair for Web Push (browser) notifications (lambdas/notifications).
+          # Optional (defaults to "" in secrets.tf) — deliver.ts treats missing keys
+          # as "web push disabled" (non-fatal). LS-6838.
+          TF_VAR_vapid_public_key: ${{ secrets.VAPID_PUBLIC_KEY }}
+          TF_VAR_vapid_private_key: ${{ secrets.VAPID_PRIVATE_KEY }}
+          TF_VAR_vapid_subject: ${{ secrets.VAPID_SUBJECT }}
           # Note: TF_VAR_github_app_* removed in LS-2425 — those variables now
           # live in terraform/runners/ and are passed by runner-terraform-apply.yml.
         run: |
@@ -698,7 +722,10 @@ jobs:
           status: failure
           title: "Apply Lambda Infrastructure — REPEATED FAILURE (${{ steps.count-failures.outputs.consecutive_failures }}x in a row)"
           environment: ${{ env.AWS_STAGE }}
-          content: "@here Apply Lambda Infrastructure has now failed ${{ steps.count-failures.outputs.consecutive_failures }} consecutive times on main (escalation threshold: ${{ steps.count-failures.outputs.threshold }})."
+          content: >-
+            @here Apply Lambda Infrastructure has now failed
+            ${{ steps.count-failures.outputs.consecutive_failures }} consecutive times on main
+            (escalation threshold: ${{ steps.count-failures.outputs.threshold }}).
           description: |
             This is a distinct escalation from the routine failure post above — uploaded Lambda artifacts may be stuck pending apply for an extended period. Investigate immediately.
 

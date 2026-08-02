@@ -47,6 +47,7 @@ on:
           - stripe-webhook
           - websocket
           - github-webhook
+          - notifications
           - mcp-jira-server
           - mcp-github-server
           - mcp-ci-server
@@ -357,6 +358,12 @@ jobs:
               "s3Prefix":"github-webhook", "ssmName":"github-webhook",
               "badgeName":"Upload GitHub Webhook Lambda",
               "distPath":"lambdas/github-webhook/dist", "rollbar":false
+            },
+            {
+              "project":"notifications", "dir":"notifications",
+              "s3Prefix":"notifications", "ssmName":"notifications",
+              "badgeName":"Upload Notifications Lambda",
+              "distPath":"lambdas/notifications/dist", "rollbar":true
             },
             {
               "project":"mcp-jira-server", "dir":"tools/mcp/jira-server",

@@ -66,8 +66,13 @@ switch ($FunctionName) {
         $ProjectName = 'github-webhook'
         $SsmParam = "/legacy-sports/${Environment}/lambda/github-webhook/version"
     }
+    'notifications' {
+        $LambdaDir = 'lambdas/notifications'
+        $ProjectName = 'notifications'
+        $SsmParam = "/legacy-sports/${Environment}/lambda/notifications/version"
+    }
     default {
-        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor, websocket, stripe-webhook, rollbar-discord, github-webhook"
+        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor, websocket, stripe-webhook, rollbar-discord, github-webhook, notifications"
     }
 }
 

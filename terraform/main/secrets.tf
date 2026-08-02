@@ -57,6 +57,26 @@ variable "rollbar_client_access_token" {
   default     = ""
 }
 
+variable "vapid_public_key" {
+  description = "VAPID public key for Web Push browser notifications (lambdas/notifications). Generate with `npx web-push generate-vapid-keys`. Also mirrored to the web client as VITE_VAPID_PUBLIC_KEY (deploy-web.yml)."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "vapid_private_key" {
+  description = "VAPID private key for Web Push browser notifications (lambdas/notifications). Generate with `npx web-push generate-vapid-keys`. Never exposed to clients."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "vapid_subject" {
+  description = "Contact URI (mailto: or https:) reported to push services in the VAPID JWT. lambdas/notifications/src/deliver.ts defaults to mailto:push@legacysports.app when unset."
+  type        = string
+  default     = ""
+}
+
 variable "giphy_api_key" {
   description = "Giphy API key for GIF search. Used as VITE_GIPHY_API_KEY in web builds."
   type        = string
@@ -245,6 +265,40 @@ resource "aws_secretsmanager_secret_version" "database_credentials" {
     username = var.database_username
     password = random_password.database_password.result
   })
+}
+
+# VAPID keypair for Web Push (browser) notifications. lambdas/notifications/src/deliver.ts
+# reads VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY as literal env var values (not a
+# runtime Secrets Manager fetch), so these secrets exist as the durable at-rest
+# store for the keypair while the Lambda's environment block (lambda-notifications.tf)
+# sources the live values directly from the same variables. count-guarded so
+# plan doesn't fail before a keypair has been generated. LS-6838.
+resource "aws_secretsmanager_secret" "vapid_public_key" {
+  count       = var.vapid_public_key != "" ? 1 : 0
+  name        = "${var.environment}/vapid-public-key"
+  description = "VAPID public key for Web Push browser notifications"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "vapid_public_key" {
+  count         = var.vapid_public_key != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.vapid_public_key[0].id
+  secret_string = var.vapid_public_key
+}
+
+resource "aws_secretsmanager_secret" "vapid_private_key" {
+  count       = var.vapid_private_key != "" ? 1 : 0
+  name        = "${var.environment}/vapid-private-key"
+  description = "VAPID private key for Web Push browser notifications"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "vapid_private_key" {
+  count         = var.vapid_private_key != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.vapid_private_key[0].id
+  secret_string = var.vapid_private_key
 }
 
 # =============================================================================

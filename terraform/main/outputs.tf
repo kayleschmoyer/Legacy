@@ -191,6 +191,7 @@ output "environment_variables_summary" {
     sqs_automatic_drafts_url          = aws_sqs_queue.automatic_drafts.url
     sqs_select_game_url               = aws_sqs_queue.select_game.url
     sqs_load_game_stats_url           = aws_sqs_queue.load_game_stats.url
+    sqs_notifications_url             = aws_sqs_queue.notifications_queue.url
     google_oauth_client_id            = var.google_oauth_client_id
     jira_proxy_url                    = "${local.api_base_url}/jira"
     ci_readonly_db_creds_secret_name  = aws_secretsmanager_secret.ci_readonly_db_credentials.name

@@ -132,6 +132,11 @@ jobs:
           # this was previously unwired, making the no-redeploy launch lever inert.)
           VITE_GROWTHBOOK_CLIENT_KEY: ${{ secrets.GROWTHBOOK_CLIENT_KEY }}
           VITE_ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
+          # Web Push (VAPID) public key — apps/web/src/hooks/useWebPushRegistration.ts
+          # short-circuits (never registers the service worker) when this resolves to
+          # '' (apps/web/src/config/environment.ts:128). See lambdas/notifications
+          # for the server-side Lambda that consumes the matching private key. LS-6838.
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           # Stripe subscription price IDs — the same neutral secrets the Android
           # build prefixes as EXPO_PUBLIC_STRIPE_* (account-global price IDs, one
           # value per platform, no drift). Unset → the web subscription screen

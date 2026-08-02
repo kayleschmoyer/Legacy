@@ -133,6 +133,11 @@ jobs:
         # cannot apply anything.
         env:
           TF_VAR_rollbar_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          # Read-scope Rollbar token consumed by the hosted mcp-rollbar Lambda
+          # (LS-8142). Reuses the same secret as the apply workflow (LS-6838
+          # fix — this was missing here, showing rollbar_read_access_token's
+          # secret version as a spurious destroy candidate).
+          TF_VAR_rollbar_read_access_token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
           # Keep in lockstep with the apply workflow so the optional client-token
           # SSM param does not show as spurious drift here (LS-7957).
           TF_VAR_rollbar_client_access_token: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
@@ -142,6 +147,11 @@ jobs:
           TF_VAR_ga_measurement_id: ${{ secrets.GA_MEASUREMENT_ID }}
           TF_VAR_ga_api_secret: ${{ secrets.GA_API_SECRET }}
           TF_VAR_mlb_data_api_key: ${{ secrets.MLB_DATA_API_KEY }}
+          # Keep in lockstep with the apply workflow (LS-6838) so the VAPID
+          # secrets don't show as spurious destroy candidates here.
+          TF_VAR_vapid_public_key: ${{ secrets.VAPID_PUBLIC_KEY }}
+          TF_VAR_vapid_private_key: ${{ secrets.VAPID_PRIVATE_KEY }}
+          TF_VAR_vapid_subject: ${{ secrets.VAPID_SUBJECT }}
         run: |
           # Disable errexit so a failing plan does NOT abort the step before we
           # record its exit code — the GitHub Actions default shell runs with
@@ -219,7 +229,8 @@ jobs:
               '',
               ok
                 ? ''
-                : 'If this is a missing IAM permission, see `.agents/skills/terraform/references/permission-planning.md` (mirror new `Get*`/`List*`/`Describe*` actions into `github_actions_plan_policy`).',
+                : 'If this is a missing IAM permission, see `.agents/skills/terraform/references/permission-planning.md` ' +
+                  '(mirror new `Get*`/`List*`/`Describe*` actions into `github_actions_plan_policy`).',
             ].join('\n');
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;

@@ -174,6 +174,31 @@ resource "aws_iam_role_policy_attachment" "draft_processor_lambda_websocket" {
   role       = aws_iam_role.draft_processor_lambda.name
 }
 
+# Permission to publish draft_completed push notification events onto the
+# notifications queue (lib/aws-utils NotificationPublisher). LS-6838.
+resource "aws_iam_policy" "draft_processor_lambda_notifications_sqs" {
+  name        = "${local.name_prefix}-draft-processor-lambda-notifications-sqs"
+  description = "Allow draft processor lambda to publish to the notifications queue"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage"]
+        Resource = aws_sqs_queue.notifications_queue.arn
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "draft_processor_lambda_notifications_sqs" {
+  policy_arn = aws_iam_policy.draft_processor_lambda_notifications_sqs.arn
+  role       = aws_iam_role.draft_processor_lambda.name
+}
+
 # Draft processor Lambda function
 resource "aws_lambda_function" "draft_processor" {
   function_name = "${local.name_prefix}-draft-processor"
@@ -220,6 +245,10 @@ resource "aws_lambda_function" "draft_processor" {
 
       # Rollbar error tracking (token fetched from Secrets Manager at cold-start)
       ROLLBAR_ACCESS_TOKEN_SECRET_NAME = aws_secretsmanager_secret.rollbar_access_token.name
+
+      # Notifications queue — publishes draft_completed push notification events
+      # (lib/aws-utils NotificationPublisher). LS-6838.
+      NOTIFICATION_QUEUE_URL = aws_sqs_queue.notifications_queue.url
     }
   }
 
@@ -229,6 +258,7 @@ resource "aws_lambda_function" "draft_processor" {
     aws_iam_role_policy_attachment.draft_processor_lambda_secrets,
     aws_iam_role_policy_attachment.draft_processor_lambda_rds,
     aws_iam_role_policy_attachment.draft_processor_lambda_sqs,
+    aws_iam_role_policy_attachment.draft_processor_lambda_notifications_sqs,
   ]
 
   tags = local.common_tags

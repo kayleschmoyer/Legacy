@@ -131,6 +131,31 @@ resource "aws_iam_role_policy_attachment" "stripe_webhook_lambda_websocket" {
   role       = aws_iam_role.stripe_webhook_lambda.name
 }
 
+# Permission to publish trial_will_end / subscription_updated push notification
+# events onto the notifications queue (lib/aws-utils NotificationPublisher). LS-6838.
+resource "aws_iam_policy" "stripe_webhook_lambda_notifications_sqs" {
+  name        = "${local.name_prefix}-stripe-webhook-lambda-notifications-sqs"
+  description = "Allow Stripe Webhook Lambda to publish to the notifications queue"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage"]
+        Resource = aws_sqs_queue.notifications_queue.arn
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "stripe_webhook_lambda_notifications_sqs" {
+  policy_arn = aws_iam_policy.stripe_webhook_lambda_notifications_sqs.arn
+  role       = aws_iam_role.stripe_webhook_lambda.name
+}
+
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "stripe_webhook_lambda" {
   name              = "/aws/lambda/${local.name_prefix}-stripe-webhook"
@@ -183,6 +208,10 @@ resource "aws_lambda_function" "stripe_webhook" {
       # GA_MEASUREMENT_ID is not sensitive; the API secret is fetched from Secrets Manager.
       GA_MEASUREMENT_ID         = var.ga_measurement_id
       GA_API_SECRET_SECRET_NAME = aws_secretsmanager_secret.ga_api_secret.name
+
+      # Notifications queue — publishes trial_will_end / subscription_updated
+      # push notification events (lib/aws-utils NotificationPublisher). LS-6838.
+      NOTIFICATION_QUEUE_URL = aws_sqs_queue.notifications_queue.url
     }
   }
 
@@ -192,6 +221,7 @@ resource "aws_lambda_function" "stripe_webhook" {
     aws_iam_role_policy_attachment.stripe_webhook_lambda_secrets,
     aws_iam_role_policy_attachment.stripe_webhook_lambda_rds,
     aws_iam_role_policy_attachment.stripe_webhook_lambda_websocket,
+    aws_iam_role_policy_attachment.stripe_webhook_lambda_notifications_sqs,
     aws_cloudwatch_log_group.stripe_webhook_lambda
   ]
 

@@ -379,3 +379,69 @@ resource "aws_sqs_queue_policy" "automatic_drafts" {
     ]
   })
 }
+
+# ─── Notifications queue ────────────────────────────────────────────────────
+# Push notification events (Expo + Web Push/VAPID). Producers: draft-processor
+# (draft_completed) and stripe-webhook (trial_will_end, subscription_updated)
+# via lib/aws-utils's NotificationPublisher, which reads NOTIFICATION_QUEUE_URL.
+# Consumer: the notifications Lambda (lambdas/notifications/src/deliver.ts).
+# Standard (non-FIFO) queue — delivery order across notification types doesn't
+# matter, and standard queues give higher throughput than FIFO. LS-6838.
+
+resource "aws_sqs_queue" "notifications_dlq" {
+  name = "${local.name_prefix}-notifications-dlq"
+
+  tags = local.common_tags
+}
+
+resource "aws_sqs_queue" "notifications_queue" {
+  name = "${local.name_prefix}-notifications"
+
+  # Message settings
+  visibility_timeout_seconds = 120     # 2 minutes (longer than lambda timeout)
+  message_retention_seconds  = 1209600 # 14 days
+  receive_wait_time_seconds  = 10      # Long polling
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.notifications_dlq.arn
+    maxReceiveCount     = 3
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_sqs_queue_policy" "notifications_queue" {
+  queue_url = aws_sqs_queue.notifications_queue.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Id      = "${local.name_prefix}-notifications-policy"
+    Statement = [
+      {
+        Sid    = "AllowLambdaServiceAccess"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.notifications_queue.arn
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = aws_lambda_function.notifications.arn
+          }
+        }
+      }
+      # No AllowApplicationSendMessages/root statement here — unlike the other
+      # queues in this file, draft-processor and stripe-webhook (the only two
+      # producers) already have explicit least-privilege sqs:SendMessage IAM
+      # role policies (draft_processor_lambda_notifications_sqs /
+      # stripe_webhook_lambda_notifications_sqs below and in
+      # lambda-stripe-webhook.tf), so a broad account-root grant here would be
+      # redundant and violate least privilege.
+    ]
+  })
+}
